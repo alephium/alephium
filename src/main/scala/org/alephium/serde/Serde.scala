@@ -59,15 +59,15 @@ object Serde {
     }
   }
 
-  def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Array[T]] =
-    new Serde[Array[T]] {
+  def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =
+    new Serde[Seq[T]] {
       override val serdeSize: Int = size * serde.serdeSize
 
-      override def serialize(input: Array[T]): ByteString = {
+      override def serialize(input: Seq[T]): ByteString = {
         input.map(serde.serialize).foldLeft(ByteString.empty)(_ ++ _)
       }
 
-      override def deserialize(input: ByteString): Try[Array[T]] = Try {
+      override def deserialize(input: ByteString): Try[Seq[T]] = Try {
         if (input.size == size) {
           input
             .sliding(serde.serdeSize, serde.serdeSize)
@@ -77,7 +77,7 @@ object Serde {
                 case Failure(exception) => throw exception
               }
             }
-            .toArray
+            .toSeq
         } else throw InvalidNumberOfBytesException(serdeSize, input.size)
       }
     }

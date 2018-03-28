@@ -39,8 +39,8 @@ class SerdeSpec extends AlephiumSuite {
     }
   }
 
-  "Serde for fixed size array" should "serde correctly" in {
-    forAll { (input: Array[Byte]) =>
+  "Serde for fixed size sequence" should "serde correctly" in {
+    forAll { (input: Seq[Byte]) =>
       val serde  = Serde.fixedSizeBytesSerde(input.length, implicitly[Serde[Byte]])
       val output = serde.deserialize(serde.serialize(input)).success.value
       output shouldBe input
