@@ -27,7 +27,7 @@ trait Hash[T <: HashOutput] {
 
   def unsafeFrom(hash: Array[Byte]): T
 
-  // Scala sucks here: replacing lazy val with value could not work
+  // Scala sucks here: replacing lazy val with val could not work
   implicit lazy val serde: Serde[T] = {
     Serde.fixedSizeBytesSerde(hashSize, implicitly[Serde[Byte]]).xmap(unsafeFrom, _.digest)
   }
