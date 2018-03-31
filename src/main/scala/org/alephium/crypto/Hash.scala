@@ -13,6 +13,8 @@ trait HashOutput {
 }
 
 trait Hash[T <: HashOutput] {
+  def unsafeFrom(hash: Seq[Byte]): T
+
   def hashSize: Int
 
   def hash(input: Seq[Byte]): T
@@ -25,8 +27,6 @@ trait Hash[T <: HashOutput] {
     hash(input.getBytes(charset))
   }
 
-  def unsafeFrom(hash: Seq[Byte]): T
-
   // Scala sucks here: replacing lazy val with val could not work
   implicit lazy val serde: Serde[T] = {
     Serde.fixedSizeBytesSerde(hashSize, implicitly[Serde[Byte]]).xmap(unsafeFrom, _.digest)
@@ -36,11 +36,6 @@ trait Hash[T <: HashOutput] {
 final case class Sha256(digest: Seq[Byte]) extends HashOutput
 
 object Sha256 extends Hash[Sha256] {
-  override def hash(input: Seq[Byte]): Sha256 = {
-    val digest = _Sha256.hash(input.toArray)
-    new Sha256(digest)
-  }
-
   override val hashSize: Int = 32
 
   private def apply(digest: Seq[Byte]): Sha256 = {
@@ -51,5 +46,10 @@ object Sha256 extends Hash[Sha256] {
   override def unsafeFrom(hash: Seq[Byte]): Sha256 = {
     require(hash.length == hashSize)
     new Sha256(hash)
+  }
+
+  override def hash(input: Seq[Byte]): Sha256 = {
+    val digest = _Sha256.hash(input.toArray)
+    apply(digest)
   }
 }

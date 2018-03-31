@@ -6,11 +6,13 @@ import org.alephium.serde._
 case class NetworkMessage(header: NetworkHeader, payload: NetworkPayload)
 
 object NetworkMessage {
+  private def apply(header: NetworkHeader, payload: NetworkPayload): NetworkMessage =
+    new NetworkMessage(header, payload)
 
   def apply[T <: NetworkPayload](version: Int, payload: T)(
       implicit withCmdCode: NetworkPayloadCompanion[T]): NetworkMessage = {
     val header = NetworkHeader(version, withCmdCode.cmdCode)
-    NetworkMessage(header, payload)
+    apply(header, payload)
   }
 
   implicit val serializer: Serializer[NetworkMessage] = {
@@ -23,6 +25,6 @@ object NetworkMessage {
     for {
       (header, hRest)  <- implicitly[Serde[NetworkHeader]]._deserialize(input)
       (payload, pRest) <- NetworkPayload.deserializer(header.cmdCode)._deserialize(hRest)
-    } yield (NetworkMessage(header, payload), pRest)
+    } yield (apply(header, payload), pRest)
   }
 }
