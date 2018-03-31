@@ -5,9 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.network.message.NetworkMessage
-import org.alephium.util.BaseActor
 
-trait TcpHandler extends BaseActor {
+trait TcpHandler extends MessageHandler {
 
   def remote: InetSocketAddress
 
@@ -18,6 +17,7 @@ trait TcpHandler extends BaseActor {
     case Tcp.Received(data) =>
       val message = NetworkMessage.deserializer.deserialize(data).get
       logger.debug(s"Received $message from $remote")
+      handleMessage(message)
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
       logger.debug(s"Connection closed: $closeEvent")
       context stop self
