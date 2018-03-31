@@ -9,7 +9,7 @@ import org.alephium.util.BaseActor
 
 trait TcpHandler extends BaseActor {
 
-  def remoteAddress: InetSocketAddress
+  def remote: InetSocketAddress
 
   def handle(connection: ActorRef): Receive =
     handleEvent orElse handleCommand(connection)
@@ -17,7 +17,7 @@ trait TcpHandler extends BaseActor {
   def handleEvent: Receive = {
     case Tcp.Received(data) =>
       val message = NetworkMessage.deserializer.deserialize(data).get
-      logger.debug(s"Received $message from $remoteAddress")
+      logger.debug(s"Received $message from $remote")
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
       logger.debug(s"Connection closed: $closeEvent")
       context stop self
@@ -34,8 +34,6 @@ object SimpleTcpHandler {
     Props(new SimpleTcpHandler(remote, connection))
 }
 
-class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef) extends TcpHandler {
-  override def remoteAddress: InetSocketAddress = remote
-
+case class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef) extends TcpHandler {
   override def receive: Receive = handle(connection)
 }
