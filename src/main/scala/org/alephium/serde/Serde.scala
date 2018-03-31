@@ -16,7 +16,12 @@ trait Serializer[T] {
 trait Deserializer[T] {
   def _deserialize(input: ByteString): Try[(T, ByteString)]
 
-  def deserialize(input: ByteString): Try[T]
+  def deserialize(input: ByteString): Try[T] =
+    _deserialize(input).flatMap {
+      case (output, rest) =>
+        if (rest.isEmpty) Success(output)
+        else Failure(InvalidNumberOfBytesException(input.size - rest.size, input.size))
+    }
 }
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
@@ -100,13 +105,6 @@ object Serde {
       override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
         _deserialize(input, size, Seq.empty)
       }
-
-      override def deserialize(input: ByteString): Try[Seq[T]] =
-        _deserialize(input).flatMap {
-          case (output, rest) =>
-            if (rest.isEmpty) Success(output)
-            else Failure(InvalidNumberOfBytesException(input.size - rest.size, input.size))
-        }
     }
 
   object HNilSerde extends FixedSizeSerde[HNil] {
