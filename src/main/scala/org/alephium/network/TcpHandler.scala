@@ -4,9 +4,8 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import org.alephium.primitive.BlockHeader
+import org.alephium.network.message.NetworkMessage
 import org.alephium.util.BaseActor
-import org.alephium.serde._
 
 trait TcpHandler extends BaseActor {
 
@@ -17,16 +16,16 @@ trait TcpHandler extends BaseActor {
 
   def handleEvent: Receive = {
     case Tcp.Received(data) =>
-      val bh = deserialize[BlockHeader](data).get
-      logger.debug(s"Received $bh from $remoteAddress")
+      val message = NetworkMessage.deserializer.deserialize(data).get
+      logger.debug(s"Received $message from $remoteAddress")
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
       logger.debug(s"Connection closed: $closeEvent")
       context stop self
   }
 
   def handleCommand(connection: ActorRef): Receive = {
-    case bh: BlockHeader =>
-      connection ! Tcp.Write(serialize(bh))
+    case message: NetworkMessage =>
+      connection ! Tcp.Write(NetworkMessage.serializer.serialize(message))
   }
 }
 
