@@ -6,7 +6,7 @@ import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSuite {
   "Serde for Byte" should "serialize Byte into 1 byte" in {
-    implicitly[Serde[Byte]].serdeSize shouldBe 1
+    implicitly[Serde[Byte]].asInstanceOf[FixedSizeSerde[Byte]].serdeSize shouldBe 1
   }
 
   it should "serde correctly" in {
@@ -23,7 +23,7 @@ class SerdeSpec extends AlephiumSuite {
   }
 
   "Serde for Int" should "serialize integer into 4 bytes" in {
-    implicitly[Serde[Int]].serdeSize shouldBe 4
+    implicitly[Serde[Int]].asInstanceOf[FixedSizeSerde[Int]].serdeSize shouldBe 4
   }
 
   it should "serde correctly" in {
@@ -49,11 +49,7 @@ class SerdeSpec extends AlephiumSuite {
 
   case class Test(x: Int, y: Int, z: Int)
 
-  "Serde for case class" should "serialize into correct number of bytes" in {
-    implicitly[Serde[Test]].serdeSize shouldBe 4 * 3
-  }
-
-  it should "serde correctly" in {
+  "Serde for case class" should "serde correctly" in {
     forAll { (x: Int, y: Int, z: Int) =>
       val input  = Test(x, y, z)
       val output = deserialize[Test](serialize(input))

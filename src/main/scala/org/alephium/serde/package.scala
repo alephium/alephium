@@ -3,7 +3,7 @@ package org.alephium
 import shapeless._
 import akka.util.ByteString
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 package object serde {
   import Serde._
@@ -16,24 +16,21 @@ package object serde {
 
   implicit val intSerde: Serde[Int] = IntSerde
 
-  implicit val hnilSerde: Serde[HNil] = new Serde[HNil] {
-    override def serdeSize: Int = 0
-
-    override def serialize(input: HNil): ByteString = ByteString.empty
-
-    override def deserialize(input: ByteString): Try[HNil] =
-      if (input.isEmpty) Success(HNil) else throw InvalidNumberOfBytesException(0, input.size)
-  }
+  implicit val hnilSerde: Serde[HNil] = HNilSerde
 
   implicit def hlistSerde[A, L <: HList](implicit a: Serde[A], l: Serde[L]): Serde[A :: L] =
     prepend(a, l)
 
   implicit def derivedSerde[T, R](implicit gen: Generic.Aux[T, R], serde: Serde[R]): Serde[T] =
     new Serde[T] {
-      override def serdeSize: Int = serde.serdeSize
-
       override def serialize(input: T): ByteString = {
         serde.serialize(gen.to(input))
+      }
+
+      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
+        serde._deserialize(input).map {
+          case (r, rest) => (gen.from(r), rest)
+        }
       }
 
       override def deserialize(input: ByteString): Try[T] = {
