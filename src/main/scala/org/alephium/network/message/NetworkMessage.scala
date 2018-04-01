@@ -1,6 +1,7 @@
 package org.alephium.network.message
 
 import akka.util.ByteString
+import org.alephium.constant.Protocol
 import org.alephium.serde._
 
 case class NetworkMessage(header: NetworkHeader, payload: NetworkPayload)
@@ -9,9 +10,9 @@ object NetworkMessage {
   private def apply(header: NetworkHeader, payload: NetworkPayload): NetworkMessage =
     new NetworkMessage(header, payload)
 
-  def apply[T <: NetworkPayload](version: Int, payload: T)(
+  def apply[T <: NetworkPayload](payload: T)(
       implicit withCmdCode: NetworkPayloadCompanion[T]): NetworkMessage = {
-    val header = NetworkHeader(version, withCmdCode.cmdCode)
+    val header = NetworkHeader(Protocol.version, withCmdCode.cmdCode)
     apply(header, payload)
   }
 
