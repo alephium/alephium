@@ -26,4 +26,4 @@ before_script:
 
 test:
   script:
-    - sbt clean coverage test coverageReport
+    - sbt clean scalastyle coverage test coverageReport
