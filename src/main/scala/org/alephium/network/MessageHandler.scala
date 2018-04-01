@@ -7,6 +7,7 @@ import org.alephium.util.BaseActor
 
 import scala.util.Random
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 object MessageHandler {
   sealed trait Command
