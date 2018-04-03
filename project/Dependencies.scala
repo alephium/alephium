@@ -15,4 +15,5 @@ object Dependencies {
   lazy val shapeless       = "com.chuusai"                %% "shapeless"      % "2.3.3"
   lazy val akkTest         = "com.typesafe.akka"          %% "akka-testkit"   % Version.akka % Test
   lazy val scalaCheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
+  lazy val curve25519      = "org.whispersystems"         % "curve25519-j2me" % "0.2.5"
 }
