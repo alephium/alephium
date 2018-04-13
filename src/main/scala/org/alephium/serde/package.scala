@@ -3,6 +3,7 @@ package org.alephium
 import shapeless._
 import akka.util.ByteString
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
 package object serde {
@@ -17,6 +18,9 @@ package object serde {
   implicit val byteSerde: Serde[Byte] = ByteSerde
 
   implicit val intSerde: Serde[Int] = IntSerde
+
+  implicit def seqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[Seq[T]] =
+    dynamicSizeBytesSerde(serde)
 
   implicit val hnilSerde: Serde[HNil] = HNilSerde
 

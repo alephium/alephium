@@ -105,28 +105,44 @@ object Serde {
     }
   }
 
+  private abstract class SeqSerde[T: ClassTag](serde: Serde[T]) extends Serde[Seq[T]] {
+    @tailrec
+    final def _deserialize(rest: ByteString,
+                           itemCnt: Int,
+                           output: Seq[T]): Try[(Seq[T], ByteString)] = {
+      if (itemCnt == 0) Success((output, rest))
+      else {
+        serde._deserialize(rest) match {
+          case Success((t, tRest)) =>
+            _deserialize(tRest, itemCnt - 1, output :+ t)
+          case Failure(e) => Failure(e)
+        }
+      }
+    }
+  }
+
   def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =
-    new Serde[Seq[T]] {
+    new SeqSerde[T](serde) {
       override def serialize(input: Seq[T]): ByteString = {
         input.map(serde.serialize).foldLeft(ByteString.empty)(_ ++ _)
       }
 
-      @tailrec
-      private def _deserialize(rest: ByteString,
-                               itemCnt: Int,
-                               output: Seq[T]): Try[(Seq[T], ByteString)] = {
-        if (itemCnt == 0) Success((output, rest))
-        else {
-          serde._deserialize(rest) match {
-            case Success((t, tRest)) =>
-              _deserialize(tRest, itemCnt - 1, output :+ t)
-            case Failure(e) => Failure(e)
-          }
-        }
+      override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
+        _deserialize(input, size, Seq.empty)
+      }
+    }
+
+  def dynamicSizeBytesSerde[T: ClassTag](serde: Serde[T]): Serde[Seq[T]] =
+    new SeqSerde[T](serde) {
+      override def serialize(input: Seq[T]): ByteString = {
+        input.map(serde.serialize).foldLeft(IntSerde.serialize(input.size))(_ ++ _)
       }
 
       override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
-        _deserialize(input, size, Seq.empty)
+        IntSerde._deserialize(input).flatMap {
+          case (size, rest) =>
+            _deserialize(rest, size, Seq.empty)
+        }
       }
     }
 

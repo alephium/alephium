@@ -47,6 +47,15 @@ class SerdeSpec extends AlephiumSuite {
     }
   }
 
+  "Serde for sequence" should "serde correctly" in {
+    forAll { (input: Seq[Byte]) =>
+      val serde  = Serde.dynamicSizeBytesSerde(implicitly[Serde[Byte]])
+      val output = serde.deserialize(serde.serialize(input)).success.value
+      println(output)
+      output shouldBe input
+    }
+  }
+
   case class Test(x: Int, y: Int, z: Int)
 
   "Serde for case class" should "serde correctly" in {
