@@ -2,7 +2,9 @@ package org.alephium.crypto
 
 import java.nio.charset.Charset
 
+import akka.util.ByteString
 import org.alephium.util.{Bytes, FixedSizeBytes}
+import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
 
 trait HashOutput extends Bytes
@@ -16,11 +18,19 @@ trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
   }
 
   def hash(input: String): T = {
-    hash(input.getBytes())
+    hash(ByteString(input))
   }
 
   def hash(input: String, charset: Charset): T = {
-    hash(input.getBytes(charset))
+    hash(ByteString(input, charset))
+  }
+
+//  def hash(input: ByteString): T = {
+//    hash(input.toSeq)
+//  }
+
+  def hash[S](input: S)(implicit serializer: Serializer[S]): T = {
+    hash(serializer.serialize(input))
   }
 
   def provider: Digest
