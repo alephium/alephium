@@ -41,12 +41,12 @@ case class Ping(nonce: Int) extends NetworkPayload
 
 object Ping extends NetworkPayloadCompanion[Ping] {
   implicit val withCmdCode: NetworkPayloadCompanion[Ping] = new NetworkPayloadCompanion[Ping] {}
-  implicit val serde: Serde[Ping] = Serde.forProduct1(apply, p => p.nonce)
+  implicit val serde: Serde[Ping]                         = Serde.forProduct1(apply, p => p.nonce)
 }
 
 case class Pong(nonce: Int) extends NetworkPayload
 
 object Pong {
-  implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
   implicit val withCmdCode: NetworkPayloadCompanion[Pong] = new NetworkPayloadCompanion[Pong] {}
+  implicit val serde: Serde[Pong]                         = Serde.forProduct1(apply, p => p.nonce)
 }

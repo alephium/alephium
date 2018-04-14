@@ -12,5 +12,6 @@ case class BlockHeader(
 )
 
 object BlockHeader {
-  implicit val serde: Serde[BlockHeader] = Serde.forProduct3(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp))
+  implicit val serde: Serde[BlockHeader] =
+    Serde.forProduct3(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp))
 }
