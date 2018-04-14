@@ -1,6 +1,7 @@
 package org.alephium.crypto
 
 import java.nio.charset.Charset
+import java.security.SecureRandom
 
 import akka.util.ByteString
 import org.alephium.util.{Bytes, FixedSizeBytes}
@@ -10,6 +11,8 @@ import org.bouncycastle.crypto.Digest
 trait HashOutput extends Bytes
 
 trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
+  def provider: Digest
+
   def hash(input: Seq[Byte]): T = {
     provider.update(input.toArray, 0, input.length)
     val res = new Array[Byte](size)
@@ -25,13 +28,9 @@ trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
     hash(ByteString(input, charset))
   }
 
-//  def hash(input: ByteString): T = {
-//    hash(input.toSeq)
-//  }
-
   def hash[S](input: S)(implicit serializer: Serializer[S]): T = {
     hash(serializer.serialize(input))
   }
 
-  def provider: Digest
+  def random: T = hash(ByteString(SecureRandom.getInstanceStrong.nextLong))
 }
