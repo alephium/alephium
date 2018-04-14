@@ -1,10 +1,10 @@
 package org.alephium.serde
 
 import akka.util.ByteString
-import org.alephium.AlephiumSuite
+import org.alephium.AlephiumSpec
 import org.scalatest.TryValues._
 
-class SerdeSpec extends AlephiumSuite {
+class SerdeSpec extends AlephiumSpec {
   "Serde for Byte" should "serialize Byte into 1 byte" in {
     implicitly[Serde[Byte]].asInstanceOf[FixedSizeSerde[Byte]].serdeSize shouldBe 1
   }

@@ -1,11 +1,11 @@
 package org.alephium.crypto
 
 import org.scalatest.TryValues._
-import org.alephium.AlephiumSuite
+import org.alephium.AlephiumSpec
 import org.alephium.util.Hex._
 import org.alephium.serde._
 
-class HashSpec extends AlephiumSuite {
+class HashSpec extends AlephiumSpec {
 
   def check[T <: HashOutput](provider: Hash[T], message: String, expected: Seq[Byte])(
       implicit serde: Serde[T]): Unit = {
