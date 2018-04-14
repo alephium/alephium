@@ -2,11 +2,9 @@ import Dependencies._
 
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
-lazy val root = (project in file(".")).
-  settings(commonSettings: _*).
-  settings(
-    libraryDependencies ++= dependencies
-  )
+lazy val root = (project in file("."))
+  .settings(commonSettings: _*)
+  .settings(libraryDependencies ++= dependencies)
 
 val commonSettings = Seq(
   organization := "org.alephium",
