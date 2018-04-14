@@ -69,6 +69,12 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
 trait FixedSizeSerde[T] extends Serde[T] {
   def serdeSize: Int
 
+  def deserialize0(input: ByteString, f: ByteString => T): Try[T] = Try {
+    if (input.size == serdeSize) {
+      f(input)
+    } else throw InvalidNumberOfBytesException(serdeSize, input.size)
+  }
+
   override def _deserialize(input: ByteString): Try[(T, ByteString)] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
@@ -84,11 +90,8 @@ object Serde {
       ByteString(input)
     }
 
-    override def deserialize(input: ByteString): Try[Byte] = Try {
-      if (input.size == serdeSize) {
-        input(0)
-      } else throw InvalidNumberOfBytesException(serdeSize, input.size)
-    }
+    override def deserialize(input: ByteString): Try[Byte] =
+      deserialize0(input, _.apply(0))
   }
 
   object IntSerde extends FixedSizeSerde[Int] {
@@ -100,9 +103,21 @@ object Serde {
       ByteString.fromByteBuffer(buf)
     }
 
-    override def deserialize(input: ByteString): Try[Int] = Try {
-      input.asByteBuffer.getInt()
+    override def deserialize(input: ByteString): Try[Int] =
+      deserialize0(input, _.asByteBuffer.getInt())
+  }
+
+  object LongSerde extends FixedSizeSerde[Long] {
+    override val serdeSize: Int = java.lang.Long.BYTES
+
+    override def serialize(input: Long): ByteString = {
+      val buf = ByteBuffer.allocate(serdeSize).putLong(input)
+      buf.flip()
+      ByteString.fromByteBuffer(buf)
     }
+
+    override def deserialize(input: ByteString): Try[Long] =
+      deserialize0(input, _.asByteBuffer.getLong())
   }
 
   private abstract class SeqSerde[T: ClassTag](serde: Serde[T]) extends Serde[Seq[T]] {
