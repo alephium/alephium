@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import org.alephium.protocol.message.NetworkMessage
+import org.alephium.protocol.message.Message
 
 object TcpHandler {
   sealed trait Command
@@ -26,7 +26,7 @@ trait TcpHandler extends MessageHandler {
 
   def handleEvent(connection: ActorRef): Receive = {
     case Tcp.Received(data) =>
-      val message = NetworkMessage.deserializer.deserialize(data).get
+      val message = Message.deserializer.deserialize(data).get
       logger.debug(s"Received $message from $remote")
       handleMessage(message, connection)
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
@@ -35,7 +35,7 @@ trait TcpHandler extends MessageHandler {
   }
 
   def handleCommand(connection: ActorRef): Receive = {
-    case message: NetworkMessage =>
+    case message: Message =>
       connection ! envelope(message)
   }
 }
