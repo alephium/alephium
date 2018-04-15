@@ -59,6 +59,7 @@ val commonSettings = Seq(
 
 val dependencies = Seq(
   akka,
+  `akka-slf4j`,
   bcprov,
   `scala-logging`,
   logback,
