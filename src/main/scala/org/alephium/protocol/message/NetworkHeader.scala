@@ -1,4 +1,4 @@
-package org.alephium.network.message
+package org.alephium.protocol.message
 
 import org.alephium.serde.Serde
 
