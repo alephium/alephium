@@ -58,8 +58,7 @@ val commonSettings = Seq(
   Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
   Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
   fork := true,
-  Compile / run / javaOptions += "-Xss1m -Xmx4g",
-  Test / run / javaOptions += "-Xss16m -Xmx4g"
+  run / javaOptions += "-Xss1m -Xmx4g"
 )
 
 val dependencies = Seq(
