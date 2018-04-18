@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import org.alephium.AlephiumSpec
 import org.alephium.crypto.{ED25519, Keccak256}
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.deserialize
 import org.scalacheck.Gen
 import org.scalatest.TryValues._
 
@@ -31,7 +31,7 @@ class SerdeSpec extends AlephiumSpec {
     } yield Block.from(Seq.empty, txs)
 
     forAll(blockGen) { input =>
-      val output = deserialize[Block](serialize(input)).success.value
+      val output = deserialize[Block](input.bytes).success.value
       output shouldBe input
     }
   }

@@ -3,7 +3,7 @@ package org.alephium.network
 import akka.actor.{ActorRef, Timers}
 import akka.io.Tcp
 import org.alephium.constant.Network
-import org.alephium.protocol.message.{Message, Ping, Pong}
+import org.alephium.protocol.message.{Message, Ping, Pong, TransactionMsg}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
@@ -37,6 +37,8 @@ trait MessageHandler extends BaseActor with Timers {
           logger.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
           context stop self
         }
+      case TransactionMsg(transaction) =>
+        logger.debug(s"Tranction received: $transaction")
     }
   }
 

@@ -1,6 +1,6 @@
 package org.alephium
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpecLike, Matchers}
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-trait AlephiumSpec extends FlatSpec with GeneratorDrivenPropertyChecks with Matchers
+trait AlephiumSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers
