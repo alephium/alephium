@@ -16,7 +16,7 @@ object TcpFun extends App {
   val server = system.actorOf(TcpServer.props(Network.port), "server")
   val tcpHandler =
     system.actorOf(TcpClient.props(new InetSocketAddress("localhost", Network.port)), "client")
-  val blockPool = new BlockPool()
+  val blockPool = BlockPool()
   val client =
     Client(Protocol.Genesis.privateKey, Protocol.Genesis.publicKey, blockPool, tcpHandler)
 

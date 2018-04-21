@@ -4,12 +4,32 @@ import org.alephium.constant.Protocol
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
-// consider single chain for the moment
-class BlockPool() {
-  val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
-  val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
+trait BlockPool {
+  def addBlock(block: Block): Unit
 
-  def addBlock(block: Block): Unit = {
+  def addBlocks(blocks: Seq[Block]): Unit
+
+  def getBestHeader: Block
+
+  def getBestChain: Seq[Block]
+
+  def getUTXOs(address: ED25519PublicKey): Seq[TxInput]
+
+  def getUTXOs(address: ED25519PublicKey, value: Int): Option[(Seq[TxInput], Int)]
+
+  def getBalance(address: ED25519PublicKey): (Block, Int)
+}
+
+object BlockPool {
+  def apply(): BlockPool = new BlockPoolImpl()
+}
+
+// consider single chain for the moment
+class BlockPoolImpl() extends BlockPool {
+  private val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
+  private val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
+
+  override def addBlock(block: Block): Unit = {
     blockStore += block.hash -> block
     block.transactions.foreach { tx =>
       txStore += tx.hash -> tx
@@ -18,7 +38,7 @@ class BlockPool() {
 
   addBlock(Protocol.Genesis.block)
 
-  def addBlocks(blocks: Seq[Block]): Unit = {
+  override def addBlocks(blocks: Seq[Block]): Unit = {
     blocks.foreach(addBlock)
   }
 
@@ -43,6 +63,7 @@ class BlockPool() {
         if (txOutput.publicKey == address) txOutput.value else 0
     }.sum
   }
+
   private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): Int = {
     transaction.unsigned.outputs.map { txOutput =>
       if (txOutput.publicKey == address) txOutput.value else 0
@@ -57,16 +78,16 @@ class BlockPool() {
     block.transactions.map(transaction => getBalance(transaction, address)).sum
   }
 
-  def getBestHeader: Block = {
+  override def getBestHeader: Block = {
     require(blockStore.nonEmpty)
     blockStore.values.maxBy(getHeight)
   }
 
-  def getBestChain: Seq[Block] = {
+  override def getBestChain: Seq[Block] = {
     getChain(getBestHeader)
   }
 
-  def getUTXOs(address: ED25519PublicKey): Seq[TxInput] = {
+  override def getUTXOs(address: ED25519PublicKey): Seq[TxInput] = {
     val bestChain = getBestChain
     for {
       block             <- bestChain
@@ -77,7 +98,7 @@ class BlockPool() {
   }
 
   // return a number of inputs with at lease value Aleph
-  def getUTXOs(address: ED25519PublicKey, value: Int): Option[(Seq[TxInput], Int)] = {
+  override def getUTXOs(address: ED25519PublicKey, value: Int): Option[(Seq[TxInput], Int)] = {
     val utxos = getUTXOs(address)
     val values = utxos.scanLeft(0) {
       case (acc, TxInput(txHash, outputIndex)) =>
@@ -90,7 +111,7 @@ class BlockPool() {
   }
 
   // calculated from best chain
-  def getBalance(address: ED25519PublicKey): (Block, Int) = {
+  override def getBalance(address: ED25519PublicKey): (Block, Int) = {
     (getBestHeader, getBestChain.map(block => getBalance(block, address)).sum)
   }
 }
