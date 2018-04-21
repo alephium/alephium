@@ -65,9 +65,7 @@ class BlockPoolImpl() extends BlockPool {
   }
 
   private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): Int = {
-    transaction.unsigned.outputs.map { txOutput =>
-      if (txOutput.publicKey == address) txOutput.value else 0
-    }.sum
+    transaction.unsigned.outputs.filter(_.publicKey == address).map(_.value).sum
   }
 
   private def getBalance(transaction: Transaction, address: ED25519PublicKey): Int = {
@@ -89,24 +87,32 @@ class BlockPoolImpl() extends BlockPool {
 
   override def getUTXOs(address: ED25519PublicKey): Seq[TxInput] = {
     val bestChain = getBestChain
-    for {
+    val txosOI = for {
       block             <- bestChain
       transaction       <- block.transactions
       (txOutput, index) <- transaction.unsigned.outputs.zipWithIndex
       if txOutput.publicKey == address
     } yield TxInput(transaction.hash, index)
+    val stxosOI = for {
+      block       <- bestChain
+      transaction <- block.transactions
+      txInput     <- transaction.unsigned.inputs
+    } yield txInput
+    txosOI diff stxosOI
   }
 
   // return a number of inputs with at lease value Aleph
   override def getUTXOs(address: ED25519PublicKey, value: Int): Option[(Seq[TxInput], Int)] = {
     val utxos = getUTXOs(address)
-    val values = utxos.scanLeft(0) {
-      case (acc, TxInput(txHash, outputIndex)) =>
-        val tx       = txStore(txHash)
-        val txOutput = tx.unsigned.outputs(outputIndex)
-        acc + txOutput.value
-    }
-    val index = values.tail.indexWhere(_ >= value)
+    val values = utxos
+      .scanLeft(0) {
+        case (acc, TxInput(txHash, outputIndex)) =>
+          val tx       = txStore(txHash)
+          val txOutput = tx.unsigned.outputs(outputIndex)
+          acc + txOutput.value
+      }
+      .tail
+    val index = values.indexWhere(_ >= value)
     if (index == -1) None else Some((utxos.take(index + 1), values(index)))
   }
 

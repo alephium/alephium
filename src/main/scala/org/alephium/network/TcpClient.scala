@@ -2,15 +2,15 @@ package org.alephium.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
 object TcpClient {
-  def props(remote: InetSocketAddress): Props = Props(new TcpClient(remote))
+  def props(remote: InetSocketAddress, blockHandler: ActorRef): Props =
+    Props(new TcpClient(remote, blockHandler))
 }
 
-case class TcpClient(remote: InetSocketAddress) extends TcpHandler {
-
+case class TcpClient(remote: InetSocketAddress, blockHandler: ActorRef) extends TcpHandler {
   import context.system
 
   IO(Tcp) ! Tcp.Connect(remote)

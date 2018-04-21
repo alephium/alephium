@@ -24,8 +24,11 @@ case class Client(privateKey: ED25519PrivateKey,
         val txOutputs   = Seq(txOutput1, txOutput2)
         val unsigned    = UnsignedTransaction(txInputs, txOutputs)
         val transaction = Transaction.from(unsigned, privateKey)
-        val block       = Block.from(Seq.empty, Seq(transaction))
-        val message     = Message(SendBlock(block))
+        val prevBlock   = blockPool.getBestHeader.hash
+        val block       = Block.from(Seq(prevBlock), Seq(transaction))
+
+        blockPool.addBlock(block)
+        val message = Message(SendBlock(block))
         tcpHandler ! message
       case None =>
         logger.info(s"Not able to transfer $value Aleph")

@@ -2,15 +2,15 @@ package org.alephium.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import org.alephium.util.BaseActor
 
 object TcpServer {
-  def props(port: Int): Props = Props(new TcpServer(port))
+  def props(port: Int, blockHandler: ActorRef): Props = Props(new TcpServer(port, blockHandler))
 }
 
-class TcpServer(port: Int) extends BaseActor {
+class TcpServer(port: Int, blockHandler: ActorRef) extends BaseActor {
 
   import context.system
 
@@ -31,7 +31,7 @@ class TcpServer(port: Int) extends BaseActor {
     case Tcp.Connected(remoteAddress, localAddress) =>
       logger.debug(s"Connect to $remoteAddress, Listen at $localAddress")
       val connection = sender()
-      val handler = context.actorOf(SimpleTcpHandler.props(remoteAddress, connection),
+      val handler = context.actorOf(SimpleTcpHandler.props(remoteAddress, connection, blockHandler),
                                     s"${localAddress.getPort}-${remoteAddress.getPort}")
       connection ! Tcp.Register(handler)
       handler ! TcpHandler.Start
