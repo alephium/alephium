@@ -6,7 +6,6 @@ variables:
 
 
 cache:
-  # key: "$CI_BUILD_REF_NAME"
   untracked: true
   paths:
     - "sbt-cache/ivy/cache"
@@ -26,4 +25,4 @@ before_script:
 
 test:
   script:
-    - sbt clean scalastyle coverage test coverageReport
+    - sbt clean scalastyle test:scalastyle coverage test coverageReport

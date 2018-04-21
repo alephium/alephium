@@ -1,7 +1,7 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
-import org.alephium.protocol.model.Transaction
+import org.alephium.protocol.model.Block
 import org.alephium.serde._
 
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
@@ -11,15 +11,15 @@ sealed trait Payload
 
 object Payload {
   val cmdCodes: Map[String, Int] = Map(
-    "Ping"           -> 0,
-    "Pong"           -> 1,
-    "TransactionMsg" -> 2
+    "Ping"      -> 0,
+    "Pong"      -> 1,
+    "SendBlock" -> 2
   )
 
   implicit val serializer: Serializer[Payload] = {
-    case x: Ping           => implicitly[Serializer[Ping]].serialize(x)
-    case x: Pong           => implicitly[Serializer[Pong]].serialize(x)
-    case x: TransactionMsg => implicitly[Serializer[TransactionMsg]].serialize(x)
+    case x: Ping      => implicitly[Serializer[Ping]].serialize(x)
+    case x: Pong      => implicitly[Serializer[Pong]].serialize(x)
+    case x: SendBlock => x.block.bytes
   }
 
   def deserializer(cmdCode: Int): Deserializer[Payload] =
@@ -29,8 +29,8 @@ object Payload {
           implicitly[Serde[Ping]]._deserialize(input)
         case Pong.cmdCode =>
           implicitly[Serde[Pong]]._deserialize(input)
-        case TransactionMsg.cmdCode =>
-          implicitly[Serde[TransactionMsg]]._deserialize(input)
+        case SendBlock.cmdCode =>
+          implicitly[Serde[SendBlock]]._deserialize(input)
         case _ => Failure(OtherError(s"Invalid cmd code: $cmdCode"))
     }
 }
@@ -56,8 +56,8 @@ object Pong extends PayloadCompanion[Pong] {
   implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
-case class TransactionMsg(transaction: Transaction) extends Payload
+case class SendBlock(block: Block) extends Payload
 
-object TransactionMsg extends PayloadCompanion[TransactionMsg] {
-  implicit val serde: Serde[TransactionMsg] = Serde.forProduct1(apply, p => p.transaction)
+object SendBlock extends PayloadCompanion[SendBlock] {
+  implicit val serde: Serde[SendBlock] = Serde.forProduct1(apply, p => p.block)
 }
