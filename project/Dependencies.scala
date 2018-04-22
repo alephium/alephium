@@ -1,7 +1,8 @@
 import sbt._
 
 object Version {
-  lazy val akka = "2.5.12"
+  lazy val akka  = "2.5.12"
+  lazy val circe = "0.9.3"
 }
 
 object Dependencies {
@@ -14,4 +15,5 @@ object Dependencies {
   lazy val logback         = "ch.qos.logback"             % "logback-classic" % "1.2.3"
   lazy val scalaCheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
   lazy val curve25519      = "org.whispersystems"         % "curve25519-java" % "0.4.1"
+  lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"   % Version.circe
 }

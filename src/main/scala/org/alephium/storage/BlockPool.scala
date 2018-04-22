@@ -1,6 +1,6 @@
 package org.alephium.storage
 
-import org.alephium.constant.Protocol
+import org.alephium.constant.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
@@ -36,7 +36,7 @@ class BlockPoolImpl() extends BlockPool {
     }
   }
 
-  addBlock(Protocol.Genesis.block)
+  addBlock(Genesis.block)
 
   override def addBlocks(blocks: Seq[Block]): Unit = {
     blocks.foreach(addBlock)

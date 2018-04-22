@@ -1,7 +1,8 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, Keccak256}
-import org.alephium.constant.Protocol.Genesis
+import org.alephium.AlephiumSpec
+import org.alephium.constant.Genesis
+import org.alephium.crypto._
 import org.scalacheck.Gen
 
 object ModelGen {
@@ -35,11 +36,11 @@ object ModelGen {
 
   def blockForTransfer(to: ED25519PublicKey, value: Int): Block = {
     val txOutput1 = TxOutput(value, to)
-    val txOutput2 = TxOutput(Genesis.balance - value, Genesis.publicKey)
+    val txOutput2 = TxOutput(AlephiumSpec.testBalance - value, AlephiumSpec.testPublicKey)
     val txInput   = TxInput(Genesis.block.transactions.head.hash, 0)
     val transaction = Transaction.from(
       UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
-      Genesis.privateKey
+      AlephiumSpec.testPrivateKey
     )
     Block.from(Seq(Genesis.block.hash), Seq(transaction))
   }
