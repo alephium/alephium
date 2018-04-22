@@ -10,11 +10,11 @@ case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.blockHeader, b.transactions))
 
-  def from(blockDeps: Seq[Keccak256], transactions: Seq[Transaction]): Block = {
+  def from(blockDeps: Seq[Keccak256], transactions: Seq[Transaction], nonce: Int): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
     val txsHash     = Keccak256.hash(transactions)
     val timestamp   = System.currentTimeMillis()
-    val blockHeader = BlockHeader(blockDeps, txsHash, timestamp)
+    val blockHeader = BlockHeader(blockDeps, txsHash, timestamp, nonce)
     Block(blockHeader, transactions)
   }
 }

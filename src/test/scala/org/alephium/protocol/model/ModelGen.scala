@@ -26,13 +26,13 @@ object ModelGen {
   val blockGen = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq.empty, txs)
+  } yield Block.from(Seq.empty, txs, 0)
 
   def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, txs)
+    } yield Block.from(deps, txs, 0)
 
   def blockForTransfer(to: ED25519PublicKey, value: Int): Block = {
     val txOutput1 = TxOutput(value, to)
@@ -42,6 +42,6 @@ object ModelGen {
       UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
       AlephiumSpec.testPrivateKey
     )
-    Block.from(Seq(Genesis.block.hash), Seq(transaction))
+    Block.from(Seq(Genesis.block.hash), Seq(transaction), 0)
   }
 }

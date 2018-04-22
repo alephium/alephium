@@ -29,7 +29,7 @@ object Genesis {
       }
     }
 
-    Block.from(Seq.empty, transactions.toSeq)
+    Block.from(Seq.empty, transactions.toSeq, 0)
   }
 
   val block: Block = loadGenesis("genesis.json")
