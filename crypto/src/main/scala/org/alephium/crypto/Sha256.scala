@@ -9,7 +9,8 @@ case class Sha256(bytes: ByteString) extends HashOutput
 object Sha256 extends Hash[Sha256] {
   override val size: Int = 32
 
-  override val provider: Digest = new SHA256Digest()
+  // TODO: optimize with queue of providers
+  override def provider: Digest = new SHA256Digest()
 
   private def apply(digest: ByteString): Sha256 = {
     require(digest.length == size)
