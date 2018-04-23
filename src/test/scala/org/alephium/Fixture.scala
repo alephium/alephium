@@ -2,15 +2,28 @@ package org.alephium
 
 import io.circe.parser.parse
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.protocol.Genesis
+import org.alephium.protocol.model._
 import org.alephium.util.{Hex, UInt}
-import org.scalatest.{FlatSpecLike, Matchers}
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
 import scala.io.Source
 
-trait AlephiumSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers
+trait Fixture {
 
-object AlephiumSpec {
+  def blockForTransfer(to: ED25519PublicKey, value: Int): Block = {
+    assert(value >= 0)
+
+    val uvalue    = UInt(value)
+    val txOutput1 = TxOutput(uvalue, to)
+    val txOutput2 = TxOutput(testBalance minus uvalue, testPublicKey)
+    val txInput   = TxInput(Genesis.block.transactions.head.hash, 0)
+    val transaction = Transaction.from(
+      UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
+      testPrivateKey
+    )
+    Block.from(Seq(Genesis.block.hash), Seq(transaction), UInt.zero)
+  }
+
   private val json = parse(Source.fromResource("genesis.json").mkString).right.get
 
   private val test = json.hcursor.downField("test")

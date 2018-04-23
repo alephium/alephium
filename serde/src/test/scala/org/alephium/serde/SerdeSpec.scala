@@ -1,10 +1,11 @@
 package org.alephium.serde
 
 import akka.util.ByteString
-import org.alephium.AlephiumSpec
 import org.scalatest.TryValues._
+import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-class SerdeSpec extends AlephiumSpec {
+class SerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers {
   "Serde for Byte" should "serialize Byte into 1 byte" in {
     implicitly[Serde[Byte]].asInstanceOf[FixedSizeSerde[Byte]].serdeSize shouldBe 1
   }

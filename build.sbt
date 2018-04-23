@@ -5,6 +5,31 @@ resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositori
 lazy val root = (project in file("."))
   .settings(commonSettings: _*)
   .settings(libraryDependencies ++= dependencies)
+  .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
+  .aggregate(util, serde, crypto, protocol)
+
+lazy val serde = (project in file("serde"))
+  .settings(commonSettings: _*)
+  .settings(
+    libraryDependencies ++= dependencies,
+    Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+  )
+
+lazy val util = (project in file("util"))
+  .settings(commonSettings: _*)
+  .settings(libraryDependencies ++= dependencies)
+  .dependsOn(serde)
+
+lazy val crypto = (project in file("crypto"))
+  .settings(commonSettings: _*)
+  .settings(libraryDependencies ++= dependencies)
+  .dependsOn(util % "test->test;compile->compile", serde)
+
+lazy val protocol = (project in file("protocol"))
+  .settings(commonSettings: _*)
+  .settings(libraryDependencies ++= dependencies)
+  .dependsOn(util % "test->test;compile->compile", serde, crypto)
 
 val commonSettings = Seq(
   organization := "org.alephium",
@@ -55,8 +80,6 @@ val commonSettings = Seq(
   ),
   Test / scalacOptions += "-Xcheckinit",
   Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml",
-  Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-  Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
   fork := true,
   run / javaOptions += "-Xmx4g"
 )
