@@ -1,8 +1,7 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature, WithKeccak256}
 import org.alephium.serde.{Serde, serialize}
-import org.alephium.util.WithKeccak256
 
 case class Transaction(
     unsigned: UnsignedTransaction,

@@ -1,9 +1,8 @@
-package org.alephium.util
+package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.crypto.Keccak256
-import org.alephium.serde.Serde
 import org.alephium.serde._
+import org.alephium.util.Bytes
 
 class WithKeccak256[T: Serde] extends Bytes { self: T =>
   override lazy val bytes: ByteString = serialize[T](this)
