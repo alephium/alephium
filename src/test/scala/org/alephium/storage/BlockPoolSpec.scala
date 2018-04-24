@@ -1,10 +1,11 @@
 package org.alephium.storage
 
+import java.math.BigInteger
+
 import org.alephium.{AlephiumSpec, Fixture}
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{Block, ModelGen, TxInput}
-import org.alephium.util.UInt
 
 class BlockPoolSpec extends AlephiumSpec with Fixture {
   val genesis: Block = Genesis.block
@@ -61,20 +62,20 @@ class BlockPoolSpec extends AlephiumSpec with Fixture {
     balance1 shouldBe testBalance
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe genesis
-    balance2 shouldBe UInt.zero
+    balance2 shouldBe BigInteger.ZERO
   }
 
   it should "return correct balance after transfering money" in {
     val pool     = BlockPool()
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
     pool.addBlock(newBlock)
 
     val (block1, balance1) = pool.getBalance(testPublicKey)
     block1 shouldBe newBlock
-    balance1 shouldBe (testBalance minus UInt(10))
+    balance1 shouldBe (testBalance subtract BigInteger.valueOf(10l))
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe newBlock
-    balance2 shouldBe UInt(10)
+    balance2 shouldBe BigInteger.valueOf(10l)
   }
 
   it should "return correct utxos with only genesis block" in {
@@ -89,16 +90,16 @@ class BlockPoolSpec extends AlephiumSpec with Fixture {
     val utxos3 = pool.getUTXOs(testPublicKey, testBalance)
     utxos3 shouldBe defined
     utxos3.get._2 shouldBe testBalance
-    val utxos4 = pool.getUTXOs(testPublicKey, testBalance plus UInt.one)
+    val utxos4 = pool.getUTXOs(testPublicKey, testBalance add BigInteger.ONE)
     utxos4 shouldBe None
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
     utxos5 shouldBe None
   }
 
   it should "return correct utxos after transfering money" in {
     val pool     = BlockPool()
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
     pool.addBlock(newBlock)
 
     val utxos1 = pool.getUTXOs(testPublicKey)
@@ -106,16 +107,16 @@ class BlockPoolSpec extends AlephiumSpec with Fixture {
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 1
 
-    val utxos3 = pool.getUTXOs(testPublicKey, UInt(10))
+    val utxos3 = pool.getUTXOs(testPublicKey, BigInteger.valueOf(10l))
     utxos3 shouldBe defined
-    utxos3.get._2 shouldBe (testBalance minus UInt(10))
-    val utxos4 = pool.getUTXOs(testPublicKey, UInt(100))
+    utxos3.get._2 shouldBe (testBalance subtract BigInteger.valueOf(10l))
+    val utxos4 = pool.getUTXOs(testPublicKey, BigInteger.valueOf(100l))
     utxos4 shouldBe None
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
     utxos5 shouldBe defined
-    utxos5.get._2 shouldBe UInt(10)
-    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, UInt(11))
+    utxos5.get._2 shouldBe BigInteger.valueOf(10l)
+    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(11l))
     utxos6 shouldBe None
   }
 }

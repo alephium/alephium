@@ -1,5 +1,6 @@
 package org.alephium
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
@@ -8,7 +9,6 @@ import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.network.{BlockHandler, TcpClient, TcpServer}
 import org.alephium.storage.BlockPool
-import org.alephium.util.UInt
 import org.alephium.util.Hex._
 
 object TcpFun extends App {
@@ -32,7 +32,7 @@ object TcpFun extends App {
 
   Thread.sleep(1000)
   val (_, pk) = ED25519.generateKeyPair()
-  0 to 10 foreach { i =>
-    client.transfer(pk, UInt(i * 10))
+  0l to 10l foreach { i =>
+    client.transfer(pk, BigInteger.valueOf(i * 10))
   }
 }
