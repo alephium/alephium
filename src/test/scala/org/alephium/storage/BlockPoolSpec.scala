@@ -2,121 +2,128 @@ package org.alephium.storage
 
 import java.math.BigInteger
 
-import org.alephium.{AlephiumSpec, Fixture}
+import akka.actor.{ActorRef, Props}
+import org.alephium.{AlephiumActorSpec, Fixture}
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.protocol.model.{Block, ModelGen, TxInput}
+import org.alephium.protocol.model.{Block, ModelGen}
 
-class BlockPoolSpec extends AlephiumSpec with Fixture {
-  val genesis: Block = Genesis.block
+class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
+  import BlockPool._
+
+  private val genesis: Block        = Genesis.block
+  private val blockPoolProps: Props = BlockPool.props()
 
   behavior of "BlockPool"
 
   it should "contains genesis block in the beginning" in {
-    val pool  = BlockPool()
-    val chain = pool.getBestChain
-    chain.size shouldBe 1
-    val block = chain.head
-    block shouldBe genesis
+    val pool = system.actorOf(blockPoolProps)
+    pool ! GetBestChain
+    expectMsg(BestChain(Seq(genesis)))
   }
 
   it should "add a new block and increase the chain length" in {
     forAll(ModelGen.blockGenWith(Seq(genesis.hash))) { block =>
-      val pool = BlockPool()
-      pool.addBlock(block)
-      pool.getBestHeader shouldBe block
-      val chain = pool.getBestChain
-      chain.size shouldBe 2
-      chain.last shouldBe block
+      val pool = system.actorOf(blockPoolProps)
+      addBlocks(pool, block)
+      pool ! GetBestHeader
+      expectMsg(BestHeader(block))
+      pool ! GetBestChain
+      expectMsg(BestChain(Seq(genesis, block)))
     }
   }
 
   it should "add a side block and keep the chain length" in {
     forAll(ModelGen.blockGen) { block =>
-      val pool = BlockPool()
-      pool.addBlock(block)
-      val chain = pool.getBestChain
-      chain.size shouldBe 1
+      val pool = system.actorOf(blockPoolProps)
+      addBlocks(pool, block)
+      pool ! GetBestChain
+      expectMsgAnyOf(BestChain(Seq(genesis)), BestChain(Seq(block)))
     }
   }
 
   it should "add two sequential blocks and increase the chain length" in {
     forAll(ModelGen.blockGenWith(Seq(genesis.hash))) { block1 =>
       forAll(ModelGen.blockGenWith(Seq(block1.hash))) { block2 =>
-        val pool = BlockPool()
-        pool.addBlocks(Seq(block1, block2))
-        pool.getBestHeader shouldBe block2
-        val chain = pool.getBestChain
-        chain.size shouldBe 3
-        chain(1) shouldBe block1
-        chain(2) shouldBe block2
+        val pool = system.actorOf(blockPoolProps)
+        addBlocks(pool, block1, block2)
+        pool ! GetBestHeader
+        expectMsg(BestHeader(block2))
+        pool ! GetBestChain
+        expectMsg(BestChain(Seq(genesis, block1, block2)))
       }
     }
   }
 
   it should "return correct balance with only genesis block" in {
-    val pool = BlockPool()
+    val pool = system.actorOf(blockPoolProps)
 
-    val (block1, balance1) = pool.getBalance(testPublicKey)
-    block1 shouldBe genesis
-    balance1 shouldBe testBalance
-    val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
-    block2 shouldBe genesis
-    balance2 shouldBe BigInteger.ZERO
+    pool ! GetBalance(testPublicKey)
+    expectMsg(Balance(testPublicKey, genesis, testBalance))
+    pool ! GetBalance(ED25519PublicKey.zero)
+    expectMsg(Balance(ED25519PublicKey.zero, genesis, BigInteger.ZERO))
   }
 
   it should "return correct balance after transfering money" in {
-    val pool     = BlockPool()
+    val pool     = system.actorOf(blockPoolProps)
     val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
-    pool.addBlock(newBlock)
 
-    val (block1, balance1) = pool.getBalance(testPublicKey)
-    block1 shouldBe newBlock
-    balance1 shouldBe (testBalance subtract BigInteger.valueOf(10l))
-    val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
-    block2 shouldBe newBlock
-    balance2 shouldBe BigInteger.valueOf(10l)
+    addBlocks(pool, newBlock)
+
+    pool ! GetBestHeader
+    expectMsg(BestHeader(newBlock))
+
+    pool ! GetBestChain
+    expectMsg(BestChain(Seq(genesis, newBlock)))
+
+    pool ! GetBalance(testPublicKey)
+    expectMsg(Balance(testPublicKey, newBlock, testBalance subtract BigInteger.valueOf(10l)))
+
+    pool ! GetBalance(ED25519PublicKey.zero)
+    expectMsg(Balance(ED25519PublicKey.zero, newBlock, BigInteger.valueOf(10l)))
   }
 
   it should "return correct utxos with only genesis block" in {
-    val pool = BlockPool()
+    val pool = system.actorOf(blockPoolProps)
 
-    val utxos1 = pool.getUTXOs(testPublicKey)
-    utxos1.size shouldBe 1
-    utxos1.head shouldBe TxInput(Genesis.transactions.head.hash, 0)
-    val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
-    utxos2.size shouldBe 0
+    pool ! GetUTXOs(testPublicKey, testBalance)
+    expectMsgPF() {
+      case UTXOs(header, inputs, total) =>
+        header shouldBe genesis.hash
+        inputs.size shouldBe 1
+        total shouldBe testBalance
+    }
 
-    val utxos3 = pool.getUTXOs(testPublicKey, testBalance)
-    utxos3 shouldBe defined
-    utxos3.get._2 shouldBe testBalance
-    val utxos4 = pool.getUTXOs(testPublicKey, testBalance add BigInteger.ONE)
-    utxos4 shouldBe None
+    pool ! GetUTXOs(testPublicKey, testBalance add BigInteger.ONE)
+    expectMsg(NoEnoughBalance)
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
-    utxos5 shouldBe None
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    expectMsg(NoEnoughBalance)
   }
 
   it should "return correct utxos after transfering money" in {
-    val pool     = BlockPool()
+    val pool     = system.actorOf(blockPoolProps)
     val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
-    pool.addBlock(newBlock)
+    addBlocks(pool, newBlock)
 
-    val utxos1 = pool.getUTXOs(testPublicKey)
-    utxos1.size shouldBe 1
-    val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
-    utxos2.size shouldBe 1
+    pool ! GetUTXOs(testPublicKey, BigInteger.valueOf(10l))
+    expectMsgPF() {
+      case UTXOs(header, inputs, total) =>
+        header shouldBe newBlock.hash
+        inputs.size shouldBe 1
+        total shouldBe (testBalance subtract BigInteger.valueOf(10l))
+    }
 
-    val utxos3 = pool.getUTXOs(testPublicKey, BigInteger.valueOf(10l))
-    utxos3 shouldBe defined
-    utxos3.get._2 shouldBe (testBalance subtract BigInteger.valueOf(10l))
-    val utxos4 = pool.getUTXOs(testPublicKey, BigInteger.valueOf(100l))
-    utxos4 shouldBe None
+    pool ! GetUTXOs(testPublicKey, BigInteger.valueOf(100l))
+    expectMsg(NoEnoughBalance)
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
-    utxos5 shouldBe defined
-    utxos5.get._2 shouldBe BigInteger.valueOf(10l)
-    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(11l))
-    utxos6 shouldBe None
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    expectMsgType[UTXOs]
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(11l))
+    expectMsg(NoEnoughBalance)
+  }
+
+  private def addBlocks(pool: ActorRef, blocks: Block*) = {
+    pool ! AddBlocks(blocks)
   }
 }
