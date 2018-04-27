@@ -4,7 +4,7 @@ import java.math.BigInteger
 
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
-import org.alephium.protocol.message.{Message, SendBlock}
+import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction, TxOutput, UnsignedTransaction}
 import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
@@ -36,7 +36,7 @@ case class Client(privateKey: ED25519PrivateKey,
       val block       = Client.mine(Seq(header), Seq(transaction))
 
       blockPool ! BlockPool.AddBlocks(Seq(block))
-      val message = Message(SendBlock(block))
+      val message = Message(SendBlocks(Seq(block)))
       tcpHandler ! message
 
       context become receive
@@ -58,7 +58,7 @@ object Client {
 
   sealed trait Event
   case object TransferSuccess extends Event
-  case object TransferFailed extends Event
+  case object TransferFailed  extends Event
 
   def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Block = {
     @tailrec

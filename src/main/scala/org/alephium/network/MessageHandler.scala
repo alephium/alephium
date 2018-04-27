@@ -3,7 +3,8 @@ package org.alephium.network
 import akka.actor.{ActorRef, Timers}
 import akka.io.Tcp
 import org.alephium.constant.Network
-import org.alephium.protocol.message.{Message, Ping, Pong, SendBlock}
+import org.alephium.protocol.message._
+import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
 
 import scala.util.Random
@@ -15,7 +16,7 @@ object MessageHandler {
 
 trait MessageHandler extends BaseActor with Timers {
 
-  def blockHandler: ActorRef
+  def blockPool: ActorRef
 
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
@@ -39,13 +40,22 @@ trait MessageHandler extends BaseActor with Timers {
           logger.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
           context stop self
         }
-      case SendBlock(block) =>
-        logger.debug(s"Block received: $block")
-        blockHandler ! BlockHandler.AddBlock(block)
+      case SendBlocks(blocks) =>
+        logger.debug(s"Blocks received: $blocks")
+        blockPool ! BlockPool.AddBlocks(blocks)
+      case GetBlocks(locators) =>
+        logger.debug(s"GetBlocks received: $locators")
+        blockPool ! BlockPool.GetBlocks(locators)
+        context become (awaitBlocks(connection) orElse forMessageHandler(connection))
     }
   }
 
-  // nonce for ping/pong message
+  def awaitBlocks(connection: ActorRef): Receive = {
+    case BlockPool.SendBlocks(blocks) =>
+      connection ! envelope(Message(SendBlocks(blocks)))
+      context.unbecome()
+  }
+
   private var pingNonce: Int = 0
 
   def sendPing(connection: ActorRef): Unit = {

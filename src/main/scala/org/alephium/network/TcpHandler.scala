@@ -41,11 +41,11 @@ trait TcpHandler extends MessageHandler {
 }
 
 object SimpleTcpHandler {
-  def props(remote: InetSocketAddress, connection: ActorRef, blockHandler: ActorRef): Props =
-    Props(new SimpleTcpHandler(remote, connection, blockHandler))
+  def props(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef): Props =
+    Props(new SimpleTcpHandler(remote, connection, blockPool))
 }
 
-case class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef, blockHandler: ActorRef)
+case class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
     extends TcpHandler {
   override def receive: Receive = awaitStart(connection)
 }
