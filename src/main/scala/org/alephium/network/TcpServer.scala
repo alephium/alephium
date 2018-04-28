@@ -7,10 +7,11 @@ import akka.io.{IO, Tcp}
 import org.alephium.util.BaseActor
 
 object TcpServer {
-  def props(port: Int, blockHandler: ActorRef): Props = Props(new TcpServer(port, blockHandler))
+  def props(port: Int, peerManager: ActorRef): Props =
+    Props(new TcpServer(port, peerManager))
 }
 
-class TcpServer(port: Int, blockHandler: ActorRef) extends BaseActor {
+class TcpServer(port: Int, peerManager: ActorRef) extends BaseActor {
 
   import context.system
 
@@ -28,12 +29,7 @@ class TcpServer(port: Int, blockHandler: ActorRef) extends BaseActor {
   }
 
   def ready: Receive = {
-    case Tcp.Connected(remoteAddress, localAddress) =>
-      logger.debug(s"Connect to $remoteAddress, Listen at $localAddress")
-      val connection = sender()
-      val handler = context.actorOf(SimpleTcpHandler.props(remoteAddress, connection, blockHandler),
-                                    s"${localAddress.getPort}-${remoteAddress.getPort}")
-      connection ! Tcp.Register(handler)
-      handler ! TcpHandler.Start
+    case c: Tcp.Connected =>
+      peerManager.forward(c)
   }
 }
