@@ -11,6 +11,10 @@ object PeerManager {
 
   sealed trait Command
   case class Connect(remote: InetSocketAddress) extends Command
+  case object GetPeers                          extends Command
+
+  sealed trait Event
+  case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
 class PeerManager(blockPool: ActorRef) extends BaseActor {
@@ -21,6 +25,8 @@ class PeerManager(blockPool: ActorRef) extends BaseActor {
   def manage(peers: Map[InetSocketAddress, ActorRef]): Receive = {
     case Connect(remote) =>
       IO(Tcp)(context.system) ! Tcp.Connect(remote)
+    case GetPeers =>
+      sender() ! Peers(peers)
     case Tcp.Connected(remote, local) =>
       logger.debug(s"Connect to $remote, Listen at $local")
       val connection = sender()
@@ -28,7 +34,6 @@ class PeerManager(blockPool: ActorRef) extends BaseActor {
       connection ! Tcp.Register(tcpHandler)
       val newReceive = manage(peers + (remote -> tcpHandler))
       context.become(newReceive)
-      context.parent ! tcpHandler // TODO: remove this
     case Tcp.CommandFailed(x: Tcp.Connect) =>
       logger.info(s"Cannot connect to ${x.remoteAddress}")
   }
