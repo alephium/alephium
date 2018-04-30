@@ -18,10 +18,6 @@ object MessageHandler {
 
 class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActor with Timers {
 
-  override def preStart(): Unit = {
-    self ! MessageHandler.SendPing
-  }
-
   override def receive: Receive = handlePayload orElse handleInternal orElse awaitSendPing
 
   def handlePayload: Receive = {
