@@ -22,21 +22,21 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
 
   def handlePayload: Receive = {
     case Ping(nonce) =>
-      logger.debug("Ping received, response with pong")
+      log.debug("Ping received, response with pong")
       connection ! TcpHandler.envelope(Message(Pong(nonce)))
     case Pong(nonce) =>
       if (nonce == pingNonce) {
-        logger.debug("Pong received, no response")
+        log.debug("Pong received, no response")
         pingNonce = 0
       } else {
-        logger.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
+        log.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
         context stop self
       }
     case SendBlocks(blocks) =>
-      logger.debug(s"Blocks received: $blocks")
+      log.debug(s"Blocks received: $blocks")
       blockPool ! BlockPool.AddBlocks(blocks)
     case GetBlocks(locators) =>
-      logger.debug(s"GetBlocks received: $locators")
+      log.debug(s"GetBlocks received: $locators")
       blockPool ! BlockPool.GetBlocks(locators)
   }
 
@@ -54,7 +54,7 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
 
   def sendPing(): Unit = {
     if (pingNonce != 0) {
-      logger.debug("No pong message received in time")
+      log.debug("No pong message received in time")
       context stop self
     } else {
       pingNonce = Random.nextInt()

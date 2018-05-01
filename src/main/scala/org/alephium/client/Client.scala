@@ -41,7 +41,7 @@ case class Client(privateKey: ED25519PrivateKey,
 
       context become receive
     case BlockPool.NoEnoughBalance =>
-      logger.info(s"Not able to transfer $value Aleph")
+      log.info(s"Not able to transfer $value Aleph")
       context become receive
   }
 }

@@ -21,10 +21,10 @@ class TcpServer(port: Int, peerManager: ActorRef) extends BaseActor {
 
   def binding: Receive = {
     case Tcp.Bound(localAddress) =>
-      logger.debug(s"Server binded to $localAddress")
+      log.debug(s"Server binded to $localAddress")
       context.become(ready)
     case Tcp.CommandFailed(_: Tcp.Bind) =>
-      logger.debug(s"Bind failed")
+      log.debug(s"Bind failed")
       context stop self
   }
 

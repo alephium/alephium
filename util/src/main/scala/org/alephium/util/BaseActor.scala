@@ -1,11 +1,10 @@
 package org.alephium.util
 
-import akka.actor.Actor
-import com.typesafe.scalalogging.StrictLogging
+import akka.actor.{Actor, ActorLogging}
 
-trait BaseActor extends Actor with StrictLogging {
+trait BaseActor extends Actor with ActorLogging {
 
   override def unhandled(message: Any): Unit = {
-    logger.warn(s"Unhandled message: $message")
+    log.warning(s"Unhandled message: $message")
   }
 }
