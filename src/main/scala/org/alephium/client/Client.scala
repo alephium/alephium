@@ -1,7 +1,5 @@
 package org.alephium.client
 
-import java.math.BigInteger
-
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.protocol.message.{Message, SendBlocks}
@@ -26,10 +24,10 @@ case class Client(privateKey: ED25519PrivateKey,
       context become transfer(toAddress, value)
   }
 
-  def transfer(toAddress: ED25519PublicKey, value: BigInteger): Receive = {
+  def transfer(toAddress: ED25519PublicKey, value: BigInt): Receive = {
     case BlockPool.UTXOs(header, txInputs, total) =>
       val txOutput1   = TxOutput(value, toAddress)
-      val txOutput2   = TxOutput(total subtract value, address)
+      val txOutput2   = TxOutput(total - value, address)
       val txOutputs   = Seq(txOutput1, txOutput2)
       val unsigned    = UnsignedTransaction(txInputs, txOutputs)
       val transaction = Transaction.from(unsigned, privateKey)
@@ -54,7 +52,7 @@ object Client {
     Props(new Client(privateKey, publicKey, blockPool, tcpHandler))
 
   sealed trait Command
-  case class Transfer(toAddress: ED25519PublicKey, value: BigInteger) extends Command
+  case class Transfer(toAddress: ED25519PublicKey, value: BigInt) extends Command
 
   sealed trait Event
   case object TransferSuccess extends Event
@@ -62,13 +60,13 @@ object Client {
 
   def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Block = {
     @tailrec
-    def loop(nonce: BigInteger): Block = {
+    def loop(nonce: BigInt): Block = {
       val block = Block.from(deps, transactions, nonce)
       if (isDifficult(Keccak256.hash(block.hash))) {
         block
-      } else loop(nonce add BigInteger.ONE)
+      } else loop(nonce + BigInt(1))
     }
-    loop(BigInteger.ZERO)
+    loop(BigInt(0))
   }
 
   def isDifficult(hash: Keccak256): Boolean = {
