@@ -29,7 +29,7 @@ object Genesis {
       }
     }
 
-    Block.from(Seq(Keccak256.zero), transactions.toSeq, BigInt(0))
+    Block.from(Seq(Keccak256.zero), transactions.toSeq, 0)
   }
 
   val block: Block                   = loadGenesis("genesis.json")

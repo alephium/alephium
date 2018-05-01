@@ -11,7 +11,7 @@ import scala.io.Source
 trait Fixture {
 
   def blockForTransfer(to: ED25519PublicKey, value: BigInt): Block = {
-    require(value >= BigInt(0))
+    require(value >= 0)
 
     val txOutput1 = TxOutput(value, to)
     val txOutput2 = TxOutput(testBalance - value, testPublicKey)
@@ -20,7 +20,7 @@ trait Fixture {
       UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
       testPrivateKey
     )
-    Block.from(Seq(Genesis.block.hash), Seq(transaction), BigInt(0))
+    Block.from(Seq(Genesis.block.hash), Seq(transaction), 0)
   }
 
   private val json = parse(Source.fromResource("genesis.json").mkString).right.get

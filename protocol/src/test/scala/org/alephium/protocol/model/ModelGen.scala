@@ -11,8 +11,8 @@ object ModelGen {
   } yield TxInput(Keccak256.zero, index) // Has to use zero here to pass test on ubuntu
 
   val txOutputGen: Gen[TxOutput] = for {
-    value <- Gen.choose(0l, 100l)
-  } yield TxOutput(BigInt(value), pk)
+    value <- Gen.choose(0, 100)
+  } yield TxOutput(value, pk)
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(0, 5)
@@ -24,11 +24,11 @@ object ModelGen {
   val blockGen: Gen[Block] = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq(Keccak256.zero), txs, BigInt(0))
+  } yield Block.from(Seq(Keccak256.zero), txs, 0)
 
   def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, txs, BigInt(0))
+    } yield Block.from(deps, txs, 0)
 }

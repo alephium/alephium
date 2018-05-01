@@ -40,7 +40,7 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
     val sBytes = bytes.takeRight(32).toArray.reverse
     sBytes(0) = (sBytes(0) & 0x7F).toByte
     val s = BigInt(sBytes)
-    s >= BigInt(0) && s < ED25519.generator
+    s >= 0 && s < ED25519.generator
   }
 
   private def apply(bytes: ByteString): ED25519Signature = {

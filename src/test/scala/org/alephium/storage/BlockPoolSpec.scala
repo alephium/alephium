@@ -59,12 +59,12 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
     pool ! GetBalance(testPublicKey)
     expectMsg(Balance(testPublicKey, genesis, testBalance))
     pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, genesis, BigInt(0)))
+    expectMsg(Balance(ED25519PublicKey.zero, genesis, 0))
   }
 
   it should "return correct balance after transfering money" in {
     val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInt(10l))
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
 
     addBlocks(pool, newBlock)
 
@@ -75,10 +75,10 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
     expectMsg(BestChain(Seq(genesis, newBlock)))
 
     pool ! GetBalance(testPublicKey)
-    expectMsg(Balance(testPublicKey, newBlock, testBalance - BigInt(10l)))
+    expectMsg(Balance(testPublicKey, newBlock, testBalance - 10))
 
     pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, newBlock, BigInt(10l)))
+    expectMsg(Balance(ED25519PublicKey.zero, newBlock, 10))
   }
 
   it should "return correct utxos with only genesis block" in {
@@ -92,32 +92,32 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
         total shouldBe testBalance
     }
 
-    pool ! GetUTXOs(testPublicKey, testBalance + BigInt(1))
+    pool ! GetUTXOs(testPublicKey, testBalance + 1)
     expectMsg(NoEnoughBalance)
 
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(10l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, 10)
     expectMsg(NoEnoughBalance)
   }
 
   it should "return correct utxos after transfering money" in {
     val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInt(10l))
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
     addBlocks(pool, newBlock)
 
-    pool ! GetUTXOs(testPublicKey, BigInt(10l))
+    pool ! GetUTXOs(testPublicKey, 10)
     expectMsgPF() {
       case UTXOs(header, inputs, total) =>
         header shouldBe newBlock.hash
         inputs.size shouldBe 1
-        total shouldBe (testBalance - BigInt(10l))
+        total shouldBe (testBalance - 10)
     }
 
-    pool ! GetUTXOs(testPublicKey, BigInt(100l))
+    pool ! GetUTXOs(testPublicKey, 100)
     expectMsg(NoEnoughBalance)
 
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(10l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, 10)
     expectMsgType[UTXOs]
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(11l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, 11)
     expectMsg(NoEnoughBalance)
   }
 
