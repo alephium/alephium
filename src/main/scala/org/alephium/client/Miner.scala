@@ -1,24 +1,21 @@
 package org.alephium.client
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.protocol.message.SendBlocks
+//import org.alephium.network.PeerManager
+//import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
 
 object Miner {
-  def props(address: ED25519PublicKey, blockPool: ActorRef): Props =
-    Props(new Miner(address, blockPool))
+  def props(address: ED25519PublicKey, blockPool: ActorRef, peerManager: ActorRef): Props =
+    Props(new Miner(address, blockPool, peerManager))
 
   sealed trait Command
-  case object Start                                                extends Command
-  case object Stop                                                 extends Command
-  case class Peer(remote: InetSocketAddress, tcpHandler: ActorRef) extends Command
-  case class Pool(transaction: Transaction)                        extends Command
-  case class Nonce(nonce: BigInt)                                  extends Command
+  case object Start               extends Command
+  case object Stop                extends Command
+  case class Nonce(nonce: BigInt) extends Command
 
   def tryMine(deps: Seq[Keccak256],
               transactions: Seq[Transaction],
@@ -30,50 +27,51 @@ object Miner {
   }
 
   def isDifficult(hash: Keccak256): Boolean = {
-    hash.bytes(0) == 0 //TODO: improve this
+    hash.bytes.take(2).forall(_ == 0) //TODO: improve this
   }
 }
 
-case class Miner(address: ED25519PublicKey, blockPool: ActorRef) extends BaseActor {
-  private val peers           = collection.mutable.HashMap.empty[InetSocketAddress, ActorRef]
-  private val transactionPool = collection.mutable.HashMap.empty[Keccak256, Transaction]
+case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: ActorRef)
+    extends BaseActor {
 
-  override def receive: Receive = idle
+  override def receive: Receive = awaitStart
 
-  def common: Receive = {
-    case Miner.Peer(remote, tcpHandler) =>
-      peers += remote -> tcpHandler
-    case Miner.Pool(transaction) =>
-      transactionPool += transaction.hash -> transaction
-  }
-
-  def idle: Receive = common orElse {
+  def awaitStart: Receive = {
     case Miner.Start =>
+      blockPool ! BlockPool.GetBestHeader
       context become collect
   }
 
-  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive = common orElse {
-    case Miner.Stop => context become idle
+  def awaitStop: Receive = {
+    case Miner.Stop =>
+      context become awaitStart
+  }
+
+  private def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive = {
     case Miner.Nonce(nonce) =>
       Miner.tryMine(deps, transactions, nonce) match {
         case Some(block) =>
-          broadcast(block)
+          log.info("A new block is mined")
           blockPool ! BlockPool.AddBlocks(Seq(block))
           blockPool ! BlockPool.GetBestHeader
+          /* TODO: enable broadcasting
+           * peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
+           */
           context become collect
         case None =>
           self ! Miner.Nonce(nonce + 1)
       }
   }
 
-  def collect: Receive = common orElse {
+  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive =
+    _mine(deps, transactions) orElse awaitStop
+
+  private def _collect: Receive = {
     case BlockPool.BestHeader(header) =>
       val transaction = Transaction.coinbase(address, 1)
       context become mine(Seq(header.hash), Seq(transaction))
       self ! Miner.Nonce(1)
   }
 
-  private def broadcast(block: Block): Unit = {
-    peers.values.foreach(_ ! SendBlocks(Seq(block)))
-  }
+  def collect: Receive = _collect orElse awaitStop
 }

@@ -22,6 +22,7 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
 
   def handlePayload: Receive = {
     case Ping(nonce) =>
+      // TODO: refuse ping if it's too frequent
       log.debug("Ping received, response with pong")
       connection ! TcpHandler.envelope(Message(Pong(nonce)))
     case Pong(nonce) =>
@@ -33,15 +34,15 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
         context stop self
       }
     case SendBlocks(blocks) =>
-      log.debug(s"Blocks received: $blocks")
+      log.debug(s"Received #${blocks.size} blocks")
       blockPool ! BlockPool.AddBlocks(blocks)
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockPool ! BlockPool.GetBlocks(locators)
+      blockPool ! BlockPool.GetBlocksAfter(locators)
   }
 
   def handleInternal: Receive = {
-    case BlockPool.SendBlocks(blocks) =>
+    case BlockPool.SendBlocksAfter(_, blocks) =>
       connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
   }
 
