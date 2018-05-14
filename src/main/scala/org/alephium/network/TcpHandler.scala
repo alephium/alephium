@@ -8,6 +8,8 @@ import akka.util.ByteString
 import org.alephium.protocol.message.Message
 import org.alephium.util.BaseActor
 
+import scala.util.{Failure, Success, Try}
+
 object TcpHandler {
 
   def props(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef): Props =
@@ -18,6 +20,17 @@ object TcpHandler {
 
   sealed trait Command
   case object Start extends Command
+
+  def sequentialDeserialize(data: ByteString): Try[Seq[Message]] = {
+    def iter(rest: ByteString, acc: Seq[Message]): Try[Seq[Message]] = {
+      Message.deserializer._deserialize(rest).flatMap {
+        case (message, newRest) =>
+          if (newRest.isEmpty) Success(acc :+ message)
+          else iter(newRest, acc :+ message)
+      }
+    }
+    iter(data, Seq.empty)
+  }
 }
 
 class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
@@ -37,30 +50,26 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
     case Tcp.Received(data) =>
       // We assume each packet contains several complete messages
       // TODO: remove this assumption
-      val messages = sequentialDeserialize(data)
-      messages.foreach { message =>
-        log.debug(s"Received message of #${message.header.cmdCode} from $remote")
-        messageHandler ! message.payload
+      TcpHandler.sequentialDeserialize(data) match {
+        case Success(messages) =>
+          messages.foreach { message =>
+            log.debug(s"Received message of cmd@${message.header.cmdCode} from $remote")
+            messageHandler ! message.payload
+          }
+        case Failure(_) =>
+          log.debug(s"Received corrupted data from $remote with serde exception")
       }
-    case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
-      log.debug(s"Connection closed: $closeEvent")
-      context stop self
-    case Tcp.ErrorClosed(cause) =>
-      log.debug(s"Connection closed with error: $cause")
+    case event: Tcp.ConnectionClosed =>
+      if (event.isErrorClosed) {
+        log.debug(s"Connection closed with error: ${event.getErrorCause}")
+      } else {
+        log.debug(s"Connection closed normally: $event")
+      }
       context stop self
   }
 
   def handleOutMessage: Receive = {
     case message: Message =>
       connection ! TcpHandler.envelope(message)
-  }
-
-  private def sequentialDeserialize(data: ByteString): List[Message] = {
-    // TODO: safe code; optimized code
-    Message.deserializer._deserialize(data).get match {
-      case (message, restData) =>
-        if (restData.isEmpty) List(message)
-        else message :: sequentialDeserialize(restData)
-    }
   }
 }
