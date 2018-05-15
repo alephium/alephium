@@ -25,12 +25,9 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
       Props(
         new TcpHandler(remote, connection.ref, blockPool.ref) {
           override val messageHandler = obj.messageHandler.ref
-
-          override def preStart(): Unit = {}
         }
       )
     )
-    tcpHandler ! TcpHandler.Start
     messageHandler.expectMsg(MessageHandler.SendPing)
   }
 

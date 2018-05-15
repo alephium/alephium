@@ -18,9 +18,6 @@ object TcpHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
 
-  sealed trait Command
-  case object Start extends Command
-
   def sequentialDeserialize(data: ByteString): Try[Seq[Message]] = {
     def iter(rest: ByteString, acc: Seq[Message]): Try[Seq[Message]] = {
       Message.deserializer._deserialize(rest).flatMap {
@@ -36,15 +33,13 @@ object TcpHandler {
 class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
     extends BaseActor {
 
-  protected val messageHandler = context.actorOf(MessageHandler.props(connection, blockPool))
+  val messageHandler: ActorRef = context.actorOf(MessageHandler.props(connection, blockPool))
 
-  override def receive: Receive = awaitStart
-
-  def awaitStart: Receive = {
-    case TcpHandler.Start =>
-      messageHandler ! MessageHandler.SendPing
-      context become (handleEvent orElse handleOutMessage)
+  override def preStart(): Unit = {
+    messageHandler ! MessageHandler.SendPing
   }
+
+  override def receive: Receive = handleEvent orElse handleOutMessage
 
   def handleEvent: Receive = {
     case Tcp.Received(data) =>
