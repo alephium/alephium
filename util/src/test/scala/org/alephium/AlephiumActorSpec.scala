@@ -20,7 +20,9 @@ object AlephiumActorSpec {
     """
       |akka {
       |  stdout-loglevel = "OFF"
-      |  loglevel = "WARNING"
+      |  loggers = ["akka.testkit.TestEventListener"]
+      |  stdout-loglevel = "OFF"
+      |  loglevel = "OFF"
       |
       |  actor {
       |    debug {
