@@ -10,7 +10,7 @@ import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
 
 object PeerManager {
-  def props(blockPool: ActorRef): Props = Props(new PeerManager(blockPool))
+  def props(port: Int, blockPool: ActorRef): Props = Props(new PeerManager(port, blockPool))
 
   sealed trait Command
   case class Connect(remote: InetSocketAddress)                        extends Command
@@ -22,8 +22,10 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(blockPool: ActorRef) extends BaseActor {
+class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
   import PeerManager._
+
+  val server: ActorRef = context.actorOf(TcpServer.props(port))
 
   override def receive: Receive = manage(Map.empty)
 

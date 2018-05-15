@@ -7,24 +7,24 @@ import akka.io.{IO, Tcp}
 import org.alephium.util.BaseActor
 
 object TcpServer {
-  def props(port: Int, peerManager: ActorRef): Props =
-    Props(new TcpServer(port, peerManager))
+  def props(port: Int): Props = Props(new TcpServer(port))
 }
 
-class TcpServer(port: Int, peerManager: ActorRef) extends BaseActor {
-
+class TcpServer(port: Int) extends BaseActor {
   import context.system
 
-  IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress("localhost", port))
+  val peerManager: ActorRef = context.parent
+
+  IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port))
 
   override def receive: Receive = binding
 
   def binding: Receive = {
     case Tcp.Bound(localAddress) =>
-      log.debug(s"Server binded to $localAddress")
+      log.debug(s"Server bound to $localAddress")
       context.become(ready)
     case Tcp.CommandFailed(_: Tcp.Bind) =>
-      log.debug(s"Bind failed")
+      log.debug(s"Binding failed")
       context stop self
   }
 

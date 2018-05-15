@@ -2,11 +2,11 @@ package org.alephium
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import org.alephium.client.Client
 import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.network.{PeerManager, TcpServer}
+import org.alephium.network.PeerManager
 import org.alephium.protocol.Genesis
 import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.storage.BlockPool
@@ -16,8 +16,7 @@ import org.alephium.util.Hex._
 // scalastyle:off magic.number
 class TcpFun extends BaseActor {
   private val blockPool   = context.actorOf(BlockPool.props())
-  private val peerManager = context.actorOf(PeerManager.props(blockPool))
-  val server: ActorRef    = context.actorOf(TcpServer.props(Network.port, peerManager), "server")
+  private val peerManager = context.actorOf(PeerManager.props(Network.port, blockPool))
 
   private val privateKey: ED25519PrivateKey = ED25519PrivateKey.unsafeFrom(
     hex"604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65")

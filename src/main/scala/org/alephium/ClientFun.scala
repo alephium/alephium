@@ -11,7 +11,7 @@ import org.alephium.storage.BlockPool
 object ClientFun extends App {
   val system      = ActorSystem("ClientFun")
   val blockPool   = system.actorOf(BlockPool.props())
-  val peerManager = system.actorOf(PeerManager.props(blockPool))
+  val peerManager = system.actorOf(PeerManager.props(10303, blockPool))
 
   val remote = new InetSocketAddress(Network.port)
   peerManager ! PeerManager.Connect(remote)
