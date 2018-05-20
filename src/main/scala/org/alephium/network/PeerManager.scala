@@ -17,6 +17,7 @@ object PeerManager {
   sealed trait Command
   case class Connect(remote: InetSocketAddress)                        extends Command
   case class Sync(remote: InetSocketAddress, locators: Seq[Keccak256]) extends Command
+  case class BroadCast(message: Message)                               extends Command
   case object GetPeers                                                 extends Command
 
   sealed trait Event
@@ -29,6 +30,9 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
   val server: ActorRef                                = context.actorOf(TcpServer.props(port))
   val peers: mutable.Map[InetSocketAddress, ActorRef] = mutable.Map.empty
 
+  def tcpHandlers: Iterable[ActorRef] = peers.values
+  def peersSize: Int                  = peers.size
+
   override def preStart(): Unit = {
     context.watch(server)
     context.watch(blockPool)
@@ -40,7 +44,8 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
       IO(Tcp)(context.system) ! Tcp.Connect(remote)
     case Tcp.Connected(remote, local) =>
       addPeer(remote, sender())
-      log.debug(s"Connected to $remote, listen at $local, now ${peers.size} peers")
+      log.debug(s"Connected to $remote, listen at $local, now $peersSize peers")
+      blockPool ! BlockPool.PrepareSync(remote)
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       log.info(s"Cannot connect to ${c.remoteAddress}")
     case Sync(remote, locators) =>
@@ -51,6 +56,9 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
       } else {
         log.warning(s"No connection to $remote")
       }
+    case BroadCast(message) =>
+      log.debug(s"Broadcast message to $peersSize peers")
+      tcpHandlers.foreach(_ ! message)
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>
@@ -62,7 +70,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
         unwatchAndStop()
       } else {
         removePeer(child)
-        log.debug(s"Peer connection closed, removing peer, ${peers.size} peers left")
+        log.debug(s"Peer connection closed, removing peer, $peersSize peers left")
       }
   }
 
@@ -82,7 +90,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
   def unwatchAndStop(): Unit = {
     context.unwatch(server)
     context.unwatch(blockPool)
-    peers.values.foreach(context.unwatch)
+    tcpHandlers.foreach(context.unwatch)
     context.stop(self)
   }
 }
