@@ -19,7 +19,7 @@ trait Deserializer[T] {
     _deserialize(input).flatMap {
       case (output, rest) =>
         if (rest.isEmpty) Success(output)
-        else Failure(new InvalidNumberOfBytesException(input.size - rest.size, input.size))
+        else Failure(WrongFormatException.redundant(input.size - rest.size, input.size))
     }
 }
 
@@ -71,14 +71,18 @@ trait FixedSizeSerde[T] extends Serde[T] {
   def deserialize0(input: ByteString, f: ByteString => T): Try[T] = Try {
     if (input.size == serdeSize) {
       f(input)
-    } else throw new InvalidNumberOfBytesException(serdeSize, input.size)
+    } else if (input.size > serdeSize) {
+      throw WrongFormatException.redundant(serdeSize, input.size)
+    } else {
+      throw NotEnoughBytesException(serdeSize, input.size)
+    }
   }
 
   override def _deserialize(input: ByteString): Try[(T, ByteString)] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map((_, rest))
-    } else Failure(new InvalidNumberOfBytesException(serdeSize, input.size))
+    } else Failure(NotEnoughBytesException(serdeSize, input.size))
 }
 
 object Serde extends ProductSerde {
