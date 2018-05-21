@@ -6,8 +6,10 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 import org.alephium.protocol.message.Message
+import org.alephium.serde.NotEnoughBytesException
 import org.alephium.util.BaseActor
 
+import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 object TcpHandler {
@@ -18,12 +20,16 @@ object TcpHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
 
-  def sequentialDeserialize(data: ByteString): Try[Seq[Message]] = {
-    def iter(rest: ByteString, acc: Seq[Message]): Try[Seq[Message]] = {
-      Message.deserializer._deserialize(rest).flatMap {
-        case (message, newRest) =>
-          if (newRest.isEmpty) Success(acc :+ message)
-          else iter(newRest, acc :+ message)
+  def deserialize(data: ByteString): Try[(Seq[Message], ByteString)] = {
+    @tailrec
+    def iter(rest: ByteString, acc: Seq[Message]): Try[(Seq[Message], ByteString)] = {
+      Message.deserializer._deserialize(rest) match {
+        case Success((message, newRest)) =>
+          iter(newRest, acc :+ message)
+        case Failure(_: NotEnoughBytesException) =>
+          Success((acc, rest))
+        case Failure(e) =>
+          Failure(e)
       }
     }
     iter(data, Seq.empty)
@@ -40,20 +46,20 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
     messageHandler ! MessageHandler.SendPing
   }
 
-  override def receive: Receive = handleEvent orElse handleOutMessage
+  override def receive: Receive = handleEvent(ByteString.empty) orElse handleOutMessage
 
-  def handleEvent: Receive = {
+  def handleEvent(unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
-      // We assume each packet contains several complete messages
-      // TODO: remove this assumption
-      TcpHandler.sequentialDeserialize(data) match {
-        case Success(messages) =>
+      TcpHandler.deserialize(unaligned ++ data) match {
+        case Success((messages, rest)) =>
           messages.foreach { message =>
             log.debug(s"Received message of cmd@${message.header.cmdCode} from $remote")
             messageHandler ! message.payload
           }
+          context.become(handleEvent(rest) orElse handleOutMessage)
         case Failure(_) =>
-          log.debug(s"Received corrupted data from $remote with serde exception")
+          log.info(s"Received corrupted data from $remote with serde exception; Close connection")
+          context stop self
       }
     case event: Tcp.ConnectionClosed =>
       if (event.isErrorClosed) {
