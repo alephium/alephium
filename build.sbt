@@ -18,14 +18,14 @@ def subProject(path: String): Project = {
     .settings(Test / scalastyleConfig := root.base / "scalastyle-test-config.xml")
 }
 
+lazy val util = subProject("util")
+
 lazy val serde = subProject("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
     Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
   )
-
-lazy val util = subProject("util")
-  .dependsOn(serde)
+  .dependsOn(util % "test->test;compile->compile")
 
 lazy val crypto = subProject("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)

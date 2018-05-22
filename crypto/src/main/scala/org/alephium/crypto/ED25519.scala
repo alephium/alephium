@@ -1,7 +1,7 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.util.FixedSizeBytes
+import org.alephium.serde.FixedSizeBytes
 import org.whispersystems.curve25519.Curve25519
 
 case class ED25519PrivateKey(bytes: ByteString) extends PrivateKey
