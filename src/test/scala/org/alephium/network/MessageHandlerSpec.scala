@@ -4,7 +4,7 @@ import akka.io.Tcp
 import akka.testkit.TestProbe
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message._
-import org.alephium.storage.BlockPool
+import org.alephium.storage.BlockPoolHandler
 
 import scala.util.Random
 
@@ -41,16 +41,16 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
 
   it should "let block pool add blocks when receiving new blocks" in new Fixture {
     messageHandler ! SendBlocks(Seq.empty)
-    blockPool.expectMsg(BlockPool.AddBlocks(Seq.empty))
+    blockPool.expectMsg(BlockPoolHandler.AddBlocks(Seq.empty))
   }
 
   it should "let block pool send blocks when asked for new blocks" in new Fixture {
     messageHandler ! GetBlocks(Seq.empty)
-    blockPool.expectMsg(BlockPool.GetBlocksAfter(Seq.empty))
+    blockPool.expectMsg(BlockPoolHandler.GetBlocksAfter(Seq.empty))
   }
 
   it should "send blocks to connection when receiving new blocks from block pool" in new Fixture {
-    messageHandler ! BlockPool.SendBlocksAfter(Seq.empty, Seq.empty)
+    messageHandler ! BlockPoolHandler.SendBlocksAfter(Seq.empty, Seq.empty)
     connection.expectMsg(TcpHandler.envelope(Message(SendBlocks(Seq.empty))))
   }
 }

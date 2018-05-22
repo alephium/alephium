@@ -5,7 +5,7 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.storage.BlockPool
+import org.alephium.storage.BlockPoolHandler
 import org.alephium.util.BaseActor
 
 object Miner {
@@ -38,7 +38,7 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
 
   def awaitStart: Receive = {
     case Miner.Start =>
-      blockPool ! BlockPool.GetBestHeader
+      blockPool ! BlockPoolHandler.GetBestHeader
       context become collect
   }
 
@@ -52,8 +52,8 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
       Miner.tryMine(deps, transactions, nonce) match {
         case Some(block) =>
           log.info("A new block is mined")
-          blockPool ! BlockPool.AddBlocks(Seq(block))
-          blockPool ! BlockPool.GetBestHeader
+          blockPool ! BlockPoolHandler.AddBlocks(Seq(block))
+          blockPool ! BlockPoolHandler.GetBestHeader
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
           context become collect
         case None =>
@@ -65,7 +65,7 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
     _mine(deps, transactions) orElse awaitStop
 
   private def _collect: Receive = {
-    case BlockPool.BestHeader(header) =>
+    case BlockPoolHandler.BestHeader(header) =>
       val transaction = Transaction.coinbase(address, 1)
       context become mine(Seq(header.hash), Seq(transaction))
       self ! Miner.Nonce(1)

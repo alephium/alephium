@@ -5,12 +5,12 @@ import org.alephium.client.Miner
 import org.alephium.constant.Network
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.network.PeerManager
-import org.alephium.storage.BlockPool
+import org.alephium.storage.BlockPoolHandler
 import org.alephium.util.Hex._
 
 object ServerFun extends App {
   val system      = ActorSystem("ServerFun")
-  val blockPool   = system.actorOf(BlockPool.props())
+  val blockPool   = system.actorOf(BlockPoolHandler.props())
   val peerManager = system.actorOf(PeerManager.props(Network.port, blockPool))
 
   val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
