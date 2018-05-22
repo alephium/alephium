@@ -9,7 +9,7 @@ class SerdeSpec extends AlephiumSpec {
   "Block" should "be serde correctly" in {
     forAll(ModelGen.blockGen) { input =>
       val output = deserialize[Block](input.bytes).success.value
-      output shouldBe input
+      output is input
     }
   }
 }

@@ -7,7 +7,7 @@ class SignatureSpec extends AlephiumSpec {
     forAll { (message: Seq[Byte]) =>
       val (sk, pk) = ED25519.generateKeyPair()
       val sign     = ED25519.sign(message, sk)
-      ED25519.verify(message, sign, pk) shouldBe true
+      ED25519.verify(message, sign, pk) is true
     }
   }
 
@@ -18,9 +18,9 @@ class SignatureSpec extends AlephiumSpec {
         val (_, pk2)   = ED25519.generateKeyPair()
         val signature  = ED25519.sign(message1, sk1)
 
-        ED25519.verify(message1, signature, pk1) shouldBe true
-        ED25519.verify(message2, signature, pk1) should not be true
-        ED25519.verify(message1, signature, pk2) should not be true
+        ED25519.verify(message1, signature, pk1) is true
+        ED25519.verify(message2, signature, pk1) is false
+        ED25519.verify(message1, signature, pk2) is false
       }
     }
   }

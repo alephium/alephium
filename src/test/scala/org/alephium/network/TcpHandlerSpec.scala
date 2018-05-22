@@ -79,25 +79,25 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   it should "deserialize two messages correctly" in new SerdeFixture {
     val result = TcpHandler.deserialize(bytes).success.value
-    result._1 shouldBe Seq(message1, message2)
-    result._2 shouldBe ByteString.empty
+    result._1 is Seq(message1, message2)
+    result._2 is ByteString.empty
     for (n <- bytes.indices) {
       val input  = bytes.take(n)
       val output = TcpHandler.deserialize(input).success.value
       if (n < bytes1.length) {
-        output._1 shouldBe Seq.empty
-        output._2 shouldBe input
+        output._1 is Seq.empty
+        output._2 is input
       } else {
-        output._1 shouldBe Seq(message1)
-        output._2 shouldBe input.drop(bytes1.length)
+        output._1 is Seq(message1)
+        output._2 is input.drop(bytes1.length)
       }
     }
   }
 
   it should "fail when data is corrupted" in new SerdeFixture {
     val exception1 = TcpHandler.deserialize(bytes.tail).failure.exception
-    exception1 shouldBe a[WrongFormatException]
+    exception1 is a[WrongFormatException]
     val exception2 = TcpHandler.deserialize(bytes1 ++ bytes2.tail).failure.exception
-    exception2 shouldBe a[WrongFormatException]
+    exception2 is a[WrongFormatException]
   }
 }
