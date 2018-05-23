@@ -1,7 +1,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto._
-import org.alephium.serde.{Serde, serialize}
+import org.alephium.serde.{serialize, Serde}
 
 case class Transaction(
     unsigned: UnsignedTransaction,
