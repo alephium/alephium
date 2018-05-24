@@ -9,14 +9,14 @@ import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.Genesis
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 import org.alephium.util.Hex._
 
 // scalastyle:off magic.number
 class TcpFun extends BaseActor {
-  private val blockPool   = context.actorOf(BlockPoolHandler.props())
-  private val peerManager = context.actorOf(PeerManager.props(Network.port, blockPool))
+  private val blockHandler = context.actorOf(BlockHandler.props())
+  private val peerManager  = context.actorOf(PeerManager.props(Network.port, blockHandler))
 
   private val privateKey: ED25519PrivateKey = ED25519PrivateKey.unsafeFrom(
     hex"604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65")
@@ -36,7 +36,7 @@ class TcpFun extends BaseActor {
   def tryTransfer: Receive = {
     case PeerManager.Peers(peers) =>
       val tcpHandler = peers(serverAddress)
-      val client     = context.actorOf(Client.props(privateKey, publicKey, blockPool, tcpHandler))
+      val client     = context.actorOf(Client.props(privateKey, publicKey, blockHandler, tcpHandler))
 
       Thread.sleep(1000)
       val (_, pk) = ED25519.generateKeyPair()

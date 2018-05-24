@@ -3,20 +3,20 @@ package org.alephium.network
 import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.constant.Network
 import org.alephium.protocol.message._
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 
 import scala.util.Random
 
 object MessageHandler {
-  def props(connection: ActorRef, blockPool: ActorRef): Props =
-    Props(new MessageHandler(connection, blockPool))
+  def props(connection: ActorRef, blockHandler: ActorRef): Props =
+    Props(new MessageHandler(connection, blockHandler))
 
   sealed trait Command
   case object SendPing extends Command
 }
 
-class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActor with Timers {
+class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseActor with Timers {
 
   override def receive: Receive = handlePayload orElse handleInternal orElse awaitSendPing
 
@@ -35,14 +35,14 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.size} blocks")
-      blockPool ! BlockPoolHandler.AddBlocks(blocks)
+      blockHandler ! BlockHandler.AddBlocks(blocks)
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockPool ! BlockPoolHandler.GetBlocksAfter(locators)
+      blockHandler ! BlockHandler.GetBlocksAfter(locators)
   }
 
   def handleInternal: Receive = {
-    case BlockPoolHandler.SendBlocksAfter(_, blocks) =>
+    case BlockHandler.SendBlocksAfter(_, blocks) =>
       connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
   }
 
