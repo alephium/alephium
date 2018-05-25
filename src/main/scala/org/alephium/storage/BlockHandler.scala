@@ -39,7 +39,7 @@ class BlockHandler() extends BaseActor {
 
   val blockPool = new BlockPool()
 
-  blockPool.addBlock(Genesis.block)
+  blockPool.add(Genesis.block)
 
   override def receive: Receive = {
     case AddBlocks(blocks) =>
