@@ -2,16 +2,16 @@ package org.alephium.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.ChainSlice
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 class ForksTree extends AbsBlockPool {
   var root: ForksTree.Root = _
 
-  val blocksTable: mutable.HashMap[Keccak256, ForksTree.TreeNode] = mutable.HashMap.empty
+  val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
+  val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
 
   private def postOrderTraverse(f: ForksTree.TreeNode => Unit): Unit = {
     def iter(node: ForksTree.TreeNode): Unit = {
@@ -37,6 +37,13 @@ class ForksTree extends AbsBlockPool {
 
   def weight: Int = root.weight
 
+  private def updateTable(node: ForksTree.Node): Unit = {
+    blocksTable += node.block.hash -> node
+    node.block.transactions.foreach { transaction =>
+      transactionsTable += transaction.hash -> transaction
+    }
+  }
+
   @tailrec
   private def updateWeightFrom(node: ForksTree.Node): Unit = {
     val parent       = node.parent
@@ -49,10 +56,6 @@ class ForksTree extends AbsBlockPool {
         case _: ForksTree.Root => ()
       }
     }
-  }
-
-  private def updateTable(node: ForksTree.Node): Unit = {
-    blocksTable += node.block.hash -> node
   }
 
   private def update(node: ForksTree.Node): Unit = {
@@ -154,6 +157,8 @@ class ForksTree extends AbsBlockPool {
   override def getAllHeaders: Seq[Keccak256] = {
     blocksTable.values.filter(_.isLeaf).map(_.block.hash).toSeq
   }
+
+  override def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
 //  def prune(): Unit
 
