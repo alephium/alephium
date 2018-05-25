@@ -1,6 +1,7 @@
-package org.alephium.flow
+package org.alephium.storage
 
 import org.alephium.AlephiumSpec
+import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.ModelGen
 
 class ForksTreeSpec extends AlephiumSpec {
