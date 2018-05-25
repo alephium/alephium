@@ -51,8 +51,12 @@ class ForksTree {
     }
   }
 
-  private def update(node: ForksTree.Node): Unit = {
+  private def updateTable(node: ForksTree.Node): Unit = {
     blocksTable += node.block.hash -> node
+  }
+
+  private def update(node: ForksTree.Node): Unit = {
+    updateTable(node)
     updateWeightFrom(node)
   }
 
@@ -72,6 +76,33 @@ class ForksTree {
             false
         }
     }
+  }
+
+  @tailrec
+  private def add(parent: ForksTree.TreeNode, blocks: Seq[Block]): Unit = {
+    require(blocks.nonEmpty && blocks.head.prevBlockHash == parent.block.hash)
+    if (blocks.nonEmpty) {
+      val currentBlock = blocks.head
+      val restBlocks   = blocks.tail
+      val newNode      = ForksTree.Node(currentBlock, parent)
+      parent.successors += newNode
+      update(newNode)
+      add(newNode, restBlocks)
+    }
+  }
+
+  def add(slice: ChainSlice): Boolean = {
+    val uncommitedBlocks = slice.blocks.dropWhile(contains)
+    if (uncommitedBlocks.nonEmpty) {
+      val firstBlock = uncommitedBlocks.head
+      blocksTable.get(firstBlock.prevBlockHash) match {
+        case Some(parent) =>
+          add(parent, uncommitedBlocks)
+          true
+        case None =>
+          false
+      }
+    } else false
   }
 
 //  def prune(): Unit
