@@ -2,10 +2,11 @@ package org.alephium.storage
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.Genesis
+import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, TxInput}
 import org.alephium.util.BaseActor
 
@@ -24,7 +25,7 @@ object BlockHandler {
   case class PrepareSync(remote: InetSocketAddress)             extends Command
 
   sealed trait Event
-  case class SendBlocksAfter(locators: Seq[Keccak256], blocks: Seq[Block])   extends Event
+//  case class SendBlocksAfter(locators: Seq[Keccak256], blocks: Seq[Block])   extends Event
   case class BestHeader(header: Block)                                       extends Event
   case class BestChain(blocks: Seq[Block])                                   extends Event
   case class AllHeaders(headers: Seq[Keccak256])                             extends Event
@@ -39,18 +40,28 @@ class BlockHandler() extends BaseActor {
 
   val blockPool = ForksTree(Genesis.block)
 
-  override def receive: Receive = {
+  override def receive: Receive = awaitPeerManager
+
+  def awaitPeerManager: Receive = {
+    case PeerManager.Hello => context.become(handleWith(sender()))
+  }
+
+  def handleWith(peerManager: ActorRef): Receive = {
     case AddBlocks(blocks) =>
       val ok = blockPool.addBlocks(blocks)
       if (ok) {
         log.debug(
           s"Add ${blocks.size} blocks, #blocks: ${blockPool.numBlocks}, #height: ${blockPool.getHeight}")
+        if (blocks.size == 1) {
+          log.debug(s"Got new block, broadcast it")
+          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), sender())
+        }
       } else {
         log.warning(s"Failed to add a new block")
       }
     case GetBlocksAfter(locators) =>
       val newBlocks = blockPool.getBlocks(locators)
-      sender() ! SendBlocksAfter(locators, newBlocks)
+      sender() ! Message(SendBlocks(newBlocks))
     case GetBestHeader =>
       sender() ! BestHeader(blockPool.getBestHeader)
     case GetBestChain =>

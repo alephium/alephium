@@ -48,9 +48,4 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
     messageHandler ! GetBlocks(Seq.empty)
     blockHandler.expectMsg(BlockHandler.GetBlocksAfter(Seq.empty))
   }
-
-  it should "send blocks to connection when receiving new blocks from block pool" in new Fixture {
-    messageHandler ! BlockHandler.SendBlocksAfter(Seq.empty, Seq.empty)
-    connection.expectMsg(TcpHandler.envelope(Message(SendBlocks(Seq.empty))))
-  }
 }

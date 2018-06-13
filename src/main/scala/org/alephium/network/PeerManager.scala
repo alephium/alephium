@@ -15,10 +15,16 @@ object PeerManager {
   def props(port: Int, blockHandler: ActorRef): Props = Props(new PeerManager(port, blockHandler))
 
   sealed trait Command
+  case object Hello                                                    extends Command
   case class Connect(remote: InetSocketAddress)                        extends Command
   case class Sync(remote: InetSocketAddress, locators: Seq[Keccak256]) extends Command
-  case class BroadCast(message: Message)                               extends Command
+  case class BroadCast(message: Message, except: Option[ActorRef])     extends Command
   case object GetPeers                                                 extends Command
+
+  object BroadCast {
+    def apply(message: Message): BroadCast                   = BroadCast(message, None)
+    def apply(message: Message, except: ActorRef): BroadCast = BroadCast(message, Some(except))
+  }
 
   sealed trait Event
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
@@ -36,7 +42,8 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
   override def preStart(): Unit = {
     context.watch(server)
     context.watch(blockHandler)
-    ()
+
+    blockHandler ! Hello
   }
 
   override def receive: Receive = {
@@ -56,9 +63,10 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
       } else {
         log.warning(s"No connection to $remote")
       }
-    case BroadCast(message) =>
-      log.debug(s"Broadcast message to $peersSize peers")
-      tcpHandlers.foreach(_ ! message)
+    case BroadCast(message, except) =>
+      val toHandlers = tcpHandlers.filterNot(except contains _)
+      log.debug(s"Broadcast message to ${toHandlers.size} peers")
+      toHandlers.foreach(_ ! message)
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>

@@ -12,6 +12,7 @@ class ForksTree extends BlockPool {
 
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
+//  private val orphanBlocksTable: HashMap[Keccak256, Block]        = HashMap.empty
 
   override def numBlocks: Int = blocksTable.size
 
@@ -71,7 +72,7 @@ class ForksTree extends BlockPool {
 
   override def add(block: Block): Boolean = {
     blocksTable.get(block.hash) match {
-      case Some(_) => true
+      case Some(_) => false
       case None =>
         blocksTable.get(block.prevBlockHash) match {
           case Some(parent) =>
