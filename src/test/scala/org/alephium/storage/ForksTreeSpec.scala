@@ -28,6 +28,9 @@ class ForksTreeSpec extends AlephiumSpec {
         blocks1.foreach(block => forksTree.contains(block) is true)
         blocks2.foreach(block => forksTree.contains(block) is true)
         forksTree.weight is 5
+        forksTree.getBlocks(blocks1.head.hash).size is 5
+        forksTree.getBlocks(blocks2.head.hash).size is 0
+        forksTree.getBlocks(blocks1.tail.head.hash).size is 3
       }
     }
   }
