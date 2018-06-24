@@ -86,6 +86,8 @@ class ForksTree extends BlockPool {
     }
   }
 
+  override def getBlock(hash: Keccak256): Block = blocksTable(hash).block
+
   @tailrec
   private def addAfter(parent: ForksTree.TreeNode, blocks: Seq[Block]): Unit = {
     require(blocks.nonEmpty && blocks.head.prevBlockHash == parent.block.hash)

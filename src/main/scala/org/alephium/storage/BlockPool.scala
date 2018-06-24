@@ -1,7 +1,7 @@
 package org.alephium.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.flow.ChainSlice
+//import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
 trait BlockPool {
@@ -12,7 +12,10 @@ trait BlockPool {
 
   def add(block: Block): Boolean
 
-  def add(slice: ChainSlice): Boolean
+  // TODO: make this safe
+  def getBlock(hash: Keccak256): Block
+
+//  def add(slice: ChainSlice): Boolean
 
   def addBlocks(blocks: Seq[Block]): Boolean = {
     blocks.forall(add)
