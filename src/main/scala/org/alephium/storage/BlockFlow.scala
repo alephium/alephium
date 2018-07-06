@@ -45,6 +45,11 @@ class BlockFlow(groups: Int, initialBlocks: Seq[Seq[Block]]) extends BlockPool {
 
   private def getPool(hash: Keccak256): BlockPool = getPool(getIndex(hash))
 
+  override def contains(block: Block): Boolean = {
+    val pool = getPool(block)
+    pool.contains(block)
+  }
+
   override def add(block: Block): Boolean = {
     val pool = getPool(block)
     pool.add(block)
