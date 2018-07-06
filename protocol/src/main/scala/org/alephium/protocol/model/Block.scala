@@ -21,9 +21,9 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: Seq[Transaction]): Block = {
+  def genesis(transactions: Seq[Transaction], nonce: BigInt = 0): Block = {
     val txsHash     = Keccak256.hash(transactions)
-    val blockHeader = BlockHeader(Seq(Keccak256.zero), txsHash, 0, 0)
+    val blockHeader = BlockHeader(Seq.empty, txsHash, 0, nonce)
     Block(blockHeader, transactions)
   }
 
