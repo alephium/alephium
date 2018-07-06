@@ -1,6 +1,7 @@
 package org.alephium.client
 
 import akka.actor.Props
+import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
@@ -16,9 +17,9 @@ object Miner {
     Props(new Miner(address, node, chainIndex))
 
   sealed trait Command
-  case object Start               extends Command
-  case object Stop                extends Command
-  case class Nonce(nonce: BigInt) extends Command
+  case object Start                          extends Command
+  case object Stop                           extends Command
+  case class Nonce(from: BigInt, to: BigInt) extends Command
 
   def mineGenesis(chainIndex: ChainIndex): Block = {
     @tailrec
@@ -48,8 +49,8 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
   }
 
   private def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive = {
-    case Miner.Nonce(nonce) =>
-      tryMine(deps, transactions, nonce) match {
+    case Miner.Nonce(from, to) =>
+      tryMine(deps, transactions, from, to) match {
         case Some(block) =>
           log.info("A new block is mined")
           blockHandler ! BlockHandler.AddBlocks(Seq(block))
@@ -57,7 +58,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
           context become collect
         case None =>
-          self ! Miner.Nonce(nonce + 1)
+          self ! Miner.Nonce(to, 2 * to - from)
       }
   }
 
@@ -68,16 +69,25 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
     case BlockHandler.BlockFlowTemplate(deps) =>
       val transaction = Transaction.coinbase(address, 1)
       context become mine(deps, Seq(transaction))
-      self ! Miner.Nonce(0)
+      self ! Miner.Nonce(0, Network.nonceStep)
   }
 
   def collect: Receive = _collect orElse awaitStop
 
   def tryMine(deps: Seq[Keccak256],
               transactions: Seq[Transaction],
-              nonce: BigInt): Option[Block] = {
-    val block = Block.from(deps, transactions, nonce)
-    Some(block).filter(isDifficult)
+              from: BigInt,
+              to: BigInt): Option[Block] = {
+    @tailrec
+    def iter(current: BigInt): Option[Block] = {
+      if (current < to) {
+        val block = Block.from(deps, transactions, current)
+        if (isDifficult(block)) Some(block)
+        else iter(current + 1)
+      } else None
+    }
+
+    iter(from)
   }
 
   def isDifficult(block: Block): Boolean = {
