@@ -20,6 +20,7 @@ object BlockHandler {
   case object GetBestHeader                                     extends Command
   case object GetBestChain                                      extends Command
   case object GetAllHeaders                                     extends Command
+  case object GetBlockInfo                                      extends Command
   case class GetUTXOs(address: ED25519PublicKey, value: BigInt) extends Command
   case class GetBalance(address: ED25519PublicKey)              extends Command
   case class PrepareSync(remote: InetSocketAddress)             extends Command
@@ -76,6 +77,8 @@ class BlockHandler() extends BaseActor {
       sender() ! BestChain(blockFlow.getBestChain)
     case GetAllHeaders =>
       sender() ! AllHeaders(blockFlow.getAllHeaders)
+    case GetBlockInfo =>
+      sender() ! blockFlow.getBlockInfo
     case GetUTXOs(address, value) =>
       blockFlow.getUTXOs(address, value) match {
         case Some((header, inputs, total)) =>

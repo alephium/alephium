@@ -98,6 +98,8 @@ val dependencies = Seq(
   akka,
   akkatest,
   `akka-slf4j`,
+  `akka-http`,
+  `akka-stream`,
   bcprov,
   `scala-logging`,
   logback,

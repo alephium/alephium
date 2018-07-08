@@ -49,6 +49,8 @@ trait BlockPool {
 
   def getAllHeaders: Seq[Keccak256]
 
+  def getAllBlocks: Iterable[Block]
+
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
 
