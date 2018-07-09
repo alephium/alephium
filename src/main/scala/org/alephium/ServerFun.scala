@@ -5,8 +5,9 @@ import java.net.InetSocketAddress
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
+import akka.stream.scaladsl.Flow
 import akka.util.Timeout
 import org.alephium.client.{Miner, Node}
 import org.alephium.constant.Network
@@ -58,14 +59,19 @@ object ServerFun extends App {
     implicit val executionContext = system.dispatcher
     implicit val timeout          = Timeout(5.seconds)
 
-    val route = path("blocks") {
-      get {
+    val wsService =
+      Flow[Message].mapAsync(5) { _ =>
         val blockInfosF = (node.blockHandler ? BlockHandler.GetBlockInfo)
           .mapTo[Seq[BlockFlow.BlockInfo]]
-        onSuccess(blockInfosF) { blockInfos =>
-          val json = "[" + blockInfos.map(toJson).mkString(",") + "]"
-          complete(HttpEntity(ContentTypes.`application/json`, s"$json"))
+        val messageF = blockInfosF.map { blockInfos =>
+          "[" + blockInfos.map(toJson).mkString(",") + "]"
         }
+        messageF.map(TextMessage.apply)
+      }
+
+    val route = path("blocks") {
+      get {
+        handleWebSocketMessages(wsService)
       }
     }
 
