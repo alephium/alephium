@@ -64,7 +64,8 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
     case BroadCast(message, except) =>
       val toSend = tcpHandlers.filterNot(except.contains)
       log.debug(s"Broadcast message to ${toSend.size} peers")
-      toSend.foreach(_ ! message)
+      val write = TcpHandler.envelope(message)
+      toSend.foreach(_ ! write)
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>
