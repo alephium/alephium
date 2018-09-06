@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
-import org.alephium.protocol.model.{Block, TxInput}
+import org.alephium.protocol.model.Block
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.BaseActor
 
@@ -31,9 +31,9 @@ object BlockHandler {
   case class BestHeader(header: Block)                                       extends Event
   case class BestChain(blocks: Seq[Block])                                   extends Event
   case class AllHeaders(headers: Seq[Keccak256])                             extends Event
-  case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInt)   extends Event
-  case object NoEnoughBalance                                                extends Event
-  case class Balance(address: ED25519PublicKey, block: Block, total: BigInt) extends Event
+//  case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInt)   extends Event
+//  case object NoEnoughBalance                                                extends Event
+//  case class Balance(address: ED25519PublicKey, block: Block, total: BigInt) extends Event
   case class BlockFlowTemplate(deps: Seq[Keccak256])                         extends Event
 }
 
@@ -79,16 +79,6 @@ class BlockHandler() extends BaseActor {
       sender() ! AllHeaders(blockFlow.getAllHeaders)
     case GetBlockInfo =>
       sender() ! blockFlow.getBlockInfo
-    case GetUTXOs(address, value) =>
-      blockFlow.getUTXOs(address, value) match {
-        case Some((header, inputs, total)) =>
-          sender() ! UTXOs(header, inputs, total)
-        case None =>
-          sender() ! NoEnoughBalance
-      }
-    case GetBalance(address) =>
-      val (block, total) = blockFlow.getBalance(address)
-      sender() ! Balance(address, block, total)
     case PrepareSync(remote: InetSocketAddress) =>
       // TODO: improve sync algorithm
       val headers = blockFlow.getAllHeaders
