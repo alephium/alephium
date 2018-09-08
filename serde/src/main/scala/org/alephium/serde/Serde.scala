@@ -150,6 +150,18 @@ object Serde extends ProductSerde {
     }
   }
 
+  def bytesSerde(bytes: Int): Serde[ByteString] = new FixedSizeSerde[ByteString] {
+    override val serdeSize: Int = bytes
+
+    override def serialize(bs: ByteString): ByteString = {
+      assert(bs.length == serdeSize)
+      bs
+    }
+
+    override def deserialize(input: ByteString): Try[ByteString] =
+      deserialize0(input, identity)
+  }
+
   def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =
     new SeqSerde[T](serde) {
       override def serialize(input: Seq[T]): ByteString = {
