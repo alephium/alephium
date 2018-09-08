@@ -26,6 +26,6 @@ trait FixedSizeBytes[T <: Bytes] {
   // Scala sucks here: replacing lazy val with val could not work
   implicit lazy val serde: Serde[T] =
     Serde
-      .fixedSizeBytesSerde(size, implicitly[Serde[Byte]])
+      .fixedSizeBytesSerde(size, Serde[Byte])
       .xmap(bytes => unsafeFrom(ByteString(bytes.toArray)), _.bytes)
 }
