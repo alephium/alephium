@@ -3,10 +3,9 @@ package org.alephium.protocol.message
 import akka.util.ByteString
 import org.scalacheck.{Arbitrary}
 
-import org.alephium.AlephiumSpec
 import org.alephium.protocol.model.{ModelGen, PeerId}
 import org.alephium.serde.{Deserializer, Serde, Serializer}
-import org.alephium.util.EnumerationMacros
+import org.alephium.util.{AlephiumSpec, EnumerationMacros}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code

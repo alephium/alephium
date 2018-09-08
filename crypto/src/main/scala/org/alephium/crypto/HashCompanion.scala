@@ -1,5 +1,6 @@
 package org.alephium.crypto
 
+import scala.reflect.runtime.universe.TypeTag
 import java.nio.charset.Charset
 import java.security.SecureRandom
 
@@ -7,36 +8,14 @@ import akka.util.ByteString
 import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
 
-trait RandomBytes extends Bytes {
-  assert(bytes.size >= 4)
-
-  // scalastyle:off magic.number
-  override def hashCode(): Int = {
-    val size = bytes.size
-    (bytes(size - 4) & 0xFF) << 24 |
-      (bytes(size - 3) & 0xFF) << 16 |
-      (bytes(size - 2) & 0xFF) << 8 |
-      (bytes(size - 1) & 0xFF)
-  }
-  // scalastyle:on magic.number
-
-  override def equals(obj: Any): Boolean = obj match {
-    case that: RandomBytes => bytes == that.bytes
-    case _                 => false
-  }
-
-  def last: Byte = bytes.last
-
-  def second2Last: Byte = bytes.apply(bytes.length - 2)
-}
-
-trait Hash[T <: RandomBytes] extends FixedSizeBytes[T] {
+abstract class HashCompanion[T: TypeTag](unsafeFrom: ByteString => T, toBytes: T => ByteString)
+    extends RandomBytes.Companion[T](unsafeFrom, toBytes) {
   def provider: Digest
 
   def hash(input: Seq[Byte]): T = {
     val _provider = provider
     _provider.update(input.toArray, 0, input.length)
-    val res = new Array[Byte](size)
+    val res = new Array[Byte](length)
     _provider.doFinal(res, 0)
     unsafeFrom(ByteString(res))
   }
