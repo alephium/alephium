@@ -1,5 +1,6 @@
 package org.alephium.serde
 
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteBuffer
 
 import akka.util.ByteString
@@ -133,6 +134,18 @@ object Serde extends ProductSerde {
     override def deserialize(input: ByteString): Try[Long] =
       deserialize0(input, _.asByteBuffer.getLong())
   }
+
+  // TODO Where should we put those? (Could have trait we mix in there...)
+  implicit val inetAddressSerde: Serde[InetAddress] =
+    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray), ia => ByteString(ia.getAddress))
+
+  implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
+    forProduct2[InetAddress, Int, InetSocketAddress](
+      { (hostname, port) =>
+        new InetSocketAddress(hostname, port)
+      },
+      isa => (isa.getAddress, isa.getPort)
+    )
 
   private abstract class SeqSerde[T: ClassTag](serde: Serde[T]) extends Serde[Seq[T]] {
     @tailrec
