@@ -14,6 +14,7 @@ object Network {
   val pingFrequency: Duration = config.getDuration("pingFrequency")
   val groups: Int             = config.getInt("groups")
   val nonceStep: BigInt       = config.getInt("nonceStep")
+  val chainNum                = groups * groups
 
   def createBlockFlow(groups: Int): Seq[Seq[Block]] = {
     Seq.tabulate(groups, groups) {

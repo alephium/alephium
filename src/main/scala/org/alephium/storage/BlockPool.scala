@@ -12,6 +12,8 @@ trait BlockPool {
 
   def contains(block: Block): Boolean
 
+  def contains(hash: Keccak256): Boolean
+
   def add(block: Block): Boolean
 
   // TODO: make this safe
@@ -50,6 +52,8 @@ trait BlockPool {
   def getAllHeaders: Seq[Keccak256]
 
   def getAllBlocks: Iterable[Block]
+
+  def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
 
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
