@@ -3,7 +3,7 @@ package org.alephium.storage
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.Keccak256
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.Block
@@ -15,26 +15,20 @@ object BlockHandler {
   def props(): Props = Props(new BlockHandler())
 
   sealed trait Command
-  case class AddBlocks(blocks: Seq[Block])                      extends Command
-  case class GetBlocksAfter(locators: Seq[Keccak256])           extends Command
-  case object GetBestHeader                                     extends Command
-  case object GetBestChain                                      extends Command
-  case object GetAllHeaders                                     extends Command
-  case object GetBlockInfo                                      extends Command
-  case class GetUTXOs(address: ED25519PublicKey, value: BigInt) extends Command
-  case class GetBalance(address: ED25519PublicKey)              extends Command
-  case class PrepareSync(remote: InetSocketAddress)             extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex)           extends Command
+  case class AddBlocks(blocks: Seq[Block])            extends Command
+  case class GetBlocksAfter(locators: Seq[Keccak256]) extends Command
+  case object GetBestHeader                           extends Command
+  case object GetBestChain                            extends Command
+  case object GetAllHeaders                           extends Command
+  case object GetBlockInfo                            extends Command
+  case class PrepareSync(remote: InetSocketAddress)   extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
 
   sealed trait Event
-//  case class SendBlocksAfter(locators: Seq[Keccak256], blocks: Seq[Block])   extends Event
-  case class BestHeader(header: Block)                                       extends Event
-  case class BestChain(blocks: Seq[Block])                                   extends Event
-  case class AllHeaders(headers: Seq[Keccak256])                             extends Event
-//  case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInt)   extends Event
-//  case object NoEnoughBalance                                                extends Event
-//  case class Balance(address: ED25519PublicKey, block: Block, total: BigInt) extends Event
-  case class BlockFlowTemplate(deps: Seq[Keccak256])                         extends Event
+  case class BestHeader(header: Block)               extends Event
+  case class BestChain(blocks: Seq[Block])           extends Event
+  case class AllHeaders(headers: Seq[Keccak256])     extends Event
+  case class BlockFlowTemplate(deps: Seq[Keccak256]) extends Event
 }
 
 // consider single chain for the moment
