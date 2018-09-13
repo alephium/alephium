@@ -24,7 +24,7 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
       // TODO: support more blocks later
       assert(blocks.length == 1)
       val block = blocks.head
-      add(block) match {
+      blockFlow.addBlock(block) match {
         case AddBlockResult.Success =>
           val index    = blockFlow.getIndex(block)
           val blockNum = blockFlow.numBlocks
@@ -50,17 +50,6 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
       case Failure(exception) =>
         println(s"Deps checking exception: $exception")
       case Success(_) =>
-    }
-  }
-
-  def add(block: Block): AddBlockResult = {
-    val deps        = block.blockHeader.blockDeps
-    val missingDeps = deps.filterNot(blockFlow.contains) // TODO: investigate concurrency in master
-    if (missingDeps.isEmpty) {
-      val ok = blockPool.add(block)
-      if (ok) AddBlockResult.Success else AddBlockResult.AlreadyExisted
-    } else {
-      AddBlockResult.MissingDeps(missingDeps :+ block.hash)
     }
   }
 }
