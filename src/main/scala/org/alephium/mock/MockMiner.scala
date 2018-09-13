@@ -35,7 +35,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex, a
         if (lastTs == 0) currentTs + delta
         else {
           val num = (currentTs - lastTs) / delta + 1
-          if (num > 1) println(s"---- step: $num")
+          if (num > 1) log.info(s"---- step: $num")
           lastTs + num * delta
         }
       val sleepTs = nextTs - currentTs
