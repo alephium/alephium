@@ -6,15 +6,16 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.AlephiumActorSpec
 import org.alephium.network.PeerManager.GetPeers
 import org.alephium.protocol.message.{GetBlocks, Message}
+import org.alephium.storage.HandlerUtils
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   trait Fixture {
-    val blockHandler = TestProbe()
-    val port         = SocketUtil.temporaryLocalPort()
-    val peerManager  = system.actorOf(PeerManager.props(port, blockHandler.ref))
+    val blockHandlers = HandlerUtils.createBlockHandlersProbe
+    val port          = SocketUtil.temporaryLocalPort()
+    val peerManager   = system.actorOf(PeerManager.props(port))
 
-    blockHandler.expectMsg(PeerManager.Hello)
+    peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
   }
 
   behavior of "PeerManagerSpec"
@@ -43,30 +44,32 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   }
 
   it should "try to send GetBlocks to peer" in {
-    val blockHandler = TestProbe()
-    val port         = SocketUtil.temporaryLocalPort()
-    val remote       = SocketUtil.temporaryServerAddress()
-    val tcpHandler   = TestProbe()
-    val peerManager = system.actorOf(Props(new PeerManager(port, blockHandler.ref) {
+    val port       = SocketUtil.temporaryLocalPort()
+    val remote     = SocketUtil.temporaryServerAddress()
+    val tcpHandler = TestProbe()
+
+    val blockHandlers = HandlerUtils.createBlockHandlersProbe
+    val peerManager = system.actorOf(Props(new PeerManager(port) {
       peers += (remote -> tcpHandler.ref)
     }))
+    peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
     peerManager ! PeerManager.Sync(remote, Seq.empty)
     tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
   }
 
   it should "stop if block pool stoped" in new Fixture {
     watch(peerManager)
-    system.stop(blockHandler.ref)
+    system.stop(blockHandlers.globalHandler)
     expectTerminated(peerManager)
   }
 
-  it should "stop if server stopped" in new Fixture {
-    override val peerManager = system.actorOf(Props(new PeerManager(port, blockHandler.ref) {
-      override def postStop(): Unit = {
-        testActor ! "stop"
-      }
-    }))
-    expectMsg("stop")
+  it should "stop if server stopped" in {
+    val port = SocketUtil.temporaryLocalPort()
+    system.actorOf(TcpServer.props(port))
+
+    val peerManager = system.actorOf(Props(new PeerManager(port)))
+    watch(peerManager)
+    expectTerminated(peerManager)
   }
 
   it should "remove peer when tcp handler stopped" in new Fixture {

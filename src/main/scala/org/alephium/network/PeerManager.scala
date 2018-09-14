@@ -6,15 +6,16 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
+import org.alephium.storage.BlockHandlers
 import org.alephium.util.BaseActor
 
 import scala.collection.mutable
 
 object PeerManager {
-  def props(port: Int, blockHandler: ActorRef): Props = Props(new PeerManager(port, blockHandler))
+  def props(port: Int): Props = Props(new PeerManager(port))
 
   sealed trait Command
-  case object Hello                                                    extends Command
+  case class SetBlockHandlers(blockhandlers: BlockHandlers)            extends Command
   case class Connect(remote: InetSocketAddress)                        extends Command
   case class Sync(remote: InetSocketAddress, locators: Seq[Keccak256]) extends Command
   case class BroadCast(message: Message, except: Option[ActorRef])     extends Command
@@ -29,7 +30,7 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
+class PeerManager(port: Int) extends BaseActor {
   import PeerManager._
 
   val server: ActorRef                                = context.actorOf(TcpServer.props(port))
@@ -40,17 +41,28 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
 
   override def preStart(): Unit = {
     context.watch(server)
-    context.watch(blockHandler)
-
-    blockHandler ! Hello
+    ()
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = awaitBlockHandlers orElse {
+    case Terminated(child) if child == server =>
+      context.unwatch(server)
+      context.stop(self)
+  }
+
+  def awaitBlockHandlers: Receive = {
+    case SetBlockHandlers(blockHandlers) =>
+      context.watch(blockHandlers.globalHandler)
+      blockHandlers.poolHandlers.flatten.foreach(context.watch)
+      context become handleWith(blockHandlers)
+  }
+
+  def handleWith(blockHandlers: BlockHandlers): Receive = {
     case Connect(remote) =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remote)
+      IO(Tcp)(context.system) ! Tcp.Connect(remote, options = List(Tcp.SO.TcpNoDelay(true)))
     case Tcp.Connected(remote, local) =>
-      addPeer(remote, sender())
-      log.debug(s"Connected to $remote, listen at $local, now $peersSize peers")
+      addPeer(remote, sender(), blockHandlers)
+      log.info(s"Connected to $remote, listen at $local, now $peersSize peers")
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       log.info(s"Cannot connect to ${c.remoteAddress}")
     case Sync(remote, locators) =>
@@ -71,18 +83,20 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
     case Terminated(child) =>
       if (child == server) {
         log.error("Server stopped, stopping peer manager")
-        unwatchAndStop()
-      } else if (child == blockHandler) {
+        unwatchAndStop(blockHandlers)
+      } else if (child == blockHandlers.globalHandler) {
         log.error("Block pool stopped, stopping peer manager")
-        unwatchAndStop()
+        unwatchAndStop(blockHandlers)
       } else {
         removePeer(child)
         log.debug(s"Peer connection closed, removing peer, $peersSize peers left")
       }
   }
 
-  def addPeer(remote: InetSocketAddress, connection: ActorRef): Unit = {
-    val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockHandler))
+  def addPeer(remote: InetSocketAddress,
+              connection: ActorRef,
+              blockHandlers: BlockHandlers): Unit = {
+    val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockHandlers))
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
 //    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
@@ -94,9 +108,10 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
     toRemove.foreach(peers.remove)
   }
 
-  def unwatchAndStop(): Unit = {
+  def unwatchAndStop(blockHandlers: BlockHandlers): Unit = {
     context.unwatch(server)
-    context.unwatch(blockHandler)
+    context.unwatch(blockHandlers.globalHandler)
+    blockHandlers.poolHandlers.flatten.foreach(context.unwatch)
     tcpHandlers.foreach(context.unwatch)
     context.stop(self)
   }

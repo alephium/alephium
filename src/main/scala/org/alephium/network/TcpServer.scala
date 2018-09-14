@@ -24,7 +24,7 @@ class TcpServer(port: Int) extends BaseActor {
       log.debug(s"Server bound to $localAddress")
       context.become(ready)
     case Tcp.CommandFailed(_: Tcp.Bind) =>
-      log.debug(s"Binding failed")
+      log.warning(s"Binding failed")
       context stop self
   }
 
