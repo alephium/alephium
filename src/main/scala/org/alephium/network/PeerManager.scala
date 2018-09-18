@@ -23,11 +23,6 @@ object PeerManager {
   case class BroadCast(message: Message, origin: BlockOrigin)          extends Command
   case object GetPeers                                                 extends Command
 
-  object BroadCast {
-    def apply(message: Message, origin: BlockOrigin = BlockOrigin.Local): BroadCast =
-      BroadCast(message, origin)
-  }
-
   sealed trait Event
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
