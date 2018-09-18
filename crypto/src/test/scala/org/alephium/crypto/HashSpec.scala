@@ -1,5 +1,6 @@
 package org.alephium.crypto
 
+import akka.util.ByteString
 import org.scalatest.TryValues._
 import org.alephium.AlephiumSpec
 import org.alephium.util.Hex._
@@ -21,20 +22,28 @@ class HashSpec extends AlephiumSpec {
     }
   }
 
-  def check[T <: HashOutput](provider: Hash[T], tests: Map[String, Seq[Byte]])(
+  def check[T <: HashOutput](provider: Hash[T], tests: Map[String, ByteString])(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {
         val output = provider.hash(message)
-        expected is output.bytes
+        output.bytes is expected
       }
     }
 
     it should "serde correctly" in {
-      for ((message, expected) <- tests) {
+      for ((message, _) <- tests) {
         val input  = provider.hash(message)
         val output = deserialize[T](serialize(input)).success.value
         output is input
+      }
+    }
+
+    it should "compute hashCode correctly" in {
+      for ((message, inHex) <- tests) {
+        val output  = BigInt(provider.hash(message).hashCode())
+        val expcted = BigInt(inHex.takeRight(4).toArray)
+        output is expcted
       }
     }
   }
