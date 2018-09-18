@@ -6,7 +6,7 @@ object Version {
 }
 
 object Dependencies {
-  lazy val scalatest       = "org.scalatest"              %% "scalatest"      % "3.0.5"
+  lazy val scalatest       = "org.scalatest"              %% "scalatest"      % "3.0.5" % Test
   lazy val akka            = "com.typesafe.akka"          %% "akka-actor"     % Version.akka
   lazy val `akka-slf4j`    = "com.typesafe.akka"          %% "akka-slf4j"     % Version.akka
   lazy val akkatest        = "com.typesafe.akka"          %% "akka-testkit"   % Version.akka % Test
@@ -18,4 +18,6 @@ object Dependencies {
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
   lazy val curve25519      = "org.whispersystems"         % "curve25519-java" % "0.4.1"
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"   % Version.circe
+
+  def `scala-reflect`(scalaVersion: String) = "org.scala-lang"             % "scala-reflect"   % scalaVersion
 }
