@@ -1,17 +1,20 @@
 package org.alephium.network
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.constant.Network
 import org.alephium.protocol.message._
 import org.alephium.storage.BlockFlow.ChainIndex
+import org.alephium.storage.BlockHandler.BlockOrigin.Remote
 import org.alephium.storage.{BlockHandler, BlockHandlers}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
 
 object MessageHandler {
-  def props(connection: ActorRef, blockHandlers: BlockHandlers): Props =
-    Props(new MessageHandler(connection, blockHandlers))
+  def props(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+    Props(new MessageHandler(remote, connection, blockHandlers))
 
   object Timer
 
@@ -19,7 +22,7 @@ object MessageHandler {
   case object SendPing extends Command
 }
 
-class MessageHandler(connection: ActorRef, blockHandlers: BlockHandlers)
+class MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
     extends BaseActor
     with Timers {
   val tcpHandler = context.parent
@@ -45,7 +48,7 @@ class MessageHandler(connection: ActorRef, blockHandlers: BlockHandlers)
       val block      = blocks.head
       val chainIndex = ChainIndex.fromHash(block.hash)
       val handler    = blockHandlers.getHandler(chainIndex)
-      handler.tell(BlockHandler.AddBlocks(blocks), tcpHandler)
+      handler ! BlockHandler.AddBlocks(blocks, Remote(remote))
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
       blockHandlers.globalHandler.tell(BlockHandler.GetBlocksAfter(locators), tcpHandler)

@@ -1,7 +1,9 @@
 package org.alephium.network
 
+import java.net.InetSocketAddress
+
 import akka.io.Tcp
-import akka.testkit.TestProbe
+import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message._
 import org.alephium.storage.HandlerUtils
@@ -11,9 +13,12 @@ import scala.util.Random
 class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
 
   trait Fixture {
-    lazy val connection     = TestProbe()
-    lazy val blockHandlers  = HandlerUtils.createBlockHandlersProbe
-    lazy val messageHandler = system.actorOf(MessageHandler.props(connection.ref, blockHandlers))
+    lazy val remote        = new InetSocketAddress(SocketUtil.temporaryLocalPort())
+    lazy val connection    = TestProbe()
+    lazy val blockHandlers = HandlerUtils.createBlockHandlersProbe
+
+    lazy val messageHandler =
+      system.actorOf(MessageHandler.props(remote, connection.ref, blockHandlers))
   }
 
   behavior of "MessageHandlerSpec"
