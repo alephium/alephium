@@ -44,7 +44,7 @@ class BlockFlow() extends BlockPool {
   val numGroups: Int = groups
 
   private def getPool(i: Int, j: Int): BlockPool = {
-    require(i >= 0 && i < groups && j >= 0 && j < groups)
+    assert(i >= 0 && i < groups && j >= 0 && j < groups)
     blockPools(i)(j)
   }
 
@@ -177,7 +177,7 @@ class BlockFlow() extends BlockPool {
     if (hash1 == Keccak256.zero) Some(hash2)
     else if (hash2 == Keccak256.zero) Some(hash1)
     else {
-      require(getIndex(hash1) == getIndex(hash2))
+      assert(getIndex(hash1) == getIndex(hash2))
       val pool = getPool(hash1)
       if (pool.isBefore(hash1, hash2)) Some(hash2)
       else if (pool.isBefore(hash2, hash1)) Some(hash1)
@@ -186,7 +186,7 @@ class BlockFlow() extends BlockPool {
   }
 
   def merge(headers1: Seq[Keccak256], headers2: Seq[Keccak256]): Option[Seq[Keccak256]] = {
-    // require(headers1.size == headers2.size)
+    // assert(headers1.size == headers2.size)
     val merged = headers1.zip(headers2).map {
       case (h1, h2) => merge(h1, h2)
     }
