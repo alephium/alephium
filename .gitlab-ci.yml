@@ -22,4 +22,4 @@ before_script:
 
 test:
   script:
-    - sbt clean scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport
+    - make test
