@@ -8,7 +8,7 @@ import org.alephium.serde._
 
 class HashSpec extends AlephiumSpec {
 
-  def check[T <: HashOutput](provider: Hash[T], message: String, expected: Seq[Byte])(
+  def check[T <: RandomBytes](provider: Hash[T], message: String, expected: Seq[Byte])(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       val output = provider.hash(message)
@@ -22,7 +22,7 @@ class HashSpec extends AlephiumSpec {
     }
   }
 
-  def check[T <: HashOutput](provider: Hash[T], tests: Map[String, ByteString])(
+  def check[T <: RandomBytes](provider: Hash[T], tests: Map[String, ByteString])(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {

@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.SHA256Digest
 
-class Sha256(val bytes: ByteString) extends HashOutput
+class Sha256(val bytes: ByteString) extends RandomBytes
 
 object Sha256 extends Hash[Sha256] {
   override val size: Int = 32
