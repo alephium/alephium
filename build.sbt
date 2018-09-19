@@ -47,7 +47,11 @@ lazy val app = mainProject("app")
 
 lazy val `app-debug` = mainProject("app-debug")
   .settings(
-    coverageEnabled := true
+    coverageEnabled := true,
+    libraryDependencies ++= Seq(
+      metrics,
+      `metrics-jmx`
+    )
   )
 
 def subProject(path: String): Project = {
