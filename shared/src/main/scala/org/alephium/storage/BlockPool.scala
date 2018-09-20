@@ -4,22 +4,27 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 //import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
+// scalastyle:off number.of.methods
 trait BlockPool {
 
   def numBlocks: Int
 
   def numTransactions: Int
 
-  def contains(block: Block): Boolean
+  def maxHeight: Int
+
+  def maxWeight: Int
+
+  def contains(block: Block): Boolean = contains(block.hash)
 
   def contains(hash: Keccak256): Boolean
 
   def add(block: Block): Boolean
 
-  // TODO: make this safe
-  def getBlock(hash: Keccak256): Block
+  def add(block: Block, weight: Int): Boolean
 
-//  def add(slice: ChainSlice): Boolean
+  // Note: assuming the hash is in the pool
+  def getBlock(hash: Keccak256): Block
 
   def addBlocks(blocks: Seq[Block]): Boolean = {
     blocks.forall(add)
@@ -36,9 +41,13 @@ trait BlockPool {
 
   def getBlocks(locator: Keccak256): Seq[Block]
 
-  def getHeightFor(hash: Keccak256): Int = getChain(getBlock(hash)).size
+  def getHeight(hash: Keccak256): Int
 
-  def getHeightFor(block: Block): Int = getChain(block).size
+  def getHeight(block: Block): Int = getHeight(block.hash)
+
+  def getWeight(hash: Keccak256): Int
+
+  def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of Seq[Block]
   def getChain(block: Block): Seq[Block]
@@ -48,8 +57,6 @@ trait BlockPool {
   def getBestHeader: Block
 
   def getBestChain: Seq[Block] = getChain(getBestHeader)
-
-  def getHeight: Int = getBestChain.size
 
   def getAllHeaders: Seq[Keccak256]
 
@@ -120,3 +127,4 @@ trait BlockPool {
     (bestHeader, balance)
   }
 }
+// scalastyle:on number.of.methods
