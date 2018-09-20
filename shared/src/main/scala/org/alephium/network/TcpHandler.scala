@@ -40,7 +40,8 @@ object TcpHandler {
 class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
     extends BaseActor {
 
-  val messageHandler: ActorRef = context.actorOf(MessageHandler.props(connection, blockHandlers))
+  val messageHandler: ActorRef =
+    context.actorOf(MessageHandler.props(remote, connection, blockHandlers))
 
   override def preStart(): Unit = {
     context.watch(messageHandler)

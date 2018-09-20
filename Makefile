@@ -1,3 +1,6 @@
+test:
+	sbt clean scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport
+
 build:
 	sbt app/stage
 
