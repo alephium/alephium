@@ -6,7 +6,7 @@ import org.alephium.protocol.model.{Block, Transaction}
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-class ForksTree(root: ForksTree.Root) extends BlockPool {
+class ForksTree(root: ForksTree.Root) extends SingleChain {
 
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
@@ -40,8 +40,6 @@ class ForksTree(root: ForksTree.Root) extends BlockPool {
   override def maxWeight: Int = blocksTable.values.map(_.weight).max
 
   override def contains(hash: Keccak256): Boolean = blocksTable.contains(hash)
-
-  override def add(block: Block): Boolean = ???
 
   override def add(block: Block, weight: Int): Boolean = {
     blocksTable.get(block.hash) match {
@@ -99,7 +97,7 @@ class ForksTree(root: ForksTree.Root) extends BlockPool {
     iter(Seq.empty, node)
   }
 
-  override def getChain(block: Block): Seq[Block] = {
+  override def getChainSlice(block: Block): Seq[Block] = {
     blocksTable.get(block.hash) match {
       case Some(node) =>
         getChain(node).map(_.block)
@@ -108,8 +106,8 @@ class ForksTree(root: ForksTree.Root) extends BlockPool {
     }
   }
 
-  override def isHeader(block: Block): Boolean = {
-    blocksTable.get(block.hash) match {
+  override def isHeader(hash: Keccak256): Boolean = {
+    blocksTable.get(hash) match {
       case Some(node) =>
         node.isLeaf
       case None =>

@@ -6,15 +6,15 @@ import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.BaseActor
 
-object BlockPoolHandler {
+object ChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef): Props =
-    Props(new BlockPoolHandler(blockFlow, chainIndex, peerManager))
+    Props(new ChainHandler(blockFlow, chainIndex, peerManager))
 }
 
 // TODO: investigate concurrency in master branch
-class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)
+class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)
     extends BaseActor {
-  val blockPool = blockFlow.getPool(chainIndex)
+  val chain = blockFlow.getChain(chainIndex)
 
   override def receive: Receive = {
     case BlockHandler.AddBlocks(blocks, origin) =>
@@ -22,7 +22,7 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
       assert(blocks.length == 1)
       val block = blocks.head
 
-      val result = blockFlow.addBlock(block)
+      val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
           val index    = blockFlow.getIndex(block)
