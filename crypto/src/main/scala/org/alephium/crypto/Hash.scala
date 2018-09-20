@@ -7,9 +7,26 @@ import akka.util.ByteString
 import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
 
-trait HashOutput extends Bytes
+trait RandomBytes extends Bytes {
+  assert(bytes.size >= 4)
 
-trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
+  // scalastyle:off magic.number
+  override def hashCode(): Int = {
+    val size = bytes.size
+    (bytes(size - 4) & 0xFF) << 24 |
+      (bytes(size - 3) & 0xFF) << 16 |
+      (bytes(size - 2) & 0xFF) << 8 |
+      (bytes(size - 1) & 0xFF)
+  }
+  // scalastyle:on magic.number
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: RandomBytes => bytes == that.bytes
+    case _                 => false
+  }
+}
+
+trait Hash[T <: RandomBytes] extends FixedSizeBytes[T] {
   def provider: Digest
 
   def hash(input: Seq[Byte]): T = {
