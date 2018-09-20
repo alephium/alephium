@@ -13,7 +13,7 @@ object Keccak256 extends Hash[Keccak256] {
   override def provider: Digest = new KeccakDigest(size * 8)
 
   private def apply(digest: ByteString): Keccak256 = {
-    require(digest.length == size)
+    assert(digest.length == size)
     new Keccak256(digest)
   }
 
