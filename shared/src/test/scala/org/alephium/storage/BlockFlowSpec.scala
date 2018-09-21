@@ -122,12 +122,12 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   def show(blockFlow: BlockFlow): String = {
-    blockFlow.getAllHeaders
-      .map { header =>
-        val height = blockFlow.getWeight(header)
-        val block  = blockFlow.getBlock(header)
+    blockFlow.getAllTips
+      .map { tip =>
+        val height = blockFlow.getWeight(tip)
+        val block  = blockFlow.getBlock(tip)
         val index  = blockFlow.getIndex(block)
-        val hash   = showHash(header)
+        val hash   = showHash(tip)
         val deps   = block.blockHeader.blockDeps.map(showHash).mkString("-")
         s"height: $height, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
       }
