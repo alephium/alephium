@@ -5,8 +5,8 @@ import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.{AddBlockResult, BlockHandler}
-import org.alephium.storage.BlockHandler.BlockOrigin.Local
+import org.alephium.storage.{AddBlockResult, ChainHandler, FlowHandler}
+import org.alephium.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec
@@ -39,7 +39,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
-      blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
+      blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
 
@@ -54,12 +54,12 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
         case Some(block) =>
           log.info(s"A new block is mined since $lastTs")
           val chainIndex = ChainIndex.fromHash(block.hash)
-          blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block), Local)
+          blockHandlers.getHandler(chainIndex) ! ChainHandler.AddBlocks(Seq(block), Local)
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)
       }
     case _: AddBlockResult =>
-      blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
+      blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
 
@@ -67,7 +67,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
     _mine(deps, transactions, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
-    case BlockHandler.BlockFlowTemplate(deps, lastTs) =>
+    case FlowHandler.BlockFlowTemplate(deps, lastTs) =>
       val transaction = Transaction.coinbase(address, 1)
       context become mine(deps, Seq(transaction), lastTs)
       self ! Miner.Nonce(0, Network.nonceStep)

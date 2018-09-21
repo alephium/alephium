@@ -1,7 +1,6 @@
 package org.alephium.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-//import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
 trait BlockPool {
@@ -36,21 +35,19 @@ trait BlockPool {
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of Seq[Block]
-  def getChainSlice(block: Block): Seq[Block]
+  def getBlockSlice(block: Block): Seq[Block]
 
   // Assuming the hash or block is in the pool
-  def isHeader(hash: Keccak256): Boolean
-  def isHeader(block: Block): Boolean = isHeader(block.hash)
+  def isTip(hash: Keccak256): Boolean
+  def isTip(block: Block): Boolean = isTip(block.hash)
 
-  def getBestHeader: Block
+  def getBestTip: Block
 
-  def getBestChain: Seq[Block] = getChainSlice(getBestHeader)
+  def getBestChain: Seq[Block] = getBlockSlice(getBestTip)
 
-  def getAllHeaders: Seq[Keccak256]
+  def getAllTips: Seq[Keccak256]
 
   def getAllBlocks: Iterable[Block]
-
-  def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
 
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
@@ -110,7 +107,7 @@ trait BlockPool {
 
   // calculated from best chain
   def getBalance(address: ED25519PublicKey): (Block, BigInt) = {
-    val bestHeader = getBestHeader
+    val bestHeader = getBestTip
     val balance    = getBestChain.map(block => getBalance(block, address)).sum
     (bestHeader, balance)
   }

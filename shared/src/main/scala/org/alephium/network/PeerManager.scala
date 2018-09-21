@@ -6,9 +6,8 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.storage.BlockHandler.BlockOrigin
-import org.alephium.storage.BlockHandler.BlockOrigin.{Local, Remote}
 import org.alephium.storage.BlockHandlers
+import org.alephium.storage.ChainHandler.BlockOrigin
 import org.alephium.util.BaseActor
 
 import scala.collection.mutable
@@ -49,7 +48,7 @@ class PeerManager(port: Int) extends BaseActor {
 
   def awaitBlockHandlers: Receive = {
     case SetBlockHandlers(blockHandlers) =>
-      context.watch(blockHandlers.globalHandler)
+      context.watch(blockHandlers.flowHandler)
       blockHandlers.chainHandlers.flatten.foreach(context.watch)
       context become handleWith(blockHandlers)
   }
@@ -72,8 +71,8 @@ class PeerManager(port: Int) extends BaseActor {
       }
     case BroadCast(message, origin) =>
       val toSend = origin match {
-        case Local          => tcpHandlers
-        case Remote(remote) => peers.filterKeys(_ != remote).values
+        case BlockOrigin.Local          => tcpHandlers
+        case BlockOrigin.Remote(remote) => peers.filterKeys(_ != remote).values
       }
       log.debug(s"Broadcast message to ${toSend.size} peers")
       val write = TcpHandler.envelope(message)
@@ -84,7 +83,7 @@ class PeerManager(port: Int) extends BaseActor {
       if (child == server) {
         log.error("Server stopped, stopping peer manager")
         unwatchAndStop(blockHandlers)
-      } else if (child == blockHandlers.globalHandler) {
+      } else if (child == blockHandlers.flowHandler) {
         log.error("Block pool stopped, stopping peer manager")
         unwatchAndStop(blockHandlers)
       } else {
@@ -110,7 +109,7 @@ class PeerManager(port: Int) extends BaseActor {
 
   def unwatchAndStop(blockHandlers: BlockHandlers): Unit = {
     context.unwatch(server)
-    context.unwatch(blockHandlers.globalHandler)
+    context.unwatch(blockHandlers.flowHandler)
     blockHandlers.chainHandlers.flatten.foreach(context.unwatch)
     tcpHandlers.foreach(context.unwatch)
     context.stop(self)

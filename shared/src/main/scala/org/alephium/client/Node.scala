@@ -3,7 +3,7 @@ package org.alephium.client
 import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.network.PeerManager
 import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.{BlockFlow, BlockHandler, BlockHandlers, ChainHandler}
+import org.alephium.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
 
 case class Node(
     name: String,
@@ -19,7 +19,7 @@ object Node {
     val blockFlow   = BlockFlow()
     val peerManager = system.actorOf(PeerManager.props(port), "PeerManager")
 
-    val blockHandler = system.actorOf(BlockHandler.props(blockFlow), "BlockHandler")
+    val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
     val chainHandlers = Seq.tabulate(groups, groups) {
       case (from, to) =>
         system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager))

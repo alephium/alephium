@@ -49,14 +49,14 @@ class BlockPoolSpec extends AlephiumSpec {
 
       blockPool.getHeight(headBlock) is 0
       blockPool.getHeight(lastBlock) is blocks.size
-      blockPool.getChainSlice(headBlock) is Seq(headBlock)
-      blockPool.getChainSlice(lastBlock) is genesis +: blocks
-      blockPool.isHeader(headBlock) is false
-      blockPool.isHeader(lastBlock) is true
-      blockPool.getBestHeader is lastBlock
+      blockPool.getBlockSlice(headBlock) is Seq(headBlock)
+      blockPool.getBlockSlice(lastBlock) is genesis +: blocks
+      blockPool.isTip(headBlock) is false
+      blockPool.isTip(lastBlock) is true
+      blockPool.getBestTip is lastBlock
       blockPool.getBestChain is genesis +: blocks
       blockPool.maxHeight is blocks.size
-      blockPool.getAllHeaders is Seq(lastBlock.hash)
+      blockPool.getAllTips is Seq(lastBlock.hash)
     }
   }
 
@@ -71,18 +71,18 @@ class BlockPoolSpec extends AlephiumSpec {
         blockPool.getHeight(longChain.last) is longChain.size
         blockPool.getHeight(shortChain.head) is 1
         blockPool.getHeight(shortChain.last) is shortChain.size
-        blockPool.getChainSlice(longChain.head) is Seq(genesis, longChain.head)
-        blockPool.getChainSlice(longChain.last) is genesis +: longChain
-        blockPool.getChainSlice(shortChain.head) is Seq(genesis, shortChain.head)
-        blockPool.getChainSlice(shortChain.last) is genesis +: shortChain
-        blockPool.isHeader(longChain.head) is false
-        blockPool.isHeader(longChain.last) is true
-        blockPool.isHeader(shortChain.head) is false
-        blockPool.isHeader(shortChain.last) is true
-        blockPool.getBestHeader is longChain.last
+        blockPool.getBlockSlice(longChain.head) is Seq(genesis, longChain.head)
+        blockPool.getBlockSlice(longChain.last) is genesis +: longChain
+        blockPool.getBlockSlice(shortChain.head) is Seq(genesis, shortChain.head)
+        blockPool.getBlockSlice(shortChain.last) is genesis +: shortChain
+        blockPool.isTip(longChain.head) is false
+        blockPool.isTip(longChain.last) is true
+        blockPool.isTip(shortChain.head) is false
+        blockPool.isTip(shortChain.last) is true
+        blockPool.getBestTip is longChain.last
         blockPool.getBestChain is genesis +: longChain
         blockPool.maxHeight is longChain.size
-        blockPool.getAllHeaders.toSet is Set(longChain.last.hash, shortChain.last.hash)
+        blockPool.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
   }
