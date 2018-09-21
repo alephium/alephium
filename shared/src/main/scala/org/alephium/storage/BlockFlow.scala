@@ -10,13 +10,12 @@ import org.alephium.util.Hex
 
 import scala.collection.JavaConverters._
 
-// scalastyle:off number.of.methods
 class BlockFlow() extends MultiChain {
   import Network.groups
 
   val initialBlocks: Seq[Seq[Block]] = Network.blocksForFlow
 
-  val SingleChains: Seq[Seq[SingleChain]] =
+  val singleChains: Seq[Seq[SingleChain]] =
     Seq.tabulate(groups, groups) {
       case (from, to) => ForksTree(initialBlocks(from)(to))
     }
@@ -34,7 +33,7 @@ class BlockFlow() extends MultiChain {
     }
 
   private def aggregate[T](f: SingleChain => T)(reduce: Seq[T] => T): T = {
-    reduce(SingleChains.flatMap(_.map(f)))
+    reduce(singleChains.flatMap(_.map(f)))
   }
 
   override def numBlocks: Int = aggregate(_.numBlocks)(_.sum)
@@ -43,40 +42,18 @@ class BlockFlow() extends MultiChain {
 
   override def maxWeight: Int = aggregate(_.maxWeight)(_.max)
 
-  private def getChain(i: Int, j: Int): SingleChain = {
+  def getChain(i: Int, j: Int): SingleChain = {
     assert(i >= 0 && i < groups && j >= 0 && j < groups)
-    SingleChains(i)(j)
+    singleChains(i)(j)
   }
 
   def getChain(chainIndex: ChainIndex): SingleChain = {
     getChain(chainIndex.from, chainIndex.to)
   }
 
-  def getIndex(block: Block): ChainIndex = {
-    getIndex(block.hash)
-  }
-
-  private def getIndex(hash: Keccak256): ChainIndex = {
-    ChainIndex.fromHash(hash)
-  }
-
-  private def getChain(block: Block): SingleChain = getChain(getIndex(block))
-
-  private def getChain(hash: Keccak256): SingleChain = getChain(getIndex(hash))
-
-  override def contains(block: Block): Boolean = {
-    val chain = getChain(block)
-    chain.contains(block)
-  }
-
-  def contains(hash: Keccak256): Boolean = {
-    val chain = getChain(hash)
-    chain.contains(hash)
-  }
-
   def addDeps(block: Block, deps: Seq[Keccak256]): Unit = {
     val chainIndex = getIndex(block)
-    val chain      = SingleChains(chainIndex.from)(chainIndex.to)
+    val chain      = singleChains(chainIndex.from)(chainIndex.to)
     val caches     = depsInTips(chainIndex.from)(chainIndex.to)
     caches.retain { (tip, _) =>
       !chain.isBefore(tip, block.hash) || {
@@ -105,26 +82,6 @@ class BlockFlow() extends MultiChain {
     } else {
       AddBlockResult.MissingDeps(missingDeps :+ block.hash)
     }
-  }
-
-  override def getBlock(hash: Keccak256): Block = {
-    getChain(hash).getBlock(hash)
-  }
-
-  override def getBlocks(locator: Keccak256): Seq[Block] = {
-    getChain(locator).getBlocks(locator)
-  }
-
-  override def isTip(hash: Keccak256): Boolean = {
-    getChain(hash).isTip(hash)
-  }
-
-  override def getHeight(hash: Keccak256): Int = {
-    getChain(hash).getHeight(hash)
-  }
-
-  override def getWeight(hash: Keccak256): Int = {
-    getChain(hash).getWeight(hash)
   }
 
   override def getBestTip: Block = {
@@ -190,7 +147,7 @@ class BlockFlow() extends MultiChain {
     }
   }
 
-  def getTipsWeight(tips: Seq[Keccak256]): Int = {
+  private def getTipsWeight(tips: Seq[Keccak256]): Int = {
     tips.map(getHeight).sum
   }
 
@@ -232,16 +189,12 @@ class BlockFlow() extends MultiChain {
     (newDeps3, getBlock(newDeps3.last).blockHeader.timestamp)
   }
 
-  override def getBlockSlice(block: Block): Seq[Block] = getChain(block).getBlockSlice(block)
-
   override def getAllBlocks: Iterable[Block] =
     for {
       i     <- 0 until groups
       j     <- 0 until groups
       block <- getChain(i, j).getAllBlocks
     } yield block
-
-  override def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = ???
 
   override def getTransaction(hash: Keccak256): Transaction = ???
 
@@ -278,7 +231,6 @@ class BlockFlow() extends MultiChain {
     s"""{"timestamp":$timestamp,"chainFrom":$from,"chainTo":$to,"height":"$height","hash":"$hash","deps":$deps}"""
   }
 }
-// scalastyle:on number.of.methods
 
 object BlockFlow {
   def apply(): BlockFlow = new BlockFlow()
