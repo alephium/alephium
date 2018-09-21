@@ -17,9 +17,9 @@ object Node {
   def apply(name: String, port: Int, groups: Int): Node = {
     val system      = ActorSystem(name)
     val blockFlow   = BlockFlow()
-    val peerManager = system.actorOf(PeerManager.props(port))
+    val peerManager = system.actorOf(PeerManager.props(port), "PeerManager")
 
-    val blockHandler = system.actorOf(BlockHandler.props(blockFlow))
+    val blockHandler = system.actorOf(BlockHandler.props(blockFlow), "BlockHandler")
     val poolHandlers = Seq.tabulate(groups, groups) {
       case (from, to) =>
         system.actorOf(BlockPoolHandler.props(blockFlow, ChainIndex(from, to), peerManager))
