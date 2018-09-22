@@ -35,13 +35,14 @@ trait BlockPool {
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of Seq[Block]
-  def getBlockSlice(block: Block): Seq[Block]
+  def getBlockSlice(hash: Keccak256): Seq[Block]
+  def getBlockSlice(block: Block): Seq[Block] = getBlockSlice(block.hash)
 
   // Assuming the hash or block is in the pool
   def isTip(hash: Keccak256): Boolean
   def isTip(block: Block): Boolean = isTip(block.hash)
 
-  def getBestTip: Block
+  def getBestTip: Keccak256
 
   def getBestChain: Seq[Block] = getBlockSlice(getBestTip)
 
@@ -106,9 +107,9 @@ trait BlockPool {
   }
 
   // calculated from best chain
-  def getBalance(address: ED25519PublicKey): (Block, BigInt) = {
-    val bestHeader = getBestTip
-    val balance    = getBestChain.map(block => getBalance(block, address)).sum
-    (bestHeader, balance)
+  def getBalance(address: ED25519PublicKey): (Keccak256, BigInt) = {
+    val bestTip = getBestTip
+    val balance = getBestChain.map(block => getBalance(block, address)).sum
+    (bestTip, balance)
   }
 }

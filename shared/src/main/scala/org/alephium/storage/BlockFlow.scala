@@ -1,14 +1,12 @@
 package org.alephium.storage
 
-import java.util.concurrent.ConcurrentHashMap
-
 import org.alephium.constant.Network
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.Hex
 
-import scala.collection.JavaConverters._
+import scala.collection.SeqView
 
 class BlockFlow() extends MultiChain {
   import Network.groups
@@ -18,18 +16,6 @@ class BlockFlow() extends MultiChain {
   val singleChains: Seq[Seq[SingleChain]] =
     Seq.tabulate(groups, groups) {
       case (from, to) => ForksTree(initialBlocks(from)(to))
-    }
-
-  val depsInTips: Seq[Seq[collection.concurrent.Map[Keccak256, Seq[Keccak256]]]] =
-    Seq.tabulate(groups, groups) { (from, to) =>
-      val header = initialBlocks(from)(to).hash
-      val deps = Seq.tabulate(Network.chainNum) { index =>
-        val i = index / groups
-        val j = index % groups
-        initialBlocks(i)(j).hash
-      }
-      val map = new ConcurrentHashMap[Keccak256, Seq[Keccak256]]().asScala
-      map += (header -> deps)
     }
 
   private def aggregate[T](f: SingleChain => T)(reduce: Seq[T] => T): T = {
@@ -51,143 +37,147 @@ class BlockFlow() extends MultiChain {
     getChain(chainIndex.from, chainIndex.to)
   }
 
-  def addDeps(block: Block, deps: Seq[Keccak256]): Unit = {
-    val chainIndex = getIndex(block)
-    val chain      = singleChains(chainIndex.from)(chainIndex.to)
-    val caches     = depsInTips(chainIndex.from)(chainIndex.to)
-    caches.retain { (tip, _) =>
-      !chain.isBefore(tip, block.hash) || {
-        val tipHeight   = chain.getHeight(tip)
-        val blockHeight = chain.getHeight(block)
-        tipHeight >= blockHeight - 5
-      }
-    }
-    caches += (block.hash -> deps)
-  }
-
   override def add(block: Block): AddBlockResult = {
     // TODO: check dependencies
     val deps        = block.blockHeader.blockDeps
     val missingDeps = deps.filterNot(contains)
     if (missingDeps.isEmpty) {
-      val tips       = getDepsInTips(block)
       val chainIndex = getIndex(block)
       val chain      = getChain(chainIndex)
-      val weight     = getTipsWeight(tips) + 1
-      chain.add(block, weight) match {
-        case AddBlockResult.Success =>
-          addDeps(block, tips.updated(chainIndex.toOneDim, block.hash))
-          AddBlockResult.Success
-        case x => x
-      }
+      val parent     = deps.view.takeRight(groups)(chainIndex.to)
+      val weight     = calWeight(block)
+      chain.add(block, parent, weight)
     } else {
       AddBlockResult.MissingDeps(missingDeps :+ block.hash)
     }
   }
 
-  override def getBestTip: Block = {
-    aggregate(_.getBestTip)(_.maxBy(block => getWeight(block)))
+  private def calWeight(block: Block): Int = {
+    val deps = block.blockHeader.blockDeps
+    if (deps.isEmpty) 0
+    else {
+      val weight1 = deps.view.dropRight(groups).map(calGroupWeight).sum
+      val weight2 = deps.view.takeRight(groups).map(getHeight).sum
+      weight1 + weight2 + 1
+    }
+  }
+
+  private def calGroupWeight(hash: Keccak256): Int = {
+    val block = getBlock(hash)
+    val deps  = block.blockHeader.blockDeps
+    if (deps.isEmpty) 0
+    else {
+      deps.view.takeRight(groups).map(getHeight).sum + 1
+    }
+  }
+
+  override def getBestTip: Keccak256 = {
+    aggregate(_.getBestTip)(_.maxBy(hash => getWeight(hash)))
   }
 
   override def getAllTips: Seq[Keccak256] =
     aggregate(_.getAllTips)(_.foldLeft(Seq.empty[Keccak256])(_ ++ _))
 
-  def getCachedHeaders(hash: Keccak256): Seq[Keccak256] = {
-    val chainIndex = getIndex(hash)
-    depsInTips(chainIndex.from)(chainIndex.to)(hash)
+  def getRtips(tip: Keccak256, from: Int): Array[Keccak256] = {
+    val rdeps = new Array[Keccak256](Network.groups)
+    rdeps(from) = tip
+
+    val block = getBlock(tip)
+    val deps  = block.blockHeader.blockDeps
+    if (deps.isEmpty) {
+      0 until groups foreach { k =>
+        if (k != from) rdeps(k) = initialBlocks(k).head.hash
+      }
+    } else {
+      0 until groups foreach { k =>
+        if (k < from) rdeps(k) = deps(k)
+        else if (k > from) rdeps(k) = deps(k - 1)
+      }
+    }
+    rdeps
   }
 
-  def getCachedHeaders(block: Block): Seq[Keccak256] = {
-    getCachedHeaders(block.hash)
-  }
+  def isExtending(current: Keccak256, previous: Keccak256): Boolean = {
+    val index1 = getIndex(current)
+    val index2 = getIndex(previous)
+    assert(index1.from == index2.from)
 
-  def getTips(hash: Keccak256): Seq[Keccak256] = {
-    val block = getBlock(hash)
-    getTips(block)
-  }
-
-  def getDepsInTips(block: Block): Seq[Keccak256] = {
-    block.blockHeader.blockDeps.map(getCachedHeaders).reduce(merge(_, _).get)
-  }
-
-  def getTips(block: Block): Seq[Keccak256] = {
-    val deps       = getDepsInTips(block)
-    val chainIndex = getIndex(block)
-    deps.updated(chainIndex.toOneDim, block.hash)
-  }
-
-  def merge(hash1: Keccak256, hash2: Keccak256): Option[Keccak256] = {
-    if (hash1 == Keccak256.zero) Some(hash2)
-    else if (hash2 == Keccak256.zero) Some(hash1)
+    val chain = getChain(index2)
+    if (index1.to == index2.to) chain.isBefore(previous, current)
     else {
-      assert(getIndex(hash1) == getIndex(hash2))
-      val chain = getChain(hash1)
-      if (chain.isBefore(hash1, hash2)) Some(hash2)
-      else if (chain.isBefore(hash2, hash1)) Some(hash1)
-      else None
+      val groupDeps = getGroupDeps(current, index1.from)
+      chain.isBefore(previous, groupDeps(index2.to))
     }
   }
 
-  def merge(tips1: Seq[Keccak256], tips2: Seq[Keccak256]): Option[Seq[Keccak256]] = {
-    assert(tips1.size == tips2.size)
-    val merged = tips1.zip(tips2).map {
-      case (hash1, hash2) => merge(hash1, hash2)
-    }
-
-    if (merged.forall(_.nonEmpty)) {
-      Some(merged.map(_.get))
-    } else None
-  }
-
-  def merge(tips: Seq[Keccak256], hash: Keccak256): Option[(Seq[Keccak256], Keccak256, Int)] = {
-    val newTips = getCachedHeaders(hash)
-    merge(tips, newTips).map { mergedTips =>
-      val heightBefore = getTipsWeight(tips)
-      val heightAfter  = getTipsWeight(mergedTips)
-      (mergedTips, hash, heightAfter - heightBefore)
+  def isCompatible(rtips: Seq[Keccak256], tip: Keccak256, from: Int): Boolean = {
+    val newRtips = getRtips(tip, from)
+    assert(rtips.size == newRtips.length)
+    rtips.indices forall { k =>
+      val t1 = rtips(k)
+      val t2 = newRtips(k)
+      isExtending(t1, t2) || isExtending(t2, t1)
     }
   }
 
-  private def getTipsWeight(tips: Seq[Keccak256]): Int = {
-    tips.map(getHeight).sum
+  def updateRtips(rtips: Array[Keccak256], tip: Keccak256, from: Int): Unit = {
+    val newRtips = getRtips(tip, from)
+    assert(rtips.length == newRtips.length)
+    rtips.indices foreach { k =>
+      val t1 = rtips(k)
+      val t2 = newRtips(k)
+      if (isExtending(t2, t1)) {
+        rtips(k) = t2
+      }
+    }
   }
 
-  def updateGroupDeps(tips: Seq[Keccak256],
-                      deps: Seq[Keccak256],
-                      toTry: Seq[Keccak256],
-                      chainIndex: ChainIndex): (Seq[Keccak256], Seq[Keccak256]) = {
-    val validNewTips = toTry.flatMap(merge(tips, _))
-    if (validNewTips.nonEmpty) {
-      val (newTips, newDep, _) = validNewTips.maxBy(_._3)
-      (newTips, deps :+ newDep)
-    } else (tips, deps :+ tips(chainIndex.toOneDim))
+  def getGroupDeps(tip: Keccak256, from: Int): SeqView[Keccak256, Seq[_]] = {
+    val deps = getBlock(tip).blockHeader.blockDeps
+    if (deps.isEmpty) {
+      initialBlocks(from).view.map(_.hash)
+    } else {
+      deps.view.takeRight(groups)
+    }
   }
 
-  def getBestDeps(chainIndex: ChainIndex): (Seq[Keccak256], Long) = {
-    val bestTip       = getBestTip
-    val tipsOfBestTip = getCachedHeaders(bestTip)
-    val bestIndex     = getIndex(bestTip)
-    val initialDeps   = if (bestIndex.from == chainIndex.from) Seq.empty else Seq(bestTip.hash)
-    val (newTips1, newDeps1) = (0 until groups)
-      .filter(k => k != chainIndex.from && k != bestIndex.from)
-      .foldLeft((tipsOfBestTip, initialDeps)) {
-        case ((tips, deps), k) =>
-          val toTry = (0 until groups).flatMap { l =>
-            getChain(k, l).getAllTips
+  def getBestDeps(chainIndex: ChainIndex): Seq[Keccak256] = {
+    val bestTip   = getBestTip
+    val bestIndex = getIndex(bestTip)
+    val rtips     = getRtips(bestTip, bestIndex.from)
+    val deps1 = (0 until groups)
+      .filter(_ != chainIndex.from)
+      .foldLeft(Seq.empty[Keccak256]) {
+        case (deps, k) =>
+          if (k == bestIndex.from) deps :+ bestTip
+          else {
+            val toTries = (0 until groups).flatMap { l =>
+              getChain(k, l).getAllTips
+            }
+            val validTries = toTries.filter(tip => isCompatible(rtips, tip, k))
+            if (validTries.isEmpty) deps :+ rtips(k)
+            else {
+              val bestTry = validTries.maxBy(getWeight) // TODO: improve
+              updateRtips(rtips, bestTry, k)
+              deps :+ bestTry
+            }
           }
-          updateGroupDeps(tips, deps, toTry, ChainIndex(k, 0))
       }
-    val (newTips2, newDeps2) = (0 until groups)
-      .filter(_ != chainIndex.to)
-      .foldLeft((newTips1, newDeps1)) {
-        case ((tips, deps), l) =>
-          val toTryIndex = ChainIndex(chainIndex.from, l)
-          val toTry      = getChain(chainIndex.from, l).getAllTips
-          updateGroupDeps(tips, deps, toTry, toTryIndex)
+    val groupTip  = rtips(chainIndex.from)
+    val groupDeps = getGroupDeps(groupTip, chainIndex.from)
+    val deps2 = (0 until groups)
+      .foldLeft(deps1) {
+        case (deps, l) =>
+          val chain      = getChain(chainIndex.from, l)
+          val toTries    = chain.getAllTips
+          val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l), tip))
+          if (validTries.isEmpty) deps :+ groupDeps(l)
+          else {
+            val bestTry = validTries.maxBy(getWeight) // TODO: improve
+            deps :+ bestTry
+          }
       }
-    val toTry         = getChain(chainIndex).getAllTips
-    val (_, newDeps3) = updateGroupDeps(newTips2, newDeps2, toTry, chainIndex)
-    (newDeps3, getBlock(newDeps3.last).blockHeader.timestamp)
+    deps2
   }
 
   override def getAllBlocks: Iterable[Block] =
