@@ -34,7 +34,27 @@ def mainProject(id: String): Project = baseProject(id)
       `circe-parser`,
       `scala-logging`,
       logback,
-    )
+    ),
+    run := {
+      import scala.sys.process._
+      import complete.DefaultParsers._
+
+      val args: Seq[String] = spaceDelimited("<arg>").parsed
+
+      val nodes       = args(0).toInt
+      val port_start  = args(1).toInt // TODO Should this be read directly from the `platform.conf`?
+
+      val tmp         = System.getProperty("java.io.tmpdir")
+
+      (0 until nodes).foreach { node =>
+        val port = port_start + node
+        val app = target.value / "universal" / "stage" / "bin" / name.value
+        val log = Path(tmp) / "alephium-log" / s"$port.txt"
+        val cmd = s"$app $port" #> log
+        println(cmd)
+        cmd.run()
+      }
+    }
   )
   .enablePlugins(JavaAppPackaging)
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
