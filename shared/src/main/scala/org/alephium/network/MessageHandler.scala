@@ -31,15 +31,16 @@ class MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandl
 
   override def receive: Receive = handlePayload orElse handleInternal orElse awaitSendPing
 
-  def handlePing(nonce: Int, timestamp: Long): Unit = {
+  def handlePing(nonce: Int, delay: Long): Unit = {
     // TODO: refuse ping if it's too frequent
-    val delay = System.currentTimeMillis() - timestamp
     log.info(s"Ping received with ${delay}ms delay, response with pong")
     connection ! TcpHandler.envelope(Message(Pong(nonce)))
   }
 
   def handlePayload: Receive = {
-    case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
+    case Ping(nonce, timestamp) =>
+      val delay = System.currentTimeMillis() - timestamp
+      handlePing(nonce, delay)
     case Pong(nonce) =>
       if (nonce == pingNonce) {
         log.debug("Pong received, no response")
