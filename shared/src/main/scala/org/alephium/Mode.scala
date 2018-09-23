@@ -5,12 +5,16 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.client.Node
 import org.alephium.constant.Network
+import org.alephium.network.{TcpHandler, MessageHandler}
 
 import scala.sys.process._
 
 // scalastyle:off magic.number
 
 trait Mode {
+  def builders: TcpHandler.Builder with MessageHandler.Builder =
+    new TcpHandler.Builder with MessageHandler.Builder
+
   def createNode(args: Array[String]): Node
 
   def getIndex(args: Array[String]): Int
@@ -22,7 +26,7 @@ trait Mode {
 
 object Mode {
   object Aws extends Mode with StrictLogging {
-    override def createNode(args: Array[String]): Node = Node("Root", Network.port, Network.groups)
+    override def createNode(args: Array[String]): Node = Node(builders, "Root", Network.port, Network.groups)
 
     override def getIndex(args: Array[String]): Int = {
       val hostname = "hostname".!!.stripLineEnd
@@ -42,7 +46,7 @@ object Mode {
   }
 
   object Local extends Mode {
-    override def createNode(args: Array[String]): Node = Node("Root", args(0).toInt, Network.groups)
+    override def createNode(args: Array[String]): Node = Node(builders, "Root", args(0).toInt, Network.groups)
 
     override def getIndex(args: Array[String]): Int = {
       val port = args(0).toInt
