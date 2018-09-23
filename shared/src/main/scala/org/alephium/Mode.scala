@@ -25,7 +25,7 @@ trait Mode {
 }
 
 object Mode {
-  object Aws extends Mode with StrictLogging {
+  class Aws extends Mode with StrictLogging {
     override def createNode(args: Array[String]): Node = Node(builders, "Root", Network.port, Network.groups)
 
     override def getIndex(args: Array[String]): Int = {
@@ -45,7 +45,7 @@ object Mode {
     override def getHttpPort(args: Array[String]): Int = 8080
   }
 
-  object Local extends Mode {
+  class Local extends Mode {
     override def createNode(args: Array[String]): Node = Node(builders, "Root", args(0).toInt, Network.groups)
 
     override def getIndex(args: Array[String]): Int = {
