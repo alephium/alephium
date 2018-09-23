@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.client.Miner
+import org.alephium.client.{Miner, Node}
 import org.alephium.constant.Network
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.mock.MockMiner
@@ -19,19 +19,15 @@ import scala.concurrent.Future
 trait Platform extends App with StrictLogging {
   def mode: Mode
 
-  val node   = mode.createNode(args)
-  val index  = mode.getIndex(args)
-  val groups = Network.groups
+  def init() = {
+    val node   = mode.createNode(args)
+    val index  = mode.getIndex(args)
 
-  val second = index / groups
-  val from   = index % groups
+    connect(node, index)
+    runServer(node, index)
+  }
 
-  logger.info(s"second: $second, index: $from")
-
-  connect()
-  runServer()
-
-  def connect(): Unit = {
+  def connect(node: Node, index: Int): Unit = {
     Thread.sleep(1000 * 60)
 
     if (index > 0) {
@@ -41,10 +37,16 @@ trait Platform extends App with StrictLogging {
     }
   }
 
-  def runServer(): Future[Http.ServerBinding] = {
+  def runServer(node: Node, index: Int): Future[Http.ServerBinding] = {
     implicit val system           = node.system
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
+
+    val groups = Network.groups
+    val second = index / groups
+    val from   = index % groups
+
+    logger.info(s"second: $second, index: $from")
 
     val route = path("mining") {
       put {
