@@ -2,7 +2,7 @@ package org.alephium.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
@@ -13,7 +13,7 @@ import org.alephium.util.BaseActor
 import scala.collection.mutable
 
 object PeerManager {
-  def props(port: Int): Props = Props(new PeerManager(port))
+  // def props(port: Int): Props = Props(new PeerManager(port))
 
   sealed trait Command
   case class SetBlockHandlers(blockhandlers: BlockHandlers)            extends Command
@@ -26,7 +26,7 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(port: Int) extends BaseActor {
+class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port: Int) extends BaseActor {
   import PeerManager._
 
   val server: ActorRef                                = context.actorOf(TcpServer.props(port))
@@ -95,7 +95,7 @@ class PeerManager(port: Int) extends BaseActor {
   def addPeer(remote: InetSocketAddress,
               connection: ActorRef,
               blockHandlers: BlockHandlers): Unit = {
-    val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockHandlers))
+    val tcpHandler = context.actorOf(builders.TcpHandler(builders, remote, connection, blockHandlers))
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
 //    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack

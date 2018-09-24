@@ -15,9 +15,6 @@ import scala.util.{Failure, Success, Try}
 
 object TcpHandler {
 
-  def props(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
-    Props(new TcpHandler(remote, connection, blockHandlers))
-
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
 
@@ -35,13 +32,18 @@ object TcpHandler {
     }
     iter(data, Seq.empty)
   }
+
+  trait Builder {
+    def TcpHandler(mhb: MessageHandler.Builder, remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+      Props(new TcpHandler(mhb, remote, connection, blockHandlers))
+  }
 }
 
-class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
+class TcpHandler(builders: MessageHandler.Builder, remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
     extends BaseActor {
 
   val messageHandler: ActorRef =
-    context.actorOf(MessageHandler.props(remote, connection, blockHandlers))
+    context.actorOf(builders.MessageHandler(remote, connection, blockHandlers))
 
   override def preStart(): Unit = {
     context.watch(messageHandler)
