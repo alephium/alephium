@@ -18,7 +18,7 @@ lazy val root: Project = Project("root", file("."))
     scalastyle := {},
     scalastyle in Test := {},
   )
-  .aggregate(app, util, serde, crypto, protocol)
+  .aggregate(app, `app-debug`, util, serde, crypto, protocol)
 
 def mainProject(id: String): Project = baseProject(id)
   .settings(
@@ -65,13 +65,13 @@ lazy val app = mainProject("app")
     unmanagedResourceDirectories in Test      += baseDirectory.value / ".." / "shared" / "src" / "test" / "resources"
   )
 
-lazy val `app-debug` = mainProject("app-debug")
+lazy val `app-debug`: Project = mainProject("app-debug")
   .settings(
-    coverageEnabled := true,
     libraryDependencies ++= Seq(
       metrics,
       `metrics-jmx`
-    )
+    ),
+    coverageEnabled := false
   )
 
 def subProject(path: String): Project = {
@@ -163,6 +163,12 @@ val commonSettings = Seq(
   Test / scalacOptions += "-Xcheckinit",
   fork := true,
   run / javaOptions += "-Xmx4g -XX:+UseG1GC",
+  scalafmtOnCompile := true,
+  (compile in Compile) := {
+    val result = (compile in Compile).value
+    scalastyle.in(Compile).toTask("").value
+    result
+  },
   libraryDependencies ++= Seq(
     akkatest,
     scalacheck,
