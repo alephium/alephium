@@ -8,7 +8,7 @@ package:
 	sbt app/universal:packageBin
 
 root:
-	sbt 'app/run ${nodes} 9973'
+	sbt 'app/run ${nodes} 9973' &
 
 mine:
 	index=0; port=8080 ; while [[ $$index -lt $$nodes ]] ; do \
