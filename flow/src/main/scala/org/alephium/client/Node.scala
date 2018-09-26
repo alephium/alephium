@@ -1,6 +1,6 @@
 package org.alephium.client
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.network.{MessageHandler, PeerManager, TcpHandler}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
@@ -22,12 +22,13 @@ object Node {
 
     val system      = ActorSystem(name)
     val blockFlow   = BlockFlow()
-    val peerManager = system.actorOf(Props(new PeerManager(builders, port)), "PeerManager")
+    val peerManager = system.actorOf(PeerManager.props(builders, port), "PeerManager")
 
     val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
     val chainHandlers = Seq.tabulate(groups, groups) {
       case (from, to) =>
-        system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager))
+        system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager),
+                       s"ChainHandler-$from-$to")
     }
     val blockHandlers = BlockHandlers(blockHandler, chainHandlers)
     peerManager ! PeerManager.SetBlockHandlers(blockHandlers)

@@ -2,7 +2,7 @@ package org.alephium.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Terminated}
+import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
@@ -13,6 +13,9 @@ import org.alephium.util.BaseActor
 import scala.collection.mutable
 
 object PeerManager {
+  def props(builders: TcpHandler.Builder with MessageHandler.Builder, port: Int): Props =
+    Props(new PeerManager(builders, port))
+
   sealed trait Command
   case class SetBlockHandlers(blockhandlers: BlockHandlers)            extends Command
   case class Connect(remote: InetSocketAddress)                        extends Command
@@ -28,7 +31,7 @@ class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port
     extends BaseActor {
   import PeerManager._
 
-  val server: ActorRef                                = context.actorOf(TcpServer.props(port))
+  val server: ActorRef                                = context.actorOf(TcpServer.props(port), "TcpServer")
   val peers: mutable.Map[InetSocketAddress, ActorRef] = mutable.Map.empty
 
   def tcpHandlers: Iterable[ActorRef] = peers.values
@@ -94,8 +97,10 @@ class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port
   def addPeer(remote: InetSocketAddress,
               connection: ActorRef,
               blockHandlers: BlockHandlers): Unit = {
-    val tcpHandler =
-      context.actorOf(builders.createTcpHandler(builders, remote, connection, blockHandlers))
+    val handlerName = BaseActor.envalidActorName(s"TcpHandler-$remote")
+    val tcpHandler = context.actorOf(
+      builders.createTcpHandler(builders, remote, connection, blockHandlers),
+      handlerName)
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
 //    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
