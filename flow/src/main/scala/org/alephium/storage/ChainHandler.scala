@@ -27,7 +27,7 @@ object ChainHandler {
 // TODO: investigate concurrency in master branch
 class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)
     extends BaseActor {
-  val chain = blockFlow.getChain(chainIndex)
+  val chain: SingleChain = blockFlow.getChain(chainIndex)
 
   override def receive: Receive = {
     case ChainHandler.AddBlocks(blocks, origin) =>
@@ -38,13 +38,12 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          val index    = blockFlow.getIndex(block)
-          val blockNum = blockFlow.numBlocks
-          //            val length   = blockFlow.getBestLength
-          //            val info     = blockFlow.getInfo
-          //            log.info(s"Add block for $index, #blocks: $blockNum, #length: $length, info: $info")
+          val total       = blockFlow.numBlocks
+          val blockNum    = chain.numBlocks
+          val height      = chain.maxHeight
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
-          log.info(s"Index: $index; Blocks: $blockNum; Time elapsed: ${elapsedTime}ms")
+          log.info(
+            s"Total: $total; Index: $chainIndex; Height: $height/$blockNum; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
         case AddBlockResult.AlreadyExisted =>
           log.info(s"Received already included block")
