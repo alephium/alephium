@@ -15,7 +15,9 @@ case class Node(
 )
 
 object Node {
-  def apply(builders: TcpHandler.Builder, name: String, port: Int, groups: Int): Node = {
+  type Builder = TcpHandler.Builder
+
+  def apply(builders: Builder, name: String, port: Int, groups: Int): Node = {
 
     val system    = ActorSystem(name)
     val blockFlow = BlockFlow()

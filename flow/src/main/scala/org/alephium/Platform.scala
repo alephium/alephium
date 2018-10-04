@@ -10,7 +10,6 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.client.{Miner, Node}
 import org.alephium.constant.Network
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.mock.MockMiner
 import org.alephium.network.PeerManager
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.Hex._
@@ -43,10 +42,9 @@ trait Platform extends App with StrictLogging {
     implicit val executionContext = system.dispatcher
 
     val groups = Network.groups
-    val second = index / groups
     val from   = index % groups
 
-    logger.info(s"second: $second, index: $from")
+    logger.info(s"index: $from")
 
     val route = path("mining") {
       put {
@@ -55,7 +53,7 @@ trait Platform extends App with StrictLogging {
 
         (0 until groups).foreach { to =>
           val chainIndex = ChainIndex(from, to)
-          val miner = node.system.actorOf(MockMiner.props(publicKey, node, chainIndex, second == 0),
+          val miner = node.system.actorOf(mode.builders.createMiner(publicKey, node, chainIndex),
                                           s"MockMiner-$from-$to")
           miner ! Miner.Start
         }
