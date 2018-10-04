@@ -20,13 +20,14 @@ lazy val root: Project = Project("root", file("."))
   )
   .aggregate(app, `app-debug`, flow, util, serde, crypto, protocol)
 
-def mainProject(id: String): Project = baseProject(id)
-  .settings(
-    Compile / scalastyleConfig := root.base / scalastyleCfgFile,
-    Test    / scalastyleConfig := root.base / scalastyleTestCfgFile
-  )
-  .enablePlugins(JavaAppPackaging)
-  .dependsOn(flow)
+def mainProject(id: String): Project =
+  baseProject(id)
+    .settings(
+      Compile / scalastyleConfig := root.base / scalastyleCfgFile,
+      Test / scalastyleConfig := root.base / scalastyleTestCfgFile
+    )
+    .enablePlugins(JavaAppPackaging)
+    .dependsOn(flow)
 
 lazy val app = mainProject("app")
 
@@ -43,7 +44,7 @@ def subProject(path: String): Project = {
   baseProject(path)
     .settings(
       Compile / scalastyleConfig := root.base / scalastyleCfgFile,
-      Test    / scalastyleConfig := root.base / scalastyleTestCfgFile
+      Test / scalastyleConfig := root.base / scalastyleTestCfgFile
     )
 }
 
@@ -68,7 +69,11 @@ lazy val flow = subProject("flow")
       `scala-reflect`(scalaVersion.value),
       logback
     )
-  ).dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
+  )
+  .dependsOn(util % "test->test;compile->compile",
+             serde,
+             crypto,
+             protocol % "test->test;compile->compile")
 
 lazy val protocol = subProject("protocol")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
@@ -81,7 +86,7 @@ lazy val protocol = subProject("protocol")
 lazy val serde = subProject("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-    Test    / sourceGenerators += (sourceManaged in Test   ).map(Boilerplate.genTest).taskValue
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -101,7 +106,8 @@ val commonSettings = Seq(
   parallelExecution in Test := false,
   scalacOptions := Seq(
     "-deprecation",
-    "-encoding", "utf-8",
+    "-encoding",
+    "utf-8",
     "-explaintypes",
     "-feature",
     "-unchecked",
