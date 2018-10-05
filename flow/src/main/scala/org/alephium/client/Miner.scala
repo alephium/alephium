@@ -1,7 +1,7 @@
 package org.alephium.client
 
 import akka.actor.Props
-import org.alephium.constant.Network
+import org.alephium.constant.{Consensus, Network}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
@@ -88,7 +88,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
-        val block = Block.from(deps, transactions, current)
+        val block = Block.from(deps, transactions, Consensus.maxMiningTarget, current)
         if (isDifficult(block)) Some(block)
         else iter(current + 1)
       } else None

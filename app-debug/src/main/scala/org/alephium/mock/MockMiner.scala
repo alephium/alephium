@@ -2,6 +2,7 @@ package org.alephium.mock
 
 import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.client.{Miner, Node}
+import org.alephium.constant.Consensus
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
@@ -62,7 +63,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val timestamp = System.currentTimeMillis()
-        val block     = Block.from(deps, timestamp, current)
+        val block     = Block.from(deps, timestamp, Consensus.maxMiningTarget, current)
         if (isDifficult(block)) Some(block)
         else iter(current + 1)
       } else None
