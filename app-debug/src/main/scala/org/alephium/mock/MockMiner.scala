@@ -1,13 +1,13 @@
 package org.alephium.mock
 
 import akka.actor.{ActorRef, Props, Timers}
-import org.alephium.client.{Miner, Node}
-import org.alephium.constant.Consensus
+import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.constant.Consensus
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.ChainHandler.BlockOrigin.Local
-import org.alephium.storage.{AddBlockResult, ChainHandler, FlowHandler}
+import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
+import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
