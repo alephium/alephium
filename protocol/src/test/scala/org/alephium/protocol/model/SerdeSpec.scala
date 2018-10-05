@@ -1,7 +1,7 @@
 package org.alephium.protocol.model
 
-import org.alephium.AlephiumSpec
 import org.alephium.serde.deserialize
+import org.alephium.util.AlephiumSpec
 import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSpec {

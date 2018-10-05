@@ -1,8 +1,8 @@
 package org.alephium.serde
 
 import akka.util.ByteString
-import org.alephium.AlephiumSpec
 import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
+import org.alephium.util.AlephiumSpec
 import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSpec {

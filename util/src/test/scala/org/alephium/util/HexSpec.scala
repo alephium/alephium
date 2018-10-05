@@ -1,6 +1,5 @@
 package org.alephium.util
 
-import org.alephium.AlephiumSpec
 import org.alephium.util.Hex._
 
 class HexSpec extends AlephiumSpec {

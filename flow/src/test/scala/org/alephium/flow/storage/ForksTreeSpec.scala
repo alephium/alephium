@@ -1,7 +1,6 @@
 package org.alephium.flow.storage
-
-import org.alephium.AlephiumSpec
 import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.util.AlephiumSpec
 
 class ForksTreeSpec extends AlephiumSpec {
   behavior of "ForksTree"
