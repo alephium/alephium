@@ -5,8 +5,8 @@ import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.flow.Mode
 import org.alephium.flow.network.PeerManager.GetPeers
-import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.flow.storage.HandlerUtils
+import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.util.AlephiumActorSpec
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {

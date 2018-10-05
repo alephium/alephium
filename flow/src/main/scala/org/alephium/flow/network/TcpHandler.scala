@@ -8,15 +8,15 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.constant.Network
 import org.alephium.flow.model.ChainIndex
-import org.alephium.protocol.message._
-import org.alephium.serde.NotEnoughBytesException
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Remote
 import org.alephium.flow.storage.{AddBlockResult, BlockHandlers, ChainHandler, FlowHandler}
+import org.alephium.protocol.message._
+import org.alephium.serde.NotEnoughBytesException
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec
-import scala.util.{Failure, Random, Success, Try}
 import scala.concurrent.duration._
+import scala.util.{Failure, Random, Success, Try}
 
 object TcpHandler {
 

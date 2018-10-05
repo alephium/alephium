@@ -6,11 +6,11 @@ import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
-import org.scalatest.TryValues._
+import org.alephium.flow.storage.{BlockHandlers, HandlerUtils}
 import org.alephium.protocol.message._
 import org.alephium.serde.WrongFormatException
-import org.alephium.flow.storage.{BlockHandlers, HandlerUtils}
 import org.alephium.util.AlephiumActorSpec
+import org.scalatest.TryValues._
 
 import scala.util.Random
 
