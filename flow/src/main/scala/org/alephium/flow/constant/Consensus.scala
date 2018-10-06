@@ -1,11 +1,12 @@
 package org.alephium.flow.constant
-import scala.concurrent.duration._
 
-object Consensus {
+import java.time.Duration
 
-  val numZerosAtLeastInHash: Int = 12
+object Consensus extends WithConfig {
+
+  val numZerosAtLeastInHash: Int = config.getInt("numZerosAtLeastInHash")
   val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-  val blockTargetTime: Duration = 4.minutes
-  val blockSpanNum: Int         = 15 * 12
+  val blockTargetTime: Duration = config.getDuration("blockTargetTime")
+  val blockSpanNum: Int         = config.getInt("blockSpanNum")
 }

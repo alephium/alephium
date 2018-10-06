@@ -1,6 +1,6 @@
 package org.alephium.mock
 
-import akka.actor.{ActorRef, Props, Timers}
+import akka.actor.{Props, Timers}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.constant.Consensus
@@ -29,8 +29,6 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
     with Timers {
   import node.blockHandlers
 
-  val chainHandler: ActorRef = blockHandlers.getHandler(chainIndex)
-
   override def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive = {
     case Miner.Nonce(_, _) =>
       val delta     = 1000 * 30 + Random.nextInt(1000 * 60)
@@ -50,9 +48,12 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
       log.info(s"A new block ${block.shortHash} is mined at ${block.blockHeader.timestamp}")
       chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
 
-    case _: AddBlockResult =>
+    case AddBlockResult.Success =>
       blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
+
+    case _: AddBlockResult.Failure =>
+      context stop self
   }
 
   override def tryMine(deps: Seq[Keccak256],
@@ -70,9 +71,5 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
     }
 
     iter(Random.nextInt)
-  }
-
-  override def isDifficult(block: Block): Boolean = {
-    chainIndex.accept(block.hash)
   }
 }
