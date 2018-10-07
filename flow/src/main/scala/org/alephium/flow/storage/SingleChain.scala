@@ -1,5 +1,6 @@
 package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.Block
 
 trait SingleChain extends BlockPool {
@@ -17,6 +18,19 @@ trait SingleChain extends BlockPool {
   def getConfirmedBlock(height: Int): Option[Block]
 
   def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
+
+  def getHashTarget(hash: Keccak256): BigInt = {
+    val block     = getBlock(hash)
+    val height    = getHeight(hash)
+    val refHeight = height - Consensus.retargetInterval
+    getConfirmedBlock(refHeight) match {
+      case Some(refBlock) =>
+        val timeSpan = block.blockHeader.timestamp - refBlock.blockHeader.timestamp
+        val retarget = block.blockHeader.target * Consensus.retargetInterval * Consensus.blockTargetTime.toMillis / timeSpan
+        retarget
+      case None => Consensus.maxMiningTarget
+    }
+  }
 }
 
 sealed trait AddBlockResult

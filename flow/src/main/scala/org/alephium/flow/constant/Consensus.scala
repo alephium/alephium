@@ -8,6 +8,6 @@ object Consensus extends WithConfig {
   val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
   val blockTargetTime: Duration = config.getDuration("blockTargetTime")
-  val blockSpanNum: Int         = config.getInt("blockSpanNum")
   val blockConfirmNum: Int      = config.getInt("blockConfirmNum")
+  val retargetInterval: Int     = config.getInt("retargetInterval") // number of blocks for retarget
 }
