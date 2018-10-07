@@ -61,28 +61,33 @@ class BlockPoolSpec extends AlephiumSpec {
   }
 
   it should "work correctly with two chains of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(3, genesis), minSuccessful(1)) { longChain =>
+    forAll(ModelGen.chainGen(4, genesis), minSuccessful(1)) { longChain =>
       forAll(ModelGen.chainGen(2, genesis), minSuccessful(1)) { shortChain =>
         val blockPool = ForksTree(genesis, 0, 0)
-        longChain.foreach(block  => blockPool.add(block, 0))
-        shortChain.foreach(block => blockPool.add(block, 0))
 
-        blockPool.getHeight(longChain.head) is 1
-        blockPool.getHeight(longChain.last) is longChain.size
+        shortChain.foreach(block => blockPool.add(block, 0))
         blockPool.getHeight(shortChain.head) is 1
         blockPool.getHeight(shortChain.last) is shortChain.size
-        blockPool.getBlockSlice(longChain.head) is Seq(genesis, longChain.head)
-        blockPool.getBlockSlice(longChain.last) is genesis +: longChain
         blockPool.getBlockSlice(shortChain.head) is Seq(genesis, shortChain.head)
         blockPool.getBlockSlice(shortChain.last) is genesis +: shortChain
-        blockPool.isTip(longChain.head) is false
-        blockPool.isTip(longChain.last) is true
         blockPool.isTip(shortChain.head) is false
         blockPool.isTip(shortChain.last) is true
+
+        longChain.init.foreach(block => blockPool.add(block, 0))
+        blockPool.maxHeight is longChain.size - 1
+        blockPool.getAllTips.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
+
+        blockPool.add(longChain.last, 0)
+        blockPool.getHeight(longChain.head) is 1
+        blockPool.getHeight(longChain.last) is longChain.size
+        blockPool.getBlockSlice(longChain.head) is Seq(genesis, longChain.head)
+        blockPool.getBlockSlice(longChain.last) is genesis +: longChain
+        blockPool.isTip(longChain.head) is false
+        blockPool.isTip(longChain.last) is true
         blockPool.getBestTip is longChain.last.hash
         blockPool.getBestChain is genesis +: longChain
         blockPool.maxHeight is longChain.size
-        blockPool.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
+        blockPool.getAllTips.toSet is Set(longChain.last.hash)
       }
     }
   }
