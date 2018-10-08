@@ -2,7 +2,7 @@ package org.alephium
 
 import io.circe.parser.parse
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.protocol.Genesis
+import org.alephium.flow.constant.{Consensus, Genesis}
 import org.alephium.protocol.model._
 import org.alephium.util.Hex
 
@@ -20,7 +20,7 @@ trait TxFixture {
       UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
       testPrivateKey
     )
-    Block.from(Seq(Genesis.block.hash), Seq(transaction), 0)
+    Block.from(Seq(Genesis.block.hash), Seq(transaction), Consensus.maxMiningTarget, 0)
   }
 
   private val json = parse(Source.fromResource("genesis.json").mkString).right.get
