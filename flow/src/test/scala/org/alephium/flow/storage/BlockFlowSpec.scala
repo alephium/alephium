@@ -110,7 +110,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val deps = blockFlow.getBestDeps(chainIndex)
+    val deps = blockFlow.getBestDeps(chainIndex).deps
 
     @tailrec
     def iter(nonce: BigInt): Block = {

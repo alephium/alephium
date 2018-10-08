@@ -25,7 +25,7 @@ object Boilerplate {
   }
 
   private val header       = "// auto-generated boilerplate"
-  private val maxAritySrc  = 22
+  private val maxAritySrc  = 10
   private val maxArityTest = 6
 
   class TemplateVals(val arity: Int) {

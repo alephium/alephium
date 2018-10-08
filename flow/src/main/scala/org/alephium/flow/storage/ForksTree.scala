@@ -14,6 +14,11 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   private val tips: HashSet[Keccak256]                            = HashSet.empty
   private val confirmedBlocks: ArrayBuffer[ForksTree.TreeNode]    = ArrayBuffer.empty
 
+  // Initialization
+  {
+    postOrderTraverse(updateTable)
+  }
+
   // Assuming that node is a tip node
   private def updateTable(node: ForksTree.TreeNode): Unit = {
     assert(node.isLeaf)
@@ -107,11 +112,6 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
       f(node)
     }
     iter(root)
-  }
-
-  // Initialization
-  {
-    postOrderTraverse(updateTable)
   }
 
   override def numBlocks: Int = blocksTable.size

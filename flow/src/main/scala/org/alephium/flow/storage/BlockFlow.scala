@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.constant.Network
-import org.alephium.flow.model.ChainIndex
+import org.alephium.flow.model.{BlockDeps, ChainIndex}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.Hex
 
@@ -141,7 +141,7 @@ class BlockFlow() extends MultiChain {
     }
   }
 
-  def getBestDeps(chainIndex: ChainIndex): Seq[Keccak256] = {
+  def getBestDeps(chainIndex: ChainIndex): BlockDeps = {
     val bestTip   = getBestTip
     val bestIndex = getIndex(bestTip)
     val rtips     = getRtips(bestTip, bestIndex.from)
@@ -177,7 +177,7 @@ class BlockFlow() extends MultiChain {
             deps :+ bestTry
           }
       }
-    deps2
+    BlockDeps(chainIndex, deps2)
   }
 
   override def getAllBlocks: Iterable[Block] =
