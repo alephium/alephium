@@ -12,8 +12,6 @@ import org.alephium.util.BaseActor
 import scala.annotation.tailrec
 
 object Miner {
-  def props(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex): Props =
-    Props(new Miner(address, node, chainIndex))
 
   sealed trait Command
   case object Start                          extends Command
@@ -28,6 +26,11 @@ object Miner {
     }
 
     iter(0)
+  }
+
+  trait Builder {
+    def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex): Props =
+      Props(new Miner(address, node, chainIndex))
   }
 }
 
