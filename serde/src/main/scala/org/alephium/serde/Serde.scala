@@ -1,5 +1,6 @@
 package org.alephium.serde
 
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteBuffer
 
 import akka.util.ByteString
@@ -12,7 +13,9 @@ trait Serializer[T] {
   def serialize(input: T): ByteString
 }
 
-trait Deserializer[T] {
+object Serializer { def apply[T](implicit T: Serializer[T]): Serializer[T] = T }
+
+trait Deserializer[T] { self =>
   def _deserialize(input: ByteString): Try[(T, ByteString)]
 
   def deserialize(input: ByteString): Try[T] =
@@ -21,7 +24,20 @@ trait Deserializer[T] {
         if (rest.isEmpty) Success(output)
         else Failure(WrongFormatException.redundant(input.size - rest.size, input.size))
     }
+
+  def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
+    (input: ByteString) => {
+      self._deserialize(input).flatMap {
+        case (t, rest) =>
+          get(t) match {
+            case Some(u) => Success((u, rest))
+            case None    => Failure(new WrongFormatException(error(t)))
+          }
+      }
+    }
 }
+
+object Deserializer { def apply[T](implicit T: Deserializer[T]): Deserializer[T] = T }
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -41,25 +57,25 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
     }
   }
 
-  def deValidate(predictor: T => Boolean, error: String): Serde[T] = new Serde[T] {
+  def validate(predicate: T => Boolean, error: T => String): Serde[T] = new Serde[T] {
     override def serialize(input: T): ByteString = self.serialize(input)
 
     override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
       // write explicitly for performance
       self._deserialize(input).flatMap {
         case (t, rest) =>
-          if (predictor(t)) {
+          if (predicate(t)) {
             Success((t, rest))
-          } else throw new WrongFormatException(error)
+          } else Failure(new WrongFormatException(error(t)))
       }
     }
 
     override def deserialize(input: ByteString): Try[T] = {
       // write explicitly for performance
       self.deserialize(input).flatMap { t =>
-        if (predictor(t)) {
+        if (predicate(t)) {
           Success(t)
-        } else throw new WrongFormatException(error)
+        } else Failure(new WrongFormatException(error(t)))
       }
     }
   }
@@ -123,6 +139,17 @@ object Serde extends ProductSerde {
       deserialize0(input, _.asByteBuffer.getLong())
   }
 
+  implicit val inetAddressSerde: Serde[InetAddress] =
+    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray), ia => ByteString(ia.getAddress))
+
+  implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
+    forProduct2[InetAddress, Int, InetSocketAddress](
+      { (hostname, port) =>
+        new InetSocketAddress(hostname, port)
+      },
+      isa => (isa.getAddress, isa.getPort)
+    )
+
   private abstract class SeqSerde[T: ClassTag](serde: Serde[T]) extends Serde[Seq[T]] {
     @tailrec
     final def _deserialize(rest: ByteString,
@@ -137,6 +164,20 @@ object Serde extends ProductSerde {
         }
       }
     }
+  }
+
+  def apply[T](implicit T: Serde[T]): Serde[T] = T
+
+  def bytesSerde(bytes: Int): Serde[ByteString] = new FixedSizeSerde[ByteString] {
+    override val serdeSize: Int = bytes
+
+    override def serialize(bs: ByteString): ByteString = {
+      assert(bs.length == serdeSize)
+      bs
+    }
+
+    override def deserialize(input: ByteString): Try[ByteString] =
+      deserialize0(input, identity)
   }
 
   def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =

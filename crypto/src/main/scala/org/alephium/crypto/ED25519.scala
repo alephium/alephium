@@ -1,47 +1,35 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.serde.FixedSizeBytes
+import org.alephium.serde.RandomBytes
 import org.whispersystems.curve25519.Curve25519
 
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 
-object ED25519PrivateKey extends FixedSizeBytes[ED25519PrivateKey] {
-  override val size: Int = 32
-
-  override def unsafeFrom(data: ByteString): ED25519PrivateKey = {
-    assert(data.length == size)
-    new ED25519PrivateKey(data)
-  }
+object ED25519PrivateKey
+    extends RandomBytes.Companion[ED25519PrivateKey](new ED25519PrivateKey(_), _.bytes) {
+  override def length: Int = ed25519KeyLength
 }
 
 class ED25519PublicKey(val bytes: ByteString) extends PublicKey
 
-object ED25519PublicKey extends FixedSizeBytes[ED25519PublicKey] {
-  override val size: Int = 32
-
-  override def unsafeFrom(data: ByteString): ED25519PublicKey = {
-    assert(data.length == size)
-    new ED25519PublicKey(data)
-  }
+object ED25519PublicKey
+    extends RandomBytes.Companion[ED25519PublicKey](new ED25519PublicKey(_), _.bytes) {
+  override def length: Int = ed25519KeyLength
 }
 
 class ED25519Signature(val bytes: ByteString) extends Signature
 
-object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
-  override val size: Int = 64
+object ED25519Signature
+    extends RandomBytes.Companion[ED25519Signature](new ED25519Signature(_), _.bytes) {
+  override def length: Int = ed25519SigLength
 
   def isCanonical(bytes: ByteString): Boolean = {
-    assert(bytes.length == size)
+    assert(bytes.length == length)
     val sBytes = bytes.takeRight(32).toArray.reverse
     sBytes(0) = (sBytes(0) & 0x7F).toByte
     val s = BigInt(sBytes)
     s >= 0 && s < ED25519.generator
-  }
-
-  override def unsafeFrom(data: ByteString): ED25519Signature = {
-    assert(data.length == size && isCanonical(data))
-    new ED25519Signature(data)
   }
 }
 
