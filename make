@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse, os, tempfile
 
 parser = argparse.ArgumentParser(description='Alephium Make')
@@ -30,7 +30,7 @@ elif args.goal == 'run':
 
     for node in range(0, int(os.environ['nodes'])):
         port = 9973 + node
-        run('./app/target/universal/stage/bin/app {} &> {}/{}.txt &'.format(port, logdir, port))
+        run('./app/target/universal/stage/bin/boot {} &> {}/{}.txt &'.format(port, logdir, port))
 
 elif args.goal == 'mine':
     for node in range(0, int(os.environ['nodes'])):
@@ -39,3 +39,6 @@ elif args.goal == 'mine':
 
 elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs sudo kill 2> /dev/null")
+
+elif args.goal == 'genesis':
+    run('./app/target/universal/stage/bin/prepare-genesis ./app/src/main/resources/application.conf')

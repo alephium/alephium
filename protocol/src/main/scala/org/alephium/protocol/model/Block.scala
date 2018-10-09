@@ -30,7 +30,7 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: Seq[Transaction], target: BigInt, nonce: BigInt = 0): Block = {
+  def genesis(transactions: Seq[Transaction], target: BigInt, nonce: BigInt): Block = {
     val txsHash     = Keccak256.hash(transactions)
     val blockHeader = BlockHeader(Seq.empty, txsHash, 0, target, nonce)
     Block(blockHeader, transactions)

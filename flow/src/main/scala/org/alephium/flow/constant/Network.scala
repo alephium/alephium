@@ -3,9 +3,8 @@ package org.alephium.flow.constant
 import java.time.Duration
 
 import com.typesafe.config.ConfigFactory
-import org.alephium.flow.client.Miner
-import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
+
 object Network {
   private val config = ConfigFactory.load().getConfig("alephium")
 
@@ -13,13 +12,19 @@ object Network {
   val pingFrequency: Duration = config.getDuration("pingFrequency")
   val groups: Int             = config.getInt("groups")
   val nonceStep: BigInt       = config.getInt("nonceStep")
-  val chainNum                = groups * groups
+  val chainNum: Int           = groups * groups
 
-  def createBlockFlow(groups: Int): Seq[Seq[Block]] = {
+  def loadBlockFlow(groups: Int): Seq[Seq[Block]] = {
+    val nonces = config.getStringList("nonces")
+    assert(nonces.size == Network.groups * Network.groups)
+
     Seq.tabulate(groups, groups) {
-      case (from, to) => Miner.mineGenesis(ChainIndex(from, to))
+      case (from, to) =>
+        val index = from * Network.groups + to
+        val nonce = nonces.get(index)
+        Block.genesis(Seq.empty, Consensus.maxMiningTarget, BigInt(nonce))
     }
   }
 
-  val blocksForFlow: Seq[Seq[Block]] = createBlockFlow(groups)
+  lazy val blocksForFlow: Seq[Seq[Block]] = loadBlockFlow(groups)
 }
