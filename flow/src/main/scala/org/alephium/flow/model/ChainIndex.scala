@@ -28,7 +28,7 @@ object ChainIndex {
   }
 
   private[ChainIndex] def hash2Index(hash: Keccak256): Int = {
-    val BigIndex = (hash.second2LastByte & 0xFF) << 8 | (hash.lastByte & 0xFF)
+    val BigIndex = (hash.beforeLast & 0xFF) << 8 | (hash.last & 0xFF)
     BigIndex % Network.chainNum
   }
 }

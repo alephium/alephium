@@ -5,7 +5,7 @@ import java.time.Duration
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 
-object Network extends WithConfig {
+object Network extends DefaultConfig {
 
   val port: Int               = config.getInt("port")
   val pingFrequency: Duration = config.getDuration("pingFrequency")

@@ -2,7 +2,7 @@ package org.alephium.flow.constant
 
 import java.time.Duration
 
-object Consensus extends WithConfig {
+object Consensus extends DefaultConfig {
 
   val numZerosAtLeastInHash: Int = config.getInt("numZerosAtLeastInHash")
   val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
