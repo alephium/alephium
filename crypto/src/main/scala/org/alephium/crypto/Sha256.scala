@@ -8,7 +8,12 @@ import org.alephium.serde.RandomBytes
 
 class Sha256(val bytes: ByteString) extends RandomBytes
 
-object Sha256 extends HashCompanion[Sha256](new Sha256(_), _.bytes) {
+object Sha256
+    extends HashCompanion[Sha256](bs => {
+      assert(bs.size == sha256Length)
+      new Sha256(bs)
+    }, _.bytes) {
+
   override def length: Int = sha256Length
 
   // TODO: optimize with queue of providers

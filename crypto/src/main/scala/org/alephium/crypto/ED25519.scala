@@ -7,21 +7,30 @@ import org.whispersystems.curve25519.Curve25519
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 
 object ED25519PrivateKey
-    extends RandomBytes.Companion[ED25519PrivateKey](new ED25519PrivateKey(_), _.bytes) {
+    extends RandomBytes.Companion[ED25519PrivateKey](bs => {
+      assert(bs.size == ed25519KeyLength)
+      new ED25519PrivateKey(bs)
+    }, _.bytes) {
   override def length: Int = ed25519KeyLength
 }
 
 class ED25519PublicKey(val bytes: ByteString) extends PublicKey
 
 object ED25519PublicKey
-    extends RandomBytes.Companion[ED25519PublicKey](new ED25519PublicKey(_), _.bytes) {
+    extends RandomBytes.Companion[ED25519PublicKey](bs => {
+      assert(bs.size == ed25519KeyLength)
+      new ED25519PublicKey(bs)
+    }, _.bytes) {
   override def length: Int = ed25519KeyLength
 }
 
 class ED25519Signature(val bytes: ByteString) extends Signature
 
 object ED25519Signature
-    extends RandomBytes.Companion[ED25519Signature](new ED25519Signature(_), _.bytes) {
+    extends RandomBytes.Companion[ED25519Signature](bs => {
+      assert(bs.size == ed25519SigLength)
+      new ED25519Signature(bs)
+    }, _.bytes) {
   override def length: Int = ed25519SigLength
 
   def isCanonical(bytes: ByteString): Boolean = {

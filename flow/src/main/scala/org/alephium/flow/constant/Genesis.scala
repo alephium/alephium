@@ -21,7 +21,7 @@ object Genesis {
       val cursor   = genesisJson.hcursor
       val balances = cursor.downField("balance")
       balances.keys.get map { key =>
-        val publicKey = ED25519PublicKey.unsafeFrom(Hex(key))
+        val publicKey = ED25519PublicKey.unsafeFrom(Hex.unsafeFrom(key))
         val balance   = balances.get[BigInt](key).right.get
         val unsigned =
           UnsignedTransaction(Seq.empty, Seq(TxOutput(balance, publicKey)))
