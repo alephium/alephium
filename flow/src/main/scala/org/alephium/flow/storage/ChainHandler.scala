@@ -3,6 +3,7 @@ package org.alephium.flow.storage
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
+import org.alephium.flow.constant.Network
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
@@ -38,14 +39,10 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          // TODO: refactor this into blockflow
-          val total       = blockFlow.numBlocks
-          val weight      = chain.getWeight(block)
-          val blockNum    = chain.numBlocks - 1 // exclude genesis block
-          val height      = chain.maxHeight
+          val total       = blockFlow.numBlocks - Network.chainNum // exclude genesis blocks
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(
-            s"Total: $total; Index: $chainIndex; Weight: $weight; Height: $height/$blockNum; Time elapsed: ${elapsedTime}ms")
+            s"Index: $chainIndex; Total: $total; ${chain.show(block)}; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
         case error: AddBlockResult.Failure =>
           log.info(s"Failed in adding new block: $error")

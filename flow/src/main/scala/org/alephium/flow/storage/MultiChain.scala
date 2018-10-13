@@ -1,4 +1,5 @@
 package org.alephium.flow.storage
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
