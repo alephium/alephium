@@ -22,6 +22,9 @@ elif args.goal == 'test':
 elif args.goal == 'package':
     run('sbt app/universal:packageBin')
 
+elif args.goal == 'benchmark':
+    run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
+
 elif args.goal == 'run':
     logdir = "{}/alephium-log".format(tempdir)
 
