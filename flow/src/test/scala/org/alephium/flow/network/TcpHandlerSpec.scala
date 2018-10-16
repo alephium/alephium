@@ -6,6 +6,7 @@ import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
+import org.alephium.flow.{PlatformConfig, WithConfig}
 import org.alephium.flow.storage.{BlockHandlers, HandlerUtils}
 import org.alephium.protocol.message._
 import org.alephium.serde.WrongFormatException
@@ -18,7 +19,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   behavior of "TcpHandler"
 
-  trait Fixture { obj =>
+  trait Fixture extends WithConfig { obj =>
     val remote = SocketUtil.temporaryServerAddress()
 
     val message = Message(SendBlocks(Seq.empty))
@@ -29,8 +30,8 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
     val payloadHandler = TestProbe()
     val builder = new TcpHandler.Builder {
-      override def createTcpHandler(remote: InetSocketAddress,
-                                    blockHandlers: BlockHandlers): Props = {
+      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+          implicit config: PlatformConfig): Props = {
         Props(new TcpHandler(remote, blockHandlers) {
           override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
         })
@@ -106,7 +107,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   behavior of "ping/ping protocol"
 
-  trait PingPongFixture { obj =>
+  trait PingPongFixture extends WithConfig { obj =>
     val remote        = SocketUtil.temporaryServerAddress()
     val connection    = TestProbe()
     val blockHandlers = HandlerUtils.createBlockHandlersProbe

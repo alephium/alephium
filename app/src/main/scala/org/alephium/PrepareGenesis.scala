@@ -1,17 +1,17 @@
 package org.alephium
 
-import java.io.{File, FileWriter}
-
-import com.typesafe.config.ConfigFactory
+import java.io.FileWriter
 import com.typesafe.scalalogging.StrictLogging
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner
-import org.alephium.flow.constant.{Consensus, Network}
+import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 
 import scala.collection.parallel.ParSeq
 
 object PrepareGenesis extends App with StrictLogging {
+  implicit val config = PlatformConfig.load()
 
   def createGenesisBlocks(groups: Int): ParSeq[Block] = {
     (0 until groups * groups).par.map { index =>
@@ -22,21 +22,20 @@ object PrepareGenesis extends App with StrictLogging {
   }
 
   def run(): Unit = {
-    val configFile = new File(args.head)
-    val config     = ConfigFactory.parseFile(configFile)
-    val path       = "alephium.nonces"
+    val path = "nonces"
 
     logger.info(s"Leading zeros: #${Consensus.numZerosAtLeastInHash}")
 
     val start = System.currentTimeMillis()
-    if (config.hasPath(path)) {
+    if (config.underlying.hasPath(path)) {
       logger.warn(s"Nonces have already been generated in the config file")
     } else {
-      val genesis = createGenesisBlocks(Network.groups)
+      val genesis = createGenesisBlocks(config.groups)
       val nonces  = genesis.map(_.blockHeader.nonce)
-      val line    = s"\n$path = [${nonces.mkString(",")}]"
+      val line    = s"alephium.$path = [${nonces.mkString(",")}]"
 
-      val writer = new FileWriter(configFile, true)
+      val noncesPath = PlatformConfig.getNoncesFilePath(config.groups)
+      val writer     = new FileWriter(noncesPath.toFile, true)
       writer.append(line)
       writer.close()
     }

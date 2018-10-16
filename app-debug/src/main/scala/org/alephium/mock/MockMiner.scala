@@ -2,6 +2,7 @@ package org.alephium.mock
 
 import akka.actor.{Props, Timers}
 import org.alephium.crypto.{ED25519PublicKey}
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
@@ -18,12 +19,14 @@ object MockMiner {
   case class MockMining(timestamp: Long)
 
   trait Builder extends Miner.Builder {
-    override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex): Props =
+    override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
+        implicit config: PlatformConfig): Props =
       Props(new MockMiner(address, node, chainIndex))
   }
 }
 
-class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
+class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
+    implicit config: PlatformConfig)
     extends Miner(address, node, chainIndex)
     with Timers {
   import node.blockHandlers
