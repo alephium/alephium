@@ -10,9 +10,7 @@ import scala.sys.process._
 
 // scalastyle:off magic.number
 
-trait Mode {
-  final implicit val config: PlatformConfig = PlatformConfig.load()
-
+trait Mode extends PlatformConfig.Default {
   def port: Int
 
   def index: Int
