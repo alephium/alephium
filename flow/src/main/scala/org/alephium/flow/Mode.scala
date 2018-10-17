@@ -4,14 +4,13 @@ import java.net.InetSocketAddress
 
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.constant.Network
 import org.alephium.flow.network.TcpHandler
 
 import scala.sys.process._
 
 // scalastyle:off magic.number
 
-trait Mode {
+trait Mode extends PlatformConfig.Default {
   def port: Int
 
   def index: Int
@@ -32,7 +31,7 @@ object Mode {
   def defaultBuilders: Builder = new TcpHandler.Builder with Miner.Builder
 
   class Aws extends Mode with StrictLogging {
-    val port: Int = Network.port
+    val port: Int = config.port
 
     val index: Int = {
       val hostname = "hostname".!!.stripLineEnd
@@ -47,25 +46,25 @@ object Mode {
       val peerIndex   = startIndex + index
       val peerAddress = s"10.0.0.$peerIndex"
 
-      new InetSocketAddress(peerAddress, Network.port)
+      new InetSocketAddress(peerAddress, config.port)
     }
 
     override def createNode: Node =
-      Node(builders, "Root", Network.port, Network.groups)
+      Node(builders, "Root", config.port, config.groups)
   }
 
   class Local(val port: Int) extends Mode {
     val index: Int = {
-      port - Network.port
+      port - config.port
     }
 
     def httpPort: Int = 8080 + index
 
     override def index2Ip(index: Int): InetSocketAddress = {
-      new InetSocketAddress("localhost", Network.port + index)
+      new InetSocketAddress("localhost", config.port + index)
     }
 
     override def createNode: Node =
-      Node(builders, "Root", port, Network.groups)
+      Node(builders, "Root", port, config.groups)
   }
 }

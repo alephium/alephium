@@ -1,17 +1,17 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.constant.Network
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.{BlockDeps, ChainIndex}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.Hex
 
 import scala.collection.SeqView
 
-class BlockFlow() extends MultiChain {
-  import Network.groups
+class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
+  import config.{blocksForFlow, groups}
 
-  val initialBlocks: Seq[Seq[Block]] = Network.blocksForFlow
+  val initialBlocks: Seq[Seq[Block]] = blocksForFlow
 
   val singleChains: Seq[Seq[SingleChain]] =
     Seq.tabulate(groups, groups) {
@@ -79,7 +79,7 @@ class BlockFlow() extends MultiChain {
     aggregate(_.getAllTips)(_.foldLeft(Seq.empty[Keccak256])(_ ++ _))
 
   def getRtips(tip: Keccak256, from: Int): Array[Keccak256] = {
-    val rdeps = new Array[Keccak256](Network.groups)
+    val rdeps = new Array[Keccak256](groups)
     rdeps(from) = tip
 
     val block = getBlock(tip)
@@ -224,7 +224,7 @@ class BlockFlow() extends MultiChain {
 }
 
 object BlockFlow {
-  def apply(): BlockFlow = new BlockFlow()
+  def apply()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

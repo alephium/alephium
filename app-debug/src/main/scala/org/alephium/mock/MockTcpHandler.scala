@@ -3,6 +3,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.Props
 import com.codahale.metrics.{Histogram, MetricRegistry}
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.TcpHandler
 import org.alephium.flow.storage.BlockHandlers
 import org.alephium.monitoring.Monitoring
@@ -11,12 +12,14 @@ object MockTcpHandler {
 
   trait Builder extends TcpHandler.Builder {
 
-    override def createTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers): Props =
+    override def createTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+        implicit config: PlatformConfig): Props =
       Props(new MockTcpHandler(remote, blockHandlers))
   }
 }
 
-class MockTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)
+class MockTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+    implicit config: PlatformConfig)
     extends TcpHandler(remote, blockHandlers) {
 
   val delays: Histogram =
