@@ -1,0 +1,403 @@
+package org.alephium.util
+
+import org.alephium.macros.HPC
+
+import scala.reflect.ClassTag
+import scala.{inline, specialized => sp}
+
+// scalastyle:off number.of.methods return
+abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
+  import HPC.cfor
+
+  protected[util] var elems: Array[A]
+
+  def capacity: Int = elems.length
+
+  // The left index boundary (inclusive) of elements
+  def start: Int
+
+  // The right index boundary (exclusive) of elements
+  def end: Int
+
+  def length: Int = end - start
+
+  var appendable: Boolean
+
+  def isEmpty: Boolean = length == 0
+
+  def nonEmpty: Boolean = length > 0
+
+  def head: A = {
+    assert(nonEmpty)
+    elems(start)
+  }
+
+  def last: A = {
+    assert(nonEmpty)
+    elems(end - 1)
+  }
+
+  def init: AVector[A] = {
+    assert(nonEmpty)
+    AVector.unsafe(elems, start, end - 1, false)
+  }
+
+  def tail: AVector[A] = {
+    assert(nonEmpty)
+    AVector.unsafe(elems, start + 1, end, appendable)
+  }
+
+  def apply(i: Int): A = {
+    assert(i >= 0 && i < length)
+
+    elems(start + i)
+  }
+
+  private[util] def ensureSize(n: Int): Unit = {
+    assert(n >= 0)
+
+    val goal = start + n
+    if (goal > capacity) {
+      val size =
+        if (goal <= AVector.defaultSize) AVector.defaultSize
+        else AVector.nextPowerOfTwo(goal)
+      growTo(size)
+    }
+  }
+
+  private[util] def growTo(size: Int): Unit = {
+    val arr = new Array[A](size)
+    System.arraycopy(elems, 0, arr, 0, capacity)
+    elems = arr
+  }
+
+  def :+(elem: A): AVector[A] = {
+    if (appendable) {
+      ensureSize(length + 1)
+      elems(end) = elem
+      appendable = false
+      AVector.unsafe(elems, start, end + 1, true)
+    } else {
+      val arr = new Array[A](length + 1)
+      System.arraycopy(elems, start, arr, 0, length)
+      arr(length) = elem
+      AVector.unsafe(arr)
+    }
+  }
+
+  def ++(that: AVector[A]): AVector[A] = {
+    val newLength = length + that.length
+    if (appendable) {
+      ensureSize(newLength)
+      System.arraycopy(that.elems, that.start, elems, end, that.length)
+      appendable = false
+      AVector.unsafe(elems, start, start + newLength, true)
+    } else {
+      val arr = new Array[A](newLength)
+      System.arraycopy(elems, start, arr, 0, length)
+      System.arraycopy(that.elems, that.start, arr, length, that.length)
+      AVector.unsafe(arr)
+    }
+  }
+
+  def contains(elem: A): Boolean = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      if (elems(i) == elem) return true
+    }
+    false
+  }
+
+  def take(n: Int): AVector[A] = {
+    assert(n >= 0 && n <= length)
+
+    if (n == length) self
+    else {
+      AVector.unsafe(elems, start, start + n, false)
+    }
+  }
+
+  def drop(n: Int): AVector[A] = {
+    assert(n >= 0 && n <= length)
+
+    if (n == 0) self
+    else {
+      AVector.unsafe(elems, start + n, end, appendable)
+    }
+  }
+
+  def takeRight(n: Int): AVector[A] = {
+    assert(n >= 0 && n <= length)
+
+    if (n == length) self
+    else {
+      AVector.unsafe(elems, end - n, end, appendable)
+    }
+  }
+
+  def dropRight(n: Int): AVector[A] = {
+    assert(n >= 0 && n <= length)
+
+    if (n == 0) self
+    else {
+      AVector.unsafe(elems, start, end - n, false)
+    }
+  }
+
+  def reverse: AVector[A] = {
+    val arr       = new Array[A](length)
+    val rightmost = end - 1
+    cfor(0)(_ < length, _ + 1) { i =>
+      arr(i) = elems(rightmost - i)
+    }
+    AVector.unsafe(arr)
+  }
+
+  def foreach[U](f: A => U): Unit = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      f(elems(i))
+      ()
+    }
+  }
+
+  def foreachIndexed[U](f: (A, Int) => U): Unit = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      f(elems(i), i - start)
+      ()
+    }
+  }
+
+  def map[@sp B: ClassTag](f: A => B): AVector[B] = {
+    AVector.tabulate(length) { i =>
+      f(apply(i))
+    }
+  }
+
+  def mapIndexed[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
+    AVector.tabulate(length) { i =>
+      f(apply(i), i)
+    }
+  }
+
+  def filter(p: A => Boolean): AVector[A] = {
+    foldLeft(AVector.empty[A]) { (acc, elem) =>
+      if (p(elem)) acc :+ elem else acc
+    }
+  }
+
+  def filterNot(p: A => Boolean): AVector[A] = {
+    foldLeft(AVector.empty[A]) { (acc, elem) =>
+      if (p(elem)) acc else acc :+ elem
+    }
+  }
+
+  def withFilter(p: A => Boolean): WithFilter = new WithFilter(p)
+
+  class WithFilter(p: A => Boolean) {
+    def map[@sp B: ClassTag](f: A => B): AVector[B] = {
+      foldLeft(AVector.empty[B]) { (acc, elem) =>
+        if (p(elem)) acc :+ f(elem) else acc
+      }
+    }
+
+    def flatMap[@sp B: ClassTag](f: A => AVector[B]): AVector[B] = {
+      foldLeft(AVector.empty[B]) { (acc, elem) =>
+        if (p(elem)) acc ++ f(elem) else acc
+      }
+    }
+
+    def foreach[U](f: A => U): Unit = {
+      foreach { elem =>
+        if (p(elem)) f(elem)
+      }
+    }
+
+    def withFilter(q: A => Boolean): WithFilter = new WithFilter(elem => p(elem) && q(elem))
+  }
+
+  def foldLeft[B](zero: B)(f: (B, A) => B): B = {
+    var res = zero
+    cfor(start)(_ < end, _ + 1) { i =>
+      res = f(res, elems(i))
+    }
+    res
+  }
+
+  def reduceLeft(op: (A, A) => A): A = {
+    assert(nonEmpty)
+    var res = elems(start)
+    cfor(start + 1)(_ < end, _ + 1) { i =>
+      res = op(res, elems(i))
+    }
+    res
+  }
+
+  def flatMap[B: ClassTag](f: A => AVector[B]): AVector[B] = {
+    foldLeft(AVector.empty[B]) { (acc, elem) =>
+      acc ++ f(elem)
+    }
+  }
+
+  // Note: the return vector does not include zero
+  def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
+    val arr = new Array[B](length)
+    var acc = zero
+    cfor(0)(_ < length, _ + 1) { i =>
+      acc = op(acc, apply(i))
+      arr(i) = acc
+    }
+    AVector.unsafe(arr)
+  }
+
+  def indexWhere(f: A => Boolean): Int = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      if (f(elems(i))) return i - start
+    }
+    -1
+  }
+
+  def sum(implicit num: Numeric[A]): A = foldLeft(num.zero)(num.plus)
+
+  def max(implicit cmp: Ordering[A]): A = {
+    assert(nonEmpty)
+
+    reduceLeft((x, y) => if (cmp.gteq(x, y)) x else y)
+  }
+
+  def min(implicit cmp: Ordering[A]): A = {
+    assert(nonEmpty)
+
+    reduceLeft((x, y) => if (cmp.lteq(x, y)) x else y)
+  }
+
+  def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
+    assert(nonEmpty)
+
+    var maxA = head
+    var maxB = f(maxA)
+    cfor(start + 1)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      val b = f(a)
+      if (cmp.gt(b, maxB)) {
+        maxA = a
+        maxB = b
+      }
+    }
+    maxA
+  }
+
+  def minBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
+    assert(nonEmpty)
+
+    var minA = head
+    var minB = f(minA)
+    cfor(start + 1)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      val b = f(a)
+      if (cmp.lt(b, minB)) {
+        minA = a
+        minB = b
+      }
+    }
+    minA
+  }
+
+  def toArray: Array[A] = {
+    val arr = new Array[A](length)
+    System.arraycopy(elems, start, arr, 0, length)
+    arr
+  }
+
+  def toIterable: Iterable[A] = {
+    new Iterable[A] {
+      override def size: Int    = length
+      def iterator: Iterator[A] = elems.iterator.slice(start, end)
+      override def foreach[U](f: A => U): Unit = self.foreach(f)
+    }
+  }
+
+  def indices: Range = 0 until length
+
+  def mkString(start: String, sep: String, end: String): String = {
+    toIterable.mkString(start, sep, end)
+  }
+
+  def mkString(sep: String): String = mkString("", sep, "")
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: AVector[_] =>
+      if (length == that.length && ct == that.ct) {
+        val vc = that.asInstanceOf[AVector[A]]
+        cfor(0)(_ < length, _ + 1) { i =>
+          if (apply(i) != vc(i)) return false
+        }
+        true
+      } else false
+    case _ => false
+  }
+
+  // scalastyle:off magic.number
+  override def hashCode(): Int = {
+    var code: Int = 0xd55d283e
+    cfor(start)(_ < end, _ + 1) { i =>
+      code = (code * 19) + elems(i).##
+    }
+    code
+  }
+}
+// scalastyle:on
+
+object AVector {
+  import HPC.cfor
+
+  private[util] val defaultSize = 8
+
+  def empty[@sp A: ClassTag]: AVector[A] = ofSize[A](defaultSize)
+
+  def apply[@sp A: ClassTag](elems: A*): AVector[A] = {
+    unsafe(elems.toArray)
+  }
+
+  def ofSize[@sp A: ClassTag](n: Int): AVector[A] = {
+    val arr = new Array[A](n)
+    unsafe(arr, 0, 0, true)
+  }
+
+  @inline def tabulate[@sp A: ClassTag](n: Int)(f: Int => A): AVector[A] = {
+    val arr = new Array[A](n)
+    cfor(0)(_ < n, _ + 1) { i =>
+      arr(i) = f(i)
+    }
+    unsafe(arr)
+  }
+
+  def tabulate[@sp A: ClassTag](n1: Int, n2: Int)(f: (Int, Int) => A): AVector[AVector[A]] = {
+    tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
+  }
+
+  def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {
+    unsafe(elems.toArray)
+  }
+
+  @inline private def unsafe[@sp A: ClassTag](elems: Array[A], start: Int): AVector[A] = {
+    val appendable = true
+    unsafe(elems, start, elems.length, appendable)
+  }
+
+  private def unsafe[@sp A: ClassTag](_elems: Array[A],
+                                      _start: Int,
+                                      _end: Int,
+                                      _appendable: Boolean): AVector[A] =
+    new AVector[A] {
+      override var elems: Array[A]     = _elems
+      override def start: Int          = _start
+      override def end: Int            = _end
+      override var appendable: Boolean = _appendable
+    }
+
+  @inline def unsafe[@sp A: ClassTag](elems: Array[A]): AVector[A] = unsafe(elems, 0)
+
+  private[util] def nextPowerOfTwo(n: Int): Int = {
+    val x = java.lang.Integer.highestOneBit(n)
+    if (x == n) n else x * 2
+  }
+}
