@@ -1,13 +1,14 @@
 package org.alephium.mock
 
 import akka.actor.{Props, Timers}
-import org.alephium.crypto.{ED25519PublicKey}
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
 import org.alephium.protocol.model.Block
+import org.alephium.util.AVector
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -48,7 +49,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs, Long.MaxValue).get
       log.info(s"A new block ${block.shortHash} is mined at ${block.blockHeader.timestamp}")
-      chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
+      chainHandler ! ChainHandler.AddBlocks(AVector(block), Local)
 
     case AddBlockResult.Success =>
       blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

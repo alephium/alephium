@@ -2,15 +2,16 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 import org.alephium.serde.Serde
+import org.alephium.util.AVector
 
 import scala.util.Try
 
-case class UnsignedTransaction(inputs: Seq[TxInput], outputs: Seq[TxOutput])
+case class UnsignedTransaction(inputs: AVector[TxInput], outputs: AVector[TxOutput])
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] = new Serde[UnsignedTransaction] {
-    val inputsSerde: Serde[Seq[TxInput]]   = Serde[Seq[TxInput]]
-    val outputsSerde: Serde[Seq[TxOutput]] = Serde[Seq[TxOutput]]
+    val inputsSerde: Serde[AVector[TxInput]]   = Serde[AVector[TxInput]]
+    val outputsSerde: Serde[AVector[TxOutput]] = Serde[AVector[TxOutput]]
 
     override def serialize(input: UnsignedTransaction): ByteString = {
       inputsSerde.serialize(input.inputs) ++

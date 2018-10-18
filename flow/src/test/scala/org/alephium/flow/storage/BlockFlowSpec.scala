@@ -4,8 +4,8 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.ChainIndex
-import org.alephium.protocol.model.Block
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.util.{AVector, AlephiumSpec, Hex}
 
 import scala.annotation.tailrec
 
@@ -14,7 +14,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow()
-    config.blocksForFlow.flatten.foreach { block =>
+    config.blocksForFlow.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block) is 0
     }
   }
@@ -114,7 +114,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, Seq.empty, Consensus.maxMiningTarget, nonce)
+      val block = Block.from(deps, AVector.empty[Transaction], Consensus.maxMiningTarget, nonce)
       if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 

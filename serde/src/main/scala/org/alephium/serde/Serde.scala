@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteBuffer
 
 import akka.util.ByteString
+import org.alephium.util.AVector
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -150,11 +151,11 @@ object Serde extends ProductSerde {
       isa => (isa.getAddress, isa.getPort)
     )
 
-  private abstract class SeqSerde[T: ClassTag](serde: Serde[T]) extends Serde[Seq[T]] {
+  private abstract class AVectorSerde[T: ClassTag](serde: Serde[T]) extends Serde[AVector[T]] {
     @tailrec
     final def _deserialize(rest: ByteString,
                            itemCnt: Int,
-                           output: Seq[T]): Try[(Seq[T], ByteString)] = {
+                           output: AVector[T]): Try[(AVector[T], ByteString)] = {
       if (itemCnt == 0) Success((output, rest))
       else {
         serde._deserialize(rest) match {
@@ -180,27 +181,27 @@ object Serde extends ProductSerde {
       deserialize0(input, identity)
   }
 
-  def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =
-    new SeqSerde[T](serde) {
-      override def serialize(input: Seq[T]): ByteString = {
+  def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] =
+    new AVectorSerde[T](serde) {
+      override def serialize(input: AVector[T]): ByteString = {
         input.map(serde.serialize).foldLeft(ByteString.empty)(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
-        _deserialize(input, size, Seq.empty)
+      override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
+        _deserialize(input, size, AVector.empty)
       }
     }
 
-  def dynamicSizeBytesSerde[T: ClassTag](serde: Serde[T]): Serde[Seq[T]] =
-    new SeqSerde[T](serde) {
-      override def serialize(input: Seq[T]): ByteString = {
-        input.map(serde.serialize).foldLeft(IntSerde.serialize(input.size))(_ ++ _)
+  def dynamicSizeBytesSerde[T: ClassTag](serde: Serde[T]): Serde[AVector[T]] =
+    new AVectorSerde[T](serde) {
+      override def serialize(input: AVector[T]): ByteString = {
+        input.map(serde.serialize).foldLeft(IntSerde.serialize(input.length))(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
+      override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
         IntSerde._deserialize(input).flatMap {
           case (size, rest) =>
-            _deserialize(rest, size, Seq.empty)
+            _deserialize(rest, size, AVector.empty)
         }
       }
     }

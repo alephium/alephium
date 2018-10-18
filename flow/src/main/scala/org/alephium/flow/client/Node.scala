@@ -5,6 +5,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.{PeerManager, TcpHandler, TcpServer}
 import org.alephium.flow.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
+import org.alephium.util.AVector
 
 case class Node(
     name: String,
@@ -26,7 +27,7 @@ object Node {
 
     val peerManager  = system.actorOf(PeerManager.props(builders), "PeerManager")
     val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
-    val chainHandlers = Seq.tabulate(groups, groups) {
+    val chainHandlers = AVector.tabulate(groups, groups) {
       case (from, to) =>
         system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager),
                        s"ChainHandler-$from-$to")

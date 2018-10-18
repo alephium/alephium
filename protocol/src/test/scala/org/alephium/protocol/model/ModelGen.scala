@@ -3,6 +3,7 @@ package org.alephium.protocol.model
 import java.net.InetSocketAddress
 
 import org.alephium.crypto._
+import org.alephium.util.AVector
 import org.scalacheck.Gen
 
 // TODO: rename as GenFixture
@@ -24,30 +25,30 @@ object ModelGen {
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(0, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
-  } yield Transaction.from(UnsignedTransaction(inputs, outputs), sk)
+  } yield Transaction.from(UnsignedTransaction(AVector.from(inputs), AVector.from(outputs)), sk)
 
   val blockGen: Gen[Block] = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq(Keccak256.zero), txs, maxMiningTarget, 0)
+  } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), maxMiningTarget, 0)
 
-  def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
+  def blockGenWith(deps: AVector[Keccak256]): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, txs, maxMiningTarget, 0)
+    } yield Block.from(deps, AVector.from(txs), maxMiningTarget, 0)
 
-  def chainGen(length: Int, block: Block): Gen[Seq[Block]] = chainGen(length, block.hash)
+  def chainGen(length: Int, block: Block): Gen[AVector[Block]] = chainGen(length, block.hash)
 
-  def chainGen(length: Int): Gen[Seq[Block]] = chainGen(length, Keccak256.zero)
+  def chainGen(length: Int): Gen[AVector[Block]] = chainGen(length, Keccak256.zero)
 
-  def chainGen(length: Int, initialHash: Keccak256): Gen[Seq[Block]] =
+  def chainGen(length: Int, initialHash: Keccak256): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
-      blocks.foldLeft(Seq.empty[Block]) {
+      blocks.foldLeft(AVector.empty[Block]) {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
           val currentHeader = block.blockHeader
-          val newHeader     = currentHeader.copy(blockDeps = Seq(prevHash))
+          val newHeader     = currentHeader.copy(blockDeps = AVector(prevHash))
           val newBlock      = block.copy(blockHeader = newHeader)
           acc :+ newBlock
       }

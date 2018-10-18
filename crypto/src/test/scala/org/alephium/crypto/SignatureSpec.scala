@@ -1,9 +1,11 @@
 package org.alephium.crypto
-import org.alephium.util.AlephiumSpec
+
+import org.alephium.util.{AVector, AlephiumSpec}
 
 class SignatureSpec extends AlephiumSpec {
   "ED25519" should "sign correctly" in {
-    forAll { (message: Seq[Byte]) =>
+    forAll { (_message: Seq[Byte]) =>
+      val message  = AVector.from(_message)
       val (sk, pk) = ED25519.generateKeyPair()
       val sign     = ED25519.sign(message, sk)
       ED25519.verify(message, sign, pk) is true
@@ -11,7 +13,9 @@ class SignatureSpec extends AlephiumSpec {
   }
 
   it should "be verified with proper public key" in {
-    forAll { (message1: Seq[Byte], message2: Seq[Byte]) =>
+    forAll { (_message1: Seq[Byte], _message2: Seq[Byte]) =>
+      val message1 = AVector.from(_message1)
+      val message2 = AVector.from(_message2)
       whenever(message1 != message2) {
         val (sk1, pk1) = ED25519.generateKeyPair()
         val (_, pk2)   = ED25519.generateKeyPair()

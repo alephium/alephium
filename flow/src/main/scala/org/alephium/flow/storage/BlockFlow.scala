@@ -4,21 +4,21 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.{BlockDeps, ChainIndex}
 import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
-import scala.collection.SeqView
+import scala.reflect.ClassTag
 
 class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   import config.{blocksForFlow, groups}
 
-  val initialBlocks: Seq[Seq[Block]] = blocksForFlow
+  val initialBlocks: AVector[AVector[Block]] = blocksForFlow
 
-  val singleChains: Seq[Seq[SingleChain]] =
-    Seq.tabulate(groups, groups) {
+  val singleChains: AVector[AVector[SingleChain]] =
+    AVector.tabulate(groups, groups) {
       case (from, to) => ForksTree(initialBlocks(from)(to))
     }
 
-  private def aggregate[T](f: SingleChain => T)(reduce: Seq[T] => T): T = {
+  private def aggregate[T: ClassTag](f: SingleChain => T)(reduce: AVector[T] => T): T = {
     reduce(singleChains.flatMap(_.map(f)))
   }
 
@@ -44,7 +44,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     if (missingDeps.isEmpty) {
       val chainIndex = getIndex(block)
       val chain      = getChain(chainIndex)
-      val parent     = deps.view.takeRight(groups)(chainIndex.to)
+      val parent     = deps.takeRight(groups)(chainIndex.to)
       val weight     = calWeight(block)
       chain.add(block, parent, weight)
     } else {
@@ -56,8 +56,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val deps = block.blockHeader.blockDeps
     if (deps.isEmpty) 0
     else {
-      val weight1 = deps.view.dropRight(groups).map(calGroupWeight).sum
-      val weight2 = deps.view.takeRight(groups).map(getHeight).sum
+      val weight1 = deps.dropRight(groups).map(calGroupWeight).sum
+      val weight2 = deps.takeRight(groups).map(getHeight).sum
       weight1 + weight2 + 1
     }
   }
@@ -67,7 +67,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val deps  = block.blockHeader.blockDeps
     if (deps.isEmpty) 0
     else {
-      deps.view.takeRight(groups).map(getHeight).sum + 1
+      deps.takeRight(groups).map(getHeight).sum + 1
     }
   }
 
@@ -75,8 +75,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     aggregate(_.getBestTip)(_.maxBy(hash => getWeight(hash)))
   }
 
-  override def getAllTips: Seq[Keccak256] =
-    aggregate(_.getAllTips)(_.foldLeft(Seq.empty[Keccak256])(_ ++ _))
+  override def getAllTips: AVector[Keccak256] =
+    aggregate(_.getAllTips)(_.foldLeft(AVector.empty[Keccak256])(_ ++ _))
 
   def getRtips(tip: Keccak256, from: Int): Array[Keccak256] = {
     val rdeps = new Array[Keccak256](groups)
@@ -110,7 +110,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
   }
 
-  def isCompatible(rtips: Seq[Keccak256], tip: Keccak256, from: Int): Boolean = {
+  def isCompatible(rtips: IndexedSeq[Keccak256], tip: Keccak256, from: Int): Boolean = {
     val newRtips = getRtips(tip, from)
     assert(rtips.size == newRtips.length)
     rtips.indices forall { k =>
@@ -132,12 +132,12 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
   }
 
-  def getGroupDeps(tip: Keccak256, from: Int): SeqView[Keccak256, Seq[_]] = {
+  def getGroupDeps(tip: Keccak256, from: Int): AVector[Keccak256] = {
     val deps = getBlock(tip).blockHeader.blockDeps
     if (deps.isEmpty) {
-      initialBlocks(from).view.map(_.hash)
+      initialBlocks(from).map(_.hash)
     } else {
-      deps.view.takeRight(groups)
+      deps.takeRight(groups)
     }
   }
 
@@ -147,12 +147,12 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val rtips     = getRtips(bestTip, bestIndex.from)
     val deps1 = (0 until groups)
       .filter(_ != chainIndex.from)
-      .foldLeft(Seq.empty[Keccak256]) {
+      .foldLeft(AVector.empty[Keccak256]) {
         case (deps, k) =>
           if (k == bestIndex.from) deps :+ bestTip
           else {
-            val toTries = (0 until groups).flatMap { l =>
-              getChain(k, l).getAllTips
+            val toTries = (0 until groups).foldLeft(AVector.empty[Keccak256]) { (acc, l) =>
+              acc ++ getChain(k, l).getAllTips
             }
             val validTries = toTries.filter(tip => isCompatible(rtips, tip, k))
             if (validTries.isEmpty) deps :+ rtips(k)

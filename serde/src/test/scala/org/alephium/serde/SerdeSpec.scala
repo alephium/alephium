@@ -2,10 +2,15 @@ package org.alephium.serde
 
 import akka.util.ByteString
 import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AVector, AlephiumSpec}
+import org.scalacheck.Gen
+import org.scalacheck.Arbitrary.arbByte
 import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSpec {
+
+  implicit val bytesGen: Gen[AVector[Byte]] = Gen.listOf(arbByte.arbitrary).map(AVector.from)
+
   def checkException[T](serde: FixedSizeSerde[T]): Unit = {
     it should "throw correct exceptions when error occurs" in {
       forAll { inputs: Array[Byte] =>
@@ -79,7 +84,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for fixed size sequence" should "serde correctly" in {
-    forAll { input: Seq[Byte] =>
+    forAll { input: AVector[Byte] =>
       {
         val serde  = Serde.fixedSizeBytesSerde(input.length, Serde[Byte])
         val output = serde.deserialize(serde.serialize(input)).success.value
@@ -90,6 +95,7 @@ class SerdeSpec extends AlephiumSpec {
         val exception = serde.deserialize(ByteString(input.toArray)).failure.exception
         exception is a[NotEnoughBytesException]
       }
+
       if (input.nonEmpty) {
         val serde     = Serde.fixedSizeBytesSerde(input.length - 1, Serde[Byte])
         val exception = serde.deserialize(ByteString(input.toArray)).failure.exception
@@ -99,7 +105,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for sequence" should "serde correctly" in {
-    forAll { input: Seq[Byte] =>
+    forAll { input: AVector[Byte] =>
       val serde  = Serde.dynamicSizeBytesSerde(Serde[Byte])
       val output = serde.deserialize(serde.serialize(input)).success.value
       output is input

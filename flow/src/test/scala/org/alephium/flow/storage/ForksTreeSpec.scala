@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.flow.constant.{Consensus, Genesis}
 import org.alephium.protocol.model.{Block, ModelGen}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AVector, AlephiumSpec}
 
 class ForksTreeSpec extends AlephiumSpec {
 
@@ -11,7 +11,7 @@ class ForksTreeSpec extends AlephiumSpec {
   trait Fixture {
     val genesis   = Genesis.block
     val forkstree = ForksTree(genesis)
-    val blockGen  = ModelGen.blockGenWith(Seq(genesis.hash))
+    val blockGen  = ModelGen.blockGenWith(AVector(genesis.hash))
     val chainGen  = ModelGen.chainGen(4, genesis)
   }
 
@@ -35,7 +35,7 @@ class ForksTreeSpec extends AlephiumSpec {
       blocks.foreach(block => forkstree.add(block, 0))
       val blocksSize2 = forkstree.numBlocks
       val txSize2     = forkstree.numTransactions
-      blocksSize1 + blocks.size is blocksSize2
+      blocksSize1 + blocks.length is blocksSize2
       txSize1 + blocks.map(_.transactions.length).sum is txSize2
 
       checkConfirmedBlocks(forkstree, blocks)
@@ -48,17 +48,18 @@ class ForksTreeSpec extends AlephiumSpec {
       blocks.foreach(block => blockPool.add(block, 0))
       val headBlock = genesis
       val lastBlock = blocks.last
+      val chain     = AVector(genesis) ++ blocks
 
       blockPool.getHeight(headBlock) is 0
-      blockPool.getHeight(lastBlock) is blocks.size
-      blockPool.getBlockSlice(headBlock) is Seq(headBlock)
-      blockPool.getBlockSlice(lastBlock) is genesis +: blocks
+      blockPool.getHeight(lastBlock) is blocks.length
+      blockPool.getBlockSlice(headBlock) is AVector(headBlock)
+      blockPool.getBlockSlice(lastBlock) is chain
       blockPool.isTip(headBlock) is false
       blockPool.isTip(lastBlock) is true
       blockPool.getBestTip is lastBlock.hash
-      blockPool.getBestChain is genesis +: blocks
-      blockPool.maxHeight is blocks.size
-      blockPool.getAllTips is Seq(lastBlock.hash)
+      blockPool.getBestChain is chain
+      blockPool.maxHeight is blocks.length
+      blockPool.getAllTips is AVector(lastBlock.hash)
       checkConfirmedBlocks(blockPool, blocks)
     }
   }
@@ -70,27 +71,27 @@ class ForksTreeSpec extends AlephiumSpec {
 
         shortChain.foreach(block => blockPool.add(block, 0))
         blockPool.getHeight(shortChain.head) is 1
-        blockPool.getHeight(shortChain.last) is shortChain.size
-        blockPool.getBlockSlice(shortChain.head) is Seq(genesis, shortChain.head)
-        blockPool.getBlockSlice(shortChain.last) is genesis +: shortChain
+        blockPool.getHeight(shortChain.last) is shortChain.length
+        blockPool.getBlockSlice(shortChain.head) is AVector(genesis, shortChain.head)
+        blockPool.getBlockSlice(shortChain.last) is AVector(genesis) ++ shortChain
         blockPool.isTip(shortChain.head) is false
         blockPool.isTip(shortChain.last) is true
 
         longChain.init.foreach(block => blockPool.add(block, 0))
-        blockPool.maxHeight is longChain.size - 1
-        blockPool.getAllTips.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
+        blockPool.maxHeight is longChain.length - 1
+        blockPool.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
         blockPool.add(longChain.last, 0)
         blockPool.getHeight(longChain.head) is 1
-        blockPool.getHeight(longChain.last) is longChain.size
-        blockPool.getBlockSlice(longChain.head) is Seq(genesis, longChain.head)
-        blockPool.getBlockSlice(longChain.last) is genesis +: longChain
+        blockPool.getHeight(longChain.last) is longChain.length
+        blockPool.getBlockSlice(longChain.head) is AVector(genesis, longChain.head)
+        blockPool.getBlockSlice(longChain.last) is AVector(genesis) ++ longChain
         blockPool.isTip(longChain.head) is false
         blockPool.isTip(longChain.last) is true
         blockPool.getBestTip is longChain.last.hash
-        blockPool.getBestChain is genesis +: longChain
-        blockPool.maxHeight is longChain.size
-        blockPool.getAllTips.toSet is Set(longChain.last.hash)
+        blockPool.getBestChain is AVector(genesis) ++ longChain
+        blockPool.maxHeight is longChain.length
+        blockPool.getAllTips.toIterable.toSet is Set(longChain.last.hash)
       }
     }
   }
@@ -117,18 +118,18 @@ class ForksTreeSpec extends AlephiumSpec {
         blocks2.foreach(block => forksTree.contains(block) is true)
         forksTree.maxHeight is 4
         forksTree.maxWeight is 8
-        forksTree.getBlocks(blocks1.head.hash).size is 5
-        forksTree.getBlocks(blocks2.head.hash).size is 0
-        forksTree.getBlocks(blocks1.tail.head.hash).size is 3
+        forksTree.getBlocks(blocks1.head.hash).length is 5
+        forksTree.getBlocks(blocks2.head.hash).length is 0
+        forksTree.getBlocks(blocks1.tail.head.hash).length is 3
       }
     }
   }
 
-  def checkConfirmedBlocks(blockPool: SingleChain, newBlocks: Seq[Block]): Unit = {
+  def checkConfirmedBlocks(blockPool: SingleChain, newBlocks: AVector[Block]): Unit = {
     newBlocks.indices.foreach { index =>
       val height   = index + 1
       val blockOpt = blockPool.getConfirmedBlock(height)
-      if (height + Consensus.blockConfirmNum <= newBlocks.size) {
+      if (height + Consensus.blockConfirmNum <= newBlocks.length) {
         blockOpt.get is newBlocks(index)
       } else {
         blockOpt.isEmpty
@@ -138,10 +139,10 @@ class ForksTreeSpec extends AlephiumSpec {
     ()
   }
 
-  def createForksTree(blocks: Seq[Block]): ForksTree = {
+  def createForksTree(blocks: AVector[Block]): ForksTree = {
     assert(blocks.nonEmpty)
     val forksTree = ForksTree(blocks.head, 0, 0)
-    blocks.zipWithIndex.tail foreach {
+    blocks.toIterable.zipWithIndex.tail foreach {
       case (block, index) =>
         forksTree.add(block, index * 2)
     }

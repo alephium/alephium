@@ -7,7 +7,7 @@ import org.alephium.flow.{Mode, PlatformConfig}
 import org.alephium.flow.network.PeerManager.GetPeers
 import org.alephium.flow.storage.HandlerUtils
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{AVector, AlephiumActorSpec}
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
@@ -53,8 +53,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
       peers += (remote -> tcpHandler.ref)
     }))
     peerManager ! PeerManager.Set(server.ref, blockHandlers)
-    peerManager ! PeerManager.Sync(remote, Seq.empty)
-    tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
+    peerManager ! PeerManager.Sync(remote, AVector.empty)
+    tcpHandler.expectMsg(Message(GetBlocks(AVector.empty)))
   }
 
   it should "stop if server stopped" in new Fixture {

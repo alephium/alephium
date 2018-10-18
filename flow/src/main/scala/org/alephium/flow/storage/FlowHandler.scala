@@ -8,7 +8,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
 
@@ -16,13 +16,13 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case class GetBlocksAfter(locators: Seq[Keccak256]) extends Command
-  case object GetBlockInfo                            extends Command
-  case class PrepareSync(remote: InetSocketAddress)   extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
+  case class GetBlocksAfter(locators: AVector[Keccak256]) extends Command
+  case object GetBlockInfo                                extends Command
+  case class PrepareSync(remote: InetSocketAddress)       extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex)     extends Command
 
   sealed trait Event
-  case class BlockFlowTemplate(deps: Seq[Keccak256], target: BigInt) extends Event
+  case class BlockFlowTemplate(deps: AVector[Keccak256], target: BigInt) extends Event
 }
 
 // consider single chain for the moment

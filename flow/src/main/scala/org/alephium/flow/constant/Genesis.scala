@@ -4,7 +4,7 @@ import io.circe.Json
 import io.circe.parser.parse
 import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.model.{Block, Transaction, TxOutput, UnsignedTransaction}
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
 import scala.io.Source
 
@@ -24,14 +24,14 @@ object Genesis {
         val publicKey = ED25519PublicKey.unsafeFrom(Hex.unsafeFrom(key))
         val balance   = balances.get[BigInt](key).right.get
         val unsigned =
-          UnsignedTransaction(Seq.empty, Seq(TxOutput(balance, publicKey)))
+          UnsignedTransaction(AVector.empty, AVector(TxOutput(balance, publicKey)))
         Transaction(unsigned, ED25519Signature.zero)
       }
     }
 
-    Block.genesis(transactions.toSeq, Consensus.maxMiningTarget, 0)
+    Block.genesis(AVector.from(transactions), Consensus.maxMiningTarget, 0)
   }
 
-  val block: Block                   = loadGenesis("genesis.json")
-  val transactions: Seq[Transaction] = block.transactions
+  val block: Block                       = loadGenesis("genesis.json")
+  val transactions: AVector[Transaction] = block.transactions
 }

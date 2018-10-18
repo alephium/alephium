@@ -10,7 +10,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.{BlockHandlers, HandlerUtils}
 import org.alephium.protocol.message._
 import org.alephium.serde.WrongFormatException
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalatest.TryValues._
 
 import scala.util.Random
@@ -22,7 +22,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   trait Fixture extends PlatformConfig.Default { obj =>
     val remote = SocketUtil.temporaryServerAddress()
 
-    val message = Message(SendBlocks(Seq.empty))
+    val message = Message(SendBlocks(AVector.empty))
     val data    = Message.serializer.serialize(message)
 
     val connection    = TestProbe()
@@ -83,16 +83,16 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   it should "deserialize two messages correctly" in new SerdeFixture {
     val result = TcpHandler.deserialize(bytes).success.value
-    result._1 is Seq(message1, message2)
+    result._1 is AVector(message1, message2)
     result._2 is ByteString.empty
     for (n <- bytes.indices) {
       val input  = bytes.take(n)
       val output = TcpHandler.deserialize(input).success.value
       if (n < bytes1.length) {
-        output._1 is Seq.empty
+        output._1 is AVector.empty[Message]
         output._2 is input
       } else {
-        output._1 is Seq(message1)
+        output._1 is AVector(message1)
         output._2 is input.drop(bytes1.length)
       }
     }
