@@ -3,6 +3,10 @@ package org.alephium.macros
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox._
 
+/*
+ * Extracted, with some modifications, from spire
+ * https://github.com/non/spire.git
+ */
 object HPC {
 
   def cfor[A](init: A)(test: A => Boolean, next: A => A)(body: A => Unit): Unit =
