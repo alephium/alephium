@@ -1,12 +1,11 @@
 package org.alephium.flow.network
 
 import java.net.InetSocketAddress
-import scala.collection.mutable
 
+import scala.collection.mutable
 import akka.actor.{ActorRef, Props, Timers}
 import akka.io.{IO, Udp}
-import org.alephium.util.BaseActor
-
+import org.alephium.util.{AVector, BaseActor}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{PeerAddress, PeerId}
 
@@ -129,9 +128,9 @@ class DiscoveryServer(config: DiscoveryConfig, subscribers: Set[ActorRef])
           .take(config.neighborsMax)
           .map(_.address)
 
-        send(socket, remote, Neighbors(callId, nearests))
+        send(socket, remote, Neighbors(callId, AVector.from(nearests)))
 
-      case Neighbors(callId: CallId, nearests: Seq[PeerAddress]) =>
+      case Neighbors(callId: CallId, nearests: AVector[PeerAddress]) =>
         verified(remote, callId) { _ =>
           val neighbors = nearests
             .sortBy(p => PeerId.distance(p.id, config.peerId))
