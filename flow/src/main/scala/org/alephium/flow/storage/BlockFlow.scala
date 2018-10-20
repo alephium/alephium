@@ -19,8 +19,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
 
   private def aggregate[T: ClassTag](f: SingleChain => T)(op: (T, T) => T): T = {
-    singleChains.reduceLeftBy { chains =>
-      chains.reduceLeftBy(f)(op)
+    singleChains.reduceBy { chains =>
+      chains.reduceBy(f)(op)
     }(op)
   }
 
