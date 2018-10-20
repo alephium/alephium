@@ -179,14 +179,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def filter(p: A => Boolean): AVector[A] = {
-    foldLeft(AVector.empty[A]) { (acc, elem) =>
-      if (p(elem)) acc :+ elem else acc
-    }
+    filterImpl(p, true)
   }
 
   def filterNot(p: A => Boolean): AVector[A] = {
+    filterImpl(p, false)
+  }
+
+  def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
     foldLeft(AVector.empty[A]) { (acc, elem) =>
-      if (p(elem)) acc else acc :+ elem
+      if (p(elem) == target) acc :+ elem else acc
     }
   }
 
@@ -223,12 +225,17 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def reduceLeft(op: (A, A) => A): A = {
+    reduceLeftBy(identity)(op)
+  }
+
+  def reduceLeftBy[B: ClassTag](f: A => B)(op: (B, B) => B): B = {
     assert(nonEmpty)
-    var res = elems(start)
+
+    var acc = f(elems(start))
     cfor(start + 1)(_ < end, _ + 1) { i =>
-      res = op(res, elems(i))
+      acc = op(acc, f(elems(i)))
     }
-    res
+    acc
   }
 
   def flatMap[B: ClassTag](f: A => AVector[B]): AVector[B] = {
