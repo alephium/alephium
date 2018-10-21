@@ -1,12 +1,11 @@
 package org.alephium
 
 import java.io.FileWriter
+
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner
-import org.alephium.flow.constant.Consensus
-import org.alephium.flow.model.ChainIndex
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 
 import scala.collection.parallel.ParSeq
 
@@ -22,7 +21,7 @@ object PrepareGenesis extends App with StrictLogging with PlatformConfig.Default
   def run(): Unit = {
     val path = "nonces"
 
-    logger.info(s"Leading zeros: #${Consensus.numZerosAtLeastInHash}")
+    logger.info(s"Leading zeros: #${config.numZerosAtLeastInHash}")
 
     val start = System.currentTimeMillis()
     if (config.underlying.hasPath(path)) {

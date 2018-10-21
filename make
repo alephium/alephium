@@ -14,7 +14,7 @@ def run(cmd):
     os.system(cmd)
 
 if args.goal == 'build':
-    run('sbt app/stage')
+    run('sbt clean app/stage')
 
 elif args.goal == 'test':
     run('sbt clean scalafmtSbt coverage test coverageReport')

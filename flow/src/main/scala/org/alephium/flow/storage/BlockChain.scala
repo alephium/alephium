@@ -1,7 +1,6 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.AVector
 
@@ -18,6 +17,10 @@ trait BlockChain extends BlockPool with BlockHashChain {
   override def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
   override def getBlock(hash: Keccak256): Block = blocksTable(hash)
+
+  def add(block: Block, weight: Int): AddBlockResult = {
+    add(block, block.parentHash, weight)
+  }
 
   def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
     blockHashesTable.get(block.hash) match {
@@ -46,13 +49,6 @@ trait BlockChain extends BlockPool with BlockHashChain {
     block.transactions.foreach { transaction =>
       transactionsTable += transaction.hash -> transaction
     }
-  }
-
-  // Note: this function is mainly for testing right now
-  // TODO: remove this!
-  def add(block: Block, weight: Int): AddBlockResult = {
-    val deps = block.blockHeader.blockDeps
-    add(block, deps.last, weight)
   }
 
   def getConfirmedBlock(height: Int): Option[Block] = {
@@ -104,13 +100,13 @@ trait BlockChain extends BlockPool with BlockHashChain {
   def getHashTarget(hash: Keccak256): BigInt = {
     val block     = getBlock(hash)
     val height    = getHeight(hash)
-    val refHeight = height - Consensus.retargetInterval
+    val refHeight = height - config.retargetInterval
     getConfirmedBlock(refHeight) match {
       case Some(refBlock) =>
         val timeSpan = block.blockHeader.timestamp - refBlock.blockHeader.timestamp
-        val retarget = block.blockHeader.target * Consensus.retargetInterval * Consensus.blockTargetTime.toMillis / timeSpan
+        val retarget = block.blockHeader.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
         retarget
-      case None => Consensus.maxMiningTarget
+      case None => config.maxMiningTarget
     }
   }
 

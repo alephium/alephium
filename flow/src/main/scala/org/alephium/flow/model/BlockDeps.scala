@@ -2,6 +2,7 @@ package org.alephium.flow.model
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
 /*
