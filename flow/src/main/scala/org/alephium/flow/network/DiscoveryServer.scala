@@ -9,6 +9,8 @@ import org.alephium.util.{AVector, BaseActor}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{PeerAddress, PeerId}
 
+import scala.util.{Failure, Success}
+
 object DiscoveryServer {
   case class PeerInfo(address: PeerAddress, createdAt: Long, updatedAt: Long)
   object PeerInfo {
@@ -123,19 +125,20 @@ class DiscoveryServer(config: DiscoveryConfig, subscribers: Set[ActorRef])
         }
 
       case FindNode(callId, target) =>
-        val nearests = peers.values.toSeq
+        val nearests = AVector
+          .from(peers.values)
           .sortBy(p => PeerId.distance(target, p.address.id))
-          .take(config.neighborsMax)
+          .takeUpto(config.neighborsMax)
           .map(_.address)
 
-        send(socket, remote, Neighbors(callId, AVector.from(nearests)))
+        send(socket, remote, Neighbors(callId, nearests))
 
       case Neighbors(callId: CallId, nearests: AVector[PeerAddress]) =>
         verified(remote, callId) { _ =>
           val neighbors = nearests
             .sortBy(p => PeerId.distance(p.id, config.peerId))
             .filterNot(_.id == config.peerId)
-            .take(config.peersMax - peers.size)
+            .takeUpto(config.peersMax - peers.size)
 
           neighbors.foreach(callPing(socket, _))
         }
@@ -153,12 +156,13 @@ class DiscoveryServer(config: DiscoveryConfig, subscribers: Set[ActorRef])
         log.debug(s"Discovered new peer $peerAddress")
 
         if (peers.size > config.peersMax) {
-          val earliests = peers.values.toVector
+          val earliests = AVector
+            .from(peers.values)
             .sortBy(_.createdAt)
-            .drop(config.peersMax)
+            .dropUpto(config.peersMax)
             .map(_.address.id)
 
-          earliests.foreach(peers.remove(_))
+          earliests.foreach(peers.remove)
         }
 
         subscribers.foreach(_ ! Discovery(peers.values.toSet))
@@ -188,13 +192,12 @@ class DiscoveryServer(config: DiscoveryConfig, subscribers: Set[ActorRef])
     case cmd: Command =>
       handleCommand(socket, cmd)
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserializer
-        .deserialize(data)
-        .fold(
-          err =>
-            log.info(
-              s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes)"),
-          handleMessage(socket, remote, _))
+      DiscoveryMessage.deserializer.deserialize(data) match {
+        case Success(message) => handleMessage(socket, remote, message)
+        case Failure(error) =>
+          log.info(
+            s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
+      }
   }
 
 }

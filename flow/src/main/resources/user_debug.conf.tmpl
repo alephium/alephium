@@ -23,6 +23,8 @@ akka {
       throughput = 1
     }
 
+    guardian-supervisor-strategy = "org.alephium.util.LetItCrashStrategy"
+
     debug {
       receive = on
       autoreceive = on

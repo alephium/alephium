@@ -169,12 +169,16 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen0) { vc =>
       vc.take(0).isEmpty is true
       vc.take(vc.length) is vc
+      vc.takeUpto(vc.length + 1) is vc
       vc.takeRight(0).isEmpty is true
       vc.takeRight(vc.length) is vc
+      vc.takeRightUpto(vc.length + 1) is vc
       vc.drop(0) is vc
       vc.drop(vc.length).isEmpty is true
+      vc.dropUpto(vc.length + 1).isEmpty is true
       vc.dropRight(0) is vc
       vc.dropRight(vc.length).isEmpty is true
+      vc.dropRightUpto(vc.length + 1).isEmpty is true
 
       val k = Random.nextInt(vc.length)
       checkEq(vc.take(k), vc.toArray.take(k))
