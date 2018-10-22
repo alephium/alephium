@@ -4,7 +4,6 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.AVector
 
-import scala.annotation.tailrec
 import scala.collection.mutable.HashMap
 
 trait BlockChain extends BlockPool with BlockHashChain {
@@ -18,11 +17,11 @@ trait BlockChain extends BlockPool with BlockHashChain {
 
   override def getBlock(hash: Keccak256): Block = blocksTable(hash)
 
-  def add(block: Block, weight: Int): AddBlockResult = {
+  override def add(block: Block, weight: Int): AddBlockResult = {
     add(block, block.parentHash, weight)
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
+  override def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
     blockHashesTable.get(block.hash) match {
       case Some(_) => AddBlockResult.AlreadyExisted
       case None =>
@@ -73,30 +72,6 @@ trait BlockChain extends BlockPool with BlockHashChain {
     }
   }
 
-  override def getBlockSlice(hash: Keccak256): AVector[Block] = {
-    blockHashesTable.get(hash) match {
-      case Some(node) =>
-        getChain(node).map(n => getBlock(n.blockHash))
-      case None =>
-        AVector.empty
-    }
-  }
-
-  private def getChain(node: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
-    @tailrec
-    def iter(acc: AVector[BlockHashChain.TreeNode],
-             current: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
-      current match {
-        case n: BlockHashChain.Root => acc :+ n
-        case n: BlockHashChain.Node => iter(acc :+ current, n.parent)
-      }
-    }
-    iter(AVector.empty, node).reverse
-  }
-
-  override def getAllBlocks: Iterable[Block] =
-    blockHashesTable.values.map(n => getBlock(n.blockHash))
-
   def getHashTarget(hash: Keccak256): BigInt = {
     val block     = getBlock(hash)
     val height    = getHeight(hash)
@@ -113,22 +88,8 @@ trait BlockChain extends BlockPool with BlockHashChain {
   def show(block: Block): String = {
     val shortHash = block.shortHash
     val weight    = getWeight(block)
-    val blockNum  = numBlocks - 1 // exclude genesis block
+    val blockNum  = numHashes - 1 // exclude genesis block
     val height    = getHeight(block)
     s"Hash: $shortHash; Weight: $weight; Height: $height/$blockNum"
-  }
-}
-
-sealed trait AddBlockResult
-
-object AddBlockResult {
-  case object Success extends AddBlockResult
-
-  trait Failure extends AddBlockResult
-  case object AlreadyExisted extends Failure {
-    override def toString: String = "Block already exist"
-  }
-  case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #${deps.length - 1} deps"
   }
 }

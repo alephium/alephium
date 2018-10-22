@@ -4,7 +4,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.util.AVector
 
 trait BlockHashPool {
-  def numBlocks: Int
+  def numHashes: Int
 
   def maxWeight: Int
 
@@ -18,7 +18,11 @@ trait BlockHashPool {
 
   def isTip(hash: Keccak256): Boolean
 
+  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]
+
   def getBestTip: Keccak256
 
   def getAllTips: AVector[Keccak256]
+
+  def getAllBlockHashes: Iterable[Keccak256]
 }
