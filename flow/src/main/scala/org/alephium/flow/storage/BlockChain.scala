@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.AVector
 
@@ -91,5 +92,27 @@ trait BlockChain extends BlockPool with BlockHashChain {
     val blockNum  = numHashes - 1 // exclude genesis block
     val height    = getHeight(block)
     s"Hash: $shortHash; Weight: $weight; Height: $height/$blockNum"
+  }
+}
+
+object BlockChain {
+
+  def fromGenesis(genesis: Block)(implicit config: PlatformConfig): BlockChain =
+    apply(genesis, 0, 0)
+
+  def apply(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
+      implicit _config: PlatformConfig): BlockChain = {
+
+    val rootNode = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight)
+
+    new BlockChain {
+      override implicit val config = _config
+
+      override def root: BlockHashChain.Root = rootNode
+
+      val hash = root.blockHash
+      blocksTable += hash -> rootBlock
+      addNode(rootNode)
+    }
   }
 }
