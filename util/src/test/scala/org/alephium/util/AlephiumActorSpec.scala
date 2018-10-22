@@ -28,7 +28,7 @@ object AlephiumActorSpec {
       |      unhandled = on
       |    }
       |
-      |    guardian-supervisor-strategy = "org.alephium.util.LetItCrashStrategy"
+      |    guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
       |  }
       |}
     """.stripMargin
