@@ -1,10 +1,15 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde.RandomBytes
 
 /** 160bits identifier of a Peer **/
-class PeerId private[PeerId] (val bytes: ByteString) extends RandomBytes
+class PeerId private[PeerId] (val bytes: ByteString) extends RandomBytes {
+  def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
+    ChainIndex.fromPeerId(this)
+  }
+}
 
 object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
   override def length: Int = peerIdLength
@@ -19,4 +24,11 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
   }
 
   def ordering(origin: PeerId): Ordering[PeerId] = Ordering.by(distance(origin, _))
+
+  def generateFor(chainIndex: ChainIndex)(implicit config: ConsensusConfig): PeerId = {
+    val id = PeerId.generate
+    if (id.chainIndex == chainIndex) {
+      id
+    } else generateFor(chainIndex)
+  }
 }

@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.TcpHandler
+import org.alephium.protocol.model.ChainIndex
 
 import scala.sys.process._
 
@@ -14,6 +15,10 @@ trait Mode extends PlatformConfig.Default {
   def port: Int
 
   def index: Int
+
+  def chainIndex: ChainIndex = {
+    ChainIndex.fromInt(index)
+  }
 
   def httpPort: Int
 
@@ -50,7 +55,7 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root", config.port, config.groups)
+      Node(builders, "Root", chainIndex, config.port, config.groups)
   }
 
   class Local(val port: Int) extends Mode {
@@ -65,6 +70,6 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root", port, config.groups)
+      Node(builders, "Root", chainIndex, port, config.groups)
   }
 }
