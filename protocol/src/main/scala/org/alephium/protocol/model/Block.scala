@@ -9,8 +9,6 @@ case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
     extends Keccak256Hash[Block] {
   override def hash: Keccak256 = blockHeader.hash
 
-  def miningHash: Keccak256 = Block.toMiningHash(this.hash)
-
   def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
     blockHeader.chainIndex
   }
@@ -51,6 +49,4 @@ object Block {
     val blockHeader = BlockHeader(AVector.empty, txsHash, 0, target, nonce)
     Block(blockHeader, transactions)
   }
-
-  def toMiningHash(hash: Keccak256): Keccak256 = Keccak256.hash(hash)
 }
