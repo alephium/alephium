@@ -29,7 +29,7 @@ object ChainHandler {
 class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
     implicit config: PlatformConfig)
     extends BaseActor {
-  val chain: BlockChain = blockFlow.getChain(chainIndex)
+  val chain: BlockChain = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
     case ChainHandler.AddBlocks(blocks, origin) =>

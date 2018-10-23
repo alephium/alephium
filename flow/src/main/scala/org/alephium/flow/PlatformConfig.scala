@@ -103,5 +103,5 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
     }
   }
 
-  lazy val blocksForFlow: AVector[AVector[Block]] = loadBlockFlow(groups)
+  lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow(groups)
 }

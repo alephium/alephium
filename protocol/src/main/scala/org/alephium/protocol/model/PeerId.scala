@@ -6,8 +6,8 @@ import org.alephium.serde.RandomBytes
 
 /** 160bits identifier of a Peer **/
 class PeerId private[PeerId] (val bytes: ByteString) extends RandomBytes {
-  def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
-    ChainIndex.fromPeerId(this)
+  def groupIndex(implicit config: ConsensusConfig): Int = {
+    math.abs(bytes.last.toInt) % config.groups
   }
 }
 
@@ -25,10 +25,12 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
 
   def ordering(origin: PeerId): Ordering[PeerId] = Ordering.by(distance(origin, _))
 
-  def generateFor(chainIndex: ChainIndex)(implicit config: ConsensusConfig): PeerId = {
+  def generateFor(mainGroup: Int)(implicit config: ConsensusConfig): PeerId = {
+    assert(mainGroup < config.groups)
+
     val id = PeerId.generate
-    if (id.chainIndex == chainIndex) {
+    if (id.groupIndex == mainGroup) {
       id
-    } else generateFor(chainIndex)
+    } else generateFor(mainGroup)
   }
 }
