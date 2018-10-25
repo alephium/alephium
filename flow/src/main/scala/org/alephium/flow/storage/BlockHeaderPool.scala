@@ -11,9 +11,9 @@ trait BlockHeaderPool extends BlockHashPool {
   // Assuming the entity is in the pool
   def getBlockHeader(hash: Keccak256): BlockHeader
 
-  def add(block: BlockHeader, weight: Int): AddBlockHeaderResult
+  def add(header: BlockHeader, weight: Int): AddBlockHeaderResult
 
-  def add(block: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult
 
   def getHeight(bh: BlockHeader): Int = getHeight(bh.hash)
 

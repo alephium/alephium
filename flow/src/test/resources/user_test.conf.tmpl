@@ -3,9 +3,7 @@ alephium {
   blockTargetTime = 4 minutes
   blockConfirmNum = 2
   retargetInterval = 180 // 180 blocks; about 12 hours
-}
 
-alephium {
   port = 9973
   port = ${?port}
   groups = 3
@@ -13,4 +11,7 @@ alephium {
   retryTimeout = 300 second
 
   nonceStep = 10000
+
+  mainGroup = 0
+  mainGroup = ${?mainGroup}
 }

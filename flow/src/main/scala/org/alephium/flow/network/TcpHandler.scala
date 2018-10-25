@@ -7,9 +7,10 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.storage.ChainHandler.BlockOrigin.Remote
-import org.alephium.flow.storage.{AddBlockResult, BlockHandlers, ChainHandler, FlowHandler}
+import org.alephium.flow.model.DataOrigin.Remote
+import org.alephium.flow.storage.{AddBlockResult, AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.message._
+import org.alephium.protocol.model.PeerId
 import org.alephium.serde.NotEnoughBytesException
 import org.alephium.util.{AVector, BaseActor}
 
@@ -46,29 +47,74 @@ object TcpHandler {
   }
 
   trait Builder {
-    def createTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+    def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
         implicit config: PlatformConfig): Props =
       Props(new TcpHandler(remote, blockHandlers))
   }
 }
 
-class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
     implicit config: PlatformConfig)
     extends BaseActor
     with Timers {
 
   // Initialized once; use var for performance reason
   var connection: ActorRef = _
+  var peerId: PeerId       = _
+
+  def register(_connection: ActorRef): Unit = {
+    connection = _connection
+    connection ! Tcp.Register(self)
+  }
 
   override def receive: Receive = awaitInit
 
   def awaitInit: Receive = {
     case TcpHandler.Set(_connection) =>
-      startWith(_connection)
+      register(_connection)
+      handshakeOut()
 
     case TcpHandler.Connect(until: Instant) =>
       IO(Tcp)(context.system) ! Tcp.Connect(remote)
       context.become(connecting(until))
+  }
+
+  def handshakeOut(): Unit = {
+    connection ! TcpHandler.envelope(Message(Hello(config.peerId)))
+    context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
+  }
+
+  def handshakeIn(): Unit = {
+    context become handleWith(ByteString.empty, awaitHello, handlePayload)
+  }
+
+  def awaitHello(payload: Payload): Unit = payload match {
+    case hello: Hello =>
+      if (hello.validate) {
+        connection ! TcpHandler.envelope(Message(HelloAck(config.peerId)))
+        context.parent ! PeerManager.Connected(hello.peerId, self)
+        startPingPong()
+      } else {
+        log.info("Hello is invalid, closing connection")
+        stop()
+      }
+    case err =>
+      log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
+      stop()
+  }
+
+  def awaitHelloAck(payload: Payload): Unit = payload match {
+    case helloAck: HelloAck =>
+      if (!helloAck.validate) {
+        log.info("HelloAck is invalid, closing connection")
+        stop()
+      } else {
+        context.parent ! PeerManager.Connected(helloAck.peerId, self)
+        startPingPong()
+      }
+    case err =>
+      log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
+      stop()
   }
 
   def connecting(until: Instant): Receive = {
@@ -77,8 +123,8 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
 
     case _: Tcp.Connected =>
       val _connection = sender()
-      startWith(_connection)
-      context.parent ! PeerManager.Connected(remote, self)
+      register(_connection)
+      handshakeIn()
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       val current = Instant.now()
@@ -86,33 +132,33 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
         timers.startSingleTimer(TcpHandler.Timer, TcpHandler.Retry, 1.second)
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}")
-        context.stop(self)
+        stop()
       }
   }
 
-  def startWith(_connection: ActorRef): Unit = {
-    connection = _connection
-    connection ! Tcp.Register(self)
-    sendPing()
-    context.become(handleWith(ByteString.empty))
+  def handleWith(unaligned: ByteString,
+                 current: Payload => Unit,
+                 next: Payload    => Unit): Receive = {
+    handleEvent(unaligned, current, next) orElse handleOutMessage orElse handleInternal
   }
 
-  def handleWith(unaligned: ByteString): Receive = {
-    handleEvent(unaligned) orElse handleOutMessage orElse handleInternal
+  def handleWith(unaligned: ByteString, handle: Payload => Unit): Receive = {
+    handleEvent(unaligned, handle, handle) orElse handleOutMessage orElse handleInternal
   }
 
-  def handleEvent(unaligned: ByteString): Receive = {
+  def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
     case Tcp.Received(data) =>
       TcpHandler.deserialize(unaligned ++ data) match {
         case Success((messages, rest)) =>
           messages.foreach { message =>
-            log.debug(s"Received message of cmd@${message.header.cmdCode} from $remote")
-            handlePayload(message.payload)
+            val cmdName = message.payload.getClass.getSimpleName
+            log.debug(s"Received message of cmd@$cmdName from $remote")
+            handle(message.payload)
           }
-          context.become(handleWith(rest))
+          context.become(handleWith(rest, next))
         case Failure(_) =>
-          log.info(s"Received corrupted data from $remote with serde exception; Close connection")
-          context stop self
+          log.info(s"Received corrupted data from $remote with serde exception; Closing connection")
+          stop()
       }
     case TcpHandler.SendPing => sendPing()
     case event: Tcp.ConnectionClosed =>
@@ -137,6 +183,10 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
   }
 
   def handlePayload(payload: Payload): Unit = payload match {
+    case Hello(_, _, _) =>
+      ???
+    case HelloAck(_, _, _) =>
+      ???
     case Ping(nonce, timestamp) =>
       val delay = System.currentTimeMillis() - timestamp
       handlePing(nonce, delay)
@@ -146,15 +196,15 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
         pingNonce = 0
       } else {
         log.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
-        context stop self
+        stop()
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.length} blocks")
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      val handler    = blockHandlers.getHandler(chainIndex)
+      val handler    = blockHandlers.getBlockHandler(chainIndex)
 
-      handler ! ChainHandler.AddBlocks(blocks, Remote(remote))
+      handler ! BlockChainHandler.AddBlocks(blocks, Remote(remote))
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
       blockHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
@@ -177,12 +227,22 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
   def sendPing(): Unit = {
     if (pingNonce != 0) {
       log.debug("No pong message received in time")
-      context stop self
+      stop()
     } else {
       pingNonce = Random.nextInt()
       val timestamp = System.currentTimeMillis()
       connection ! TcpHandler.envelope(Message(Ping(pingNonce, timestamp)))
-      timers.startSingleTimer(TcpHandler.Timer, TcpHandler.SendPing, config.pingFrequency)
     }
+  }
+
+  def startPingPong(): Unit = {
+    timers.startSingleTimer(TcpHandler.Timer, TcpHandler.SendPing, config.pingFrequency)
+  }
+
+  def stop(): Unit = {
+    if (connection != null) {
+      connection ! Tcp.Close
+    }
+    context stop self
   }
 }

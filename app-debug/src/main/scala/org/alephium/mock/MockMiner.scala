@@ -5,8 +5,8 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
-import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
+import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 
@@ -30,7 +30,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformConfig)
     extends Miner(address, node, chainIndex)
     with Timers {
-  import node.blockHandlers
+  import node.allHandlers
 
   override def _mine(template: BlockTemplate, lastTs: Long): Receive = {
     case Miner.Nonce(_, _) =>
@@ -48,11 +48,11 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs, Long.MaxValue).get
-      log.info(s"A new block ${block.shortHash} is mined at ${block.blockHeader.timestamp}")
-      chainHandler ! ChainHandler.AddBlocks(AVector(block), Local)
+      log.info(s"A new block ${block.shortHex} is mined at ${block.blockHeader.timestamp}")
+      blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
 
     case AddBlockResult.Success =>
-      blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+      allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
 
     case _: AddBlockResult.Failure =>

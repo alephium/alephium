@@ -8,25 +8,26 @@ import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
 
-class BlockFlow(mainGroup: Int)(implicit val config: PlatformConfig) extends MultiChain {
-  assert(mainGroup >= 0 && mainGroup < config.groups)
+class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
+  import config.{genesisBlocks, mainGroup}
 
-  import config.genesisBlocks
+  assert(mainGroup >= 0 && mainGroup < config.groups)
 
   override val groups = config.groups
 
-  val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { from =>
-    BlockChain.fromGenesis(genesisBlocks(from)(mainGroup))
+  private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
+    BlockChain.fromGenesis(genesisBlocks(if (k < mainGroup) k else k + 1)(mainGroup))
   }
-  val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
+  private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
     BlockChain.fromGenesis(genesisBlocks(mainGroup)(to))
   }
   val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
         if (from == mainGroup) outBlockChains(to)
-        else if (to == mainGroup) inBlockChains(from)
-        else BlockHeaderChain.fromGenesis(genesisBlocks(from)(to))
+        else if (to == mainGroup) {
+          inBlockChains(if (from < mainGroup) from else from - 1)
+        } else BlockHeaderChain.fromGenesis(genesisBlocks(from)(to))
     }
 
   override protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T = {
@@ -44,7 +45,7 @@ class BlockFlow(mainGroup: Int)(implicit val config: PlatformConfig) extends Mul
 
     assert(from == mainGroup || to == mainGroup)
     if (from == mainGroup) outBlockChains(to)
-    else inBlockChains(from)
+    else inBlockChains(if (from < mainGroup) from else from - 1)
   }
 
   override protected def getHeaderChain(from: Int, to: Int): BlockHeaderPool = {
@@ -248,7 +249,7 @@ class BlockFlow(mainGroup: Int)(implicit val config: PlatformConfig) extends Mul
 }
 
 object BlockFlow {
-  def apply(mainGroup: Int)(implicit config: PlatformConfig): BlockFlow = new BlockFlow(mainGroup)
+  def apply()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }
