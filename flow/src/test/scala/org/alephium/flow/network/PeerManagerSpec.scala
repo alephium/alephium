@@ -1,9 +1,9 @@
 package org.alephium.flow.network
 
 import akka.actor.{Props, Terminated}
-import akka.testkit.TestProbe
+import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.flow.{Mode, PlatformConfig}
-import org.alephium.flow.network.PeerManager.GetPeers
+import org.alephium.flow.network.PeerManager.{GetPeers, PeerInfo}
 import org.alephium.flow.storage.HandlerUtils
 import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.protocol.model.PeerId
@@ -11,7 +11,14 @@ import org.alephium.util.{AVector, AlephiumActorSpec}
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
-  trait Fixture extends PlatformConfig.Default {
+  trait PeerFixture extends PlatformConfig.Default {
+    val remote     = SocketUtil.temporaryServerAddress()
+    val peerId     = PeerId.generate
+    val tcpHandler = TestProbe()
+    val peerInfo   = PeerInfo(peerId, remote, tcpHandler.ref)
+  }
+
+  trait Fixture extends PeerFixture {
     val server        = TestProbe()
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
     val peerManager   = system.actorOf(PeerManager.props(Mode.defaultBuilders))
@@ -22,9 +29,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   behavior of "PeerManagerSpec"
 
   it should "add peer when received connection" in new Fixture {
-    val peerId     = PeerId.generate
-    val connection = TestProbe()
-    peerManager ! PeerManager.Connected(peerId, connection.ref)
+    peerManager ! PeerManager.Connected(peerId, peerInfo)
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers) =>
@@ -33,14 +38,11 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     }
   }
 
-  it should "try to send GetBlocks to peer" in new PlatformConfig.Default {
-    val peerId     = PeerId.generate
-    val tcpHandler = TestProbe()
-
+  it should "try to send GetBlocks to peer" in new PeerFixture {
     val server        = TestProbe()
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
     val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders) {
-      peers += (peerId -> tcpHandler.ref)
+      peers += (peerId -> peerInfo)
     }))
     peerManager ! PeerManager.Set(server.ref, blockHandlers)
     peerManager ! PeerManager.Sync(peerId, AVector.empty)
@@ -55,16 +57,14 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   }
 
   it should "remove peer when tcp handler stopped" in new Fixture {
-    val peerId     = PeerId.generate
-    val connection = TestProbe()
     watch(peerManager)
-    peerManager ! PeerManager.Connected(peerId, connection.ref)
+    peerManager ! PeerManager.Connected(peerId, peerInfo)
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers1) =>
         peers1.size is 1
         peers1.head._1 is peerId
-        val handler = peers1.head._2
+        val handler = peers1.head._2.tcpHandler
         watch(handler)
         system.stop(handler)
         expectMsgPF() {

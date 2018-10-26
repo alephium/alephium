@@ -20,15 +20,23 @@ object PeerManager {
     Props(new PeerManager(builders))
 
   sealed trait Command
-  case class Set(server: ActorRef, blockhandlers: AllHandlers)  extends Command
+  case class Set(server: ActorRef, handlers: AllHandlers)       extends Command
   case class Connect(remote: InetSocketAddress, until: Instant) extends Command
-  case class Connected(peerId: PeerId, tcpHandler: ActorRef)    extends Command
+  case class Connected(peerId: PeerId, peerInfo: PeerInfo)      extends Command
   case class Sync(peerId: PeerId, locators: AVector[Keccak256]) extends Command
   case class BroadCast(message: Message, origin: DataOrigin)    extends Command
   case object GetPeers                                          extends Command
 
   sealed trait Event
-  case class Peers(peers: Map[PeerId, ActorRef]) extends Event
+  case class Peers(peers: Map[PeerId, PeerInfo]) extends Event
+
+  case class PeerInfo(id: PeerId, index: Int, address: InetSocketAddress, tcpHandler: ActorRef)
+  object PeerInfo {
+    def apply(id: PeerId, address: InetSocketAddress, tcpHandler: ActorRef)(
+        implicit config: PlatformConfig): PeerInfo = {
+      PeerInfo(id, id.groupIndex, address, tcpHandler)
+    }
+  }
 }
 
 class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig) extends BaseActor {
@@ -38,10 +46,9 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
   var server: ActorRef           = _
   var blockHandlers: AllHandlers = _
 
-  val peers: mutable.Map[PeerId, ActorRef] = mutable.Map.empty
+  val peers: mutable.Map[PeerId, PeerInfo] = mutable.Map.empty
 
-  def tcpHandlers: Iterable[ActorRef] = peers.values
-  def peersSize: Int                  = peers.size
+  def peersSize: Int = peers.size
 
   override def receive: Receive = awaitInit
 
@@ -61,8 +68,10 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       val tcpHandler =
         context.actorOf(builders.createTcpHandler(remote, blockHandlers), handlerName)
       tcpHandler ! TcpHandler.Connect(until)
-    case Connected(peerId, tcpHandler) =>
-      addPeerWithHandler(peerId, tcpHandler)
+    case Connected(peerId, peerInfo) =>
+      context.watch(peerInfo.tcpHandler)
+      peers += (peerId -> peerInfo)
+      log.info(s"Connected to $peerId@${peerInfo.address}, now $peersSize peers")
     case Tcp.Connected(remote, _) =>
       val connection  = sender()
       val handlerName = BaseActor.envalidActorName(s"TcpHandler-$remote")
@@ -71,7 +80,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       tcpHandler ! TcpHandler.Set(connection)
     case Sync(peerId, locators) =>
       if (peers.contains(peerId)) {
-        val peer = peers(peerId)
+        val peer = peers(peerId).tcpHandler
         log.debug(s"Send GetBlocks to $peerId")
         peer ! Message(GetBlocks(locators))
       } else {
@@ -79,12 +88,12 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       }
     case BroadCast(message, origin) =>
       val toSend = origin match {
-        case DataOrigin.Local          => tcpHandlers
+        case DataOrigin.Local          => peers.values
         case DataOrigin.Remote(remote) => peers.filterKeys(_ != remote).values
       }
       log.debug(s"Broadcast message to ${toSend.size} peers")
       val write = TcpHandler.envelope(message)
-      toSend.foreach(_ ! write)
+      toSend.foreach(_.tcpHandler ! write)
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>
@@ -97,25 +106,18 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       }
   }
 
-  def addPeerWithHandler(peerId: PeerId, tcpHandler: ActorRef): Unit = {
-    context.watch(tcpHandler)
-//    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
-    peers += (peerId -> tcpHandler)
-    log.info(s"Connected to $peerId, now $peersSize peers")
-  }
-
-  def removePeer(handler: ActorRef): Unit = {
-    val toRemove = peers.view.filter(_._2 == handler)
+  def removePeer(tcpHandler: ActorRef): Unit = {
+    val toRemove = peers.view.filter(_._2.tcpHandler == tcpHandler)
     toRemove.foreach {
-      case (remote, tcpHandler) =>
-        context.unwatch(tcpHandler)
+      case (remote, info) =>
+        context.unwatch(info.tcpHandler)
         peers.remove(remote)
     }
   }
 
   def unwatchAndStop(): Unit = {
     context.unwatch(server)
-    tcpHandlers.foreach(context.unwatch)
+    peers.values.foreach(info => context.unwatch(info.tcpHandler))
     context.stop(self)
   }
 }
