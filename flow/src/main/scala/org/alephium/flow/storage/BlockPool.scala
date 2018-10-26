@@ -18,15 +18,10 @@ trait BlockPool extends BlockHashPool {
   def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult
 
   def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
-    val blocks = locators.map(getBlocks)
-    blocks.fold(AVector.empty[Block]) {
-      case (acc, newBlocks) =>
-        val toAdd = newBlocks.filterNot(acc.contains)
-        acc ++ toAdd
-    }
+    locators.map(getBlock)
   }
 
-  def getBlocks(locator: Keccak256): AVector[Block]
+  def getBlocksAfter(locator: Keccak256): AVector[Block]
 
   def getHeight(block: Block): Int = getHeight(block.hash)
 

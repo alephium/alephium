@@ -24,6 +24,9 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
     AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
   }
 
+  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
+    getBlocksAfter(locator).map(_.blockHeader)
+
   /* BlockChain apis */
 
   protected val blocksTable: HashMap[Keccak256, Block]             = HashMap.empty
@@ -66,23 +69,8 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
     getConfirmedHash(height).map(getBlock)
   }
 
-  def getBlocks(locator: Keccak256): AVector[Block] = {
-    blockHashesTable.get(locator) match {
-      case Some(node) => getBlocksAfter(node)
-      case None       => AVector.empty[Block]
-    }
-  }
-
-  private def getBlocksAfter(node: BlockHashChain.TreeNode): AVector[Block] = {
-    if (node.isLeaf) AVector.empty[Block]
-    else {
-      val buffer = node.successors.foldLeft(node.successors.map(n => getBlock(n.blockHash))) {
-        case (blocks, successor) =>
-          blocks ++ getBlocksAfter(successor).toIterable
-      }
-      AVector.from(buffer)
-    }
-  }
+  def getBlocksAfter(locator: Keccak256): AVector[Block] =
+    getHashesAfter(locator).map(getBlock)
 
   def getHashTarget(hash: Keccak256): BigInt = {
     val block     = getBlock(hash)

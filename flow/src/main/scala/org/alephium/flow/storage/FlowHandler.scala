@@ -4,7 +4,7 @@ import akka.actor.Props
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.PeerManager
-import org.alephium.protocol.message.{Message, SendBlocks}
+import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{ChainIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -14,10 +14,11 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case class GetBlocksAfter(locators: AVector[Keccak256]) extends Command
-  case object GetBlockInfo                                extends Command
-  case class PrepareSync(peerId: PeerId)                  extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex)     extends Command
+  case class GetBlocksAfter(locators: AVector[Keccak256])  extends Command
+  case class GetHeadersAfter(locators: AVector[Keccak256]) extends Command
+  case object GetBlockInfo                                 extends Command
+  case class PrepareSync(peerId: PeerId)                   extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex)      extends Command
 
   sealed trait Event
   case class BlockFlowTemplate(deps: AVector[Keccak256], target: BigInt) extends Event
@@ -29,8 +30,11 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
 
   override def receive: Receive = {
     case GetBlocksAfter(locators) =>
-      val newBlocks = blockFlow.getBlocks(locators)
+      val newBlocks = blockFlow.getBlocksAfter(locators)
       sender() ! Message(SendBlocks(newBlocks))
+    case GetHeadersAfter(locators) =>
+      val newHeaders = blockFlow.getHeadersAfter(locators)
+      sender() ! Message(SendHeaders(newHeaders))
     case GetBlockInfo =>
       sender() ! blockFlow.getBlockInfo
     case PrepareSync(peerId) =>

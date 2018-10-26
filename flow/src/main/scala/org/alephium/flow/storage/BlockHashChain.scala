@@ -121,6 +121,24 @@ trait BlockHashChain extends BlockHashPool {
     tips.contains(hash)
   }
 
+  def getHashesAfter(locator: Keccak256): AVector[Keccak256] = {
+    blockHashesTable.get(locator) match {
+      case Some(node) => getHashesAfter(node)
+      case None       => AVector.empty
+    }
+  }
+
+  private def getHashesAfter(node: BlockHashChain.TreeNode): AVector[Keccak256] = {
+    if (node.isLeaf) AVector.empty[Keccak256]
+    else {
+      val buffer = node.successors.foldLeft(node.successors.map(_.blockHash)) {
+        case (blocks, successor) =>
+          blocks ++ getHashesAfter(successor).toIterable
+      }
+      AVector.from(buffer)
+    }
+  }
+
   def getBestTip: Keccak256 = {
     getAllTips.map(blockHashesTable.apply).maxBy(_.height).blockHash
   }

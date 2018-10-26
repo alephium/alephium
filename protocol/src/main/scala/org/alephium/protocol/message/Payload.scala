@@ -127,7 +127,7 @@ object SendHeaders extends Payload.Code {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
-case class GetHeaders(locators: AVector[BlockHeader]) extends Payload
+case class GetHeaders(locators: AVector[Keccak256]) extends Payload
 
 object GetHeaders extends Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
