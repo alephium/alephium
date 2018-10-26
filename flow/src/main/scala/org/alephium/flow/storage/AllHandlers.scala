@@ -13,12 +13,12 @@ case class AllHandlers(flowHandler: ActorRef,
                        headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformConfig) {
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRef = {
-    assert(chainIndex.from == config.mainGroup || chainIndex.to == config.mainGroup)
+    assert(chainIndex.relateTo(config.mainGroup))
     blockHandlers(chainIndex)
   }
 
   def getHeaderHandler(chainIndex: ChainIndex): ActorRef = {
-    assert(chainIndex.from != config.mainGroup && chainIndex.to != config.mainGroup)
+    assert(!chainIndex.relateTo(config.mainGroup))
     headerHandlers(chainIndex)
   }
 }

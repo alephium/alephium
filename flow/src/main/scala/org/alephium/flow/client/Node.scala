@@ -4,12 +4,13 @@ import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.{PeerManager, TcpHandler, TcpServer}
 import org.alephium.flow.storage._
-import org.alephium.protocol.model.{ChainIndex, PeerId}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, PeerId}
 
 case class Node(
     name: String,
+    config: PlatformConfig,
     port: Int,
-    mainGroup: Int,
+    mainGroup: GroupIndex,
     peerId: PeerId,
     system: ActorSystem,
     blockFlow: BlockFlow,
@@ -20,7 +21,7 @@ case class Node(
 object Node {
   type Builder = TcpHandler.Builder
 
-  def apply(builders: Builder, name: String, mainGroup: Int, port: Int, groups: Int)(
+  def apply(builders: Builder, name: String, mainGroup: GroupIndex, port: Int, groups: Int)(
       implicit config: PlatformConfig): Node = {
 
     val system    = ActorSystem(name, config.all)
@@ -32,7 +33,7 @@ object Node {
       for {
         from <- 0 until groups
         to   <- 0 until groups
-        if from == config.mainGroup || to == config.mainGroup
+        if ChainIndex(from, to).relateTo(config.mainGroup)
       } yield {
         val index = ChainIndex(from, to)
         val handler = system.actorOf(BlockChainHandler.props(blockFlow, index, peerManager),
@@ -43,7 +44,7 @@ object Node {
     val headerHandlers = (for {
       from <- 0 until groups
       to   <- 0 until groups
-      if from != config.mainGroup && to != config.mainGroup
+      if !ChainIndex(from, to).relateTo(config.mainGroup)
     } yield {
       val chainIndex = ChainIndex(from, to)
       val headerHander = system.actorOf(
@@ -55,6 +56,6 @@ object Node {
     val server      = system.actorOf(TcpServer.props(port, peerManager), "TcpServer")
     peerManager ! PeerManager.Set(server, allHandlers)
 
-    Node(name, port, mainGroup, config.peerId, system, blockFlow, peerManager, allHandlers)
+    Node(name, config, port, mainGroup, config.peerId, system, blockFlow, peerManager, allHandlers)
   }
 }

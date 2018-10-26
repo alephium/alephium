@@ -7,7 +7,7 @@ import java.nio.file.{Path, Paths}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{Block, ChainIndex, PeerId}
+import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Files}
 
 object PlatformConfig extends StrictLogging {
@@ -89,10 +89,10 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
   val nonceStep: BigInt       = underlying.getInt("nonceStep")
   val retryTimeout: Duration  = underlying.getDuration("retryTimeout")
 
-  val mainGroup: Int = {
+  val mainGroup: GroupIndex = {
     val myGroup = underlying.getInt("mainGroup")
     assert(myGroup >= 0 && myGroup < groups)
-    myGroup
+    GroupIndex(myGroup)(this)
   }
   val peerId = PeerId.generateFor(mainGroup)(this)
 
@@ -102,10 +102,11 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
 
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        val index = from * self.groups + to
-        val nonce = nonces.get(index)
-        val block = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
-        assert(ChainIndex(from, to).accept(block)(this))
+        val index      = from * self.groups + to
+        val nonce      = nonces.get(index)
+        val block      = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
+        val chainIndex = ChainIndex(from, to)(this)
+        assert(chainIndex.accept(block)(this))
         block
     }
   }

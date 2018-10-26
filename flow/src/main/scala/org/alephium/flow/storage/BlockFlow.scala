@@ -9,9 +9,9 @@ import org.alephium.util.AVector
 import scala.reflect.ClassTag
 
 class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
-  import config.{genesisBlocks, mainGroup}
+  import config.genesisBlocks
 
-  assert(mainGroup >= 0 && mainGroup < config.groups)
+  private def mainGroup: Int = config.mainGroup.value
 
   override val groups = config.groups
 
