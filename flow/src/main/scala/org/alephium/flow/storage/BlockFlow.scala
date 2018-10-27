@@ -21,7 +21,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
     BlockChain.fromGenesis(genesisBlocks(mainGroup)(to))
   }
-  val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
+  private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
         if (from == mainGroup) outBlockChains(to)
@@ -64,6 +64,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val index = block.chainIndex
     if (index.from != mainGroup && index.to != mainGroup) {
       AddBlockResult.InvalidIndex
+    } else if (contains(block.hash)) {
+      AddBlockResult.AlreadyExisted
     } else {
       val deps        = block.blockHeader.blockDeps
       val missingDeps = deps.filterNot(contains)
@@ -91,6 +93,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val index = header.chainIndex
     if (index.from == mainGroup || index.to == mainGroup) {
       AddBlockHeaderResult.Other("Block is expected, not BlockHeader")
+    } else if (contains(header.hash)) {
+      AddBlockHeaderResult.AlreadyExisted
     } else {
       val deps        = header.blockDeps
       val missingDeps = deps.filterNot(contains)
@@ -100,7 +104,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
         val weight = calWeight(header)
         chain.add(header, parent, weight)
       } else {
-        AddBlockHeaderResult.MissingDeps(missingDeps :+ header.hash)
+        AddBlockHeaderResult.MissingDeps(missingDeps)
       }
     }
   }

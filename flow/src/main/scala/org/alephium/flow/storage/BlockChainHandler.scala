@@ -39,7 +39,7 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
           val headers = blocks.map(_.blockHeader)
           peerManager ! PeerManager.BroadCast(Message(SendHeaders(headers)), origin)
         case error: AddBlockResult.Failure =>
-          log.info(s"Failed in adding new block: $error")
+          log.warning(s"Failed in adding new block: ${error.toString}")
       }
 
       sender() ! result
