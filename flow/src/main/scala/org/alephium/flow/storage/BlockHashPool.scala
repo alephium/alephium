@@ -18,6 +18,7 @@ trait BlockHashPool {
 
   def isTip(hash: Keccak256): Boolean
 
+  // The return includes locator
   def getHashesAfter(locator: Keccak256): AVector[Keccak256]
 
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]

@@ -129,9 +129,9 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   private def getHashesAfter(node: BlockHashChain.TreeNode): AVector[Keccak256] = {
-    if (node.isLeaf) AVector.empty[Keccak256]
+    if (node.isLeaf) AVector(node.blockHash)
     else {
-      val buffer = node.successors.foldLeft(node.successors.map(_.blockHash)) {
+      val buffer = node.successors.foldLeft(ArrayBuffer[Keccak256](node.blockHash)) {
         case (blocks, successor) =>
           blocks ++ getHashesAfter(successor).toIterable
       }
