@@ -28,13 +28,11 @@ akka {
 }
 
 alephium {
-  numZerosAtLeastInHash = 12
+  numZerosAtLeastInHash = 9
   blockTargetTime = 4 minutes
   blockConfirmNum = 10
   retargetInterval = 180 // number of blocks; about 12 hours
-}
 
-alephium {
   port = 9973
   port = ${?port}
   groups = 32
@@ -43,5 +41,7 @@ alephium {
   retryTimeout = 300 second
 
   nonceStep = 10000
+
+  mainGroup = ${?mainGroup}
 }
 

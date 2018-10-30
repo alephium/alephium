@@ -18,6 +18,9 @@ trait BlockHashPool {
 
   def isTip(hash: Keccak256): Boolean
 
+  // The return includes locator
+  def getHashesAfter(locator: Keccak256): AVector[Keccak256]
+
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]
 
   def getBestTip: Keccak256
@@ -25,4 +28,12 @@ trait BlockHashPool {
   def getAllTips: AVector[Keccak256]
 
   def getAllBlockHashes: Iterable[Keccak256]
+
+  def show(hash: Keccak256): String = {
+    val shortHash = hash.shortHex
+    val weight    = getWeight(hash)
+    val hashNum   = numHashes - 1 // exclude genesis block
+    val height    = getHeight(hash)
+    s"Hash: $shortHash; Weight: $weight; Height: $height/$hashNum"
+  }
 }

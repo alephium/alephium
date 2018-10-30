@@ -1,14 +1,16 @@
 package org.alephium.flow.network
 
 import java.net.InetSocketAddress
+import java.time.Instant
 
 import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.storage.{BlockHandlers, HandlerUtils}
+import org.alephium.flow.storage.{AllHandlers, HandlerUtils}
 import org.alephium.protocol.message._
+import org.alephium.protocol.model.PeerId
 import org.alephium.serde.WrongFormatException
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalatest.TryValues._
@@ -19,27 +21,99 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   behavior of "TcpHandler"
 
-  trait Fixture extends PlatformConfig.Default { obj =>
+  trait BaseFixture extends PlatformConfig.Default {
     val remote = SocketUtil.temporaryServerAddress()
+    val local  = SocketUtil.temporaryServerAddress()
 
     val message = Message(SendBlocks(AVector.empty))
     val data    = Message.serializer.serialize(message)
 
-    val connection    = TestProbe()
+    val connection    = TestProbe("connection")
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
 
-    val payloadHandler = TestProbe()
+    val payloadHandler = TestProbe("payload-probe")
+  }
+
+  it should "send Hello to incoming connection" in new BaseFixture {
+    val pingpongProbe = TestProbe()
     val builder = new TcpHandler.Builder {
-      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
+      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
           implicit config: PlatformConfig): Props = {
         Props(new TcpHandler(remote, blockHandlers) {
+          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+
+          override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+        })
+      }
+    }
+    val tcpHandler = system.actorOf(builder.createTcpHandler(remote, blockHandlers))
+
+    tcpHandler ! TcpHandler.Set(connection.ref)
+    connection.expectMsgType[Tcp.Register]
+    connection.expectMsgPF() {
+      case write: Tcp.Write =>
+        val message = Message.deserializer.deserialize(write.data).get
+        message.payload match {
+          case Hello(0, _, peerId) => peerId is config.peerId
+          case _                   => assert(false)
+        }
+      case _ => assert(false)
+    }
+
+    val randomId = PeerId.generate
+    val helloAck = Message(HelloAck(randomId))
+    tcpHandler ! Tcp.Received(Message.serializer.serialize(helloAck))
+    pingpongProbe.expectMsg("start")
+  }
+
+  it should "response HelloAck to Hello" in new BaseFixture {
+    val pingpongProbe = TestProbe()
+    val builder = new TcpHandler.Builder {
+      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
+          implicit config: PlatformConfig): Props = {
+        Props(new TcpHandler(remote, blockHandlers) {
+          override def receive: Receive = connecting(Instant.now)
+
+          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+
+          override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+        })
+      }
+    }
+    val tcpHandler = system.actorOf(builder.createTcpHandler(remote, blockHandlers))
+
+    tcpHandler.tell(Tcp.Connected(remote, local), connection.ref)
+    connection.expectMsgType[Tcp.Register]
+
+    val randomId = PeerId.generate
+    val hello    = Message(Hello(randomId))
+    tcpHandler ! Tcp.Received(Message.serializer.serialize(hello))
+    connection.expectMsgPF() {
+      case write: Tcp.Write =>
+        val message = Message.deserializer.deserialize(write.data).get
+        message.payload match {
+          case HelloAck(0, _, peerId) => peerId is config.peerId
+          case _                      => assert(false)
+        }
+      case _ => assert(false)
+    }
+    pingpongProbe.expectMsg("start")
+  }
+
+  trait Fixture extends BaseFixture { obj =>
+    val builder = new TcpHandler.Builder {
+      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
+          implicit config: PlatformConfig): Props = {
+        Props(new TcpHandler(remote, blockHandlers) {
+          connection = obj.connection.ref
+
+          override def receive: Receive = handleWith(ByteString.empty, handlePayload)
+
           override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
         })
       }
     }
     val tcpHandler = system.actorOf(builder.createTcpHandler(remote, blockHandlers))
-    tcpHandler ! TcpHandler.Set(connection.ref)
-    connection.expectMsgType[Tcp.Register]
   }
 
   it should "forward data to message handler" in new Fixture {
@@ -66,7 +140,6 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "send data out when new message generated" in new Fixture {
-    connection.expectMsgType[Tcp.Write] // Ping message
     tcpHandler ! message
     connection.expectMsg(TcpHandler.envelope(message))
   }
@@ -107,17 +180,22 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   behavior of "ping/ping protocol"
 
-  trait PingPongFixture extends PlatformConfig.Default { obj =>
-    val remote        = SocketUtil.temporaryServerAddress()
-    val connection    = TestProbe()
-    val blockHandlers = HandlerUtils.createBlockHandlersProbe
-    val builder       = new TcpHandler.Builder {}
-    val tcpHandler    = system.actorOf(builder.createTcpHandler(remote, blockHandlers))
-    tcpHandler ! TcpHandler.Set(connection.ref)
-    connection.expectMsgType[Tcp.Register]
+  trait PingPongFixture extends BaseFixture { obj =>
+
+    val builder = new TcpHandler.Builder {
+      override def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
+          implicit config: PlatformConfig): Props = {
+        Props(new TcpHandler(remote, blockHandlers) {
+          connection = obj.connection.ref
+          override def receive: Receive = handleWith(ByteString.empty, handlePayload)
+        })
+      }
+    }
+    val tcpHandler = system.actorOf(builder.createTcpHandler(remote, blockHandlers))
   }
 
   it should "send ping after receiving SendPing" in new PingPongFixture {
+    tcpHandler ! TcpHandler.SendPing
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
         val message = Message.deserializer.deserialize(data).get
@@ -126,20 +204,19 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "replay pong to ping" in new PingPongFixture {
-    connection.expectMsgType[Tcp.Write]
-    val nonce   = Random.nextInt()
-    val message = Message(Ping(nonce, System.currentTimeMillis()))
-    val data    = Message.serializer.serialize(message)
-    tcpHandler ! Tcp.Received(data)
+    val nonce    = Random.nextInt()
+    val message1 = Message(Ping(nonce, System.currentTimeMillis()))
+    val data1    = Message.serializer.serialize(message1)
+    tcpHandler ! Tcp.Received(data1)
     connection.expectMsg(TcpHandler.envelope(Message(Pong(nonce))))
   }
 
   it should "fail if receive a wrong ping" in new PingPongFixture {
     watch(tcpHandler)
-    val nonce   = Random.nextInt()
-    val message = Message(Pong(nonce))
-    val data    = Message.serializer.serialize(message)
-    tcpHandler ! Tcp.Received(data)
+    val nonce    = Random.nextInt()
+    val message1 = Message(Pong(nonce))
+    val data1    = Message.serializer.serialize(message1)
+    tcpHandler ! Tcp.Received(data1)
     expectTerminated(tcpHandler)
   }
 }

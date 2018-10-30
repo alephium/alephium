@@ -4,8 +4,8 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
-import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
+import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -37,16 +37,16 @@ object Miner {
 class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformConfig)
     extends BaseActor {
-  import node.blockHandlers
+  import node.allHandlers
 
-  val chainHandler: ActorRef = blockHandlers.getHandler(chainIndex)
+  val blockHandler: ActorRef = allHandlers.getBlockHandler(chainIndex)
 
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
-      blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+      allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
 
@@ -60,14 +60,14 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       tryMine(template, from, to) match {
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
-          log.info(s"A new block ${block.shortHash} is mined, elapsed $elapsed ms")
-          chainHandler ! ChainHandler.AddBlocks(AVector(block), Local)
+          log.info(s"A new block ${block.shortHex} is mined, elapsed $elapsed ms")
+          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)
       }
 
     case AddBlockResult.Success =>
-      blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+      allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
 
     case _: AddBlockResult.Failure =>
@@ -80,10 +80,12 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(deps, target) =>
       assert(deps.length == (2 * config.groups - 1))
-      val transaction = Transaction.coinbase(address, 1)
-      val chainDep    = deps.takeRight(config.groups)(chainIndex.to)
-      val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
-      val template    = BlockTemplate(deps, target, AVector(transaction))
+      // scalastyle:off magic.number
+      val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
+      val chainDep     = deps.takeRight(config.groups)(chainIndex.to)
+      val lastTs       = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
+      val template     = BlockTemplate(deps, target, transactions)
+      // scalastyle:on magic.number
       context become mine(template, lastTs)
       self ! Miner.Nonce(0, config.nonceStep)
   }
@@ -94,16 +96,12 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
-        val block = Block.from(template.deps, template.transactions, template.target, current)
-        if (isDifficult(block)) Some(block)
+        val header = template.buildHeader(current)
+        if (chainIndex.accept(header)) Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }
 
     iter(from)
-  }
-
-  def isDifficult(block: Block): Boolean = {
-    chainIndex.accept(block)
   }
 }

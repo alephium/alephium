@@ -33,7 +33,9 @@ elif args.goal == 'run':
 
     for node in range(0, int(os.environ['nodes'])):
         port = 9973 + node
-        run('./app/target/universal/stage/bin/boot {} &> {}/{}.txt &'.format(port, logdir, port))
+        groups = int(os.getenv('groups'))
+        main_group = node % groups
+        run('mainGroup={} ./app/target/universal/stage/bin/boot {} &> {}/{}.txt &'.format(main_group, port, logdir, port))
 
 elif args.goal == 'mine':
     for node in range(0, int(os.environ['nodes'])):

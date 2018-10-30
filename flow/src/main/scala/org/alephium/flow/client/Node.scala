@@ -3,39 +3,30 @@ package org.alephium.flow.client
 import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.{PeerManager, TcpHandler, TcpServer}
-import org.alephium.flow.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
-import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.AVector
+import org.alephium.flow.storage._
 
 case class Node(
     name: String,
-    port: Int,
+    config: PlatformConfig,
     system: ActorSystem,
     blockFlow: BlockFlow,
     peerManager: ActorRef,
-    blockHandlers: BlockHandlers
+    allHandlers: AllHandlers
 )
 
 object Node {
   type Builder = TcpHandler.Builder
 
-  def apply(builders: Builder, name: String, port: Int, groups: Int)(
-      implicit config: PlatformConfig): Node = {
+  def apply(builders: Builder, name: String)(implicit config: PlatformConfig): Node = {
 
-    val system    = ActorSystem(name, config.all)
-    val blockFlow = BlockFlow()
+    val system      = ActorSystem(name, config.all)
+    val peerManager = system.actorOf(PeerManager.props(builders), "PeerManager")
 
-    val peerManager  = system.actorOf(PeerManager.props(builders), "PeerManager")
-    val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
-    val chainHandlers = AVector.tabulate(groups, groups) {
-      case (from, to) =>
-        system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager),
-                       s"ChainHandler-$from-$to")
-    }
-    val blockHandlers = BlockHandlers(blockHandler, chainHandlers)
-    val server        = system.actorOf(TcpServer.props(port, peerManager), "TcpServer")
-    peerManager ! PeerManager.Set(server, blockHandlers)
+    val blockFlow   = BlockFlow()
+    val allHandlers = AllHandlers.build(system, peerManager, blockFlow)
+    val server      = system.actorOf(TcpServer.props(config.port, peerManager), "TcpServer")
+    peerManager ! PeerManager.Set(server, allHandlers)
 
-    Node(name, port, system, blockFlow, peerManager, blockHandlers)
+    Node(name, config, system, blockFlow, peerManager, allHandlers)
   }
 }
