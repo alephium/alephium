@@ -58,7 +58,7 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root", mainGroup, config.port, config.groups)
+      Node(builders, "Root")
   }
 
   class Local(val port: Int) extends Mode {
@@ -73,6 +73,6 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root", mainGroup, port, config.groups)
+      Node(builders, "Root")
   }
 }
