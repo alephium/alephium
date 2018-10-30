@@ -11,7 +11,7 @@ import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.PeerManager.PeerInfo
 import org.alephium.flow.storage._
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{GroupIndex, PeerId}
+import org.alephium.protocol.model.PeerId
 import org.alephium.serde.NotEnoughBytesException
 import org.alephium.util.{AVector, BaseActor}
 
@@ -220,10 +220,10 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       // TODO: support many headers
       val header     = headers.head
       val chainIndex = header.chainIndex
-      if (chainIndex.from != config.mainGroup.value) {
-        if (chainIndex.to == config.mainGroup.value) {
+      if (chainIndex.from != config.mainGroup) {
+        if (chainIndex.to == config.mainGroup) {
           val message = TcpHandler.envelope(GetBlocks(AVector(header.hash)))
-          val group   = GroupIndex(chainIndex.from)
+          val group   = chainIndex.from
           context.parent ! PeerManager.Send(message, group)
         } else {
           val handler = allHandlers.getHeaderHandler(chainIndex)

@@ -24,9 +24,9 @@ case class BlockHeader(
   }
 
   // when toIndex == chainIndex.to, it returns hash of parent
-  def uncleHash(toIndex: Int)(implicit config: ConsensusConfig): Keccak256 = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: ConsensusConfig): Keccak256 = {
     assert(toIndex == chainIndex.to)
-    blockDeps.takeRight(config.groups)(toIndex)
+    blockDeps.takeRight(config.groups)(toIndex.value)
   }
 }
 

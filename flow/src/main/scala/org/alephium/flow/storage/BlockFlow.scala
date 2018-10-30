@@ -3,7 +3,7 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockDeps
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
@@ -11,22 +11,22 @@ import scala.reflect.ClassTag
 class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   import config.genesisBlocks
 
-  private def mainGroup: Int = config.mainGroup.value
+  private def mainGroup: GroupIndex = config.mainGroup
 
   override val groups = config.groups
 
   private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
-    BlockChain.fromGenesis(genesisBlocks(if (k < mainGroup) k else k + 1)(mainGroup))
+    BlockChain.fromGenesis(genesisBlocks(if (k < mainGroup.value) k else k + 1)(mainGroup.value))
   }
   private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
-    BlockChain.fromGenesis(genesisBlocks(mainGroup)(to))
+    BlockChain.fromGenesis(genesisBlocks(mainGroup.value)(to))
   }
   private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        if (from == mainGroup) outBlockChains(to)
-        else if (to == mainGroup) {
-          inBlockChains(if (from < mainGroup) from else from - 1)
+        if (from == mainGroup.value) outBlockChains(to)
+        else if (to == mainGroup.value) {
+          inBlockChains(if (from < mainGroup.value) from else from - 1)
         } else BlockHeaderChain.fromGenesis(genesisBlocks(from)(to))
     }
 
@@ -40,24 +40,18 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     inBlockChains.sumBy(_.numTransactions) + outBlockChains.sumBy(_.numTransactions)
   }
 
-  override protected def getBlockChain(from: Int, to: Int): BlockChain = {
-    assert(0 <= from && from < groups && 0 <= to && to < groups)
-
+  override protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
     assert(from == mainGroup || to == mainGroup)
-    if (from == mainGroup) outBlockChains(to)
-    else inBlockChains(if (from < mainGroup) from else from - 1)
+    if (from == mainGroup) outBlockChains(to.value)
+    else inBlockChains(if (from.value < mainGroup.value) from.value else from.value - 1)
   }
 
-  override protected def getHeaderChain(from: Int, to: Int): BlockHeaderPool = {
-    assert(0 <= from && from < groups && 0 <= to && to < groups)
-
-    blockHeaderChains(from)(to)
+  override protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool = {
+    blockHeaderChains(from.value)(to.value)
   }
 
-  override protected def getHashChain(from: Int, to: Int): BlockHashChain = {
-    assert(0 <= from && from < groups && 0 <= to && to < groups)
-
-    blockHeaderChains(from)(to)
+  override protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain = {
+    blockHeaderChains(from.value)(to.value)
   }
 
   def add(block: Block): AddBlockResult = {
@@ -149,20 +143,20 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     aggregate(_.getAllTips)(_ ++ _)
   }
 
-  def getRtips(tip: Keccak256, from: Int): Array[Keccak256] = {
+  def getRtips(tip: Keccak256, from: GroupIndex): Array[Keccak256] = {
     val rdeps = new Array[Keccak256](groups)
-    rdeps(from) = tip
+    rdeps(from.value) = tip
 
     val header = getBlockHeader(tip)
     val deps   = header.blockDeps
     if (deps.isEmpty) {
       0 until groups foreach { k =>
-        if (k != from) rdeps(k) = genesisBlocks(k).head.hash
+        if (k != from.value) rdeps(k) = genesisBlocks(k).head.hash
       }
     } else {
       0 until groups foreach { k =>
-        if (k < from) rdeps(k) = deps(k)
-        else if (k > from) rdeps(k) = deps(k - 1)
+        if (k < from.value) rdeps(k) = deps(k)
+        else if (k > from.value) rdeps(k) = deps(k - 1)
       }
     }
     rdeps
@@ -177,11 +171,11 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     if (index1.to == index2.to) chain.isBefore(previous, current)
     else {
       val groupDeps = getGroupDeps(current, index1.from)
-      chain.isBefore(previous, groupDeps(index2.to))
+      chain.isBefore(previous, groupDeps(index2.to.value))
     }
   }
 
-  def isCompatible(rtips: IndexedSeq[Keccak256], tip: Keccak256, from: Int): Boolean = {
+  def isCompatible(rtips: IndexedSeq[Keccak256], tip: Keccak256, from: GroupIndex): Boolean = {
     val newRtips = getRtips(tip, from)
     assert(rtips.size == newRtips.length)
     rtips.indices forall { k =>
@@ -191,7 +185,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
   }
 
-  def updateRtips(rtips: Array[Keccak256], tip: Keccak256, from: Int): Unit = {
+  def updateRtips(rtips: Array[Keccak256], tip: Keccak256, from: GroupIndex): Unit = {
     val newRtips = getRtips(tip, from)
     assert(rtips.length == newRtips.length)
     rtips.indices foreach { k =>
@@ -203,10 +197,10 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
   }
 
-  def getGroupDeps(tip: Keccak256, from: Int): AVector[Keccak256] = {
+  def getGroupDeps(tip: Keccak256, from: GroupIndex): AVector[Keccak256] = {
     val deps = getBlockHeader(tip).blockDeps
     if (deps.isEmpty) {
-      genesisBlocks(from).map(_.hash)
+      genesisBlocks(from.value).map(_.hash)
     } else {
       deps.takeRight(groups)
     }
@@ -217,16 +211,18 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val bestIndex = ChainIndex.fromHash(bestTip)
     val rtips     = getRtips(bestTip, bestIndex.from)
     val deps1 = (0 until groups)
-      .filter(_ != chainIndex.from)
+      .filter(_ != chainIndex.from.value)
       .foldLeft(AVector.empty[Keccak256]) {
-        case (deps, k) =>
+        case (deps, _k) =>
+          val k = GroupIndex(_k)
           if (k == bestIndex.from) deps :+ bestTip
           else {
-            val toTries = (0 until groups).foldLeft(AVector.empty[Keccak256]) { (acc, l) =>
+            val toTries = (0 until groups).foldLeft(AVector.empty[Keccak256]) { (acc, _l) =>
+              val l = GroupIndex(_l)
               acc ++ getHashChain(k, l).getAllTips
             }
             val validTries = toTries.filter(tip => isCompatible(rtips, tip, k))
-            if (validTries.isEmpty) deps :+ rtips(k)
+            if (validTries.isEmpty) deps :+ rtips(k.value)
             else {
               val bestTry = validTries.maxBy(getWeight) // TODO: improve
               updateRtips(rtips, bestTry, k)
@@ -234,15 +230,16 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
             }
           }
       }
-    val groupTip  = rtips(chainIndex.from)
+    val groupTip  = rtips(chainIndex.from.value)
     val groupDeps = getGroupDeps(groupTip, chainIndex.from)
     val deps2 = (0 until groups)
       .foldLeft(deps1) {
-        case (deps, l) =>
+        case (deps, _l) =>
+          val l          = GroupIndex(_l)
           val chain      = getHashChain(chainIndex.from, l)
           val toTries    = chain.getAllTips
-          val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l), tip))
-          if (validTries.isEmpty) deps :+ groupDeps(l)
+          val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l.value), tip))
+          if (validTries.isEmpty) deps :+ groupDeps(l.value)
           else {
             val bestTry = validTries.maxBy(getWeight) // TODO: improve
             deps :+ bestTry

@@ -13,6 +13,6 @@ import org.alephium.util.AVector
 case class BlockDeps(chainIndex: ChainIndex, deps: AVector[Keccak256]) {
 
   def getChainHash(implicit config: PlatformConfig): Keccak256 = {
-    deps.takeRight(config.groups)(chainIndex.to)
+    deps.takeRight(config.groups)(chainIndex.to.value)
   }
 }
