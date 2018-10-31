@@ -4,8 +4,12 @@ import java.net.InetSocketAddress
 
 import org.alephium.serde.Serde
 
-case class PeerAddress(id: PeerId, socketAddress: InetSocketAddress)
+case class PeerAddress(
+    peerId: PeerId,
+    group: GroupIndex,
+    socketAddress: InetSocketAddress
+)
 object PeerAddress {
   implicit val serde: Serde[PeerAddress] =
-    Serde.forProduct2(PeerAddress.apply, p => (p.id, p.socketAddress))
+    Serde.forProduct3(PeerAddress.apply, p => (p.peerId, p.group, p.socketAddress))
 }

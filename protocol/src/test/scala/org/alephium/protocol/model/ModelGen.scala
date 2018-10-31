@@ -59,16 +59,21 @@ object ModelGen {
     }
 
   def groupGen(implicit config: ConsensusConfig): Gen[GroupIndex] =
-    Gen.choose(0, config.groups - 1).map(n => GroupIndex.apply(n))
+    groupGen_(config.groups)
+
+  def groupGen_(groups: Int): Gen[GroupIndex] =
+    Gen.choose(0, groups - 1).map(n => GroupIndex.unsafe(n))
 
   val peerId: Gen[PeerId] = Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
 
-  val peerAddress: Gen[PeerAddress] = for {
-    ip0  <- Gen.choose(0, 255)
-    ip1  <- Gen.choose(0, 255)
-    ip2  <- Gen.choose(0, 255)
-    ip3  <- Gen.choose(0, 255)
-    port <- Gen.choose(0, 65535)
-    id   <- peerId
-  } yield PeerAddress(id, new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port))
+  def peerAddress(groups: Int): Gen[PeerAddress] =
+    for {
+      ip0   <- Gen.choose(0, 255)
+      ip1   <- Gen.choose(0, 255)
+      ip2   <- Gen.choose(0, 255)
+      ip3   <- Gen.choose(0, 255)
+      port  <- Gen.choose(0, 65535)
+      id    <- peerId
+      group <- groupGen_(groups)
+    } yield PeerAddress(id, group, new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port))
 }
