@@ -1,5 +1,6 @@
 package org.alephium.protocol.model
 
+import org.alephium.serde.Serde
 import org.alephium.protocol.config.ConsensusConfig
 
 class GroupIndex private (val value: Int) extends AnyVal {
@@ -8,9 +9,13 @@ class GroupIndex private (val value: Int) extends AnyVal {
 
 object GroupIndex {
   def apply(value: Int)(implicit config: ConsensusConfig): GroupIndex = {
-    assert(0 <= value && value < config.groups)
-    new GroupIndex(value)
+    val index = new GroupIndex(value)
+    assert(validate(index, config.groups))
+    index
   }
 
-  def unsafe(value: Int): GroupIndex = new GroupIndex(value)
+  def unsafe(value: Int): GroupIndex                    = new GroupIndex(value)
+  def validate(group: GroupIndex, groups: Int): Boolean = 0 <= group.value && group.value < groups
+
+  implicit val serde: Serde[GroupIndex] = Serde.IntSerde.xmap[GroupIndex](unsafe(_), _.value)
 }

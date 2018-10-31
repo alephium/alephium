@@ -3,63 +3,82 @@ package org.alephium.flow.network
 import java.net.{InetAddress, InetSocketAddress}
 import scala.concurrent.duration._
 
-import akka.testkit.{SocketUtil, TestProbe}
-
-import org.alephium.protocol.model.{PeerAddress, PeerId}
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.protocol.model.{GroupIndex, PeerAddress, PeerId}
+import org.alephium.util.{AVector, AlephiumActorSpec}
 
 class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
 
   behavior of "DiscoveryServerSpec"
 
-  it should "discover 32 peers with a mean 'rank' of 1" in {
+  it should "discover 128 peers in 8 groups with a mean distance below 0.05" in {
+    val groups        = 8
+    val networkSize   = 128
+    val peersPerGroup = 1
+
     def createAddr(port: Int): InetSocketAddress =
       new InetSocketAddress(InetAddress.getLocalHost, port)
 
-    def createConfig(port: Int, peerId: PeerId): DiscoveryConfig =
+    def createConfig(port: Int, peerId: PeerId, group: GroupIndex): DiscoveryConfig =
       DiscoveryConfig(port,
+                      groups,
                       peerId,
-                      peersMax      = 6,
-                      scanMax       = 1,
-                      neighborsMax  = 1,
-                      scanFrequency = 1000.millis)
+                      group,
+                      peersPerGroup,
+                      scanMax           = 1,
+                      neighborsPerGroup = 1,
+                      scanFrequency     = 500.millis)
 
-    val networkSize = 32
-    def enumerate   = 0 until networkSize
+    def enumerate = 0 until networkSize
 
-    val peerIds = enumerate.map(_ => PeerId.generate)
-    val ports   = enumerate.map(_ => SocketUtil.temporaryLocalPort(true))
+    val groupIds = enumerate.map(i => GroupIndex.unsafe(i % groups))
+    val peerIds  = enumerate.map(_ => PeerId.generate)
+    val ports    = enumerate.map(i => 10000 + i)
 
-    val bootstrapPeers = Set(PeerAddress(peerIds(0), createAddr(ports(0))))
+    val bootstrapPeers = AVector(PeerAddress(peerIds(0), groupIds(0), createAddr(ports(0))))
 
-    val probes = enumerate.map { i =>
-      val config = createConfig(ports(i), peerIds(i))
-      val probe  = TestProbe()
-      val actor =
-        system.actorOf(DiscoveryServer.props(config, Set(probe.ref)), ports(i).toString)
-      actor ! DiscoveryServer.Bootstrap(if (i == 0) Set.empty else bootstrapPeers)
-      probe
+    val actors = enumerate.map { i =>
+      val config = createConfig(ports(i), peerIds(i), groupIds(i))
+      system.actorOf(DiscoveryServer.props(config, if (i == 0) AVector.empty else bootstrapPeers),
+                     ports(i).toString)
     }
 
-    val discoveries = enumerate.par.map { i =>
-      val xs = probes(i).receiveWhile(4.seconds, 2.seconds, 64) {
-        case x: DiscoveryServer.Discovery => x
+    val discoveries = enumerate.map { i =>
+      actors(i) ! DiscoveryServer.GetPeers
+
+      val DiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
+        case DiscoveryServer.Peers(peers) =>
+          if (peers.flatMap(identity).length >= groups * peersPerGroup) true
+          else {
+            actors(i) ! DiscoveryServer.GetPeers
+            false
+          }
       }
-      xs.last
+
+      peers
     }
 
+    // Ensure total group diversity
+    enumerate.foreach { i =>
+      discoveries(i).foreach { xs =>
+        xs.length is peersPerGroup
+      }
+    }
+
+    // Compute distance ranking (1.0 farest, 0.0 closest)
     val ranks = enumerate.map { i =>
       val peerId = peerIds(i)
 
-      val discovereds = discoveries(i).peers.map(_.address.id).toSet
-      val nearests    = peerIds.sortBy(PeerId.distance(peerId, _))
+      val discovereds =
+        discoveries(i).flatMap(_.map(_.address.peerId)).sortBy(PeerId.distance(peerId, _))
+      val nearests = peerIds.sortBy(PeerId.distance(peerId, _))
+      val rank = nearests.zipWithIndex.collectFirst {
+        case (id, i) if discovereds.contains(id) => i
+      }
 
-      val rank = nearests.zipWithIndex.collectFirst { case (id, i) if discovereds(id) => i }
-
-      rank.getOrElse(0)
+      (rank.getOrElse(0) / networkSize.toDouble)
     }
 
-    ranks.min is 1
-    (ranks.sum / ranks.size) is 1
+    ranks.min isnot 0.0
+    ((ranks.sum / ranks.size) < 0.05)
   }
 }
