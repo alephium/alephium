@@ -2,11 +2,7 @@ package org.alephium.protocol.config
 
 import java.time.Duration
 
-trait ConsensusConfig {
-
-  def groups: Int
-  def chainNum: Int = groups * groups
-  def depsNum: Int  = 2 * groups - 1
+trait ConsensusConfig extends GroupConfig {
 
   def numZerosAtLeastInHash: Int
   def maxMiningTarget: BigInt

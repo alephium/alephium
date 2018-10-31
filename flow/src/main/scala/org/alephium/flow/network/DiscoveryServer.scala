@@ -8,16 +8,16 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.{IO, Udp}
 import org.alephium.util.{AVector, BaseActor}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{GroupIndex, PeerAddress, PeerId}
+import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 
 import scala.util.{Failure, Success}
 
 object DiscoveryServer {
-  case class PeerInfo(address: PeerAddress, createdAt: Long, updatedAt: Long)
-  object PeerInfo {
-    def fromAddress(address: PeerAddress): PeerInfo = {
+  case class PeerStatus(info: PeerInfo, createdAt: Long, updatedAt: Long)
+  object PeerStatus {
+    def fromInfo(info: PeerInfo): PeerStatus = {
       val now = System.currentTimeMillis
-      PeerInfo(address, now, now)
+      PeerStatus(info, now, now)
     }
   }
 
@@ -28,14 +28,14 @@ object DiscoveryServer {
 
   sealed trait Event
 
-  case class Peers(infos: AVector[AVector[PeerInfo]]) extends Event
+  case class Peers(infos: AVector[AVector[PeerStatus]]) extends Event
 
-  def props(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddress]): Props =
-    Props(new DiscoveryServer(config, bootstrapPeers))
+  def props(bootstrapPeers: AVector[PeerInfo])(implicit config: DiscoveryConfig): Props =
+    Props(new DiscoveryServer(bootstrapPeers))
 }
 
 // TODO Add rate limiter to prevent "Ping/FindNode" flooding?
-class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddress])
+class DiscoveryServer(bootstrapPeers: AVector[PeerInfo])(implicit config: DiscoveryConfig)
     extends BaseActor
     with Timers {
   import DiscoveryServer._
@@ -45,76 +45,76 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
 
   implicit val orderingPeerId: Ordering[PeerId] = PeerId.ordering(config.peerId)
 
-  val calls: mutable.Map[CallId, PeerAddress] = mutable.Map()
+  val calls: mutable.Map[CallId, PeerInfo] = mutable.Map()
 
   val peersMax = config.peersPerGroup * config.groups
-  val peers: AVector[mutable.SortedMap[PeerId, PeerInfo]] =
+  val peers: AVector[mutable.SortedMap[PeerId, PeerStatus]] =
     AVector.tabulate(config.groups)(_ => mutable.SortedMap())
 
   IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.udpPort))
 
   override def receive: Receive = binding
 
-  def call(socket: ActorRef, address: PeerAddress)(f: CallId => DiscoveryMessage): Unit = {
+  def call(socket: ActorRef, address: PeerInfo)(f: CallId => DiscoveryMessage): Unit = {
     val callId = CallId.generate
     calls.put(callId, address)
     send(socket, address.socketAddress, f(callId))
   }
 
-  def callPing(socket: ActorRef, address: PeerAddress): Unit = {
-    call(socket, address)(Ping(_, config.peerId, config.group))
+  def callPing(socket: ActorRef, address: PeerInfo): Unit = {
+    call(socket, address)(Ping(_, config.nodeInfo))
   }
 
   def cleanup(now: Long): Unit = {
     (0 until config.groups).foreach { g =>
       val deadPeers = peers(g).values
         .filter(info => (now - info.updatedAt) > config.peersTimeout.toMillis)
-        .map(_.address.peerId)
+        .map(_.info.id)
         .toSet
 
       peers(g) --= deadPeers
-      calls --= calls.collect { case (id, addr) if deadPeers(addr.peerId) => id }
+      calls --= calls.collect { case (id, addr) if deadPeers(addr.id) => id }
     }
   }
 
-  def discovery(socket: ActorRef, addrs: AVector[AVector[PeerAddress]]): Unit = {
-    val discovereds: AVector[PeerAddress] = addrs.flatMapWithIndex { (xs, i) =>
+  def discovery(socket: ActorRef, addrs: AVector[AVector[PeerInfo]]): Unit = {
+    val discovereds: AVector[PeerInfo] = addrs.flatMapWithIndex { (xs, i) =>
       val ps    = peers(i)
       val slots = config.peersPerGroup - ps.size
 
       if (slots > 0) {
         val unknowns = xs.filterNot { addr =>
-          ps.contains(addr.peerId)
+          ps.contains(addr.id)
         }
-        unknowns.sortBy(addr => PeerId.distance(config.peerId, addr.peerId)).takeUpto(slots)
-      } else AVector.empty[PeerAddress]
+        unknowns.sortBy(addr => PeerId.distance(config.peerId, addr.id)).takeUpto(slots)
+      } else AVector.empty[PeerInfo]
     }
 
     discovereds.foreach(addr => callPing(socket, addr))
   }
 
-  def discoveryAdd(peerId: PeerId, addr: PeerAddress): Unit = {
+  def discoveryAdd(peerId: PeerId, addr: PeerInfo): Unit = {
     val ps = peers(addr.group.value)
     if (ps.size < config.peersPerGroup) {
       log.debug(s"Discovered new peer $addr")
-      val _ = ps.put(peerId, PeerInfo.fromAddress(addr))
+      val _ = ps.put(peerId, PeerStatus.fromInfo(addr))
     }
   }
 
   def send(socket: ActorRef, remote: InetSocketAddress, msg: DiscoveryMessage): Unit = {
-    val bs = DiscoveryMessage.serializer.serialize(msg)
+    val bs = DiscoveryMessage.serialize(msg)
     socket ! Udp.Send(bs, remote)
   }
 
   def verified(remote: InetSocketAddress, callId: CallId)(f: (PeerId, GroupIndex) => Unit): Unit =
     calls
       .get(callId)
-      .fold(log.warning(s"Received unrequested message from ${remote}")) { address =>
-        if (remote != address.socketAddress) {
+      .fold(log.warning(s"Received unrequested message from ${remote}")) { info =>
+        if (remote != info.socketAddress) {
           log.warning(s"Unauthorized call answer from $remote")
         } else {
           calls.remove(callId)
-          f(address.peerId, address.group)
+          f(info.id, info.group)
         }
       }
 
@@ -130,13 +130,13 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
           .flatMap(xs => AVector.from(xs.values))
           .sortBy(_.createdAt)
           .takeUpto(config.scanMax)
-          .map(_.address)
+          .map(_.info)
 
         val bootstraps = if (actives.length < math.min(bootstrapPeers.length, config.scanMax)) {
           bootstrapPeers
             .filterNot(actives.contains)
             .takeUpto(config.scanMax - actives.length)
-        } else AVector.empty[PeerAddress]
+        } else AVector.empty[PeerInfo]
 
         (actives ++ bootstraps).foreach(addr => callPing(socket, addr))
     }
@@ -148,32 +148,23 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
 
   def handleMessage(socket: ActorRef, remote: InetSocketAddress, msg: DiscoveryMessage): Unit = {
     msg match {
-      case Ping(callId, peerId, group) =>
-        if (GroupIndex.validate(group, config.groups)) {
-          send(socket, remote, Pong(callId, config.peerId, config.group))
+      case Ping(callId, peer) =>
+        send(socket, remote, Pong(callId))
+        discoveryAdd(peer.id, PeerInfo(peer.id, remote))
 
-          discoveryAdd(peerId, PeerAddress(peerId, group, remote))
-        } else {
-          log.warning(s"Unauthorized Ping (group=$group) from $remote")
-        }
-
-      case Pong(callId, remotePeerId, remoteGroupId) =>
+      case Pong(callId) =>
         verified(remote, callId) {
           case (peerId, group) =>
-            if (peerId != remotePeerId || group != remoteGroupId) {
-              log.warning(s"Unauthorized Pong from $remote")
-            } else {
-              handlePong(socket, remote, peerId, group)
-            }
+            handlePong(socket, remote, peerId, group)
         }
 
-      case FindNode(callId, target) =>
+      case FindNode(callId, sourceId, targetId) =>
         val nearests = peers.map { xs =>
           AVector
             .from(xs.values)
-            .sortBy(p => PeerId.distance(target, p.address.peerId))
+            .sortBy(p => PeerId.distance(targetId, p.info.id))
             .takeUpto(config.peersPerGroup)
-            .map(_.address)
+            .map(_.info)
         }
 
         send(socket, remote, Neighbors(callId, nearests))
@@ -189,7 +180,7 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
                  remote: InetSocketAddress,
                  peerId: PeerId,
                  group: GroupIndex): Unit = {
-    val addr = PeerAddress(peerId, group, remote)
+    val addr = PeerInfo(peerId, remote)
 
     val ps = peers(group.value)
 
@@ -197,7 +188,7 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
       .fold {
         discoveryAdd(peerId, addr)
       } { info =>
-        ps.update(addr.peerId, info.copy(updatedAt = System.currentTimeMillis))
+        ps.update(addr.id, info.copy(updatedAt = System.currentTimeMillis))
       }
 
     if (peers.sumBy(_.size) < peersMax) {
@@ -221,17 +212,12 @@ class DiscoveryServer(config: DiscoveryConfig, bootstrapPeers: AVector[PeerAddre
     case cmd: Command =>
       handleCommand(socket, cmd)
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserializer.deserialize(data) match {
+      DiscoveryMessage.deserialize(data) match {
         case Success(message) =>
-          if (DiscoveryMessage.validate(message)(config.peerId, config.groups)) {
-            handleMessage(socket, remote, message)
-          } else {
-            log.info(s"${config.peerId} - Received non-valid UDP message from $remote")
-          }
+          handleMessage(socket, remote, message)
         case Failure(error) =>
           log.info(
             s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
       }
   }
-
 }
