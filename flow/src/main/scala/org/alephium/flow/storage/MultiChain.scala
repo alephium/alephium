@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 
 import scala.reflect.ClassTag
@@ -33,7 +33,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     ChainIndex.fromHash(hash)
   }
 
-  protected def getHashChain(from: Int, to: Int): BlockHashChain
+  protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain
 
   def getHashChain(chainIndex: ChainIndex): BlockHashChain = {
     getHashChain(chainIndex.from, chainIndex.to)
@@ -66,7 +66,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   /* BlockHeader apis */
 
-  protected def getHeaderChain(from: Int, to: Int): BlockHeaderPool
+  protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool
 
   def getHeaderChain(chainIndex: ChainIndex): BlockHeaderPool = {
     getHeaderChain(chainIndex.from, chainIndex.to)
@@ -93,7 +93,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   /* BlockChain apis */
 
-  protected def getBlockChain(from: Int, to: Int): BlockChain
+  protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain
 
   def getBlockChain(chainIndex: ChainIndex): BlockChain = {
     getBlockChain(chainIndex.from, chainIndex.to)
@@ -124,7 +124,11 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     val infos = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"($i, $j): ${getHashChain(i, j).maxHeight}/${getHashChain(i, j).numHashes - 1}"
+    } yield {
+      val gi = GroupIndex(i)
+      val gj = GroupIndex(j)
+      s"($i, $j): ${getHashChain(gi, gj).maxHeight}/${getHashChain(gi, gj).numHashes - 1}"
+    }
     infos.mkString("; ")
   }
 
@@ -132,13 +136,17 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     val blocks = for {
       i    <- 0 until groups
       j    <- 0 until groups
-      hash <- getHashChain(i, j).getAllBlockHashes
+      hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
     } yield toJson(i, j, hash)
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
     val heights = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"""{"chainFrom":$i,"chainTo":$j,"height":${getHashChain(i, j).maxHeight}}"""
+    } yield {
+      val gi = GroupIndex(i)
+      val gj = GroupIndex(j)
+      s"""{"chainFrom":$i,"chainTo":$j,"height":${getHashChain(gi, gj).maxHeight}}"""
+    }
     val heightsJson = heights.mkString("[", ",", "]")
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
