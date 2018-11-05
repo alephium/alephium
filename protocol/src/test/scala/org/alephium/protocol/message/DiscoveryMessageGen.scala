@@ -15,12 +15,13 @@ object DiscoveryMessageGen {
   val findNode: Gen[FindNode] = for {
     cid    <- callId
     source <- ModelGen.peerId
-  } yield FindNode(cid, source)
+    target <- ModelGen.peerId
+  } yield FindNode(cid, source, target)
 
   val ping: Gen[Ping] =
     for {
       cid    <- callId
-      source <- ModelGen.peerId
+      source <- ModelGen.peerInfo
     } yield Ping(cid, source)
 
   val pong: Gen[Pong] =
@@ -34,7 +35,7 @@ object DiscoveryMessageGen {
       _groups <- Gen.choose(2, 8)
       config = new GroupConfig { override def groups: Int = _groups }
       source <- Gen.sequence(
-        (0 until _groups).map(i => Gen.listOf(ModelGen.peerAddress(GroupIndex(i)(config))(config))))
+        (0 until _groups).map(i => Gen.listOf(ModelGen.peerInfo(GroupIndex(i)(config))(config))))
     } yield Neighbors(_callId, AVector.from(source.asScala.map(AVector.from)))
 
   val message: Gen[DiscoveryMessage] =

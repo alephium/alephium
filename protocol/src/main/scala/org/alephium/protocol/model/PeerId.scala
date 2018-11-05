@@ -45,9 +45,9 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
 
   private val countLookUp = Array(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4)
 
-  private def hammingDist(byte0: Byte, byte1: Byte): Int = {
+  def hammingDist(byte0: Byte, byte1: Byte): Int = {
     val xor = byte0 ^ byte1
-    countLookUp(xor & 0x0F) + countLookUp(xor >> 4)
+    countLookUp(xor & 0x0F) + countLookUp((xor >> 4) & 0x0F)
   }
 
   def generateFor(mainGroup: GroupIndex)(implicit config: GroupConfig): PeerId = {

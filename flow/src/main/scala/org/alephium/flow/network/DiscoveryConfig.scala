@@ -17,7 +17,6 @@ case class DiscoveryConfig(
     scanMax: Int,
     /* Wait time between two scan. */
     scanFrequency: FiniteDuration,
-    bucketLength: Int,
     /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
     neighborsPerGroup: Int
 ) extends DC {
