@@ -6,15 +6,21 @@ import akka.actor.Props
 import akka.io.{IO, Udp}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{PeerId, PeerInfo}
+import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 import org.alephium.util.{AVector, BaseActor}
 
-import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 
 object AnotherDiscoveryServer {
-  def props(bootstrap: AVector[PeerInfo])(implicit config: DiscoveryConfig): Props =
+  def props(bootstrap: AVector[AVector[PeerInfo]])(implicit config: DiscoveryConfig): Props =
     Props(new AnotherDiscoveryServer(bootstrap))
+
+  def props(peers: PeerInfo*)(implicit config: DiscoveryConfig): Props = {
+    val bootstrap = AVector.tabulate(config.groups) { i =>
+      AVector.from(peers.view.filter(_.id.groupIndex == GroupIndex(i)))
+    }
+    props(bootstrap)
+  }
 
   case class PeerStatus(info: PeerInfo, updateAt: Long)
   object PeerStatus {
@@ -24,11 +30,7 @@ object AnotherDiscoveryServer {
     }
   }
 
-  trait PendingStatus {
-    def pingAt: Long
-  }
-  case class AwaitPong(pingAt: Long)                       extends PendingStatus
-  case class FindNodeReceived(msg: FindNode, pingAt: Long) extends PendingStatus // awaiting pong
+  case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
 
   sealed trait Command
 
@@ -48,15 +50,16 @@ object AnotherDiscoveryServer {
  *  -> send ping to another peer to detect the liveness
  *  -> pong back when received valid ping
  *  -> ping back to verify peer address when received ping for the first time from another peer
- *  -> send find_node to newly discovered peer (i.e. received a valid pong from that peer)
- *  -> send neighbors back when received find_node from valid peer
+ *  -> send find_node to discover peers
+ *  -> send neighbors back when received find_node
  *  -> ping all the new neighbors received from peers
- *  -> fetch neighbors periodically from peers
+ *  -> send find_node periodically to peers to update knowledge of neighbors
  *
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class AnotherDiscoveryServer(bootstrap: AVector[PeerInfo])(implicit val config: DiscoveryConfig)
+class AnotherDiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
+    implicit val config: DiscoveryConfig)
     extends BaseActor
     with DiscoveryServerState {
   import AnotherDiscoveryServer._
@@ -71,8 +74,8 @@ class AnotherDiscoveryServer(bootstrap: AVector[PeerInfo])(implicit val config: 
     case Udp.Bound(_) =>
       log.debug(s"UDP server bound successfully")
       setSocket(sender())
-      bootstrap.foreach(peer => tryPing(peer))
-      system.scheduler.schedule(Duration.Zero, config.scanFrequency, self, Scan)
+      bootstrap.foreach(_.foreach(tryPing))
+      system.scheduler.schedule(config.scanFrequency, config.scanFrequency, self, Scan)
       context.become(ready)
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
@@ -100,6 +103,7 @@ class AnotherDiscoveryServer(bootstrap: AVector[PeerInfo])(implicit val config: 
 
   def _handleInternal(command: InternalCommand): Unit = command match {
     case Scan =>
+      log.debug("Scan the available peers")
       cleanup()
       scan()
   }
@@ -107,14 +111,9 @@ class AnotherDiscoveryServer(bootstrap: AVector[PeerInfo])(implicit val config: 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(data) match {
-        case Success(message: DiscoveryMessage.Request) =>
-          updateStatus(message.sourceId)
-          handleRequest(message)
-        case Success(message: DiscoveryMessage.Response) =>
-          verify(message.callId, remote) { peer =>
-            updateStatus(peer.id)
-            handleResponse(message, peer)
-          }
+        case Success(message: DiscoveryMessage) =>
+          val sourceId = PeerId.fromPublicKey(message.header.publicKey)
+          handlePayload(sourceId, remote)(message.payload)
         case Failure(error) =>
           // TODO: handler error properly
           log.info(
@@ -122,32 +121,21 @@ class AnotherDiscoveryServer(bootstrap: AVector[PeerInfo])(implicit val config: 
       }
   }
 
-  def handleRequest(message: DiscoveryMessage.Request): Unit =
-    message match {
-      case Ping(callId, source) =>
-        log.debug(s"Ping received from $source")
-        send(source.socketAddress, Pong(callId))
-        tryPing(source)
-
-      case msg @ FindNode(callId, sourceId, targetId) =>
-        log.debug(s"FindNode received from $sourceId")
-        getPeer(sourceId) match {
-          case Some(source) =>
-            val neighbors = getNeighbors(targetId)
-            send(source.socketAddress, Neighbors(callId, neighbors))
-          case None =>
-            pendingFindNode(msg)
+  def handlePayload(sourceId: PeerId, remote: InetSocketAddress)(payload: Payload): Unit =
+    payload match {
+      case Ping(sourceAddress) =>
+        send(sourceAddress, Pong())
+        tryPing(PeerInfo(sourceId, sourceAddress))
+      case Pong() =>
+        handlePong(sourceId)
+      case FindNode(targetId) =>
+        val sourceAddress = getPeer(sourceId) match {
+          case Some(source) => source.socketAddress
+          case None         => remote
         }
-    }
-
-  def handleResponse(message: DiscoveryMessage.Response, source: PeerInfo): Unit =
-    message match {
-      case Pong(_) =>
-        log.debug(s"Pong received from $source")
-        handlePong(source)
-
-      case Neighbors(_, peers) =>
-        log.debug(s"Receive neighbors from $source")
-        peers.foreach(_.foreach(peer => tryPing(peer)))
+        val neighbors = getNeighbors(targetId)
+        send(sourceAddress, Neighbors(neighbors))
+      case Neighbors(peers) =>
+        peers.foreach(_.foreach(tryPing))
     }
 }

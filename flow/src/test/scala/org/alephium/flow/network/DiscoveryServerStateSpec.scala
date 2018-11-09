@@ -3,10 +3,9 @@ package org.alephium.flow.network
 import akka.event.LoggingAdapter
 import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.flow.network.AnotherDiscoveryServer.FindNodeReceived
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{ModelGen, PeerInfo}
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -31,24 +30,26 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       implicit def config: DiscoveryConfig = self.config
       def log: LoggingAdapter              = system.log
 
+      def bootstrap: AVector[AVector[PeerInfo]] = AVector.empty
+
       setSocket(socketProbe.ref)
     }
     val peer = ModelGen.peerInfo.sample.get
 
-    def expectPayload[T <: DiscoveryMessage: ClassTag]: Assertion = {
+    def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
         createConfig(groupSize, 0, udpPort, peersPerGroup, scanFrequency)
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
           val message = DiscoveryMessage.deserialize(send.payload)(peerConfig).get
-          message is a[T]
+          message.payload is a[T]
       }
     }
 
     def addToTable(peer: PeerInfo): Assertion = {
       state.tryPing(peer)
       state.isPending(peer.id) is true
-      state.handlePong(peer)
+      state.handlePong(peer.id)
       state.isInTable(peer.id) is true
     }
   }
@@ -71,19 +72,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   }
 
   it should "remove peer from pending list when received pong back" in new PingedFixture {
-    state.handlePong(peer)
+    state.handlePong(peer.id)
     expectPayload[FindNode]
-    state.isUnknown(peer.id) is false
-    state.isPending(peer.id) is false
-    state.isInTable(peer.id) is true
-  }
-
-  it should "pending find_node when received find_node before pong" in new PingedFixture {
-    state.pendingFindNode(FindNode(CallId.generate, peer.id, peer.id))
-    state.isPending(peer.id) is true
-    state.getPending(peer.id).get is a[FindNodeReceived]
-    state.handlePong(peer)
-    expectPayload[Neighbors]
     state.isUnknown(peer.id) is false
     state.isPending(peer.id) is false
     state.isInTable(peer.id) is true
@@ -101,24 +91,14 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     state.isPending(peer0.id) is false
   }
 
-  it should "sort peers in table" in new Fixture {
-    override def peersPerGroup: Int = 4
-
-    val groupIndex = peer.group
-    val toAdds     = Gen.listOfN(peersPerGroup, ModelGen.peerInfo(groupIndex)).sample.get
-    toAdds.foreach(addToTable)
-    val peers  = state.getActivePeers
-    val bucket = peers(groupIndex.value).map(p => config.peerId.hammingDist(p.id)).toIterable.toList
-    bucket is bucket.sorted
-  }
-
   it should "sort neighbors with respect to target" in new Fixture {
     override def peersPerGroup: Int = 4
 
     val groupIndex = peer.group
-    val toAdds     = Gen.listOfN(peersPerGroup, ModelGen.peerInfo(groupIndex)).sample.get
+    val toAdds     = Gen.listOfN(peersPerGroup - 1, ModelGen.peerInfo(groupIndex)).sample.get
     toAdds.foreach(addToTable)
-    val peers  = state.getNeighbors(peer.id)
+    val peers = state.getNeighbors(peer.id)
+    peers.sumBy(_.length) is peersPerGroup
     val bucket = peers(groupIndex.value).map(p => peer.id.hammingDist(p.id)).toIterable.toList
     bucket is bucket.sorted
   }
