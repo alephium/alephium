@@ -17,7 +17,7 @@ case class DiscoveryConfig(
     /* Maximum number of peers to track. */
     peersPerGroup: Int,
     /* Maximum number of peers used for probing during a scan. */
-    scanMax: Int,
+    scanMaxPerGroup: Int,
     /* Wait time between two scan. */
     scanFrequency: FiniteDuration,
     /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
@@ -29,5 +29,5 @@ case class DiscoveryConfig(
 
   def udpAddress: InetSocketAddress = nodeInfo.socketAddress
 
-  val nodeInfo: PeerInfo = PeerInfo(peerId, new InetSocketAddress(publicAddress, udpPort))
+  val nodeInfo: PeerInfo = PeerInfo(nodeId, new InetSocketAddress(publicAddress, udpPort))
 }

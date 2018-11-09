@@ -58,6 +58,22 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
     }
   }
 
+  def xfmap[S](to: T => Try[S], from: S => T): Serde[S] = new Serde[S] {
+    override def serialize(input: S): ByteString = {
+      self.serialize(from(input))
+    }
+
+    override def _deserialize(input: ByteString): Try[(S, ByteString)] = {
+      self._deserialize(input).flatMap {
+        case (t, rest) => to(t).map((_, rest))
+      }
+    }
+
+    override def deserialize(input: ByteString): Try[S] = {
+      self.deserialize(input).flatMap(to)
+    }
+  }
+
   def validate(predicate: T => Boolean, error: T => String): Serde[T] = new Serde[T] {
     override def serialize(input: T): ByteString = self.serialize(input)
 

@@ -90,7 +90,7 @@ class DiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
         case Failure(error) =>
           // TODO: handler error properly
           log.info(
-            s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
+            s"${config.nodeId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
       }
   }
 
