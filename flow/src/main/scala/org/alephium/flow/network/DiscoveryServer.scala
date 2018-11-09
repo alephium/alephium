@@ -11,9 +11,9 @@ import org.alephium.util.{AVector, BaseActor}
 
 import scala.util.{Failure, Success}
 
-object AnotherDiscoveryServer {
+object DiscoveryServer {
   def props(bootstrap: AVector[AVector[PeerInfo]])(implicit config: DiscoveryConfig): Props =
-    Props(new AnotherDiscoveryServer(bootstrap))
+    Props(new DiscoveryServer(bootstrap))
 
   def props(peers: PeerInfo*)(implicit config: DiscoveryConfig): Props = {
     val bootstrap = AVector.tabulate(config.groups) { i =>
@@ -54,11 +54,11 @@ object AnotherDiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class AnotherDiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
+class DiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
     implicit val config: DiscoveryConfig)
     extends BaseActor
     with DiscoveryServerState {
-  import AnotherDiscoveryServer._
+  import DiscoveryServer._
   import context.system
   import context.dispatcher
 
