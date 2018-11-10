@@ -20,11 +20,9 @@ trait Platform extends App with StrictLogging {
   def mode: Mode
 
   def init(): Future[Http.ServerBinding] = {
-    val node  = mode.createNode
-    val index = mode.index
+    val node = mode.createNode
 
-    connect(node, index)
-    runServer(node, index)
+    runServer(node)
   }
 
   def connect(node: Node, index: Int): Unit = {
@@ -35,16 +33,16 @@ trait Platform extends App with StrictLogging {
     }
   }
 
-  def runServer(node: Node, index: Int): Future[Http.ServerBinding] = {
+  def runServer(node: Node): Future[Http.ServerBinding] = {
     implicit val system           = node.system
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
     implicit val config           = mode.config
 
     val groups = mode.config.groups
-    val from   = index % groups
+    val from   = mode.config.mainGroup.value
 
-    logger.info(s"index: $from")
+    logger.info(s"index: ${mode.index}, group: $from")
 
     val route = path("mining") {
       put {

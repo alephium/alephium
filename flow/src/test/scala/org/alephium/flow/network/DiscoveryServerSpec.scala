@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture, DiscoveryConfig => DC}
-import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
+import org.alephium.protocol.model.{GroupIndex, PeerId}
 import org.alephium.util.AlephiumActorSpec
 import org.scalacheck.Gen
 
@@ -47,8 +47,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val server0   = system.actorOf(DiscoveryServer.props()(config0), "server0")
     val port1     = SocketUtil.temporaryLocalPort(udp = true)
     val config1   = createConfig(groupSize, 1, port1, 1)
-    val bootstrap = PeerInfo(config0.nodeId, createAddr(port0))
-    val server1   = system.actorOf(DiscoveryServer.props(bootstrap)(config1), "server1")
+    val server1   = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
 
     Thread.sleep(1000)
 
@@ -96,10 +95,9 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val peerIds = configs.map(_.nodeId)
     val ports   = configs.map(_.udpPort)
 
-    val bootstrap = PeerInfo(peerIds(0), createAddr(ports(0)))
     val actors = enumerate.map { i =>
       val config = configs(i)
-      system.actorOf(DiscoveryServer.props(bootstrap)(config), ports(i).toString)
+      system.actorOf(DiscoveryServer.props(createAddr(ports(0)))(config), ports(i).toString)
     }
 
     Thread.sleep(1000)
