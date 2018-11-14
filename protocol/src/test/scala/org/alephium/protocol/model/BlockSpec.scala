@@ -1,10 +1,11 @@
 package org.alephium.protocol.model
 
+import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
 import org.scalatest.TryValues._
 
-class BlockSpec extends AlephiumSpec with ConfigFixture {
+class BlockSpec extends AlephiumSpec with ConsensusConfigFixture {
 
   behavior of "Block"
 

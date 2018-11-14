@@ -17,7 +17,7 @@ if args.goal == 'build':
     run('sbt clean app/stage')
 
 elif args.goal == 'test':
-    run('sbt clean scalafmtSbt coverage test coverageReport scaladoc')
+    run('sbt clean scalafmtSbt coverage test coverageReport doc')
 
 elif args.goal == 'package':
     run('sbt app/universal:packageBin')

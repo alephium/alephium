@@ -1,113 +1,163 @@
 package org.alephium.protocol.message
 
+import java.net.InetSocketAddress
+
 import akka.util.ByteString
-import org.alephium.serde.{Deserializer, RandomBytes, Serde, Serializer}
-import org.alephium.protocol.model.{peerIdLength, GroupIndex, PeerAddress, PeerId}
+import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
+import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.serde.{Deserializer, Serde, ValidationException, WrongFormatException}
+import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 import org.alephium.util.AVector
 
-/**
-  *  Discovery RPC Protocol (Kademila based)
-  *  https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf
-  *
-  *  FindNode  -> Neighbors
-  *  Ping      -> Pong
- **/
-sealed trait DiscoveryMessage {
-  def callId: DiscoveryMessage.CallId
-}
+import scala.language.existentials
+import scala.util.{Failure, Success, Try}
+
+case class DiscoveryMessage(header: DiscoveryMessage.Header, payload: DiscoveryMessage.Payload)
 
 object DiscoveryMessage {
-  val version: Byte = 0
+  val version: Int = 0
 
-  /** The 160bits (20bytes) identifier of a Remote Procedure Call **/
-  class CallId private[CallId] (val bytes: ByteString) extends RandomBytes
-  object CallId extends RandomBytes.Companion[CallId](new CallId(_), _.bytes) {
-    override def length: Int = peerIdLength
+  def from(payload: Payload)(implicit config: DiscoveryConfig): DiscoveryMessage = {
+    val header = Header(version, config.discoveryPublicKey)
+    DiscoveryMessage(header, payload)
   }
 
-  // Commands
-  case class FindNode(callId: CallId, target: PeerId) extends DiscoveryMessage
-  object FindNode extends Code {
-    val serde: Serde[FindNode] =
-      Serde.forProduct2(FindNode.apply, p => (p.callId, p.target))
-  }
+  case class Header(version: Int, publicKey: ED25519PublicKey)
+  object Header {
+    private val serde = Serde.tuple2[Int, ED25519PublicKey]
 
-  /** Ping using the `PeerId` of the sender **/
-  case class Ping(callId: CallId, sourceId: PeerId, sourceGroup: GroupIndex)
-      extends DiscoveryMessage
-  object Ping extends Code {
-    val serde: Serde[Ping] =
-      Serde.forProduct3(Ping.apply, p => (p.callId, p.sourceId, p.sourceGroup))
-  }
+    def serialize(header: Header): ByteString = serde.serialize((header.version, header.publicKey))
 
-  // Events
-  case class Neighbors(callId: CallId, peers: AVector[AVector[PeerAddress]])
-      extends DiscoveryMessage
-  object Neighbors extends Code {
-    val serde: Serde[Neighbors] =
-      Serde.forProduct2(Neighbors.apply, p => (p.callId, p.peers))
-  }
-
-  /** Pong using the `targetId` and `targetGroup` of the sender of `Pong` **/
-  case class Pong(callId: CallId, targetId: PeerId, targetGroup: GroupIndex)
-      extends DiscoveryMessage
-  object Pong extends Code {
-    val serde: Serde[Pong] =
-      Serde.forProduct3(Pong.apply, p => (p.callId, p.targetId, p.targetGroup))
-  }
-
-  sealed trait Code
-  object Code {
-    val values: AVector[Code] = AVector(Ping, Pong, FindNode, Neighbors)
-
-    val toByte: Map[Code, Byte]   = values.toIterable.zipWithIndex.toMap.mapValues(_.toByte)
-    val fromByte: Map[Byte, Code] = toByte.map(_.swap)
-  }
-
-  val deserializerCode: Deserializer[Code] =
-    Serde[Byte].validateGet(Code.fromByte.get, c => s"Invalid message code '$c'")
-
-  val deserializerVersion: Deserializer[Byte] =
-    Serde[Byte]
-      .validate(_ == version, v => s"Incompatible protocol version $v (expecting $version)")
-
-  def validate(msg: DiscoveryMessage)(peerId: PeerId, groups: Int): Boolean =
-    msg match {
-      case _: CallId          => true
-      case _: FindNode        => true
-      case Ping(_, id, group) => id != peerId && GroupIndex.validate(group, groups)
-      case Pong(_, id, group) => id != peerId && GroupIndex.validate(group, groups)
-      case Neighbors(_, peers) =>
-        peers.length == groups &&
-          (0 until groups)
-            .map { i =>
-              peers(i).forall(info => info.peerId != peerId && info.group.value == i)
+    def _deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Try[(Header, ByteString)] = {
+      serde._deserialize(input).flatMap {
+        case ((_version, publicKey), rest) =>
+          if (_version == version) {
+            if (publicKey != config.discoveryPublicKey) {
+              Success((Header(_version, publicKey), rest))
+            } else {
+              Failure(ValidationException(s"Peer's public key is the same as ours"))
             }
-            .reduce(_ && _)
-    }
-
-  implicit val deserializer: Deserializer[DiscoveryMessage] = (input0: ByteString) =>
-    for {
-      (_, input1) <- deserializerVersion._deserialize(input0)
-      (c, input2) <- deserializerCode._deserialize(input1)
-      serde = c match {
-        case Ping      => Ping.serde
-        case Pong      => Pong.serde
-        case FindNode  => FindNode.serde
-        case Neighbors => Neighbors.serde
+          } else {
+            Failure(ValidationException(s"Invalid version: got ${_version}, expect: $version"))
+          }
       }
-      res <- serde._deserialize(input2)
-    } yield res
-
-  implicit val serializer: Serializer[DiscoveryMessage] = { message =>
-    val (code, data) = message match {
-      case x: Ping      => (Ping, Ping.serde.serialize(x))
-      case x: Pong      => (Pong, Pong.serde.serialize(x))
-      case x: FindNode  => (FindNode, FindNode.serde.serialize(x))
-      case x: Neighbors => (Neighbors, Neighbors.serde.serialize(x))
     }
-
-    Serde[Byte].serialize(version) ++ Serde[Byte].serialize(Code.toByte(code)) ++ data
   }
 
+  trait Payload
+  object Payload {
+    def serialize(payload: Payload): ByteString = {
+      val (code: Code[_], data) = payload match {
+        case x: Ping      => (Ping, Ping.serialize(x))
+        case x: Pong      => (Pong, Pong.serialize(x))
+        case x: FindNode  => (FindNode, FindNode.serialize(x))
+        case x: Neighbors => (Neighbors, Neighbors.serialize(x))
+      }
+      Serde[Int].serialize(Code.toInt(code)) ++ data
+    }
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Payload] = {
+      for {
+        (cmd, rest) <- deserializerCode._deserialize(input)
+        result <- cmd match {
+          case Ping      => Ping.deserialize(rest)
+          case Pong      => Pong.deserialize(rest)
+          case FindNode  => FindNode.deserialize(rest)
+          case Neighbors => Neighbors.deserialize(rest)
+        }
+      } yield result
+    }
+  }
+
+  sealed trait Request  extends Payload
+  sealed trait Response extends Payload
+
+  case class Ping(sourceAddress: InetSocketAddress) extends Request
+  object Ping extends Code[Ping] {
+    private val serde = Serde.tuple1[InetSocketAddress]
+
+    def serialize(ping: Ping): ByteString =
+      serde.serialize(ping.sourceAddress)
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Ping] = {
+      serde.deserialize(input).map(Ping(_))
+    }
+  }
+
+  case class FindNode(targetId: PeerId) extends Request
+  object FindNode extends Code[FindNode] {
+    private val serde = Serde.tuple1[PeerId]
+
+    def serialize(data: FindNode): ByteString =
+      serde.serialize(data.targetId)
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[FindNode] =
+      serde.deserialize(input).map(FindNode(_))
+  }
+
+  case class Pong() extends Response
+  object Pong extends Code[Pong] {
+    def serialize(pong: Pong): ByteString = ByteString.empty
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
+      if (input.isEmpty) Success(Pong())
+      else Failure(WrongFormatException.redundant(0, input.length))
+    }
+  }
+
+  case class Neighbors(peers: AVector[AVector[PeerInfo]]) extends Response
+  object Neighbors extends Code[Neighbors] {
+    private val serde = Serde.tuple1[AVector[AVector[PeerInfo]]]
+
+    def serialize(data: Neighbors): ByteString = serde.serialize(data.peers)
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Neighbors] = {
+      serde.deserialize(input).flatMap { peers =>
+        if (peers.length == config.groups) {
+          val ok = peers.forallWithIndex { (peers, idx) =>
+            peers.forall(info =>
+              info.id != config.peerId && info.id.groupIndex == GroupIndex.unsafe(idx))
+          }
+          if (ok) Success(Neighbors(peers))
+          else Failure(ValidationException(s"PeerInfos are invalid"))
+        } else {
+          Failure(
+            ValidationException(s"Got ${peers.length} groups, expect ${config.groups} groups"))
+        }
+      }
+    }
+  }
+
+  sealed trait Code[T] {
+    def serialize(t: T): ByteString
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[T]
+  }
+  object Code {
+    val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
+
+    val toInt: Map[Code[_], Int]   = values.toIterable.zipWithIndex.toMap
+    val fromInt: Map[Int, Code[_]] = toInt.map(_.swap)
+  }
+
+  val deserializerCode: Deserializer[Code[_]] =
+    Serde[Int].validateGet(Code.fromInt.get, c => s"Invalid message code '$c'")
+
+  def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
+    val headerBytes  = Header.serialize(message.header)
+    val payloadBytes = Payload.serialize(message.payload)
+    val signature    = ED25519.sign(payloadBytes, config.discoveryPrivateKey)
+    headerBytes ++ signature.bytes ++ payloadBytes
+  }
+
+  def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[DiscoveryMessage] = {
+    for {
+      (header, rest1)    <- Header._deserialize(input)
+      (signature, rest2) <- Serde[ED25519Signature]._deserialize(rest1)
+      payload <- Payload.deserialize(rest2).flatMap { payload =>
+        if (ED25519.verify(rest2, signature, header.publicKey)) Success(payload)
+        else Failure(ValidationException(s"Invalid signature"))
+      }
+    } yield DiscoveryMessage(header, payload)
+  }
 }

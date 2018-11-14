@@ -121,6 +121,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     true
   }
 
+  def forallWithIndex(f: (A, Int) => Boolean): Boolean = {
+    foreachWithIndex { (a, i) =>
+      if (!f(a, i)) { return false }
+    }
+    true
+  }
+
   def slice(from: Int, until: Int): AVector[A] = {
     assert(from >= 0 && from <= until && until <= length)
 
@@ -430,7 +437,7 @@ object AVector {
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
   }
 
-  @inline def fill[@sp A: ClassTag](n: Int)(elem: A): AVector[A] = {
+  @inline def fill[@sp A: ClassTag](n: Int)(elem: => A): AVector[A] = {
     assert(n >= 0)
     tabulate(n)(_ => elem)
   }
