@@ -15,7 +15,7 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
   }
 
   def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
-    accept(block.blockHeader) && (block.blockHeader.txsHash == Keccak256.hash(block.transactions))
+    accept(block.header) && (block.header.txsHash == Keccak256.hash(block.transactions))
   }
 
   def relateTo(groupIndex: GroupIndex): Boolean = {
