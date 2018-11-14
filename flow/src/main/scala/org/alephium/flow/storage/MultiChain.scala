@@ -24,13 +24,13 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   /* BlockHash apis */
 
   def contains(hash: Keccak256): Boolean = {
-    val index = ChainIndex.fromHash(hash)
+    val index = ChainIndex.from(hash)
     val chain = getHashChain(index)
     chain.contains(hash)
   }
 
   def getIndex(hash: Keccak256): ChainIndex = {
-    ChainIndex.fromHash(hash)
+    ChainIndex.from(hash)
   }
 
   protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain
@@ -40,7 +40,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   }
 
   def getHashChain(hash: Keccak256): BlockHashChain = {
-    val index = ChainIndex.fromHash(hash)
+    val index = ChainIndex.from(hash)
     getHashChain(index.from, index.to)
   }
 
@@ -77,7 +77,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   }
 
   def getHeaderChain(hash: Keccak256): BlockHeaderPool = {
-    getHeaderChain(ChainIndex.fromHash(hash))
+    getHeaderChain(ChainIndex.from(hash))
   }
 
   def getBlockHeader(hash: Keccak256): BlockHeader =
@@ -102,7 +102,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getBlockChain(block: Block): BlockChain = getBlockChain(block.chainIndex)
 
   def getBlockChain(hash: Keccak256): BlockChain = {
-    getBlockChain(ChainIndex.fromHash(hash))
+    getBlockChain(ChainIndex.from(hash))
   }
 
   def getBlock(hash: Keccak256): Block = {
