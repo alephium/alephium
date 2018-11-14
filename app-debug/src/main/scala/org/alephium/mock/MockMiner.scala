@@ -1,6 +1,6 @@
 package org.alephium.mock
 
-import akka.actor.{Props, Timers}
+import akka.actor.Props
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
@@ -16,7 +16,6 @@ import scala.util.Random
 
 object MockMiner {
 
-  object Timer
   case class MockMining(timestamp: Long)
 
   trait Builder extends Miner.Builder {
@@ -28,8 +27,7 @@ object MockMiner {
 
 class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformConfig)
-    extends Miner(address, node, chainIndex)
-    with Timers {
+    extends Miner(address, node, chainIndex) {
   import node.allHandlers
 
   override def _mine(template: BlockTemplate, lastTs: Long): Receive = {
@@ -44,7 +42,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           lastTs + num * delta
         }
       val sleepTs = nextTs - currentTs
-      timers.startSingleTimer(MockMiner.Timer, MockMiner.MockMining(nextTs), sleepTs.millis)
+      scheduleOnce(self, MockMiner.MockMining(nextTs), sleepTs.millis)
 
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs, Long.MaxValue).get

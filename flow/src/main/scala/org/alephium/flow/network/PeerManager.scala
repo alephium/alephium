@@ -48,8 +48,6 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
     extends BaseActor
     with PeerManagerState {
   import PeerManager._
-  import context.system
-  import context.dispatcher
 
   // Initialized once; use var for performance reason
   var server: ActorRef           = _
@@ -83,10 +81,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
           ps.foreach(peer => self ! Connect(peer.socketAddress, until))
         }
       } else {
-        system.scheduler.scheduleOnce(1.second, discoveryServer, DiscoveryServer.GetPeers)(
-          dispatcher,
-          self)
-        ()
+        scheduleOnce(discoveryServer, DiscoveryServer.GetPeers, 1.second)
       }
   }
 

@@ -87,11 +87,11 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
   override val retargetInterval
     : Int = underlying.getInt("retargetInterval") // number of blocks for retarget
 
-  val port: Int               = underlying.getInt("port")
-  val pingFrequency: Duration = underlying.getDuration("pingFrequency")
-  val groups: Int             = underlying.getInt("groups")
-  val nonceStep: BigInt       = underlying.getInt("nonceStep")
-  val retryTimeout: Duration  = underlying.getDuration("retryTimeout")
+  val port: Int                     = underlying.getInt("port")
+  val pingFrequency: FiniteDuration = getDuration("pingFrequency")
+  val groups: Int                   = underlying.getInt("groups")
+  val nonceStep: BigInt             = underlying.getInt("nonceStep")
+  val retryTimeout: FiniteDuration  = getDuration("retryTimeout")
 
   val mainGroup: GroupIndex = {
     val myGroup = underlying.getInt("mainGroup")
@@ -141,5 +141,10 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
                     scanMaxPerGroup,
                     scanFrequency,
                     neighborsPerGroup)
+  }
+
+  def getDuration(path: String): FiniteDuration = {
+    val duration = underlying.getDuration(path)
+    FiniteDuration(duration.toNanos, NANOSECONDS)
   }
 }
