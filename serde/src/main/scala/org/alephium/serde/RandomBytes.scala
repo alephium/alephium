@@ -38,7 +38,7 @@ trait RandomBytes {
     s"""$name(hex"$hex")"""
   }
 
-  def shortHex: String = Hex.toHexString(bytes).take(8)
+  def shortHex: String = Hex.toHexString(bytes).takeRight(8)
 }
 
 object RandomBytes {
