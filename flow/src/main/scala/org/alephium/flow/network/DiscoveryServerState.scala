@@ -20,8 +20,6 @@ trait DiscoveryServerState {
 
   import DiscoveryServer._
 
-  implicit val orderingPeerId: Ordering[PeerId] = PeerId.hammingOrder(config.peerId)
-
   private var socket: ActorRef = _
   private val table            = AVector.fill(config.groups)(mutable.HashMap.empty[PeerId, PeerStatus])
   private val pendings         = mutable.HashMap.empty[PeerId, AwaitPong]
@@ -104,7 +102,7 @@ trait DiscoveryServerState {
     pendings --= deadPendings
   }
 
-  def appendPeer(peer: PeerInfo, bucket: mutable.HashMap[PeerId, PeerStatus]): Unit = {
+  private def appendPeer(peer: PeerInfo, bucket: mutable.HashMap[PeerId, PeerStatus]): Unit = {
     log.debug(s"Add a new peer $peer")
     bucket += peer.id -> PeerStatus.fromInfo(peer)
     fetchNeighbors(peer)

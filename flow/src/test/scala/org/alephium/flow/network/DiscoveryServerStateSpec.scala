@@ -91,15 +91,24 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     state.isPending(peer0.id) is false
   }
 
+  // TODO: use scalacheck
   it should "sort neighbors with respect to target" in new Fixture {
     override def peersPerGroup: Int = 4
 
-    val groupIndex = peer.group
+    state.getActivePeers.sumBy(_.length) is 0
+    val groupIndex = config.nodeInfo.group
     val toAdds     = Gen.listOfN(peersPerGroup - 1, ModelGen.peerInfo(groupIndex)).sample.get
     toAdds.foreach(addToTable)
-    val peers = state.getNeighbors(peer.id)
-    peers.sumBy(_.length) is peersPerGroup
-    val bucket = peers(groupIndex.value).map(p => peer.id.hammingDist(p.id)).toIterable.toList
-    bucket is bucket.sorted
+
+    val peers0 = state.getNeighbors(peer.id)
+    peers0.sumBy(_.length) is peersPerGroup
+    val bucket0 = peers0(groupIndex.value).map(p => peer.id.hammingDist(p.id)).toIterable.toList
+    bucket0 is bucket0.sorted
+
+    val peers1 = state.getNeighbors(config.peerId)
+    peers1.sumBy(_.length) is peersPerGroup - 1
+    val bucket1 =
+      peers1(groupIndex.value).map(p => config.peerId.hammingDist(p.id)).toIterable.toList
+    bucket1 is bucket1.sorted
   }
 }
