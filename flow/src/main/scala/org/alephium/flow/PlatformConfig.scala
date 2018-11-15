@@ -2,13 +2,17 @@ package org.alephium.flow
 
 import java.time.Duration
 import java.io.File
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.{Path, Paths}
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.flow.network.DiscoveryConfig
+import org.alephium.protocol.config.{ConsensusConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
-import org.alephium.util.{AVector, Files}
+import org.alephium.util.{AVector, Files, Network}
+
+import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
   val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
@@ -94,15 +98,22 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
     assert(myGroup >= 0 && myGroup < groups)
     GroupIndex(myGroup)(this)
   }
-  val peerId = PeerId.generateFor(mainGroup)(this)
 
-  def loadBlockFlow(groups: Int): AVector[AVector[Block]] = {
+  lazy val discoveryConfig: DiscoveryConfig = loadDiscoveryConfig()
+  lazy val bootstrap: AVector[InetSocketAddress] =
+    Network.parseAddresses(underlying.getString("bootstrap"))
+
+  def nodeId: PeerId = discoveryConfig.nodeId
+
+  lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow()
+
+  def loadBlockFlow(): AVector[AVector[Block]] = {
     val nonces = underlying.getStringList("nonces")
-    assert(nonces.size == self.groups * self.groups)
+    assert(nonces.size == groups * groups)
 
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        val index      = from * self.groups + to
+        val index      = from * groups + to
         val nonce      = nonces.get(index)
         val block      = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
         val chainIndex = ChainIndex(from, to)(this)
@@ -111,5 +122,24 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
     }
   }
 
-  lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow(groups)
+  def loadDiscoveryConfig(): DiscoveryConfig = {
+    val discovery = underlying.getConfig("discovery").resolve()
+    discovery.resolve()
+    val publicAddress           = InetAddress.getByName(discovery.getString("publicAddress"))
+    val udpPort                 = discovery.getInt("udpPort")
+    val peersPerGroup           = discovery.getInt("peersPerGroup")
+    val scanMaxPerGroup         = discovery.getInt("scanMaxPerGroup")
+    val scanFrequency           = discovery.getDuration("scanFrequency").toMillis.millis
+    val neighborsPerGroup       = discovery.getInt("neighborsPerGroup")
+    val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(mainGroup)(this)
+    DiscoveryConfig(publicAddress,
+                    udpPort,
+                    groups,
+                    privateKey,
+                    publicKey,
+                    peersPerGroup,
+                    scanMaxPerGroup,
+                    scanFrequency,
+                    neighborsPerGroup)
+  }
 }

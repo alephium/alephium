@@ -43,5 +43,17 @@ alephium {
   nonceStep = 10000
 
   mainGroup = ${?mainGroup}
+
+  discovery {
+    publicAddress = "localhost"
+    publicAddress = ${?publicAddress}
+    udpPort = ${alephium.port}
+    peersPerGroup = 16
+    scanMaxPerGroup = 8
+    scanFrequency = 100.seconds
+    neighborsPerGroup = 8
+  }
+  bootstrap=""
+  bootstrap = ${?bootstrap}
 }
 

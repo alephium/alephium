@@ -13,14 +13,13 @@ import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.protocol.model.{GroupIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
-import scala.collection.mutable
+import scala.concurrent.duration._
 
 object PeerManager {
   def props(builders: TcpHandler.Builder)(implicit config: PlatformConfig): Props =
     Props(new PeerManager(builders))
 
   sealed trait Command
-  case class Set(server: ActorRef, handlers: AllHandlers)       extends Command
   case class Connect(remote: InetSocketAddress, until: Instant) extends Command
   case class Connected(peerId: PeerId, peerInfo: PeerInfo)      extends Command
   case class Sync(peerId: PeerId, locators: AVector[Keccak256]) extends Command
@@ -28,8 +27,10 @@ object PeerManager {
   case class Send(message: Tcp.Write, group: GroupIndex)        extends Command
   case object GetPeers                                          extends Command
 
+  case class Set(server: ActorRef, handlers: AllHandlers, discoveryServer: ActorRef) extends Command
+
   sealed trait Event
-  case class Peers(peers: Map[PeerId, PeerInfo]) extends Event
+  case class Peers(peers: AVector[AVector[PeerInfo]]) extends Event
 
   case class PeerInfo(id: PeerId,
                       index: GroupIndex,
@@ -43,27 +44,50 @@ object PeerManager {
   }
 }
 
-class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig) extends BaseActor {
+class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformConfig)
+    extends BaseActor
+    with PeerManagerState {
   import PeerManager._
+  import context.system
+  import context.dispatcher
 
   // Initialized once; use var for performance reason
   var server: ActorRef           = _
   var blockHandlers: AllHandlers = _
-
-  val peers: mutable.Map[PeerId, PeerInfo] = mutable.Map.empty
-
-  def peersSize: Int = peers.size
+  var discoveryServer: ActorRef  = _
 
   override def receive: Receive = awaitInit
 
   def awaitInit: Receive = {
-    case Set(_server, _blockHandlers) =>
-      server        = _server
-      blockHandlers = _blockHandlers
+    case Set(_server, _blockHandlers, _discoveryServer) =>
+      server          = _server
+      blockHandlers   = _blockHandlers
+      discoveryServer = _discoveryServer
 
       server ! TcpServer.Start
       context.watch(server)
-      context.become(handle)
+
+      discoveryServer ! DiscoveryServer.GetPeers
+      context.become(awaitPeers orElse handle)
+  }
+
+  def awaitPeers: Receive = {
+    case DiscoveryServer.Peers(discoveried) =>
+      log.info(s"Discoveried #${discoveried.sumBy(_.length)} peers")
+      val isEnough = discoveried.forallWithIndex { (peers, i) =>
+        i == config.mainGroup.value || peers.length >= 1
+      }
+      if (isEnough) {
+        val until = Instant.now().plusMillis(config.retryTimeout.toMillis)
+        discoveried.foreach { ps =>
+          ps.foreach(peer => self ! Connect(peer.socketAddress, until))
+        }
+      } else {
+        system.scheduler.scheduleOnce(1.second, discoveryServer, DiscoveryServer.GetPeers)(
+          dispatcher,
+          self)
+        ()
+      }
   }
 
   def handle: Receive = {
@@ -74,7 +98,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       tcpHandler ! TcpHandler.Connect(until)
     case Connected(peerId, peerInfo) =>
       context.watch(peerInfo.tcpHandler)
-      peers += (peerId -> peerInfo)
+      addPeer(peerInfo)
       log.info(s"Connected to $peerId@${peerInfo.address}, now $peersSize peers")
     case Tcp.Connected(remote, _) =>
       val connection  = sender()
@@ -83,26 +107,26 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
         context.actorOf(builders.createTcpHandler(remote, blockHandlers), handlerName)
       tcpHandler ! TcpHandler.Set(connection)
     case Sync(peerId, locators) =>
-      if (peers.contains(peerId)) {
-        val peer = peers(peerId).tcpHandler
-        log.debug(s"Send GetBlocks to $peerId")
-        peer ! Message(GetBlocks(locators))
-      } else {
-        log.warning(s"No connection to $peerId")
+      getHandler(peerId) match {
+        case Some(tcpHandler) =>
+          log.debug(s"Send GetBlocks to $peerId")
+          tcpHandler ! Message(GetBlocks(locators))
+        case None =>
+          log.warning(s"No connection to $peerId")
       }
     case BroadCast(message, origin) =>
-      val toSend = origin match {
-        case DataOrigin.Local          => peers.values
-        case DataOrigin.Remote(remote) => peers.filterKeys(_ != remote).values
+      origin match {
+        case DataOrigin.Local =>
+          traversePeers(_.tcpHandler ! message)
+        case DataOrigin.Remote(remote) =>
+          traversePeers(pi => if (pi.id != remote) pi.tcpHandler ! message)
       }
-      log.debug(s"Broadcast message to ${toSend.size} peers")
-      toSend.foreach(_.tcpHandler ! message)
+      log.debug(s"Broadcast message to peers")
     case Send(message, group) =>
-      log.debug(s"""Send message to $group; Peers: ${availableGroups.mkString(",")}""")
-      val peerInfo = peers.values.filter(_.id.groupIndex == group).head
-      peerInfo.tcpHandler ! message
+      log.debug(s"""Send message to $group""")
+      traverseGroup(group, _.tcpHandler ! message)
     case GetPeers =>
-      sender() ! Peers(peers.toMap)
+      sender() ! Peers(getPeers)
     case Terminated(child) =>
       if (child == server) {
         log.error("Server stopped, stopping peer manager")
@@ -113,24 +137,18 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       }
   }
 
-  def availableGroups: AVector[GroupIndex] = AVector.from(peers.values.map(_.index))
-
   def removePeer(tcpHandler: ActorRef): Unit = {
-    val toRemove = peers.collectFirst {
-      case (id, info) if info.tcpHandler == tcpHandler => id
-    }
-    toRemove match {
-      case Some(remote) =>
+    traversePeers { peerInfo =>
+      if (peerInfo.tcpHandler == tcpHandler) {
         context.unwatch(tcpHandler)
-        peers -= remote
-      case None =>
-        log.debug("The tcpHandler to be removed is not among the peers")
+        removePeer(peerInfo.id)
+      }
     }
   }
 
   def unwatchAndStop(): Unit = {
     context.unwatch(server)
-    peers.values.foreach(info => context.unwatch(info.tcpHandler))
+    traversePeers(info => context.unwatch(info.tcpHandler))
     context.stop(self)
   }
 }

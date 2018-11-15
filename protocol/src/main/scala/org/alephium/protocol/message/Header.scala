@@ -1,10 +1,22 @@
 package org.alephium.protocol.message
 
-import org.alephium.serde.Serde
+import org.alephium.protocol.Protocol
+import org.alephium.serde.{Serde, WrongFormatException}
 
-case class Header(version: Int, cmdCode: Int)
+import scala.util.{Failure, Success}
+
+case class Header(version: Int)
 
 object Header {
   implicit val serde: Serde[Header] =
-    Serde.forProduct2(apply, nh => (nh.version, nh.cmdCode))
+    Serde
+      .tuple1[Int]
+      .xfmap(
+        version =>
+          if (version == Protocol.version) Success(Header(version))
+          else
+            Failure(
+              WrongFormatException(s"Invalid version, got $version, expect ${Protocol.version}")),
+        header => header.version
+      )
 }

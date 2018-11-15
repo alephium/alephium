@@ -25,7 +25,7 @@ trait DiscoveryConfig extends GroupConfig {
 
   def discoveryPublicKey: ED25519PublicKey
 
-  val peerId: PeerId = PeerId.fromPublicKey(discoveryPublicKey)
+  val nodeId: PeerId = PeerId.fromPublicKey(discoveryPublicKey)
 
-  val group: GroupIndex = peerId.groupIndex(this)
+  val group: GroupIndex = nodeId.groupIndex(this)
 }
