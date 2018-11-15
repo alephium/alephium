@@ -33,10 +33,10 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
       result match {
         case AddBlockResult.Success =>
           val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
-          val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
+          val elapsedTime = System.currentTimeMillis() - block.header.timestamp
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(block.hash)}; Time elapsed: ${elapsedTime}ms")
-          val headers = blocks.map(_.blockHeader)
+          val headers = blocks.map(_.header)
           peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
         case error: AddBlockResult.Failure =>
           log.warning(s"Failed in adding new block: ${error.toString}")

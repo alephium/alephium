@@ -29,8 +29,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block2.blockHeader)
-      blockFlow.getWeight(block2.blockHeader) is 2
+      addAndCheck(blockFlow, block2.header)
+      blockFlow.getWeight(block2.header) is 2
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
@@ -58,8 +58,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 1
         } else {
-          addAndCheck(blockFlow, block.blockHeader)
-          blockFlow.getWeight(block.blockHeader) is 1
+          addAndCheck(blockFlow, block.header)
+          blockFlow.getWeight(block.header) is 1
         }
       }
 
@@ -73,8 +73,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 4
         } else {
-          addAndCheck(blockFlow, block.blockHeader)
-          blockFlow.getWeight(block.blockHeader) is 4
+          addAndCheck(blockFlow, block.header)
+          blockFlow.getWeight(block.header) is 4
         }
       }
 
@@ -88,8 +88,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 8
         } else {
-          addAndCheck(blockFlow, block.blockHeader)
-          blockFlow.getWeight(block.blockHeader) is 8
+          addAndCheck(blockFlow, block.header)
+          blockFlow.getWeight(block.header) is 8
         }
       }
     }
@@ -114,8 +114,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
       val block22     = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block21.blockHeader)
-      addAndCheck(blockFlow, block22.blockHeader)
+      addAndCheck(blockFlow, block21.header)
+      addAndCheck(blockFlow, block22.header)
       blockFlow.getWeight(block21) is 3
       blockFlow.getWeight(block22) is 3
 
@@ -153,7 +153,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         val block  = blockFlow.getBlock(tip)
         val index  = block.chainIndex
         val hash   = showHash(tip)
-        val deps   = block.blockHeader.blockDeps.map(showHash).mkString("-")
+        val deps   = block.header.blockDeps.map(showHash).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
       }
       .mkString("\n")

@@ -8,21 +8,32 @@ import java.nio.file.{Path, Paths}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
-import org.alephium.protocol.config.{ConsensusConfig, DiscoveryConfig => DC}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
-import org.alephium.util.{AVector, Files, Network}
+import org.alephium.util.{AVector, Env, Files, Network}
 
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
-  val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
+  private val env      = Env.resolve()
+  private val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
 
-  def resolve(path: String): Path = rootPath.resolve(path)
+  object Default extends PlatformConfig(env, rootPath)
 
-  def getNoncesFilePath(groups: Int): Path = resolve(s"nonces-$groups.conf")
+  trait Default {
+    implicit def config: PlatformConfig = Default
+  }
+}
 
-  def getNoncesFile(groups: Int): File = {
-    val path = getNoncesFilePath(groups)
+trait PlatformConfigFiles extends StrictLogging {
+  def env: Env
+  def rootPath: Path
+
+  def getNoncesPath(groups: Int, leadingZeros: Int): Path =
+    rootPath.resolve(s"nonces-$groups-$leadingZeros.conf")
+
+  def getNoncesFile(groups: Int, leadingZeros: Int): File = {
+    val path = getNoncesPath(groups, leadingZeros)
     val file = path.toFile
     if (!file.exists()) {
       logger.error(s"No nonces file exists: $path")
@@ -35,80 +46,46 @@ object PlatformConfig extends StrictLogging {
     val directory = rootPath.toFile
     if (!directory.exists) directory.mkdir()
 
-    val env = System.getenv("ALEPHIUM_ENV")
-    val filename = env match {
-      case "test"  => "user_test.conf"
-      case "debug" => "user_debug.conf"
-      case _       => "user.conf"
-    }
-    val path = resolve(filename)
-    logger.info(s"Under environment $env, using conf file $path")
+    val env      = Env.resolve()
+    val filename = s"user_${env.name}.conf"
+    val path     = rootPath.resolve(filename)
+    logger.info(s"using conf file $path")
 
     val file = path.toFile
     if (!file.exists) Files.copyFromResource(s"/$filename.tmpl", path)
     file
   }
 
-  def loadUserConfig(): Config = {
-    ConfigFactory.parseFile(getUserFile).resolve()
-  }
-
-  def loadNoncesConfig(groups: Int): Config = {
-    ConfigFactory.parseFile(getNoncesFile(groups)).resolve()
-  }
-
-  def load(withNonces: Boolean): PlatformConfig = {
-    val user = loadUserConfig()
-    val all = if (withNonces) {
-      val groups = user.getInt("alephium.groups")
-      val nonces = loadNoncesConfig(groups)
-      user.withFallback(nonces)
-    } else user
-    new PlatformConfig(all)
-  }
-
-  object Default {
-    val config: PlatformConfig = PlatformConfig.load(withNonces = true)
-  }
-
-  trait Default {
-    implicit def config: PlatformConfig = Default.config
-  }
+  val all      = ConfigFactory.parseFile(getUserFile).resolve()
+  val alephium = all.getConfig("alephium")
 }
 
-class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
-  val underlying = all.getConfig("alephium")
-
-  override val numZerosAtLeastInHash: Int = underlying.getInt("numZerosAtLeastInHash")
-  override val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
-
-  override val blockTargetTime: Duration = underlying.getDuration("blockTargetTime")
-  override val blockConfirmNum: Int      = underlying.getInt("blockConfirmNum")
-  override val retargetInterval
-    : Int = underlying.getInt("retargetInterval") // number of blocks for retarget
-
-  val port: Int               = underlying.getInt("port")
-  val pingFrequency: Duration = underlying.getDuration("pingFrequency")
-  val groups: Int             = underlying.getInt("groups")
-  val nonceStep: BigInt       = underlying.getInt("nonceStep")
-  val retryTimeout: Duration  = underlying.getDuration("retryTimeout")
+trait PlatformGroupConfig extends PlatformConfigFiles with GroupConfig {
+  val groups: Int = alephium.getInt("groups")
 
   val mainGroup: GroupIndex = {
-    val myGroup = underlying.getInt("mainGroup")
+    val myGroup = alephium.getInt("mainGroup")
     assert(myGroup >= 0 && myGroup < groups)
     GroupIndex(myGroup)(this)
   }
+}
 
-  lazy val discoveryConfig: DiscoveryConfig = loadDiscoveryConfig()
-  lazy val bootstrap: AVector[InetSocketAddress] =
-    Network.parseAddresses(underlying.getString("bootstrap"))
+trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
+  protected def alephium: Config
 
-  def nodeId: PeerId = discoveryConfig.nodeId
+  val numZerosAtLeastInHash: Int = alephium.getInt("numZerosAtLeastInHash")
+  val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-  lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow()
+  val blockTargetTime: Duration = alephium.getDuration("blockTargetTime")
+  val blockConfirmNum: Int      = alephium.getInt("blockConfirmNum")
+  val retargetInterval: Int     = alephium.getInt("retargetInterval") // number of blocks for retarget
+}
 
+trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
   def loadBlockFlow(): AVector[AVector[Block]] = {
-    val nonces = underlying.getStringList("nonces")
+    val noncesConfig =
+      ConfigFactory.parseFile(getNoncesFile(groups, numZerosAtLeastInHash)).resolve()
+    val nonces = noncesConfig.getStringList("nonces")
     assert(nonces.size == groups * groups)
 
     AVector.tabulate(groups, groups) {
@@ -122,8 +99,17 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
     }
   }
 
+  lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow()
+}
+
+trait PDiscoveryConfig extends PlatformGroupConfig {
+  lazy val discoveryConfig: DiscoveryConfig = loadDiscoveryConfig()
+  lazy val bootstrap: AVector[InetSocketAddress] =
+    Network.parseAddresses(alephium.getString("bootstrap"))
+  def nodeId: PeerId = discoveryConfig.nodeId
+
   def loadDiscoveryConfig(): DiscoveryConfig = {
-    val discovery = underlying.getConfig("discovery").resolve()
+    val discovery = alephium.getConfig("discovery").resolve()
     discovery.resolve()
     val publicAddress           = InetAddress.getByName(discovery.getString("publicAddress"))
     val udpPort                 = discovery.getInt("udpPort")
@@ -141,5 +127,23 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
                     scanMaxPerGroup,
                     scanFrequency,
                     neighborsPerGroup)
+  }
+
+}
+
+class PlatformConfig(val env: Env, val rootPath: Path)
+    extends PlatformGroupConfig
+    with PlatformConsensusConfig
+    with PlatformGenesisConfig
+    with PDiscoveryConfig { self =>
+
+  val port: Int                     = alephium.getInt("port")
+  val pingFrequency: FiniteDuration = getDuration("pingFrequency")
+  val nonceStep: BigInt             = alephium.getInt("nonceStep")
+  val retryTimeout: FiniteDuration  = getDuration("retryTimeout")
+
+  def getDuration(path: String): FiniteDuration = {
+    val duration = alephium.getDuration(path)
+    FiniteDuration(duration.toNanos, NANOSECONDS)
   }
 }
