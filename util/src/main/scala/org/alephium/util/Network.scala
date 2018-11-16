@@ -9,7 +9,7 @@ object Network {
       val addresses = input.split(";").map { address =>
         val splitIndex    = address.indexOf(':')
         val (left, right) = address.splitAt(splitIndex)
-        InetSocketAddress.createUnresolved(left, right.tail.toInt)
+        new InetSocketAddress(left, right.tail.toInt)
       }
       AVector(addresses: _*)
     }
