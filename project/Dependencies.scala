@@ -21,6 +21,7 @@ object Dependencies {
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"  % "3.9.0"
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
   lazy val scalatest       = "org.scalatest"              %% "scalatest"      % "3.0.5" % Test
+  lazy val rocksdb         = "org.rocksdb"                % "rocksdbjni"      % "5.15.10"
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 }
