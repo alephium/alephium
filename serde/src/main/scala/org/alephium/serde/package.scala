@@ -4,7 +4,6 @@ import akka.util.ByteString
 import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
-import scala.util.Try
 
 package object serde {
   import Serde._
@@ -12,7 +11,7 @@ package object serde {
   def serialize[T](input: T)(implicit serializer: Serde[T]): ByteString =
     serializer.serialize(input)
 
-  def deserialize[T](input: ByteString)(implicit deserializer: Serde[T]): Try[T] =
+  def deserialize[T](input: ByteString)(implicit deserializer: Serde[T]): Either[SerdeError, T] =
     deserializer.deserialize(input)
 
   implicit val byteSerde: Serde[Byte] = ByteSerde

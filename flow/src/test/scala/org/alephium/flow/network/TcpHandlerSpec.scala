@@ -11,9 +11,9 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.{AllHandlers, HandlerUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
-import org.alephium.serde.WrongFormatException
+import org.alephium.serde.WrongFormatError
 import org.alephium.util.{AVector, AlephiumActorSpec}
-import org.scalatest.TryValues._
+import org.scalatest.EitherValues._
 
 import scala.util.Random
 
@@ -52,7 +52,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserialize(write.data).get
+        val message = Message.deserialize(write.data).right.value
         message.payload match {
           case Hello(0, _, peerId) => peerId is config.nodeId
           case _                   => assert(false)
@@ -90,7 +90,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     tcpHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserialize(write.data).get
+        val message = Message.deserialize(write.data).right.value
         message.payload match {
           case HelloAck(0, _, peerId) => peerId is config.nodeId
           case _                      => assert(false)
@@ -155,12 +155,12 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "deserialize two messages correctly" in new SerdeFixture {
-    val result = TcpHandler.deserialize(bytes).success.value
+    val result = TcpHandler.deserialize(bytes).right.value
     result._1 is AVector(message1, message2)
     result._2 is ByteString.empty
     for (n <- bytes.indices) {
       val input  = bytes.take(n)
-      val output = TcpHandler.deserialize(input).success.value
+      val output = TcpHandler.deserialize(input).right.value
       if (n < bytes1.length) {
         output._1 is AVector.empty[Message]
         output._2 is input
@@ -172,10 +172,10 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "fail when data is corrupted" in new SerdeFixture {
-    val exception1 = TcpHandler.deserialize(bytes.tail).failure.exception
-    exception1 is a[WrongFormatException]
-    val exception2 = TcpHandler.deserialize(bytes1 ++ bytes2.tail).failure.exception
-    exception2 is a[WrongFormatException]
+    val exception1 = TcpHandler.deserialize(bytes.tail).left.value
+    exception1 is a[WrongFormatError]
+    val exception2 = TcpHandler.deserialize(bytes1 ++ bytes2.tail).left.value
+    exception2 is a[WrongFormatError]
   }
 
   behavior of "ping/ping protocol"
@@ -198,7 +198,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     tcpHandler ! TcpHandler.SendPing
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        val message = Message.deserialize(data).get
+        val message = Message.deserialize(data).right.value
         message.payload is a[Ping]
     }
   }

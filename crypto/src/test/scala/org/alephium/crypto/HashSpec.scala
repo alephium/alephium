@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
-import org.scalatest.TryValues._
+import org.scalatest.EitherValues._
 
 class HashSpec extends AlephiumSpec {
 
@@ -17,7 +17,7 @@ class HashSpec extends AlephiumSpec {
 
     it should "serde correctly" in {
       val input  = provider.hash(message)
-      val output = deserialize[T](serialize(input)).success.value
+      val output = deserialize[T](serialize(input)).right.value
       output is input
     }
   }
@@ -34,7 +34,7 @@ class HashSpec extends AlephiumSpec {
     it should "serde correctly" in {
       for ((message, _) <- tests) {
         val input  = provider.hash(message)
-        val output = deserialize[T](serialize(input)).success.value
+        val output = deserialize[T](serialize(input)).right.value
         output is input
       }
     }

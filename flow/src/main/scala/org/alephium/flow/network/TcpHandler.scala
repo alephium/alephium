@@ -12,12 +12,12 @@ import org.alephium.flow.network.PeerManager.PeerInfo
 import org.alephium.flow.storage._
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
-import org.alephium.serde.NotEnoughBytesException
+import org.alephium.serde.{NotEnoughBytesError, SerdeError}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.Random
 
 object TcpHandler {
 
@@ -35,16 +35,17 @@ object TcpHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serialize(message))
 
-  def deserialize(data: ByteString): Try[(AVector[Message], ByteString)] = {
+  def deserialize(data: ByteString): Either[SerdeError, (AVector[Message], ByteString)] = {
     @tailrec
-    def iter(rest: ByteString, acc: AVector[Message]): Try[(AVector[Message], ByteString)] = {
+    def iter(rest: ByteString,
+             acc: AVector[Message]): Either[SerdeError, (AVector[Message], ByteString)] = {
       Message._deserialize(rest) match {
-        case Success((message, newRest)) =>
+        case Right((message, newRest)) =>
           iter(newRest, acc :+ message)
-        case Failure(_: NotEnoughBytesException) =>
-          Success((acc, rest))
-        case Failure(e) =>
-          Failure(e)
+        case Left(_: NotEnoughBytesError) =>
+          Right((acc, rest))
+        case Left(e) =>
+          Left(e)
       }
     }
     iter(data, AVector.empty)
@@ -157,14 +158,14 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
     case Tcp.Received(data) =>
       TcpHandler.deserialize(unaligned ++ data) match {
-        case Success((messages, rest)) =>
+        case Right((messages, rest)) =>
           messages.foreach { message =>
             val cmdName = message.payload.getClass.getSimpleName
             log.debug(s"Received message of cmd@$cmdName from $remote")
             handle(message.payload)
           }
           context.become(handleWith(rest, next))
-        case Failure(_) =>
+        case Left(_) =>
           log.info(s"Received corrupted data from $remote with serde exception; Closing connection")
           stop()
       }
