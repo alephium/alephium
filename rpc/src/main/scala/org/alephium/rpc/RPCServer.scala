@@ -16,6 +16,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.{Mode, Platform}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.rpc.model.ViewerQuery
 import org.alephium.util.Hex._
 
 trait RPCServer extends Platform with StrictLogging {
@@ -65,30 +66,23 @@ trait RPCServer extends Platform with StrictLogging {
 
 }
 
-object RPCServer {
+object RPCServer extends StrictLogging {
+
   def wsViewer(node: Node)(implicit rpc: RPCConfig): Flow[Message, Message, Any] = {
+    val failure = TextMessage("""{"error": "Bad request"}"""")
+
     Flow[Message]
       .collect {
-        case requestJson: TextMessage =>
+        case request: TextMessage.Strict =>
           val now   = Instant.now()
           val limit = now.minus(rpc.viewerBlockAgeLimit).toEpochMilli()
 
-          val request = parse(requestJson.getStrictText)
-          val from = Math.max(
-            request.flatMap(_.hcursor.get[Long]("from")).toOption.getOrElse(limit),
-            limit
-          )
-
-          val blocks = node.blockFlow.getBlocks
-            .filter { case (_, _, header) => header.timestamp > from }
-
-          val json = {
-            val blocksJson = blocks
-              .map {
-                case ((i, j), hash, header) =>
-                  node.blockFlow.toJson(i, j, hash, header)
+          decode[ViewerQuery](request.text) match {
+            case Right(query) =>
+              val from = query.from match {
+                case None     => limit
+                case Some(ts) => Math.max(ts, limit)
               }
-              .mkString("[", ",", "]")
 
               val blocks = node.blockFlow.getHeaders(header => header.timestamp > from)
 
@@ -109,7 +103,9 @@ object RPCServer {
               failure
           }
 
-          TextMessage(json)
+        case request =>
+          logger.info(s"Received non-valid RPC viewer request: ${request}")
+          failure
       }
   }
 }

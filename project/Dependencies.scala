@@ -14,6 +14,7 @@ object Dependencies {
   lazy val akkatest        = "com.typesafe.akka"          %% "akka-testkit"   % Version.akka % Test
   lazy val bcprov          = "org.bouncycastle"           % "bcprov-jdk15on"  % "1.59"
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"   % Version.circe
+  lazy val `circe-generic` = "io.circe"                   %% "circe-generic"  % Version.circe
   lazy val curve25519      = "org.whispersystems"         % "curve25519-java" % "0.4.1"
   lazy val logback         = "ch.qos.logback"             % "logback-classic" % "1.2.3"
   lazy val metrics         = "io.dropwizard.metrics"      % "metrics-core"    % Version.metrics

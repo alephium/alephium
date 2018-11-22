@@ -68,6 +68,7 @@ lazy val flow = subProject("flow")
       `akka-stream`,
       bcprov,
       `circe-parser`,
+      `circe-generic`,
       `scala-logging`,
       `scala-reflect`(scalaVersion.value),
       logback
