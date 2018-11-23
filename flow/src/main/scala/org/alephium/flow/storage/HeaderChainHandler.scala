@@ -36,8 +36,13 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
-        case error: AddBlockHeaderResult.Failure =>
-          log.warning(s"Failed in adding new header: ${error.toString}")
+        case AddBlockHeaderResult.AlreadyExisted =>
+          log.debug(s"Header already existed")
+        case x: AddBlockHeaderResult.Incomplete =>
+          // TODO: handle missing data
+          log.debug(s"No enough data to verify header: ${x.toString}")
+        case x: AddBlockHeaderResult.Error =>
+          log.warning(s"Failed in adding new header: ${x.toString}")
       }
       sender() ! result
   }

@@ -13,9 +13,11 @@ trait BlockPool extends BlockHashPool {
   // Assuming the hash is in the pool
   def getBlock(hash: Keccak256): Block
 
-  def add(block: Block, weight: Int): AddBlockResult
+  // Assuming the block is verified
+  def add(block: Block, weight: Int): Unit
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult
+  // Assuming the block is verified
+  def add(block: Block, parentHash: Keccak256, weight: Int): Unit
 
   def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
     locators.map(getBlock)
@@ -72,19 +74,19 @@ trait BlockPool extends BlockHashPool {
 sealed trait AddBlockResult
 
 object AddBlockResult {
-  case object Success extends AddBlockResult
-
-  trait Failure extends AddBlockResult
-  case object AlreadyExisted extends Failure {
+  sealed trait OK     extends AddBlockResult
+  case object Success extends OK
+  case object AlreadyExisted extends OK {
     override def toString: String = "Block already exist"
   }
-  case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #$deps.length deps"
-  }
-  case object InvalidIndex extends Failure {
-    override def toString: String = "Block index is invalid"
-  }
-  case class Other(message: String) extends Failure {
+
+  // needs more data for verification
+  sealed trait Incomplete                                              extends AddBlockResult
+  case class HeaderIncomplete(result: AddBlockHeaderResult.Incomplete) extends Incomplete
+
+  sealed trait Error                                         extends AddBlockResult
+  case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
+  case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding block: $message"
   }
 }

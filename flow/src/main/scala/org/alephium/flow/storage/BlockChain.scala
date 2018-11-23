@@ -16,12 +16,12 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
     getBlock(hash).header
   }
 
-  def add(header: BlockHeader, weight: Int): AddBlockHeaderResult = {
-    AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
+  def add(header: BlockHeader, weight: Int): Unit = {
+    assert(false) // not allowed
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
-    AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit = {
+    assert(false) // not allowed
   }
 
   def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
@@ -38,31 +38,23 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
 
   def getBlock(hash: Keccak256): Block = blocksTable(hash)
 
-  def add(block: Block, weight: Int): AddBlockResult = {
+  def add(block: Block, weight: Int): Unit = {
     add(block, block.parentHash, weight)
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
-    blockHashesTable.get(block.hash) match {
-      case Some(_) => AddBlockResult.AlreadyExisted
-      case None =>
-        blockHashesTable.get(parentHash) match {
-          case Some(parent) =>
-            addHash(block.hash, parent, weight)
-            addBlock(block)
-            AddBlockResult.Success
-          case None =>
-            AddBlockResult.MissingDeps(AVector(parentHash))
-        }
-    }
+  def add(block: Block, parentHash: Keccak256, weight: Int): Unit = {
+    assert(!contains(block.hash) && contains(parentHash))
+    val parent = blockHashesTable(parentHash)
+    addHash(block.hash, parent, weight)
+    addBlock(block)
   }
 
   protected def addBlock(block: Block): Unit = {
     blocksTable += block.hash -> block
-
-    block.transactions.foreach { transaction =>
-      transactionsTable += transaction.hash -> transaction
-    }
+    // TODO: handle transactions later
+//    block.transactions.foreach { transaction =>
+//      transactionsTable += transaction.hash -> transaction
+//    }
   }
 
   def getConfirmedBlock(height: Int): Option[Block] = {
