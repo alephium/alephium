@@ -8,7 +8,7 @@ import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.storage.{AllHandlers, HandlerUtils}
+import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
 import org.alephium.serde.WrongFormatError
@@ -29,7 +29,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     val data    = Message.serialize(message)
 
     val connection    = TestProbe("connection")
-    val blockHandlers = HandlerUtils.createBlockHandlersProbe
+    val blockHandlers = TestUtils.createBlockHandlersProbe
 
     val payloadHandler = TestProbe("payload-probe")
   }

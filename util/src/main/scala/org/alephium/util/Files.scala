@@ -1,7 +1,7 @@
 package org.alephium.util
 
 import java.io.{InputStreamReader, PrintWriter}
-import java.nio.file.{Path}
+import java.nio.file.{Path, Paths}
 
 object Files {
   def copyFromResource(resourcePath: String, filePath: Path): Unit = {
@@ -13,11 +13,15 @@ object Files {
     var len        = 0
 
     while ({ len = in.read(buffer); len } >= 0) {
-      out.write(buffer, 0, len);
+      out.write(buffer, 0, len)
     }
 
     out.flush()
     out.close()
     in.close()
   }
+
+  def homeDir: Path = Paths.get(System.getProperty("user.home"))
+
+  def tmpDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
 }

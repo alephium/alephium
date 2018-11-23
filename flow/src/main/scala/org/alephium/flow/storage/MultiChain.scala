@@ -105,16 +105,9 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(ChainIndex.from(hash))
   }
 
-  def getBlock(hash: Keccak256): Block = {
+  def getBlock(hash: Keccak256): Either[DiskIOError, Block] = {
     getBlockChain(hash).getBlock(hash)
   }
-
-  def getBlocksAfter(locator: Keccak256): AVector[Block] = {
-    getBlockChain(locator).getBlocksAfter(locator)
-  }
-
-  def getBlocksAfter(locators: AVector[Keccak256]): AVector[Block] =
-    locators.flatMap(getBlocksAfter)
 
   def add(block: Block): AddBlockResult
 

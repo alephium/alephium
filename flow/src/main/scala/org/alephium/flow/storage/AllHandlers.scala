@@ -26,7 +26,7 @@ case class AllHandlers(flowHandler: ActorRef,
 object AllHandlers {
   def build(system: ActorSystem, peerManager: ActorRef, blockFlow: BlockFlow)(
       implicit config: PlatformConfig): AllHandlers = {
-    val flowHandler    = system.actorOf(FlowHandler.props(blockFlow, peerManager), "BlockHandler")
+    val flowHandler    = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
     val blockHandlers  = buildBlockHandlers(system, peerManager, blockFlow)
     val headerHandlers = buildHeaderHandlers(system, peerManager, blockFlow)
     AllHandlers(flowHandler, blockHandlers, headerHandlers)

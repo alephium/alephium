@@ -1,24 +1,18 @@
 package org.alephium.flow.storage
 
-import java.nio.file.{Files, Path, Paths}
-import java.util.Comparator
+import java.nio.file.Files
 
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
 import org.alephium.serde._
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Files => AFiles}
 import org.scalatest.EitherValues._
 
 class DiskIOSpec extends AlephiumSpec {
 
   trait Fixture {
-    val tmpdir = System.getProperty("java.io.tmpdir")
-    val root   = Paths.get(tmpdir + "/.alephium-test")
+    val root   = AFiles.tmpDir.resolve(".alephium-test")
     val diskIO = DiskIO.create(root).right.value
-
-    def cleanup(): Unit = {
-      Files.walk(root).sorted(Comparator.reverseOrder[Path]).forEach(p => Files.delete(p))
-    }
   }
 
   it should "create related folders" in new Fixture {
@@ -26,7 +20,7 @@ class DiskIOSpec extends AlephiumSpec {
     Files.exists(diskIO.blockFolder) is true
     DiskIO.create(root).isRight is true
 
-    cleanup()
+    TestUtils.cleanup(root)
     Files.exists(root) is false
     Files.exists(diskIO.blockFolder) is false
   }
@@ -39,6 +33,6 @@ class DiskIOSpec extends AlephiumSpec {
       diskIO.checkBlockFile(block.hash) is true
       diskIO.getBlock(block.hash).right.value is block
     }
-    cleanup()
+    TestUtils.cleanup(root)
   }
 }

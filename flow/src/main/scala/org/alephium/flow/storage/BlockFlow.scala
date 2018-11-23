@@ -8,7 +8,7 @@ import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
 
-class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
+class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends MultiChain {
   import config.genesisBlocks
 
   private def mainGroup: GroupIndex = config.mainGroup
@@ -81,20 +81,19 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     }
   }
 
-  protected def add(block: Block, index: ChainIndex): Unit = {
+  protected def add(block: Block, index: ChainIndex): Either[AddBlockResult, Unit] = {
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
     val weight = calWeight(block)
-    chain.add(block, parent, weight)
+    chain.add(block, parent, weight).left.map(AddBlockResult.IOError)
   }
 
-  def add(block: Block, weight: Int): Unit = {
-    add(block, block.parentHash, weight)
+  def add(block: Block, weight: Int): Either[DiskIOError, Unit] = {
+    ???
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): Unit = {
-    val chain = getBlockChain(block)
-    chain.add(block, parentHash, weight)
+  def add(block: Block, parentHash: Keccak256, weight: Int): Either[DiskIOError, Unit] = {
+    ???
   }
 
   def add(header: BlockHeader): AddBlockHeaderResult = {
@@ -134,12 +133,11 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   }
 
   def add(header: BlockHeader, weight: Int): Unit = {
-    add(header, header.parentHash, weight)
+    ???
   }
 
   def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit = {
-    val chain = getHeaderChain(header)
-    chain.add(header, parentHash, weight)
+    ???
   }
 
   private def calWeight(block: Block): Int = {
@@ -280,7 +278,9 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
 }
 
 object BlockFlow {
-  def apply()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
+  def apply()(implicit config: PlatformConfig): BlockFlow = {
+    new BlockFlow(config.diskIO)
+  }
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

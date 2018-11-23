@@ -10,7 +10,7 @@ import org.scalatest.EitherValues._
 class DatabaseSpec extends AlephiumSpec {
 
   trait Fixture {
-    val tmpdir         = System.getProperty("java.io.tmpdir")
+    val tmpdir         = Files.tmpDir
     def dbname: String = "foo"
     def dbPath: String = tmpdir + "/" + dbname
 

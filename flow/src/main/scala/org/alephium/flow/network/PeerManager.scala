@@ -5,11 +5,9 @@ import java.time.Instant
 
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.protocol.model.{GroupIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -22,7 +20,6 @@ object PeerManager {
   sealed trait Command
   case class Connect(remote: InetSocketAddress, until: Instant) extends Command
   case class Connected(peerId: PeerId, peerInfo: PeerInfo)      extends Command
-  case class Sync(peerId: PeerId, locators: AVector[Keccak256]) extends Command
   case class BroadCast(message: Tcp.Write, origin: DataOrigin)  extends Command
   case class Send(message: Tcp.Write, group: GroupIndex)        extends Command
   case object GetPeers                                          extends Command
@@ -101,14 +98,6 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
       val tcpHandler =
         context.actorOf(builders.createTcpHandler(remote, blockHandlers), handlerName)
       tcpHandler ! TcpHandler.Set(connection)
-    case Sync(peerId, locators) =>
-      getHandler(peerId) match {
-        case Some(tcpHandler) =>
-          log.debug(s"Send GetBlocks to $peerId")
-          tcpHandler ! Message(GetBlocks(locators))
-        case None =>
-          log.warning(s"No connection to $peerId")
-      }
     case BroadCast(message, origin) =>
       origin match {
         case DataOrigin.Local =>
