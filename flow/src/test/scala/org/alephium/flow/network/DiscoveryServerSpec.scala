@@ -32,7 +32,8 @@ object DiscoveryServerSpec {
       peersPerGroup,
       scanMaxPerGroup   = 1,
       neighborsPerGroup = peersPerGroup,
-      scanFrequency     = scanFrequency
+      scanFrequency     = scanFrequency,
+      scanFastFrequency = scanFrequency
     )
   }
 }

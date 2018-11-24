@@ -188,7 +188,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
-  it should "test existence" in new Fixture {
+  it should "contain" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc: AVector[A], a: A) =>
       vc.contains(a) is vc.toArray.contains(a)
       vc.foreach { elem =>
@@ -243,6 +243,20 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc1  = vc.filterNot(p)
       val arr1 = arr.filterNot(p)
       checkEq(vc1, arr1)
+    }
+  }
+
+  it should "exist" in new Fixture {
+    forAll(vectorGen, ab.arbitrary) { (vc, a) =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.exists(_ == elem) is vc.contains(elem)
+      }
+      vc.exists(_ == a) is vc.contains(a)
+      vc.foreachWithIndex { (elem, index) =>
+        vc.existsWithIndex((e, i) => (e == elem) && (i == index)) is true
+        vc.existsWithIndex((e, i) => (e == elem) && (i == -1)) is false
+      }
     }
   }
 
