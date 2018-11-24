@@ -8,7 +8,7 @@ import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{GroupIndex, PeerId}
+import org.alephium.protocol.model.{Block, BlockHeader, GroupIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.concurrent.duration._
@@ -20,9 +20,18 @@ object PeerManager {
   sealed trait Command
   case class Connect(remote: InetSocketAddress, until: Instant) extends Command
   case class Connected(peerId: PeerId, peerInfo: PeerInfo)      extends Command
-  case class BroadCast(message: Tcp.Write, origin: DataOrigin)  extends Command
-  case class Send(message: Tcp.Write, group: GroupIndex)        extends Command
   case object GetPeers                                          extends Command
+  case class BroadCastHeader(
+      header: BlockHeader,
+      headerMsg: Tcp.Write,
+      origin: DataOrigin
+  ) extends Command
+  case class BroadCastBlock(
+      block: Block,
+      blockMsg: Tcp.Write,
+      headerMsg: Tcp.Write,
+      origin: DataOrigin
+  ) extends Command
 
   case class Set(server: ActorRef, handlers: AllHandlers, discoveryServer: ActorRef) extends Command
 
@@ -98,17 +107,14 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
       val tcpHandler =
         context.actorOf(builders.createTcpHandler(remote, blockHandlers), handlerName)
       tcpHandler ! TcpHandler.Set(connection)
-    case BroadCast(message, origin) =>
-      origin match {
-        case DataOrigin.Local =>
-          traversePeers(_.tcpHandler ! message)
-        case DataOrigin.Remote(remote) =>
-          traversePeers(pi => if (pi.id != remote) pi.tcpHandler ! message)
-      }
-      log.debug(s"Broadcast message to peers")
-    case Send(message, group) =>
-      log.debug(s"""Send message to $group""")
-      traverseGroup(group, _.tcpHandler ! message)
+    case BroadCastBlock(block, blockMsg, headerMsg, origin) =>
+      assert(block.chainIndex.relateTo(config.mainGroup))
+      log.debug(s"Broadcast block/header to peers")
+      broadcastBlock(block, blockMsg, headerMsg, origin)
+    case BroadCastHeader(header, headerMsg, origin) =>
+      assert(!header.chainIndex.relateTo(config.mainGroup))
+      log.debug(s"Broadcast header to peers")
+      broadcastHeader(header, headerMsg, origin)
     case GetPeers =>
       sender() ! Peers(getPeers)
     case Terminated(child) =>
@@ -119,6 +125,28 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
         removePeer(child)
         log.debug(s"Peer connection closed, removing peer, $peersSize peers left")
       }
+  }
+
+  def broadcastBlock(block: Block,
+                     blockMsg: Tcp.Write,
+                     headerMsg: Tcp.Write,
+                     origin: DataOrigin): Unit = {
+    val blockIndex = block.chainIndex
+    traversePeers { pi =>
+      if (origin.isNot(pi.id)) {
+        if (blockIndex.relateTo(pi.id.groupIndex)) pi.tcpHandler ! blockMsg
+        else pi.tcpHandler ! headerMsg
+      }
+    }
+  }
+
+  def broadcastHeader(header: BlockHeader, headerMsg: Tcp.Write, origin: DataOrigin): Unit = {
+    val headerIndex = header.chainIndex
+    traversePeers { pi =>
+      if (origin.isNot(pi.id)) {
+        if (!headerIndex.relateTo(pi.id.groupIndex)) pi.tcpHandler ! headerMsg
+      }
+    }
   }
 
   def removePeer(tcpHandler: ActorRef): Unit = {

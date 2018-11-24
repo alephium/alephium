@@ -1,4 +1,5 @@
 package org.alephium.flow.storage
+
 import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
@@ -31,11 +32,8 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
       val result = blockFlow.add(header)
       result match {
         case AddBlockHeaderResult.Success =>
-          val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
-          val elapsedTime = System.currentTimeMillis() - header.timestamp
-          log.info(
-            s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
-          peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
+          logInfo(header)
+          broadcast(header, origin)
         case AddBlockHeaderResult.AlreadyExisted =>
           log.debug(s"Header already existed")
         case x: AddBlockHeaderResult.Incomplete =>
@@ -45,5 +43,17 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
           log.warning(s"Failed in adding new header: ${x.toString}")
       }
       sender() ! result
+  }
+
+  def logInfo(header: BlockHeader): Unit = {
+    val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
+    val elapsedTime = System.currentTimeMillis() - header.timestamp
+    log.info(
+      s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
+  }
+
+  def broadcast(header: BlockHeader, origin: DataOrigin): Unit = {
+    val headerMsg = TcpHandler.envelope(SendHeaders(AVector(header)))
+    peerManager ! PeerManager.BroadCastHeader(header, headerMsg, origin)
   }
 }

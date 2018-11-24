@@ -211,26 +211,26 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       // TODO: support many blocks
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      val handler    = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
+      if (chainIndex.relateTo(config.mainGroup)) {
+        val handler = allHandlers.getBlockHandler(chainIndex)
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
+      } else {
+        log.warning(s"Received blocks for wrong chain from ${peerInfo.address}")
+      }
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
-      allHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
+      allHandlers.flowHandler ! FlowHandler.GetBlocks(locators)
     case SendHeaders(headers) =>
       log.debug(s"Received #${headers.length} block headers")
       // TODO: support many headers
       val header     = headers.head
       val chainIndex = header.chainIndex
-      if (chainIndex.from != config.mainGroup) {
-        if (chainIndex.to == config.mainGroup) {
-          val message = TcpHandler.envelope(GetBlocks(AVector(header.hash)))
-          val group   = chainIndex.from
-          context.parent ! PeerManager.Send(message, group)
-        } else {
-          val handler = allHandlers.getHeaderHandler(chainIndex)
-          handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
-        }
-      } // else ignore since the header comes from this node
+      if (!chainIndex.relateTo(config.mainGroup)) {
+        val handler = allHandlers.getHeaderHandler(chainIndex)
+        handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
+      } else {
+        log.warning(s"Received headers for wrong chain from ${peerInfo.address}")
+      }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")
       allHandlers.flowHandler ! FlowHandler.GetHeadersAfter(locators)
