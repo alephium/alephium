@@ -121,6 +121,23 @@ trait BlockHashChain extends BlockHashPool {
     tips.contains(hash)
   }
 
+  def getParentHash(hash: Keccak256, height: Int): Keccak256 = {
+    @tailrec
+    def iter(current: Keccak256): Keccak256 = {
+      val node = getNode(current)
+      assert(node.height >= height)
+      if (node.height == height) current
+      else
+        node match {
+          case n: BlockHashChain.Node => iter(n.parent.blockHash)
+          case _: BlockHashChain.Root => current // Note: this branch should not be reached
+        }
+    }
+    assert(height >= 0)
+    if (height == 0) root.blockHash
+    else iter(hash)
+  }
+
   def getHashesAfter(locator: Keccak256): AVector[Keccak256] = {
     blockHashesTable.get(locator) match {
       case Some(node) => getHashesAfter(node)
@@ -212,7 +229,8 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   def getConfirmedHash(height: Int): Option[Keccak256] = {
-    if (height < confirmedBlocks.size && height >= 0) {
+    assert(height >= 0)
+    if (height < confirmedBlocks.size) {
       Some(confirmedBlocks(height).blockHash)
     } else None
   }

@@ -8,10 +8,11 @@ import java.nio.file.Path
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
-import org.alephium.flow.storage.DiskIO
+import org.alephium.flow.storage.{Database, DiskIO}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
+import org.rocksdb.Options
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -170,6 +171,15 @@ class PlatformConfig(val env: Env, val rootPath: Path)
       case Left(error) =>
         throw new RuntimeException(error.toString)
       case Right(io) => io
+    }
+  }
+
+  val dbPath = rootPath.resolve("db")
+  val headerDB: Database = {
+    Database.open(dbPath.resolve("headers"), new Options().setCreateIfMissing(true)) match {
+      case Left(error) =>
+        throw new RuntimeException(error.toString)
+      case Right(db) => db
     }
   }
 }
