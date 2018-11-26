@@ -80,7 +80,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHeaderChain(ChainIndex.from(hash))
   }
 
-  def getBlockHeader(hash: Keccak256): DBResult[BlockHeader] =
+  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] =
     getHeaderChain(hash).getBlockHeader(hash)
 
   def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader =
@@ -102,7 +102,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(ChainIndex.from(hash))
   }
 
-  def getBlock(hash: Keccak256): Either[DiskIOError, Block] = {
+  def getBlock(hash: Keccak256): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
   }
 

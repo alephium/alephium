@@ -9,7 +9,7 @@ import org.alephium.serde._
 import org.rocksdb.{Options, RocksDB, RocksDBException}
 
 object Database {
-  def open(path: Path, options: Options): DBResult[Database] = {
+  def open(path: Path, options: Options): IOResult[Database] = {
     execute {
       RocksDB.loadLibrary()
       val db = RocksDB.open(options, path.toString)
@@ -17,20 +17,20 @@ object Database {
     }
   }
 
-  def dESTROY(path: Path, options: Options): DBResult[Unit] = execute {
+  def dESTROY(path: Path, options: Options): IOResult[Unit] = execute {
     RocksDB.destroyDB(path.toString, options)
   }
 
   @inline
-  private def execute[T](f: => T): DBResult[T] = {
+  private def execute[T](f: => T): IOResult[T] = {
     executeF(Right(f))
   }
 
   @inline
-  private def executeF[T](f: => DBResult[T]): DBResult[T] = {
+  private def executeF[T](f: => IOResult[T]): IOResult[T] = {
     try f
     catch {
-      case e: RocksDBException => Left(RocksDBError(e))
+      case e: RocksDBException => Left(RocksDBExpt(e))
     }
   }
 }
@@ -38,78 +38,95 @@ object Database {
 class Database private (db: RocksDB) {
   import Database._
 
-  def close(): DBResult[Unit] = execute {
+  def close(): IOResult[Unit] = execute {
     db.close()
   }
 
-  def getOpt(key: ByteString): DBResult[Option[ByteString]] = execute {
+  def closeUnsafe(): Unit = db.close()
+
+  def getOpt(key: ByteString): IOResult[Option[ByteString]] = execute {
+    getOptUnsafe(key)
+  }
+
+  def getOptUnsafe(key: ByteString): Option[ByteString] = {
     val result = db.get(key.toArray)
     if (result == null) None else Some(ByteString.fromArrayUnsafe(result))
   }
 
-  def get(key: ByteString): DBResult[ByteString] = executeF {
-    val result = db.get(key.toArray)
-    if (result == null) Left(KeyNotFound)
-    else Right(ByteString.fromArrayUnsafe(result))
+  def get(key: ByteString): IOResult[ByteString] = execute {
+    getUnsafe(key)
   }
 
-  def exists(key: ByteString): DBResult[Boolean] = execute {
+  def getUnsafe(key: ByteString): ByteString = {
+    val result = db.get(key.toArray)
+    if (result == null) throw RocksDBExpt.keyNotFound.e
+    else ByteString.fromArrayUnsafe(result)
+  }
+
+  def exists(key: ByteString): IOResult[Boolean] = execute {
+    existsUnsafe(key)
+  }
+
+  def existsUnsafe(key: ByteString): Boolean = {
     val result = db.get(key.toArray)
     result != null
   }
 
-  def put(key: ByteString, value: ByteString): DBResult[Unit] = execute {
+  def put(key: ByteString, value: ByteString): IOResult[Unit] = execute {
+    putUnsafe(key, value)
+  }
+
+  def putUnsafe(key: ByteString, value: ByteString): Unit = {
     db.put(key.toArray, value.toArray)
   }
 
-  def delete(key: ByteString): DBResult[Unit] = execute {
+  def delete(key: ByteString): IOResult[Unit] = execute {
+    deleteUnsafe(key)
+  }
+
+  def deleteUnsafe(key: ByteString): Unit = {
     db.delete(key.toArray)
   }
 
-  def getHeaderOpt(hash: Keccak256): DBResult[Option[BlockHeader]] = {
-    getOpt(hash.bytes).right.flatMap { dataOpt =>
-      dataOpt.fold[DBResult[Option[BlockHeader]]](Right(None)) { data =>
-        deserialize[BlockHeader](data) match {
-          case Left(e)       => Left(DeError(e))
-          case Right(header) => Right(Some(header))
-        }
+  def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] = execute {
+    getHeaderOptUnsafe(hash)
+  }
+
+  def getHeaderOptUnsafe(hash: Keccak256): Option[BlockHeader] = {
+    val dataOpt = getOptUnsafe(hash.bytes)
+    dataOpt.fold[Option[BlockHeader]](None) { data =>
+      deserialize[BlockHeader](data) match {
+        case Left(e)       => throw e
+        case Right(header) => Some(header)
       }
     }
   }
 
-  def getHeader(hash: Keccak256): DBResult[BlockHeader] = {
-    get(hash.bytes).right.flatMap { data =>
-      deserialize[BlockHeader](data).left.map(DeError)
+  def getHeader(hash: Keccak256): IOResult[BlockHeader] = execute {
+    getHeaderUnsafe(hash)
+  }
+
+  def getHeaderUnsafe(hash: Keccak256): BlockHeader = {
+    val data = getUnsafe(hash.bytes)
+    deserialize[BlockHeader](data) match {
+      case Left(e)       => throw e
+      case Right(header) => header
     }
   }
 
-  def putHeader(header: BlockHeader): DBResult[Unit] = {
+  def putHeader(header: BlockHeader): IOResult[Unit] = {
     put(header.hash.bytes, serialize(header))
   }
 
-  def deleteHeader(hash: Keccak256): DBResult[Unit] = {
+  def putHeaderUnsafe(header: BlockHeader): Unit = {
+    putUnsafe(header.hash.bytes, serialize(header))
+  }
+
+  def deleteHeader(hash: Keccak256): IOResult[Unit] = {
     delete(hash.bytes)
   }
-}
 
-sealed trait DBError
-object DBError {
-  def from(exception: Exception): DBError = exception match {
-    case e: RocksDBException => RocksDBError(e)
-    case e: SerdeError       => DeError(e)
-    case e: Exception        => Other(e)
+  def deleteHeaderUnsafe(hash: Keccak256): Unit = {
+    deleteUnsafe(hash.bytes)
   }
-}
-
-case class RocksDBError(exception: RocksDBException) extends DBError {
-  override def toString: String = exception.toString
-}
-case class DeError(serdeError: SerdeError) extends DBError {
-  override def toString: String = serdeError.toString
-}
-case class Other(e: Exception) extends DBError {
-  override def toString: String = e.toString
-}
-case object KeyNotFound extends DBError {
-  override def toString: String = "Key not found"
 }

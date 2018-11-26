@@ -89,11 +89,11 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
     chain.add(block, parent, weight).left.map(AddBlockResult.IOError)
   }
 
-  def add(block: Block, weight: Int): Either[DiskIOError, Unit] = {
+  def add(block: Block, weight: Int): IOResult[Unit] = {
     ???
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): Either[DiskIOError, Unit] = {
+  def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     ???
   }
 
@@ -126,7 +126,7 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
     else Left(AddBlockHeaderResult.MissingDeps(missingDeps))
   }
 
-  protected def add(header: BlockHeader, index: ChainIndex): DBResult[Unit] = {
+  protected def add(header: BlockHeader, index: ChainIndex): IOResult[Unit] = {
     val chain  = getHeaderChain(index)
     val parent = header.uncleHash(index.to)
     try {
@@ -134,15 +134,15 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
       chain.add(header, parent, weight)
     } catch {
       case e: Exception =>
-        Left(DBError.from(e))
+        Left(IOError.from(e))
     }
   }
 
-  def add(header: BlockHeader, weight: Int): DBResult[Unit] = {
+  def add(header: BlockHeader, weight: Int): IOResult[Unit] = {
     ???
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): DBResult[Unit] = {
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     ???
   }
 

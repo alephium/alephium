@@ -11,16 +11,16 @@ trait BlockPool extends BlockHashPool {
   def contains(block: Block): Boolean = contains(block.hash)
 
   // Assuming the hash is in the pool
-  def getBlock(hash: Keccak256): Either[DiskIOError, Block]
+  def getBlock(hash: Keccak256): IOResult[Block]
 
   // Assuming the block is verified
-  def add(block: Block, weight: Int): Either[DiskIOError, Unit]
+  def add(block: Block, weight: Int): IOResult[Unit]
 
   // Assuming the block is verified
-  def add(block: Block, parentHash: Keccak256, weight: Int): Either[DiskIOError, Unit]
+  def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
   // scalastyle:off return
-  def getBlocks(locators: AVector[Keccak256]): Either[DiskIOError, AVector[Block]] = {
+  def getBlocks(locators: AVector[Keccak256]): IOResult[AVector[Block]] = {
     var blocks = AVector.empty[Block]
     locators.foreach { hash =>
       if (contains(hash)) {
@@ -40,7 +40,7 @@ trait BlockPool extends BlockHashPool {
 
   // TODO: use ChainSlice instead of AVector[Block]
   // scalastyle:off return
-  def getBlockSlice(hash: Keccak256): Either[DiskIOError, AVector[Block]] = {
+  def getBlockSlice(hash: Keccak256): IOResult[AVector[Block]] = {
     var blocks = AVector.empty[Block]
     getBlockHashSlice(hash).map { hash =>
       getBlock(hash) match {
@@ -51,7 +51,7 @@ trait BlockPool extends BlockHashPool {
     Right(blocks)
   }
   // scalastyle:on return
-  def getBlockSlice(block: Block): Either[DiskIOError, AVector[Block]] = getBlockSlice(block.hash)
+  def getBlockSlice(block: Block): IOResult[AVector[Block]] = getBlockSlice(block.hash)
 
   def isTip(block: Block): Boolean = isTip(block.hash)
 
@@ -95,7 +95,7 @@ object AddBlockResult {
 
   sealed trait Error                                         extends AddBlockResult
   case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
-  case class IOError(error: DiskIOError)                     extends Error
+  case class IOError(error: IOError)                         extends Error
   case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding block: $message"
   }
