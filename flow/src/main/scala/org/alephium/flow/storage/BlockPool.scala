@@ -95,7 +95,7 @@ object AddBlockResult {
 
   sealed trait Error                                         extends AddBlockResult
   case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
-  case class IOError(error: IOError)                         extends Error
+  case class IOErrorForBlock(error: IOError)                 extends Error
   case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding block: $message"
   }

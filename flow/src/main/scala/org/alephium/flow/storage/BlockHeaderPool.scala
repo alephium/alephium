@@ -52,8 +52,9 @@ object AddBlockHeaderResult {
     override def toString: String = s"Missing #$deps.length deps"
   }
 
-  trait Error                    extends AddBlockHeaderResult
-  sealed trait VerificationError extends Error
+  trait Error                                 extends AddBlockHeaderResult
+  sealed trait VerificationError              extends Error
+  case class IOErrorForHeader(error: IOError) extends Error
   case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding blockheader: $message"
   }
