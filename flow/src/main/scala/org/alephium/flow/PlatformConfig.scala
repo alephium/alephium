@@ -175,6 +175,7 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   val dbPath = rootPath.resolve("db")
   val headerDB: Database = {
     DiskIO.createDirUnsafe(dbPath)
-    Database.openUnafe(dbPath.resolve("headers"), new Options().setCreateIfMissing(true))
+    val dbName = "headers-" + nodeId.shortHex
+    Database.openUnafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
 }
