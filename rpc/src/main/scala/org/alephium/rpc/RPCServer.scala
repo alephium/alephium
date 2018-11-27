@@ -19,7 +19,7 @@ import org.alephium.protocol.model.ChainIndex
 import org.alephium.rpc.model.ViewerQuery
 import org.alephium.util.Hex._
 
-trait RPCServer extends Platform with StrictLogging {
+trait RPCServer extends Platform with CORSHandler with StrictLogging {
   import RPCServer._
 
   def mode: Mode
@@ -53,11 +53,11 @@ trait RPCServer extends Platform with StrictLogging {
         complete((StatusCodes.Accepted, "Start mining"))
       }
     } ~
-      path("viewer") {
+      corsHandler(path("viewer") {
         get {
           handleWebSocketMessages(wsViewer(node))
         }
-      }
+      })
 
     Http()
       .bindAndHandle(route, "0.0.0.0", mode.httpPort)
