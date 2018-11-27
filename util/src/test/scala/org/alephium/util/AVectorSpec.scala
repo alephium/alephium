@@ -2,6 +2,7 @@ package org.alephium.util
 
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
+import org.scalatest.EitherValues._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -188,7 +189,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
-  it should "test existence" in new Fixture {
+  it should "contain" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc: AVector[A], a: A) =>
       vc.contains(a) is vc.toArray.contains(a)
       vc.foreach { elem =>
@@ -243,6 +244,30 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc1  = vc.filterNot(p)
       val arr1 = arr.filterNot(p)
       checkEq(vc1, arr1)
+    }
+  }
+
+  it should "traverse" in new Fixture {
+    def alwaysRight: A => Either[Unit, A] = Right.apply
+    def alwaysLeft: A  => Either[Unit, A] = _ => Left(())
+    forAll(vectorGen) { vc =>
+      val vc0 = vc.traverse(alwaysRight).right.value
+      vc0 is vc
+      vc.traverse(alwaysLeft).isLeft is true
+    }
+  }
+
+  it should "exists" in new Fixture {
+    forAll(vectorGen, ab.arbitrary) { (vc, a) =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.exists(_ == elem) is vc.contains(elem)
+      }
+      vc.exists(_ == a) is vc.contains(a)
+      vc.foreachWithIndex { (elem, index) =>
+        vc.existsWithIndex((e, i) => (e == elem) && (i == index)) is true
+        vc.existsWithIndex((e, i) => (e == elem) && (i == -1)) is false
+      }
     }
   }
 

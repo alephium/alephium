@@ -4,12 +4,20 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, BeforeAndAfter}
 
 import scala.annotation.tailrec
 
-class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
+class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
   behavior of "BlockFlow"
+
+  before {
+    DiskIO.createDir(config.diskIO.blockFolder).isRight is true
+  }
+
+  after {
+    TestUtils.cleanup(config.diskIO.blockFolder)
+  }
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow()
@@ -127,12 +135,12 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val deps = blockFlow.getBestDeps(chainIndex).deps
+    val deps = blockFlow.getBestDepsUnsafe(chainIndex).deps
 
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.from(deps, AVector.empty[Transaction], config.maxMiningTarget, nonce)
-      if (chainIndex.accept(block)) block else iter(nonce + 1)
+      if (chainIndex.validateDiff(block)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -150,10 +158,10 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
     blockFlow.getAllTips
       .map { tip =>
         val weight = blockFlow.getWeight(tip)
-        val block  = blockFlow.getBlock(tip)
-        val index  = block.chainIndex
+        val header = blockFlow.getBlockHeaderUnsafe(tip)
+        val index  = header.chainIndex
         val hash   = showHash(tip)
-        val deps   = block.header.blockDeps.map(showHash).mkString("-")
+        val deps   = header.blockDeps.map(showHash).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
       }
       .mkString("\n")

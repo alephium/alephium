@@ -22,6 +22,6 @@ class BlockFlowBench extends PlatformConfig.Default {
   def findBestDeps(): BlockDeps = {
     val i = RandomBytes.source.nextInt(config.groups)
     val j = RandomBytes.source.nextInt(config.groups)
-    blockFlow.getBestDeps(ChainIndex(i, j))
+    blockFlow.getBestDepsUnsafe(ChainIndex(i, j))
   }
 }

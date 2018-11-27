@@ -1,10 +1,8 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
-import org.alephium.serde.Serde
+import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
-
-import scala.util.Try
 
 case class UnsignedTransaction(inputs: AVector[TxInput], outputs: AVector[TxOutput])
 
@@ -18,10 +16,15 @@ object UnsignedTransaction {
         outputsSerde.serialize(input.outputs)
     }
 
-    override def _deserialize(input: ByteString): Try[(UnsignedTransaction, ByteString)] = {
+    override def _deserialize(
+        input: ByteString): Either[SerdeError, (UnsignedTransaction, ByteString)] = {
       for {
-        (inputs, rest1)  <- inputsSerde._deserialize(input)
-        (outputs, rest2) <- outputsSerde._deserialize(rest1)
+        inputsPair <- inputsSerde._deserialize(input)
+        inputs = inputsPair._1
+        rest1  = inputsPair._2
+        outputsPair <- outputsSerde._deserialize(rest1)
+        outputs = outputsPair._1
+        rest2   = outputsPair._2
       } yield (UnsignedTransaction(inputs, outputs), rest2)
     }
   }

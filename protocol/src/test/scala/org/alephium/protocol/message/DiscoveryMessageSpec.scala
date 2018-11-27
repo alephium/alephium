@@ -4,6 +4,7 @@ import org.alephium.protocol.config.DiscoveryConfigFixture
 import org.scalacheck.Arbitrary
 import org.alephium.protocol.model.{ModelGen, PeerId}
 import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
+import org.scalatest.EitherValues._
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code
@@ -24,9 +25,8 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     val peerFixture = new DiscoveryConfigFixture { override def groups: Int = 4 }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
-      val value = DiscoveryMessage.deserialize(bytes)(config).get
+      val value = DiscoveryMessage.deserialize(bytes)(config).right.value
       msg == value
     }
   }
-
 }

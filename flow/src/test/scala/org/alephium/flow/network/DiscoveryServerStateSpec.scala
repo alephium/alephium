@@ -10,6 +10,7 @@ import org.alephium.protocol.model.{ModelGen, PeerInfo}
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
+import org.scalatest.EitherValues._
 
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -43,7 +44,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
         createConfig(groupSize, 0, udpPort, peersPerGroup, scanFrequency)
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
-          val message = DiscoveryMessage.deserialize(send.payload)(peerConfig).get
+          val message = DiscoveryMessage.deserialize(send.payload)(peerConfig).right.value
           message.payload is a[T]
       }
     }

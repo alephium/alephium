@@ -1,12 +1,10 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde.RandomBytes
 
 class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
-
-  def accept(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
+  def validateDiff(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
     val actual = header.chainIndex
     from == actual.from && to == actual.to && {
       val current = BigInt(1, header.hash.bytes.toArray)
@@ -14,8 +12,8 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
     }
   }
 
-  def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
-    accept(block.header) && (block.header.txsHash == Keccak256.hash(block.transactions))
+  def validateDiff(block: Block)(implicit config: ConsensusConfig): Boolean = {
+    validateDiff(block.header)
   }
 
   def relateTo(groupIndex: GroupIndex): Boolean = {
@@ -33,7 +31,7 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
     from.value ^ to.value
   }
 
-  override def toString: String = s"ChainIndex($from, $to)"
+  override def toString: String = s"ChainIndex(${from.value}, ${to.toString})"
 }
 
 object ChainIndex {

@@ -12,12 +12,12 @@ import org.alephium.flow.network.PeerManager.PeerInfo
 import org.alephium.flow.storage._
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
-import org.alephium.serde.NotEnoughBytesException
+import org.alephium.serde.{NotEnoughBytesError, SerdeError}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.Random
 
 object TcpHandler {
 
@@ -35,16 +35,17 @@ object TcpHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serialize(message))
 
-  def deserialize(data: ByteString): Try[(AVector[Message], ByteString)] = {
+  def deserialize(data: ByteString): Either[SerdeError, (AVector[Message], ByteString)] = {
     @tailrec
-    def iter(rest: ByteString, acc: AVector[Message]): Try[(AVector[Message], ByteString)] = {
+    def iter(rest: ByteString,
+             acc: AVector[Message]): Either[SerdeError, (AVector[Message], ByteString)] = {
       Message._deserialize(rest) match {
-        case Success((message, newRest)) =>
+        case Right((message, newRest)) =>
           iter(newRest, acc :+ message)
-        case Failure(_: NotEnoughBytesException) =>
-          Success((acc, rest))
-        case Failure(e) =>
-          Failure(e)
+        case Left(_: NotEnoughBytesError) =>
+          Right((acc, rest))
+        case Left(e) =>
+          Left(e)
       }
     }
     iter(data, AVector.empty)
@@ -157,15 +158,16 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
     case Tcp.Received(data) =>
       TcpHandler.deserialize(unaligned ++ data) match {
-        case Success((messages, rest)) =>
+        case Right((messages, rest)) =>
           messages.foreach { message =>
             val cmdName = message.payload.getClass.getSimpleName
             log.debug(s"Received message of cmd@$cmdName from $remote")
             handle(message.payload)
           }
           context.become(handleWith(rest, next))
-        case Failure(_) =>
-          log.info(s"Received corrupted data from $remote with serde exception; Closing connection")
+        case Left(e) =>
+          log.info(
+            s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
           stop()
       }
     case TcpHandler.SendPing => sendPing()
@@ -210,29 +212,29 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       // TODO: support many blocks
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      val handler    = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
+      if (chainIndex.relateTo(config.mainGroup)) {
+        val handler = allHandlers.getBlockHandler(chainIndex)
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
+      } else {
+        log.warning(s"Received blocks for wrong chain ${chainIndex} from ${peerInfo.address}")
+      }
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
-      allHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
+      allHandlers.flowHandler ! FlowHandler.GetBlocks(locators)
     case SendHeaders(headers) =>
       log.debug(s"Received #${headers.length} block headers")
       // TODO: support many headers
       val header     = headers.head
       val chainIndex = header.chainIndex
-      if (chainIndex.from != config.mainGroup) {
-        if (chainIndex.to == config.mainGroup) {
-          val message = TcpHandler.envelope(GetBlocks(AVector(header.hash)))
-          val group   = chainIndex.from
-          context.parent ! PeerManager.Send(message, group)
-        } else {
-          val handler = allHandlers.getHeaderHandler(chainIndex)
-          handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
-        }
-      } // else ignore since the header comes from this node
+      if (!chainIndex.relateTo(config.mainGroup)) {
+        val handler = allHandlers.getHeaderHandler(chainIndex)
+        handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
+      } else {
+        log.warning(s"Received headers for wrong chain from ${peerInfo.address}")
+      }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")
-      allHandlers.flowHandler ! FlowHandler.GetHeadersAfter(locators)
+      allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
     case _ =>
       log.warning(s"Got unexpected payload type")
   }

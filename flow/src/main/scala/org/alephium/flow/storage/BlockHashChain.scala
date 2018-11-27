@@ -15,7 +15,7 @@ trait BlockHashChain extends BlockHashPool {
 
   protected val blockHashesTable: HashMap[Keccak256, BlockHashChain.TreeNode] = HashMap.empty
   protected val tips: HashSet[Keccak256]                                      = HashSet.empty
-  protected val confirmedBlocks: ArrayBuffer[BlockHashChain.TreeNode]         = ArrayBuffer.empty
+  protected val confirmedHashes: ArrayBuffer[BlockHashChain.TreeNode]         = ArrayBuffer.empty
 
   protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
 
@@ -35,7 +35,7 @@ trait BlockHashChain extends BlockHashPool {
     }
 
     pruneDueto(node)
-    confirmBlocks()
+    confirmHashes()
     ()
   }
 
@@ -79,18 +79,18 @@ trait BlockHashChain extends BlockHashPool {
     }
   }
 
-  private def confirmBlocks(): Unit = {
+  private def confirmHashes(): Unit = {
     val oldestTip = tips.view.map(blockHashesTable).minBy(_.height)
 
     @tailrec
     def iter(): Unit = {
-      if (confirmedBlocks.isEmpty && root.successors.size == 1) {
-        confirmedBlocks.append(root)
+      if (confirmedHashes.isEmpty && root.successors.size == 1) {
+        confirmedHashes.append(root)
         iter()
-      } else if (confirmedBlocks.nonEmpty) {
-        val lastConfirmed = confirmedBlocks.last
+      } else if (confirmedHashes.nonEmpty) {
+        val lastConfirmed = confirmedHashes.last
         if (lastConfirmed.successors.size == 1 && (oldestTip.height >= lastConfirmed.height + config.blockConfirmNum)) {
-          confirmedBlocks.append(lastConfirmed.successors.head)
+          confirmedHashes.append(lastConfirmed.successors.head)
           iter()
         }
       }
@@ -179,6 +179,11 @@ trait BlockHashChain extends BlockHashPool {
     isBefore(node1, node2)
   }
 
+  def getPredecessor(hash: Keccak256, height: Int): Keccak256 = {
+    val node = getNode(hash)
+    getPredecessor(node, height).blockHash
+  }
+
   private def getPredecessor(node: BlockHashChain.TreeNode,
                              height: Int): BlockHashChain.TreeNode = {
     @tailrec
@@ -197,7 +202,12 @@ trait BlockHashChain extends BlockHashPool {
       }
     }
 
-    iter(node)
+    if (height < confirmedHashes.size) {
+      val targetHash = confirmedHashes(height).blockHash
+      getNode(targetHash)
+    } else {
+      iter(node)
+    }
   }
 
   private def isBefore(node1: BlockHashChain.TreeNode, node2: BlockHashChain.TreeNode): Boolean = {
@@ -212,8 +222,9 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   def getConfirmedHash(height: Int): Option[Keccak256] = {
-    if (height < confirmedBlocks.size && height >= 0) {
-      Some(confirmedBlocks(height).blockHash)
+    assert(height >= 0)
+    if (height < confirmedHashes.size) {
+      Some(confirmedHashes(height).blockHash)
     } else None
   }
 }
