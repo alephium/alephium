@@ -16,20 +16,9 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
-  // scalastyle:off return
   def getHeaders(locators: AVector[Keccak256]): IOResult[AVector[BlockHeader]] = {
-    var blocks = AVector.empty[BlockHeader]
-    locators.foreach { hash =>
-      if (contains(hash)) {
-        getBlockHeader(hash) match {
-          case Left(error)  => return Left(error)
-          case Right(block) => blocks = blocks :+ block
-        }
-      }
-    }
-    Right(blocks)
+    locators.filter(contains).traverse(getBlockHeader)
   }
-  // scalastyle:on return
 
   def getHeight(bh: BlockHeader): Int = getHeight(bh.hash)
 

@@ -19,38 +19,18 @@ trait BlockPool extends BlockHashPool {
   // Assuming the block is verified
   def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
-  // scalastyle:off return
   def getBlocks(locators: AVector[Keccak256]): IOResult[AVector[Block]] = {
-    var blocks = AVector.empty[Block]
-    locators.foreach { hash =>
-      if (contains(hash)) {
-        getBlock(hash) match {
-          case Left(error)  => return Left(error)
-          case Right(block) => blocks = blocks :+ block
-        }
-      }
-    }
-    Right(blocks)
+    locators.filter(contains).traverse(getBlock)
   }
-  // scalastyle:on return
 
   def getHeight(block: Block): Int = getHeight(block.hash)
 
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
-  // scalastyle:off return
   def getBlockSlice(hash: Keccak256): IOResult[AVector[Block]] = {
-    var blocks = AVector.empty[Block]
-    getBlockHashSlice(hash).map { hash =>
-      getBlock(hash) match {
-        case Left(error)  => return Left(error)
-        case Right(block) => blocks = blocks :+ block
-      }
-    }
-    Right(blocks)
+    getBlockHashSlice(hash).traverse(getBlock)
   }
-  // scalastyle:on return
   def getBlockSlice(block: Block): IOResult[AVector[Block]] = getBlockSlice(block.hash)
 
   def isTip(block: Block): Boolean = isTip(block.hash)

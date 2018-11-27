@@ -2,6 +2,7 @@ package org.alephium.util
 
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
+import org.scalatest.EitherValues._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -246,7 +247,17 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
-  it should "exist" in new Fixture {
+  it should "traverse" in new Fixture {
+    def alwaysRight: A => Either[Unit, A] = Right.apply
+    def alwaysLeft: A  => Either[Unit, A] = _ => Left(())
+    forAll(vectorGen) { vc =>
+      val vc0 = vc.traverse(alwaysRight).right.value
+      vc0 is vc
+      vc.traverse(alwaysLeft).isLeft is true
+    }
+  }
+
+  it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
       arr.foreach { elem =>
