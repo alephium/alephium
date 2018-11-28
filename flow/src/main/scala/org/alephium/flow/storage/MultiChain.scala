@@ -122,12 +122,28 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     infos.mkString("; ")
   }
 
+  def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
+    for {
+      i    <- 0 until groups
+      j    <- 0 until groups
+      hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
+      header = getBlockHeaderUnsafe(hash)
+      if predicate(header)
+    } yield {
+      header
+    }
+  }
+
   def getBlockInfo: String = {
     val blocks = for {
       i    <- 0 until groups
       j    <- 0 until groups
       hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
-    } yield toJsonUnsafe(i, j, hash)
+    } yield {
+      val header = getBlockHeaderUnsafe(hash)
+      toJsonUnsafe(header)
+    }
+
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
     val heights = for {
       i <- 0 until groups
@@ -141,10 +157,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
 
-  def toJsonUnsafe(from: Int, to: Int, blockHash: Keccak256): String = {
-    val header    = getBlockHeaderUnsafe(blockHash)
+  def toJsonUnsafe(header: BlockHeader): String = {
+    val index     = header.chainIndex
+    val from      = index.from.value
+    val to        = index.to.value
     val timestamp = header.timestamp
-    val height    = getHeight(blockHash)
+    val height    = getHeight(header)
     val hash      = header.shortHex
     val deps = header.blockDeps
       .map(h => "\"" + h.shortHex + "\"")

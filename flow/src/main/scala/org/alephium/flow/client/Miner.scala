@@ -60,7 +60,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       tryMine(template, from, to) match {
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
-          log.info(s"A new block ${block.shortHex} is mined, elapsed $elapsed ms")
+          log.info(s"A new block ${block.shortHex} is mined for $chainIndex, elapsed $elapsed ms")
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)

@@ -68,6 +68,11 @@ alephium {
     scanFastFrequency = 10.seconds
     neighborsPerGroup = 8
   }
+
+  rpc {
+    viewerBlockAgeLimit = 30 minutes
+  }
+
   bootstrap=""
   bootstrap = ${?bootstrap}
 }
