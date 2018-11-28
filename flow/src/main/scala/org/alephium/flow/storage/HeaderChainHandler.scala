@@ -17,12 +17,14 @@ object HeaderChainHandler {
   case class AddHeaders(headers: AVector[BlockHeader], origin: DataOrigin)
 }
 
-class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
-    implicit config: PlatformConfig)
-    extends BaseActor {
+class HeaderChainHandler(val blockFlow: BlockFlow,
+                         val chainIndex: ChainIndex,
+                         peerManager: ActorRef)(implicit val config: PlatformConfig)
+    extends BaseActor
+    with ChainHandlerLogger {
   import HeaderChainHandler._
 
-  val chain = blockFlow.getHeaderChain(chainIndex)
+  val chain: BlockHeaderPool = blockFlow.getHeaderChain(chainIndex)
 
   override def receive: Receive = {
     case AddHeaders(headers, origin) =>
@@ -43,13 +45,6 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
           log.warning(s"Failed in adding new header: ${x.toString}")
       }
       sender() ! result
-  }
-
-  def logInfo(header: BlockHeader): Unit = {
-    val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
-    val elapsedTime = System.currentTimeMillis() - header.timestamp
-    log.info(
-      s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
   }
 
   def broadcast(header: BlockHeader, origin: DataOrigin): Unit = {

@@ -18,10 +18,11 @@ object BlockChainHandler {
 }
 
 // TODO: investigate concurrency in master branch
-class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
-    implicit config: PlatformConfig)
-    extends BaseActor {
-  val chain: BlockChain = blockFlow.getBlockChain(chainIndex)
+class BlockChainHandler(val blockFlow: BlockFlow, val chainIndex: ChainIndex, peerManager: ActorRef)(
+    implicit val config: PlatformConfig)
+    extends BaseActor
+    with ChainHandlerLogger {
+  val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
     case BlockChainHandler.AddBlocks(blocks, origin) =>
@@ -32,7 +33,7 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          logInfo(block)
+          logInfo(block.header)
           broadcast(block, origin)
         case AddBlockResult.AlreadyExisted =>
           log.debug(s"Block already existed")
@@ -44,12 +45,6 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
       }
 
       sender() ! result
-  }
-
-  def logInfo(block: Block): Unit = {
-    val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
-    val elapsedTime = System.currentTimeMillis() - block.header.timestamp
-    log.info(s"$chainIndex; total: $total; ${chain.show(block.hash)}; elapsed: ${elapsedTime}ms")
   }
 
   def broadcast(block: Block, origin: DataOrigin): Unit = {
