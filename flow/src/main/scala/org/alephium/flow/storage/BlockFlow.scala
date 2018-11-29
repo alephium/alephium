@@ -8,7 +8,7 @@ import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
 
-class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
+class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with FlowUtils {
   import config.genesisBlocks
 
   private def mainGroup: GroupIndex = config.mainGroup
