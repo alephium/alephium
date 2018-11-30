@@ -10,6 +10,7 @@ import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 
 object Miner {
   sealed trait Command
@@ -38,6 +39,8 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformConfig)
     extends BaseActor {
   import node.allHandlers
+  var totalMiningCount = 0 // This counts how many mining tasks got run so far
+  var taskStartingTime = 0l // This is the starting time for current task
 
   val blockHandler: ActorRef = allHandlers.getBlockHandler(chainIndex)
 
@@ -57,13 +60,20 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   protected def _mine(template: BlockTemplate, lastTs: Long): Receive = {
     case Miner.Nonce(from, to) =>
+      totalMiningCount += 1
       tryMine(template, from, to) match {
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
-          log.info(s"A new block ${block.shortHex} is mined for $chainIndex, elapsed $elapsed ms")
+          log.info(
+            s"A new block ${block.shortHex} is mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
-          self ! Miner.Nonce(to, 2 * to - from)
+          if (System.currentTimeMillis() - taskStartingTime >= 5.seconds.toMillis) {
+            allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+            context become collect
+          } else {
+            self ! Miner.Nonce(to, to + config.nonceStep)
+          }
       }
 
     case AddBlockResult.Success =>
@@ -92,6 +102,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           val lastTs   = header.timestamp
           val template = BlockTemplate(deps, target, transactions)
           context become mine(template, lastTs)
+          taskStartingTime = System.currentTimeMillis()
           self ! Miner.Nonce(0, config.nonceStep)
       }
   }
