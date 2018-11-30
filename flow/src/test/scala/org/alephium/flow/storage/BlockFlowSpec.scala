@@ -20,7 +20,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
   }
 
   it should "compute correct blockflow height" in {
-    val blockFlow = BlockFlow()
+    val blockFlow = BlockFlow.createUnsafe()
     config.genesisBlocks.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block.hash) is 0
     }
@@ -28,7 +28,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
 
   it should "work for at least 2 user group when adding blocks sequentially" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow()
+      val blockFlow = BlockFlow.createUnsafe()
 
       val chainIndex1 = ChainIndex(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
@@ -54,7 +54,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow()
+      val blockFlow = BlockFlow.createUnsafe()
 
       val newBlocks1 = for {
         i <- 0 to 1
@@ -105,7 +105,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
 
   it should "work for 2 user group when there is forks" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow()
+      val blockFlow = BlockFlow.createUnsafe()
 
       val chainIndex1 = ChainIndex(0, 0)
       val block11     = mine(blockFlow, chainIndex1)
