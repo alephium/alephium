@@ -72,6 +72,18 @@ class DiskIO private (root: Path) {
     }
   }
 
+  def putBlockUnsafe(block: Block): Int = {
+    val data    = serialize(block)
+    val outPath = getBlockPath(block)
+    val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
+    try {
+      val length = out.write(data.toByteBuffer)
+      length
+    } finally {
+      out.close()
+    }
+  }
+
   def getBlock(blockHash: Keccak256): IOResult[Block] = {
     val dataIOResult = execute {
       val inPath = getBlockPath(blockHash)

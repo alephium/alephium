@@ -14,7 +14,7 @@ import org.openjdk.jmh.annotations._
 @State(Scope.Thread)
 class BlockFlowBench extends PlatformConfig.Default {
 
-  val blockFlow: BlockFlow = BlockFlow()(config)
+  val blockFlow: BlockFlow = BlockFlow.createUnsafe()(config)
 
   // TODO: benchmark blockheader verification
 

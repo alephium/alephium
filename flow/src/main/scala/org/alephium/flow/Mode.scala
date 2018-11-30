@@ -58,7 +58,7 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root")
+      Node.createUnsafe(builders, "Root")
   }
 
   class Local extends Mode {
@@ -75,6 +75,6 @@ object Mode {
     }
 
     override def createNode: Node =
-      Node(builders, "Root")
+      Node.createUnsafe(builders, "Root")
   }
 }

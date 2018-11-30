@@ -17,18 +17,18 @@ case class Node(
 object Node {
   type Builder = TcpHandler.Builder
 
-  def apply(builders: Builder, name: String)(implicit config: PlatformConfig): Node = {
+  def createUnsafe(builders: Builder, name: String)(implicit config: PlatformConfig): Node = {
 
     val system      = ActorSystem(name, config.all)
     val peerManager = system.actorOf(PeerManager.props(builders), "PeerManager")
 
-    val blockFlow       = BlockFlow()
+    val blockFlow       = BlockFlow.createUnsafe()
     val allHandlers     = AllHandlers.build(system, peerManager, blockFlow)
     val server          = system.actorOf(TcpServer.props(config.port, peerManager), "TcpServer")
     val discoveryProps  = DiscoveryServer.props(config.bootstrap)(config.discoveryConfig)
     val discoveryServer = system.actorOf(discoveryProps, "DiscoveryServer")
     peerManager ! PeerManager.Set(server, allHandlers, discoveryServer)
 
-    Node(name, config, system, blockFlow, peerManager, allHandlers)
+    new Node(name, config, system, blockFlow, peerManager, allHandlers)
   }
 }

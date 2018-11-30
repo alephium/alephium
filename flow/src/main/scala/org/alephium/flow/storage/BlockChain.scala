@@ -35,20 +35,21 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def persistBlock(block: Block): IOResult[Unit] = {
     diskIO.putBlock(block).right.map(_ => ())
     // TODO: handle transactions later
-//    block.transactions.foreach { transaction =>
-//      transactionsTable += transaction.hash -> transaction
-//    }
+  }
+
+  protected def persistBlockUnsafe(block: Block): Unit = {
+    diskIO.putBlockUnsafe(block)
+    ()
   }
 }
 
 object BlockChain {
 
-  def fromGenesis(genesis: Block)(implicit config: PlatformConfig): BlockChain =
-    apply(genesis, 0, 0)
+  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockChain =
+    createUnsafe(genesis, 0, 0)
 
-  def apply(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
+  private def createUnsafe(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
       implicit _config: PlatformConfig): BlockChain = {
-
     val rootNode = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight)
 
     new BlockChain {
@@ -57,9 +58,9 @@ object BlockChain {
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
+      this.persistBlockUnsafe(rootBlock)
+      this.addHeaderUnsafe(rootBlock.header)
       this.addNode(rootNode)
-      this.addHeader(rootBlock.header)
-      this.persistBlock(rootBlock)
     }
   }
 }
