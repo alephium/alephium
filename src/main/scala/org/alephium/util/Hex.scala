@@ -8,6 +8,10 @@ import scala.reflect.macros.blackbox
 
 object Hex {
 
+  def toHexString(input: Array[Byte]): String = {
+    BHex.toHexString(input)
+  }
+
   implicit class HexStringSyntax(val sc: StringContext) extends AnyVal {
     def hex(): ByteString = macro hexImpl
   }

@@ -4,8 +4,9 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Udp}
-import akka.util.ByteString
+import org.alephium.primitive.BlockHeader
 import org.alephium.util.BaseActor
+import org.alephium.serde._
 
 object PeerHandler {
   def props(port: Int): Props = Props(new PeerHandler(port))
@@ -14,7 +15,7 @@ object PeerHandler {
   case class Ready(port: Int, listener: ActorRef)
 
   sealed trait Command
-  case class Send(message: String, remote: InetSocketAddress) extends Command
+  case class Send(blockHeader: BlockHeader, remote: InetSocketAddress) extends Command
 }
 
 class PeerHandler(port: Int) extends BaseActor {
@@ -31,10 +32,10 @@ class PeerHandler(port: Int) extends BaseActor {
 
   def ready(socket: ActorRef): Receive = {
     case Udp.Received(data, remote) =>
-      logger.debug(s"Received `${data.decodeString("UTF-8")}` from " + remote.toString)
-    case PeerHandler.Send(message: String, remote: InetSocketAddress) =>
-      socket ! Udp.Send(ByteString(message), remote)
-      logger.debug(s"Send message `$message` to " + remote.toString)
+      logger.debug(s"Received `${deserialize[BlockHeader](data)}` from " + remote.toString)
+    case PeerHandler.Send(blockHeader: BlockHeader, remote: InetSocketAddress) =>
+      socket ! Udp.Send(serialize(blockHeader), remote)
+      logger.debug(s"Send message `$blockHeader` to " + remote.toString)
     case Udp.Unbind =>
       socket ! Udp.Unbind
       logger.debug(s"Unbind $port")
