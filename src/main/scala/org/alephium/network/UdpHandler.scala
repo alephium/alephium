@@ -8,17 +8,17 @@ import org.alephium.primitive.BlockHeader
 import org.alephium.util.BaseActor
 import org.alephium.serde._
 
-object PeerHandler {
-  def props(port: Int): Props = Props(new PeerHandler(port))
+object UdpHandler {
+  def props(port: Int): Props = Props(new UdpHandler(port))
 
   sealed trait Event
-  case class Ready(port: Int, listener: ActorRef)
+  case class Ready(port: Int, listener: ActorRef) extends Event
 
   sealed trait Command
   case class Send(blockHeader: BlockHeader, remote: InetSocketAddress) extends Command
 }
 
-class PeerHandler(port: Int) extends BaseActor {
+class UdpHandler(port: Int) extends BaseActor {
   import context.system
 
   val address = new InetSocketAddress(port)
@@ -33,7 +33,7 @@ class PeerHandler(port: Int) extends BaseActor {
   def ready(socket: ActorRef): Receive = {
     case Udp.Received(data, remote) =>
       logger.debug(s"Received `${deserialize[BlockHeader](data)}` from " + remote.toString)
-    case PeerHandler.Send(blockHeader: BlockHeader, remote: InetSocketAddress) =>
+    case UdpHandler.Send(blockHeader: BlockHeader, remote: InetSocketAddress) =>
       socket ! Udp.Send(serialize(blockHeader), remote)
       logger.debug(s"Send message `$blockHeader` to " + remote.toString)
     case Udp.Unbind =>
