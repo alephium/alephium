@@ -8,6 +8,7 @@ import org.alephium.network.PeerHandler
 import org.alephium.network.PeerHandler.Send
 
 object Alephium extends App {
+
   val system = ActorSystem("Alephium")
 
   val port1 = 9080

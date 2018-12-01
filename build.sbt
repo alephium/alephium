@@ -13,12 +13,26 @@ val commonSettings = Seq(
   name := "alephium",
   version := "0.1.0-SNAPSHOT",
   scalaVersion := "2.12.3",
+  parallelExecution in Test := false,
+  scalacOptions := Seq(
+    "-unchecked",
+    "-deprecation",
+    "-feature",
+    "-Xfatal-warnings",
+    "-Xlint:unsound-match",
+    "-Ywarn-inaccessible",
+    "-Ywarn-unused-import",
+    "-encoding", "utf-8"
+  ),
 )
 
 val dependencies = Seq(
   akka,
   `akka-slf4j`,
+  shapeless,
   scrypto,
   `scala-logging`,
-  logback
+  logback,
+  scalaTest,
+  scalaCheck
 )
