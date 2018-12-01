@@ -1,3 +1,5 @@
+image: java:8
+
 before_script:
   - apt-get update -y
   - apt-get install apt-transport-https -y
