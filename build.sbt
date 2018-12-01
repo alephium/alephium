@@ -22,8 +22,9 @@ val commonSettings = Seq(
     "-Xlint:unsound-match",
     "-Ywarn-inaccessible",
     "-Ywarn-unused-import",
-    "-encoding", "utf-8"
+    "-encoding", "utf-8",
   ),
+  scalacOptions in Test += "-Xcheckinit"
 )
 
 val dependencies = Seq(
