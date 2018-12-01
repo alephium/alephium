@@ -5,8 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.io.Udp
 import org.alephium.crypto.Hash.Sha256
-import org.alephium.network.PeerHandler
-import org.alephium.network.PeerHandler.Send
+import org.alephium.network.UdpHandler
+import org.alephium.network.UdpHandler.Send
 import org.alephium.primitive.BlockHeader
 
 object Alephium extends App {
@@ -15,8 +15,8 @@ object Alephium extends App {
 
   val port1 = 9080
   val port2 = 9081
-  val peer1 = system.actorOf(PeerHandler.props(port1), "listener-1")
-  val peer2 = system.actorOf(PeerHandler.props(port2), "listener-2")
+  val peer1 = system.actorOf(UdpHandler.props(port1), "listener-1")
+  val peer2 = system.actorOf(UdpHandler.props(port2), "listener-2")
 
   Thread.sleep(1000)
 
