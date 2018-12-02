@@ -6,9 +6,20 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.network.message.NetworkMessage
 
+object TcpHandler {
+  sealed trait Command
+  case object Start extends Command
+}
+
 trait TcpHandler extends MessageHandler {
 
   def remote: InetSocketAddress
+
+  def awaitStart(connection: ActorRef): Receive = {
+    case TcpHandler.Start =>
+      startPing(connection)
+      context.become(handle(connection))
+  }
 
   def handle(connection: ActorRef): Receive =
     handleEvent orElse handleCommand(connection)
@@ -25,7 +36,7 @@ trait TcpHandler extends MessageHandler {
 
   def handleCommand(connection: ActorRef): Receive = {
     case message: NetworkMessage =>
-      connection ! Tcp.Write(NetworkMessage.serializer.serialize(message))
+      connection ! envelope(message)
   }
 }
 
@@ -35,5 +46,5 @@ object SimpleTcpHandler {
 }
 
 case class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef) extends TcpHandler {
-  override def receive: Receive = handle(connection)
+  override def receive: Receive = awaitStart(connection)
 }

@@ -34,5 +34,6 @@ class TcpServer(port: Int) extends BaseActor {
       val handler = context.actorOf(SimpleTcpHandler.props(remoteAddress, connection),
                                     s"${localAddress.getPort}-${remoteAddress.getPort}")
       connection ! Tcp.Register(handler)
+      handler ! TcpHandler.Start
   }
 }
