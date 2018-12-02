@@ -9,13 +9,11 @@ object TcpClient {
   def props(remote: InetSocketAddress): Props = Props(new TcpClient(remote))
 }
 
-class TcpClient(remote: InetSocketAddress) extends TcpHandler {
+case class TcpClient(remote: InetSocketAddress) extends TcpHandler {
 
   import context.system
 
   IO(Tcp) ! Tcp.Connect(remote)
-
-  override def remoteAddress: InetSocketAddress = remote
 
   override def receive: Receive = connecting
 
