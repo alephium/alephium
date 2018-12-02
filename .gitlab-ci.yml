@@ -1,5 +1,19 @@
 image: java:8
 
+variables:
+  SBT_OPTS: "-Dsbt.global.base=sbt-cache/sbtboot -Dsbt.boot.directory=sbt-cache/boot -Dsbt.ivy.home=sbt-cache/ivy"
+  COURSIER_CACHE: sbt-cache/coursier
+
+
+cache:
+  # key: "$CI_BUILD_REF_NAME"
+  untracked: true
+  paths:
+    - "sbt-cache/ivy/cache"
+    - "sbt-cache/boot"
+    - "sbt-cache/sbtboot"
+    - "sbt-cache/coursier"
+
 before_script:
   - apt-get update -y
   - apt-get install apt-transport-https -y
