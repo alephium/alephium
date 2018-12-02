@@ -9,13 +9,17 @@ import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-trait Serde[T] { self =>
+trait Serializer[T] {
   def serialize(input: T): ByteString
+}
 
+trait Deserializer[T] {
   def _deserialize(input: ByteString): Try[(T, ByteString)]
 
   def deserialize(input: ByteString): Try[T]
+}
 
+trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
   def xmap[S](to: T => S, from: S => T): Serde[S] = new Serde[S] {
     override def serialize(input: S): ByteString = {
