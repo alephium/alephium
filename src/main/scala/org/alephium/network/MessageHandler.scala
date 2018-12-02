@@ -2,12 +2,11 @@ package org.alephium.network
 
 import akka.actor.{ActorRef, Timers}
 import akka.io.Tcp
+import org.alephium.constant.Network
 import org.alephium.network.message.{NetworkMessage, Ping, Pong}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 object MessageHandler {
   sealed trait Command
@@ -51,7 +50,7 @@ trait MessageHandler extends BaseActor with Timers {
     } else {
       pingNonce = Random.nextInt()
       connection ! envelope(NetworkMessage(Ping(pingNonce)))
-      timers.startSingleTimer(MessageHandler, MessageHandler.SendPing, 1 minute)
+      timers.startSingleTimer(MessageHandler, MessageHandler.SendPing, Network.pingFrequency)
     }
   }
 }
