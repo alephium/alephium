@@ -22,4 +22,7 @@ object TcpFun extends App {
   val bh2 = BlockHeader(Sha256.hash("bh2"), 2)
   client1 ! bh1
   client2 ! bh2
+
+  Thread.sleep(100)
+  system.terminate()
 }

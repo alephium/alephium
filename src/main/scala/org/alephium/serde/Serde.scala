@@ -5,23 +5,27 @@ import java.nio.ByteBuffer
 import akka.util.ByteString
 import shapeless._
 
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 trait Serde[T] { self =>
-  // Number of bytes necessary for serialization
-  def serdeSize: Int
-
   def serialize(input: T): ByteString
+
+  def _deserialize(input: ByteString): Try[(T, ByteString)]
 
   def deserialize(input: ByteString): Try[T]
 
   // Note: make sure that T and S are isomorphic
   def xmap[S](to: T => S, from: S => T): Serde[S] = new Serde[S] {
-    override def serdeSize: Int = self.serdeSize
-
     override def serialize(input: S): ByteString = {
       self.serialize(from(input))
+    }
+
+    override def _deserialize(input: ByteString): Try[(S, ByteString)] = {
+      self._deserialize(input).map {
+        case (t, rest) => (to(t), rest)
+      }
     }
 
     override def deserialize(input: ByteString): Try[S] = {
@@ -30,9 +34,19 @@ trait Serde[T] { self =>
   }
 }
 
+trait FixedSizeSerde[T] extends Serde[T] {
+  def serdeSize: Int
+
+  override def _deserialize(input: ByteString): Try[(T, ByteString)] =
+    if (input.size >= serdeSize) {
+      val (init, rest) = input.splitAt(serdeSize)
+      deserialize(init).map((_, rest))
+    } else Failure(InvalidNumberOfBytesException(serdeSize, input.size))
+}
+
 object Serde {
-  object ByteSerde extends Serde[Byte] {
-    override def serdeSize: Int = java.lang.Byte.BYTES
+  object ByteSerde extends FixedSizeSerde[Byte] {
+    override val serdeSize: Int = java.lang.Byte.BYTES
 
     override def serialize(input: Byte): ByteString = {
       ByteString(input)
@@ -45,7 +59,7 @@ object Serde {
     }
   }
 
-  object IntSerde extends Serde[Int] {
+  object IntSerde extends FixedSizeSerde[Int] {
     override val serdeSize: Int = java.lang.Integer.BYTES
 
     override def serialize(input: Int): ByteString = {
@@ -61,39 +75,66 @@ object Serde {
 
   def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[Seq[T]] =
     new Serde[Seq[T]] {
-      override val serdeSize: Int = size * serde.serdeSize
-
       override def serialize(input: Seq[T]): ByteString = {
         input.map(serde.serialize).foldLeft(ByteString.empty)(_ ++ _)
       }
 
-      override def deserialize(input: ByteString): Try[Seq[T]] = Try {
-        if (input.size == size) {
-          input
-            .sliding(serde.serdeSize, serde.serdeSize)
-            .map { bs =>
-              serde.deserialize(bs) match {
-                case Success(value)     => value
-                case Failure(exception) => throw exception
-              }
-            }
-            .toSeq
-        } else throw InvalidNumberOfBytesException(serdeSize, input.size)
+      @tailrec
+      private def _deserialize(rest: ByteString,
+                               itemCnt: Int,
+                               output: Seq[T]): Try[(Seq[T], ByteString)] = {
+        if (itemCnt == 0) Success((output, rest))
+        else {
+          serde._deserialize(rest) match {
+            case Success((t, tRest)) =>
+              _deserialize(tRest, itemCnt - 1, output :+ t)
+            case Failure(e) => Failure(e)
+          }
+        }
+      }
+
+      override def _deserialize(input: ByteString): Try[(Seq[T], ByteString)] = {
+        _deserialize(input, size, Seq.empty)
+      }
+
+      override def deserialize(input: ByteString): Try[Seq[T]] =
+        _deserialize(input).flatMap {
+          case (output, rest) =>
+            if (rest.isEmpty) Success(output)
+            else Failure(InvalidNumberOfBytesException(input.size - rest.size, input.size))
+        }
+    }
+
+  object HNilSerde extends FixedSizeSerde[HNil] {
+
+    override def serdeSize: Int = 0
+
+    override def serialize(input: HNil): ByteString = ByteString.empty
+
+    override def _deserialize(input: ByteString): Try[(HNil, ByteString)] = Success((HNil, input))
+
+    override def deserialize(input: ByteString): Try[HNil] =
+      if (input.isEmpty) Success(HNil) else throw InvalidNumberOfBytesException(0, input.size)
+  }
+
+  def prepend[A, L <: HList](a: Serde[A], l: Serde[L]): Serde[A :: L] =
+    new Serde[A :: L] {
+      override def serialize(input: A :: L): ByteString = {
+        a.serialize(input.head) ++ l.serialize(input.tail)
+      }
+
+      override def _deserialize(input: ByteString): Try[(::[A, L], ByteString)] = {
+        for {
+          (a, aRest) <- a._deserialize(input)
+          (l, lRest) <- l._deserialize(aRest)
+        } yield (a :: l, lRest)
+      }
+
+      override def deserialize(input: ByteString): Try[A :: L] = {
+        for {
+          (a, aRest) <- a._deserialize(input)
+          l          <- l.deserialize(aRest)
+        } yield a :: l
       }
     }
-
-  def prepend[A, L <: HList](a: Serde[A], l: Serde[L]): Serde[A :: L] = new Serde[A :: L] {
-    override val serdeSize: Int = a.serdeSize + l.serdeSize
-
-    override def serialize(input: A :: L): ByteString = {
-      a.serialize(input.head) ++ l.serialize(input.tail)
-    }
-
-    override def deserialize(input: ByteString): Try[A :: L] = {
-      for {
-        head <- a.deserialize(input.slice(0, a.serdeSize))
-        tail <- l.deserialize(input.slice(a.serdeSize, serdeSize))
-      } yield head :: tail
-    }
-  }
 }

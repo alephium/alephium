@@ -2,7 +2,7 @@ package org.alephium.crypto
 
 import java.nio.charset.Charset
 
-import org.alephium.serde.Serde
+import org.alephium.serde._
 import org.alephium.util.Hex
 import scorex.crypto.hash.{Sha256 => _Sha256}
 
