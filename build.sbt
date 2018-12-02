@@ -18,6 +18,7 @@ val commonSettings = Seq(
     "-deprecation",
     "-encoding", "utf-8",
     "-explaintypes",
+    "-feature",
     "-unchecked",
     "-Xfatal-warnings",
     "-Xlint:adapted-args",
@@ -48,10 +49,10 @@ val commonSettings = Seq(
     "-Ywarn-numeric-widen",
     "-Ywarn-unused:implicits",
     "-Ywarn-unused:imports",
-//    "-Ywarn-unused:locals",
+    "-Ywarn-unused:locals",
     "-Ywarn-unused:params",
     "-Ywarn-unused:patvars",
-//    "-Ywarn-unused:privates",
+    "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
   scalacOptions in Test += "-Xcheckinit"
