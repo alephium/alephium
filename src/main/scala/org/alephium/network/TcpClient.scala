@@ -26,6 +26,7 @@ case class TcpClient(remote: InetSocketAddress) extends TcpHandler {
       context.parent ! "Connected"
       val connection = sender()
       connection ! Tcp.Register(self)
-      context.become(handle(connection))
+      context.become(awaitStart(connection))
+      self ! TcpHandler.Start
   }
 }
