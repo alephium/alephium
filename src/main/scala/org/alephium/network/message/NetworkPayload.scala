@@ -11,7 +11,7 @@ sealed trait NetworkPayload
 object NetworkPayload {
   val cmdCodes: Map[String, Int] = Map(
     "Ping" -> 0,
-    "Pong" -> 1,
+    "Pong" -> 1
   )
 
   implicit val serializer: Serializer[NetworkPayload] = {
