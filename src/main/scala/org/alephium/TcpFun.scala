@@ -14,7 +14,4 @@ object TcpFun extends App {
 
   val client1 = system.actorOf(TcpClient.props(new InetSocketAddress(port)), "client1")
   val client2 = system.actorOf(TcpClient.props(new InetSocketAddress(port)), "client2")
-
-  Thread.sleep(1500)
-  system.terminate()
 }
