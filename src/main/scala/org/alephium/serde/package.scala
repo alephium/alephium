@@ -8,9 +8,11 @@ import scala.util.Try
 package object serde {
   import Serde._
 
-  def serialize[T](input: T)(implicit serde: Serde[T]): ByteString = serde.serialize(input)
+  def serialize[T](input: T)(implicit serializer: Serializer[T]): ByteString =
+    serializer.serialize(input)
 
-  def deserialize[T](input: ByteString)(implicit serde: Serde[T]): Try[T] = serde.deserialize(input)
+  def deserialize[T](input: ByteString)(implicit deserializer: Deserializer[T]): Try[T] =
+    deserializer.deserialize(input)
 
   implicit val byteSerde: Serde[Byte] = ByteSerde
 
