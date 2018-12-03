@@ -1,4 +1,4 @@
-package org.alephium.primitive
+package org.alephium.protocol
 
 import org.alephium.crypto.Sha256
 
