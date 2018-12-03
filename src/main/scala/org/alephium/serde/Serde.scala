@@ -3,7 +3,6 @@ package org.alephium.serde
 import java.nio.ByteBuffer
 
 import akka.util.ByteString
-import shapeless._
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -161,36 +160,48 @@ object Serde {
       }
     }
 
-  object HNilSerde extends FixedSizeSerde[HNil] {
-
-    override def serdeSize: Int = 0
-
-    override def serialize(input: HNil): ByteString = ByteString.empty
-
-    override def _deserialize(input: ByteString): Try[(HNil, ByteString)] = Success((HNil, input))
-
-    override def deserialize(input: ByteString): Try[HNil] =
-      if (input.isEmpty) Success(HNil) else throw InvalidNumberOfBytesException(0, input.size)
-  }
-
-  def prepend[A, L <: HList](a: Serde[A], l: Serde[L]): Serde[A :: L] =
-    new Serde[A :: L] {
-      override def serialize(input: A :: L): ByteString = {
-        a.serialize(input.head) ++ l.serialize(input.tail)
+  def forProduct1[A, T](pack: A => T, unpack: T => A)(implicit serdeA: Serde[A]): Serde[T] =
+    new Serde[T] {
+      override def serialize(input: T): ByteString = {
+        val a = unpack(input)
+        serdeA.serialize(a)
       }
 
-      override def _deserialize(input: ByteString): Try[(::[A, L], ByteString)] = {
+      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
         for {
-          (a, aRest) <- a._deserialize(input)
-          (l, lRest) <- l._deserialize(aRest)
-        } yield (a :: l, lRest)
+          (a, rest) <- serdeA._deserialize(input)
+        } yield (pack(a), rest)
+      }
+    }
+
+  def forProduct2[A, B, T](pack: (A, B) => T, unpack: T => (A, B))(implicit serdeA: Serde[A], serdeB: Serde[B]): Serde[T] =
+    new Serde[T] {
+      override def serialize(input: T): ByteString = {
+        val (a, b) = unpack(input)
+        serdeA.serialize(a) ++ serdeB.serialize(b)
       }
 
-      override def deserialize(input: ByteString): Try[A :: L] = {
+      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
         for {
-          (a, aRest) <- a._deserialize(input)
-          l          <- l.deserialize(aRest)
-        } yield a :: l
+          (a, rest1) <- serdeA._deserialize(input)
+          (b, rest2) <- serdeB._deserialize(rest1)
+        } yield (pack(a, b), rest2)
+      }
+    }
+
+  def forProduct3[A, B, C, T](pack: (A, B, C) => T, unpack: T => (A, B, C))(implicit serdeA: Serde[A], serdeB: Serde[B], serdeC: Serde[C]): Serde[T] =
+    new Serde[T] {
+      override def serialize(input: T): ByteString = {
+        val (a, b, c) = unpack(input)
+        serdeA.serialize(a) ++ serdeB.serialize(b) ++ serdeC.serialize(c)
+      }
+
+      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
+        for {
+          (a, rest1) <- serdeA._deserialize(input)
+          (b, rest2) <- serdeB._deserialize(rest1)
+          (c, rest3) <- serdeC._deserialize(rest2)
+        } yield (pack(a, b, c), rest3)
       }
     }
 }

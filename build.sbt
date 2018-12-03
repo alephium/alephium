@@ -61,12 +61,10 @@ val commonSettings = Seq(
 val dependencies = Seq(
   akka,
   `akka-slf4j`,
-  shapeless,
   scrypto,
   `scala-logging`,
   logback,
   scalaTest,
   scalaCheck,
-  "org.locationtech.jts" % "jts-core" % "1.15.0",
   curve25519
 )
