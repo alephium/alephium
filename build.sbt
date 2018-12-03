@@ -66,5 +66,6 @@ val dependencies = Seq(
   `scala-logging`,
   logback,
   scalaTest,
-  scalaCheck
+  scalaCheck,
+  curve25519
 )
