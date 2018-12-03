@@ -10,8 +10,8 @@ class BlockHeaderChainSpec extends AlephiumSpec with PlatformConfig.Default {
     val genesis = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val gHeader = genesis.header
     val chain   = BlockHeaderChain.fromGenesisUnsafe(genesis)
-    chain.getTarget(genesis.header, chain.expectedTimeSpan) is gHeader.target
-    chain.getTarget(genesis.header, 2 * chain.expectedTimeSpan) is (2 * gHeader.target)
-    chain.getTarget(genesis.header, chain.expectedTimeSpan / 2) is (gHeader.target / 2)
+    chain.getTarget(genesis.header, config.expectedTimeSpan) is gHeader.target
+    chain.getTarget(genesis.header, 2 * config.expectedTimeSpan) is (2 * gHeader.target)
+    chain.getTarget(genesis.header, config.expectedTimeSpan / 2) is (gHeader.target / 2)
   }
 }

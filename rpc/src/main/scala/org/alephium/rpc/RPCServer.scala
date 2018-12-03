@@ -8,14 +8,12 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow}
+import akka.stream.scaladsl.Flow
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.parser._
-
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.{Mode, Platform}
-import org.alephium.flow.client.{Miner, Node}
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.rpc.model.ViewerQuery
 import org.alephium.util.Hex._
 
@@ -31,8 +29,7 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
     implicit val config           = mode.config
     implicit val rpcConfig        = RPCConfig.load(config.alephium)
 
-    val groups = mode.config.groups
-    val from   = mode.config.mainGroup.value
+    val from = mode.config.mainGroup.value
 
     logger.info(s"index: ${mode.index}, group: $from")
 
@@ -40,15 +37,9 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
       put {
         val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
           hex"2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1d")
-
-        (0 until groups).foreach { to =>
-          val chainIndex = ChainIndex(from, to)
-          val props = mode.builders
-            .createMiner(publicKey, node, chainIndex)
-            .withDispatcher("akka.actor.mining-dispatcher")
-          val miner = node.system.actorOf(props, s"Miner-$from-$to")
-          miner ! Miner.Start
-        }
+        val props = FairMiner.props(publicKey, node)
+        val miner = node.system.actorOf(props, s"FairMiner")
+        miner ! Miner.Start
 
         complete((StatusCodes.Accepted, "Start mining"))
       }
