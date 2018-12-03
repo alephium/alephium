@@ -35,8 +35,16 @@ case class ED25519Signature(bytes: Seq[Byte]) extends Signature
 object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
   override val size: Int = 64
 
-  private def apply(bytes: Seq[Byte]): ED25519Signature = {
+  def isCanonical(bytes: Seq[Byte]): Boolean = {
     require(bytes.length == size)
+    val sBytes = bytes.takeRight(32).toArray.reverse
+    sBytes(0) = (sBytes(0) & 0x7F).toByte
+    val s = BigInt(sBytes)
+    s >= BigInt(0) && s < ED25519.generator
+  }
+
+  private def apply(bytes: Seq[Byte]): ED25519Signature = {
+    require(bytes.length == size && isCanonical(bytes))
     new ED25519Signature(bytes)
   }
 
@@ -46,6 +54,9 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
 object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25519Signature] {
 
   val curve25519: Curve25519 = Curve25519.getInstance(Curve25519.BEST)
+
+  val generator: BigInt = BigInt(
+    "7237005577332262213973186563042994240857116359379907606001950938285454250989")
 
   override def generateKeyPair(): (ED25519PrivateKey, ED25519PublicKey) = {
     val keyPair    = curve25519.generateKeyPair()
