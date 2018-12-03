@@ -2,24 +2,15 @@ package org.alephium.crypto
 
 import java.nio.charset.Charset
 
-import org.alephium.serde._
-import org.alephium.util.Hex
+import org.alephium.util.{Bytes, FixedSizeBytes}
 import org.bouncycastle.crypto.Digest
 
-trait HashOutput {
-  def digest: Seq[Byte]
+trait HashOutput extends Bytes
 
-  override def toString: String = Hex.toHexString(digest)
-}
-
-trait Hash[T <: HashOutput] {
-  def unsafeFrom(digest: Seq[Byte]): T
-
-  def hashSize: Int
-
+trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
   def hash(input: Seq[Byte]): T = {
     provider.update(input.toArray, 0, input.length)
-    val res = new Array[Byte](hashSize)
+    val res = new Array[Byte](size)
     provider.doFinal(res, 0)
     unsafeFrom(res.toSeq)
   }
@@ -33,9 +24,4 @@ trait Hash[T <: HashOutput] {
   }
 
   def provider: Digest
-
-  // Scala sucks here: replacing lazy val with val could not work
-  implicit lazy val serde: Serde[T] = {
-    Serde.fixedSizeBytesSerde(hashSize, implicitly[Serde[Byte]]).xmap(unsafeFrom, _.digest)
-  }
 }

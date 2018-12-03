@@ -7,7 +7,6 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 object Hex {
-
   def toHexString(input: Seq[Byte]): String = {
     BHex.toHexString(input.toArray)
   }

@@ -1,14 +1,15 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
+import org.alephium.util.Bytes
 
-trait PrivateKey
-trait PublicKey
-trait Signature
+trait PrivateKey extends Bytes
+
+trait PublicKey extends Bytes
+
+trait Signature extends Bytes
 
 trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Signature] {
-
-  def seedSize: Int
 
   def generateKeyPair(): (D, Q)
 
