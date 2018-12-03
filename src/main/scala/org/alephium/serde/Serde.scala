@@ -41,6 +41,29 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.deserialize(input).map(to)
     }
   }
+
+  def deValidate(predictor: T => Boolean, error: String): Serde[T] = new Serde[T] {
+    override def serialize(input: T): ByteString = self.serialize(input)
+
+    override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
+      // write explicitly for performance
+      self._deserialize(input).flatMap {
+        case (t, rest) =>
+          if (predictor(t)) {
+            Success((t, rest))
+          } else throw ValidationError(error)
+      }
+    }
+
+    override def deserialize(input: ByteString): Try[T] = {
+      // write explicitly for performance
+      self.deserialize(input).flatMap { t =>
+        if (predictor(t)) {
+          Success(t)
+        } else throw ValidationError(error)
+      }
+    }
+  }
 }
 
 trait FixedSizeSerde[T] extends Serde[T] {
