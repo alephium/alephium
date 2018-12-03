@@ -27,7 +27,8 @@ package object serde {
   implicit def hlistSerde[A, L <: HList](implicit a: Serde[A], l: Serde[L]): Serde[A :: L] =
     prepend(a, l)
 
-  implicit def derivedSerde[T, R](implicit gen: Generic.Aux[T, R], serde: Serde[R]): Serde[T] =
+  implicit def derivedSerde[T <: scala.Product, R](implicit gen: Generic.Aux[T, R],
+                                                   serde: Serde[R]): Serde[T] =
     new Serde[T] {
       override def serialize(input: T): ByteString = {
         serde.serialize(gen.to(input))
