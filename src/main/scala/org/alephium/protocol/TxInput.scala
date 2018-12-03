@@ -1,5 +1,5 @@
 package org.alephium.protocol
 
-import org.alephium.crypto.Sha256
+import org.alephium.crypto.Keccak256
 
-case class TxInput(prevOutput: Sha256, signature: Seq[Byte])
+case class TxInput(txHash: Keccak256, outputIndex: Int)
