@@ -66,12 +66,41 @@ class SerdeSpec extends AlephiumSuite {
     }
   }
 
-  case class Test(x: Int, y: Int, z: Int)
+  case class Test1(x: Int)
+  object Test1 {
+    implicit val serde: Serde[Test1] = Serde.forProduct1(apply, t => t.x)
+  }
 
-  "Serde for case class" should "serde correctly" in {
+  case class Test2(x: Int, y: Int)
+  object Test2 {
+    implicit val serde: Serde[Test2] = Serde.forProduct2(apply, t => (t.x, t.y))
+  }
+
+  case class Test3(x: Int, y: Int, z: Int)
+  object Test3 {
+    implicit val serde: Serde[Test3] = Serde.forProduct3(apply, t => (t.x, t.y, t.z))
+  }
+
+  "Serde for case class" should "serde one field correctly" in {
+    forAll { (x: Int) =>
+      val input  = Test1(x)
+      val output = deserialize[Test1](serialize(input))
+      output.success.value shouldBe input
+    }
+  }
+
+  it should "serde two fields correctly" in {
+    forAll { (x: Int, y: Int) =>
+      val input  = Test2(x, y)
+      val output = deserialize[Test2](serialize(input))
+      output.success.value shouldBe input
+    }
+  }
+
+  it should "serde three fields correctly" in {
     forAll { (x: Int, y: Int, z: Int) =>
-      val input  = Test(x, y, z)
-      val output = deserialize[Test](serialize(input))
+      val input  = Test3(x, y, z)
+      val output = deserialize[Test3](serialize(input))
       output.success.value shouldBe input
     }
   }
