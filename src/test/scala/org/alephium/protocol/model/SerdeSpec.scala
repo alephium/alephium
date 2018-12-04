@@ -1,8 +1,8 @@
-package org.alephium.protocol
+package org.alephium.protocol.model
 
 import org.alephium.AlephiumSpec
 import org.alephium.crypto.{ED25519, Keccak256}
-import org.alephium.serde.{serialize, deserialize}
+import org.alephium.serde.{deserialize, serialize}
 import org.scalacheck.Gen
 import org.scalatest.TryValues._
 

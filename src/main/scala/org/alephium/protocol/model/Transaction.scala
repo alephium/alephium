@@ -1,4 +1,4 @@
-package org.alephium.protocol
+package org.alephium.protocol.model
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.serde.{Serde, serialize}
