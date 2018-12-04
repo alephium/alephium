@@ -10,7 +10,7 @@ val commonSettings = Seq(
   organization := "org.alephium",
   name := "alephium",
   version := "0.1.0-SNAPSHOT",
-  scalaVersion := "2.12.5",
+  scalaVersion := "2.12.4",
   parallelExecution in Test := false,
   scalacOptions := Seq(
     "-deprecation",
@@ -53,10 +53,12 @@ val commonSettings = Seq(
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
-  scalacOptions in Test += "-Xcheckinit",
-  scalastyleConfig in Test := baseDirectory.value / "scalastyle-test-config.xml",
-  sourceGenerators in Compile += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-  sourceGenerators in Test += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+  Test / scalacOptions += "-Xcheckinit",
+  Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml",
+  Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
+  Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
+  fork := true,
+  run / javaOptions += "-Xmx4g"
 )
 
 val dependencies = Seq(
