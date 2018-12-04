@@ -1,8 +1,8 @@
 package org.alephium.crypto
 
-import org.alephium.AlephiumSuite
+import org.alephium.AlephiumSpec
 
-class SignatureSpec extends AlephiumSuite {
+class SignatureSpec extends AlephiumSpec {
   "ED25519" should "sign correctly" in {
     forAll { (message: Seq[Byte]) =>
       val (sk, pk) = ED25519.generateKeyPair()
