@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import org.alephium.network.message.NetworkMessage
+import org.alephium.protocol.message.NetworkMessage
 
 object TcpHandler {
   sealed trait Command
