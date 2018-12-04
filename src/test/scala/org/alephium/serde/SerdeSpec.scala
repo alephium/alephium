@@ -22,7 +22,7 @@ class SerdeSpec extends AlephiumSuite {
     }
   }
 
-  "Serde for Int" should "serialize integer into 4 bytes" in {
+  "Serde for Int" should "serialize int into 4 bytes" in {
     implicitly[Serde[Int]].asInstanceOf[FixedSizeSerde[Int]].serdeSize shouldBe 4
   }
 
@@ -39,6 +39,17 @@ class SerdeSpec extends AlephiumSuite {
     }
   }
 
+  "Serde for Long" should "serialize long into 8 bytes" in {
+    implicitly[Serde[Long]].asInstanceOf[FixedSizeSerde[Long]].serdeSize shouldBe 8
+  }
+
+  it should "serde correctly" in {
+    forAll { (n: Long) =>
+      val nn = deserialize[Long](serialize(n))
+      nn.success.value shouldBe n
+    }
+  }
+
   "Serde for fixed size sequence" should "serde correctly" in {
     forAll { (input: Seq[Byte]) =>
       val serde  = Serde.fixedSizeBytesSerde(input.length, implicitly[Serde[Byte]])
@@ -51,7 +62,6 @@ class SerdeSpec extends AlephiumSuite {
     forAll { (input: Seq[Byte]) =>
       val serde  = Serde.dynamicSizeBytesSerde(implicitly[Serde[Byte]])
       val output = serde.deserialize(serde.serialize(input)).success.value
-      println(output)
       output shouldBe input
     }
   }
