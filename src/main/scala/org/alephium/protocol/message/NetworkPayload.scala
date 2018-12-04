@@ -1,4 +1,4 @@
-package org.alephium.network.message
+package org.alephium.protocol.message
 
 import akka.util.ByteString
 import org.alephium.serde._

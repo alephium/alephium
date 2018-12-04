@@ -3,7 +3,7 @@ package org.alephium.network
 import akka.actor.{ActorRef, Timers}
 import akka.io.Tcp
 import org.alephium.constant.Network
-import org.alephium.network.message.{NetworkMessage, Ping, Pong}
+import org.alephium.protocol.message.{NetworkMessage, Ping, Pong}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
