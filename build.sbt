@@ -54,7 +54,9 @@ val commonSettings = Seq(
     "-Ywarn-value-discard"
   ),
   scalacOptions in Test += "-Xcheckinit",
-  scalastyleConfig in Test := baseDirectory.value / "scalastyle-test-config.xml"
+  scalastyleConfig in Test := baseDirectory.value / "scalastyle-test-config.xml",
+  sourceGenerators in Compile += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
+  sourceGenerators in Test += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
 )
 
 val dependencies = Seq(
