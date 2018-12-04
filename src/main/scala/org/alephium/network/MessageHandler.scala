@@ -3,7 +3,7 @@ package org.alephium.network
 import akka.actor.{ActorRef, Timers}
 import akka.io.Tcp
 import org.alephium.constant.Network
-import org.alephium.protocol.message.{NetworkMessage, Ping, Pong}
+import org.alephium.protocol.message.{Message, Ping, Pong}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
@@ -15,20 +15,20 @@ object MessageHandler {
 
 trait MessageHandler extends BaseActor with Timers {
 
-  def envelope(message: NetworkMessage): Tcp.Write =
-    Tcp.Write(NetworkMessage.serializer.serialize(message))
+  def envelope(message: Message): Tcp.Write =
+    Tcp.Write(Message.serializer.serialize(message))
 
   def forMessageHandler(connection: ActorRef): Receive = {
     case MessageHandler.SendPing =>
       sendPing(connection)
   }
 
-  def handleMessage(message: NetworkMessage, connection: ActorRef): Unit = {
+  def handleMessage(message: Message, connection: ActorRef): Unit = {
     val payload = message.payload
     payload match {
       case Ping(nonce) =>
         logger.debug("Ping received, response with pong")
-        connection ! envelope(NetworkMessage(Pong(nonce)))
+        connection ! envelope(Message(Pong(nonce)))
       case Pong(nonce) =>
         if (nonce == pingNonce) {
           logger.debug("Pong received, no response")
@@ -49,7 +49,7 @@ trait MessageHandler extends BaseActor with Timers {
       context stop self
     } else {
       pingNonce = Random.nextInt()
-      connection ! envelope(NetworkMessage(Ping(pingNonce)))
+      connection ! envelope(Message(Ping(pingNonce)))
       timers.startSingleTimer(MessageHandler, MessageHandler.SendPing, Network.pingFrequency)
     }
   }
