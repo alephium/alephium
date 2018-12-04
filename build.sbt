@@ -10,7 +10,7 @@ val commonSettings = Seq(
   organization := "org.alephium",
   name := "alephium",
   version := "0.1.0-SNAPSHOT",
-  scalaVersion := "2.12.3",
+  scalaVersion := "2.12.5",
   parallelExecution in Test := false,
   scalacOptions := Seq(
     "-deprecation",
