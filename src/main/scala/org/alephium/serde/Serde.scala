@@ -174,7 +174,8 @@ object Serde {
       }
     }
 
-  def forProduct2[A, B, T](pack: (A, B) => T, unpack: T => (A, B))(implicit serdeA: Serde[A], serdeB: Serde[B]): Serde[T] =
+  def forProduct2[A, B, T](pack: (A, B) => T, unpack: T => (A, B))(implicit serdeA: Serde[A],
+                                                                   serdeB: Serde[B]): Serde[T] =
     new Serde[T] {
       override def serialize(input: T): ByteString = {
         val (a, b) = unpack(input)
@@ -189,7 +190,10 @@ object Serde {
       }
     }
 
-  def forProduct3[A, B, C, T](pack: (A, B, C) => T, unpack: T => (A, B, C))(implicit serdeA: Serde[A], serdeB: Serde[B], serdeC: Serde[C]): Serde[T] =
+  def forProduct3[A, B, C, T](pack: (A, B, C) => T, unpack: T => (A, B, C))(
+      implicit serdeA: Serde[A],
+      serdeB: Serde[B],
+      serdeC: Serde[C]): Serde[T] =
     new Serde[T] {
       override def serialize(input: T): ByteString = {
         val (a, b, c) = unpack(input)

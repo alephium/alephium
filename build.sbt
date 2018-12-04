@@ -55,7 +55,8 @@ val commonSettings = Seq(
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
-  scalacOptions in Test += "-Xcheckinit"
+  scalacOptions in Test += "-Xcheckinit",
+  scalastyleConfig in Test := baseDirectory.value / "scalastyle-test-config.xml"
 )
 
 val dependencies = Seq(

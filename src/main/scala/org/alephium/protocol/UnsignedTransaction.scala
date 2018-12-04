@@ -9,8 +9,9 @@ case class UnsignedTransaction(inputs: Seq[TxInput], outputs: Seq[TxOutput])
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] = new Serde[UnsignedTransaction] {
-    val inputsSerde: Serde[Seq[TxInput]] = implicitly[Serde[Seq[TxInput]]]
+    val inputsSerde: Serde[Seq[TxInput]]   = implicitly[Serde[Seq[TxInput]]]
     val outputsSerde: Serde[Seq[TxOutput]] = implicitly[Serde[Seq[TxOutput]]]
+
     override def serialize(input: UnsignedTransaction): ByteString = {
       inputsSerde.serialize(input.inputs) ++
         outputsSerde.serialize(input.outputs)
@@ -18,7 +19,7 @@ object UnsignedTransaction {
 
     override def _deserialize(input: ByteString): Try[(UnsignedTransaction, ByteString)] = {
       for {
-        (inputs, rest1) <- inputsSerde._deserialize(input)
+        (inputs, rest1)  <- inputsSerde._deserialize(input)
         (outputs, rest2) <- outputsSerde._deserialize(rest1)
       } yield (UnsignedTransaction(inputs, outputs), rest2)
     }

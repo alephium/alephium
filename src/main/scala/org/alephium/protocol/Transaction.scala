@@ -9,7 +9,8 @@ case class Transaction(
 )
 
 object Transaction {
-  implicit val serde: Serde[Transaction] = Serde.forProduct2(Transaction.apply, t => (t.unsigned, t.signature))
+  implicit val serde: Serde[Transaction] =
+    Serde.forProduct2(Transaction.apply, t => (t.unsigned, t.signature))
 
   def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
