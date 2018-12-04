@@ -1,4 +1,4 @@
-package org.alephium.protocol
+package org.alephium.protocol.model
 
 import org.alephium.crypto._
 import org.alephium.serde.Serde
