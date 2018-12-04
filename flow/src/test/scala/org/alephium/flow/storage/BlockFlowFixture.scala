@@ -6,10 +6,10 @@ import org.scalatest.BeforeAndAfter
 
 trait BlockFlowFixture extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
   before {
-    DiskIO.createDir(config.diskIO.blockFolder).isRight is true
+    Disk.createDir(config.disk.blockFolder).isRight is true
   }
 
   after {
-    TestUtils.cleanup(config.diskIO.blockFolder)
+    TestUtils.cleanup(config.disk.blockFolder)
   }
 }
