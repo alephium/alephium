@@ -81,7 +81,7 @@ trait FixedSizeSerde[T] extends Serde[T] {
     } else Failure(InvalidNumberOfBytesException(serdeSize, input.size))
 }
 
-object Serde {
+object Serde extends ProductSerde {
   object ByteSerde extends FixedSizeSerde[Byte] {
     override val serdeSize: Int = java.lang.Byte.BYTES
 
@@ -157,55 +157,6 @@ object Serde {
           case (size, rest) =>
             _deserialize(rest, size, Seq.empty)
         }
-      }
-    }
-
-  def forProduct1[A, T](pack: A => T, unpack: T => A)(implicit serdeA: Serde[A]): Serde[T] =
-    new Serde[T] {
-      override def serialize(input: T): ByteString = {
-        val a = unpack(input)
-        serdeA.serialize(a)
-      }
-
-      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
-        for {
-          (a, rest) <- serdeA._deserialize(input)
-        } yield (pack(a), rest)
-      }
-    }
-
-  def forProduct2[A, B, T](pack: (A, B) => T, unpack: T => (A, B))(implicit serdeA: Serde[A],
-                                                                   serdeB: Serde[B]): Serde[T] =
-    new Serde[T] {
-      override def serialize(input: T): ByteString = {
-        val (a, b) = unpack(input)
-        serdeA.serialize(a) ++ serdeB.serialize(b)
-      }
-
-      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
-        for {
-          (a, rest1) <- serdeA._deserialize(input)
-          (b, rest2) <- serdeB._deserialize(rest1)
-        } yield (pack(a, b), rest2)
-      }
-    }
-
-  def forProduct3[A, B, C, T](pack: (A, B, C) => T, unpack: T => (A, B, C))(
-      implicit serdeA: Serde[A],
-      serdeB: Serde[B],
-      serdeC: Serde[C]): Serde[T] =
-    new Serde[T] {
-      override def serialize(input: T): ByteString = {
-        val (a, b, c) = unpack(input)
-        serdeA.serialize(a) ++ serdeB.serialize(b) ++ serdeC.serialize(c)
-      }
-
-      override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
-        for {
-          (a, rest1) <- serdeA._deserialize(input)
-          (b, rest2) <- serdeB._deserialize(rest1)
-          (c, rest3) <- serdeC._deserialize(rest2)
-        } yield (pack(a, b, c), rest3)
       }
     }
 }
