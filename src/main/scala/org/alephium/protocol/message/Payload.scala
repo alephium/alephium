@@ -6,20 +6,20 @@ import org.alephium.serde._
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
 import scala.util.Failure
 
-sealed trait NetworkPayload
+sealed trait Payload
 
-object NetworkPayload {
+object Payload {
   val cmdCodes: Map[String, Int] = Map(
     "Ping" -> 0,
     "Pong" -> 1
   )
 
-  implicit val serializer: Serializer[NetworkPayload] = {
+  implicit val serializer: Serializer[Payload] = {
     case x: Ping => implicitly[Serializer[Ping]].serialize(x)
     case x: Pong => implicitly[Serializer[Pong]].serialize(x)
   }
 
-  def deserializer(cmdCode: Int): Deserializer[NetworkPayload] =
+  def deserializer(cmdCode: Int): Deserializer[Payload] =
     (input: ByteString) =>
       cmdCode match {
         case Ping.withCmdCode.cmdCode =>
@@ -30,23 +30,23 @@ object NetworkPayload {
     }
 }
 
-class NetworkPayloadCompanion[T: TypeTag]() {
+class PayloadCompanion[T: TypeTag]() {
   val cmdCode: Int = {
     val name = typeOf[T].typeSymbol.name.toString
-    NetworkPayload.cmdCodes(name)
+    Payload.cmdCodes(name)
   }
 }
 
-case class Ping(nonce: Int) extends NetworkPayload
+case class Ping(nonce: Int) extends Payload
 
-object Ping extends NetworkPayloadCompanion[Ping] {
-  implicit val withCmdCode: NetworkPayloadCompanion[Ping] = new NetworkPayloadCompanion[Ping] {}
-  implicit val serde: Serde[Ping]                         = Serde.forProduct1(apply, p => p.nonce)
+object Ping extends PayloadCompanion[Ping] {
+  implicit val withCmdCode: PayloadCompanion[Ping] = new PayloadCompanion[Ping] {}
+  implicit val serde: Serde[Ping]                  = Serde.forProduct1(apply, p => p.nonce)
 }
 
-case class Pong(nonce: Int) extends NetworkPayload
+case class Pong(nonce: Int) extends Payload
 
 object Pong {
-  implicit val withCmdCode: NetworkPayloadCompanion[Pong] = new NetworkPayloadCompanion[Pong] {}
-  implicit val serde: Serde[Pong]                         = Serde.forProduct1(apply, p => p.nonce)
+  implicit val withCmdCode: PayloadCompanion[Pong] = new PayloadCompanion[Pong] {}
+  implicit val serde: Serde[Pong]                  = Serde.forProduct1(apply, p => p.nonce)
 }

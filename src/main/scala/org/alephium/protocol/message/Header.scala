@@ -2,9 +2,9 @@ package org.alephium.protocol.message
 
 import org.alephium.serde.Serde
 
-case class NetworkHeader(version: Int, cmdCode: Int)
+case class Header(version: Int, cmdCode: Int)
 
-object NetworkHeader {
-  implicit val serde: Serde[NetworkHeader] =
+object Header {
+  implicit val serde: Serde[Header] =
     Serde.forProduct2(apply, nh => (nh.version, nh.cmdCode))
 }
