@@ -1,11 +1,12 @@
 package org.alephium.storage
 
 import org.alephium.AlephiumSpec
-import org.alephium.constant.Protocol
-import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.constant.Protocol.Genesis
+import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.model.{Block, ModelGen, TxInput}
 
 class BlockPoolSpec extends AlephiumSpec {
-  val genesis: Block = Protocol.Genesis.block
+  val genesis: Block = Genesis.block
 
   behavior of "BlockPool"
 
@@ -49,5 +50,46 @@ class BlockPoolSpec extends AlephiumSpec {
         chain(2) shouldBe block2
       }
     }
+  }
+
+  it should "return correct balance with only genesis block" in {
+    val pool               = BlockPool()
+    val (block1, balance1) = pool.getBalance(Genesis.publicKey)
+    block1 shouldBe genesis
+    balance1 shouldBe Genesis.balance
+    val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
+    block2 shouldBe genesis
+    balance2 shouldBe 0
+  }
+
+  it should "return correct balance after transfering money" in {
+    val pool     = BlockPool()
+    val newBlock = ModelGen.blockForTransfer(ED25519PublicKey.zero, 10)
+    pool.addBlock(newBlock)
+    val (block1, balance1) = pool.getBalance(Genesis.publicKey)
+    block1 shouldBe newBlock
+    balance1 shouldBe (Genesis.balance - 10)
+    val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
+    block2 shouldBe newBlock
+    balance2 shouldBe 10
+  }
+
+  it should "return correct utxos with only genesis block" in {
+    val pool   = BlockPool()
+    val utxos1 = pool.getUTXOs(Genesis.publicKey)
+    utxos1.size shouldBe 1
+    utxos1.head shouldBe TxInput(Genesis.transaction.hash, 0)
+    val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
+    utxos2.size shouldBe 0
+  }
+
+  it should "return correct utxos after transfering money" in {
+    val pool     = BlockPool()
+    val newBlock = ModelGen.blockForTransfer(ED25519PublicKey.zero, 10)
+    pool.addBlock(newBlock)
+    val utxos1 = pool.getUTXOs(Genesis.publicKey)
+    utxos1.size shouldBe 1
+    val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
+    utxos2.size shouldBe 1
   }
 }
