@@ -4,6 +4,7 @@ import org.alephium.AlephiumSpec
 import org.alephium.constant.Genesis
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{Block, ModelGen, TxInput}
+import org.alephium.util.UInt
 
 class BlockPoolSpec extends AlephiumSpec {
   val genesis: Block = Genesis.block
@@ -60,7 +61,7 @@ class BlockPoolSpec extends AlephiumSpec {
     balance1 shouldBe AlephiumSpec.testBalance
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe genesis
-    balance2 shouldBe 0
+    balance2 shouldBe UInt.zero
   }
 
   it should "return correct balance after transfering money" in {
@@ -70,10 +71,10 @@ class BlockPoolSpec extends AlephiumSpec {
 
     val (block1, balance1) = pool.getBalance(AlephiumSpec.testPublicKey)
     block1 shouldBe newBlock
-    balance1 shouldBe (AlephiumSpec.testBalance - 10)
+    balance1 shouldBe (AlephiumSpec.testBalance minus UInt(10))
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe newBlock
-    balance2 shouldBe 10
+    balance2 shouldBe UInt(10)
   }
 
   it should "return correct utxos with only genesis block" in {
@@ -88,10 +89,10 @@ class BlockPoolSpec extends AlephiumSpec {
     val utxos3 = pool.getUTXOs(AlephiumSpec.testPublicKey, AlephiumSpec.testBalance)
     utxos3 shouldBe defined
     utxos3.get._2 shouldBe AlephiumSpec.testBalance
-    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, AlephiumSpec.testBalance + 1)
+    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, AlephiumSpec.testBalance plus UInt.one)
     utxos4 shouldBe None
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, 10)
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))
     utxos5 shouldBe None
   }
 
@@ -105,16 +106,16 @@ class BlockPoolSpec extends AlephiumSpec {
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 1
 
-    val utxos3 = pool.getUTXOs(AlephiumSpec.testPublicKey, 10)
+    val utxos3 = pool.getUTXOs(AlephiumSpec.testPublicKey, UInt(10))
     utxos3 shouldBe defined
-    utxos3.get._2 shouldBe (AlephiumSpec.testBalance - 10)
-    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, 100)
+    utxos3.get._2 shouldBe (AlephiumSpec.testBalance minus UInt(10))
+    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, UInt(100))
     utxos4 shouldBe None
 
-    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, 10)
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))
     utxos5 shouldBe defined
-    utxos5.get._2 shouldBe 10
-    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, 11)
+    utxos5.get._2 shouldBe UInt(10)
+    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, UInt(11))
     utxos6 shouldBe None
   }
 }

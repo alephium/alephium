@@ -8,7 +8,7 @@ import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.network.{BlockHandler, TcpClient, TcpServer}
 import org.alephium.storage.BlockPool
-import org.alephium.util.Hex
+import org.alephium.util.{Hex, UInt}
 
 object TcpFun extends App {
   // scalastyle:off magic.number
@@ -32,7 +32,6 @@ object TcpFun extends App {
   Thread.sleep(1000)
   val (_, pk) = ED25519.generateKeyPair()
   0 to 10 foreach { i =>
-    Thread.sleep(200)
-    client.transfer(pk, i * 10)
+    client.transfer(pk, UInt(i * 10))
   }
 }

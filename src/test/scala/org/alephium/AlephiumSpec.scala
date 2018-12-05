@@ -2,7 +2,7 @@ package org.alephium
 
 import io.circe.parser.parse
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.util.Hex
+import org.alephium.util.{Hex, UInt}
 import org.scalatest.{FlatSpecLike, Matchers}
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
@@ -18,5 +18,5 @@ object AlephiumSpec {
     ED25519PrivateKey.unsafeFrom(Hex(test.get[String]("privateKey").right.get))
   val testPublicKey: ED25519PublicKey =
     ED25519PublicKey.unsafeFrom(Hex(test.get[String]("publicKey").right.get))
-  val testBalance: Int = test.get[Int]("balance").right.get
+  val testBalance: UInt = UInt.fromString(test.get[Int]("balance").right.get.toString)
 }
