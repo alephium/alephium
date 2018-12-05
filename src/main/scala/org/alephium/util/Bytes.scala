@@ -14,6 +14,8 @@ trait FixedSizeBytes[T <: Bytes] {
 
   def unsafeFrom(data: ByteString): T
 
+  lazy val zero: T = unsafeFrom(ByteString(Array.fill[Byte](size)(0)))
+
   // Scala sucks here: replacing lazy val with val could not work
   implicit lazy val serde: Serde[T] =
     Serde

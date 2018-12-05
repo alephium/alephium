@@ -4,17 +4,23 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
 import org.alephium.client.Client
-import org.alephium.constant.Network
+import org.alephium.constant.{Network, Protocol}
 import org.alephium.crypto.ED25519
 import org.alephium.network.{TcpClient, TcpServer}
+import org.alephium.storage.BlockPool
 
 object TcpFun extends App {
+  // scalastyle:off magic.number
   val system = ActorSystem("TcpFun")
 
-  val server                  = system.actorOf(TcpServer.props(Network.port), "server")
-  val client1                 = system.actorOf(TcpClient.props(new InetSocketAddress(Network.port)), "client1")
-  val client2                 = system.actorOf(TcpClient.props(new InetSocketAddress(Network.port)), "client2")
-  val tcpHandler              = system.actorOf(TcpClient.props(new InetSocketAddress(Network.port)), "client1")
-  val (privateKey, publicKey) = ED25519.generateKeyPair()
-  val client                  = Client(privateKey, publicKey, ???, tcpHandler)
+  val server = system.actorOf(TcpServer.props(Network.port), "server")
+  val tcpHandler =
+    system.actorOf(TcpClient.props(new InetSocketAddress("localhost", Network.port)), "client")
+  val blockPool = new BlockPool()
+  val client =
+    Client(Protocol.Genesis.privateKey, Protocol.Genesis.publicKey, blockPool, tcpHandler)
+
+  Thread.sleep(2000)
+  val (_, pk) = ED25519.generateKeyPair()
+  client.transfer(pk, 100)
 }
