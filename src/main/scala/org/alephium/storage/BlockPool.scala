@@ -1,6 +1,6 @@
 package org.alephium.storage
 
-import org.alephium.constant.Genesis
+import org.alephium.protocol.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.UInt

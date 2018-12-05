@@ -1,4 +1,4 @@
-package org.alephium.constant
+package org.alephium.protocol
 
 import io.circe.Json
 import io.circe.parser.parse

@@ -1,7 +1,7 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
-import org.alephium.constant.Protocol
+import org.alephium.protocol.Protocol
 import org.alephium.serde._
 
 case class Message(header: Header, payload: Payload)

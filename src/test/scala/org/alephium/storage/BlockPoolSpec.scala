@@ -1,12 +1,12 @@
 package org.alephium.storage
 
-import org.alephium.AlephiumSpec
-import org.alephium.constant.Genesis
+import org.alephium.{AlephiumSpec, Fixture}
+import org.alephium.protocol.Genesis
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{Block, ModelGen, TxInput}
 import org.alephium.util.UInt
 
-class BlockPoolSpec extends AlephiumSpec {
+class BlockPoolSpec extends AlephiumSpec with Fixture {
   val genesis: Block = Genesis.block
 
   behavior of "BlockPool"
@@ -56,9 +56,9 @@ class BlockPoolSpec extends AlephiumSpec {
   it should "return correct balance with only genesis block" in {
     val pool = BlockPool()
 
-    val (block1, balance1) = pool.getBalance(AlephiumSpec.testPublicKey)
+    val (block1, balance1) = pool.getBalance(testPublicKey)
     block1 shouldBe genesis
-    balance1 shouldBe AlephiumSpec.testBalance
+    balance1 shouldBe testBalance
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe genesis
     balance2 shouldBe UInt.zero
@@ -66,12 +66,12 @@ class BlockPoolSpec extends AlephiumSpec {
 
   it should "return correct balance after transfering money" in {
     val pool     = BlockPool()
-    val newBlock = ModelGen.blockForTransfer(ED25519PublicKey.zero, 10)
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
     pool.addBlock(newBlock)
 
-    val (block1, balance1) = pool.getBalance(AlephiumSpec.testPublicKey)
+    val (block1, balance1) = pool.getBalance(testPublicKey)
     block1 shouldBe newBlock
-    balance1 shouldBe (AlephiumSpec.testBalance minus UInt(10))
+    balance1 shouldBe (testBalance minus UInt(10))
     val (block2, balance2) = pool.getBalance(ED25519PublicKey.zero)
     block2 shouldBe newBlock
     balance2 shouldBe UInt(10)
@@ -80,16 +80,16 @@ class BlockPoolSpec extends AlephiumSpec {
   it should "return correct utxos with only genesis block" in {
     val pool = BlockPool()
 
-    val utxos1 = pool.getUTXOs(AlephiumSpec.testPublicKey)
+    val utxos1 = pool.getUTXOs(testPublicKey)
     utxos1.size shouldBe 1
     utxos1.head shouldBe TxInput(Genesis.transactions.head.hash, 0)
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 0
 
-    val utxos3 = pool.getUTXOs(AlephiumSpec.testPublicKey, AlephiumSpec.testBalance)
+    val utxos3 = pool.getUTXOs(testPublicKey, testBalance)
     utxos3 shouldBe defined
-    utxos3.get._2 shouldBe AlephiumSpec.testBalance
-    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, AlephiumSpec.testBalance plus UInt.one)
+    utxos3.get._2 shouldBe testBalance
+    val utxos4 = pool.getUTXOs(testPublicKey, testBalance plus UInt.one)
     utxos4 shouldBe None
 
     val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))
@@ -98,18 +98,18 @@ class BlockPoolSpec extends AlephiumSpec {
 
   it should "return correct utxos after transfering money" in {
     val pool     = BlockPool()
-    val newBlock = ModelGen.blockForTransfer(ED25519PublicKey.zero, 10)
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
     pool.addBlock(newBlock)
 
-    val utxos1 = pool.getUTXOs(AlephiumSpec.testPublicKey)
+    val utxos1 = pool.getUTXOs(testPublicKey)
     utxos1.size shouldBe 1
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 1
 
-    val utxos3 = pool.getUTXOs(AlephiumSpec.testPublicKey, UInt(10))
+    val utxos3 = pool.getUTXOs(testPublicKey, UInt(10))
     utxos3 shouldBe defined
-    utxos3.get._2 shouldBe (AlephiumSpec.testBalance minus UInt(10))
-    val utxos4 = pool.getUTXOs(AlephiumSpec.testPublicKey, UInt(100))
+    utxos3.get._2 shouldBe (testBalance minus UInt(10))
+    val utxos4 = pool.getUTXOs(testPublicKey, UInt(100))
     utxos4 shouldBe None
 
     val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, UInt(10))

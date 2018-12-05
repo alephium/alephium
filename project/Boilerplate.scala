@@ -119,10 +119,11 @@ object Boilerplate {
       block"""
         |package org.alephium.serde
         |
-        |import org.alephium.AlephiumSpec
         |import org.scalatest.TryValues._
+        |import org.scalatest.{FlatSpecLike, Matchers}
+        |import org.scalatest.prop.GeneratorDrivenPropertyChecks
         |
-        |class ProductSerdeSpec extends AlephiumSpec {
+        |class ProductSerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers {
         |
         |  behavior of "Serde for case class"
         +
