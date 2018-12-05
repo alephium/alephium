@@ -20,7 +20,6 @@ object TcpFun extends App {
   val client =
     Client(Protocol.Genesis.privateKey, Protocol.Genesis.publicKey, blockPool, tcpHandler)
 
-  Thread.sleep(2000)
   val (_, pk) = ED25519.generateKeyPair()
   client.transfer(pk, 100)
 }
