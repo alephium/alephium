@@ -15,6 +15,8 @@ object MessageHandler {
 
 trait MessageHandler extends BaseActor with Timers {
 
+  def blockHandler: ActorRef
+
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
 
@@ -37,8 +39,9 @@ trait MessageHandler extends BaseActor with Timers {
           logger.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
           context stop self
         }
-      case SendBlock(transaction) =>
-        logger.debug(s"Tranction received: $transaction")
+      case SendBlock(block) =>
+        logger.debug(s"Tranction received: $block")
+        blockHandler ! BlockHandler.AddBlock(block)
     }
   }
 
