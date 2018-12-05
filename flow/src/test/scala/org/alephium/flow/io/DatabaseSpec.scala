@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import akka.util.ByteString
 import org.alephium.util.{AlephiumSpec, Files}
@@ -67,5 +67,6 @@ class DatabaseSpec extends AlephiumSpec {
     db.exists(key).right.value is true
     db.delete(key).isRight is true
     db.exists(key).right.value is false
+    postTest()
   }
 }

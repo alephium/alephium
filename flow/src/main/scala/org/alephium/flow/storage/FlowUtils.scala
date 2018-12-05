@@ -1,5 +1,6 @@
 package org.alephium.flow.storage
 
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
 import org.alephium.protocol.model.ChainIndex
