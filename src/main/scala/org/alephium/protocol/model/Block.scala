@@ -2,8 +2,10 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.Keccak256
 import org.alephium.serde.Serde
+import org.alephium.util.WithKeccak256
 
 case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
+    extends WithKeccak256[Block]
 
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.blockHeader, b.transactions))

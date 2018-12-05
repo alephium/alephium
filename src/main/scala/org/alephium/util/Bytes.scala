@@ -1,9 +1,10 @@
 package org.alephium.util
 
+import akka.util.ByteString
 import org.alephium.serde._
 
 trait Bytes {
-  def bytes: Seq[Byte]
+  def bytes: ByteString
 
   override def toString: String = Hex.toHexString(bytes)
 }
@@ -11,9 +12,11 @@ trait Bytes {
 trait FixedSizeBytes[T <: Bytes] {
   def size: Int
 
-  def unsafeFrom(data: Seq[Byte]): T
+  def unsafeFrom(data: ByteString): T
 
   // Scala sucks here: replacing lazy val with val could not work
   implicit lazy val serde: Serde[T] =
-    Serde.fixedSizeBytesSerde(size, implicitly[Serde[Byte]]).xmap(unsafeFrom, _.bytes)
+    Serde
+      .fixedSizeBytesSerde(size, implicitly[Serde[Byte]])
+      .xmap(bytes => unsafeFrom(ByteString(bytes.toArray)), _.bytes)
 }
