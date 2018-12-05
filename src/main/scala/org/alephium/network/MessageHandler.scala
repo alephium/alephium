@@ -40,7 +40,7 @@ trait MessageHandler extends BaseActor with Timers {
           context stop self
         }
       case SendBlock(block) =>
-        logger.debug(s"Tranction received: $block")
+        logger.debug(s"Block received: $block")
         blockHandler ! BlockHandler.AddBlock(block)
     }
   }

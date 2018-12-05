@@ -2,12 +2,13 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto._
 import org.alephium.serde.Serde
+import org.alephium.util.UInt
 
 case class BlockHeader(
     blockDeps: Seq[Keccak256],
     txsHash: Keccak256,
     timestamp: Long,
-    nonce: Int
+    nonce: UInt
 )
 
 object BlockHeader {
