@@ -75,21 +75,44 @@ class BlockPoolSpec extends AlephiumSpec {
   }
 
   it should "return correct utxos with only genesis block" in {
-    val pool   = BlockPool()
+    val pool = BlockPool()
+
     val utxos1 = pool.getUTXOs(Genesis.publicKey)
     utxos1.size shouldBe 1
     utxos1.head shouldBe TxInput(Genesis.transaction.hash, 0)
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 0
+
+    val utxos3 = pool.getUTXOs(Genesis.publicKey, Genesis.balance)
+    utxos3 shouldBe defined
+    utxos3.get._2 shouldBe Genesis.balance
+    val utxos4 = pool.getUTXOs(Genesis.publicKey, Genesis.balance + 1)
+    utxos4 shouldBe None
+
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, 10)
+    utxos5 shouldBe None
   }
 
   it should "return correct utxos after transfering money" in {
     val pool     = BlockPool()
     val newBlock = ModelGen.blockForTransfer(ED25519PublicKey.zero, 10)
     pool.addBlock(newBlock)
+
     val utxos1 = pool.getUTXOs(Genesis.publicKey)
     utxos1.size shouldBe 1
     val utxos2 = pool.getUTXOs(ED25519PublicKey.zero)
     utxos2.size shouldBe 1
+
+    val utxos3 = pool.getUTXOs(Genesis.publicKey, 10)
+    utxos3 shouldBe defined
+    utxos3.get._2 shouldBe (Genesis.balance - 10)
+    val utxos4 = pool.getUTXOs(Genesis.publicKey, 100)
+    utxos4 shouldBe None
+
+    val utxos5 = pool.getUTXOs(ED25519PublicKey.zero, 10)
+    utxos5 shouldBe defined
+    utxos5.get._2 shouldBe 10
+    val utxos6 = pool.getUTXOs(ED25519PublicKey.zero, 11)
+    utxos6 shouldBe None
   }
 }
