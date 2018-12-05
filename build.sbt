@@ -2,33 +2,37 @@ import Dependencies._
 
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
-lazy val root = (project in file("."))
-  .settings(commonSettings: _*)
-  .settings(libraryDependencies ++= dependencies)
+def baseProject(path: String, id: String): Project = {
+  Project(id, file(path))
+    .settings(commonSettings: _*)
+    .settings(libraryDependencies ++= dependencies)
+}
+
+lazy val root = baseProject(".", "root")
+  .settings(Compile / scalastyleConfig := baseDirectory.value / "scalastyle-config.xml")
+  .settings(Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
   .aggregate(util, serde, crypto, protocol)
 
-lazy val serde = (project in file("serde"))
-  .settings(commonSettings: _*)
+def subProject(path: String): Project = {
+  baseProject(path, path)
+    .settings(Compile / scalastyleConfig := root.base / "scalastyle-config.xml")
+    .settings(Test / scalastyleConfig := root.base / "scalastyle-test-config.xml")
+}
+
+lazy val serde = subProject("serde")
   .settings(
-    libraryDependencies ++= dependencies,
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
     Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
   )
 
-lazy val util = (project in file("util"))
-  .settings(commonSettings: _*)
-  .settings(libraryDependencies ++= dependencies)
+lazy val util = subProject("util")
   .dependsOn(serde)
 
-lazy val crypto = (project in file("crypto"))
-  .settings(commonSettings: _*)
-  .settings(libraryDependencies ++= dependencies)
+lazy val crypto = subProject("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
 
-lazy val protocol = (project in file("protocol"))
-  .settings(commonSettings: _*)
-  .settings(libraryDependencies ++= dependencies)
+lazy val protocol = subProject("protocol")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
 
 val commonSettings = Seq(
@@ -79,7 +83,6 @@ val commonSettings = Seq(
     "-Ywarn-value-discard"
   ),
   Test / scalacOptions += "-Xcheckinit",
-  Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml",
   fork := true,
   run / javaOptions += "-Xmx4g"
 )
