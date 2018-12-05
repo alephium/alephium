@@ -6,12 +6,11 @@ import org.alephium.serde.Serde
 case class BlockHeader(
     blockDeps: Seq[Keccak256],
     txsHash: Keccak256,
-    timestamp: Long
-//    difficulty: Int,
-//    nonce: Int,
+    timestamp: Long,
+    nonce: Int
 )
 
 object BlockHeader {
   implicit val serde: Serde[BlockHeader] =
-    Serde.forProduct3(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp))
+    Serde.forProduct4(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.nonce))
 }

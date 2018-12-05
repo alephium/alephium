@@ -2,10 +2,12 @@ package org.alephium.client
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.protocol.message.{Message, SendBlock}
 import org.alephium.protocol.model.{Block, Transaction, TxOutput, UnsignedTransaction}
 import org.alephium.storage.BlockPool
+
+import scala.annotation.tailrec
 
 case class Client(privateKey: ED25519PrivateKey,
                   publicKey: ED25519PublicKey,
@@ -25,7 +27,7 @@ case class Client(privateKey: ED25519PrivateKey,
         val unsigned    = UnsignedTransaction(txInputs, txOutputs)
         val transaction = Transaction.from(unsigned, privateKey)
         val prevBlock   = blockPool.getBestHeader.hash
-        val block       = Block.from(Seq(prevBlock), Seq(transaction))
+        val block       = Client.mine(Seq(prevBlock), Seq(transaction))
 
         blockPool.addBlock(block)
         val message = Message(SendBlock(block))
@@ -33,5 +35,22 @@ case class Client(privateKey: ED25519PrivateKey,
       case None =>
         logger.info(s"Not able to transfer $value Aleph")
     }
+  }
+}
+
+object Client {
+  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Block = {
+    @tailrec
+    def loop(nonce: Int): Block = {
+      val block = Block.from(deps, transactions, nonce)
+      if (isDifficult(block.hash)) {
+        block
+      } else loop(nonce + 1)
+    }
+    loop(0)
+  }
+
+  def isDifficult(hash: Keccak256): Boolean = {
+    if (hash.bytes(0) == 0 && hash.bytes(1) == 0 && hash.bytes(2) < 16) true else false
   }
 }
