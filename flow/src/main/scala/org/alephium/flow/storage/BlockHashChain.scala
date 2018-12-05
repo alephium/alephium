@@ -2,10 +2,10 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, ConcurrentHashMap, CopyOnWriteSet}
 
 import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
+import scala.collection.mutable.ArrayBuffer
 
 trait BlockHashChain extends BlockHashPool {
 
@@ -13,9 +13,9 @@ trait BlockHashChain extends BlockHashPool {
 
   protected def root: BlockHashChain.Root
 
-  protected val blockHashesTable: HashMap[Keccak256, BlockHashChain.TreeNode] = HashMap.empty
-  protected val tips: HashSet[Keccak256]                                      = HashSet.empty
-  protected val confirmedHashes: ArrayBuffer[BlockHashChain.TreeNode]         = ArrayBuffer.empty
+  protected val blockHashesTable = ConcurrentHashMap.empty[Keccak256, BlockHashChain.TreeNode]
+  protected val tips             = CopyOnWriteSet.empty[Keccak256]
+  protected val confirmedHashes  = ArrayBuffer.empty[BlockHashChain.TreeNode]
 
   protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
 
@@ -23,13 +23,13 @@ trait BlockHashChain extends BlockHashPool {
     assert(node.isLeaf)
 
     val hash = node.blockHash
-    blockHashesTable += hash -> node
+    blockHashesTable.put(hash, node)
     node match {
       case _: BlockHashChain.Root =>
         tips.add(hash)
         ()
       case n: BlockHashChain.Node =>
-        tips.remove(n.parent.blockHash)
+        tips.removeIfExist(n.parent.blockHash)
         tips.add(hash)
         ()
     }
@@ -53,7 +53,7 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   private def pruneDueto(newNode: BlockHashChain.TreeNode): Boolean = {
-    val toCut = tips.filter { key =>
+    val toCut = tips.iterator.filter { key =>
       val tipNode = blockHashesTable(key)
       newNode.height >= tipNode.height + config.blockConfirmNum
     }
@@ -80,7 +80,7 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   private def confirmHashes(): Unit = {
-    val oldestTip = tips.view.map(blockHashesTable).minBy(_.height)
+    val oldestTip = tips.iterator.map(blockHashesTable.apply).minBy(_.height)
 
     @tailrec
     def iter(): Unit = {
@@ -101,9 +101,9 @@ trait BlockHashChain extends BlockHashPool {
 
   def numHashes: Int = blockHashesTable.size
 
-  def maxWeight: Int = blockHashesTable.values.map(_.weight).max
+  def maxWeight: Int = blockHashesTable.reduceValuesBy(_.weight)(math.max)
 
-  def maxHeight: Int = blockHashesTable.values.map(_.height).max
+  def maxHeight: Int = blockHashesTable.reduceValuesBy(_.height)(math.max)
 
   def contains(hash: Keccak256): Boolean = blockHashesTable.contains(hash)
 
@@ -144,7 +144,7 @@ trait BlockHashChain extends BlockHashPool {
   }
 
   def getAllTips: AVector[Keccak256] = {
-    AVector.from(tips)
+    AVector.fromIterator(tips.iterator)
   }
 
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
@@ -168,7 +168,7 @@ trait BlockHashChain extends BlockHashPool {
     iter(AVector.empty, node).reverse
   }
 
-  def getAllBlockHashes: Iterable[Keccak256] = {
+  def getAllBlockHashes: Iterator[Keccak256] = {
     blockHashesTable.values.map(_.blockHash)
   }
 
