@@ -8,7 +8,8 @@ import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.network.{BlockHandler, TcpClient, TcpServer}
 import org.alephium.storage.BlockPool
-import org.alephium.util.{Hex, UInt}
+import org.alephium.util.UInt
+import org.alephium.util.Hex._
 
 object TcpFun extends App {
   // scalastyle:off magic.number
@@ -23,9 +24,9 @@ object TcpFun extends App {
   )
 
   val privateKey: ED25519PrivateKey = ED25519PrivateKey.unsafeFrom(
-    Hex("604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65"))
+    hex"604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65")
   val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
-    Hex("2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c"))
+    hex"2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c")
   val client =
     Client(privateKey, publicKey, BlockPool(), tcpHandler)
 
