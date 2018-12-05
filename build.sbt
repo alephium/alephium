@@ -70,5 +70,6 @@ val dependencies = Seq(
   logback,
   scalaTest,
   scalaCheck,
-  curve25519
+  curve25519,
+  `circe-parser`
 )

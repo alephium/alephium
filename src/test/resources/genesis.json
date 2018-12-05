@@ -1,0 +1,11 @@
+{
+  "balance": {
+    "2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c": 100
+  },
+
+  "test": {
+    "privateKey": "604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65",
+    "publicKey": "2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c",
+    "balance": 100
+  }
+}
