@@ -1,8 +1,8 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.Keccak256
+import org.alephium.crypto.{Keccak256, WithKeccak256}
 import org.alephium.serde.Serde
-import org.alephium.util.{UInt, WithKeccak256}
+import org.alephium.util.UInt
 
 case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
     extends WithKeccak256[Block]
