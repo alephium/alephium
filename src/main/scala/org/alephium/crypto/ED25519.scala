@@ -4,38 +4,38 @@ import akka.util.ByteString
 import org.alephium.util.FixedSizeBytes
 import org.whispersystems.curve25519.Curve25519
 
-case class ED25519PrivateKey(bytes: Seq[Byte]) extends PrivateKey
+case class ED25519PrivateKey(bytes: ByteString) extends PrivateKey
 
 object ED25519PrivateKey extends FixedSizeBytes[ED25519PrivateKey] {
   override val size: Int = 32
 
-  private def apply(bytes: Seq[Byte]): ED25519PrivateKey = {
+  private def apply(bytes: ByteString): ED25519PrivateKey = {
     require(bytes.length == size)
     new ED25519PrivateKey(bytes)
   }
 
-  override def unsafeFrom(data: Seq[Byte]): ED25519PrivateKey = apply(data)
+  override def unsafeFrom(data: ByteString): ED25519PrivateKey = apply(data)
 }
 
-case class ED25519PublicKey(bytes: Seq[Byte]) extends PublicKey
+case class ED25519PublicKey(bytes: ByteString) extends PublicKey
 
 object ED25519PublicKey extends FixedSizeBytes[ED25519PublicKey] {
   override val size: Int = 32
 
-  private def apply(bytes: Seq[Byte]): ED25519PublicKey = {
+  private def apply(bytes: ByteString): ED25519PublicKey = {
     require(bytes.length == size)
     new ED25519PublicKey(bytes)
   }
 
-  override def unsafeFrom(data: Seq[Byte]): ED25519PublicKey = apply(data)
+  override def unsafeFrom(data: ByteString): ED25519PublicKey = apply(data)
 }
 
-case class ED25519Signature(bytes: Seq[Byte]) extends Signature
+case class ED25519Signature(bytes: ByteString) extends Signature
 
 object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
   override val size: Int = 64
 
-  def isCanonical(bytes: Seq[Byte]): Boolean = {
+  def isCanonical(bytes: ByteString): Boolean = {
     require(bytes.length == size)
     val sBytes = bytes.takeRight(32).toArray.reverse
     sBytes(0) = (sBytes(0) & 0x7F).toByte
@@ -43,12 +43,12 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
     s >= BigInt(0) && s < ED25519.generator
   }
 
-  private def apply(bytes: Seq[Byte]): ED25519Signature = {
+  private def apply(bytes: ByteString): ED25519Signature = {
     require(bytes.length == size && isCanonical(bytes))
     new ED25519Signature(bytes)
   }
 
-  override def unsafeFrom(data: Seq[Byte]): ED25519Signature = apply(data)
+  override def unsafeFrom(data: ByteString): ED25519Signature = apply(data)
 }
 
 object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25519Signature] {
@@ -60,8 +60,8 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
 
   override def generateKeyPair(): (ED25519PrivateKey, ED25519PublicKey) = {
     val keyPair    = curve25519.generateKeyPair()
-    val privateKey = ED25519PrivateKey.unsafeFrom(keyPair.getPrivateKey)
-    val publicKey  = ED25519PublicKey.unsafeFrom(keyPair.getPublicKey)
+    val privateKey = ED25519PrivateKey.unsafeFrom(ByteString(keyPair.getPrivateKey))
+    val publicKey  = ED25519PublicKey.unsafeFrom(ByteString(keyPair.getPublicKey))
     (privateKey, publicKey)
   }
 
@@ -75,7 +75,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
 
   private def sign(message: Array[Byte], privateKey: Array[Byte]): ED25519Signature = {
     val signature = curve25519.calculateSignature(privateKey, message)
-    ED25519Signature.unsafeFrom(signature)
+    ED25519Signature.unsafeFrom(ByteString(signature))
   }
 
   override def verify(message: ByteString,

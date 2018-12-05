@@ -17,7 +17,7 @@ trait Hash[T <: HashOutput] extends FixedSizeBytes[T] {
     provider.update(input.toArray, 0, input.length)
     val res = new Array[Byte](size)
     provider.doFinal(res, 0)
-    unsafeFrom(res.toSeq)
+    unsafeFrom(ByteString(res))
   }
 
   def hash(input: String): T = {
