@@ -26,4 +26,4 @@ before_script:
 
 test:
   script:
-    - SBT_OPTS="-Xss16m -Xmx4G" sbt clean scalastyle coverage test coverageReport
+    - sbt clean scalastyle coverage test coverageReport
