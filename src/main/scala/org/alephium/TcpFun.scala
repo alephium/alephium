@@ -60,7 +60,7 @@ class TcpFun extends BaseActor {
   }
 
   def end: Receive = {
-    case x => logger.info(s"Deadletter $x")
+    case x => log.info(s"Deadletter $x")
   }
 }
 

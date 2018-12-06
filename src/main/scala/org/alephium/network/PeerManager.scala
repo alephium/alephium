@@ -28,13 +28,13 @@ class PeerManager(blockPool: ActorRef) extends BaseActor {
     case GetPeers =>
       sender() ! Peers(peers)
     case Tcp.Connected(remote, local) =>
-      logger.debug(s"Connect to $remote, Listen at $local")
+      log.debug(s"Connect to $remote, Listen at $local")
       val connection = sender()
       val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockPool))
       connection ! Tcp.Register(tcpHandler)
       val newReceive = manage(peers + (remote -> tcpHandler))
       context.become(newReceive)
     case Tcp.CommandFailed(x: Tcp.Connect) =>
-      logger.info(s"Cannot connect to ${x.remoteAddress}")
+      log.info(s"Cannot connect to ${x.remoteAddress}")
   }
 }
