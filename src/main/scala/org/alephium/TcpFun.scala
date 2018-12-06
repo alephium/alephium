@@ -42,7 +42,7 @@ class TcpFun extends BaseActor {
       Thread.sleep(1000)
       val (_, pk) = ED25519.generateKeyPair()
       0l to 10l foreach { i =>
-        client ! Client.Transfer(pk, BigInt(i * 10))
+        client ! Client.Transfer(pk, i * 10)
         Thread.sleep(1000)
       }
 
