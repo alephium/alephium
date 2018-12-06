@@ -33,10 +33,10 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
   def handleEvent: Receive = {
     case Tcp.Received(data) =>
       val message = Message.deserializer.deserialize(data).get
-      logger.debug(s"Received $message from $remote")
+      log.debug(s"Received $message from $remote")
       messageHandler ! message.payload
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
-      logger.debug(s"Connection closed: $closeEvent")
+      log.debug(s"Connection closed: $closeEvent")
       context stop self
   }
 
