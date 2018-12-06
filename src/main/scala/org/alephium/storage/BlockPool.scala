@@ -158,7 +158,7 @@ class BlockPool() extends BaseActor {
           acc + txOutput.value
       }
       .tail
-    val index = values.indexWhere(v => (v compareTo value) >= 0)
+    val index = values.indexWhere(_ >= value)
     if (index == -1) None else Some((header, utxos.take(index + 1), values(index)))
   }
 
