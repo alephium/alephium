@@ -22,8 +22,11 @@ object TcpHandler {
 class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
     extends BaseActor {
 
-  private val messageHandler = context.actorOf(MessageHandler.props(connection, blockPool))
-  messageHandler ! MessageHandler.SendPing
+  protected val messageHandler = context.actorOf(MessageHandler.props(connection, blockPool))
+
+  override def preStart() {
+    messageHandler ! MessageHandler.SendPing
+  }
 
   override def receive: Receive = handleEvent orElse handleOutMessage
 
