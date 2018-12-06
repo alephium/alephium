@@ -5,47 +5,39 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.protocol.message.Message
+import org.alephium.util.BaseActor
 
 object TcpHandler {
+
+  def props(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef): Props =
+    Props(new TcpHandler(remote, connection, blockPool))
+
+  def envelope(message: Message): Tcp.Write =
+    Tcp.Write(Message.serializer.serialize(message))
+
   sealed trait Command
   case object Start extends Command
 }
 
-trait TcpHandler extends MessageHandler {
+class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
+    extends BaseActor {
 
-  def remote: InetSocketAddress
+  private val messageHandler = context.actorOf(MessageHandler.props(connection, blockPool))
 
-  def awaitStart(connection: ActorRef): Receive = {
-    case TcpHandler.Start =>
-      context.become(handle(connection))
-      self ! MessageHandler.SendPing
-  }
+  override def receive: Receive = handleEvent orElse handleOutMessage
 
-  def handle(connection: ActorRef): Receive =
-    handleEvent(connection) orElse handleCommand(connection) orElse forMessageHandler(connection)
-
-  def handleEvent(connection: ActorRef): Receive = {
+  def handleEvent: Receive = {
     case Tcp.Received(data) =>
       val message = Message.deserializer.deserialize(data).get
       logger.debug(s"Received $message from $remote")
-      handleMessage(message, connection)
+      messageHandler ! message.payload
     case closeEvent @ (Tcp.ConfirmedClosed | Tcp.Closed | Tcp.Aborted | Tcp.PeerClosed) =>
       logger.debug(s"Connection closed: $closeEvent")
       context stop self
   }
 
-  def handleCommand(connection: ActorRef): Receive = {
+  def handleOutMessage: Receive = {
     case message: Message =>
-      connection ! envelope(message)
+      connection ! TcpHandler.envelope(message)
   }
-}
-
-object SimpleTcpHandler {
-  def props(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef): Props =
-    Props(new SimpleTcpHandler(remote, connection, blockPool))
-}
-
-case class SimpleTcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
-    extends TcpHandler {
-  override def receive: Receive = awaitStart(connection)
 }
