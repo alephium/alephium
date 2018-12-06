@@ -1,7 +1,5 @@
 package org.alephium.protocol.model
 
-import java.math.BigInteger
-
 import org.alephium.crypto._
 import org.alephium.serde.Serde
 
@@ -9,7 +7,7 @@ case class BlockHeader(
     blockDeps: Seq[Keccak256],
     txsHash: Keccak256,
     timestamp: Long,
-    nonce: BigInteger
+    nonce: BigInt
 )
 
 object BlockHeader {
