@@ -9,7 +9,8 @@ case class Keccak256(bytes: ByteString) extends HashOutput
 object Keccak256 extends Hash[Keccak256] {
   override val size: Int = 32
 
-  override val provider: Digest = new KeccakDigest(size * 8)
+  // TODO: optimize with queue of providers
+  override def provider: Digest = new KeccakDigest(size * 8)
 
   private def apply(digest: ByteString): Keccak256 = {
     require(digest.length == size)

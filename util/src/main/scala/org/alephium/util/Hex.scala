@@ -7,7 +7,6 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 object Hex {
-  //TODO: move macro to a separated module
   def apply(s: String): ByteString = {
     ByteString(BHex.decode(s))
   }
@@ -17,7 +16,7 @@ object Hex {
   }
 
   implicit class HexStringSyntax(val sc: StringContext) extends AnyVal {
-    def hex(): Seq[Byte] = macro hexImpl
+    def hex(): ByteString = macro hexImpl
   }
 
   def hexImpl(c: blackbox.Context)(): c.Expr[ByteString] = {
@@ -25,7 +24,7 @@ object Hex {
     c.prefix.tree match {
       case Apply(_, List(Apply(_, List(Literal(Constant(s: String)))))) =>
         val bs = BHex.decode(s)
-        c.Expr(q"($bs).toSeq")
+        c.Expr(q"akka.util.ByteString($bs)")
     }
   }
 }
