@@ -1,7 +1,5 @@
 package org.alephium.storage
 
-import java.math.BigInteger
-
 import akka.actor.Props
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
@@ -13,22 +11,22 @@ object BlockPool {
   def props(): Props = Props(new BlockPool())
 
   sealed trait Command
-  case class AddBlocks(blocks: Seq[Block])                          extends Command
-  case class GetBlocks(locators: Seq[Keccak256])                    extends Command
-  case object GetBestHeader                                         extends Command
-  case object GetBestChain                                          extends Command
-  case object GetAllHeaders                                         extends Command
-  case class GetUTXOs(address: ED25519PublicKey, value: BigInteger) extends Command
-  case class GetBalance(address: ED25519PublicKey)                  extends Command
+  case class AddBlocks(blocks: Seq[Block])                      extends Command
+  case class GetBlocks(locators: Seq[Keccak256])                extends Command
+  case object GetBestHeader                                     extends Command
+  case object GetBestChain                                      extends Command
+  case object GetAllHeaders                                     extends Command
+  case class GetUTXOs(address: ED25519PublicKey, value: BigInt) extends Command
+  case class GetBalance(address: ED25519PublicKey)              extends Command
 
   sealed trait Event
-  case class SendBlocks(blocks: Seq[Block])                                      extends Event
-  case class BestHeader(header: Block)                                           extends Event
-  case class BestChain(blocks: Seq[Block])                                       extends Event
-  case class AllHeaders(headers: Seq[Keccak256])                                 extends Event
-  case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInteger)   extends Event
-  case object NoEnoughBalance                                                    extends Event
-  case class Balance(address: ED25519PublicKey, block: Block, total: BigInteger) extends Event
+  case class SendBlocks(blocks: Seq[Block])                                  extends Event
+  case class BestHeader(header: Block)                                       extends Event
+  case class BestChain(blocks: Seq[Block])                                   extends Event
+  case class AllHeaders(headers: Seq[Keccak256])                             extends Event
+  case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInt)   extends Event
+  case object NoEnoughBalance                                                extends Event
+  case class Balance(address: ED25519PublicKey, block: Block, total: BigInt) extends Event
 }
 
 // consider single chain for the moment
@@ -98,31 +96,31 @@ class BlockPool() extends BaseActor {
     !blockStore.values.exists(_.prevBlockHash == block.hash)
   }
 
-  private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
+  private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
     transaction.unsigned.inputs
       .map {
         case TxInput(txHash, outputIndex) =>
           val tx       = txStore(txHash)
           val txOutput = tx.unsigned.outputs(outputIndex)
-          if (txOutput.publicKey == address) txOutput.value else BigInteger.ZERO
+          if (txOutput.publicKey == address) txOutput.value else BigInt(0)
       }
-      .foldLeft(BigInteger.ZERO)(_ add _)
+      .foldLeft(BigInt(0))(_ + _)
   }
 
-  private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
+  private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
     transaction.unsigned.outputs
       .filter(_.publicKey == address)
-      .foldLeft(BigInteger.ZERO)(_ add _.value)
+      .foldLeft(BigInt(0))(_ + _.value)
   }
 
-  private def getBalance(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
-    getTxOutputValue(transaction, address) subtract getTxInputValue(transaction, address)
+  private def getBalance(transaction: Transaction, address: ED25519PublicKey): BigInt = {
+    getTxOutputValue(transaction, address) - getTxInputValue(transaction, address)
   }
 
-  private def getBalance(block: Block, address: ED25519PublicKey): BigInteger = {
+  private def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
     block.transactions
       .map(transaction => getBalance(transaction, address))
-      .foldLeft(BigInteger.ZERO)(_ add _)
+      .foldLeft(BigInt(0))(_ + _)
   }
 
   private def getBestHeader: Block = {
@@ -156,14 +154,14 @@ class BlockPool() extends BaseActor {
 
   // return a number of inputs with at lease value Aleph
   private def getUTXOs(address: ED25519PublicKey,
-                       value: BigInteger): Option[(Keccak256, Seq[TxInput], BigInteger)] = {
+                       value: BigInt): Option[(Keccak256, Seq[TxInput], BigInt)] = {
     val (header, utxos) = getUTXOs(address)
     val values = utxos
-      .scanLeft(BigInteger.ZERO) {
+      .scanLeft(BigInt(0)) {
         case (acc, TxInput(txHash, outputIndex)) =>
           val tx       = txStore(txHash)
           val txOutput = tx.unsigned.outputs(outputIndex)
-          acc add txOutput.value
+          acc + txOutput.value
       }
       .tail
     val index = values.indexWhere(v => (v compareTo value) >= 0)
@@ -171,10 +169,10 @@ class BlockPool() extends BaseActor {
   }
 
   // calculated from best chain
-  private def getBalance(address: ED25519PublicKey): (Block, BigInteger) = {
+  private def getBalance(address: ED25519PublicKey): (Block, BigInt) = {
     val bestHeader = getBestHeader
     val balance =
-      getBestChain.map(block => getBalance(block, address)).foldLeft(BigInteger.ZERO)(_ add _)
+      getBestChain.map(block => getBalance(block, address)).foldLeft(BigInt(0))(_ + _)
     (bestHeader, balance)
   }
 }

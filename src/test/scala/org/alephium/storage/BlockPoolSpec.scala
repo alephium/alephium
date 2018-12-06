@@ -1,7 +1,5 @@
 package org.alephium.storage
 
-import java.math.BigInteger
-
 import akka.actor.{ActorRef, Props}
 import org.alephium.{AlephiumActorSpec, Fixture}
 import org.alephium.protocol.Genesis
@@ -61,12 +59,12 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
     pool ! GetBalance(testPublicKey)
     expectMsg(Balance(testPublicKey, genesis, testBalance))
     pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, genesis, BigInteger.ZERO))
+    expectMsg(Balance(ED25519PublicKey.zero, genesis, BigInt(0)))
   }
 
   it should "return correct balance after transfering money" in {
     val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInt(10l))
 
     addBlocks(pool, newBlock)
 
@@ -77,10 +75,10 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
     expectMsg(BestChain(Seq(genesis, newBlock)))
 
     pool ! GetBalance(testPublicKey)
-    expectMsg(Balance(testPublicKey, newBlock, testBalance subtract BigInteger.valueOf(10l)))
+    expectMsg(Balance(testPublicKey, newBlock, testBalance - BigInt(10l)))
 
     pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, newBlock, BigInteger.valueOf(10l)))
+    expectMsg(Balance(ED25519PublicKey.zero, newBlock, BigInt(10l)))
   }
 
   it should "return correct utxos with only genesis block" in {
@@ -94,32 +92,32 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
         total shouldBe testBalance
     }
 
-    pool ! GetUTXOs(testPublicKey, testBalance add BigInteger.ONE)
+    pool ! GetUTXOs(testPublicKey, testBalance + BigInt(1))
     expectMsg(NoEnoughBalance)
 
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(10l))
     expectMsg(NoEnoughBalance)
   }
 
   it should "return correct utxos after transfering money" in {
     val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    val newBlock = blockForTransfer(ED25519PublicKey.zero, BigInt(10l))
     addBlocks(pool, newBlock)
 
-    pool ! GetUTXOs(testPublicKey, BigInteger.valueOf(10l))
+    pool ! GetUTXOs(testPublicKey, BigInt(10l))
     expectMsgPF() {
       case UTXOs(header, inputs, total) =>
         header shouldBe newBlock.hash
         inputs.size shouldBe 1
-        total shouldBe (testBalance subtract BigInteger.valueOf(10l))
+        total shouldBe (testBalance - BigInt(10l))
     }
 
-    pool ! GetUTXOs(testPublicKey, BigInteger.valueOf(100l))
+    pool ! GetUTXOs(testPublicKey, BigInt(100l))
     expectMsg(NoEnoughBalance)
 
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(10l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(10l))
     expectMsgType[UTXOs]
-    pool ! GetUTXOs(ED25519PublicKey.zero, BigInteger.valueOf(11l))
+    pool ! GetUTXOs(ED25519PublicKey.zero, BigInt(11l))
     expectMsg(NoEnoughBalance)
   }
 

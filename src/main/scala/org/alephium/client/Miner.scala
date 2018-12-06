@@ -1,6 +1,5 @@
 package org.alephium.client
 
-import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
@@ -19,11 +18,11 @@ object Miner {
   case object Stop                                                 extends Command
   case class Peer(remote: InetSocketAddress, tcpHandler: ActorRef) extends Command
   case class Pool(transaction: Transaction)                        extends Command
-  case class Nonce(nonce: BigInteger)                              extends Command
+  case class Nonce(nonce: BigInt)                                  extends Command
 
   def tryMine(deps: Seq[Keccak256],
               transactions: Seq[Transaction],
-              nonce: BigInteger): Option[Block] = {
+              nonce: BigInt): Option[Block] = {
     val block = Block.from(deps, transactions, nonce)
     if (isDifficult(Keccak256.hash(block.hash))) {
       Some(block)
@@ -63,15 +62,15 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef) extends BaseAct
           blockPool ! BlockPool.GetBestHeader
           context become collect
         case None =>
-          self ! Miner.Nonce(nonce add BigInteger.ONE)
+          self ! Miner.Nonce(nonce + 1)
       }
   }
 
   def collect: Receive = common orElse {
     case BlockPool.BestHeader(header) =>
-      val transaction = Transaction.coinbase(address, BigInteger.ONE)
+      val transaction = Transaction.coinbase(address, BigInt(1))
       context become mine(Seq(header.hash), Seq(transaction))
-      self ! Miner.Nonce(BigInteger.ONE)
+      self ! Miner.Nonce(1)
   }
 
   private def broadcast(block: Block): Unit = {

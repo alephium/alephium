@@ -1,7 +1,5 @@
 package org.alephium.protocol.model
 
-import java.math.BigInteger
-
 import org.alephium.crypto._
 import org.scalacheck.Gen
 
@@ -14,7 +12,7 @@ object ModelGen {
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose(0l, 100l)
-  } yield TxOutput(BigInteger.valueOf(value), pk)
+  } yield TxOutput(BigInt(value), pk)
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(0, 5)
@@ -26,11 +24,11 @@ object ModelGen {
   val blockGen: Gen[Block] = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq(Keccak256.zero), txs, BigInteger.ZERO)
+  } yield Block.from(Seq(Keccak256.zero), txs, BigInt(0))
 
   def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, txs, BigInteger.ZERO)
+    } yield Block.from(deps, txs, BigInt(0))
 }

@@ -1,7 +1,5 @@
 package org.alephium.protocol.model
 
-import java.math.BigInteger
-
 import org.alephium.crypto._
 import org.alephium.serde.{Serde, serialize}
 
@@ -21,7 +19,7 @@ object Transaction {
     Transaction(unsigned, signature)
   }
 
-  def coinbase(address: ED25519PublicKey, value: BigInteger): Transaction = {
+  def coinbase(address: ED25519PublicKey, value: BigInt): Transaction = {
     val txOutput = TxOutput(value, address)
     val unsigned = UnsignedTransaction(Seq.empty, Seq(txOutput))
     Transaction(unsigned, ED25519Signature.zero)
