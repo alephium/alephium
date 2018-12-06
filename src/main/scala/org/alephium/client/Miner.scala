@@ -68,7 +68,7 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef) extends BaseAct
 
   def collect: Receive = common orElse {
     case BlockPool.BestHeader(header) =>
-      val transaction = Transaction.coinbase(address, BigInt(1))
+      val transaction = Transaction.coinbase(address, 1)
       context become mine(Seq(header.hash), Seq(transaction))
       self ! Miner.Nonce(1)
   }

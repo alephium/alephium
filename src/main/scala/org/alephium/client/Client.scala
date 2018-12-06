@@ -64,9 +64,9 @@ object Client {
       val block = Block.from(deps, transactions, nonce)
       if (isDifficult(Keccak256.hash(block.hash))) {
         block
-      } else loop(nonce + BigInt(1))
+      } else loop(nonce + 1)
     }
-    loop(BigInt(0))
+    loop(0)
   }
 
   def isDifficult(hash: Keccak256): Boolean = {
