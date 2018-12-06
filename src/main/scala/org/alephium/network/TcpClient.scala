@@ -6,11 +6,11 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
 object TcpClient {
-  def props(remote: InetSocketAddress, blockHandler: ActorRef): Props =
-    Props(new TcpClient(remote, blockHandler))
+  def props(remote: InetSocketAddress, blockPool: ActorRef): Props =
+    Props(new TcpClient(remote, blockPool))
 }
 
-case class TcpClient(remote: InetSocketAddress, blockHandler: ActorRef) extends TcpHandler {
+case class TcpClient(remote: InetSocketAddress, blockPool: ActorRef) extends TcpHandler {
   import context.system
 
   IO(Tcp) ! Tcp.Connect(remote)

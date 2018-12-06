@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.protocol.message.SendBlock
+import org.alephium.protocol.message.SendBlocks
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
@@ -75,6 +75,6 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef) extends BaseAct
   }
 
   private def broadcast(block: Block): Unit = {
-    peers.values.foreach(_ ! SendBlock(block))
+    peers.values.foreach(_ ! SendBlocks(Seq(block)))
   }
 }

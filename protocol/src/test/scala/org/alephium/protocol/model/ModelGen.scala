@@ -16,7 +16,7 @@ object ModelGen {
     value <- Gen.choose(0l, 100l)
   } yield TxOutput(BigInteger.valueOf(value), pk)
 
-  val transactionGen = for {
+  val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(0, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(0, 5)
@@ -26,7 +26,7 @@ object ModelGen {
   val blockGen: Gen[Block] = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq.empty, txs, BigInteger.ZERO)
+  } yield Block.from(Seq(Keccak256.zero), txs, BigInteger.ZERO)
 
   def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
     for {

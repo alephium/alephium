@@ -10,25 +10,29 @@ import org.alephium.util.BaseActor
 
 object BlockPool {
 
-  def props(): Props = Props(new BlockPoolImpl())
+  def props(): Props = Props(new BlockPool())
 
   sealed trait Command
   case class AddBlocks(blocks: Seq[Block])                          extends Command
+  case class GetBlocks(locators: Seq[Keccak256])                    extends Command
   case object GetBestHeader                                         extends Command
   case object GetBestChain                                          extends Command
+  case object GetAllHeaders                                         extends Command
   case class GetUTXOs(address: ED25519PublicKey, value: BigInteger) extends Command
   case class GetBalance(address: ED25519PublicKey)                  extends Command
 
   sealed trait Event
+  case class SendBlocks(blocks: Seq[Block])                                      extends Event
   case class BestHeader(header: Block)                                           extends Event
   case class BestChain(blocks: Seq[Block])                                       extends Event
+  case class AllHeaders(headers: Seq[Keccak256])                                 extends Event
   case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInteger)   extends Event
   case object NoEnoughBalance                                                    extends Event
   case class Balance(address: ED25519PublicKey, block: Block, total: BigInteger) extends Event
 }
 
 // consider single chain for the moment
-class BlockPoolImpl() extends BaseActor {
+class BlockPool() extends BaseActor {
   import BlockPool._
 
   private val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
@@ -39,10 +43,15 @@ class BlockPoolImpl() extends BaseActor {
   override def receive: Receive = {
     case AddBlocks(blocks) =>
       addBlocks(blocks)
+    case GetBlocks(locators) =>
+      val newBlocks = getBlocks(locators)
+      sender() ! SendBlocks(newBlocks)
     case GetBestHeader =>
       sender() ! BestHeader(getBestHeader)
     case GetBestChain =>
       sender() ! BestChain(getBestChain)
+    case GetAllHeaders =>
+      sender() ! AllHeaders(getAllHeaders)
     case GetUTXOs(address, value) =>
       getUTXOs(address, value) match {
         case Some((header, inputs, total)) =>
@@ -66,17 +75,27 @@ class BlockPoolImpl() extends BaseActor {
     blocks.foreach(addBlock)
   }
 
+  private def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {
+    val bestChain = getBestChain
+    val index     = bestChain.lastIndexWhere(block => locators.contains(block.prevBlockHash))
+    bestChain.drop(index)
+  }
+
   private def getHeight(block: Block): Int = {
     getChain(block).size
   }
 
   private def getChain(block: Block): Seq[Block] = {
-    if (block.blockHeader.blockDeps.isEmpty) Seq(block)
+    if (block.prevBlockHash == Keccak256.zero) Seq(block)
     else {
-      val prevBlockHash = block.blockHeader.blockDeps.head
-      val prevBlock     = blockStore(prevBlockHash)
+      val prevBlock = blockStore(block.prevBlockHash)
       getChain(prevBlock) :+ block
     }
+  }
+
+  private def isHeader(block: Block): Boolean = {
+    blockStore.contains(block.hash) &&
+    !blockStore.values.exists(_.prevBlockHash == block.hash)
   }
 
   private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
@@ -113,6 +132,10 @@ class BlockPoolImpl() extends BaseActor {
 
   private def getBestChain: Seq[Block] = {
     getChain(getBestHeader)
+  }
+
+  private def getAllHeaders: Seq[Keccak256] = {
+    blockStore.values.filter(isHeader).map(_.hash).toSeq
   }
 
   private def getUTXOs(address: ED25519PublicKey): (Keccak256, Seq[TxInput]) = {
