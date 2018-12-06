@@ -55,7 +55,7 @@ class SerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Mat
     forAll { (n: Long) =>
       val bn  = BigInt(n)
       val bnn = deserialize[BigInt](serialize(bn)).success.value
-      (bnn compareTo bn) shouldBe 0
+      bnn shouldBe bn
     }
   }
 

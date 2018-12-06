@@ -11,7 +11,7 @@ import scala.io.Source
 trait Fixture {
 
   def blockForTransfer(to: ED25519PublicKey, value: BigInt): Block = {
-    require((value compareTo BigInt(0)) >= 0)
+    require(value >= BigInt(0))
 
     val txOutput1 = TxOutput(value, to)
     val txOutput2 = TxOutput(testBalance - value, testPublicKey)
