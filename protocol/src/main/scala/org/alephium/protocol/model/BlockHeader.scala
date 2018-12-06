@@ -1,14 +1,15 @@
 package org.alephium.protocol.model
 
+import java.math.BigInteger
+
 import org.alephium.crypto._
 import org.alephium.serde.Serde
-import org.alephium.util.UInt
 
 case class BlockHeader(
     blockDeps: Seq[Keccak256],
     txsHash: Keccak256,
     timestamp: Long,
-    nonce: UInt
+    nonce: BigInteger
 )
 
 object BlockHeader {

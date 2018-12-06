@@ -1,5 +1,7 @@
 package org.alephium.serde
 
+import java.math.BigInteger
+
 import akka.util.ByteString
 import org.scalatest.TryValues._
 import org.scalatest.{FlatSpecLike, Matchers}
@@ -48,6 +50,14 @@ class SerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Mat
     forAll { (n: Long) =>
       val nn = deserialize[Long](serialize(n))
       nn.success.value shouldBe n
+    }
+  }
+
+  "Serde for BigInteger" should "serde correctly" in {
+    forAll { (n: Long) =>
+      val bn  = BigInteger.valueOf(n)
+      val bnn = deserialize[BigInteger](serialize(bn)).success.value
+      (bnn compareTo bn) shouldBe 0
     }
   }
 
