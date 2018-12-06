@@ -97,20 +97,16 @@ class BlockPool() extends BaseActor {
   }
 
   private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
-    transaction.unsigned.inputs
-      .map {
-        case TxInput(txHash, outputIndex) =>
-          val tx       = txStore(txHash)
-          val txOutput = tx.unsigned.outputs(outputIndex)
-          if (txOutput.publicKey == address) txOutput.value else BigInt(0)
-      }
-      .foldLeft(BigInt(0))(_ + _)
+    transaction.unsigned.inputs.map {
+      case TxInput(txHash, outputIndex) =>
+        val tx       = txStore(txHash)
+        val txOutput = tx.unsigned.outputs(outputIndex)
+        if (txOutput.publicKey == address) txOutput.value else BigInt(0)
+    }.sum
   }
 
   private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
-    transaction.unsigned.outputs
-      .filter(_.publicKey == address)
-      .foldLeft(BigInt(0))(_ + _.value)
+    transaction.unsigned.outputs.filter(_.publicKey == address).map(_.value).sum
   }
 
   private def getBalance(transaction: Transaction, address: ED25519PublicKey): BigInt = {
@@ -118,9 +114,7 @@ class BlockPool() extends BaseActor {
   }
 
   private def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
-    block.transactions
-      .map(transaction => getBalance(transaction, address))
-      .foldLeft(BigInt(0))(_ + _)
+    block.transactions.map(transaction => getBalance(transaction, address)).sum
   }
 
   private def getBestHeader: Block = {
@@ -171,8 +165,7 @@ class BlockPool() extends BaseActor {
   // calculated from best chain
   private def getBalance(address: ED25519PublicKey): (Block, BigInt) = {
     val bestHeader = getBestHeader
-    val balance =
-      getBestChain.map(block => getBalance(block, address)).foldLeft(BigInt(0))(_ + _)
+    val balance    = getBestChain.map(block => getBalance(block, address)).sum
     (bestHeader, balance)
   }
 }
