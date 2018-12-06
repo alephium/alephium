@@ -1,6 +1,5 @@
 package org.alephium.network
 
-import akka.actor.Terminated
 import akka.io.Tcp
 import akka.testkit.TestProbe
 import org.alephium.AlephiumActorSpec
@@ -37,9 +36,7 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
   it should "fail if receive a wrong ping" in new Fixture {
     watch(messageHandler)
     messageHandler ! Pong(1)
-    expectMsgPF() {
-      case Terminated(actor) => actor shouldBe messageHandler
-    }
+    expectTerminated(messageHandler)
   }
 
   it should "let block pool add blocks when receiving new blocks" in new Fixture {
