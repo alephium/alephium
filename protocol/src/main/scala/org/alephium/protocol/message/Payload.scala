@@ -1,6 +1,7 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
+import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.Block
 import org.alephium.serde._
 
@@ -11,15 +12,17 @@ sealed trait Payload
 
 object Payload {
   val cmdCodes: Map[String, Int] = Map(
-    "Ping"      -> 0,
-    "Pong"      -> 1,
-    "SendBlock" -> 2
+    "Ping"       -> 0,
+    "Pong"       -> 1,
+    "SendBlocks" -> 2,
+    "GetBlocks"  -> 3
   )
 
   implicit val serializer: Serializer[Payload] = {
-    case x: Ping      => implicitly[Serializer[Ping]].serialize(x)
-    case x: Pong      => implicitly[Serializer[Pong]].serialize(x)
-    case x: SendBlock => x.block.bytes
+    case x: Ping       => implicitly[Serializer[Ping]].serialize(x)
+    case x: Pong       => implicitly[Serializer[Pong]].serialize(x)
+    case x: SendBlocks => implicitly[Serializer[SendBlocks]].serialize(x)
+    case x: GetBlocks  => implicitly[Serializer[GetBlocks]].serialize(x)
   }
 
   def deserializer(cmdCode: Int): Deserializer[Payload] =
@@ -29,8 +32,10 @@ object Payload {
           implicitly[Serde[Ping]]._deserialize(input)
         case Pong.cmdCode =>
           implicitly[Serde[Pong]]._deserialize(input)
-        case SendBlock.cmdCode =>
-          implicitly[Serde[SendBlock]]._deserialize(input)
+        case SendBlocks.cmdCode =>
+          implicitly[Serde[SendBlocks]]._deserialize(input)
+        case GetBlocks.cmdCode =>
+          implicitly[Serde[GetBlocks]]._deserialize(input)
         case _ => Failure(OtherError(s"Invalid cmd code: $cmdCode"))
     }
 }
@@ -56,8 +61,14 @@ object Pong extends PayloadCompanion[Pong] {
   implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
-case class SendBlock(block: Block) extends Payload
+case class SendBlocks(blocks: Seq[Block]) extends Payload
 
-object SendBlock extends PayloadCompanion[SendBlock] {
-  implicit val serde: Serde[SendBlock] = Serde.forProduct1(apply, p => p.block)
+object SendBlocks extends PayloadCompanion[SendBlocks] {
+  implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
+}
+
+case class GetBlocks(locators: Seq[Keccak256]) extends Payload
+
+object GetBlocks extends PayloadCompanion[GetBlocks] {
+  implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
 }

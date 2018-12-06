@@ -7,7 +7,9 @@ import akka.actor.ActorSystem
 import org.alephium.client.Client
 import org.alephium.constant.Network
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.network.{BlockHandler, TcpClient, TcpServer}
+import org.alephium.network.{TcpClient, TcpServer}
+import org.alephium.protocol.Genesis
+import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.storage.BlockPool
 import org.alephium.util.Hex._
 
@@ -15,11 +17,10 @@ object TcpFun extends App {
   // scalastyle:off magic.number
   val system = ActorSystem("TcpFun")
 
-  val blockPool    = system.actorOf(BlockPool.props())
-  val blockHandler = system.actorOf(BlockHandler.props(blockPool), "block-handler")
-  val server       = system.actorOf(TcpServer.props(Network.port, blockHandler), "server")
+  val blockPool = system.actorOf(BlockPool.props())
+  val server    = system.actorOf(TcpServer.props(Network.port, blockPool), "server")
   val tcpHandler = system.actorOf(
-    TcpClient.props(new InetSocketAddress("localhost", Network.port), blockHandler),
+    TcpClient.props(new InetSocketAddress("localhost", Network.port), blockPool),
     "client"
   )
 
@@ -35,4 +36,11 @@ object TcpFun extends App {
     client ! Client.Transfer(pk, BigInteger.valueOf(i * 10))
     Thread.sleep(1000)
   }
+
+  val syncClient = system.actorOf(
+    TcpClient.props(new InetSocketAddress("localhost", Network.port), blockPool),
+    "sync_client"
+  )
+  Thread.sleep(1000)
+  syncClient ! Message(GetBlocks(Seq(Genesis.block.hash)))
 }
