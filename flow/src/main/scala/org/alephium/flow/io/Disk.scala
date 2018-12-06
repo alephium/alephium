@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import java.nio.file.{Files, Path, StandardOpenOption => Option}
 
@@ -7,16 +7,16 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
-object DiskIO {
-  def create(root: Path): IOResult[DiskIO] = execute {
+object Disk {
+  def create(root: Path): IOResult[Disk] = execute {
     createUnsafe(root)
   }
 
-  def createUnsafe(root: Path): DiskIO = {
+  def createUnsafe(root: Path): Disk = {
     createDirUnsafe(root)
-    val diskIO = new DiskIO(root)
-    createDirUnsafe(diskIO.blockFolder)
-    diskIO
+    val disk = new Disk(root)
+    createDirUnsafe(disk.blockFolder)
+    disk
   }
 
   def createDir(path: Path): IOResult[Unit] = execute {
@@ -43,8 +43,8 @@ object DiskIO {
   }
 }
 
-class DiskIO private (root: Path) {
-  import DiskIO.{execute, executeF}
+class Disk private (root: Path) {
+  import Disk.{execute, executeF}
 
   val blockFolder: Path = root.resolve("blocks")
 

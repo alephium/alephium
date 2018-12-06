@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import org.alephium.serde.SerdeError
 import org.rocksdb.RocksDBException

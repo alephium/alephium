@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import java.nio.file.Path
 
@@ -16,11 +16,19 @@ object Database {
   def openUnsafe(path: Path, options: Options): Database = {
     RocksDB.loadLibrary()
     val db = RocksDB.open(options, path.toString)
-    new Database(db)
+    new Database(path, db)
   }
 
   def dESTROY(path: Path, options: Options): IOResult[Unit] = execute {
     RocksDB.destroyDB(path.toString, options)
+  }
+
+  def dESTROY(db: Database): IOResult[Unit] = execute {
+    dESTROYUnsafe(db)
+  }
+
+  def dESTROYUnsafe(db: Database): Unit = {
+    RocksDB.destroyDB(db.path.toString, new Options())
   }
 
   @inline
@@ -32,7 +40,7 @@ object Database {
   }
 }
 
-class Database private (db: RocksDB) {
+class Database private (val path: Path, db: RocksDB) {
   import Database._
 
   def close(): IOResult[Unit] = execute {

@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.AVector
 
