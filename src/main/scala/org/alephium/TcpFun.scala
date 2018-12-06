@@ -15,7 +15,7 @@ object TcpFun extends App {
   // scalastyle:off magic.number
   val system = ActorSystem("TcpFun")
 
-  val blockPool    = BlockPool()
+  val blockPool    = system.actorOf(BlockPool.props())
   val blockHandler = system.actorOf(BlockHandler.props(blockPool), "block-handler")
   val server       = system.actorOf(TcpServer.props(Network.port, blockHandler), "server")
   val tcpHandler = system.actorOf(
@@ -27,12 +27,12 @@ object TcpFun extends App {
     hex"604b105965f2bb262d5bede6f9790c7ba9ca08c0f31627ec24f52b67b59dfa65")
   val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
     hex"2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c")
-  val client =
-    Client(privateKey, publicKey, BlockPool(), tcpHandler)
+  val client = system.actorOf(Client.props(privateKey, publicKey, blockPool, tcpHandler))
 
   Thread.sleep(1000)
   val (_, pk) = ED25519.generateKeyPair()
   0l to 10l foreach { i =>
-    client.transfer(pk, BigInteger.valueOf(i * 10))
+    client ! Client.Transfer(pk, BigInteger.valueOf(i * 10))
+    Thread.sleep(1000)
   }
 }

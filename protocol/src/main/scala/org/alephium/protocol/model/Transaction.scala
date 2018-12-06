@@ -1,6 +1,8 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature, WithKeccak256}
+import java.math.BigInteger
+
+import org.alephium.crypto._
 import org.alephium.serde.{Serde, serialize}
 
 case class Transaction(
@@ -17,5 +19,11 @@ object Transaction {
     val message   = serialize(unsigned)
     val signature = ED25519.sign(message, privateKey)
     Transaction(unsigned, signature)
+  }
+
+  def coinbase(address: ED25519PublicKey, value: BigInteger): Transaction = {
+    val txOutput = TxOutput(value, address)
+    val unsigned = UnsignedTransaction(Seq.empty, Seq(txOutput))
+    Transaction(unsigned, ED25519Signature.zero)
   }
 }
