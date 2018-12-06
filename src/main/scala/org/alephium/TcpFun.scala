@@ -25,15 +25,20 @@ class TcpFun extends BaseActor {
   private val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
     hex"2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c")
 
+  private val serverAddress = new InetSocketAddress("localhost", Network.port)
+
   override def preStart(): Unit = {
-    peerManager ! PeerManager.Connect(new InetSocketAddress("localhost", Network.port))
+    peerManager ! PeerManager.Connect(serverAddress)
+    Thread.sleep(1000)
+    peerManager ! PeerManager.GetPeers
   }
 
   override def receive: Receive = tryTransfer
 
   def tryTransfer: Receive = {
-    case tcpHandler: ActorRef =>
-      val client = context.actorOf(Client.props(privateKey, publicKey, blockPool, tcpHandler))
+    case PeerManager.Peers(peers) =>
+      val tcpHandler = peers(serverAddress)
+      val client     = context.actorOf(Client.props(privateKey, publicKey, blockPool, tcpHandler))
 
       Thread.sleep(1000)
       val (_, pk) = ED25519.generateKeyPair()
@@ -42,18 +47,13 @@ class TcpFun extends BaseActor {
         Thread.sleep(1000)
       }
 
-      context.become(fromTransferToSync)
-  }
-
-  def fromTransferToSync: Receive = {
-    case x =>
-      logger.info(s"Deadletter $x")
-      peerManager ! PeerManager.Connect(new InetSocketAddress("localhost", Network.port))
+      preStart()
       context.become(trySync)
   }
 
   def trySync: Receive = {
-    case tcpHandler: ActorRef =>
+    case PeerManager.Peers(peers) =>
+      val tcpHandler = peers(serverAddress)
       Thread.sleep(1000)
       tcpHandler ! Message(GetBlocks(Seq(Genesis.block.hash)))
       context.become(end)
