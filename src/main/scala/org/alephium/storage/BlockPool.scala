@@ -1,9 +1,10 @@
 package org.alephium.storage
 
+import java.math.BigInteger
+
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
-import org.alephium.util.UInt
 
 trait BlockPool {
   def addBlock(block: Block): Unit
@@ -16,9 +17,9 @@ trait BlockPool {
 
   def getUTXOs(address: ED25519PublicKey): Seq[TxInput]
 
-  def getUTXOs(address: ED25519PublicKey, value: UInt): Option[(Seq[TxInput], UInt)]
+  def getUTXOs(address: ED25519PublicKey, value: BigInteger): Option[(Seq[TxInput], BigInteger)]
 
-  def getBalance(address: ED25519PublicKey): (Block, UInt)
+  def getBalance(address: ED25519PublicKey): (Block, BigInteger)
 }
 
 object BlockPool {
@@ -56,31 +57,31 @@ class BlockPoolImpl() extends BlockPool {
     }
   }
 
-  private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): UInt = {
+  private def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
     transaction.unsigned.inputs
       .map {
         case TxInput(txHash, outputIndex) =>
           val tx       = txStore(txHash)
           val txOutput = tx.unsigned.outputs(outputIndex)
-          if (txOutput.publicKey == address) txOutput.value else UInt.zero
+          if (txOutput.publicKey == address) txOutput.value else BigInteger.ZERO
       }
-      .foldLeft(UInt.zero)(_ plus _)
+      .foldLeft(BigInteger.ZERO)(_ add _)
   }
 
-  private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): UInt = {
+  private def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
     transaction.unsigned.outputs
       .filter(_.publicKey == address)
-      .foldLeft(UInt.zero)(_ plus _.value)
+      .foldLeft(BigInteger.ZERO)(_ add _.value)
   }
 
-  private def getBalance(transaction: Transaction, address: ED25519PublicKey): UInt = {
-    getTxOutputValue(transaction, address) minus getTxInputValue(transaction, address)
+  private def getBalance(transaction: Transaction, address: ED25519PublicKey): BigInteger = {
+    getTxOutputValue(transaction, address) subtract getTxInputValue(transaction, address)
   }
 
-  private def getBalance(block: Block, address: ED25519PublicKey): UInt = {
+  private def getBalance(block: Block, address: ED25519PublicKey): BigInteger = {
     block.transactions
       .map(transaction => getBalance(transaction, address))
-      .foldLeft(UInt.zero)(_ plus _)
+      .foldLeft(BigInteger.ZERO)(_ add _)
   }
 
   override def getBestHeader: Block = {
@@ -109,25 +110,26 @@ class BlockPoolImpl() extends BlockPool {
   }
 
   // return a number of inputs with at lease value Aleph
-  override def getUTXOs(address: ED25519PublicKey, value: UInt): Option[(Seq[TxInput], UInt)] = {
+  override def getUTXOs(address: ED25519PublicKey,
+                        value: BigInteger): Option[(Seq[TxInput], BigInteger)] = {
     val utxos = getUTXOs(address)
     val values = utxos
-      .scanLeft(UInt.zero) {
+      .scanLeft(BigInteger.ZERO) {
         case (acc, TxInput(txHash, outputIndex)) =>
           val tx       = txStore(txHash)
           val txOutput = tx.unsigned.outputs(outputIndex)
-          acc plus txOutput.value
+          acc add txOutput.value
       }
       .tail
-    val index = values.indexWhere(_ >= value)
+    val index = values.indexWhere(v => (v compareTo value) >= 0)
     if (index == -1) None else Some((utxos.take(index + 1), values(index)))
   }
 
   // calculated from best chain
-  override def getBalance(address: ED25519PublicKey): (Block, UInt) = {
+  override def getBalance(address: ED25519PublicKey): (Block, BigInteger) = {
     val bestHeader = getBestHeader
     val balance =
-      getBestChain.map(block => getBalance(block, address)).foldLeft(UInt.zero)(_ plus _)
+      getBestChain.map(block => getBalance(block, address)).foldLeft(BigInteger.ZERO)(_ add _)
     (bestHeader, balance)
   }
 }

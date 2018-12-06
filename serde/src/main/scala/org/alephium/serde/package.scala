@@ -1,5 +1,7 @@
 package org.alephium
 
+import java.math.BigInteger
+
 import akka.util.ByteString
 
 import scala.reflect.ClassTag
@@ -22,4 +24,7 @@ package object serde {
 
   implicit def seqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[Seq[T]] =
     dynamicSizeBytesSerde(serde)
+
+  implicit val bigIntegerSerde: Serde[BigInteger] =
+    seqSerde[Byte].xmap(bs => new BigInteger(bs.toArray), _.toByteArray)
 }

@@ -1,8 +1,9 @@
 package org.alephium.protocol.model
 
+import java.math.BigInteger
+
 import org.alephium.crypto.{Keccak256, WithKeccak256}
 import org.alephium.serde.Serde
-import org.alephium.util.UInt
 
 case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
     extends WithKeccak256[Block]
@@ -10,7 +11,7 @@ case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.blockHeader, b.transactions))
 
-  def from(blockDeps: Seq[Keccak256], transactions: Seq[Transaction], nonce: UInt): Block = {
+  def from(blockDeps: Seq[Keccak256], transactions: Seq[Transaction], nonce: BigInteger): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
     val txsHash     = Keccak256.hash(transactions)
     val timestamp   = System.currentTimeMillis()
