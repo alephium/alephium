@@ -3,7 +3,7 @@ package org.alephium.network
 import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.constant.Network
 import org.alephium.protocol.message._
-import org.alephium.storage.BlockPool
+import org.alephium.storage.BlockPoolHandler
 import org.alephium.util.BaseActor
 
 import scala.util.Random
@@ -35,14 +35,14 @@ class MessageHandler(connection: ActorRef, blockPool: ActorRef) extends BaseActo
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.size} blocks")
-      blockPool ! BlockPool.AddBlocks(blocks)
+      blockPool ! BlockPoolHandler.AddBlocks(blocks)
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockPool ! BlockPool.GetBlocksAfter(locators)
+      blockPool ! BlockPoolHandler.GetBlocksAfter(locators)
   }
 
   def handleInternal: Receive = {
-    case BlockPool.SendBlocksAfter(_, blocks) =>
+    case BlockPoolHandler.SendBlocksAfter(_, blocks) =>
       connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
   }
 

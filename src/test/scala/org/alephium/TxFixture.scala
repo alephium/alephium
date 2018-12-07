@@ -8,7 +8,7 @@ import org.alephium.util.Hex
 
 import scala.io.Source
 
-trait Fixture {
+trait TxFixture {
 
   def blockForTransfer(to: ED25519PublicKey, value: BigInt): Block = {
     require(value >= 0)

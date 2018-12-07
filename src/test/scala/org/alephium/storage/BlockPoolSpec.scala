@@ -1,135 +1,90 @@
 package org.alephium.storage
 
-import java.net.InetSocketAddress
-
-import akka.actor.{ActorRef, Props}
-import org.alephium.{AlephiumActorSpec, Fixture}
+import org.alephium.AlephiumSpec
 import org.alephium.protocol.Genesis
-import org.alephium.crypto.ED25519PublicKey
-import org.alephium.network.PeerManager
-import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.protocol.model.ModelGen
+import org.scalacheck.Gen
 
-class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
-  import BlockPool._
-
-  private val genesis: Block            = Genesis.block
-  private val blockPoolProps: Props     = BlockPool.props()
-  private val remote: InetSocketAddress = new InetSocketAddress(1000)
+class BlockPoolSpec extends AlephiumSpec {
 
   behavior of "BlockPool"
 
-  it should "contains genesis block in the beginning" in {
-    val pool = system.actorOf(blockPoolProps)
-    pool ! GetBestChain
-    expectMsg(BestChain(Seq(genesis)))
+  trait Fixture {
+    val blockPool = new BlockPool()
+    val genesis   = Genesis.block
   }
 
-  it should "add a new block and increase the chain length" in {
-    forAll(ModelGen.blockGenWith(Seq(genesis.hash))) { block =>
-      val pool = system.actorOf(blockPoolProps)
-      addBlocks(pool, block)
-      pool ! GetBestHeader
-      expectMsg(BestHeader(block))
-      pool ! GetBestChain
-      expectMsg(BestChain(Seq(genesis, block)))
-      pool ! PrepareSync(remote)
-      expectMsg(PeerManager.Sync(remote, Seq(block.hash)))
-    }
-  }
-
-  it should "add a side block and keep the chain length" in {
+  it should "add block correctly" in new Fixture {
+    blockPool.blockStore.size shouldBe 0
     forAll(ModelGen.blockGen) { block =>
-      val pool = system.actorOf(blockPoolProps)
-      addBlocks(pool, block)
-      pool ! GetBestChain
-      expectMsgAnyOf(BestChain(Seq(genesis)), BestChain(Seq(block)))
+      val blocksSize1 = blockPool.blockStore.size
+      val txSize1     = blockPool.txStore.size
+      blockPool.addBlock(block)
+      val blocksSize2 = blockPool.blockStore.size
+      val txSize2     = blockPool.txStore.size
+      blocksSize1 + 1 shouldBe blocksSize2
+      txSize1 + block.transactions.length shouldBe txSize2
     }
   }
 
-  it should "add two sequential blocks and increase the chain length" in {
-    forAll(ModelGen.blockGenWith(Seq(genesis.hash))) { block1 =>
-      forAll(ModelGen.blockGenWith(Seq(block1.hash))) { block2 =>
-        val pool = system.actorOf(blockPoolProps)
-        addBlocks(pool, block1, block2)
-        pool ! GetBestHeader
-        expectMsg(BestHeader(block2))
-        pool ! GetBestChain
-        expectMsg(BestChain(Seq(genesis, block1, block2)))
-        pool ! PrepareSync(remote)
-        expectMsg(PeerManager.Sync(remote, Seq(block2.hash)))
+  it should "add blocks correctly" in new Fixture {
+    forAll(Gen.listOf(ModelGen.blockGen)) { blocks =>
+      val blocksSize1 = blockPool.blockStore.size
+      val txSize1     = blockPool.txStore.size
+      blockPool.addBlocks(blocks)
+      val blocksSize2 = blockPool.blockStore.size
+      val txSize2     = blockPool.txStore.size
+      blocksSize1 + blocks.size shouldBe blocksSize2
+      txSize1 + blocks.map(_.transactions.length).sum shouldBe txSize2
+    }
+  }
+
+  it should "work correctly for a chain of blocks" in {
+    forAll(ModelGen.chainGen(5), minSuccessful(1)) { blocks =>
+      val blockPool = new BlockPool()
+      blockPool.addBlocks(blocks)
+      val headBlock = blocks.head
+      val lastBlock = blocks.last
+
+      blockPool.getHeight(headBlock) shouldBe 1
+      blockPool.getHeight(lastBlock) shouldBe blocks.size
+      blockPool.getChain(headBlock) shouldBe Seq(headBlock)
+      blockPool.getChain(lastBlock) shouldBe blocks
+      blockPool.isHeader(headBlock) shouldBe false
+      blockPool.isHeader(lastBlock) shouldBe true
+      blockPool.getBestHeader shouldBe lastBlock
+      blockPool.getBestChain shouldBe blocks
+      blockPool.getHeight shouldEq blocks.size
+      blockPool.getAllHeaders shouldEq Seq(lastBlock.hash)
+    }
+  }
+
+  it should "work correctly with two chains of blocks" in {
+    forAll(ModelGen.chainGen(3), minSuccessful(1)) { longChain =>
+      forAll(ModelGen.chainGen(2), minSuccessful(1)) { shortChain =>
+        val blockPool = new BlockPool()
+        blockPool.addBlocks(longChain)
+        blockPool.addBlocks(shortChain)
+
+        blockPool.getHeight(longChain.head) shouldBe 1
+        blockPool.getHeight(longChain.last) shouldBe longChain.size
+        blockPool.getHeight(shortChain.head) shouldBe 1
+        blockPool.getHeight(shortChain.last) shouldBe shortChain.size
+        blockPool.getChain(longChain.head) shouldBe Seq(longChain.head)
+        blockPool.getChain(longChain.last) shouldBe longChain
+        blockPool.getChain(shortChain.head) shouldBe Seq(shortChain.head)
+        blockPool.getChain(shortChain.last) shouldBe shortChain
+        blockPool.isHeader(longChain.head) shouldBe false
+        blockPool.isHeader(longChain.last) shouldBe true
+        blockPool.isHeader(shortChain.head) shouldBe false
+        blockPool.isHeader(shortChain.last) shouldBe true
+        blockPool.getBestHeader shouldBe longChain.last
+        blockPool.getBestChain shouldBe longChain
+        blockPool.getHeight shouldEq longChain.size
+        blockPool.getAllHeaders.toSet shouldBe Set(longChain.last.hash, shortChain.last.hash)
       }
     }
   }
 
-  it should "return correct balance with only genesis block" in {
-    val pool = system.actorOf(blockPoolProps)
-
-    pool ! GetBalance(testPublicKey)
-    expectMsg(Balance(testPublicKey, genesis, testBalance))
-    pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, genesis, 0))
-  }
-
-  it should "return correct balance after transfering money" in {
-    val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
-
-    addBlocks(pool, newBlock)
-
-    pool ! GetBestHeader
-    expectMsg(BestHeader(newBlock))
-
-    pool ! GetBestChain
-    expectMsg(BestChain(Seq(genesis, newBlock)))
-
-    pool ! GetBalance(testPublicKey)
-    expectMsg(Balance(testPublicKey, newBlock, testBalance - 10))
-
-    pool ! GetBalance(ED25519PublicKey.zero)
-    expectMsg(Balance(ED25519PublicKey.zero, newBlock, 10))
-  }
-
-  it should "return correct utxos with only genesis block" in {
-    val pool = system.actorOf(blockPoolProps)
-
-    pool ! GetUTXOs(testPublicKey, testBalance)
-    expectMsgPF() {
-      case UTXOs(header, inputs, total) =>
-        header shouldBe genesis.hash
-        inputs.size shouldBe 1
-        total shouldBe testBalance
-    }
-
-    pool ! GetUTXOs(testPublicKey, testBalance + 1)
-    expectMsg(NoEnoughBalance)
-
-    pool ! GetUTXOs(ED25519PublicKey.zero, 10)
-    expectMsg(NoEnoughBalance)
-  }
-
-  it should "return correct utxos after transfering money" in {
-    val pool     = system.actorOf(blockPoolProps)
-    val newBlock = blockForTransfer(ED25519PublicKey.zero, 10)
-    addBlocks(pool, newBlock)
-
-    pool ! GetUTXOs(testPublicKey, 10)
-    expectMsgPF() {
-      case UTXOs(header, inputs, total) =>
-        header shouldBe newBlock.hash
-        inputs.size shouldBe 1
-        total shouldBe (testBalance - 10)
-    }
-
-    pool ! GetUTXOs(testPublicKey, 100)
-    expectMsg(NoEnoughBalance)
-
-    pool ! GetUTXOs(ED25519PublicKey.zero, 10)
-    expectMsgType[UTXOs]
-    pool ! GetUTXOs(ED25519PublicKey.zero, 11)
-    expectMsg(NoEnoughBalance)
-  }
-
-  private def addBlocks(pool: ActorRef, blocks: Block*) = {
-    pool ! AddBlocks(blocks)
-  }
+  // TODO: add tests for balance
 }
