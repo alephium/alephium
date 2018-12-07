@@ -3,10 +3,11 @@ package org.alephium.network
 import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
+import akka.util.ByteString
 import org.scalatest.TryValues._
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message.{Message, Ping, Pong, SendBlocks}
-import org.alephium.serde.{NotEnoughBytesException, WrongFormatException}
+import org.alephium.serde.WrongFormatException
 
 class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
@@ -37,6 +38,18 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     messageHandler.expectMsg(message.payload)
   }
 
+  it should "stop when received corrupted data" in new Fixture {
+    watch(tcpHandler)
+    tcpHandler ! Tcp.Received(data.tail)
+    expectTerminated(tcpHandler)
+  }
+
+  it should "handle message boundary correctly" in new Fixture {
+    tcpHandler ! Tcp.Received(data.take(1))
+    tcpHandler ! Tcp.Received(data.tail)
+    messageHandler.expectMsg(message.payload)
+  }
+
   it should "stop when tcp connection closed" in new Fixture {
     watch(tcpHandler)
     tcpHandler ! Tcp.Closed
@@ -54,7 +67,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     connection.expectMsg(TcpHandler.envelope(message))
   }
 
-  behavior of "sequentialDeserialize"
+  behavior of "Deserialization"
 
   trait SerdeFixture {
     val message1 = Message(Ping(1))
@@ -65,13 +78,26 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "deserialize two messages correctly" in new SerdeFixture {
-    TcpHandler.sequentialDeserialize(bytes).success.value shouldBe Seq(message1, message2)
+    val result = TcpHandler.deserialize(bytes).success.value
+    result._1 shouldBe Seq(message1, message2)
+    result._2 shouldBe ByteString.empty
+    for (n <- bytes.indices) {
+      val input  = bytes.take(n)
+      val output = TcpHandler.deserialize(input).success.value
+      if (n < bytes1.length) {
+        output._1 shouldBe Seq.empty
+        output._2 shouldBe input
+      } else {
+        output._1 shouldBe Seq(message1)
+        output._2 shouldBe input.drop(bytes1.length)
+      }
+    }
   }
 
   it should "fail when data is corrupted" in new SerdeFixture {
-    val exception1 = TcpHandler.sequentialDeserialize(bytes.tail).failure.exception
+    val exception1 = TcpHandler.deserialize(bytes.tail).failure.exception
     exception1 shouldBe a[WrongFormatException]
-    val exception2 = TcpHandler.sequentialDeserialize(bytes.init).failure.exception
-    exception2 shouldBe a[NotEnoughBytesException]
+    val exception2 = TcpHandler.deserialize(bytes1 ++ bytes2.tail).failure.exception
+    exception2 shouldBe a[WrongFormatException]
   }
 }
