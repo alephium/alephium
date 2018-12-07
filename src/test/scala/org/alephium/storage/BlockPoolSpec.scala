@@ -15,15 +15,15 @@ class BlockPoolSpec extends AlephiumSpec {
   }
 
   it should "add block correctly" in new Fixture {
-    blockPool.blockStore.size shouldBe 0
+    blockPool.blockStore.size is 0
     forAll(ModelGen.blockGen) { block =>
       val blocksSize1 = blockPool.blockStore.size
       val txSize1     = blockPool.txStore.size
       blockPool.addBlock(block)
       val blocksSize2 = blockPool.blockStore.size
       val txSize2     = blockPool.txStore.size
-      blocksSize1 + 1 shouldBe blocksSize2
-      txSize1 + block.transactions.length shouldBe txSize2
+      blocksSize1 + 1 is blocksSize2
+      txSize1 + block.transactions.length is txSize2
     }
   }
 
@@ -34,8 +34,8 @@ class BlockPoolSpec extends AlephiumSpec {
       blockPool.addBlocks(blocks)
       val blocksSize2 = blockPool.blockStore.size
       val txSize2     = blockPool.txStore.size
-      blocksSize1 + blocks.size shouldBe blocksSize2
-      txSize1 + blocks.map(_.transactions.length).sum shouldBe txSize2
+      blocksSize1 + blocks.size is blocksSize2
+      txSize1 + blocks.map(_.transactions.length).sum is txSize2
     }
   }
 
@@ -46,16 +46,16 @@ class BlockPoolSpec extends AlephiumSpec {
       val headBlock = blocks.head
       val lastBlock = blocks.last
 
-      blockPool.getHeight(headBlock) shouldBe 1
-      blockPool.getHeight(lastBlock) shouldBe blocks.size
-      blockPool.getChain(headBlock) shouldBe Seq(headBlock)
-      blockPool.getChain(lastBlock) shouldBe blocks
-      blockPool.isHeader(headBlock) shouldBe false
-      blockPool.isHeader(lastBlock) shouldBe true
-      blockPool.getBestHeader shouldBe lastBlock
-      blockPool.getBestChain shouldBe blocks
-      blockPool.getHeight shouldEq blocks.size
-      blockPool.getAllHeaders shouldEq Seq(lastBlock.hash)
+      blockPool.getHeight(headBlock) is 1
+      blockPool.getHeight(lastBlock) is blocks.size
+      blockPool.getChain(headBlock) is Seq(headBlock)
+      blockPool.getChain(lastBlock) is blocks
+      blockPool.isHeader(headBlock) is false
+      blockPool.isHeader(lastBlock) is true
+      blockPool.getBestHeader is lastBlock
+      blockPool.getBestChain is blocks
+      blockPool.getHeight is blocks.size
+      blockPool.getAllHeaders is Seq(lastBlock.hash)
     }
   }
 
@@ -66,22 +66,22 @@ class BlockPoolSpec extends AlephiumSpec {
         blockPool.addBlocks(longChain)
         blockPool.addBlocks(shortChain)
 
-        blockPool.getHeight(longChain.head) shouldBe 1
-        blockPool.getHeight(longChain.last) shouldBe longChain.size
-        blockPool.getHeight(shortChain.head) shouldBe 1
-        blockPool.getHeight(shortChain.last) shouldBe shortChain.size
-        blockPool.getChain(longChain.head) shouldBe Seq(longChain.head)
-        blockPool.getChain(longChain.last) shouldBe longChain
-        blockPool.getChain(shortChain.head) shouldBe Seq(shortChain.head)
-        blockPool.getChain(shortChain.last) shouldBe shortChain
-        blockPool.isHeader(longChain.head) shouldBe false
-        blockPool.isHeader(longChain.last) shouldBe true
-        blockPool.isHeader(shortChain.head) shouldBe false
-        blockPool.isHeader(shortChain.last) shouldBe true
-        blockPool.getBestHeader shouldBe longChain.last
-        blockPool.getBestChain shouldBe longChain
-        blockPool.getHeight shouldEq longChain.size
-        blockPool.getAllHeaders.toSet shouldBe Set(longChain.last.hash, shortChain.last.hash)
+        blockPool.getHeight(longChain.head) is 1
+        blockPool.getHeight(longChain.last) is longChain.size
+        blockPool.getHeight(shortChain.head) is 1
+        blockPool.getHeight(shortChain.last) is shortChain.size
+        blockPool.getChain(longChain.head) is Seq(longChain.head)
+        blockPool.getChain(longChain.last) is longChain
+        blockPool.getChain(shortChain.head) is Seq(shortChain.head)
+        blockPool.getChain(shortChain.last) is shortChain
+        blockPool.isHeader(longChain.head) is false
+        blockPool.isHeader(longChain.last) is true
+        blockPool.isHeader(shortChain.head) is false
+        blockPool.isHeader(shortChain.last) is true
+        blockPool.getBestHeader is longChain.last
+        blockPool.getBestChain is longChain
+        blockPool.getHeight is longChain.size
+        blockPool.getAllHeaders.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
   }

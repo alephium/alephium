@@ -95,9 +95,9 @@ class BlockPoolHandlerSpec extends AlephiumActorSpec("block_pool_spec") with TxF
     pool ! GetUTXOs(testPublicKey, testBalance)
     expectMsgPF() {
       case UTXOs(header, inputs, total) =>
-        header shouldBe genesis.hash
-        inputs.size shouldBe 1
-        total shouldBe testBalance
+        header is genesis.hash
+        inputs.size is 1
+        total is testBalance
     }
 
     pool ! GetUTXOs(testPublicKey, testBalance + 1)
@@ -115,9 +115,9 @@ class BlockPoolHandlerSpec extends AlephiumActorSpec("block_pool_spec") with TxF
     pool ! GetUTXOs(testPublicKey, 10)
     expectMsgPF() {
       case UTXOs(header, inputs, total) =>
-        header shouldBe newBlock.hash
-        inputs.size shouldBe 1
-        total shouldBe (testBalance - 10)
+        header is newBlock.hash
+        inputs.size is 1
+        total is (testBalance - 10)
     }
 
     pool ! GetUTXOs(testPublicKey, 100)

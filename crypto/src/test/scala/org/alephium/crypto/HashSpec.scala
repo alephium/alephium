@@ -11,13 +11,13 @@ class HashSpec extends AlephiumSpec {
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       val output = provider.hash(message)
-      output.bytes shouldBe expected
+      expected is output.bytes
     }
 
     it should "serde correctly" in {
       val input  = provider.hash(message)
       val output = deserialize[T](serialize(input)).success.value
-      output shouldBe input
+      output is input
     }
   }
 
@@ -26,7 +26,7 @@ class HashSpec extends AlephiumSpec {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {
         val output = provider.hash(message)
-        output.bytes shouldBe expected
+        expected is output.bytes
       }
     }
 
@@ -34,7 +34,7 @@ class HashSpec extends AlephiumSpec {
       for ((message, expected) <- tests) {
         val input  = provider.hash(message)
         val output = deserialize[T](serialize(input)).success.value
-        output shouldBe input
+        output is input
       }
     }
   }

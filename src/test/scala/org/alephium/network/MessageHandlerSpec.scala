@@ -23,7 +23,7 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
         val message = Message.deserializer.deserialize(data).get
-        message.payload shouldBe a[Ping]
+        message.payload is a[Ping]
     }
   }
 
