@@ -1,8 +1,11 @@
 package org.alephium.storage
 
+import java.net.InetSocketAddress
+
 import akka.actor.Props
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.network.PeerManager
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.BaseActor
 
@@ -12,15 +15,16 @@ object BlockPool {
 
   sealed trait Command
   case class AddBlocks(blocks: Seq[Block])                      extends Command
-  case class GetBlocks(locators: Seq[Keccak256])                extends Command
+  case class GetBlocksAfter(locators: Seq[Keccak256])           extends Command
   case object GetBestHeader                                     extends Command
   case object GetBestChain                                      extends Command
   case object GetAllHeaders                                     extends Command
   case class GetUTXOs(address: ED25519PublicKey, value: BigInt) extends Command
   case class GetBalance(address: ED25519PublicKey)              extends Command
+  case class PrepareSync(remote: InetSocketAddress)             extends Command
 
   sealed trait Event
-  case class SendBlocks(blocks: Seq[Block])                                  extends Event
+  case class SendBlocksAfter(locators: Seq[Keccak256], blocks: Seq[Block])   extends Event
   case class BestHeader(header: Block)                                       extends Event
   case class BestChain(blocks: Seq[Block])                                   extends Event
   case class AllHeaders(headers: Seq[Keccak256])                             extends Event
@@ -41,9 +45,9 @@ class BlockPool() extends BaseActor {
   override def receive: Receive = {
     case AddBlocks(blocks) =>
       addBlocks(blocks)
-    case GetBlocks(locators) =>
+    case GetBlocksAfter(locators) =>
       val newBlocks = getBlocks(locators)
-      sender() ! SendBlocks(newBlocks)
+      sender() ! SendBlocksAfter(locators, newBlocks)
     case GetBestHeader =>
       sender() ! BestHeader(getBestHeader)
     case GetBestChain =>
@@ -60,6 +64,10 @@ class BlockPool() extends BaseActor {
     case GetBalance(address) =>
       val (block, total) = getBalance(address)
       sender() ! Balance(address, block, total)
+    case PrepareSync(remote: InetSocketAddress) =>
+      // TODO: use most recent confirmed hashes as locators
+      val block = getBestHeader
+      sender() ! PeerManager.Sync(remote, Seq(block.hash))
   }
 
   private def addBlock(block: Block): Unit = {

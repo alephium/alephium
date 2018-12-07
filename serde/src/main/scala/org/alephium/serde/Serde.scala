@@ -19,7 +19,7 @@ trait Deserializer[T] {
     _deserialize(input).flatMap {
       case (output, rest) =>
         if (rest.isEmpty) Success(output)
-        else Failure(InvalidNumberOfBytesException(input.size - rest.size, input.size))
+        else Failure(new InvalidNumberOfBytesException(input.size - rest.size, input.size))
     }
 }
 
@@ -50,7 +50,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
         case (t, rest) =>
           if (predictor(t)) {
             Success((t, rest))
-          } else throw ValidationError(error)
+          } else throw new ValidationError(error)
       }
     }
 
@@ -59,7 +59,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.deserialize(input).flatMap { t =>
         if (predictor(t)) {
           Success(t)
-        } else throw ValidationError(error)
+        } else throw new ValidationError(error)
       }
     }
   }
@@ -71,14 +71,14 @@ trait FixedSizeSerde[T] extends Serde[T] {
   def deserialize0(input: ByteString, f: ByteString => T): Try[T] = Try {
     if (input.size == serdeSize) {
       f(input)
-    } else throw InvalidNumberOfBytesException(serdeSize, input.size)
+    } else throw new InvalidNumberOfBytesException(serdeSize, input.size)
   }
 
   override def _deserialize(input: ByteString): Try[(T, ByteString)] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map((_, rest))
-    } else Failure(InvalidNumberOfBytesException(serdeSize, input.size))
+    } else Failure(new InvalidNumberOfBytesException(serdeSize, input.size))
 }
 
 object Serde extends ProductSerde {
