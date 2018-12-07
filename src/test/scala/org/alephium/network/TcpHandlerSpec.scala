@@ -6,6 +6,7 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.scalatest.TryValues._
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message.{Message, Ping, Pong, SendBlocks}
+import org.alephium.serde.{NotEnoughBytesException, WrongFormatException}
 
 class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
@@ -68,7 +69,9 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   }
 
   it should "fail when data is corrupted" in new SerdeFixture {
-    TcpHandler.sequentialDeserialize(bytes.tail).isFailure shouldBe true
-    TcpHandler.sequentialDeserialize(bytes.init).isFailure shouldBe true
+    val exception1 = TcpHandler.sequentialDeserialize(bytes.tail).failure.exception
+    exception1 shouldBe a[WrongFormatException]
+    val exception2 = TcpHandler.sequentialDeserialize(bytes.init).failure.exception
+    exception2 shouldBe a[NotEnoughBytesException]
   }
 }
