@@ -5,7 +5,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.Block
 import org.alephium.serde._
 
-import scala.reflect.runtime.universe.{TypeTag, typeOf}
+import scala.reflect.runtime.universe.{typeOf, TypeTag}
 import scala.util.Failure
 
 sealed trait Payload
