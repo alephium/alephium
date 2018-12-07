@@ -9,14 +9,12 @@ def baseProject(path: String, id: String): Project = {
 }
 
 lazy val root = baseProject(".", "root")
-  .settings(Compile / scalastyleConfig := baseDirectory.value / "scalastyle-config.xml")
   .settings(Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
   .aggregate(util, serde, crypto, protocol)
 
 def subProject(path: String): Project = {
   baseProject(path, path)
-    .settings(Compile / scalastyleConfig := root.base / "scalastyle-config.xml")
     .settings(Test / scalastyleConfig := root.base / "scalastyle-test-config.xml")
 }
 
@@ -89,13 +87,13 @@ val commonSettings = Seq(
 
 val dependencies = Seq(
   akka,
-  akkaTest,
+  akkatest,
   `akka-slf4j`,
   bcprov,
   `scala-logging`,
   logback,
-  scalaTest,
-  scalaCheck,
+  scalatest,
+  scalacheck,
   curve25519,
   `circe-parser`
 )
