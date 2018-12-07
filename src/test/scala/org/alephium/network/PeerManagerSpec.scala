@@ -1,17 +1,18 @@
 package org.alephium.network
 
-import akka.actor.Props
+import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.AlephiumActorSpec
+import org.alephium.network.PeerManager.GetPeers
 import org.alephium.protocol.message.{GetBlocks, Message}
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   trait Fixture {
-    lazy val blockPool   = TestProbe()
-    lazy val port        = SocketUtil.temporaryLocalPort()
-    lazy val peerManager = system.actorOf(PeerManager.props(port, blockPool.ref))
+    val blockPool   = TestProbe()
+    val port        = SocketUtil.temporaryLocalPort()
+    val peerManager = system.actorOf(PeerManager.props(port, blockPool.ref))
   }
 
   behavior of "PeerManagerSpec"
@@ -49,5 +50,46 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     }))
     peerManager ! PeerManager.Sync(remote, Seq.empty)
     tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
+  }
+
+  it should "stop if block pool stoped" in new Fixture {
+    watch(peerManager)
+    system.stop(blockPool.ref)
+    expectTerminated(peerManager)
+  }
+
+  it should "stop if server stopped" in new Fixture {
+    override val peerManager = system.actorOf(Props(new PeerManager(port, blockPool.ref) {
+      override def postStop(): Unit = {
+        testActor ! "stop"
+      }
+    }))
+    expectMsg("stop")
+  }
+
+  it should "remove peer when tcp handler stopped" in new Fixture {
+    val remote     = SocketUtil.temporaryServerAddress()
+    val local      = SocketUtil.temporaryServerAddress()
+    val connection = TestProbe()
+    watch(peerManager)
+    peerManager.tell(Tcp.Connected(remote, local), connection.ref)
+    peerManager ! PeerManager.GetPeers
+    expectMsgPF() {
+      case PeerManager.Peers(peers1) =>
+        peers1.size shouldBe 1
+        peers1.head._1 shouldBe remote
+        val handler = peers1.head._2
+        watch(handler)
+        system.stop(handler)
+        expectMsgPF() {
+          case message: Terminated =>
+            peerManager ! message
+            peerManager ! GetPeers
+            expectMsgPF() {
+              case PeerManager.Peers(peers2) =>
+                peers2.isEmpty shouldBe true
+            }
+        }
+    }
   }
 }
