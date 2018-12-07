@@ -46,7 +46,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     val remote     = SocketUtil.temporaryServerAddress()
     val tcpHandler = TestProbe()
     val peerManager = system.actorOf(Props(new PeerManager(port, blockPool.ref) {
-      override def receive: Receive = manage(Map(remote -> tcpHandler.ref))
+      peers += (remote -> tcpHandler.ref)
     }))
     peerManager ! PeerManager.Sync(remote, Seq.empty)
     tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
