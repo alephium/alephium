@@ -4,7 +4,6 @@ import java.nio.charset.Charset
 import java.security.SecureRandom
 
 import akka.util.ByteString
-import org.alephium.util.{Bytes, FixedSizeBytes}
 import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
 

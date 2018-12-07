@@ -1,12 +1,11 @@
 package org.alephium.serde
 
 import akka.util.ByteString
+import org.alephium.AlephiumSpec
 import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
 import org.scalatest.TryValues._
-import org.scalatest.{FlatSpecLike, Matchers}
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-class SerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers {
+class SerdeSpec extends AlephiumSpec {
   def checkException[T](serde: FixedSizeSerde[T]): Unit = {
     it should "throw correct exceptions when error occurs" in {
       forAll { inputs: Array[Byte] =>

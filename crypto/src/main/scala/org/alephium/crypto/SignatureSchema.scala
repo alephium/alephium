@@ -1,7 +1,7 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.util.Bytes
+import org.alephium.serde.Bytes
 
 trait PrivateKey extends Bytes
 
