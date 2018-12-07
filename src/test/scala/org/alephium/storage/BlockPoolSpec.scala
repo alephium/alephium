@@ -1,16 +1,20 @@
 package org.alephium.storage
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props}
 import org.alephium.{AlephiumActorSpec, Fixture}
 import org.alephium.protocol.Genesis
 import org.alephium.crypto.ED25519PublicKey
+import org.alephium.network.PeerManager
 import org.alephium.protocol.model.{Block, ModelGen}
 
 class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
   import BlockPool._
 
-  private val genesis: Block        = Genesis.block
-  private val blockPoolProps: Props = BlockPool.props()
+  private val genesis: Block            = Genesis.block
+  private val blockPoolProps: Props     = BlockPool.props()
+  private val remote: InetSocketAddress = new InetSocketAddress(1000)
 
   behavior of "BlockPool"
 
@@ -28,6 +32,8 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
       expectMsg(BestHeader(block))
       pool ! GetBestChain
       expectMsg(BestChain(Seq(genesis, block)))
+      pool ! PrepareSync(remote)
+      expectMsg(PeerManager.Sync(remote, Seq(block.hash)))
     }
   }
 
@@ -49,6 +55,8 @@ class BlockPoolSpec extends AlephiumActorSpec("block_pool_spec") with Fixture {
         expectMsg(BestHeader(block2))
         pool ! GetBestChain
         expectMsg(BestChain(Seq(genesis, block1, block2)))
+        pool ! PrepareSync(remote)
+        expectMsg(PeerManager.Sync(remote, Seq(block2.hash)))
       }
     }
   }
