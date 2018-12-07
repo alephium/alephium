@@ -27,8 +27,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers) =>
-        peers.size shouldBe 1
-        peers.head._1 shouldBe remote
+        peers.size is 1
+        peers.head._1 is remote
     }
   }
 
@@ -76,8 +76,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers1) =>
-        peers1.size shouldBe 1
-        peers1.head._1 shouldBe remote
+        peers1.size is 1
+        peers1.head._1 is remote
         val handler = peers1.head._2
         watch(handler)
         system.stop(handler)
@@ -87,7 +87,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
             peerManager ! GetPeers
             expectMsgPF() {
               case PeerManager.Peers(peers2) =>
-                peers2.isEmpty shouldBe true
+                peers2.isEmpty is true
             }
         }
     }

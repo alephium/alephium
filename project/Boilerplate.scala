@@ -119,11 +119,10 @@ object Boilerplate {
       block"""
         |package org.alephium.serde
         |
+        |import org.alephium.AlephiumSpec
         |import org.scalatest.TryValues._
-        |import org.scalatest.{FlatSpecLike, Matchers}
-        |import org.scalatest.prop.GeneratorDrivenPropertyChecks
         |
-        |class ProductSerdeSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers {
+        |class ProductSerdeSpec extends AlephiumSpec {
         |
         |  behavior of "Serde for case class"
         +
@@ -136,7 +135,7 @@ object Boilerplate {
         +    forAll { ($fields) =>
         +      val input  = Test$arity(${`a..n`})
         +      val output = deserialize[Test$arity](serialize(input)).success.value
-        +      output shouldBe input
+        +      output is input
         +    }
         +  }
         |}

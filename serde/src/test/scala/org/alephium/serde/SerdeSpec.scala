@@ -11,60 +11,60 @@ class SerdeSpec extends AlephiumSpec {
       forAll { inputs: Array[Byte] =>
         lazy val exception = serde.deserialize(ByteString(inputs)).failure.exception
         if (inputs.length < serde.serdeSize) {
-          exception shouldBe a[NotEnoughBytesException]
+          exception is a[NotEnoughBytesException]
         } else if (inputs.length > serde.serdeSize) {
-          exception shouldBe a[WrongFormatException]
+          exception is a[WrongFormatException]
         }
       }
     }
   }
 
   "Serde for Byte" should "serialize Byte into 1 byte" in {
-    implicitly[Serde[Byte]].asInstanceOf[FixedSizeSerde[Byte]].serdeSize shouldBe 1
+    implicitly[Serde[Byte]].asInstanceOf[FixedSizeSerde[Byte]].serdeSize is 1
   }
 
   it should "serde correctly" in {
     forAll { b: Byte =>
       val bb = deserialize[Byte](serialize(b))
-      bb.success.value shouldBe b
+      bb.success.value is b
     }
 
     forAll { b: Byte =>
       val input  = ByteString(b)
       val output = serialize(deserialize[Byte](input).success.value)
-      output shouldBe input
+      output is input
     }
   }
 
   checkException(ByteSerde)
 
   "Serde for Int" should "serialize int into 4 bytes" in {
-    implicitly[Serde[Int]].asInstanceOf[FixedSizeSerde[Int]].serdeSize shouldBe 4
+    implicitly[Serde[Int]].asInstanceOf[FixedSizeSerde[Int]].serdeSize is 4
   }
 
   it should "serde correctly" in {
     forAll { n: Int =>
       val nn = deserialize[Int](serialize(n))
-      nn.success.value shouldBe n
+      nn.success.value is n
     }
 
     forAll { (a: Byte, b: Byte, c: Byte, d: Byte) =>
       val input  = ByteString(a, b, c, d)
       val output = serialize(deserialize[Int](input).success.value)
-      output shouldBe input
+      output is input
     }
   }
 
   checkException(IntSerde)
 
   "Serde for Long" should "serialize long into 8 bytes" in {
-    implicitly[Serde[Long]].asInstanceOf[FixedSizeSerde[Long]].serdeSize shouldBe 8
+    implicitly[Serde[Long]].asInstanceOf[FixedSizeSerde[Long]].serdeSize is 8
   }
 
   it should "serde correctly" in {
     forAll { n: Long =>
       val nn = deserialize[Long](serialize(n))
-      nn.success.value shouldBe n
+      nn.success.value is n
     }
   }
 
@@ -74,7 +74,7 @@ class SerdeSpec extends AlephiumSpec {
     forAll { n: Long =>
       val bn  = BigInt(n)
       val bnn = deserialize[BigInt](serialize(bn)).success.value
-      bnn shouldBe bn
+      bnn is bn
     }
   }
 
@@ -83,17 +83,17 @@ class SerdeSpec extends AlephiumSpec {
       {
         val serde  = Serde.fixedSizeBytesSerde(input.length, implicitly[Serde[Byte]])
         val output = serde.deserialize(serde.serialize(input)).success.value
-        output shouldBe input
+        output is input
       }
       {
         val serde     = Serde.fixedSizeBytesSerde(input.length + 1, implicitly[Serde[Byte]])
         val exception = serde.deserialize(ByteString(input.toArray)).failure.exception
-        exception shouldBe a[NotEnoughBytesException]
+        exception is a[NotEnoughBytesException]
       }
       if (input.nonEmpty) {
         val serde     = Serde.fixedSizeBytesSerde(input.length - 1, implicitly[Serde[Byte]])
         val exception = serde.deserialize(ByteString(input.toArray)).failure.exception
-        exception shouldBe a[WrongFormatException]
+        exception is a[WrongFormatException]
       }
     }
   }
@@ -102,7 +102,7 @@ class SerdeSpec extends AlephiumSpec {
     forAll { input: Seq[Byte] =>
       val serde  = Serde.dynamicSizeBytesSerde(implicitly[Serde[Byte]])
       val output = serde.deserialize(serde.serialize(input)).success.value
-      output shouldBe input
+      output is input
     }
   }
 
@@ -125,7 +125,7 @@ class SerdeSpec extends AlephiumSpec {
     forAll { x: Int =>
       val input  = Test1(x)
       val output = deserialize[Test1](serialize(input))
-      output.success.value shouldBe input
+      output.success.value is input
     }
   }
 
@@ -133,7 +133,7 @@ class SerdeSpec extends AlephiumSpec {
     forAll { (x: Int, y: Int) =>
       val input  = Test2(x, y)
       val output = deserialize[Test2](serialize(input))
-      output.success.value shouldBe input
+      output.success.value is input
     }
   }
 
@@ -141,7 +141,7 @@ class SerdeSpec extends AlephiumSpec {
     forAll { (x: Int, y: Int, z: Int) =>
       val input  = Test3(x, y, z)
       val output = deserialize[Test3](serialize(input))
-      output.success.value shouldBe input
+      output.success.value is input
     }
   }
 }
