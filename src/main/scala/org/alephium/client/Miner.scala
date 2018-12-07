@@ -2,8 +2,8 @@ package org.alephium.client
 
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-//import org.alephium.network.PeerManager
-//import org.alephium.protocol.message.{Message, SendBlocks}
+import org.alephium.network.PeerManager
+import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockPool
 import org.alephium.util.BaseActor
@@ -27,7 +27,7 @@ object Miner {
   }
 
   def isDifficult(hash: Keccak256): Boolean = {
-    hash.bytes.take(2).forall(_ == 0) //TODO: improve this
+    hash.bytes.take(2).forall(_ == 0) && hash.bytes(2) < 0 //TODO: improve this
   }
 }
 
@@ -54,9 +54,7 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
           log.info("A new block is mined")
           blockPool ! BlockPool.AddBlocks(Seq(block))
           blockPool ! BlockPool.GetBestHeader
-          /* TODO: enable broadcasting
-           * peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
-           */
+          peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
           context become collect
         case None =>
           self ! Miner.Nonce(nonce + 1)
