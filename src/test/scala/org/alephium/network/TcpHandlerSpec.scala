@@ -14,10 +14,11 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     val message = Message(SendBlocks(Seq.empty))
     val data    = Message.serializer.serialize(message)
 
-    lazy val connection     = TestProbe()
-    lazy val blockPool      = TestProbe()
-    lazy val messageHandler = TestProbe()
-    lazy val tcpHandler = system.actorOf(
+    val connection     = TestProbe()
+    val blockPool      = TestProbe()
+    val messageHandler = TestProbe()
+
+    val tcpHandler = system.actorOf(
       Props(
         new TcpHandler(remote, connection.ref, blockPool.ref) {
           override val messageHandler = obj.messageHandler.ref
@@ -26,7 +27,8 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
         }
       )
     )
-
+    tcpHandler ! TcpHandler.Start
+    messageHandler.expectMsg(MessageHandler.SendPing)
   }
 
   behavior of "TcpHandler"
