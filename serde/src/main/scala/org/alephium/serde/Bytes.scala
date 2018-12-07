@@ -1,7 +1,7 @@
-package org.alephium.util
+package org.alephium.serde
 
 import akka.util.ByteString
-import org.alephium.serde._
+import org.alephium.util.Hex
 
 trait Bytes {
   def bytes: ByteString
