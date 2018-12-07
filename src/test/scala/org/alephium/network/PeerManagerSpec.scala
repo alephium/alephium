@@ -1,8 +1,10 @@
 package org.alephium.network
 
+import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.AlephiumActorSpec
+import org.alephium.protocol.message.{GetBlocks, Message}
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
@@ -34,5 +36,16 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     peerManager ! Tcp.CommandFailed(connect)
     peerManager ! PeerManager.GetPeers
     expectMsg(PeerManager.Peers(Map.empty))
+  }
+
+  it should "try to send GetBlocks to peer" in {
+    val blockPool  = TestProbe()
+    val remote     = SocketUtil.temporaryServerAddress()
+    val tcpHandler = TestProbe()
+    val peerManager = system.actorOf(Props(new PeerManager(blockPool.ref) {
+      override def receive: Receive = manage(Map(remote -> tcpHandler.ref))
+    }))
+    peerManager ! PeerManager.Sync(remote, Seq.empty)
+    tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
   }
 }
