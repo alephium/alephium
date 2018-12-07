@@ -50,7 +50,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
         case (t, rest) =>
           if (predictor(t)) {
             Success((t, rest))
-          } else throw new ValidationError(error)
+          } else throw new WrongFormatException(error)
       }
     }
 
@@ -59,7 +59,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.deserialize(input).flatMap { t =>
         if (predictor(t)) {
           Success(t)
-        } else throw new ValidationError(error)
+        } else throw new WrongFormatException(error)
       }
     }
   }
