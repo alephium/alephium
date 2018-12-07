@@ -37,7 +37,6 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
       val connection = sender()
       val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockPool))
       connection ! Tcp.Register(tcpHandler)
-      tcpHandler ! TcpHandler.Start
       val newReceive = manage(peers + (remote -> tcpHandler))
       context.become(newReceive)
       blockPool ! BlockPool.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
