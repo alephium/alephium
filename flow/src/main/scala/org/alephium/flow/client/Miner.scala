@@ -66,7 +66,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
           log.info(
-            s"A new block ${block.shortHex} is mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {

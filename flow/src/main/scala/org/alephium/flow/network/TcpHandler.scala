@@ -201,7 +201,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       handlePing(nonce, delay)
     case Pong(nonce) =>
       if (nonce == pingNonce) {
-        log.debug("Pong received, no response")
+        log.debug("Pong received")
         pingNonce = 0
       } else {
         log.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
@@ -243,13 +243,13 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
 
   def handlePing(nonce: Int, delay: Long): Unit = {
     // TODO: refuse ping if it's too frequent
-    log.info(s"Ping received with ${delay}ms delay, response with pong")
+    log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
     connection ! TcpHandler.envelope(Pong(nonce))
   }
 
   def sendPing(): Unit = {
     if (pingNonce != 0) {
-      log.debug("No pong message received in time")
+      log.debug("No Pong message received in time")
       stop()
     } else {
       pingNonce = Random.nextInt()

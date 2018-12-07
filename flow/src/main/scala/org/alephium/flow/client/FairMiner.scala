@@ -62,7 +62,7 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: Plat
           log.debug(
             s"""MiningCounts: ${(0 until config.groups).map(getMiningCount).mkString(",")}""")
           log.info(
-            s"A new block ${block.shortHex} is mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
           val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
@@ -80,7 +80,7 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: Plat
           }
       }
     case e: AddBlockResult =>
-      log.error(s"Error in adding new block: ${e.toString}")
+      log.error(s"An error occured while adding a new block: ${e.toString}")
       context stop self
   }
 

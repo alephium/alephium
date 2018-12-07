@@ -30,14 +30,14 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
     case GetHeaders(locators) =>
       blockFlow.getHeaders(locators) match {
         case Left(error) =>
-          log.warning(s"Failed in getting block headers: $error")
+          log.warning(s"Failure while getting block headers: $error")
         case Right(headers) =>
           sender() ! Message(SendHeaders(headers))
       }
     case GetBlocks(locators: AVector[Keccak256]) =>
       blockFlow.getBlocks(locators) match {
         case Left(error) =>
-          log.warning(s"Failed in getting blocks: $error")
+          log.warning(s"Failure while getting blocks: $error")
         case Right(blocks) =>
           sender() ! Message(SendBlocks(blocks))
       }
@@ -51,7 +51,7 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
     val template = blockFlow.prepareBlockFlow(chainIndex)
     template match {
       case Left(error) =>
-        log.warning(s"Failed in compute best deps: ${error.toString}")
+        log.warning(s"Failure while computing best dependencies: ${error.toString}")
       case Right(message) =>
         sender() ! message
     }

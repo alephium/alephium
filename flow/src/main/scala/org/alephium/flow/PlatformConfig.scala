@@ -48,7 +48,7 @@ trait PlatformConfigFiles extends StrictLogging {
     val path = getNoncesPath(groups, leadingZeros)
     val file = path.toFile
     if (!file.exists()) {
-      logger.error(s"No nonces file exists: $path")
+      logger.error(s"Nonces file not found at $path")
       System.exit(1)
     }
     file
@@ -61,7 +61,7 @@ trait PlatformConfigFiles extends StrictLogging {
     val env      = Env.resolve()
     val filename = s"user_${env.name}.conf"
     val path     = rootPath.resolve("user.conf")
-    logger.info(s"using conf file $path")
+    logger.info(s"Using configuration file at $path")
 
     val file = path.toFile
     if (!file.exists) Files.copyFromResource(s"/$filename.tmpl", path)
