@@ -10,7 +10,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   trait Fixture {
     lazy val blockPool   = TestProbe()
-    lazy val peerManager = system.actorOf(PeerManager.props(blockPool.ref))
+    lazy val port        = SocketUtil.temporaryLocalPort()
+    lazy val peerManager = system.actorOf(PeerManager.props(port, blockPool.ref))
   }
 
   behavior of "PeerManagerSpec"
@@ -40,9 +41,10 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   it should "try to send GetBlocks to peer" in {
     val blockPool  = TestProbe()
+    val port       = SocketUtil.temporaryLocalPort()
     val remote     = SocketUtil.temporaryServerAddress()
     val tcpHandler = TestProbe()
-    val peerManager = system.actorOf(Props(new PeerManager(blockPool.ref) {
+    val peerManager = system.actorOf(Props(new PeerManager(port, blockPool.ref) {
       override def receive: Receive = manage(Map(remote -> tcpHandler.ref))
     }))
     peerManager ! PeerManager.Sync(remote, Seq.empty)
