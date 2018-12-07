@@ -36,7 +36,7 @@ object Payload {
           implicitly[Serde[SendBlocks]]._deserialize(input)
         case GetBlocks.cmdCode =>
           implicitly[Serde[GetBlocks]]._deserialize(input)
-        case _ => Failure(new OtherException(s"Invalid cmd code: $cmdCode"))
+        case _ => Failure(new WrongFormatException(s"Invalid cmd code: $cmdCode"))
     }
 }
 
