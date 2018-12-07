@@ -2,7 +2,7 @@ package org.alephium.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 import org.alephium.protocol.message.Message
@@ -36,6 +36,7 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
   val messageHandler: ActorRef = context.actorOf(MessageHandler.props(connection, blockPool))
 
   override def preStart(): Unit = {
+    context.watch(messageHandler)
     messageHandler ! MessageHandler.SendPing
   }
 
@@ -60,6 +61,10 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
       } else {
         log.debug(s"Connection closed normally: $event")
       }
+      context stop self
+    case Terminated(child) if child == messageHandler =>
+      log.debug(s"message handler stopped, stopping tcp handler for $remote")
+      context unwatch messageHandler
       context stop self
   }
 

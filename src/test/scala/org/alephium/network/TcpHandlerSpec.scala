@@ -42,6 +42,12 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     expectTerminated(tcpHandler)
   }
 
+  it should "stop when message handler stopped" in new Fixture {
+    watch(tcpHandler)
+    system.stop(messageHandler.ref)
+    expectTerminated(tcpHandler)
+  }
+
   it should "send data out when new message generated" in new Fixture {
     tcpHandler ! message
     connection.expectMsg(TcpHandler.envelope(message))
