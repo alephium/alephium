@@ -9,13 +9,15 @@ def baseProject(path: String, id: String): Project = {
 }
 
 lazy val root = baseProject(".", "root")
-  .settings(Test / scalastyleConfig := baseDirectory.value / "scalastyle-test-config.xml")
+  .settings(Compile / scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml")
+  .settings(Test / scalastyleConfig := baseDirectory.value / "project/scalastyle-test-config.xml")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
   .aggregate(util, serde, crypto, protocol)
 
 def subProject(path: String): Project = {
   baseProject(path, path)
-    .settings(Test / scalastyleConfig := root.base / "scalastyle-test-config.xml")
+    .settings(Compile / scalastyleConfig := root.base / "project/scalastyle-config.xml")
+    .settings(Test / scalastyleConfig := root.base / "project/scalastyle-test-config.xml")
 }
 
 lazy val util = subProject("util")
