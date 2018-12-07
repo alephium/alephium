@@ -33,7 +33,7 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
     val miningRoute = path("mining") {
       put {
         val publicKey = config.discoveryConfig.discoveryPublicKey
-        val props     = FairMiner.props(publicKey, node)
+        val props     = FairMiner.props(publicKey, node).withDispatcher("akka.actor.mining-dispatcher")
         val miner     = system.actorOf(props, s"FairMiner")
         miner ! Miner.Start
 
