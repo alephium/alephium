@@ -3,9 +3,9 @@ package org.alephium.storage
 import java.net.InetSocketAddress
 
 import akka.actor.Props
-import org.alephium.protocol.Genesis
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
+import org.alephium.protocol.Genesis
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.BaseActor
 
@@ -45,6 +45,7 @@ class BlockPool() extends BaseActor {
   override def receive: Receive = {
     case AddBlocks(blocks) =>
       addBlocks(blocks)
+      log.debug(s"Add new block, now the height is $getHeight")
     case GetBlocksAfter(locators) =>
       val newBlocks = getBlocks(locators)
       sender() ! SendBlocksAfter(locators, newBlocks)
@@ -133,6 +134,8 @@ class BlockPool() extends BaseActor {
   private def getBestChain: Seq[Block] = {
     getChain(getBestHeader)
   }
+
+  private def getHeight: Int = getBestChain.size
 
   private def getAllHeaders: Seq[Keccak256] = {
     blockStore.values.filter(isHeader).map(_.hash).toSeq
