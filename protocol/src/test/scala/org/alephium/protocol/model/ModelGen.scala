@@ -33,9 +33,9 @@ object ModelGen {
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(deps, txs, 0)
 
-  def chainGen(length: Int): Gen[Seq[Block]] =
+  def chainGen(length: Int, prefix: Seq[Block] = Seq.empty): Gen[Seq[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
-      blocks.foldLeft(Seq.empty[Block]) {
+      blocks.foldLeft(prefix) {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) Keccak256.zero else acc.last.hash
           val currentHeader = block.blockHeader
