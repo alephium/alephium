@@ -4,7 +4,7 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
-trait AbsBlockPool {
+trait BlockPool {
 
   def numBlocks: Int
 
@@ -102,50 +102,4 @@ trait AbsBlockPool {
     val balance    = getBestChain.map(block => getBalance(block, address)).sum
     (bestHeader, balance)
   }
-}
-
-class BlockPool extends AbsBlockPool {
-  val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
-  val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
-
-  override def numBlocks: Int = blockStore.size
-
-  override def numTransactions: Int = txStore.size
-
-  def add(block: Block): Boolean = {
-    blockStore += block.hash -> block
-    block.transactions.foreach { tx =>
-      txStore += tx.hash -> tx
-    }
-    true
-  }
-
-  override def add(slice: ChainSlice): Boolean = {
-    addBlocks(slice.blocks)
-    true
-  }
-
-  def getChain(block: Block): Seq[Block] = {
-    if (block.prevBlockHash == Keccak256.zero) Seq(block)
-    else {
-      val prevBlock = blockStore(block.prevBlockHash)
-      getChain(prevBlock) :+ block
-    }
-  }
-
-  def isHeader(block: Block): Boolean = {
-    blockStore.contains(block.hash) &&
-    !blockStore.values.exists(_.prevBlockHash == block.hash)
-  }
-
-  def getBestHeader: Block = {
-    require(blockStore.nonEmpty)
-    blockStore.values.maxBy(getHeightFor)
-  }
-
-  def getAllHeaders: Seq[Keccak256] = {
-    blockStore.values.filter(isHeader).map(_.hash).toSeq
-  }
-
-  override def getTransaction(hash: Keccak256): Transaction = txStore(hash)
 }

@@ -41,8 +41,12 @@ class BlockHandler() extends BaseActor {
 
   override def receive: Receive = {
     case AddBlocks(blocks) =>
-      blockPool.addBlocks(blocks)
-      log.debug(s"Add ${blocks.size} blocks, now the height is ${blockPool.getHeight}")
+      val ok = blockPool.addBlocks(blocks)
+      if (ok) {
+        log.debug(s"Add ${blocks.size} blocks, now the height is ${blockPool.getHeight}")
+      } else {
+        log.warning(s"Failed to add a new block")
+      }
     case GetBlocksAfter(locators) =>
       val newBlocks = blockPool.getBlocks(locators)
       sender() ! SendBlocksAfter(locators, newBlocks)

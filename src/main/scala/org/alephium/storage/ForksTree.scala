@@ -7,7 +7,7 @@ import org.alephium.protocol.model.{Block, Transaction}
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-class ForksTree extends AbsBlockPool {
+class ForksTree extends BlockPool {
   private var root: ForksTree.Root = _
 
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
@@ -203,6 +203,6 @@ object ForksTree {
 
   def apply(genesis: Block): ForksTree = {
     val root = Root(genesis)
-    new ForksTree((root))
+    new ForksTree(root)
   }
 }
