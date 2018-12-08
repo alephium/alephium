@@ -28,7 +28,7 @@ class ForksTree extends AbsBlockPool {
   def this(_root: ForksTree.Root) {
     this()
     root = _root
-    postOrderTraverse(node => blocksTable += (node.block.hash -> node))
+    postOrderTraverse(updateTable)
   }
 
   def this(slice: ChainSlice) {
@@ -41,7 +41,7 @@ class ForksTree extends AbsBlockPool {
 
   def weight: Int = root.weight
 
-  private def updateTable(node: ForksTree.Node): Unit = {
+  private def updateTable(node: ForksTree.TreeNode): Unit = {
     blocksTable += node.block.hash -> node
     node.block.transactions.foreach { transaction =>
       transactionsTable += transaction.hash -> transaction

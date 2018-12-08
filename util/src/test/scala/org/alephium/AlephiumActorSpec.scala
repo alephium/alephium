@@ -19,7 +19,6 @@ object AlephiumActorSpec {
   val config: String =
     """
       |akka {
-      |  stdout-loglevel = "OFF"
       |  loggers = ["akka.testkit.TestEventListener"]
       |  stdout-loglevel = "OFF"
       |  loglevel = "OFF"
