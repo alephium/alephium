@@ -18,4 +18,10 @@ object Block {
     val blockHeader = BlockHeader(blockDeps, txsHash, timestamp, nonce)
     Block(blockHeader, transactions)
   }
+
+  def genesis(transactions: Seq[Transaction]): Block = {
+    val txsHash     = Keccak256.hash(transactions)
+    val blockHeader = BlockHeader(Seq(Keccak256.zero), txsHash, 0, 0)
+    Block(blockHeader, transactions)
+  }
 }

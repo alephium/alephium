@@ -2,7 +2,7 @@ package org.alephium.protocol
 
 import io.circe.Json
 import io.circe.parser.parse
-import org.alephium.crypto.{ED25519PublicKey, ED25519Signature, Keccak256}
+import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.model.{Block, Transaction, TxOutput, UnsignedTransaction}
 import org.alephium.util.Hex
 
@@ -29,7 +29,7 @@ object Genesis {
       }
     }
 
-    Block.from(Seq(Keccak256.zero), transactions.toSeq, 0)
+    Block.genesis(transactions.toSeq)
   }
 
   val block: Block                   = loadGenesis("genesis.json")
