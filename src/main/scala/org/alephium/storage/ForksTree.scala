@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class ForksTree {
+class ForksTree extends AbsBlockPool {
   var root: ForksTree.Root = _
 
   val blocksTable: mutable.HashMap[Keccak256, ForksTree.TreeNode] = mutable.HashMap.empty
@@ -62,7 +62,7 @@ class ForksTree {
 
   def contains(block: Block): Boolean = blocksTable.contains(block.hash)
 
-  def add(block: Block): Boolean = {
+  override def add(block: Block): Boolean = {
     blocksTable.get(block.hash) match {
       case Some(_) => true
       case None =>
@@ -79,7 +79,7 @@ class ForksTree {
   }
 
   @tailrec
-  private def add(parent: ForksTree.TreeNode, blocks: Seq[Block]): Unit = {
+  private def addAfter(parent: ForksTree.TreeNode, blocks: Seq[Block]): Unit = {
     require(blocks.nonEmpty && blocks.head.prevBlockHash == parent.block.hash)
     if (blocks.nonEmpty) {
       val currentBlock = blocks.head
@@ -87,22 +87,72 @@ class ForksTree {
       val newNode      = ForksTree.Node(currentBlock, parent)
       parent.successors += newNode
       update(newNode)
-      add(newNode, restBlocks)
+      addAfter(newNode, restBlocks)
     }
   }
 
   def add(slice: ChainSlice): Boolean = {
-    val uncommitedBlocks = slice.blocks.dropWhile(contains)
-    if (uncommitedBlocks.nonEmpty) {
-      val firstBlock = uncommitedBlocks.head
+    val uncommittedBlocks = slice.blocks.dropWhile(contains)
+    if (uncommittedBlocks.nonEmpty) {
+      val firstBlock = uncommittedBlocks.head
       blocksTable.get(firstBlock.prevBlockHash) match {
         case Some(parent) =>
-          add(parent, uncommitedBlocks)
+          addAfter(parent, uncommittedBlocks)
           true
         case None =>
           false
       }
     } else false
+  }
+
+  private def getHeight(node: ForksTree.TreeNode): Int = {
+    root.weight - node.weight
+  }
+
+  override def getHeight(block: Block): Int = {
+    blocksTable.get(block.hash) match {
+      case Some(node) =>
+        getHeight(node)
+      case None =>
+        0
+    }
+  }
+
+  private def getChain(node: ForksTree.TreeNode): Seq[ForksTree.TreeNode] = {
+    @tailrec
+    def iter(acc: Seq[ForksTree.TreeNode], current: ForksTree.TreeNode): Seq[ForksTree.TreeNode] = {
+      current match {
+        case n: ForksTree.Root => n +: acc
+        case n: ForksTree.Node => iter(current +: acc, n.parent)
+      }
+    }
+    iter(Seq.empty, node)
+  }
+
+  override def getChain(block: Block): Seq[Block] = {
+    blocksTable.get(block.hash) match {
+      case Some(node) =>
+        getChain(node).map(_.block)
+      case None =>
+        Seq.empty
+    }
+  }
+
+  override def isHeader(block: Block): Boolean = {
+    blocksTable.get(block.hash) match {
+      case Some(node) =>
+        node.isLeaf
+      case None =>
+        false
+    }
+  }
+
+  override def getBestHeader: Block = {
+    getAllHeaders.map(blocksTable.apply).maxBy(getHeight).block
+  }
+
+  override def getAllHeaders: Seq[Keccak256] = {
+    blocksTable.values.filter(_.isLeaf).map(_.block.hash).toSeq
   }
 
 //  def prune(): Unit
