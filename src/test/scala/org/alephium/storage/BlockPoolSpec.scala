@@ -43,7 +43,7 @@ class BlockPoolSpec extends AlephiumSpec {
   it should "work correctly for a chain of blocks" in new Fixture {
     forAll(ModelGen.chainGen(5, Seq(genesis)), minSuccessful(1)) { blocks =>
       val blockPool = ForksTree(genesis)
-      blockPool.addBlocks(blocks)
+      blockPool.addBlocks(blocks.tail)
       val headBlock = blocks.head
       val lastBlock = blocks.last
 
@@ -64,8 +64,8 @@ class BlockPoolSpec extends AlephiumSpec {
     forAll(ModelGen.chainGen(4, Seq(genesis)), minSuccessful(1)) { longChain =>
       forAll(ModelGen.chainGen(3, Seq(genesis)), minSuccessful(1)) { shortChain =>
         val blockPool = ForksTree(genesis)
-        blockPool.addBlocks(longChain)
-        blockPool.addBlocks(shortChain)
+        blockPool.addBlocks(longChain.tail)
+        blockPool.addBlocks(shortChain.tail)
 
         blockPool.getHeightFor(longChain.head) is 1
         blockPool.getHeightFor(longChain.last) is longChain.size

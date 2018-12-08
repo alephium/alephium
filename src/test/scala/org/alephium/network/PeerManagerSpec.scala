@@ -10,9 +10,9 @@ import org.alephium.protocol.message.{GetBlocks, Message}
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   trait Fixture {
-    val blockPool   = TestProbe()
-    val port        = SocketUtil.temporaryLocalPort()
-    val peerManager = system.actorOf(PeerManager.props(port, blockPool.ref))
+    val blockHandler = TestProbe()
+    val port         = SocketUtil.temporaryLocalPort()
+    val peerManager  = system.actorOf(PeerManager.props(port, blockHandler.ref))
   }
 
   behavior of "PeerManagerSpec"
@@ -54,12 +54,12 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   it should "stop if block pool stoped" in new Fixture {
     watch(peerManager)
-    system.stop(blockPool.ref)
+    system.stop(blockHandler.ref)
     expectTerminated(peerManager)
   }
 
   it should "stop if server stopped" in new Fixture {
-    override val peerManager = system.actorOf(Props(new PeerManager(port, blockPool.ref) {
+    override val peerManager = system.actorOf(Props(new PeerManager(port, blockHandler.ref) {
       override def postStop(): Unit = {
         testActor ! "stop"
       }

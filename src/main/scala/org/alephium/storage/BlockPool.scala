@@ -15,8 +15,7 @@ trait BlockPool {
   def add(slice: ChainSlice): Boolean
 
   def addBlocks(blocks: Seq[Block]): Boolean = {
-    blocks.foreach(add)
-    true
+    blocks.forall(add)
   }
 
   def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {

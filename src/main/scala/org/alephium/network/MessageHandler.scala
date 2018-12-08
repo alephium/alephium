@@ -17,8 +17,9 @@ object MessageHandler {
 }
 
 class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseActor with Timers {
+  val tcpHandler = context.parent
 
-  override def receive: Receive = handlePayload orElse handleInternal orElse awaitSendPing
+  override def receive: Receive = handlePayload orElse awaitSendPing
 
   def handlePayload: Receive = {
     case Ping(nonce) =>
@@ -35,16 +36,16 @@ class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseA
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.size} blocks")
-      blockHandler ! BlockHandler.AddBlocks(blocks)
+      blockHandler.tell(BlockHandler.AddBlocks(blocks), tcpHandler)
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockHandler ! BlockHandler.GetBlocksAfter(locators)
+      blockHandler.tell(BlockHandler.GetBlocksAfter(locators), tcpHandler)
   }
-
-  def handleInternal: Receive = {
-    case BlockHandler.SendBlocksAfter(_, blocks) =>
-      connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
-  }
+//
+//  def handleInternal: Receive = {
+//    case BlockHandler.SendBlocksAfter(_, blocks) =>
+//      connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
+//  }
 
   def awaitSendPing: Receive = {
     case MessageHandler.SendPing =>
