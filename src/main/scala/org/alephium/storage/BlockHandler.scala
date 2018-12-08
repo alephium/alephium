@@ -37,14 +37,12 @@ object BlockHandler {
 class BlockHandler() extends BaseActor {
   import BlockHandler._
 
-  val blockPool = new BlockPool()
-
-  blockPool.add(Genesis.block)
+  val blockPool = ForksTree(Genesis.block)
 
   override def receive: Receive = {
     case AddBlocks(blocks) =>
       blockPool.addBlocks(blocks)
-      log.debug(s"Add new block, now the height is ${blockPool.getHeight}")
+      log.debug(s"Add ${blocks.size} blocks, now the height is ${blockPool.getHeight}")
     case GetBlocksAfter(locators) =>
       val newBlocks = blockPool.getBlocks(locators)
       sender() ! SendBlocksAfter(locators, newBlocks)
