@@ -19,10 +19,15 @@ trait BlockPool {
   }
 
   def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {
-    val bestChain = getBestChain
-    val index     = bestChain.lastIndexWhere(block => locators.contains(block.prevBlockHash))
-    bestChain.drop(index)
+    val blocks = locators.map(getBlocks)
+    blocks.foldLeft(Seq.empty[Block]) {
+      case (acc, newBlocks) =>
+        val toAdd = newBlocks.filterNot(acc.contains)
+        acc ++ toAdd
+    }
   }
+
+  def getBlocks(locator: Keccak256): Seq[Block]
 
   def getHeightFor(block: Block): Int = getChain(block).size
 

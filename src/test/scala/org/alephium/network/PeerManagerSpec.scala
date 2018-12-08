@@ -13,6 +13,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     val blockHandler = TestProbe()
     val port         = SocketUtil.temporaryLocalPort()
     val peerManager  = system.actorOf(PeerManager.props(port, blockHandler.ref))
+
+    blockHandler.expectMsg(PeerManager.Hello)
   }
 
   behavior of "PeerManagerSpec"
@@ -41,11 +43,11 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   }
 
   it should "try to send GetBlocks to peer" in {
-    val blockPool  = TestProbe()
-    val port       = SocketUtil.temporaryLocalPort()
-    val remote     = SocketUtil.temporaryServerAddress()
-    val tcpHandler = TestProbe()
-    val peerManager = system.actorOf(Props(new PeerManager(port, blockPool.ref) {
+    val blockHandler = TestProbe()
+    val port         = SocketUtil.temporaryLocalPort()
+    val remote       = SocketUtil.temporaryServerAddress()
+    val tcpHandler   = TestProbe()
+    val peerManager = system.actorOf(Props(new PeerManager(port, blockHandler.ref) {
       peers += (remote -> tcpHandler.ref)
     }))
     peerManager ! PeerManager.Sync(remote, Seq.empty)

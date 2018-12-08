@@ -79,8 +79,8 @@ class BlockHandler() extends BaseActor {
       val (block, total) = blockPool.getBalance(address)
       sender() ! Balance(address, block, total)
     case PrepareSync(remote: InetSocketAddress) =>
-      // TODO: use most recent confirmed hashes as locators
-      val block = blockPool.getBestHeader
-      sender() ! PeerManager.Sync(remote, Seq(block.hash))
+      // TODO: improve sync algorithm
+      val headers = blockPool.getAllHeaders
+      sender() ! PeerManager.Sync(remote, headers)
   }
 }
