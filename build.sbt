@@ -8,16 +8,23 @@ def baseProject(path: String, id: String): Project = {
     .settings(libraryDependencies ++= dependencies)
 }
 
+val scalastyleCfgFile     = "project/scalastyle-config.xml"
+val scalastyleTestCfgFile = "project/scalastyle-test-config.xml"
+
 lazy val root = baseProject(".", "root")
-  .settings(Compile / scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml")
-  .settings(Test / scalastyleConfig := baseDirectory.value / "project/scalastyle-test-config.xml")
+  .settings(
+    Compile / scalastyleConfig := baseDirectory.value / scalastyleCfgFile,
+    Test    / scalastyleConfig := baseDirectory.value / scalastyleTestCfgFile
+  )
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
   .aggregate(util, serde, crypto, protocol)
 
 def subProject(path: String): Project = {
   baseProject(path, path)
-    .settings(Compile / scalastyleConfig := root.base / "project/scalastyle-config.xml")
-    .settings(Test / scalastyleConfig := root.base / "project/scalastyle-test-config.xml")
+    .settings(
+      Compile / scalastyleConfig := root.base / scalastyleCfgFile,
+      Test    / scalastyleConfig := root.base / scalastyleTestCfgFile
+    )
 }
 
 lazy val util = subProject("util")
@@ -25,7 +32,7 @@ lazy val util = subProject("util")
 lazy val serde = subProject("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+    Test    / sourceGenerators += (sourceManaged in Test   ).map(Boilerplate.genTest).taskValue
   )
   .dependsOn(util % "test->test;compile->compile")
 
