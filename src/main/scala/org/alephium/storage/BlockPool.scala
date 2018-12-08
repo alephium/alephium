@@ -3,16 +3,9 @@ package org.alephium.storage
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
-class BlockPool {
-  val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
-  val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
+trait AbsBlockPool {
 
-  def addBlock(block: Block): Unit = {
-    blockStore += block.hash -> block
-    block.transactions.foreach { tx =>
-      txStore += tx.hash -> tx
-    }
-  }
+  def addBlock(block: Block): Unit
 
   def addBlocks(blocks: Seq[Block]): Unit = {
     blocks.foreach(addBlock)
@@ -24,8 +17,30 @@ class BlockPool {
     bestChain.drop(index)
   }
 
-  def getHeight(block: Block): Int = {
-    getChain(block).size
+  def getHeight(block: Block): Int = getChain(block).size
+
+  def getChain(block: Block): Seq[Block]
+
+  def isHeader(block: Block): Boolean
+
+  def getBestHeader: Block
+
+  def getBestChain: Seq[Block] = getChain(getBestHeader)
+
+  def getHeight: Int = getBestChain.size
+
+  def getAllHeaders: Seq[Keccak256]
+}
+
+class BlockPool extends AbsBlockPool {
+  val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
+  val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
+
+  def addBlock(block: Block): Unit = {
+    blockStore += block.hash -> block
+    block.transactions.foreach { tx =>
+      txStore += tx.hash -> tx
+    }
   }
 
   def getChain(block: Block): Seq[Block] = {
@@ -45,12 +60,6 @@ class BlockPool {
     require(blockStore.nonEmpty)
     blockStore.values.maxBy(getHeight)
   }
-
-  def getBestChain: Seq[Block] = {
-    getChain(getBestHeader)
-  }
-
-  def getHeight: Int = getBestChain.size
 
   def getAllHeaders: Seq[Keccak256] = {
     blockStore.values.filter(isHeader).map(_.hash).toSeq
