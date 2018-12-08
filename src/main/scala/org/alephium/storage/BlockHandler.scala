@@ -43,7 +43,8 @@ class BlockHandler() extends BaseActor {
     case AddBlocks(blocks) =>
       val ok = blockPool.addBlocks(blocks)
       if (ok) {
-        log.debug(s"Add ${blocks.size} blocks, now the height is ${blockPool.getHeight}")
+        log.debug(
+          s"Add ${blocks.size} blocks, #blocks: ${blockPool.numBlocks}, #height: ${blockPool.getHeight}")
       } else {
         log.warning(s"Failed to add a new block")
       }
