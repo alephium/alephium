@@ -8,10 +8,14 @@ import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 class ForksTree extends AbsBlockPool {
-  var root: ForksTree.Root = _
+  private var root: ForksTree.Root = _
 
-  val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
-  val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
+  private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
+  private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
+
+  override def numBlocks: Int = blocksTable.size
+
+  override def numTransactions: Int = transactionsTable.size
 
   private def postOrderTraverse(f: ForksTree.TreeNode => Unit): Unit = {
     def iter(node: ForksTree.TreeNode): Unit = {
@@ -108,14 +112,21 @@ class ForksTree extends AbsBlockPool {
     } else false
   }
 
-  private def getHeight(node: ForksTree.TreeNode): Int = {
-    root.weight - node.weight
+  private def getNodeHeight(node: ForksTree.TreeNode): Int = {
+    @tailrec
+    def iter(acc: Int, node: ForksTree.TreeNode): Int = {
+      node match {
+        case _: ForksTree.Root => acc + 1
+        case n: ForksTree.Node => iter(acc + 1, n.parent)
+      }
+    }
+    iter(0, node)
   }
 
-  override def getHeight(block: Block): Int = {
+  override def getHeightFor(block: Block): Int = {
     blocksTable.get(block.hash) match {
       case Some(node) =>
-        getHeight(node)
+        getNodeHeight(node)
       case None =>
         0
     }
@@ -151,7 +162,7 @@ class ForksTree extends AbsBlockPool {
   }
 
   override def getBestHeader: Block = {
-    getAllHeaders.map(blocksTable.apply).maxBy(getHeight).block
+    getAllHeaders.map(blocksTable.apply).maxBy(getNodeHeight).block
   }
 
   override def getAllHeaders: Seq[Keccak256] = {
@@ -190,4 +201,8 @@ object ForksTree {
     def isRoot: Boolean = false
   }
 
+  def apply(genesis: Block): ForksTree = {
+    val root = Root(genesis)
+    new ForksTree((root))
+  }
 }

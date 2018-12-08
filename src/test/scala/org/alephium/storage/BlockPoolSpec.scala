@@ -3,51 +3,52 @@ package org.alephium.storage
 import org.alephium.AlephiumSpec
 import org.alephium.protocol.Genesis
 import org.alephium.protocol.model.ModelGen
-import org.scalacheck.Gen
 
 class BlockPoolSpec extends AlephiumSpec {
 
   behavior of "BlockPool"
 
   trait Fixture {
-    val blockPool = new BlockPool()
     val genesis   = Genesis.block
+    val blockPool = ForksTree(genesis)
+    val blockGen  = ModelGen.blockGenWith(Seq(genesis.hash))
+    val chainGen  = ModelGen.chainGen(5, Seq(genesis)).map(_.tail)
   }
 
   it should "add block correctly" in new Fixture {
-    blockPool.blockStore.size is 0
-    forAll(ModelGen.blockGen) { block =>
-      val blocksSize1 = blockPool.blockStore.size
-      val txSize1     = blockPool.txStore.size
+    blockPool.numBlocks is 1
+    forAll(blockGen) { block =>
+      val blocksSize1 = blockPool.numBlocks
+      val txSize1     = blockPool.numTransactions
       blockPool.add(block)
-      val blocksSize2 = blockPool.blockStore.size
-      val txSize2     = blockPool.txStore.size
+      val blocksSize2 = blockPool.numBlocks
+      val txSize2     = blockPool.numTransactions
       blocksSize1 + 1 is blocksSize2
       txSize1 + block.transactions.length is txSize2
     }
   }
 
   it should "add blocks correctly" in new Fixture {
-    forAll(Gen.listOf(ModelGen.blockGen)) { blocks =>
-      val blocksSize1 = blockPool.blockStore.size
-      val txSize1     = blockPool.txStore.size
+    forAll(chainGen) { blocks =>
+      val blocksSize1 = blockPool.numBlocks
+      val txSize1     = blockPool.numTransactions
       blockPool.addBlocks(blocks)
-      val blocksSize2 = blockPool.blockStore.size
-      val txSize2     = blockPool.txStore.size
+      val blocksSize2 = blockPool.numBlocks
+      val txSize2     = blockPool.numTransactions
       blocksSize1 + blocks.size is blocksSize2
       txSize1 + blocks.map(_.transactions.length).sum is txSize2
     }
   }
 
-  it should "work correctly for a chain of blocks" in {
-    forAll(ModelGen.chainGen(5), minSuccessful(1)) { blocks =>
-      val blockPool = new BlockPool()
+  it should "work correctly for a chain of blocks" in new Fixture {
+    forAll(ModelGen.chainGen(5, Seq(genesis)), minSuccessful(1)) { blocks =>
+      val blockPool = ForksTree(genesis)
       blockPool.addBlocks(blocks)
       val headBlock = blocks.head
       val lastBlock = blocks.last
 
-      blockPool.getHeight(headBlock) is 1
-      blockPool.getHeight(lastBlock) is blocks.size
+      blockPool.getHeightFor(headBlock) is 1
+      blockPool.getHeightFor(lastBlock) is blocks.size
       blockPool.getChain(headBlock) is Seq(headBlock)
       blockPool.getChain(lastBlock) is blocks
       blockPool.isHeader(headBlock) is false
@@ -59,17 +60,17 @@ class BlockPoolSpec extends AlephiumSpec {
     }
   }
 
-  it should "work correctly with two chains of blocks" in {
-    forAll(ModelGen.chainGen(3), minSuccessful(1)) { longChain =>
-      forAll(ModelGen.chainGen(2), minSuccessful(1)) { shortChain =>
-        val blockPool = new BlockPool()
+  it should "work correctly with two chains of blocks" in new Fixture {
+    forAll(ModelGen.chainGen(4, Seq(genesis)), minSuccessful(1)) { longChain =>
+      forAll(ModelGen.chainGen(3, Seq(genesis)), minSuccessful(1)) { shortChain =>
+        val blockPool = ForksTree(genesis)
         blockPool.addBlocks(longChain)
         blockPool.addBlocks(shortChain)
 
-        blockPool.getHeight(longChain.head) is 1
-        blockPool.getHeight(longChain.last) is longChain.size
-        blockPool.getHeight(shortChain.head) is 1
-        blockPool.getHeight(shortChain.last) is shortChain.size
+        blockPool.getHeightFor(longChain.head) is 1
+        blockPool.getHeightFor(longChain.last) is longChain.size
+        blockPool.getHeightFor(shortChain.head) is 1
+        blockPool.getHeightFor(shortChain.last) is shortChain.size
         blockPool.getChain(longChain.head) is Seq(longChain.head)
         blockPool.getChain(longChain.last) is longChain
         blockPool.getChain(shortChain.head) is Seq(shortChain.head)

@@ -6,6 +6,10 @@ import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
 trait AbsBlockPool {
 
+  def numBlocks: Int
+
+  def numTransactions: Int
+
   def add(block: Block): Boolean
 
   def add(slice: ChainSlice): Boolean
@@ -21,7 +25,7 @@ trait AbsBlockPool {
     bestChain.drop(index)
   }
 
-  def getHeight(block: Block): Int = getChain(block).size
+  def getHeightFor(block: Block): Int = getChain(block).size
 
   // TODO: use ChainSlice instead of Seq[Block]
   def getChain(block: Block): Seq[Block]
@@ -104,6 +108,10 @@ class BlockPool extends AbsBlockPool {
   val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
   val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
 
+  override def numBlocks: Int = blockStore.size
+
+  override def numTransactions: Int = txStore.size
+
   def add(block: Block): Boolean = {
     blockStore += block.hash -> block
     block.transactions.foreach { tx =>
@@ -132,7 +140,7 @@ class BlockPool extends AbsBlockPool {
 
   def getBestHeader: Block = {
     require(blockStore.nonEmpty)
-    blockStore.values.maxBy(getHeight)
+    blockStore.values.maxBy(getHeightFor)
   }
 
   def getAllHeaders: Seq[Keccak256] = {
