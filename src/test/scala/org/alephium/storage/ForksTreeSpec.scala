@@ -22,7 +22,7 @@ class ForksTreeSpec extends AlephiumSpec {
   it should "work for two chains with same root" in {
     forAll(ModelGen.chainGen(5), minSuccessful(1)) { blocks1 =>
       val chainSlice1 = ChainSlice(blocks1)
-      forAll(ModelGen.chainGen(2, Seq(blocks1.head)), minSuccessful(1)) { blocks2 =>
+      forAll(ModelGen.chainGen(1, blocks1.head), minSuccessful(1)) { blocks2 =>
         val forksTree = new ForksTree(chainSlice1)
         blocks2.foreach(forksTree.add)
         blocks1.foreach(block => forksTree.contains(block) is true)

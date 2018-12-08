@@ -12,7 +12,7 @@ class BlockPoolSpec extends AlephiumSpec {
     val genesis   = Genesis.block
     val blockPool = ForksTree(genesis)
     val blockGen  = ModelGen.blockGenWith(Seq(genesis.hash))
-    val chainGen  = ModelGen.chainGen(5, Seq(genesis)).map(_.tail)
+    val chainGen  = ModelGen.chainGen(4, genesis)
   }
 
   it should "add block correctly" in new Fixture {
@@ -41,47 +41,48 @@ class BlockPoolSpec extends AlephiumSpec {
   }
 
   it should "work correctly for a chain of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(5, Seq(genesis)), minSuccessful(1)) { blocks =>
+    forAll(ModelGen.chainGen(4, genesis), minSuccessful(1)) { blocks =>
       val blockPool = ForksTree(genesis)
-      blockPool.addBlocks(blocks.tail)
-      val headBlock = blocks.head
+      blockPool.addBlocks(blocks)
+      val headBlock = genesis
       val lastBlock = blocks.last
+      val poolSize  = blocks.size + 1
 
       blockPool.getHeightFor(headBlock) is 1
-      blockPool.getHeightFor(lastBlock) is blocks.size
+      blockPool.getHeightFor(lastBlock) is poolSize
       blockPool.getChain(headBlock) is Seq(headBlock)
-      blockPool.getChain(lastBlock) is blocks
+      blockPool.getChain(lastBlock) is genesis +: blocks
       blockPool.isHeader(headBlock) is false
       blockPool.isHeader(lastBlock) is true
       blockPool.getBestHeader is lastBlock
-      blockPool.getBestChain is blocks
-      blockPool.getHeight is blocks.size
+      blockPool.getBestChain is genesis +: blocks
+      blockPool.getHeight is poolSize
       blockPool.getAllHeaders is Seq(lastBlock.hash)
     }
   }
 
   it should "work correctly with two chains of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, Seq(genesis)), minSuccessful(1)) { longChain =>
-      forAll(ModelGen.chainGen(3, Seq(genesis)), minSuccessful(1)) { shortChain =>
+    forAll(ModelGen.chainGen(3, genesis), minSuccessful(1)) { longChain =>
+      forAll(ModelGen.chainGen(2, genesis), minSuccessful(1)) { shortChain =>
         val blockPool = ForksTree(genesis)
-        blockPool.addBlocks(longChain.tail)
-        blockPool.addBlocks(shortChain.tail)
+        blockPool.addBlocks(longChain)
+        blockPool.addBlocks(shortChain)
 
-        blockPool.getHeightFor(longChain.head) is 1
-        blockPool.getHeightFor(longChain.last) is longChain.size
-        blockPool.getHeightFor(shortChain.head) is 1
-        blockPool.getHeightFor(shortChain.last) is shortChain.size
-        blockPool.getChain(longChain.head) is Seq(longChain.head)
-        blockPool.getChain(longChain.last) is longChain
-        blockPool.getChain(shortChain.head) is Seq(shortChain.head)
-        blockPool.getChain(shortChain.last) is shortChain
+        blockPool.getHeightFor(longChain.head) is 2
+        blockPool.getHeightFor(longChain.last) is longChain.size + 1
+        blockPool.getHeightFor(shortChain.head) is 2
+        blockPool.getHeightFor(shortChain.last) is shortChain.size + 1
+        blockPool.getChain(longChain.head) is Seq(genesis, longChain.head)
+        blockPool.getChain(longChain.last) is genesis +: longChain
+        blockPool.getChain(shortChain.head) is Seq(genesis, shortChain.head)
+        blockPool.getChain(shortChain.last) is genesis +: shortChain
         blockPool.isHeader(longChain.head) is false
         blockPool.isHeader(longChain.last) is true
         blockPool.isHeader(shortChain.head) is false
         blockPool.isHeader(shortChain.last) is true
         blockPool.getBestHeader is longChain.last
-        blockPool.getBestChain is longChain
-        blockPool.getHeight is longChain.size
+        blockPool.getBestChain is genesis +: longChain
+        blockPool.getHeight is longChain.size + 1
         blockPool.getAllHeaders.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
