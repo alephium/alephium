@@ -19,7 +19,7 @@ class BlockPoolSpec extends AlephiumSpec {
     forAll(ModelGen.blockGen) { block =>
       val blocksSize1 = blockPool.blockStore.size
       val txSize1     = blockPool.txStore.size
-      blockPool.addBlock(block)
+      blockPool.add(block)
       val blocksSize2 = blockPool.blockStore.size
       val txSize2     = blockPool.txStore.size
       blocksSize1 + 1 is blocksSize2

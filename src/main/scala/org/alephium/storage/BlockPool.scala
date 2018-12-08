@@ -1,14 +1,18 @@
 package org.alephium.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
 trait AbsBlockPool {
 
-  def addBlock(block: Block): Unit
+  def add(block: Block): Boolean
 
-  def addBlocks(blocks: Seq[Block]): Unit = {
-    blocks.foreach(addBlock)
+  def add(slice: ChainSlice): Boolean
+
+  def addBlocks(blocks: Seq[Block]): Boolean = {
+    blocks.foreach(add)
+    true
   }
 
   def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {
@@ -19,6 +23,7 @@ trait AbsBlockPool {
 
   def getHeight(block: Block): Int = getChain(block).size
 
+  // TODO: use ChainSlice instead of Seq[Block]
   def getChain(block: Block): Seq[Block]
 
   def isHeader(block: Block): Boolean
@@ -36,11 +41,17 @@ class BlockPool extends AbsBlockPool {
   val blockStore = collection.mutable.HashMap.empty[Keccak256, Block]
   val txStore    = collection.mutable.HashMap.empty[Keccak256, Transaction]
 
-  def addBlock(block: Block): Unit = {
+  def add(block: Block): Boolean = {
     blockStore += block.hash -> block
     block.transactions.foreach { tx =>
       txStore += tx.hash -> tx
     }
+    true
+  }
+
+  override def add(slice: ChainSlice): Boolean = {
+    addBlocks(slice.blocks)
+    true
   }
 
   def getChain(block: Block): Seq[Block] = {
