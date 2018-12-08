@@ -33,12 +33,15 @@ object ModelGen {
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(deps, txs, 0)
 
-  // TODO: refactor this prefix
-  def chainGen(length: Int, prefix: Seq[Block] = Seq.empty): Gen[Seq[Block]] =
+  def chainGen(length: Int, block: Block): Gen[Seq[Block]] = chainGen(length, block.hash)
+
+  def chainGen(length: Int): Gen[Seq[Block]] = chainGen(length, Keccak256.zero)
+
+  def chainGen(length: Int, initialHash: Keccak256): Gen[Seq[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
-      blocks.foldLeft(prefix) {
+      blocks.foldLeft(Seq.empty[Block]) {
         case (acc, block) =>
-          val prevHash      = if (acc.isEmpty) Keccak256.zero else acc.last.hash
+          val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
           val currentHeader = block.blockHeader
           val newHeader     = currentHeader.copy(blockDeps = Seq(prevHash))
           val newBlock      = block.copy(blockHeader = newHeader)
