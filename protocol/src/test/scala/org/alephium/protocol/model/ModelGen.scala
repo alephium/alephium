@@ -33,6 +33,7 @@ object ModelGen {
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(deps, txs, 0)
 
+  // TODO: refactor this prefix
   def chainGen(length: Int, prefix: Seq[Block] = Seq.empty): Gen[Seq[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
       blocks.foldLeft(prefix) {
