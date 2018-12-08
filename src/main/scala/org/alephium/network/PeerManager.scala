@@ -6,13 +6,13 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 
 import scala.collection.mutable
 
 object PeerManager {
-  def props(port: Int, blockPool: ActorRef): Props = Props(new PeerManager(port, blockPool))
+  def props(port: Int, blockHandler: ActorRef): Props = Props(new PeerManager(port, blockHandler))
 
   sealed trait Command
   case class Connect(remote: InetSocketAddress)                        extends Command
@@ -24,7 +24,7 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
+class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
   import PeerManager._
 
   val server: ActorRef                                = context.actorOf(TcpServer.props(port))
@@ -35,7 +35,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
 
   override def preStart(): Unit = {
     context.watch(server)
-    context.watch(blockPool)
+    context.watch(blockHandler)
     ()
   }
 
@@ -45,7 +45,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
     case Tcp.Connected(remote, local) =>
       addPeer(remote, sender())
       log.debug(s"Connected to $remote, listen at $local, now $peersSize peers")
-      blockPool ! BlockPoolHandler.PrepareSync(remote)
+      blockHandler ! BlockHandler.PrepareSync(remote)
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       log.info(s"Cannot connect to ${c.remoteAddress}")
     case Sync(remote, locators) =>
@@ -65,7 +65,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
       if (child == server) {
         log.error("Server stopped, stopping peer manager")
         unwatchAndStop()
-      } else if (child == blockPool) {
+      } else if (child == blockHandler) {
         log.error("Block pool stopped, stopping peer manager")
         unwatchAndStop()
       } else {
@@ -75,10 +75,10 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
   }
 
   def addPeer(remote: InetSocketAddress, connection: ActorRef): Unit = {
-    val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockPool))
+    val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockHandler))
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
-    blockPool ! BlockPoolHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
+    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
     peers += (remote -> tcpHandler)
   }
 
@@ -89,7 +89,7 @@ class PeerManager(port: Int, blockPool: ActorRef) extends BaseActor {
 
   def unwatchAndStop(): Unit = {
     context.unwatch(server)
-    context.unwatch(blockPool)
+    context.unwatch(blockHandler)
     tcpHandlers.foreach(context.unwatch)
     context.stop(self)
   }

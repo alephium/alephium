@@ -4,14 +4,14 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction, TxOutput, UnsignedTransaction}
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec
 
 case class Client(privateKey: ED25519PrivateKey,
                   publicKey: ED25519PublicKey,
-                  blockPool: ActorRef,
+                  blockHandler: ActorRef,
                   tcpHandler: ActorRef)
     extends BaseActor {
   import Client._
@@ -20,12 +20,12 @@ case class Client(privateKey: ED25519PrivateKey,
 
   override def receive: Receive = {
     case Transfer(toAddress, value) =>
-      blockPool ! BlockPoolHandler.GetUTXOs(address, value)
+      blockHandler ! BlockHandler.GetUTXOs(address, value)
       context become transfer(toAddress, value)
   }
 
   def transfer(toAddress: ED25519PublicKey, value: BigInt): Receive = {
-    case BlockPoolHandler.UTXOs(header, txInputs, total) =>
+    case BlockHandler.UTXOs(header, txInputs, total) =>
       val txOutput1   = TxOutput(value, toAddress)
       val txOutput2   = TxOutput(total - value, address)
       val txOutputs   = Seq(txOutput1, txOutput2)
@@ -33,12 +33,12 @@ case class Client(privateKey: ED25519PrivateKey,
       val transaction = Transaction.from(unsigned, privateKey)
       val block       = Client.mine(Seq(header), Seq(transaction))
 
-      blockPool ! BlockPoolHandler.AddBlocks(Seq(block))
+      blockHandler ! BlockHandler.AddBlocks(Seq(block))
       val message = Message(SendBlocks(Seq(block)))
       tcpHandler ! message
 
       context become receive
-    case BlockPoolHandler.NoEnoughBalance =>
+    case BlockHandler.NoEnoughBalance =>
       log.info(s"Not able to transfer $value Aleph")
       context become receive
   }

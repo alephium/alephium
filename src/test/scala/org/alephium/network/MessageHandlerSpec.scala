@@ -4,7 +4,7 @@ import akka.io.Tcp
 import akka.testkit.TestProbe
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message._
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 
 import scala.util.Random
 
@@ -12,8 +12,8 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
 
   trait Fixture {
     lazy val connection     = TestProbe()
-    lazy val blockPool      = TestProbe()
-    lazy val messageHandler = system.actorOf(MessageHandler.props(connection.ref, blockPool.ref))
+    lazy val blockHandler   = TestProbe()
+    lazy val messageHandler = system.actorOf(MessageHandler.props(connection.ref, blockHandler.ref))
   }
 
   behavior of "MessageHandlerSpec"
@@ -39,18 +39,18 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
     expectTerminated(messageHandler)
   }
 
-  it should "let block pool add blocks when receiving new blocks" in new Fixture {
+  it should "add blocks when receiving new blocks" in new Fixture {
     messageHandler ! SendBlocks(Seq.empty)
-    blockPool.expectMsg(BlockPoolHandler.AddBlocks(Seq.empty))
+    blockHandler.expectMsg(BlockHandler.AddBlocks(Seq.empty))
   }
 
-  it should "let block pool send blocks when asked for new blocks" in new Fixture {
+  it should "send blocks when asked for new blocks" in new Fixture {
     messageHandler ! GetBlocks(Seq.empty)
-    blockPool.expectMsg(BlockPoolHandler.GetBlocksAfter(Seq.empty))
+    blockHandler.expectMsg(BlockHandler.GetBlocksAfter(Seq.empty))
   }
 
   it should "send blocks to connection when receiving new blocks from block pool" in new Fixture {
-    messageHandler ! BlockPoolHandler.SendBlocksAfter(Seq.empty, Seq.empty)
+    messageHandler ! BlockHandler.SendBlocksAfter(Seq.empty, Seq.empty)
     connection.expectMsg(TcpHandler.envelope(Message(SendBlocks(Seq.empty))))
   }
 }

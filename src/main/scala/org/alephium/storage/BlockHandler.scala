@@ -9,9 +9,9 @@ import org.alephium.protocol.Genesis
 import org.alephium.protocol.model.{Block, TxInput}
 import org.alephium.util.BaseActor
 
-object BlockPoolHandler {
+object BlockHandler {
 
-  def props(): Props = Props(new BlockPoolHandler())
+  def props(): Props = Props(new BlockHandler())
 
   sealed trait Command
   case class AddBlocks(blocks: Seq[Block])                      extends Command
@@ -34,8 +34,8 @@ object BlockPoolHandler {
 }
 
 // consider single chain for the moment
-class BlockPoolHandler() extends BaseActor {
-  import BlockPoolHandler._
+class BlockHandler() extends BaseActor {
+  import BlockHandler._
 
   val blockPool = new BlockPool()
 

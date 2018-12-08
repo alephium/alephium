@@ -5,12 +5,12 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.storage.BlockPoolHandler
+import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 
 object Miner {
-  def props(address: ED25519PublicKey, blockPool: ActorRef, peerManager: ActorRef): Props =
-    Props(new Miner(address, blockPool, peerManager))
+  def props(address: ED25519PublicKey, blockHandler: ActorRef, peerManager: ActorRef): Props =
+    Props(new Miner(address, blockHandler, peerManager))
 
   sealed trait Command
   case object Start               extends Command
@@ -31,14 +31,14 @@ object Miner {
   }
 }
 
-case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: ActorRef)
+case class Miner(address: ED25519PublicKey, blockHandler: ActorRef, peerManager: ActorRef)
     extends BaseActor {
 
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
-      blockPool ! BlockPoolHandler.GetBestHeader
+      blockHandler ! BlockHandler.GetBestHeader
       context become collect
   }
 
@@ -52,8 +52,8 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
       Miner.tryMine(deps, transactions, nonce) match {
         case Some(block) =>
           log.info("A new block is mined")
-          blockPool ! BlockPoolHandler.AddBlocks(Seq(block))
-          blockPool ! BlockPoolHandler.GetBestHeader
+          blockHandler ! BlockHandler.AddBlocks(Seq(block))
+          blockHandler ! BlockHandler.GetBestHeader
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
           context become collect
         case None =>
@@ -65,7 +65,7 @@ case class Miner(address: ED25519PublicKey, blockPool: ActorRef, peerManager: Ac
     _mine(deps, transactions) orElse awaitStop
 
   private def _collect: Receive = {
-    case BlockPoolHandler.BestHeader(header) =>
+    case BlockHandler.BestHeader(header) =>
       val transaction = Transaction.coinbase(address, 1)
       context become mine(Seq(header.hash), Seq(transaction))
       self ! Miner.Nonce(1)
