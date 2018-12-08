@@ -1,7 +1,7 @@
-package org.alephium.flow
+package org.alephium.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.ForksTree.{Node, Root}
+import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.Block
 
 import scala.annotation.tailrec
@@ -45,8 +45,8 @@ class ForksTree {
     if (newWeight > parentWeight) {
       parent.weight = newWeight
       parent match {
-        case p: Node => updateWeightFrom(p)
-        case _: Root => ()
+        case p: ForksTree.Node => updateWeightFrom(p)
+        case _: ForksTree.Root => ()
       }
     }
   }

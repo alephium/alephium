@@ -1,4 +1,4 @@
-package org.alephium.flow
+package org.alephium.storage
 
 import org.alephium.protocol.model.Block
 
