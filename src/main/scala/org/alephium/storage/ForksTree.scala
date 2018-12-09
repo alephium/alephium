@@ -70,6 +70,8 @@ class ForksTree extends BlockPool {
 
   override def contains(block: Block): Boolean = blocksTable.contains(block.hash)
 
+  override def contains(hash: Keccak256): Boolean = blocksTable.contains(hash)
+
   override def add(block: Block): Boolean = {
     blocksTable.get(block.hash) match {
       case Some(_) => false
@@ -190,6 +192,20 @@ class ForksTree extends BlockPool {
   }
 
   override def getAllBlocks: Iterable[Block] = blocksTable.values.map(_.block)
+
+  override def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = {
+    // require(blocksTable.contains(hash1) && blocksTable.contains(hash2))
+    val node = blocksTable(hash1)
+    isBefore(node, hash2)
+  }
+
+  private def isBefore(node: ForksTree.TreeNode, target: Keccak256): Boolean = {
+    if (node.block.hash == target) true
+    else {
+      if (node.isLeaf) false
+      node.successors.exists(isBefore(_, target))
+    }
+  }
 
   override def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 

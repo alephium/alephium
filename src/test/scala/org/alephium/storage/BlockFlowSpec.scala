@@ -29,7 +29,7 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "work for 1 user group" in {
     val chainIndex = ChainIndex(0, 0)
     val blockFlow  = BlockFlow(1, blocks1)
-    val deps1      = blockFlow.getBestDeps(chainIndex)
+    val deps1      = blockFlow.getBestDeps(chainIndex)._1
 
     blockFlow.getHeight is 1
     deps1.size is 1
@@ -37,7 +37,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val newBlock = mine(blockFlow, ChainIndex(0, 0))
     blockFlow.addBlocks(Seq(newBlock))
-    val deps2 = blockFlow.getBestDeps(chainIndex)
+    val deps2 = blockFlow.getBestDeps(chainIndex)._1
 
     blockFlow.getHeight is 2
     deps2.size is 1
@@ -85,13 +85,42 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
+  it should "work for 2 user group when there is forks" in {
+    val blockFlow = BlockFlow(2, blocks2)
+
+    val chainIndex1 = ChainIndex(0, 0)
+    val block11     = mine(blockFlow, chainIndex1)
+    val block12     = mine(blockFlow, chainIndex1)
+    blockFlow.add(block11)
+    blockFlow.add(block12)
+    blockFlow.getBlockFlowHeight(block11) is 4
+    blockFlow.getBlockFlowHeight(block12) is 4
+
+    val block13 = mine(blockFlow, chainIndex1)
+    blockFlow.add(block13)
+    blockFlow.getBlockFlowHeight(block13) is 5
+
+    val chainIndex2 = ChainIndex(1, 1)
+    val block21     = mine(blockFlow, chainIndex2)
+    val block22     = mine(blockFlow, chainIndex2)
+    blockFlow.add(block21)
+    blockFlow.add(block22)
+    blockFlow.getBlockFlowHeight(block21) is 7
+    blockFlow.getBlockFlowHeight(block22) is 7
+
+    val chainIndex3 = ChainIndex(0, 1)
+    val block3      = mine(blockFlow, chainIndex3)
+    blockFlow.addBlocks(Seq(block3))
+    blockFlow.getBlockFlowHeight(block3) is 8
+  }
+
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val deps = blockFlow.getBestDeps(chainIndex)
+    val deps = blockFlow.getBestDeps(chainIndex)._1
 
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.from(deps, Seq.empty, nonce)
-      if (chainIndex.accept(block.miningHash)) block else iter(nonce + 1)
+      if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 
     iter(0)

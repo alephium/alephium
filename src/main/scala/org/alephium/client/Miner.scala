@@ -23,7 +23,7 @@ object Miner {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(Seq.empty, nonce)
-      if (chainIndex.accept(block.miningHash)) block else iter(nonce + 1)
+      if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -31,13 +31,14 @@ object Miner {
 }
 
 class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) extends BaseActor {
-  import node.blockHandler
+  import node.blockHandlers
 
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
-      blockHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
+      log.info("Start mining")
+      blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
 
@@ -46,26 +47,27 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
       context become awaitStart
   }
 
-  private def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive = {
+  protected def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive = {
     case Miner.Nonce(from, to) =>
       tryMine(deps, transactions, from, to) match {
         case Some(block) =>
-          log.info("A new block is mined")
-          blockHandler ! BlockHandler.AddBlocks(Seq(block))
-          blockHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
+          log.info(s"A new block is mined since $lastTs")
+          val chainIndex = ChainIndex.fromHash(block.hash)
+          blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block))
+          blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
           context become collect
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)
       }
   }
 
-  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction]): Receive =
-    _mine(deps, transactions) orElse awaitStop
+  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive =
+    _mine(deps, transactions, lastTs) orElse awaitStop
 
-  private def _collect: Receive = {
-    case BlockHandler.BlockFlowTemplate(deps) =>
+  protected def _collect: Receive = {
+    case BlockHandler.BlockFlowTemplate(deps, lastTs) =>
       val transaction = Transaction.coinbase(address, 1)
-      context become mine(deps, Seq(transaction))
+      context become mine(deps, Seq(transaction), lastTs)
       self ! Miner.Nonce(0, Network.nonceStep)
   }
 

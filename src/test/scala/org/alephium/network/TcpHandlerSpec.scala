@@ -8,6 +8,7 @@ import org.scalatest.TryValues._
 import org.alephium.AlephiumActorSpec
 import org.alephium.protocol.message.{Message, Ping, Pong, SendBlocks}
 import org.alephium.serde.WrongFormatException
+import org.alephium.storage.HandlerUtils
 
 class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
@@ -20,12 +21,12 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     val data    = Message.serializer.serialize(message)
 
     val connection     = TestProbe()
-    val blockPool      = TestProbe()
     val messageHandler = TestProbe()
+    val blockHandlers  = HandlerUtils.createBlockHandlersProbe
 
     val tcpHandler = system.actorOf(
       Props(
-        new TcpHandler(remote, connection.ref, blockPool.ref) {
+        new TcpHandler(remote, connection.ref, blockHandlers) {
           override val messageHandler = obj.messageHandler.ref
         }
       )
@@ -70,7 +71,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   behavior of "Deserialization"
 
   trait SerdeFixture {
-    val message1 = Message(Ping(1))
+    val message1 = Message(Ping(1, System.currentTimeMillis()))
     val message2 = Message(Pong(2))
     val bytes1   = Message.serializer.serialize(message1)
     val bytes2   = Message.serializer.serialize(message2)
