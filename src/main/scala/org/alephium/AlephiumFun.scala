@@ -8,7 +8,7 @@ import org.alephium.storage.BlockHandler
 import org.alephium.util.Hex._
 
 // scalastyle:off magic.number
-object ClientFun extends App {
+object AlephiumFun extends App {
   val node = Node("ClientFun", Network.port)
   import node.{blockHandler, peerManager, system}
 
