@@ -189,6 +189,8 @@ class ForksTree extends BlockPool {
     blocksTable.values.filter(_.isLeaf).map(_.block.hash).toSeq
   }
 
+  override def getAllBlocks: Iterable[Block] = blocksTable.values.map(_.block)
+
   override def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
 //  def prune(): Unit

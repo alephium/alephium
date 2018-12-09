@@ -130,6 +130,13 @@ class BlockFlow(groups: Int, initialBlocks: Seq[Seq[Block]]) extends BlockPool {
 
   override def getChain(block: Block): Seq[Block] = getPool(block).getChain(block)
 
+  override def getAllBlocks: Iterable[Block] =
+    for {
+      i     <- 0 until groups
+      j     <- 0 until groups
+      block <- getPool(i, j).getAllBlocks
+    } yield block
+
   override def getTransaction(hash: Keccak256): Transaction = ???
 
   def getInfo: String = {
@@ -138,6 +145,15 @@ class BlockFlow(groups: Int, initialBlocks: Seq[Seq[Block]]) extends BlockPool {
       j <- 0 until groups
     } yield s"($i, $j): ${getPool(i, j).getHeight}"
     infos.mkString("; ")
+  }
+
+  def getBlockInfo: Seq[BlockFlow.BlockInfo] = {
+    val infos = for {
+      i     <- 0 until groups
+      j     <- 0 until groups
+      block <- getPool(i, j).getAllBlocks
+    } yield BlockFlow.BlockInfo(block.blockHeader.timestamp, ChainIndex(i, j))
+    infos.sortBy(_.timestamp)
   }
 }
 
@@ -151,4 +167,6 @@ object BlockFlow {
       hash.bytes(0) == from && hash.bytes(1) == to
     }
   }
+
+  case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }
