@@ -1,6 +1,5 @@
 package org.alephium.constant
 
-import java.net.InetSocketAddress
 import java.time.Duration
 
 import com.typesafe.config.ConfigFactory
@@ -14,19 +13,6 @@ object Network {
   val port: Int               = config.getInt("port")
   val pingFrequency: Duration = config.getDuration("pingFrequency")
   val groups: Int             = config.getInt("groups")
-
-  val peers: Seq[InetSocketAddress] = {
-    val rawInput = config.getString("peers")
-    if (rawInput.isEmpty) Seq.empty
-    else {
-      val addresses = rawInput.split(';')
-      addresses.map { address =>
-        val host = address.takeWhile(_ != ':')
-        val port = address.dropWhile(_ != ':').tail.toInt
-        new InetSocketAddress(host, port)
-      }
-    }
-  }
 
   def createBlockFlow(groups: Int): Seq[Seq[Block]] = {
     Seq.tabulate(groups, groups) {

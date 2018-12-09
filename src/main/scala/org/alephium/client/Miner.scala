@@ -23,7 +23,7 @@ object Miner {
   def mineGenesis(chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(Seq.empty, Seq.empty, nonce)
+      val block = Block.genesis(Seq.empty, nonce)
       if (chainIndex.accept(block.miningHash)) block else iter(nonce + 1)
     }
 
