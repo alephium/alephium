@@ -6,7 +6,6 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
 
 import scala.collection.mutable
@@ -52,7 +51,6 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
     case Tcp.Connected(remote, local) =>
       addPeer(remote, sender())
       log.debug(s"Connected to $remote, listen at $local, now $peersSize peers")
-      blockHandler ! BlockHandler.PrepareSync(remote)
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       log.info(s"Cannot connect to ${c.remoteAddress}")
     case Sync(remote, locators) =>
@@ -87,7 +85,7 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
     val tcpHandler = context.actorOf(TcpHandler.props(remote, connection, blockHandler))
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
-    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
+//    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack
     peers += (remote -> tcpHandler)
   }
 
