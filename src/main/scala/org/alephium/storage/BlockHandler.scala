@@ -50,18 +50,22 @@ class BlockHandler() extends BaseActor {
 
   def handleWith(peerManager: ActorRef): Receive = {
     case AddBlocks(blocks) =>
-      require(blocks.nonEmpty)
-      val ok = blockFlow.addBlocks(blocks)
-      if (ok) {
-        val length = blockFlow.getBestLength
-        val info   = blockFlow.getInfo
-        log.debug(s"Add ${blocks.size} blocks, #length: $length, info: $info")
-        if (blocks.size == 1) {
-          log.debug(s"Got new block for ${blockFlow.getIndex(blocks.head)}, broadcast it")
-          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), sender())
-        }
+      // TODO: improve this
+      require(blocks.nonEmpty && blocks.size == 1)
+      val block = blocks.head
+      if (blockFlow.contains(block)) {
+        log.debug(s"Received already included block")
       } else {
-        log.warning(s"Failed to add a new block")
+        val ok = blockFlow.add(block)
+        if (ok) {
+          val index  = blockFlow.getIndex(block)
+          val length = blockFlow.getBestLength
+          val info   = blockFlow.getInfo
+          log.debug(s"Add ${blocks.size} blocks for $index, #length: $length, info: $info")
+          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), sender())
+        } else {
+          log.warning(s"Failed to add a new block")
+        }
       }
     case GetBlocksAfter(locators) =>
       val newBlocks = blockFlow.getBlocks(locators)

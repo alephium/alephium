@@ -68,7 +68,7 @@ class ForksTree extends BlockPool {
     updateWeightFrom(node)
   }
 
-  def contains(block: Block): Boolean = blocksTable.contains(block.hash)
+  override def contains(block: Block): Boolean = blocksTable.contains(block.hash)
 
   override def add(block: Block): Boolean = {
     blocksTable.get(block.hash) match {

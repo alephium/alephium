@@ -10,6 +10,8 @@ trait BlockPool {
 
   def numTransactions: Int
 
+  def contains(block: Block): Boolean
+
   def add(block: Block): Boolean
 
   // TODO: make this safe
