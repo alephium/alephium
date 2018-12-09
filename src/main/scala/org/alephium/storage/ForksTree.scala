@@ -113,6 +113,23 @@ class ForksTree extends BlockPool {
     } else false
   }
 
+  override def getBlocks(locator: Keccak256): Seq[Block] = {
+    blocksTable.get(locator) match {
+      case Some(node) => getBlocksAfter(node)
+      case None       => Seq.empty[Block]
+    }
+  }
+
+  private def getBlocksAfter(node: ForksTree.TreeNode): Seq[Block] = {
+    if (node.isLeaf) Seq.empty[Block]
+    else {
+      node.successors.foldLeft(node.successors.map(_.block)) {
+        case (blocks, successor) =>
+          blocks ++ getBlocksAfter(successor)
+      }
+    }
+  }
+
   private def getNodeHeight(node: ForksTree.TreeNode): Int = {
     @tailrec
     def iter(acc: Int, node: ForksTree.TreeNode): Int = {
