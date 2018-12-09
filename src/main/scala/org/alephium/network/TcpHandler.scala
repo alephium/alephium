@@ -77,5 +77,7 @@ class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: Act
   def handleOutMessage: Receive = {
     case message: Message =>
       connection ! TcpHandler.envelope(message)
+    case write: Tcp.Write =>
+      connection ! write
   }
 }
