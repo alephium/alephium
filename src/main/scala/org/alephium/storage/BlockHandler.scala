@@ -18,17 +18,11 @@ object BlockHandler {
   sealed trait Command
   case class AddBlocks(blocks: Seq[Block])            extends Command
   case class GetBlocksAfter(locators: Seq[Keccak256]) extends Command
-  case object GetBestHeader                           extends Command
-  case object GetBestChain                            extends Command
-  case object GetAllHeaders                           extends Command
   case object GetBlockInfo                            extends Command
   case class PrepareSync(remote: InetSocketAddress)   extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
 
   sealed trait Event
-  case class BestHeader(header: Block)                             extends Event
-  case class BestChain(blocks: Seq[Block])                         extends Event
-  case class AllHeaders(headers: Seq[Keccak256])                   extends Event
   case class BlockFlowTemplate(deps: Seq[Keccak256], lastTs: Long) extends Event
 }
 
@@ -40,12 +34,6 @@ class BlockHandler(blockFlow: BlockFlow) extends BaseActor {
     case GetBlocksAfter(locators) =>
       val newBlocks = blockFlow.getBlocks(locators)
       sender() ! Message(SendBlocks(newBlocks))
-    case GetBestHeader =>
-      sender() ! BestHeader(blockFlow.getBestHeader)
-    case GetBestChain =>
-      sender() ! BestChain(blockFlow.getBestChain)
-    case GetAllHeaders =>
-      sender() ! AllHeaders(blockFlow.getAllHeaders)
     case GetBlockInfo =>
       sender() ! blockFlow.getBlockInfo
     case PrepareSync(remote: InetSocketAddress) =>
