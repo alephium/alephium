@@ -6,6 +6,8 @@ import org.alephium.serde.Serde
 case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
     extends WithKeccak256[Block] {
   def prevBlockHash: Keccak256 = blockHeader.blockDeps.last
+
+  def miningHash: Keccak256 = Block.toMiningHash(this.hash)
 }
 
 object Block {
@@ -24,4 +26,6 @@ object Block {
     val blockHeader = BlockHeader(Seq(Keccak256.zero), txsHash, 0, 0)
     Block(blockHeader, transactions)
   }
+
+  def toMiningHash(hash: Keccak256): Keccak256 = Keccak256.hash(hash)
 }

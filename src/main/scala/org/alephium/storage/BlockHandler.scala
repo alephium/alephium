@@ -5,9 +5,9 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.network.PeerManager
-import org.alephium.protocol.Genesis
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, TxInput}
+import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.BaseActor
 
 object BlockHandler {
@@ -23,6 +23,7 @@ object BlockHandler {
   case class GetUTXOs(address: ED25519PublicKey, value: BigInt) extends Command
   case class GetBalance(address: ED25519PublicKey)              extends Command
   case class PrepareSync(remote: InetSocketAddress)             extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex)           extends Command
 
   sealed trait Event
 //  case class SendBlocksAfter(locators: Seq[Keccak256], blocks: Seq[Block])   extends Event
@@ -32,13 +33,14 @@ object BlockHandler {
   case class UTXOs(header: Keccak256, inputs: Seq[TxInput], total: BigInt)   extends Event
   case object NoEnoughBalance                                                extends Event
   case class Balance(address: ED25519PublicKey, block: Block, total: BigInt) extends Event
+  case class BlockFlowTemplate(deps: Seq[Keccak256])                         extends Event
 }
 
 // consider single chain for the moment
 class BlockHandler() extends BaseActor {
   import BlockHandler._
 
-  val blockPool = ForksTree(Genesis.block)
+  val blockFlow = BlockFlow()
 
   override def receive: Receive = awaitPeerManager
 
@@ -48,39 +50,42 @@ class BlockHandler() extends BaseActor {
 
   def handleWith(peerManager: ActorRef): Receive = {
     case AddBlocks(blocks) =>
-      val ok = blockPool.addBlocks(blocks)
+      val ok = blockFlow.addBlocks(blocks)
       if (ok) {
-        log.debug(
-          s"Add ${blocks.size} blocks, #blocks: ${blockPool.numBlocks}, #height: ${blockPool.getHeight}")
+        val length = blockFlow.getBestLength
+        val info   = blockFlow.getInfo
+        log.debug(s"Add ${blocks.size} blocks, #length: $length, info: $info")
         if (blocks.size == 1) {
-          log.debug(s"Got new block, broadcast it")
+          log.debug(s"Got new block for ${blockFlow.getIndex(blocks.head)}, broadcast it")
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), sender())
         }
       } else {
         log.warning(s"Failed to add a new block")
       }
     case GetBlocksAfter(locators) =>
-      val newBlocks = blockPool.getBlocks(locators)
+      val newBlocks = blockFlow.getBlocks(locators)
       sender() ! Message(SendBlocks(newBlocks))
     case GetBestHeader =>
-      sender() ! BestHeader(blockPool.getBestHeader)
+      sender() ! BestHeader(blockFlow.getBestHeader)
     case GetBestChain =>
-      sender() ! BestChain(blockPool.getBestChain)
+      sender() ! BestChain(blockFlow.getBestChain)
     case GetAllHeaders =>
-      sender() ! AllHeaders(blockPool.getAllHeaders)
+      sender() ! AllHeaders(blockFlow.getAllHeaders)
     case GetUTXOs(address, value) =>
-      blockPool.getUTXOs(address, value) match {
+      blockFlow.getUTXOs(address, value) match {
         case Some((header, inputs, total)) =>
           sender() ! UTXOs(header, inputs, total)
         case None =>
           sender() ! NoEnoughBalance
       }
     case GetBalance(address) =>
-      val (block, total) = blockPool.getBalance(address)
+      val (block, total) = blockFlow.getBalance(address)
       sender() ! Balance(address, block, total)
     case PrepareSync(remote: InetSocketAddress) =>
       // TODO: improve sync algorithm
-      val headers = blockPool.getAllHeaders
+      val headers = blockFlow.getAllHeaders
       sender() ! PeerManager.Sync(remote, headers)
+    case PrepareBlockFlow(chainIndex) =>
+      sender() ! BlockFlowTemplate(blockFlow.getBestDeps(chainIndex))
   }
 }
