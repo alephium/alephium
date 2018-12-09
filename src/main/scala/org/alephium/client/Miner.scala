@@ -2,6 +2,8 @@ package org.alephium.client
 
 import akka.actor.Props
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.network.PeerManager
+import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockHandler
 import org.alephium.util.BaseActor
@@ -30,7 +32,7 @@ object Miner {
 }
 
 class Miner(address: ED25519PublicKey, node: Node) extends BaseActor {
-  import node.blockHandler
+  import node.{blockHandler, peerManager}
 
   override def receive: Receive = awaitStart
 
@@ -52,6 +54,7 @@ class Miner(address: ED25519PublicKey, node: Node) extends BaseActor {
           log.info("A new block is mined")
           blockHandler ! BlockHandler.AddBlocks(Seq(block))
           blockHandler ! BlockHandler.GetBestHeader
+          peerManager ! PeerManager.BroadCast(Message(SendBlocks(Seq(block))))
           context become collect
         case None =>
           self ! Miner.Nonce(nonce + 1)

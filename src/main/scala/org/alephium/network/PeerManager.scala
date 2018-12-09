@@ -64,9 +64,10 @@ class PeerManager(port: Int, blockHandler: ActorRef) extends BaseActor {
         log.warning(s"No connection to $remote")
       }
     case BroadCast(message, except) =>
-      val toHandlers = tcpHandlers.filterNot(except contains _)
-      log.debug(s"Broadcast message to ${toHandlers.size} peers")
-      toHandlers.foreach(_ ! message)
+      if (except.isEmpty) {
+        log.debug(s"Broadcast message to ${tcpHandlers.size} peers")
+        tcpHandlers.foreach(_ ! message)
+      } // TODO: broadcast message from peers
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>
