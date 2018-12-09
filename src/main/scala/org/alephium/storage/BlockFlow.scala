@@ -71,14 +71,24 @@ class BlockFlow(groups: Int, initialBlocks: Seq[Seq[Block]]) extends BlockPool {
   private def getGroupHeight(hash: Keccak256): Int = {
     val pool      = getPool(hash)
     val block     = pool.getBlock(hash)
-    val groupDeps = block.blockHeader.blockDeps.takeRight(groups)
-    groupDeps.map(getHeight).sum + 1
+    val blockDeps = block.blockHeader.blockDeps
+    if (blockDeps.isEmpty) 1
+    else {
+      require(blockDeps.size == (2 * groups - 1))
+      val groupDeps = blockDeps.takeRight(groups)
+      groupDeps.map(getHeight).sum + 1
+    }
   }
 
   def getBlockFlowHeight(block: Block): Int = {
-    val groupDeps = block.blockHeader.blockDeps.takeRight(groups)
-    val otherDeps = block.blockHeader.blockDeps.dropRight(groups)
-    otherDeps.map(getGroupHeight).sum + groupDeps.map(getHeight).sum + 1
+    val blockDeps = block.blockHeader.blockDeps
+    if (blockDeps.isEmpty) 1
+    else {
+      require(blockDeps.size == (2 * groups - 1))
+      val groupDeps = block.blockHeader.blockDeps.takeRight(groups)
+      val otherDeps = block.blockHeader.blockDeps.dropRight(groups)
+      otherDeps.map(getGroupHeight).sum + groupDeps.map(getHeight).sum + 1
+    }
   }
 
   def getBlockFlowHeight(blockHash: Keccak256): Int = {

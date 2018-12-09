@@ -16,6 +16,7 @@ lazy val root = baseProject(".", "root")
     Compile / scalastyleConfig := baseDirectory.value / scalastyleCfgFile,
     Test    / scalastyleConfig := baseDirectory.value / scalastyleTestCfgFile
   )
+  .enablePlugins(JavaAppPackaging)
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
   .aggregate(util, serde, crypto, protocol)
 
