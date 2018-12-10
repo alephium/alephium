@@ -10,7 +10,7 @@ object ED25519PrivateKey extends FixedSizeBytes[ED25519PrivateKey] {
   override val size: Int = 32
 
   private def apply(bytes: ByteString): ED25519PrivateKey = {
-    require(bytes.length == size)
+    assert(bytes.length == size)
     new ED25519PrivateKey(bytes)
   }
 
@@ -23,7 +23,7 @@ object ED25519PublicKey extends FixedSizeBytes[ED25519PublicKey] {
   override val size: Int = 32
 
   private def apply(bytes: ByteString): ED25519PublicKey = {
-    require(bytes.length == size)
+    assert(bytes.length == size)
     new ED25519PublicKey(bytes)
   }
 
@@ -36,7 +36,7 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
   override val size: Int = 64
 
   def isCanonical(bytes: ByteString): Boolean = {
-    require(bytes.length == size)
+    assert(bytes.length == size)
     val sBytes = bytes.takeRight(32).toArray.reverse
     sBytes(0) = (sBytes(0) & 0x7F).toByte
     val s = BigInt(sBytes)
@@ -44,7 +44,7 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
   }
 
   private def apply(bytes: ByteString): ED25519Signature = {
-    require(bytes.length == size && isCanonical(bytes))
+    assert(bytes.length == size && isCanonical(bytes))
     new ED25519Signature(bytes)
   }
 
