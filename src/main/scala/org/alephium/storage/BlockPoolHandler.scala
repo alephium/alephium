@@ -3,11 +3,8 @@ package org.alephium.storage
 import akka.actor.{ActorRef, Props}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
-import org.alephium.protocol.model.Block
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.BaseActor
-
-import scala.util.{Failure, Success, Try}
 
 object BlockPoolHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef): Props =
@@ -39,17 +36,5 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
         case AddBlockResult.MissingDeps(deps) =>
           log.error(s"Missing #${deps.size - 1} deps")
       }
-  }
-
-  def checkDeps(block: Block): Unit = {
-    Try {
-      val deps = block.blockHeader.blockDeps
-      val ok   = deps.forall(blockFlow.contains)
-      if (!ok) println("Deps checking failed")
-    } match {
-      case Failure(exception) =>
-        println(s"Deps checking exception: $exception")
-      case Success(_) =>
-    }
   }
 }

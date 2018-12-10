@@ -8,7 +8,6 @@ import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.Hex
 
-import scala.util.{Failure, Success, Try}
 import scala.collection.JavaConverters._
 
 // scalastyle:off number.of.methods
@@ -73,18 +72,6 @@ class BlockFlow() extends BlockPool {
   def contains(hash: Keccak256): Boolean = {
     val pool = getPool(hash)
     pool.contains(hash)
-  }
-
-  def checkDeps(block: Block): Unit = {
-    Try {
-      val deps = block.blockHeader.blockDeps
-      val ok   = deps.forall(contains)
-      if (!ok) println("Deps checking failed")
-    } match {
-      case Failure(exception) =>
-        println(s"Deps checking exception: $exception")
-      case Success(_) =>
-    }
   }
 
   def addDeps(block: Block, deps: Seq[Keccak256]): Unit = {

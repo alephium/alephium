@@ -17,6 +17,8 @@ import org.alephium.util.Hex._
 import scala.concurrent.Future
 import scala.sys.process._
 
+// scalastyle:off
+
 trait Mode {
   def createNode(args: Array[String]): Node
 
