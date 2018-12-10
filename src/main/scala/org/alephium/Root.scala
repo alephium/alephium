@@ -6,6 +6,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
+import com.typesafe.scalalogging.StrictLogging
 import org.alephium.client.{Miner, Node}
 import org.alephium.constant.Network
 import org.alephium.crypto.ED25519PublicKey
@@ -17,7 +18,7 @@ import org.alephium.util.Hex._
 import scala.concurrent.Future
 import scala.sys.process._
 
-// scalastyle:off
+// scalastyle:off magic.number
 
 trait Mode {
   def createNode(args: Array[String]): Node
@@ -29,12 +30,12 @@ trait Mode {
   def getHttpPort(args: Array[String]): Int
 }
 
-object Aws extends Mode {
+object Aws extends Mode with StrictLogging {
   override def createNode(args: Array[String]): Node = Node("Root", Network.port, Network.groups)
 
   override def getIndex(args: Array[String]): Int = {
     val hostname = "hostname".!!.stripLineEnd
-    println(hostname)
+    logger.info(hostname)
     hostname.split('-').last.toInt - 10
   }
 
@@ -65,7 +66,7 @@ object Local extends Mode {
 }
 
 // scalastyle:off magic.number
-object Root extends App {
+object Root extends App with StrictLogging {
   val mode   = Aws
   val node   = mode.createNode(args)
   val index  = mode.getIndex(args)
@@ -73,7 +74,7 @@ object Root extends App {
 
   val second = index / groups
   val from   = index % groups
-  println(s"second: $second, index: $from")
+  logger.info(s"second: $second, index: $from")
 
   connect()
   runServer()
