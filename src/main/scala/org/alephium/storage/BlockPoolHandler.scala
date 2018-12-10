@@ -17,7 +17,7 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
   val blockPool = blockFlow.getPool(chainIndex)
 
   override def receive: Receive = {
-    case BlockHandler.AddBlocks(blocks) =>
+    case BlockHandler.AddBlocks(blocks, origin) =>
       // TODO: support more blocks later
       assert(blocks.length == 1)
       val block = blocks.head
@@ -30,7 +30,7 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
           //            log.info(s"Add block for $index, #blocks: $blockNum, #length: $length, info: $info")
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(s"Index: $index; Blocks: $blockNum; Time elapsed: ${elapsedTime}ms")
-          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), sender())
+          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
         case AddBlockResult.AlreadyExisted =>
           log.info(s"Received already included block")
         case AddBlockResult.MissingDeps(deps) =>
