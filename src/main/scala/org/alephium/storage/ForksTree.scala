@@ -194,7 +194,7 @@ class ForksTree extends BlockPool {
   override def getAllBlocks: Iterable[Block] = blocksTable.values.map(_.block)
 
   override def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = {
-    // require(blocksTable.contains(hash1) && blocksTable.contains(hash2))
+    require(blocksTable.contains(hash1) && blocksTable.contains(hash2))
     val node = blocksTable(hash1)
     isBefore(node, hash2)
   }
