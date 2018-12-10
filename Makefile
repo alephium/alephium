@@ -1,16 +1,22 @@
 build:
 	sbt stage
 
-alephium-fun:
-	mkdir -p log
-	port=9973 target/universal/stage/bin/alephium-fun &> log/00.txt &
-	port=9974 target/universal/stage/bin/alephium-fun &> log/01.txt &
-	port=9975 target/universal/stage/bin/alephium-fun &> log/10.txt &
-	port=9976 target/universal/stage/bin/alephium-fun &> log/11.txt &
+package:
+	sbt universal:packageBin
 
-server-fun:
+root:
 	mkdir -p log
-	port=9973 target/universal/stage/bin/server-fun &> log/00.txt &
-	port=9974 target/universal/stage/bin/server-fun &> log/01.txt &
-	port=9975 target/universal/stage/bin/server-fun &> log/10.txt &
-	port=9976 target/universal/stage/bin/server-fun &> log/11.txt &
+	index=0; port=9973 ; while [[ $$index -lt $$nodes ]] ; do \
+        echo $$index $$port ; \
+		groups=$$groups target/universal/stage/bin/root $$port &> log/$$port.txt & \
+        ((index = index + 1)) ; \
+        ((port = port + 1)) ; \
+    done
+
+mine:
+	index=0; port=8080 ; while [[ $$index -lt $$nodes ]] ; do \
+        echo $$index $$port ; \
+		curl -X PUT localhost:$$port/mining ; \
+        ((index = index + 1)) ; \
+        ((port = port + 1)) ; \
+    done

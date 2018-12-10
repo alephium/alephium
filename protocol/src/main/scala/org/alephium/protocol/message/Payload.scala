@@ -49,10 +49,10 @@ class PayloadCompanion[T: TypeTag]() {
   implicit val withCmdCode: PayloadCompanion[T] = this
 }
 
-case class Ping(nonce: Int) extends Payload
+case class Ping(nonce: Int, timestamp: Long) extends Payload
 
 object Ping extends PayloadCompanion[Ping] {
-  implicit val serde: Serde[Ping] = Serde.forProduct1(apply, p => p.nonce)
+  implicit val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
 }
 
 case class Pong(nonce: Int) extends Payload

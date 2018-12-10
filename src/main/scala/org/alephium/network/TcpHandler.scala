@@ -7,6 +7,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 import org.alephium.protocol.message.Message
 import org.alephium.serde.NotEnoughBytesException
+import org.alephium.storage.BlockHandlers
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec
@@ -14,8 +15,8 @@ import scala.util.{Failure, Success, Try}
 
 object TcpHandler {
 
-  def props(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef): Props =
-    Props(new TcpHandler(remote, connection, blockPool))
+  def props(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+    Props(new TcpHandler(remote, connection, blockHandlers))
 
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
@@ -36,10 +37,10 @@ object TcpHandler {
   }
 }
 
-class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockPool: ActorRef)
+class TcpHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
     extends BaseActor {
 
-  val messageHandler: ActorRef = context.actorOf(MessageHandler.props(connection, blockPool))
+  val messageHandler: ActorRef = context.actorOf(MessageHandler.props(connection, blockHandlers))
 
   override def preStart(): Unit = {
     context.watch(messageHandler)
