@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.KeccakDigest
 
-class Keccak256(val bytes: ByteString) extends HashOutput
+class Keccak256(val bytes: ByteString) extends RandomBytes
 
 object Keccak256 extends Hash[Keccak256] {
   override val size: Int = 32
