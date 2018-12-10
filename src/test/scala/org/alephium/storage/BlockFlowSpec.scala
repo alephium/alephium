@@ -8,110 +8,103 @@ import org.alephium.storage.BlockFlow.ChainIndex
 import scala.annotation.tailrec
 
 class BlockFlowSpec extends AlephiumSpec {
-
-  val blocks1 = Network.createBlockFlow(1)
-  val blocks2 = Network.createBlockFlow(2)
-
   behavior of "BlockFlow"
 
   it should "compute correct blockflow height" in {
-    val blockFlow1 = BlockFlow(1, blocks1)
-    blocks1.flatten.foreach { block =>
-      blockFlow1.getBlockFlowHeight(block) is 1
-    }
-
-    val blockFlow2 = BlockFlow(2, blocks2)
-    blocks2.flatten.foreach { block =>
-      blockFlow2.getBlockFlowHeight(block) is 1
+    val blockFlow = BlockFlow()
+    Network.blocksForFlow.flatten.foreach { block =>
+      blockFlow.getBlockFlowHeight(block) is Network.chainNum
     }
   }
 
-  it should "work for 1 user group" in {
-    val chainIndex = ChainIndex(0, 0)
-    val blockFlow  = BlockFlow(1, blocks1)
-    val deps1      = blockFlow.getBestDeps(chainIndex)._1
+  it should "work for at least 2 user group when adding blocks sequentially" in {
+    if (Network.groups >= 2) {
+      val blockFlow = BlockFlow()
 
-    blockFlow.getHeight is 1
-    deps1.size is 1
-    deps1.head is blocks1.head.head.hash
+      val chainIndex1 = ChainIndex(0, 0)
+      val block1      = mine(blockFlow, chainIndex1)
+      blockFlow.addBlocks(Seq(block1))
+      blockFlow.getBlockFlowHeight(block1) is (Network.chainNum + 1)
 
-    val newBlock = mine(blockFlow, ChainIndex(0, 0))
-    blockFlow.addBlocks(Seq(newBlock))
-    val deps2 = blockFlow.getBestDeps(chainIndex)._1
+      val chainIndex2 = ChainIndex(1, 1)
+      val block2      = mine(blockFlow, chainIndex2)
+      blockFlow.addBlocks(Seq(block2))
+      blockFlow.getBlockFlowHeight(block2) is (Network.chainNum + 2)
 
-    blockFlow.getHeight is 2
-    deps2.size is 1
-    deps2.head is newBlock.hash
-  }
+      val chainIndex3 = ChainIndex(0, 1)
+      val block3      = mine(blockFlow, chainIndex3)
+      blockFlow.addBlocks(Seq(block3))
+      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 3) // groups + 2 + groups + 1 + 2 * (groups - 2)
 
-  it should "work for 2 user group when adding blocks sequentially" in {
-    val blockFlow = BlockFlow(2, blocks2)
-
-    val chainIndex1 = ChainIndex(0, 0)
-    val block1      = mine(blockFlow, chainIndex1)
-    blockFlow.addBlocks(Seq(block1))
-    blockFlow.getBlockFlowHeight(block1) is 4
-
-    val chainIndex2 = ChainIndex(1, 1)
-    val block2      = mine(blockFlow, chainIndex2)
-    blockFlow.addBlocks(Seq(block2))
-    blockFlow.getBlockFlowHeight(block2) is 6
-
-    val chainIndex3 = ChainIndex(0, 1)
-    val block3      = mine(blockFlow, chainIndex3)
-    blockFlow.addBlocks(Seq(block3))
-    blockFlow.getBlockFlowHeight(block3) is 7
-  }
-
-  it should "work for 2 user group when adding blocks in parallel" in {
-    val blockFlow = BlockFlow(2, blocks2)
-
-    val newBlocks1 = for {
-      i <- 0 to 1
-      j <- 0 to 1
-    } yield mine(blockFlow, ChainIndex(i, j))
-    newBlocks1.foreach { block =>
-      blockFlow.getBlockFlowHeight(block) is 4
-      blockFlow.addBlocks(Seq(block))
+      val chainIndex4 = ChainIndex(0, 0)
+      val block4      = mine(blockFlow, chainIndex4)
+      blockFlow.addBlocks(Seq(block4))
+      blockFlow.getBlockFlowHeight(block4) is (Network.chainNum + 4)
     }
+  }
 
-    val newBlocks2 = for {
-      i <- 0 to 1
-      j <- 0 to 1
-    } yield mine(blockFlow, ChainIndex(i, j))
-    newBlocks2.foreach { block =>
-      blockFlow.getBlockFlowHeight(block) is 8
-      blockFlow.addBlocks(Seq(block))
+  it should "work for at least 2 user group when adding blocks in parallel" in {
+    if (Network.groups >= 2) {
+      val blockFlow = BlockFlow()
+
+      val newBlocks1 = for {
+        i <- 0 to 1
+        j <- 0 to 1
+      } yield mine(blockFlow, ChainIndex(i, j))
+      newBlocks1.foreach { block =>
+        blockFlow.addBlocks(Seq(block))
+        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 1)
+      }
+
+      val newBlocks2 = for {
+        i <- 0 to 1
+        j <- 0 to 1
+      } yield mine(blockFlow, ChainIndex(i, j))
+      newBlocks2.foreach { block =>
+        blockFlow.addBlocks(Seq(block))
+        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 4)
+      }
+
+      val newBlocks3 = for {
+        i <- 0 to 1
+        j <- 0 to 1
+      } yield mine(blockFlow, ChainIndex(i, j))
+      newBlocks3.foreach { block =>
+        blockFlow.addBlocks(Seq(block))
+        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 8)
+      }
     }
   }
 
   it should "work for 2 user group when there is forks" in {
-    val blockFlow = BlockFlow(2, blocks2)
+    if (Network.groups >= 2) {
+      val blockFlow = BlockFlow()
 
-    val chainIndex1 = ChainIndex(0, 0)
-    val block11     = mine(blockFlow, chainIndex1)
-    val block12     = mine(blockFlow, chainIndex1)
-    blockFlow.add(block11)
-    blockFlow.add(block12)
-    blockFlow.getBlockFlowHeight(block11) is 4
-    blockFlow.getBlockFlowHeight(block12) is 4
+      val chainIndex1 = ChainIndex(0, 0)
+      val block11     = mine(blockFlow, chainIndex1)
+      val block12     = mine(blockFlow, chainIndex1)
+      blockFlow.add(block11)
+      blockFlow.add(block12)
+      blockFlow.getBlockFlowHeight(block11) is (Network.chainNum + 1)
+      blockFlow.getBlockFlowHeight(block12) is (Network.chainNum + 1)
 
-    val block13 = mine(blockFlow, chainIndex1)
-    blockFlow.add(block13)
-    blockFlow.getBlockFlowHeight(block13) is 5
+      val block13 = mine(blockFlow, chainIndex1)
+      blockFlow.add(block13)
+      blockFlow.getBlockFlowHeight(block13) is (Network.chainNum + 2)
 
-    val chainIndex2 = ChainIndex(1, 1)
-    val block21     = mine(blockFlow, chainIndex2)
-    val block22     = mine(blockFlow, chainIndex2)
-    blockFlow.add(block21)
-    blockFlow.add(block22)
-    blockFlow.getBlockFlowHeight(block21) is 7
-    blockFlow.getBlockFlowHeight(block22) is 7
+      val chainIndex2 = ChainIndex(1, 1)
+      val block21     = mine(blockFlow, chainIndex2)
+      val block22     = mine(blockFlow, chainIndex2)
+      blockFlow.add(block21)
+      blockFlow.add(block22)
+      blockFlow.getBlockFlowHeight(block21) is (Network.chainNum + 3)
+      blockFlow.getBlockFlowHeight(block22) is (Network.chainNum + 3)
 
-    val chainIndex3 = ChainIndex(0, 1)
-    val block3      = mine(blockFlow, chainIndex3)
-    blockFlow.addBlocks(Seq(block3))
-    blockFlow.getBlockFlowHeight(block3) is 8
+      val chainIndex3 = ChainIndex(0, 1)
+      val block3      = mine(blockFlow, chainIndex3)
+      blockFlow.addBlocks(Seq(block3))
+      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 4)
+    }
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {

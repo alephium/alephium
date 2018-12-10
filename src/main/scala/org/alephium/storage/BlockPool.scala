@@ -36,6 +36,8 @@ trait BlockPool {
 
   def getBlocks(locator: Keccak256): Seq[Block]
 
+  def getHeightFor(hash: Keccak256): Int = getChain(getBlock(hash)).size
+
   def getHeightFor(block: Block): Int = getChain(block).size
 
   // TODO: use ChainSlice instead of Seq[Block]
