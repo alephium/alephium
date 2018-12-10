@@ -21,7 +21,9 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
       // TODO: support more blocks later
       assert(blocks.length == 1)
       val block = blocks.head
-      blockFlow.addBlock(block) match {
+
+      val result = blockFlow.addBlock(block)
+      result match {
         case AddBlockResult.Success =>
           val index    = blockFlow.getIndex(block)
           val blockNum = blockFlow.numBlocks
@@ -36,5 +38,6 @@ class BlockPoolHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager
         case AddBlockResult.MissingDeps(deps) =>
           log.error(s"Missing #${deps.size - 1} deps")
       }
+      sender() ! result
   }
 }
