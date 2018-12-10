@@ -3,28 +3,34 @@ package org.alephium.network
 import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.constant.Network
 import org.alephium.protocol.message._
-import org.alephium.storage.BlockHandler
+import org.alephium.storage.BlockFlow.ChainIndex
+import org.alephium.storage.{BlockHandler, BlockHandlers}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
 
 object MessageHandler {
-  def props(connection: ActorRef, blockHandler: ActorRef): Props =
-    Props(new MessageHandler(connection, blockHandler))
+  def props(connection: ActorRef, blockHandlers: BlockHandlers): Props =
+    Props(new MessageHandler(connection, blockHandlers))
+
+  object Timer
 
   sealed trait Command
   case object SendPing extends Command
 }
 
-class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseActor with Timers {
+class MessageHandler(connection: ActorRef, blockHandlers: BlockHandlers)
+    extends BaseActor
+    with Timers {
   val tcpHandler = context.parent
 
   override def receive: Receive = handlePayload orElse awaitSendPing
 
   def handlePayload: Receive = {
-    case Ping(nonce) =>
+    case Ping(nonce, timestamp) =>
       // TODO: refuse ping if it's too frequent
-      log.debug("Ping received, response with pong")
+      val delay = System.currentTimeMillis() - timestamp
+      log.info(s"Ping received with ${delay}ms delay, response with pong")
       connection ! TcpHandler.envelope(Message(Pong(nonce)))
     case Pong(nonce) =>
       if (nonce == pingNonce) {
@@ -36,10 +42,13 @@ class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseA
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.size} blocks")
-      blockHandler.tell(BlockHandler.AddBlocks(blocks), tcpHandler)
+      val block      = blocks.head
+      val chainIndex = ChainIndex.fromHash(block.hash)
+      val handler    = blockHandlers.getHandler(chainIndex)
+      handler.tell(BlockHandler.AddBlocks(blocks), tcpHandler)
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockHandler.tell(BlockHandler.GetBlocksAfter(locators), tcpHandler)
+      blockHandlers.globalHandler.tell(BlockHandler.GetBlocksAfter(locators), tcpHandler)
   }
 //
 //  def handleInternal: Receive = {
@@ -60,8 +69,9 @@ class MessageHandler(connection: ActorRef, blockHandler: ActorRef) extends BaseA
       context stop self
     } else {
       pingNonce = Random.nextInt()
-      connection ! TcpHandler.envelope(Message(Ping(pingNonce)))
-      timers.startSingleTimer(MessageHandler, MessageHandler.SendPing, Network.pingFrequency)
+      val timestamp = System.currentTimeMillis()
+      connection ! TcpHandler.envelope(Message(Ping(pingNonce, timestamp)))
+      timers.startSingleTimer(MessageHandler.Timer, MessageHandler.SendPing, Network.pingFrequency)
     }
   }
 }

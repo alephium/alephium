@@ -21,6 +21,14 @@ object Block {
     Block(blockHeader, transactions)
   }
 
+  def from(blockDeps: Seq[Keccak256], timestamp: Long, nonce: BigInt): Block = {
+    // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
+    val transactions = Seq.empty[Transaction]
+    val txsHash      = Keccak256.hash(transactions)
+    val blockHeader  = BlockHeader(blockDeps, txsHash, timestamp, nonce)
+    Block(blockHeader, transactions)
+  }
+
   def genesis(transactions: Seq[Transaction], nonce: BigInt = 0): Block = {
     val txsHash     = Keccak256.hash(transactions)
     val blockHeader = BlockHeader(Seq.empty, txsHash, 0, nonce)
