@@ -18,4 +18,6 @@ object Dependencies {
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
   lazy val curve25519      = "org.whispersystems"         % "curve25519-java" % "0.4.1"
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"   % Version.circe
+
+  def `scala-reflect`(scalaVersion: String) = "org.scala-lang"             % "scala-reflect"   % scalaVersion
 }

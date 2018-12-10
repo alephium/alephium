@@ -63,7 +63,7 @@ lazy val util = subProject("util")
     libraryDependencies ++= Seq(
       akka,
       bcprov,
-      "org.scala-lang" % "scala-reflect" % scalaVersion.value
+      `scala-reflect`(scalaVersion.value)
     )
   )
 
