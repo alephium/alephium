@@ -6,6 +6,7 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.storage.BlockHandler
+import org.alephium.storage.BlockHandler.BlockOrigin.Local
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec
@@ -53,7 +54,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
         case Some(block) =>
           log.info(s"A new block is mined since $lastTs")
           val chainIndex = ChainIndex.fromHash(block.hash)
-          blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block))
+          blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block), Local)
           blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
           context become collect
         case None =>
