@@ -63,13 +63,13 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     expectTerminated(peerManager)
   }
 
-  it should "stop if server stopped" in new Fixture {
-    override val peerManager = system.actorOf(Props(new PeerManager(port) {
-      override def postStop(): Unit = {
-        testActor ! "stop"
-      }
-    }))
-    expectMsg("stop")
+  it should "stop if server stopped" in {
+    val port = SocketUtil.temporaryLocalPort()
+    system.actorOf(TcpServer.props(port))
+
+    val peerManager = system.actorOf(Props(new PeerManager(port)))
+    watch(peerManager)
+    expectTerminated(peerManager)
   }
 
   it should "remove peer when tcp handler stopped" in new Fixture {

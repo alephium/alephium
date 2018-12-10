@@ -44,7 +44,11 @@ class PeerManager(port: Int) extends BaseActor {
     ()
   }
 
-  override def receive: Receive = awaitBlockHandlers
+  override def receive: Receive = awaitBlockHandlers orElse {
+    case Terminated(child) if child == server =>
+      context.unwatch(server)
+      context.stop(self)
+  }
 
   def awaitBlockHandlers: Receive = {
     case SetBlockHandlers(blockHandlers) =>
