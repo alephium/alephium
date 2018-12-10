@@ -34,7 +34,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
       blockFlow.addBlocks(Seq(block3))
-      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 3) // groups + 2 + groups + 1 + 2 * (groups - 2)
+      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 3)
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)

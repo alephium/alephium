@@ -152,33 +152,6 @@ class BlockFlow() extends BlockPool {
   override def getAllHeaders: Seq[Keccak256] =
     aggregate(_.getAllHeaders)(_.foldLeft(Seq.empty[Keccak256])(_ ++ _))
 
-  def getGroupHeaders(hash: Keccak256): Seq[Keccak256] = {
-    val block = getBlock(hash)
-    getGroupHeaders(block)
-  }
-
-  def getGroupHeaders(block: Block): Seq[Keccak256] = {
-    val blockDeps = block.blockHeader.blockDeps
-    if (blockDeps.isEmpty) Seq(block.hash)
-    else {
-      val groupDeps = blockDeps.takeRight(groups)
-      groupDeps.updated(groupDeps.size - 1, block.hash)
-    }
-  }
-
-  def getOtherHeaders(hash: Keccak256): Seq[Keccak256] = {
-    val block = getBlock(hash)
-    getOtherHeaders(block)
-  }
-
-  def getOtherHeaders(block: Block): Seq[Keccak256] = {
-    val blockDeps = block.blockHeader.blockDeps
-    if (blockDeps.isEmpty) Seq.empty
-    else {
-      blockDeps.dropRight(groups).flatMap(getGroupHeaders)
-    }
-  }
-
   def getCachedHeaders(hash: Keccak256): Seq[Keccak256] = {
     val block = getBlock(hash)
     getCachedHeaders(block)
@@ -243,28 +216,14 @@ class BlockFlow() extends BlockPool {
     }.sum
   }
 
-  def updateOutDeps(headers: Seq[Keccak256],
-                    deps: Seq[Keccak256],
-                    toTry: Seq[Keccak256],
-                    from: Int): (Seq[Keccak256], Seq[Keccak256]) = {
-    val validNewHeaders = toTry.flatMap(merge(headers, _))
-    if (validNewHeaders.nonEmpty) {
-      val (newHeaders, newDep, _) = validNewHeaders.maxBy(_._3)
-      (newHeaders, deps :+ newDep)
-    } else (headers, deps :+ headers(ChainIndex(from, 0).toOneDim))
-  }
-
   def updateGroupDeps(headers: Seq[Keccak256],
                       deps: Seq[Keccak256],
                       toTry: Seq[Keccak256],
                       chainIndex: ChainIndex): (Seq[Keccak256], Seq[Keccak256]) = {
-    val pool   = getPool(chainIndex)
-    val headOI = headers(chainIndex.toOneDim)
-    val validNewHeaders =
-      if (headOI == Keccak256.zero) toTry else toTry.filter(pool.isBefore(headOI, _))
+    val validNewHeaders = toTry.flatMap(merge(headers, _))
     if (validNewHeaders.nonEmpty) {
-      val newHeader = validNewHeaders.maxBy(header => pool.getHeightFor(pool.getBlock(header)))
-      (headers.updated(chainIndex.toOneDim, newHeader), deps :+ newHeader)
+      val (newHeaders, newDep, _) = validNewHeaders.maxBy(_._3)
+      (newHeaders, deps :+ newDep)
     } else (headers, deps :+ headers(chainIndex.toOneDim))
   }
 
@@ -280,7 +239,7 @@ class BlockFlow() extends BlockPool {
           val toTry = (0 until groups).flatMap { l =>
             getPool(k, l).getAllHeaders
           }
-          updateOutDeps(headers, deps, toTry, k)
+          updateGroupDeps(headers, deps, toTry, ChainIndex(k, 0))
       }
     val (newHeaders2, newDeps2) = (0 until groups)
       .filter(_ != chainIndex.to)
