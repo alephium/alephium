@@ -7,6 +7,13 @@ trait Bytes {
   def bytes: ByteString
 
   override def toString: String = Hex.toHexString(bytes)
+
+  override def hashCode(): Int = bytes.hashCode()
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: Bytes => bytes.equals(that.bytes)
+    case _           => false
+  }
 }
 
 trait FixedSizeBytes[T <: Bytes] {
