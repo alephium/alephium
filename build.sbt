@@ -2,26 +2,56 @@ import Dependencies._
 
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
-def baseProject(path: String, id: String): Project = {
-  Project(id, file(path))
+def baseProject(id: String): Project = {
+  Project(id, file(id))
     .settings(commonSettings: _*)
-    .settings(libraryDependencies ++= dependencies)
 }
 
 val scalastyleCfgFile     = "project/scalastyle-config.xml"
 val scalastyleTestCfgFile = "project/scalastyle-test-config.xml"
 
-lazy val root = baseProject(".", "root")
+lazy val root: Project = Project("root", file("."))
   .settings(
-    Compile / scalastyleConfig := baseDirectory.value / scalastyleCfgFile,
-    Test    / scalastyleConfig := baseDirectory.value / scalastyleTestCfgFile
+    // This is just a project to aggregate modules, nothing to compile or to check scalastyle for.
+    unmanagedSourceDirectories in Compile := Seq(),
+    unmanagedSourceDirectories in Test := Seq(),
+    scalastyle := {},
+    scalastyle in Test := {},
+  )
+  .aggregate(app, `app-debug`, util, serde, crypto, protocol)
+
+def mainProject(id: String): Project = baseProject(id)
+  .settings(
+    unmanagedSourceDirectories in Compile     += baseDirectory.value / ".." / "src" / "main" / "scala",
+    unmanagedResourceDirectories in Compile   += baseDirectory.value / ".." / "src" / "main" / "resources",
+    Compile / scalastyleConfig := root.base / scalastyleCfgFile,
+    Test    / scalastyleConfig := root.base / scalastyleTestCfgFile,
+    libraryDependencies ++= Seq(
+      akka,
+      `akka-slf4j`,
+      `akka-http`,
+      `akka-stream`,
+      `circe-parser`,
+      `scala-logging`,
+      logback,
+    )
   )
   .enablePlugins(JavaAppPackaging)
   .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
-  .aggregate(util, serde, crypto, protocol)
+
+lazy val app = mainProject("app")
+  .settings(
+    unmanagedSourceDirectories in Test        += baseDirectory.value / ".." / "src" / "test" / "scala",
+    unmanagedResourceDirectories in Test      += baseDirectory.value / ".." / "src" / "test" / "resources"
+  )
+
+lazy val `app-debug` = mainProject("app-debug")
+  .settings(
+    coverageEnabled := true
+  )
 
 def subProject(path: String): Project = {
-  baseProject(path, path)
+  baseProject(path)
     .settings(
       Compile / scalastyleConfig := root.base / scalastyleCfgFile,
       Test    / scalastyleConfig := root.base / scalastyleTestCfgFile
@@ -29,6 +59,13 @@ def subProject(path: String): Project = {
 }
 
 lazy val util = subProject("util")
+  .settings(
+    libraryDependencies ++= Seq(
+      akka,
+      bcprov,
+      "org.scala-lang" % "scala-reflect" % scalaVersion.value
+    )
+  )
 
 lazy val serde = subProject("serde")
   .settings(
@@ -39,9 +76,19 @@ lazy val serde = subProject("serde")
 
 lazy val crypto = subProject("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
+  .settings(
+    libraryDependencies ++= Seq(
+      curve25519
+    )
+  )
 
 lazy val protocol = subProject("protocol")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
+  .settings(
+    libraryDependencies ++= Seq(
+      `circe-parser`
+    )
+  )
 
 val commonSettings = Seq(
   organization := "org.alephium",
@@ -91,20 +138,10 @@ val commonSettings = Seq(
   ),
   Test / scalacOptions += "-Xcheckinit",
   fork := true,
-  run / javaOptions += "-Xmx4g"
-)
-
-val dependencies = Seq(
-  akka,
-  akkatest,
-  `akka-slf4j`,
-  `akka-http`,
-  `akka-stream`,
-  bcprov,
-  `scala-logging`,
-  logback,
-  scalatest,
-  scalacheck,
-  curve25519,
-  `circe-parser`
+  run / javaOptions += "-Xmx4g",
+  libraryDependencies ++= Seq(
+    akkatest,
+    scalacheck,
+    scalatest,
+  )
 )
