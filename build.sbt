@@ -22,8 +22,8 @@ lazy val root: Project = Project("root", file("."))
 
 def mainProject(id: String): Project = baseProject(id)
   .settings(
-    unmanagedSourceDirectories in Compile     += baseDirectory.value / ".." / "src" / "main" / "scala",
-    unmanagedResourceDirectories in Compile   += baseDirectory.value / ".." / "src" / "main" / "resources",
+    unmanagedSourceDirectories in Compile     += baseDirectory.value / ".." / "shared" / "src" / "main" / "scala",
+    unmanagedResourceDirectories in Compile   += baseDirectory.value / ".." / "shared" / "src" / "main" / "resources",
     Compile / scalastyleConfig := root.base / scalastyleCfgFile,
     Test    / scalastyleConfig := root.base / scalastyleTestCfgFile,
     libraryDependencies ++= Seq(
@@ -41,8 +41,8 @@ def mainProject(id: String): Project = baseProject(id)
 
 lazy val app = mainProject("app")
   .settings(
-    unmanagedSourceDirectories in Test        += baseDirectory.value / ".." / "src" / "test" / "scala",
-    unmanagedResourceDirectories in Test      += baseDirectory.value / ".." / "src" / "test" / "resources"
+    unmanagedSourceDirectories in Test        += baseDirectory.value / ".." / "shared" / "src" / "test" / "scala",
+    unmanagedResourceDirectories in Test      += baseDirectory.value / ".." / "shared" / "src" / "test" / "resources"
   )
 
 lazy val `app-debug` = mainProject("app-debug")
