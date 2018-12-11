@@ -36,8 +36,8 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
       sender() ! blockFlow.getBlockInfo
     case PrepareSync(remote: InetSocketAddress) =>
       // TODO: improve sync algorithm
-      val headers = blockFlow.getAllHeaders
-      sender() ! PeerManager.Sync(remote, headers)
+      val tips = blockFlow.getAllTips
+      sender() ! PeerManager.Sync(remote, tips)
     case PrepareBlockFlow(chainIndex) =>
       val (blockHashes, lastTs) = blockFlow.getBestDeps(chainIndex)
       sender() ! BlockFlowTemplate(blockHashes, lastTs)
