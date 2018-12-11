@@ -13,7 +13,7 @@ object Sha256 extends Hash[Sha256] {
   override def provider: Digest = new SHA256Digest()
 
   private def apply(digest: ByteString): Sha256 = {
-    require(digest.length == size)
+    assert(digest.length == size)
     new Sha256(digest)
   }
 
