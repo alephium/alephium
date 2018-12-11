@@ -8,9 +8,15 @@ import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
 
 trait RandomBytes extends Bytes {
+  assert(bytes.size >= 4)
+
   // scalastyle:off magic.number
   override def hashCode(): Int = {
-    (bytes(28) & 0xFF) << 24 | (bytes(29) & 0xFF) << 16 | (bytes(30) & 0xFF) << 8 | (bytes(31) & 0xFF)
+    val size = bytes.size
+    (bytes(size - 4) & 0xFF) << 24 |
+      (bytes(size - 3) & 0xFF) << 16 |
+      (bytes(size - 2) & 0xFF) << 8 |
+      (bytes(size - 1) & 0xFF)
   }
   // scalastyle:on magic.number
 
