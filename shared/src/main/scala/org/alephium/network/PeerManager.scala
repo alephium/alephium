@@ -6,6 +6,8 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.message.{GetBlocks, Message}
+import org.alephium.storage.BlockHandler.BlockOrigin
+import org.alephium.storage.BlockHandler.BlockOrigin.{Local, Remote}
 import org.alephium.storage.BlockHandlers
 import org.alephium.util.BaseActor
 
@@ -18,13 +20,8 @@ object PeerManager {
   case class SetBlockHandlers(blockhandlers: BlockHandlers)            extends Command
   case class Connect(remote: InetSocketAddress)                        extends Command
   case class Sync(remote: InetSocketAddress, locators: Seq[Keccak256]) extends Command
-  case class BroadCast(message: Message, except: Option[ActorRef])     extends Command
+  case class BroadCast(message: Message, origin: BlockOrigin)          extends Command
   case object GetPeers                                                 extends Command
-
-  object BroadCast {
-    def apply(message: Message): BroadCast                   = BroadCast(message, None)
-    def apply(message: Message, except: ActorRef): BroadCast = BroadCast(message, Some(except))
-  }
 
   sealed trait Event
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
@@ -73,8 +70,11 @@ class PeerManager(port: Int) extends BaseActor {
       } else {
         log.warning(s"No connection to $remote")
       }
-    case BroadCast(message, except) =>
-      val toSend = tcpHandlers.filterNot(except.contains)
+    case BroadCast(message, origin) =>
+      val toSend = origin match {
+        case Local          => tcpHandlers
+        case Remote(remote) => peers.filterKeys(_ != remote).values
+      }
       log.debug(s"Broadcast message to ${toSend.size} peers")
       val write = TcpHandler.envelope(message)
       toSend.foreach(_ ! write)

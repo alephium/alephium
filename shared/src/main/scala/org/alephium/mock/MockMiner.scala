@@ -5,7 +5,8 @@ import org.alephium.client.{Miner, Node}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.BlockHandler
+import org.alephium.storage.{AddBlockResult, BlockHandler}
+import org.alephium.storage.BlockHandler.BlockOrigin.Local
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -46,8 +47,11 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex, a
       if (always || (ratio < 0.1)) {
         log.info(s"A new block is mined at ${block.blockHeader.timestamp}")
         val chainIndex = ChainIndex.fromHash(block.hash)
-        blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block))
+        blockHandlers.getHandler(chainIndex) ! BlockHandler.AddBlocks(Seq(block), Local)
+      } else {
+        self ! AddBlockResult.Success
       }
+    case _: AddBlockResult =>
       blockHandlers.globalHandler ! BlockHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }

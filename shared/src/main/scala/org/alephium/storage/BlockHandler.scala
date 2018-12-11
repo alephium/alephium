@@ -16,14 +16,21 @@ object BlockHandler {
     Props(new BlockHandler(blockFlow))
 
   sealed trait Command
-  case class AddBlocks(blocks: Seq[Block])            extends Command
-  case class GetBlocksAfter(locators: Seq[Keccak256]) extends Command
-  case object GetBlockInfo                            extends Command
-  case class PrepareSync(remote: InetSocketAddress)   extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
+  case class AddBlocks(blocks: Seq[Block], origin: BlockOrigin) extends Command
+  case class GetBlocksAfter(locators: Seq[Keccak256])           extends Command
+  case object GetBlockInfo                                      extends Command
+  case class PrepareSync(remote: InetSocketAddress)             extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex)           extends Command
 
   sealed trait Event
   case class BlockFlowTemplate(deps: Seq[Keccak256], lastTs: Long) extends Event
+
+  sealed trait BlockOrigin
+
+  object BlockOrigin {
+    case object Local                            extends BlockOrigin
+    case class Remote(remote: InetSocketAddress) extends BlockOrigin
+  }
 }
 
 // consider single chain for the moment
