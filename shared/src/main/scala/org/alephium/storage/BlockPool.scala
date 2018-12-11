@@ -1,7 +1,6 @@
 package org.alephium.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-//import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
 trait BlockPool {
