@@ -41,18 +41,18 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
 
   override def contains(hash: Keccak256): Boolean = blocksTable.contains(hash)
 
-  override def add(block: Block, weight: Int): Boolean = {
+  override def add(block: Block, weight: Int): AddBlockResult = {
     blocksTable.get(block.hash) match {
-      case Some(_) => false
+      case Some(_) => AddBlockResult.AlreadyExisted
       case None =>
         blocksTable.get(block.prevBlockHash) match {
           case Some(parent) =>
             val newNode = ForksTree.Node(block, parent, parent.height + 1, weight)
             parent.successors += newNode
             updateTable(newNode)
-            true
+            AddBlockResult.Success
           case None =>
-            false
+            AddBlockResult.MissingDeps(Seq(block.prevBlockHash))
         }
     }
   }

@@ -74,11 +74,12 @@ class BlockFlow() extends MultiChain {
       val chainIndex = getIndex(block)
       val chain      = getChain(chainIndex)
       val weight     = getTipsWeight(tips) + 1
-      val ok         = chain.add(block, weight)
-      if (ok) {
-        addDeps(block, tips.updated(chainIndex.toOneDim, block.hash))
-        AddBlockResult.Success
-      } else AddBlockResult.AlreadyExisted
+      chain.add(block, weight) match {
+        case AddBlockResult.Success =>
+          addDeps(block, tips.updated(chainIndex.toOneDim, block.hash))
+          AddBlockResult.Success
+        case x => x
+      }
     } else {
       AddBlockResult.MissingDeps(missingDeps :+ block.hash)
     }
