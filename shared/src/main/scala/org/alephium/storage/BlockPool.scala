@@ -10,8 +10,6 @@ trait BlockPool {
 
   def numTransactions: Int
 
-  def maxHeight: Int
-
   def maxWeight: Int
 
   def contains(hash: Keccak256): Boolean
