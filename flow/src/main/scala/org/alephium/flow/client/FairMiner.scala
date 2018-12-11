@@ -31,7 +31,10 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: Plat
     with FairMinerState {
   val handlers = node.allHandlers
   val actualMiners: AVector[ActorRef] = AVector.tabulate(config.groups) { to =>
-    context.actorOf(ActualMiner.props(ChainIndex(config.mainGroup.value, to)))
+    val props = ActualMiner
+      .props(ChainIndex(config.mainGroup.value, to))
+      .withDispatcher("akka.actor.mining-dispatcher")
+    context.actorOf(props)
   }
 
   def receive: Receive = awaitStart
