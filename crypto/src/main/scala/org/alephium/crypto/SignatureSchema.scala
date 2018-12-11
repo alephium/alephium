@@ -1,13 +1,12 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.serde.Bytes
 
-trait PrivateKey extends Bytes
+trait PrivateKey extends RandomBytes
 
-trait PublicKey extends Bytes
+trait PublicKey extends RandomBytes
 
-trait Signature extends Bytes
+trait Signature extends RandomBytes
 
 trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Signature] {
 
