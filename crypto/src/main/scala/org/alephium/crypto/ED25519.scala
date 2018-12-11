@@ -4,33 +4,29 @@ import akka.util.ByteString
 import org.alephium.serde.FixedSizeBytes
 import org.whispersystems.curve25519.Curve25519
 
-case class ED25519PrivateKey(bytes: ByteString) extends PrivateKey
+class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 
 object ED25519PrivateKey extends FixedSizeBytes[ED25519PrivateKey] {
   override val size: Int = 32
 
-  private def apply(bytes: ByteString): ED25519PrivateKey = {
-    assert(bytes.length == size)
-    new ED25519PrivateKey(bytes)
+  override def unsafeFrom(data: ByteString): ED25519PrivateKey = {
+    assert(data.length == size)
+    new ED25519PrivateKey(data)
   }
-
-  override def unsafeFrom(data: ByteString): ED25519PrivateKey = apply(data)
 }
 
-case class ED25519PublicKey(bytes: ByteString) extends PublicKey
+class ED25519PublicKey(val bytes: ByteString) extends PublicKey
 
 object ED25519PublicKey extends FixedSizeBytes[ED25519PublicKey] {
   override val size: Int = 32
 
-  private def apply(bytes: ByteString): ED25519PublicKey = {
-    assert(bytes.length == size)
-    new ED25519PublicKey(bytes)
+  override def unsafeFrom(data: ByteString): ED25519PublicKey = {
+    assert(data.length == size)
+    new ED25519PublicKey(data)
   }
-
-  override def unsafeFrom(data: ByteString): ED25519PublicKey = apply(data)
 }
 
-case class ED25519Signature(bytes: ByteString) extends Signature
+class ED25519Signature(val bytes: ByteString) extends Signature
 
 object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
   override val size: Int = 64
@@ -43,12 +39,10 @@ object ED25519Signature extends FixedSizeBytes[ED25519Signature] {
     s >= 0 && s < ED25519.generator
   }
 
-  private def apply(bytes: ByteString): ED25519Signature = {
-    assert(bytes.length == size && isCanonical(bytes))
-    new ED25519Signature(bytes)
+  override def unsafeFrom(data: ByteString): ED25519Signature = {
+    assert(data.length == size && isCanonical(data))
+    new ED25519Signature(data)
   }
-
-  override def unsafeFrom(data: ByteString): ED25519Signature = apply(data)
 }
 
 object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25519Signature] {
