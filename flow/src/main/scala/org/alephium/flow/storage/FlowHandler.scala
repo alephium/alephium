@@ -19,7 +19,8 @@ object FlowHandler {
   case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
 
   sealed trait Event
-  case class BlockFlowTemplate(deps: AVector[Keccak256], target: BigInt) extends Event
+  case class BlockFlowTemplate(index: ChainIndex, deps: AVector[Keccak256], target: BigInt)
+      extends Event
 }
 
 class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
