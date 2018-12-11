@@ -4,7 +4,6 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 //import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 
-// scalastyle:off number.of.methods
 trait BlockPool {
 
   def numBlocks: Int
@@ -15,20 +14,11 @@ trait BlockPool {
 
   def maxWeight: Int
 
+  def contains(hash: Keccak256): Boolean
   def contains(block: Block): Boolean = contains(block.hash)
 
-  def contains(hash: Keccak256): Boolean
-
-  def add(block: Block): Boolean
-
-  def add(block: Block, weight: Int): Boolean
-
-  // Note: assuming the hash is in the pool
+  // Assuming the hash is in the pool
   def getBlock(hash: Keccak256): Block
-
-  def addBlocks(blocks: Seq[Block]): Boolean = {
-    blocks.forall(add)
-  }
 
   def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {
     val blocks = locators.map(getBlocks)
@@ -42,21 +32,21 @@ trait BlockPool {
   def getBlocks(locator: Keccak256): Seq[Block]
 
   def getHeight(hash: Keccak256): Int
-
   def getHeight(block: Block): Int = getHeight(block.hash)
 
   def getWeight(hash: Keccak256): Int
-
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of Seq[Block]
-  def getChain(block: Block): Seq[Block]
+  def getChainSlice(block: Block): Seq[Block]
 
-  def isHeader(block: Block): Boolean
+  // Assuming the hash or block is in the pool
+  def isHeader(hash: Keccak256): Boolean
+  def isHeader(block: Block): Boolean = isHeader(block.hash)
 
   def getBestHeader: Block
 
-  def getBestChain: Seq[Block] = getChain(getBestHeader)
+  def getBestChain: Seq[Block] = getChainSlice(getBestHeader)
 
   def getAllHeaders: Seq[Keccak256]
 
@@ -127,4 +117,3 @@ trait BlockPool {
     (bestHeader, balance)
   }
 }
-// scalastyle:on number.of.methods

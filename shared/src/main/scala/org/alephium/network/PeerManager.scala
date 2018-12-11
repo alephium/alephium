@@ -50,7 +50,7 @@ class PeerManager(port: Int) extends BaseActor {
   def awaitBlockHandlers: Receive = {
     case SetBlockHandlers(blockHandlers) =>
       context.watch(blockHandlers.globalHandler)
-      blockHandlers.poolHandlers.flatten.foreach(context.watch)
+      blockHandlers.chainHandlers.flatten.foreach(context.watch)
       context become handleWith(blockHandlers)
   }
 
@@ -111,7 +111,7 @@ class PeerManager(port: Int) extends BaseActor {
   def unwatchAndStop(blockHandlers: BlockHandlers): Unit = {
     context.unwatch(server)
     context.unwatch(blockHandlers.globalHandler)
-    blockHandlers.poolHandlers.flatten.foreach(context.unwatch)
+    blockHandlers.chainHandlers.flatten.foreach(context.unwatch)
     tcpHandlers.foreach(context.unwatch)
     context.stop(self)
   }

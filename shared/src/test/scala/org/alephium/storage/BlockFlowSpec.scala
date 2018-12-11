@@ -25,22 +25,22 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val chainIndex1 = ChainIndex(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
-      blockFlow.addBlocks(Seq(block1))
+      blockFlow.add(block1)
       blockFlow.getWeight(block1) is 1
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      blockFlow.addBlocks(Seq(block2))
+      blockFlow.add(block2)
       blockFlow.getWeight(block2) is 2
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.addBlocks(Seq(block3))
+      blockFlow.add(block3)
       blockFlow.getWeight(block3) is 3
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
-      blockFlow.addBlocks(Seq(block4))
+      blockFlow.add(block4)
       blockFlow.getWeight(block4) is 4
     }
   }
@@ -54,7 +54,7 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
+        blockFlow.add(block)
         blockFlow.getWeight(block) is 1
       }
 
@@ -63,7 +63,7 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
+        blockFlow.add(block)
         blockFlow.getWeight(block) is 4
       }
 
@@ -72,7 +72,7 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
+        blockFlow.add(block)
         blockFlow.getWeight(block) is 8
       }
     }
@@ -104,7 +104,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.addBlocks(Seq(block3))
+      blockFlow.add(block3)
       blockFlow.getWeight(block3) is 4
     }
   }

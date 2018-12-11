@@ -49,8 +49,8 @@ class BlockPoolSpec extends AlephiumSpec {
 
       blockPool.getHeight(headBlock) is 0
       blockPool.getHeight(lastBlock) is blocks.size
-      blockPool.getChain(headBlock) is Seq(headBlock)
-      blockPool.getChain(lastBlock) is genesis +: blocks
+      blockPool.getChainSlice(headBlock) is Seq(headBlock)
+      blockPool.getChainSlice(lastBlock) is genesis +: blocks
       blockPool.isHeader(headBlock) is false
       blockPool.isHeader(lastBlock) is true
       blockPool.getBestHeader is lastBlock
@@ -71,10 +71,10 @@ class BlockPoolSpec extends AlephiumSpec {
         blockPool.getHeight(longChain.last) is longChain.size
         blockPool.getHeight(shortChain.head) is 1
         blockPool.getHeight(shortChain.last) is shortChain.size
-        blockPool.getChain(longChain.head) is Seq(genesis, longChain.head)
-        blockPool.getChain(longChain.last) is genesis +: longChain
-        blockPool.getChain(shortChain.head) is Seq(genesis, shortChain.head)
-        blockPool.getChain(shortChain.last) is genesis +: shortChain
+        blockPool.getChainSlice(longChain.head) is Seq(genesis, longChain.head)
+        blockPool.getChainSlice(longChain.last) is genesis +: longChain
+        blockPool.getChainSlice(shortChain.head) is Seq(genesis, shortChain.head)
+        blockPool.getChainSlice(shortChain.last) is genesis +: shortChain
         blockPool.isHeader(longChain.head) is false
         blockPool.isHeader(longChain.last) is true
         blockPool.isHeader(shortChain.head) is false
