@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.util.{AVector, ConcurrentHashMap, CopyOnWriteSet}
+import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -14,7 +14,7 @@ trait BlockHashChain extends BlockHashPool {
   protected def root: BlockHashChain.Root
 
   protected val blockHashesTable = ConcurrentHashMap.empty[Keccak256, BlockHashChain.TreeNode]
-  protected val tips             = CopyOnWriteSet.empty[Keccak256]
+  protected val tips             = ConcurrentHashSet.empty[Keccak256]
   protected val confirmedHashes  = ArrayBuffer.empty[BlockHashChain.TreeNode]
 
   protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
@@ -24,13 +24,12 @@ trait BlockHashChain extends BlockHashPool {
 
     val hash = node.blockHash
     blockHashesTable.put(hash, node)
+    tips.add(hash)
     node match {
       case _: BlockHashChain.Root =>
-        tips.add(hash)
         ()
       case n: BlockHashChain.Node =>
         tips.removeIfExist(n.parent.blockHash)
-        tips.add(hash)
         ()
     }
 
@@ -47,8 +46,8 @@ trait BlockHashChain extends BlockHashPool {
 
   protected def removeNode(node: BlockHashChain.TreeNode): Unit = {
     val hash = node.blockHash
-    blockHashesTable.remove(hash)
     if (tips.contains(hash)) tips.remove(hash)
+    blockHashesTable.remove(hash)
     ()
   }
 
