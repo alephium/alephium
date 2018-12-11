@@ -142,7 +142,7 @@ val commonSettings = Seq(
   ),
   Test / scalacOptions += "-Xcheckinit",
   fork := true,
-  run / javaOptions += "-Xmx4g",
+  run / javaOptions += "-Xmx4g -XX:+UseG1GC",
   libraryDependencies ++= Seq(
     akkatest,
     scalacheck,
