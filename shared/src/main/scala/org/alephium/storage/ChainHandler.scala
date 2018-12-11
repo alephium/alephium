@@ -1,14 +1,27 @@
 package org.alephium.storage
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props}
 import org.alephium.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
+import org.alephium.protocol.model.Block
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.BaseActor
 
 object ChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef): Props =
     Props(new ChainHandler(blockFlow, chainIndex, peerManager))
+
+  sealed trait Command
+  case class AddBlocks(blocks: Seq[Block], origin: BlockOrigin) extends Command
+
+  sealed trait BlockOrigin
+
+  object BlockOrigin {
+    case object Local                            extends BlockOrigin
+    case class Remote(remote: InetSocketAddress) extends BlockOrigin
+  }
 }
 
 // TODO: investigate concurrency in master branch
@@ -17,7 +30,7 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
   val chain = blockFlow.getChain(chainIndex)
 
   override def receive: Receive = {
-    case BlockHandler.AddBlocks(blocks, origin) =>
+    case ChainHandler.AddBlocks(blocks, origin) =>
       // TODO: support more blocks later
       assert(blocks.length == 1)
       val block = blocks.head
