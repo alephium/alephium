@@ -97,7 +97,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     iter(Seq.empty, node)
   }
 
-  override def getChainSlice(block: Block): Seq[Block] = {
+  override def getBlockSlice(block: Block): Seq[Block] = {
     blocksTable.get(block.hash) match {
       case Some(node) =>
         getChain(node).map(_.block)
@@ -106,7 +106,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     }
   }
 
-  override def isHeader(hash: Keccak256): Boolean = {
+  override def isTip(hash: Keccak256): Boolean = {
     blocksTable.get(hash) match {
       case Some(node) =>
         node.isLeaf
@@ -115,11 +115,11 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     }
   }
 
-  override def getBestHeader: Block = {
-    getAllHeaders.map(blocksTable.apply).maxBy(_.height).block
+  override def getBestTip: Block = {
+    getAllTips.map(blocksTable.apply).maxBy(_.height).block
   }
 
-  override def getAllHeaders: Seq[Keccak256] = {
+  override def getAllTips: Seq[Keccak256] = {
     blocksTable.values.filter(_.isLeaf).map(_.block.hash).toSeq
   }
 
