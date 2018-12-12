@@ -18,7 +18,7 @@ lazy val root: Project = Project("root", file("."))
     scalastyle := {},
     scalastyle in Test := {},
   )
-  .aggregate(app, `app-debug`, util, serde, crypto, protocol)
+  .aggregate(app, util, serde, crypto, protocol)
 
 def mainProject(id: String): Project = baseProject(id)
   .settings(

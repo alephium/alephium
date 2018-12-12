@@ -5,7 +5,7 @@ import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
 import org.scalatest.TryValues._
-import org.alephium.AlephiumActorSpec
+import org.alephium.{AlephiumActorSpec, Mode}
 import org.alephium.protocol.message.{Message, Ping, Pong, SendBlocks}
 import org.alephium.serde.WrongFormatException
 import org.alephium.storage.HandlerUtils
@@ -26,7 +26,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
     val tcpHandler = system.actorOf(
       Props(
-        new TcpHandler(remote, connection.ref, blockHandlers) {
+        new TcpHandler(Mode.defaultBuilders, remote, connection.ref, blockHandlers) {
           override val messageHandler = obj.messageHandler.ref
         }
       )

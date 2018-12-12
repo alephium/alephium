@@ -19,9 +19,9 @@ import scala.concurrent.Future
 trait Platform extends App with StrictLogging {
   def mode: Mode
 
-  def init() = {
-    val node   = mode.createNode(args)
-    val index  = mode.getIndex(args)
+  def init(): Future[Http.ServerBinding] = {
+    val node  = mode.createNode(args)
+    val index = mode.getIndex(args)
 
     connect(node, index)
     runServer(node, index)
