@@ -1,13 +1,11 @@
 package org.alephium
 
-import java.net.InetSocketAddress
-
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.client.{Miner, Node}
+import org.alephium.client.Miner
 import org.alephium.constant.Network
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.mock.MockMiner
@@ -16,58 +14,10 @@ import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.util.Hex._
 
 import scala.concurrent.Future
-import scala.sys.process._
-
-// scalastyle:off magic.number
-
-trait Mode {
-  def createNode(args: Array[String]): Node
-
-  def getIndex(args: Array[String]): Int
-
-  def index2Ip(index: Int): InetSocketAddress
-
-  def getHttpPort(args: Array[String]): Int
-}
-
-object Aws extends Mode with StrictLogging {
-  override def createNode(args: Array[String]): Node = Node("Root", Network.port, Network.groups)
-
-  override def getIndex(args: Array[String]): Int = {
-    val hostname = "hostname".!!.stripLineEnd
-    logger.info(hostname)
-    hostname.split('-').last.toInt - 10
-  }
-
-  override def index2Ip(index: Int): InetSocketAddress = {
-    val startIndex  = 10
-    val peerIndex   = startIndex + index
-    val peerAddress = s"10.0.0.$peerIndex"
-
-    new InetSocketAddress(peerAddress, Network.port)
-  }
-
-  override def getHttpPort(args: Array[String]): Int = 8080
-}
-
-object Local extends Mode {
-  override def createNode(args: Array[String]): Node = Node("Root", args(0).toInt, Network.groups)
-
-  override def getIndex(args: Array[String]): Int = {
-    val port = args(0).toInt
-    port - Network.port
-  }
-
-  override def index2Ip(index: Int): InetSocketAddress = {
-    new InetSocketAddress("localhost", Network.port + index)
-  }
-
-  override def getHttpPort(args: Array[String]): Int = 8080 + getIndex(args)
-}
 
 // scalastyle:off magic.number
 object Root extends App with StrictLogging {
-  val mode   = Aws
+  val mode   = Mode.Aws
   val node   = mode.createNode(args)
   val index  = mode.getIndex(args)
   val groups = Network.groups
