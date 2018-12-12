@@ -1,16 +1,14 @@
-package org.alephium
+package org.alephium.monitoring
 
-import akka.actor.ActorRef
-import akka.actor.ActorSystem
-import akka.dispatch.Envelope
-import akka.dispatch.MailboxType
-import akka.dispatch.MessageQueue
-import akka.dispatch.ProducesMessageQueue
-import com.typesafe.config.Config
-import com.codahale.metrics.MetricRegistry
 import java.util.concurrent.ConcurrentLinkedQueue
 
+import akka.actor.{ActorRef, ActorSystem}
+import akka.dispatch.{Envelope, MailboxType, MessageQueue, ProducesMessageQueue}
+import com.codahale.metrics.MetricRegistry
+import com.typesafe.config.Config
+
 object MonitoringMailbox {
+
   class MonitoringMessageQueue(owner: ActorRef)
       extends MessageQueue
       with akka.event.LoggerMessageQueueSemantics
