@@ -6,8 +6,8 @@ import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.constant.Network
 import org.alephium.protocol.message._
 import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.BlockHandler.BlockOrigin.Remote
-import org.alephium.storage.{AddBlockResult, BlockHandler, BlockHandlers}
+import org.alephium.storage.ChainHandler.BlockOrigin.Remote
+import org.alephium.storage.{AddBlockResult, BlockHandlers, ChainHandler, FlowHandler}
 import org.alephium.util.BaseActor
 
 import scala.util.Random
@@ -49,10 +49,10 @@ class MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandl
       val chainIndex = ChainIndex.fromHash(block.hash)
       val handler    = blockHandlers.getHandler(chainIndex)
 
-      handler ! BlockHandler.AddBlocks(blocks, Remote(remote))
+      handler ! ChainHandler.AddBlocks(blocks, Remote(remote))
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: $locators")
-      blockHandlers.globalHandler.tell(BlockHandler.GetBlocksAfter(locators), tcpHandler)
+      blockHandlers.flowHandler.tell(FlowHandler.GetBlocksAfter(locators), tcpHandler)
   }
 
   def handleInternal: Receive = {
