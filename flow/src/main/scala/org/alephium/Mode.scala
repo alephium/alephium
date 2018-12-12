@@ -12,15 +12,17 @@ import scala.sys.process._
 // scalastyle:off magic.number
 
 trait Mode {
-  def builders: TcpHandler.Builder with MessageHandler.Builder = Mode.defaultBuilders
+  def port: Int
 
-  def createNode(args: Array[String]): Node
+  def index: Int
 
-  def getIndex(args: Array[String]): Int
+  def httpPort: Int
 
   def index2Ip(index: Int): InetSocketAddress
 
-  def getHttpPort(args: Array[String]): Int
+  def builders: TcpHandler.Builder with MessageHandler.Builder = Mode.defaultBuilders
+
+  def createNode: Node
 }
 
 object Mode {
@@ -29,14 +31,15 @@ object Mode {
     new TcpHandler.Builder with MessageHandler.Builder
 
   class Aws extends Mode with StrictLogging {
-    override def createNode(args: Array[String]): Node =
-      Node(builders, "Root", Network.port, Network.groups)
+    val port: Int = Network.port
 
-    override def getIndex(args: Array[String]): Int = {
+    val index: Int = {
       val hostname = "hostname".!!.stripLineEnd
       logger.info(hostname)
       hostname.split('-').last.toInt - 10
     }
+
+    val httpPort: Int = 8080
 
     override def index2Ip(index: Int): InetSocketAddress = {
       val startIndex  = 10
@@ -46,22 +49,22 @@ object Mode {
       new InetSocketAddress(peerAddress, Network.port)
     }
 
-    override def getHttpPort(args: Array[String]): Int = 8080
+    override def createNode: Node =
+      Node(builders, "Root", Network.port, Network.groups)
   }
 
-  class Local extends Mode {
-    override def createNode(args: Array[String]): Node =
-      Node(builders, "Root", args(0).toInt, Network.groups)
-
-    override def getIndex(args: Array[String]): Int = {
-      val port = args(0).toInt
+  class Local(val port: Int) extends Mode {
+    val index: Int = {
       port - Network.port
     }
+
+    def httpPort: Int = 8080 + index
 
     override def index2Ip(index: Int): InetSocketAddress = {
       new InetSocketAddress("localhost", Network.port + index)
     }
 
-    override def getHttpPort(args: Array[String]): Int = 8080 + getIndex(args)
+    override def createNode: Node =
+      Node(builders, "Root", port, Network.groups)
   }
 }
