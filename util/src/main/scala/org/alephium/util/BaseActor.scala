@@ -24,7 +24,10 @@ object BaseActor {
   def envalidActorName(name: String): String = {
     name.map { char =>
       // The following magic string is from ActorPath.ValidSymbols
-      if (Character.isLetter(char) || """-_.*$+:@&=,!~';""".contains(char)) char else '-'
+      if (Character.isLetter(char) ||
+          Character.isDigit(char) ||
+          """-_.*$+:@&=,!~';""".contains(char)) char
+      else '-'
     }
   }
 }

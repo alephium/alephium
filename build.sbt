@@ -141,6 +141,7 @@ val commonSettings = Seq(
     "-Ywarn-value-discard"
   ),
   Test / scalacOptions += "-Xcheckinit",
+  Test / javaOptions += "-Xss8m",
   fork := true,
   run / javaOptions += "-Xmx4g -XX:+UseG1GC",
   scalafmtOnCompile := true,
