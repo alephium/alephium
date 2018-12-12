@@ -6,7 +6,7 @@ trait SingleChain extends BlockPool {
 
   def maxHeight: Int
 
-  def add(block: Block, weight: Int): Boolean
+  def add(block: Block, weight: Int): AddBlockResult
 
   def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
 }
