@@ -12,8 +12,8 @@ object Boot extends Platform {
     override def builders: TcpHandler.Builder with MessageHandler.Builder =
       new TcpHandler.Builder with MessageHandler.Builder {
         override def createMessageHandler(remote: InetSocketAddress,
-                                    connection: ActorRef,
-                                    blockHandlers: BlockHandlers): Props = {
+                                          connection: ActorRef,
+                                          blockHandlers: BlockHandlers): Props = {
           Props(new MessageHandler(remote, connection, blockHandlers) {
 
             val delays = Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
