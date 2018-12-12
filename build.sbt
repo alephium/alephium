@@ -23,27 +23,7 @@ lazy val root: Project = Project("root", file("."))
 def mainProject(id: String): Project = baseProject(id)
   .settings(
     Compile / scalastyleConfig := root.base / scalastyleCfgFile,
-    Test    / scalastyleConfig := root.base / scalastyleTestCfgFile,
-    run := {
-      import scala.sys.process._
-      import complete.DefaultParsers._
-
-      val args: Seq[String] = spaceDelimited("<arg>").parsed
-
-      val nodes       = args(0).toInt
-      val port_start  = args(1).toInt // TODO Should this be read directly from the `platform.conf`?
-
-      val tmp         = System.getProperty("java.io.tmpdir")
-
-      (0 until nodes).map { node =>
-        val port = port_start + node
-        val app = target.value / "universal" / "stage" / "bin" / name.value
-        val log = Path(tmp) / "alephium-log" / s"$port.txt"
-
-        val cmd = s"$app $port" #> log
-        cmd.run()
-      }.foreach(_.exitValue())
-    }
+    Test    / scalastyleConfig := root.base / scalastyleTestCfgFile
   )
   .enablePlugins(JavaAppPackaging)
   .dependsOn(flow)
