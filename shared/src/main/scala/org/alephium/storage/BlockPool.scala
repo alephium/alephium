@@ -49,8 +49,6 @@ trait BlockPool {
 
   def getAllBlocks: Iterable[Block]
 
-  def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
-
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
 
