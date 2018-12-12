@@ -17,7 +17,8 @@ import scala.concurrent.Future
 
 // scalastyle:off magic.number
 trait Platform extends App with StrictLogging {
-  val mode   = Mode.Aws
+  def mode: Mode
+
   val node   = mode.createNode(args)
   val index  = mode.getIndex(args)
   val groups = Network.groups
