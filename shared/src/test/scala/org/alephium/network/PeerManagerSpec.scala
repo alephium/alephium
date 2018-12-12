@@ -59,7 +59,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   it should "stop if block pool stoped" in new Fixture {
     watch(peerManager)
-    system.stop(blockHandlers.globalHandler)
+    system.stop(blockHandlers.flowHandler)
     expectTerminated(peerManager)
   }
 

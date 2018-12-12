@@ -314,11 +314,3 @@ object BlockFlow {
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 
 }
-
-sealed trait AddBlockResult
-
-object AddBlockResult {
-  case object Success                          extends AddBlockResult
-  case object AlreadyExisted                   extends AddBlockResult
-  case class MissingDeps(deps: Seq[Keccak256]) extends AddBlockResult
-}
