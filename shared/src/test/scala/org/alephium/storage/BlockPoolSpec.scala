@@ -53,7 +53,7 @@ class BlockPoolSpec extends AlephiumSpec {
       blockPool.getBlockSlice(lastBlock) is genesis +: blocks
       blockPool.isTip(headBlock) is false
       blockPool.isTip(lastBlock) is true
-      blockPool.getBestTip is lastBlock
+      blockPool.getBestTip is lastBlock.hash
       blockPool.getBestChain is genesis +: blocks
       blockPool.maxHeight is blocks.size
       blockPool.getAllTips is Seq(lastBlock.hash)
@@ -79,7 +79,7 @@ class BlockPoolSpec extends AlephiumSpec {
         blockPool.isTip(longChain.last) is true
         blockPool.isTip(shortChain.head) is false
         blockPool.isTip(shortChain.last) is true
-        blockPool.getBestTip is longChain.last
+        blockPool.getBestTip is longChain.last.hash
         blockPool.getBestChain is genesis +: longChain
         blockPool.maxHeight is longChain.size
         blockPool.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)

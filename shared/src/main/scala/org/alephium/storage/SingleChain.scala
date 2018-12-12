@@ -6,7 +6,13 @@ trait SingleChain extends BlockPool {
 
   def maxHeight: Int
 
-  def add(block: Block, weight: Int): AddBlockResult
+  // Note: this function is mainly for testing right now
+  def add(block: Block, weight: Int): AddBlockResult = {
+    val deps = block.blockHeader.blockDeps
+    add(block, deps.last, weight)
+  }
+
+  def add(block: Block, parent: Keccak256, weight: Int): AddBlockResult
 
   def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
 }

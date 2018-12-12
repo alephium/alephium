@@ -41,18 +41,18 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
 
   override def contains(hash: Keccak256): Boolean = blocksTable.contains(hash)
 
-  override def add(block: Block, weight: Int): AddBlockResult = {
+  override def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
     blocksTable.get(block.hash) match {
       case Some(_) => AddBlockResult.AlreadyExisted
       case None =>
-        blocksTable.get(block.prevBlockHash) match {
+        blocksTable.get(parentHash) match {
           case Some(parent) =>
             val newNode = ForksTree.Node(block, parent, parent.height + 1, weight)
             parent.successors += newNode
             updateTable(newNode)
             AddBlockResult.Success
           case None =>
-            AddBlockResult.MissingDeps(Seq(block.prevBlockHash))
+            AddBlockResult.MissingDeps(Seq(parentHash))
         }
     }
   }
@@ -97,8 +97,8 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     iter(Seq.empty, node)
   }
 
-  override def getBlockSlice(block: Block): Seq[Block] = {
-    blocksTable.get(block.hash) match {
+  override def getBlockSlice(hash: Keccak256): Seq[Block] = {
+    blocksTable.get(hash) match {
       case Some(node) =>
         getChain(node).map(_.block)
       case None =>
@@ -115,8 +115,8 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     }
   }
 
-  override def getBestTip: Block = {
-    getAllTips.map(blocksTable.apply).maxBy(_.height).block
+  override def getBestTip: Keccak256 = {
+    getAllTips.map(blocksTable.apply).maxBy(_.height).block.hash
   }
 
   override def getAllTips: Seq[Keccak256] = {

@@ -110,7 +110,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val deps = blockFlow.getBestDeps(chainIndex)._1
+    val deps = blockFlow.getBestDeps(chainIndex)
 
     @tailrec
     def iter(nonce: BigInt): Block = {
@@ -124,12 +124,12 @@ class BlockFlowSpec extends AlephiumSpec {
   def show(blockFlow: BlockFlow): String = {
     blockFlow.getAllTips
       .map { tip =>
-        val height = blockFlow.getWeight(tip)
+        val weight = blockFlow.getWeight(tip)
         val block  = blockFlow.getBlock(tip)
         val index  = blockFlow.getIndex(block)
         val hash   = showHash(tip)
         val deps   = block.blockHeader.blockDeps.map(showHash).mkString("-")
-        s"height: $height, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
+        s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
       }
       .mkString("\n")
   }
