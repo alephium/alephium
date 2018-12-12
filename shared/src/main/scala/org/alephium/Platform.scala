@@ -16,7 +16,7 @@ import org.alephium.util.Hex._
 import scala.concurrent.Future
 
 // scalastyle:off magic.number
-object Root extends App with StrictLogging {
+trait Platform extends App with StrictLogging {
   val mode   = Mode.Aws
   val node   = mode.createNode(args)
   val index  = mode.getIndex(args)
@@ -24,6 +24,7 @@ object Root extends App with StrictLogging {
 
   val second = index / groups
   val from   = index % groups
+
   logger.info(s"second: $second, index: $from")
 
   connect()
