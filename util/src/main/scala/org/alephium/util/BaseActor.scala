@@ -1,8 +1,18 @@
 package org.alephium.util
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.SupervisorStrategy.Resume
+import akka.actor.{Actor, ActorLogging, OneForOneStrategy, SupervisorStrategy}
 
 trait BaseActor extends Actor with ActorLogging {
+
+  // Note: make sure that your child actors could ignore the exception and resume
+  override val supervisorStrategy: SupervisorStrategy = {
+    OneForOneStrategy() {
+      case t: Throwable =>
+        log.error(t, "Unhandled exception")
+        Resume
+    }
+  }
 
   override def unhandled(message: Any): Unit = {
     log.warning(s"Unhandled message: $message")
