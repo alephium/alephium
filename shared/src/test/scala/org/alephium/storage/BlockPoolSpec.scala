@@ -20,7 +20,7 @@ class BlockPoolSpec extends AlephiumSpec {
     forAll(blockGen) { block =>
       val blocksSize1 = blockPool.numBlocks
       val txSize1     = blockPool.numTransactions
-      blockPool.add(block)
+      blockPool.add(block, 0)
       val blocksSize2 = blockPool.numBlocks
       val txSize2     = blockPool.numTransactions
       blocksSize1 + 1 is blocksSize2
@@ -32,7 +32,7 @@ class BlockPoolSpec extends AlephiumSpec {
     forAll(chainGen) { blocks =>
       val blocksSize1 = blockPool.numBlocks
       val txSize1     = blockPool.numTransactions
-      blockPool.addBlocks(blocks)
+      blocks.foreach(block => blockPool.add(block, 0))
       val blocksSize2 = blockPool.numBlocks
       val txSize2     = blockPool.numTransactions
       blocksSize1 + blocks.size is blocksSize2
@@ -42,21 +42,20 @@ class BlockPoolSpec extends AlephiumSpec {
 
   it should "work correctly for a chain of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis), minSuccessful(1)) { blocks =>
-      val blockPool = ForksTree(genesis)
-      blockPool.addBlocks(blocks)
+      val blockPool = ForksTree(genesis, 0, 0)
+      blocks.foreach(block => blockPool.add(block, 0))
       val headBlock = genesis
       val lastBlock = blocks.last
-      val poolSize  = blocks.size + 1
 
-      blockPool.getHeightFor(headBlock) is 1
-      blockPool.getHeightFor(lastBlock) is poolSize
-      blockPool.getChain(headBlock) is Seq(headBlock)
-      blockPool.getChain(lastBlock) is genesis +: blocks
+      blockPool.getHeight(headBlock) is 0
+      blockPool.getHeight(lastBlock) is blocks.size
+      blockPool.getChainSlice(headBlock) is Seq(headBlock)
+      blockPool.getChainSlice(lastBlock) is genesis +: blocks
       blockPool.isHeader(headBlock) is false
       blockPool.isHeader(lastBlock) is true
       blockPool.getBestHeader is lastBlock
       blockPool.getBestChain is genesis +: blocks
-      blockPool.getHeight is poolSize
+      blockPool.maxHeight is blocks.size
       blockPool.getAllHeaders is Seq(lastBlock.hash)
     }
   }
@@ -64,29 +63,27 @@ class BlockPoolSpec extends AlephiumSpec {
   it should "work correctly with two chains of blocks" in new Fixture {
     forAll(ModelGen.chainGen(3, genesis), minSuccessful(1)) { longChain =>
       forAll(ModelGen.chainGen(2, genesis), minSuccessful(1)) { shortChain =>
-        val blockPool = ForksTree(genesis)
-        blockPool.addBlocks(longChain)
-        blockPool.addBlocks(shortChain)
+        val blockPool = ForksTree(genesis, 0, 0)
+        longChain.foreach(block  => blockPool.add(block, 0))
+        shortChain.foreach(block => blockPool.add(block, 0))
 
-        blockPool.getHeightFor(longChain.head) is 2
-        blockPool.getHeightFor(longChain.last) is longChain.size + 1
-        blockPool.getHeightFor(shortChain.head) is 2
-        blockPool.getHeightFor(shortChain.last) is shortChain.size + 1
-        blockPool.getChain(longChain.head) is Seq(genesis, longChain.head)
-        blockPool.getChain(longChain.last) is genesis +: longChain
-        blockPool.getChain(shortChain.head) is Seq(genesis, shortChain.head)
-        blockPool.getChain(shortChain.last) is genesis +: shortChain
+        blockPool.getHeight(longChain.head) is 1
+        blockPool.getHeight(longChain.last) is longChain.size
+        blockPool.getHeight(shortChain.head) is 1
+        blockPool.getHeight(shortChain.last) is shortChain.size
+        blockPool.getChainSlice(longChain.head) is Seq(genesis, longChain.head)
+        blockPool.getChainSlice(longChain.last) is genesis +: longChain
+        blockPool.getChainSlice(shortChain.head) is Seq(genesis, shortChain.head)
+        blockPool.getChainSlice(shortChain.last) is genesis +: shortChain
         blockPool.isHeader(longChain.head) is false
         blockPool.isHeader(longChain.last) is true
         blockPool.isHeader(shortChain.head) is false
         blockPool.isHeader(shortChain.last) is true
         blockPool.getBestHeader is longChain.last
         blockPool.getBestChain is genesis +: longChain
-        blockPool.getHeight is longChain.size + 1
+        blockPool.maxHeight is longChain.size
         blockPool.getAllHeaders.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
   }
-
-  // TODO: add tests for balance
 }

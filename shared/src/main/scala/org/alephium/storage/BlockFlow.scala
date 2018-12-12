@@ -11,14 +11,14 @@ import org.alephium.util.Hex
 import scala.collection.JavaConverters._
 
 // scalastyle:off number.of.methods
-class BlockFlow() extends BlockPool {
+class BlockFlow() extends MultiChain {
   import Network.groups
 
   val initialBlocks: Seq[Seq[Block]] = Network.blocksForFlow
 
-  val blockPools: Seq[Seq[BlockPool]] =
+  val SingleChains: Seq[Seq[SingleChain]] =
     Seq.tabulate(groups, groups) {
-      case (from, to) => ForksTree.apply(initialBlocks(from)(to))
+      case (from, to) => ForksTree(initialBlocks(from)(to))
     }
 
   val headerDeps: Seq[Seq[collection.concurrent.Map[Keccak256, Seq[Keccak256]]]] =
@@ -33,23 +33,23 @@ class BlockFlow() extends BlockPool {
       map += (header -> deps)
     }
 
-  private def aggregate[T](f: BlockPool => T)(reduce: Seq[T] => T): T = {
-    reduce(blockPools.flatMap(_.map(f)))
+  private def aggregate[T](f: SingleChain => T)(reduce: Seq[T] => T): T = {
+    reduce(SingleChains.flatMap(_.map(f)))
   }
 
   override def numBlocks: Int = aggregate(_.numBlocks)(_.sum)
 
   override def numTransactions: Int = aggregate(_.numTransactions)(_.sum)
 
-  val numGroups: Int = groups
+  override def maxWeight: Int = aggregate(_.maxWeight)(_.max)
 
-  private def getPool(i: Int, j: Int): BlockPool = {
+  private def getChain(i: Int, j: Int): SingleChain = {
     assert(i >= 0 && i < groups && j >= 0 && j < groups)
-    blockPools(i)(j)
+    SingleChains(i)(j)
   }
 
-  def getPool(chainIndex: ChainIndex): BlockPool = {
-    getPool(chainIndex.from, chainIndex.to)
+  def getChain(chainIndex: ChainIndex): SingleChain = {
+    getChain(chainIndex.from, chainIndex.to)
   }
 
   def getIndex(block: Block): ChainIndex = {
@@ -60,51 +60,46 @@ class BlockFlow() extends BlockPool {
     ChainIndex.fromHash(hash)
   }
 
-  private def getPool(block: Block): BlockPool = getPool(getIndex(block))
+  private def getChain(block: Block): SingleChain = getChain(getIndex(block))
 
-  private def getPool(hash: Keccak256): BlockPool = getPool(getIndex(hash))
+  private def getChain(hash: Keccak256): SingleChain = getChain(getIndex(hash))
 
   override def contains(block: Block): Boolean = {
-    val pool = getPool(block)
-    pool.contains(block)
+    val chain = getChain(block)
+    chain.contains(block)
   }
 
   def contains(hash: Keccak256): Boolean = {
-    val pool = getPool(hash)
-    pool.contains(hash)
+    val chain = getChain(hash)
+    chain.contains(hash)
   }
 
   def addDeps(block: Block, deps: Seq[Keccak256]): Unit = {
     val chainIndex = getIndex(block)
-    val pool       = blockPools(chainIndex.from)(chainIndex.to)
+    val chain      = SingleChains(chainIndex.from)(chainIndex.to)
     val caches     = headerDeps(chainIndex.from)(chainIndex.to)
     caches.retain { (header, _) =>
-      !pool.isBefore(header, block.hash) || {
-        val headerHeight = pool.getHeightFor(header)
-        val blockHeight  = pool.getHeightFor(block)
+      !chain.isBefore(header, block.hash) || {
+        val headerHeight = chain.getHeight(header)
+        val blockHeight  = chain.getHeight(block)
         headerHeight >= blockHeight - 5
       }
     }
     caches += (block.hash -> deps)
   }
 
-  override def add(block: Block): Boolean = {
-    addBlock(block) match {
-      case AddBlockResult.Success => true
-      case _                      => false
-    }
-  }
-
-  def addBlock(block: Block): AddBlockResult = {
+  override def add(block: Block): AddBlockResult = {
     // TODO: check dependencies
     val deps        = block.blockHeader.blockDeps
     val missingDeps = deps.filterNot(contains)
     if (missingDeps.isEmpty) {
-      val pool = getPool(block)
-      val ok   = pool.add(block)
+      val headers    = getDepsHeaders(block)
+      val chainIndex = getIndex(block)
+      val chain      = getChain(chainIndex)
+      val weight     = getHeadersWeight(headers) + 1
+      val ok         = chain.add(block, weight)
       if (ok) {
-        val deps = getHeaders(block)
-        addDeps(block, deps)
+        addDeps(block, headers.updated(chainIndex.toOneDim, block.hash))
         AddBlockResult.Success
       } else AddBlockResult.AlreadyExisted
     } else {
@@ -113,40 +108,27 @@ class BlockFlow() extends BlockPool {
   }
 
   override def getBlock(hash: Keccak256): Block = {
-    getPool(hash).getBlock(hash)
+    getChain(hash).getBlock(hash)
   }
 
   override def getBlocks(locator: Keccak256): Seq[Block] = {
-    getPool(locator).getBlocks(locator)
+    getChain(locator).getBlocks(locator)
   }
 
-  override def isHeader(block: Block): Boolean = {
-    getPool(block).isHeader(block)
+  override def isHeader(hash: Keccak256): Boolean = {
+    getChain(hash).isHeader(hash)
   }
 
-  def getBlockFlowHeight(block: Block): Int = {
-    val chainIndex = getIndex(block)
-    val deps       = headerDeps(chainIndex.from)(chainIndex.to)(block.hash)
-    getHeadersHeight(deps)
+  override def getHeight(hash: Keccak256): Int = {
+    getChain(hash).getHeight(hash)
   }
 
-  def getBlockFlowHeight(blockHash: Keccak256): Int = {
-    val block = getBlock(blockHash)
-    getBlockFlowHeight(block)
+  override def getWeight(hash: Keccak256): Int = {
+    getChain(hash).getWeight(hash)
   }
 
   override def getBestHeader: Block = {
-    val heights = for {
-      seq            <- headerDeps
-      cache          <- seq
-      (header, deps) <- cache
-    } yield (header, getHeadersHeight(deps))
-    val blockHash = heights.maxBy(_._2)._1
-    getBlock(blockHash)
-  }
-
-  def getBestLength: Int = {
-    getAllHeaders.map(getBlockFlowHeight).max
+    aggregate(_.getBestHeader)(_.maxBy(block => getWeight(block)))
   }
 
   override def getAllHeaders: Seq[Keccak256] =
@@ -167,8 +149,12 @@ class BlockFlow() extends BlockPool {
     getHeaders(block)
   }
 
+  def getDepsHeaders(block: Block): Seq[Keccak256] = {
+    block.blockHeader.blockDeps.map(getCachedHeaders).reduce(merge(_, _).get)
+  }
+
   def getHeaders(block: Block): Seq[Keccak256] = {
-    val deps       = block.blockHeader.blockDeps.map(getCachedHeaders).reduce(merge(_, _).get)
+    val deps       = getDepsHeaders(block)
     val chainIndex = getIndex(block)
     deps.updated(chainIndex.toOneDim, block.hash)
   }
@@ -178,9 +164,9 @@ class BlockFlow() extends BlockPool {
     else if (hash2 == Keccak256.zero) Some(hash1)
     else {
       assert(getIndex(hash1) == getIndex(hash2))
-      val pool = getPool(hash1)
-      if (pool.isBefore(hash1, hash2)) Some(hash2)
-      else if (pool.isBefore(hash2, hash1)) Some(hash1)
+      val chain = getChain(hash1)
+      if (chain.isBefore(hash1, hash2)) Some(hash2)
+      else if (chain.isBefore(hash2, hash1)) Some(hash1)
       else None
     }
   }
@@ -199,21 +185,14 @@ class BlockFlow() extends BlockPool {
   def merge(headers: Seq[Keccak256], hash: Keccak256): Option[(Seq[Keccak256], Keccak256, Int)] = {
     val newHeaders = getCachedHeaders(hash)
     merge(headers, newHeaders).map { mergedHeaders =>
-      val heightBefore = getHeadersHeight(headers)
-      val heightAfter  = getHeadersHeight(mergedHeaders)
+      val heightBefore = getHeadersWeight(headers)
+      val heightAfter  = getHeadersWeight(mergedHeaders)
       (mergedHeaders, hash, heightAfter - heightBefore)
     }
   }
 
-  def getHeadersHeight(headers: Seq[Keccak256]): Int = {
-    headers.map { header =>
-      if (header == Keccak256.zero) 0
-      else {
-        val pool  = getPool(header)
-        val block = pool.getBlock(header)
-        pool.getHeightFor(block)
-      }
-    }.sum
+  def getHeadersWeight(headers: Seq[Keccak256]): Int = {
+    headers.map(getHeight).sum
   }
 
   def updateGroupDeps(headers: Seq[Keccak256],
@@ -237,7 +216,7 @@ class BlockFlow() extends BlockPool {
       .foldLeft((bestHeaders, initialDeps)) {
         case ((headers, deps), k) =>
           val toTry = (0 until groups).flatMap { l =>
-            getPool(k, l).getAllHeaders
+            getChain(k, l).getAllHeaders
           }
           updateGroupDeps(headers, deps, toTry, ChainIndex(k, 0))
       }
@@ -246,21 +225,21 @@ class BlockFlow() extends BlockPool {
       .foldLeft((newHeaders1, newDeps1)) {
         case ((headers, deps), l) =>
           val toTryIndex = ChainIndex(chainIndex.from, l)
-          val toTry      = getPool(chainIndex.from, l).getAllHeaders
+          val toTry      = getChain(chainIndex.from, l).getAllHeaders
           updateGroupDeps(headers, deps, toTry, toTryIndex)
       }
-    val toTry         = getPool(chainIndex).getAllHeaders
+    val toTry         = getChain(chainIndex).getAllHeaders
     val (_, newDeps3) = updateGroupDeps(newHeaders2, newDeps2, toTry, chainIndex)
     (newDeps3, getBlock(newDeps3.last).blockHeader.timestamp)
   }
 
-  override def getChain(block: Block): Seq[Block] = getPool(block).getChain(block)
+  override def getChainSlice(block: Block): Seq[Block] = getChain(block).getChainSlice(block)
 
   override def getAllBlocks: Iterable[Block] =
     for {
       i     <- 0 until groups
       j     <- 0 until groups
-      block <- getPool(i, j).getAllBlocks
+      block <- getChain(i, j).getAllBlocks
     } yield block
 
   override def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = ???
@@ -271,7 +250,7 @@ class BlockFlow() extends BlockPool {
     val infos = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"($i, $j): ${getPool(i, j).getHeight}"
+    } yield s"($i, $j): ${getChain(i, j).maxHeight}/${getChain(i, j).numBlocks - 1}"
     infos.mkString("; ")
   }
 
@@ -279,20 +258,20 @@ class BlockFlow() extends BlockPool {
     val blocks = for {
       i     <- 0 until groups
       j     <- 0 until groups
-      block <- getPool(i, j).getAllBlocks
+      block <- getChain(i, j).getAllBlocks
     } yield toJson(i, j, block)
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
     val heights = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"""{"chainFrom":$i,"chainTo":$j,"height":${getPool(i, j).getHeight}}"""
+    } yield s"""{"chainFrom":$i,"chainTo":$j,"height":${getChain(i, j).maxHeight}}"""
     val heightsJson = heights.mkString("[", ",", "]")
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
 
   def toJson(from: Int, to: Int, block: Block): String = {
     val timestamp = block.blockHeader.timestamp
-    val height    = getBlockFlowHeight(block)
+    val height    = getWeight(block)
     val hash      = Hex.toHexString(block.hash.bytes).take(16)
     val deps = block.blockHeader.blockDeps
       .map(h => "\"" + Hex.toHexString(h.bytes).take(16) + "\"")

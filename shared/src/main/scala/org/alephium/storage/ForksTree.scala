@@ -1,22 +1,22 @@
 package org.alephium.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.ChainSlice
 import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-class ForksTree extends BlockPool {
-  private var root: ForksTree.Root = _
+class ForksTree(root: ForksTree.Root) extends SingleChain {
 
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
-//  private val orphanBlocksTable: HashMap[Keccak256, Block]        = HashMap.empty
 
-  override def numBlocks: Int = blocksTable.size
-
-  override def numTransactions: Int = transactionsTable.size
+  private def updateTable(node: ForksTree.TreeNode): Unit = {
+    blocksTable += node.block.hash -> node
+    node.block.transactions.foreach { transaction =>
+      transactionsTable += transaction.hash -> transaction
+    }
+  }
 
   private def postOrderTraverse(f: ForksTree.TreeNode => Unit): Unit = {
     def iter(node: ForksTree.TreeNode): Unit = {
@@ -26,61 +26,30 @@ class ForksTree extends BlockPool {
     iter(root)
   }
 
-  def this(_root: ForksTree.Root) {
-    this()
-    root = _root
+  // Initialization
+  {
     postOrderTraverse(updateTable)
   }
 
-  def this(slice: ChainSlice) {
-    this()
-    val blocks = slice.blocks
-    root = ForksTree.Root(blocks.head)
-    blocksTable += (root.block.hash -> root)
-    blocks.tail.foreach(add)
-  }
+  override def numBlocks: Int = blocksTable.size
 
-  def weight: Int = root.weight
+  override def numTransactions: Int = transactionsTable.size
 
-  private def updateTable(node: ForksTree.TreeNode): Unit = {
-    blocksTable += node.block.hash -> node
-    node.block.transactions.foreach { transaction =>
-      transactionsTable += transaction.hash -> transaction
-    }
-  }
+  override def maxHeight: Int = blocksTable.values.map(_.height).max
 
-  @tailrec
-  private def updateWeightFrom(node: ForksTree.Node): Unit = {
-    val parent       = node.parent
-    val parentWeight = parent.weight
-    val newWeight    = parent.successors.view.map(_.weight).max + 1
-    if (newWeight > parentWeight) {
-      parent.weight = newWeight
-      parent match {
-        case p: ForksTree.Node => updateWeightFrom(p)
-        case _: ForksTree.Root => ()
-      }
-    }
-  }
-
-  private def update(node: ForksTree.Node): Unit = {
-    updateTable(node)
-    updateWeightFrom(node)
-  }
-
-  override def contains(block: Block): Boolean = blocksTable.contains(block.hash)
+  override def maxWeight: Int = blocksTable.values.map(_.weight).max
 
   override def contains(hash: Keccak256): Boolean = blocksTable.contains(hash)
 
-  override def add(block: Block): Boolean = {
+  override def add(block: Block, weight: Int): Boolean = {
     blocksTable.get(block.hash) match {
       case Some(_) => false
       case None =>
         blocksTable.get(block.prevBlockHash) match {
           case Some(parent) =>
-            val newNode = ForksTree.Node(block, parent)
+            val newNode = ForksTree.Node(block, parent, parent.height + 1, weight)
             parent.successors += newNode
-            update(newNode)
+            updateTable(newNode)
             true
           case None =>
             false
@@ -89,33 +58,6 @@ class ForksTree extends BlockPool {
   }
 
   override def getBlock(hash: Keccak256): Block = blocksTable(hash).block
-
-  @tailrec
-  private def addAfter(parent: ForksTree.TreeNode, blocks: Seq[Block]): Unit = {
-    assert(blocks.nonEmpty && blocks.head.prevBlockHash == parent.block.hash)
-    if (blocks.nonEmpty) {
-      val currentBlock = blocks.head
-      val restBlocks   = blocks.tail
-      val newNode      = ForksTree.Node(currentBlock, parent)
-      parent.successors += newNode
-      update(newNode)
-      addAfter(newNode, restBlocks)
-    }
-  }
-
-  def add(slice: ChainSlice): Boolean = {
-    val uncommittedBlocks = slice.blocks.dropWhile(contains)
-    if (uncommittedBlocks.nonEmpty) {
-      val firstBlock = uncommittedBlocks.head
-      blocksTable.get(firstBlock.prevBlockHash) match {
-        case Some(parent) =>
-          addAfter(parent, uncommittedBlocks)
-          true
-        case None =>
-          false
-      }
-    } else false
-  }
 
   override def getBlocks(locator: Keccak256): Seq[Block] = {
     blocksTable.get(locator) match {
@@ -134,24 +76,14 @@ class ForksTree extends BlockPool {
     }
   }
 
-  private def getNodeHeight(node: ForksTree.TreeNode): Int = {
-    @tailrec
-    def iter(acc: Int, node: ForksTree.TreeNode): Int = {
-      node match {
-        case _: ForksTree.Root => acc + 1
-        case n: ForksTree.Node => iter(acc + 1, n.parent)
-      }
-    }
-    iter(0, node)
+  override def getHeight(hash: Keccak256): Int = {
+    assert(contains(hash))
+    blocksTable(hash).height
   }
 
-  override def getHeightFor(block: Block): Int = {
-    blocksTable.get(block.hash) match {
-      case Some(node) =>
-        getNodeHeight(node)
-      case None =>
-        0
-    }
+  override def getWeight(hash: Keccak256): Int = {
+    assert(contains(hash))
+    blocksTable(hash).weight
   }
 
   private def getChain(node: ForksTree.TreeNode): Seq[ForksTree.TreeNode] = {
@@ -165,7 +97,7 @@ class ForksTree extends BlockPool {
     iter(Seq.empty, node)
   }
 
-  override def getChain(block: Block): Seq[Block] = {
+  override def getChainSlice(block: Block): Seq[Block] = {
     blocksTable.get(block.hash) match {
       case Some(node) =>
         getChain(node).map(_.block)
@@ -174,8 +106,8 @@ class ForksTree extends BlockPool {
     }
   }
 
-  override def isHeader(block: Block): Boolean = {
-    blocksTable.get(block.hash) match {
+  override def isHeader(hash: Keccak256): Boolean = {
+    blocksTable.get(hash) match {
       case Some(node) =>
         node.isLeaf
       case None =>
@@ -184,7 +116,7 @@ class ForksTree extends BlockPool {
   }
 
   override def getBestHeader: Block = {
-    getAllHeaders.map(blocksTable.apply).maxBy(getNodeHeight).block
+    getAllHeaders.map(blocksTable.apply).maxBy(_.height).block
   }
 
   override def getAllHeaders: Seq[Keccak256] = {
@@ -195,52 +127,91 @@ class ForksTree extends BlockPool {
 
   override def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = {
     assert(blocksTable.contains(hash1) && blocksTable.contains(hash2))
-    val node = blocksTable(hash1)
-    isBefore(node, hash2)
+    val node1 = blocksTable(hash1)
+    val node2 = blocksTable(hash2)
+    isBefore(node1, node2)
   }
 
-  private def isBefore(node: ForksTree.TreeNode, target: Keccak256): Boolean = {
-    if (node.block.hash == target) true
-    else {
-      if (node.isLeaf) false
-      node.successors.exists(isBefore(_, target))
+  private def getPredecessor(node: ForksTree.TreeNode, height: Int): ForksTree.TreeNode = {
+    @tailrec
+    def iter(current: ForksTree.TreeNode): ForksTree.TreeNode = {
+      assert(current.height >= height && height >= root.height)
+      current match {
+        case n: ForksTree.Node =>
+          if (n.height == height) {
+            current
+          } else {
+            iter(n.parent)
+          }
+        case _: ForksTree.Root =>
+          assert(height == root.height)
+          current
+      }
     }
+
+    iter(node)
+  }
+
+  private def isBefore(node1: ForksTree.TreeNode, node2: ForksTree.TreeNode): Boolean = {
+    val height1 = node1.height
+    val height2 = node2.height
+    if (height1 < height2) {
+      val node1Infer = getPredecessor(node2, node1.height)
+      node1Infer.eq(node1)
+    } else if (height1 == height2) {
+      node1.eq(node2)
+    } else false
   }
 
   override def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
-
-//  def prune(): Unit
-
-//  def extract(): ChainSlice
 }
 
 object ForksTree {
+
   sealed trait TreeNode {
     val block: Block
     val successors: ArrayBuffer[Node]
-    var weight: Int
+    val height: Int
+    val weight: Int
 
     def isRoot: Boolean
     def isLeaf: Boolean = successors.isEmpty
   }
+
   case class Root(
       block: Block,
-      successors: ArrayBuffer[Node] = ArrayBuffer.empty,
-      var weight: Int               = 1
+      successors: ArrayBuffer[Node],
+      height: Int,
+      weight: Int
   ) extends TreeNode {
     override def isRoot: Boolean = true
   }
+
+  object Root {
+    def apply(block: Block, height: Int, weight: Int): Root =
+      Root(block, ArrayBuffer.empty, height, weight)
+  }
+
   case class Node(
       block: Block,
       parent: TreeNode,
-      successors: ArrayBuffer[Node] = ArrayBuffer.empty,
-      var weight: Int               = 1
+      successors: ArrayBuffer[Node],
+      height: Int,
+      weight: Int
   ) extends TreeNode {
     def isRoot: Boolean = false
   }
 
-  def apply(genesis: Block): ForksTree = {
-    val root = Root(genesis)
+  object Node {
+    def apply(block: Block, parent: TreeNode, height: Int, weight: Int): Node = {
+      new Node(block, parent, ArrayBuffer.empty, height, weight)
+    }
+  }
+
+  def apply(genesis: Block): ForksTree = apply(genesis, 0, 0)
+
+  def apply(genesis: Block, initialHeight: Int, initialWeight: Int): ForksTree = {
+    val root = Root(genesis, initialHeight, initialWeight)
     new ForksTree(root)
   }
 }

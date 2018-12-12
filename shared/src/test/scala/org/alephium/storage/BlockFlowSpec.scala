@@ -2,8 +2,10 @@ package org.alephium.storage
 
 import org.alephium.AlephiumSpec
 import org.alephium.constant.Network
+import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.Block
 import org.alephium.storage.BlockFlow.ChainIndex
+import org.alephium.util.Hex
 
 import scala.annotation.tailrec
 
@@ -13,7 +15,7 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow()
     Network.blocksForFlow.flatten.foreach { block =>
-      blockFlow.getBlockFlowHeight(block) is Network.chainNum
+      blockFlow.getWeight(block) is 0
     }
   }
 
@@ -23,23 +25,23 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val chainIndex1 = ChainIndex(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
-      blockFlow.addBlocks(Seq(block1))
-      blockFlow.getBlockFlowHeight(block1) is (Network.chainNum + 1)
+      blockFlow.add(block1)
+      blockFlow.getWeight(block1) is 1
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      blockFlow.addBlocks(Seq(block2))
-      blockFlow.getBlockFlowHeight(block2) is (Network.chainNum + 2)
+      blockFlow.add(block2)
+      blockFlow.getWeight(block2) is 2
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.addBlocks(Seq(block3))
-      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 3)
+      blockFlow.add(block3)
+      blockFlow.getWeight(block3) is 3
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
-      blockFlow.addBlocks(Seq(block4))
-      blockFlow.getBlockFlowHeight(block4) is (Network.chainNum + 4)
+      blockFlow.add(block4)
+      blockFlow.getWeight(block4) is 4
     }
   }
 
@@ -52,8 +54,8 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
-        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 1)
+        blockFlow.add(block)
+        blockFlow.getWeight(block) is 1
       }
 
       val newBlocks2 = for {
@@ -61,8 +63,8 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
-        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 4)
+        blockFlow.add(block)
+        blockFlow.getWeight(block) is 4
       }
 
       val newBlocks3 = for {
@@ -70,8 +72,8 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
-        blockFlow.addBlocks(Seq(block))
-        blockFlow.getBlockFlowHeight(block) is (Network.chainNum + 8)
+        blockFlow.add(block)
+        blockFlow.getWeight(block) is 8
       }
     }
   }
@@ -85,25 +87,25 @@ class BlockFlowSpec extends AlephiumSpec {
       val block12     = mine(blockFlow, chainIndex1)
       blockFlow.add(block11)
       blockFlow.add(block12)
-      blockFlow.getBlockFlowHeight(block11) is (Network.chainNum + 1)
-      blockFlow.getBlockFlowHeight(block12) is (Network.chainNum + 1)
+      blockFlow.getWeight(block11) is 1
+      blockFlow.getWeight(block12) is 1
 
       val block13 = mine(blockFlow, chainIndex1)
       blockFlow.add(block13)
-      blockFlow.getBlockFlowHeight(block13) is (Network.chainNum + 2)
+      blockFlow.getWeight(block13) is 2
 
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
       val block22     = mine(blockFlow, chainIndex2)
       blockFlow.add(block21)
       blockFlow.add(block22)
-      blockFlow.getBlockFlowHeight(block21) is (Network.chainNum + 3)
-      blockFlow.getBlockFlowHeight(block22) is (Network.chainNum + 3)
+      blockFlow.getWeight(block21) is 3
+      blockFlow.getWeight(block22) is 3
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.addBlocks(Seq(block3))
-      blockFlow.getBlockFlowHeight(block3) is (Network.chainNum + 4)
+      blockFlow.add(block3)
+      blockFlow.getWeight(block3) is 4
     }
   }
 
@@ -117,5 +119,22 @@ class BlockFlowSpec extends AlephiumSpec {
     }
 
     iter(0)
+  }
+
+  def show(blockFlow: BlockFlow): String = {
+    blockFlow.getAllHeaders
+      .map { header =>
+        val height = blockFlow.getWeight(header)
+        val block  = blockFlow.getBlock(header)
+        val index  = blockFlow.getIndex(block)
+        val hash   = showHash(header)
+        val deps   = block.blockHeader.blockDeps.map(showHash).mkString("-")
+        s"height: $height, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
+      }
+      .mkString("\n")
+  }
+
+  def showHash(hash: Keccak256): String = {
+    Hex.toHexString(hash.bytes).take(8)
   }
 }
