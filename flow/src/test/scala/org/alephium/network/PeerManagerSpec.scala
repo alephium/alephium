@@ -13,7 +13,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   trait Fixture {
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
     val port          = SocketUtil.temporaryLocalPort()
-    val peerManager   = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port)))
+    val peerManager   = system.actorOf(PeerManager.props(Mode.defaultBuilders, port))
 
     peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
   }
@@ -67,7 +67,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     val port = SocketUtil.temporaryLocalPort()
     system.actorOf(TcpServer.props(port))
 
-    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port)))
+    val peerManager = system.actorOf(PeerManager.props(Mode.defaultBuilders, port))
     watch(peerManager)
     expectTerminated(peerManager)
   }

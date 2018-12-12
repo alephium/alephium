@@ -55,7 +55,8 @@ trait Platform extends App with StrictLogging {
 
         (0 until groups).foreach { to =>
           val chainIndex = ChainIndex(from, to)
-          val miner      = node.system.actorOf(MockMiner.props(publicKey, node, chainIndex, second == 0))
+          val miner = node.system.actorOf(MockMiner.props(publicKey, node, chainIndex, second == 0),
+                                          s"MockMiner-$from-$to")
           miner ! Miner.Start
         }
 
