@@ -24,4 +24,6 @@ object Boot extends Platform {
         }
       }
   }
+
+  init()
 }
