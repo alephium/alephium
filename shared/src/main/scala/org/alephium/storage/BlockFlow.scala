@@ -41,8 +41,6 @@ class BlockFlow() extends MultiChain {
 
   override def numTransactions: Int = aggregate(_.numTransactions)(_.sum)
 
-  override def maxHeight: Int = aggregate(_.maxHeight)(_.max)
-
   override def maxWeight: Int = aggregate(_.maxWeight)(_.max)
 
   private def getChain(i: Int, j: Int): SingleChain = {
@@ -252,7 +250,7 @@ class BlockFlow() extends MultiChain {
     val infos = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"($i, $j): ${getChain(i, j).maxHeight}"
+    } yield s"($i, $j): ${getChain(i, j).maxHeight}/${getChain(i, j).numBlocks - 1}"
     infos.mkString("; ")
   }
 
