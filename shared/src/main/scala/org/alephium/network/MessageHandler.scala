@@ -13,13 +13,15 @@ import org.alephium.util.BaseActor
 import scala.util.Random
 
 object MessageHandler {
-  def props(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
-    Props(new MessageHandler(remote, connection, blockHandlers))
-
   object Timer
 
   sealed trait Command
   case object SendPing extends Command
+
+  trait Builder {
+    def MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+      Props(new MessageHandler(remote, connection, blockHandlers))
+  }
 }
 
 class MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
@@ -29,12 +31,16 @@ class MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandl
 
   override def receive: Receive = handlePayload orElse handleInternal orElse awaitSendPing
 
+  def handlePing(nonce: Int, delay: Long): Unit = {
+    // TODO: refuse ping if it's too frequent
+    log.info(s"Ping received with ${delay}ms delay, response with pong")
+    connection ! TcpHandler.envelope(Message(Pong(nonce)))
+  }
+
   def handlePayload: Receive = {
     case Ping(nonce, timestamp) =>
-      // TODO: refuse ping if it's too frequent
       val delay = System.currentTimeMillis() - timestamp
-      log.info(s"Ping received with ${delay}ms delay, response with pong")
-      connection ! TcpHandler.envelope(Message(Pong(nonce)))
+      handlePing(nonce, delay)
     case Pong(nonce) =>
       if (nonce == pingNonce) {
         log.debug("Pong received, no response")

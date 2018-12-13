@@ -7,23 +7,16 @@ import akka.dispatch.MailboxType
 import akka.dispatch.MessageQueue
 import akka.dispatch.ProducesMessageQueue
 import com.typesafe.config.Config
+import com.codahale.metrics.MetricRegistry
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import com.codahale.metrics.MetricRegistry
-import com.codahale.metrics.jmx.JmxReporter
-
 object MonitoringMailbox {
-  val metrics = new MetricRegistry()
-  val reporter = JmxReporter.forRegistry(metrics).build()
-
-  reporter.start()
-
   class MonitoringMessageQueue(owner: ActorRef) extends MessageQueue with akka.event.LoggerMessageQueueSemantics
       with akka.dispatch.UnboundedMessageQueueSemantics
       with MonitoringMailboxSemantics {
 
     val queue = new ConcurrentLinkedQueue[Envelope]()
-    val queueSize = metrics.counter(MetricRegistry.name(owner.path.toString, "queue"))
+    val queueSize = Monitoring.metrics.counter(MetricRegistry.name(owner.path.toString, "queue"))
 
     def enqueue(receiver: ActorRef, handle: Envelope): Unit = {
       val _ = queue.offer(handle)
