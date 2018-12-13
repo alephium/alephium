@@ -2,8 +2,8 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.serde.{Deserializer, Serde, Serializer}
-import org.alephium.protocol.model.{peerIdLength, PeerAddress, PeerId, RandomId}
+import org.alephium.serde.{Deserializer, RandomBytes, Serde, Serializer}
+import org.alephium.protocol.model.{peerIdLength, PeerAddress, PeerId}
 
 /**
   *  Discovery RPC Protocol (Kademila based)
@@ -20,8 +20,8 @@ object DiscoveryMessage {
   val version: Byte = 0
 
   /** The 160bits (20bytes) identifier of a Remote Procedure Call **/
-  class CallId private[CallId] (val bytes: ByteString) extends RandomId
-  object CallId extends RandomId.Companion[CallId](new CallId(_), _.bytes) {
+  class CallId private[CallId] (val bytes: ByteString) extends RandomBytes
+  object CallId extends RandomBytes.Companion[CallId](new CallId(_), _.bytes) {
     override def length: Int = peerIdLength
   }
 
