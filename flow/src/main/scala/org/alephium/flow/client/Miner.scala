@@ -21,7 +21,7 @@ object Miner {
   def mineGenesis(chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.genesis(Seq.empty, nonce)
+      val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, nonce)
       if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 
