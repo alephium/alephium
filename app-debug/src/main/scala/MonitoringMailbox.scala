@@ -7,6 +7,7 @@ import akka.dispatch.MailboxType
 import akka.dispatch.MessageQueue
 import akka.dispatch.ProducesMessageQueue
 import com.typesafe.config.Config
+import com.codahale.metrics.MetricRegistry
 import java.util.concurrent.ConcurrentLinkedQueue
 
 object MonitoringMailbox {
