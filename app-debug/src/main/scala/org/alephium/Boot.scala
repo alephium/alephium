@@ -8,7 +8,7 @@ import org.alephium.network.{MessageHandler, TcpHandler}
 import org.alephium.storage.BlockHandlers
 
 object Boot extends Platform {
-  override val mode = new Mode.Local {
+  override val mode = new Mode.Local(args(0).toInt) {
     override def builders: TcpHandler.Builder with MessageHandler.Builder =
       new TcpHandler.Builder with MessageHandler.Builder {
         override def createMessageHandler(remote: InetSocketAddress,
