@@ -8,7 +8,6 @@ class ConfirmedChain() {
   private val blocks: ArrayBuffer[Block] = ArrayBuffer.empty
 
   def add(block: Block): Unit = {
-    assert(block.prevBlockHash == blocks.last.hash)
     blocks += block
   }
 }

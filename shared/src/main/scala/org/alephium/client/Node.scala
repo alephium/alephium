@@ -9,6 +9,7 @@ case class Node(
     name: String,
     port: Int,
     system: ActorSystem,
+    blockFlow: BlockFlow,
     peerManager: ActorRef,
     blockHandlers: BlockHandlers
 )
@@ -31,6 +32,6 @@ object Node {
     val blockHandlers = BlockHandlers(blockHandler, chainHandlers)
     peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
 
-    Node(name, port, system, peerManager, blockHandlers)
+    Node(name, port, system, blockFlow, peerManager, blockHandlers)
   }
 }

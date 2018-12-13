@@ -67,8 +67,11 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
     _mine(deps, transactions, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
-    case FlowHandler.BlockFlowTemplate(deps, lastTs) =>
+    case FlowHandler.BlockFlowTemplate(deps) =>
+      assert(deps.size == (2 * Network.groups - 1))
       val transaction = Transaction.coinbase(address, 1)
+      val chainDep    = deps.view.takeRight(Network.groups)(chainIndex.to)
+      val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
       context become mine(deps, Seq(transaction), lastTs)
       self ! Miner.Nonce(0, Network.nonceStep)
   }

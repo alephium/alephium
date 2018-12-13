@@ -46,5 +46,5 @@ trait MultiChain extends BlockPool {
     getChain(hash).getWeight(hash)
   }
 
-  def getBlockSlice(block: Block): Seq[Block] = getChain(block).getBlockSlice(block)
+  def getBlockSlice(hash: Keccak256): Seq[Block] = getChain(hash).getBlockSlice(hash)
 }
