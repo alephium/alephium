@@ -1,7 +1,7 @@
 package org.alephium.flow.model
 
-import org.alephium.flow.constant.Network
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.constant.Network
 import org.alephium.protocol.model.Block
 
 case class ChainIndex(from: Int, to: Int) {

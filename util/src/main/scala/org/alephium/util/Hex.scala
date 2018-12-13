@@ -1,7 +1,7 @@
 package org.alephium.util
 
-import org.bouncycastle.util.encoders.{Hex => BHex}
 import akka.util.ByteString
+import org.bouncycastle.util.encoders.{Hex => BHex}
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox

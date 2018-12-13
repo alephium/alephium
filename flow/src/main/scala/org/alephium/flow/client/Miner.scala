@@ -1,12 +1,12 @@
 package org.alephium.flow.client
 
 import akka.actor.Props
-import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.flow.model.ChainIndex
-import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
+import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
+import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.BaseActor
 
 import scala.annotation.tailrec

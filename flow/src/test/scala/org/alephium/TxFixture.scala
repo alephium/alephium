@@ -1,8 +1,8 @@
 package org.alephium
 
 import io.circe.parser.parse
-import org.alephium.flow.constant.{Consensus, Genesis}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.flow.constant.{Consensus, Genesis}
 import org.alephium.protocol.model._
 import org.alephium.util.Hex
 
