@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import com.codahale.metrics.{Histogram, MetricRegistry}
 import org.alephium.monitoring.Monitoring
-import org.alephium.network.TcpHandler
-import org.alephium.storage.BlockHandlers
+import org.alephium.flow.network.TcpHandler
+import org.alephium.flow.storage.BlockHandlers
 
 object MockTcpHandler {
 
