@@ -17,13 +17,13 @@ object Message {
 
   implicit val serializer: Serializer[Message] = {
     case Message(header, payload) =>
-      implicitly[Serde[Header]].serialize(header) ++
+      Serde[Header].serialize(header) ++
         Payload.serializer.serialize(payload)
   }
 
   implicit val deserializer: Deserializer[Message] = (input: ByteString) => {
     for {
-      (header, hRest)  <- implicitly[Serde[Header]]._deserialize(input)
+      (header, hRest)  <- Serde[Header]._deserialize(input)
       (payload, pRest) <- Payload.deserializer(header.cmdCode)._deserialize(hRest)
     } yield (apply(header, payload), pRest)
   }
