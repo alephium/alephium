@@ -35,14 +35,14 @@ def mainProject(id: String): Project = baseProject(id)
 
       val tmp         = System.getProperty("java.io.tmpdir")
 
-      (0 until nodes).foreach { node =>
+      (0 until nodes).map { node =>
         val port = port_start + node
         val app = target.value / "universal" / "stage" / "bin" / name.value
         val log = Path(tmp) / "alephium-log" / s"$port.txt"
+
         val cmd = s"$app $port" #> log
-        println(cmd)
         cmd.run()
-      }
+      }.foreach(_.exitValue())
     }
   )
   .enablePlugins(JavaAppPackaging)
