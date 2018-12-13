@@ -18,23 +18,12 @@ lazy val root: Project = Project("root", file("."))
     scalastyle := {},
     scalastyle in Test := {},
   )
-  .aggregate(app, util, serde, crypto, protocol)
+  .aggregate(app, `app-debug`, flow, util, serde, crypto, protocol)
 
 def mainProject(id: String): Project = baseProject(id)
   .settings(
-    unmanagedSourceDirectories in Compile     += baseDirectory.value / ".." / "shared" / "src" / "main" / "scala",
-    unmanagedResourceDirectories in Compile   += baseDirectory.value / ".." / "shared" / "src" / "main" / "resources",
     Compile / scalastyleConfig := root.base / scalastyleCfgFile,
     Test    / scalastyleConfig := root.base / scalastyleTestCfgFile,
-    libraryDependencies ++= Seq(
-      akka,
-      `akka-slf4j`,
-      `akka-http`,
-      `akka-stream`,
-      `circe-parser`,
-      `scala-logging`,
-      logback,
-    ),
     run := {
       import scala.sys.process._
       import complete.DefaultParsers._
@@ -57,21 +46,17 @@ def mainProject(id: String): Project = baseProject(id)
     }
   )
   .enablePlugins(JavaAppPackaging)
-  .dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
+  .dependsOn(flow)
 
 lazy val app = mainProject("app")
-  .settings(
-    unmanagedSourceDirectories in Test        += baseDirectory.value / ".." / "shared" / "src" / "test" / "scala",
-    unmanagedResourceDirectories in Test      += baseDirectory.value / ".." / "shared" / "src" / "test" / "resources"
-  )
 
 lazy val `app-debug` = mainProject("app-debug")
   .settings(
-    coverageEnabled := true,
     libraryDependencies ++= Seq(
       metrics,
       `metrics-jmx`
-    )
+    ),
+    coverageEnabled := false
   )
 
 def subProject(path: String): Project = {
@@ -82,12 +67,34 @@ def subProject(path: String): Project = {
     )
 }
 
-lazy val util = subProject("util")
+lazy val crypto = subProject("crypto")
+  .dependsOn(util % "test->test;compile->compile", serde)
+  .settings(
+    libraryDependencies ++= Seq(
+      curve25519
+    )
+  )
+
+lazy val flow = subProject("flow")
   .settings(
     libraryDependencies ++= Seq(
       akka,
+      `akka-slf4j`,
+      `akka-http`,
+      `akka-stream`,
       bcprov,
-      `scala-reflect`(scalaVersion.value)
+      `circe-parser`,
+      `scala-logging`,
+      `scala-reflect`(scalaVersion.value),
+      logback
+    )
+  ).dependsOn(util % "test->test;compile->compile", serde, crypto, protocol % "test->test;compile->compile")
+
+lazy val protocol = subProject("protocol")
+  .dependsOn(util % "test->test;compile->compile", serde, crypto)
+  .settings(
+    libraryDependencies ++= Seq(
+      `circe-parser`
     )
   )
 
@@ -98,19 +105,12 @@ lazy val serde = subProject("serde")
   )
   .dependsOn(util % "test->test;compile->compile")
 
-lazy val crypto = subProject("crypto")
-  .dependsOn(util % "test->test;compile->compile", serde)
+lazy val util = subProject("util")
   .settings(
     libraryDependencies ++= Seq(
-      curve25519
-    )
-  )
-
-lazy val protocol = subProject("protocol")
-  .dependsOn(util % "test->test;compile->compile", serde, crypto)
-  .settings(
-    libraryDependencies ++= Seq(
-      `circe-parser`
+      akka,
+      bcprov,
+      `scala-reflect`(scalaVersion.value)
     )
   )
 
@@ -163,6 +163,12 @@ val commonSettings = Seq(
   Test / scalacOptions += "-Xcheckinit",
   fork := true,
   run / javaOptions += "-Xmx4g -XX:+UseG1GC",
+  scalafmtOnCompile := true,
+  (compile in Compile) := {
+    val result = (compile in Compile).value
+    scalastyle.in(Compile).toTask("").value
+    result
+  },
   libraryDependencies ++= Seq(
     akkatest,
     scalacheck,
