@@ -11,11 +11,13 @@ import com.codahale.metrics.MetricRegistry
 import java.util.concurrent.ConcurrentLinkedQueue
 
 object MonitoringMailbox {
-  class MonitoringMessageQueue(owner: ActorRef) extends MessageQueue with akka.event.LoggerMessageQueueSemantics
+  class MonitoringMessageQueue(owner: ActorRef)
+      extends MessageQueue
+      with akka.event.LoggerMessageQueueSemantics
       with akka.dispatch.UnboundedMessageQueueSemantics
       with MonitoringMailboxSemantics {
 
-    val queue = new ConcurrentLinkedQueue[Envelope]()
+    val queue     = new ConcurrentLinkedQueue[Envelope]()
     val queueSize = Monitoring.metrics.counter(MetricRegistry.name(owner.path.toString, "queue"))
 
     def enqueue(receiver: ActorRef, handle: Envelope): Unit = {
@@ -31,7 +33,7 @@ object MonitoringMailbox {
     }
 
     def numberOfMessages: Int = queue.size
-    def hasMessages: Boolean = !queue.isEmpty
+    def hasMessages: Boolean  = !queue.isEmpty
 
     def cleanUp(owner: ActorRef, deadLetters: MessageQueue) {
       while (hasMessages) {
@@ -41,8 +43,9 @@ object MonitoringMailbox {
   }
 }
 
-class MonitoringMailbox extends MailboxType
-  with ProducesMessageQueue[MonitoringMailbox.MonitoringMessageQueue] {
+class MonitoringMailbox
+    extends MailboxType
+    with ProducesMessageQueue[MonitoringMailbox.MonitoringMessageQueue] {
 
   import MonitoringMailbox.MonitoringMessageQueue
 
@@ -51,8 +54,8 @@ class MonitoringMailbox extends MailboxType
   }
 
   final override def create(
-    owner:  Option[ActorRef],
-    system: Option[ActorSystem]
+      owner: Option[ActorRef],
+      system: Option[ActorSystem]
   ): MessageQueue =
     new MonitoringMessageQueue(owner.get)
 }

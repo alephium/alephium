@@ -19,7 +19,9 @@ object MessageHandler {
   case object SendPing extends Command
 
   trait Builder {
-    def MessageHandler(remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+    def createMessageHandler(remote: InetSocketAddress,
+                             connection: ActorRef,
+                             blockHandlers: BlockHandlers): Props =
       Props(new MessageHandler(remote, connection, blockHandlers))
   }
 }

@@ -13,8 +13,6 @@ import org.alephium.util.BaseActor
 import scala.collection.mutable
 
 object PeerManager {
-  // def props(port: Int): Props = Props(new PeerManager(port))
-
   sealed trait Command
   case class SetBlockHandlers(blockhandlers: BlockHandlers)            extends Command
   case class Connect(remote: InetSocketAddress)                        extends Command
@@ -26,7 +24,8 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port: Int) extends BaseActor {
+class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port: Int)
+    extends BaseActor {
   import PeerManager._
 
   val server: ActorRef                                = context.actorOf(TcpServer.props(port))
@@ -95,7 +94,8 @@ class PeerManager(builders: TcpHandler.Builder with MessageHandler.Builder, port
   def addPeer(remote: InetSocketAddress,
               connection: ActorRef,
               blockHandlers: BlockHandlers): Unit = {
-    val tcpHandler = context.actorOf(builders.TcpHandler(builders, remote, connection, blockHandlers))
+    val tcpHandler =
+      context.actorOf(builders.createTcpHandler(builders, remote, connection, blockHandlers))
     context.watch(tcpHandler)
     connection ! Tcp.Register(tcpHandler)
 //    blockHandler ! BlockHandler.PrepareSync(remote) // TODO: mark tcpHandler in sync status; DoS attack

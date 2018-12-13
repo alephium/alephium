@@ -3,7 +3,7 @@ package org.alephium.network
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.AlephiumActorSpec
+import org.alephium.{AlephiumActorSpec, Mode}
 import org.alephium.network.PeerManager.GetPeers
 import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.storage.HandlerUtils
@@ -13,7 +13,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   trait Fixture {
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
     val port          = SocketUtil.temporaryLocalPort()
-    val peerManager   = system.actorOf(PeerManager.props(port))
+    val peerManager   = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port)))
 
     peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
   }
@@ -49,7 +49,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     val tcpHandler = TestProbe()
 
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
-    val peerManager = system.actorOf(Props(new PeerManager(port) {
+    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port) {
       peers += (remote -> tcpHandler.ref)
     }))
     peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
@@ -67,7 +67,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     val port = SocketUtil.temporaryLocalPort()
     system.actorOf(TcpServer.props(port))
 
-    val peerManager = system.actorOf(Props(new PeerManager(port)))
+    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port)))
     watch(peerManager)
     expectTerminated(peerManager)
   }

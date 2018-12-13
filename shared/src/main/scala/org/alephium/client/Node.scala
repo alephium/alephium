@@ -1,7 +1,7 @@
 package org.alephium.client
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import org.alephium.network.{PeerManager, TcpHandler, MessageHandler}
+import org.alephium.network.{MessageHandler, PeerManager, TcpHandler}
 import org.alephium.storage.BlockFlow.ChainIndex
 import org.alephium.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
 
@@ -15,7 +15,9 @@ case class Node(
 
 object Node {
   def apply(builders: TcpHandler.Builder with MessageHandler.Builder,
-            name: String, port: Int, groups: Int): Node = {
+            name: String,
+            port: Int,
+            groups: Int): Node = {
 
     val system      = ActorSystem(name)
     val blockFlow   = BlockFlow()

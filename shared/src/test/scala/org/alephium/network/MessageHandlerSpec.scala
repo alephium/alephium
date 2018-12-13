@@ -10,7 +10,9 @@ import org.alephium.storage.HandlerUtils
 
 import scala.util.Random
 
-class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
+class MessageHandlerSpec
+    extends AlephiumActorSpec("MessageHandlerSpec")
+    with MessageHandler.Builder {
 
   trait Fixture {
     lazy val remote        = new InetSocketAddress(SocketUtil.temporaryLocalPort())
@@ -18,7 +20,7 @@ class MessageHandlerSpec extends AlephiumActorSpec("MessageHandlerSpec") {
     lazy val blockHandlers = HandlerUtils.createBlockHandlersProbe
 
     lazy val messageHandler =
-      system.actorOf(MessageHandler.props(remote, connection.ref, blockHandlers))
+      system.actorOf(createMessageHandler(remote, connection.ref, blockHandlers))
   }
 
   behavior of "MessageHandlerSpec"

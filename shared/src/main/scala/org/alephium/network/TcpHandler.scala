@@ -34,16 +34,22 @@ object TcpHandler {
   }
 
   trait Builder {
-    def TcpHandler(mhb: MessageHandler.Builder, remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers): Props =
+    def createTcpHandler(mhb: MessageHandler.Builder,
+                         remote: InetSocketAddress,
+                         connection: ActorRef,
+                         blockHandlers: BlockHandlers): Props =
       Props(new TcpHandler(mhb, remote, connection, blockHandlers))
   }
 }
 
-class TcpHandler(builders: MessageHandler.Builder, remote: InetSocketAddress, connection: ActorRef, blockHandlers: BlockHandlers)
+class TcpHandler(builders: MessageHandler.Builder,
+                 remote: InetSocketAddress,
+                 connection: ActorRef,
+                 blockHandlers: BlockHandlers)
     extends BaseActor {
 
   val messageHandler: ActorRef =
-    context.actorOf(builders.MessageHandler(remote, connection, blockHandlers))
+    context.actorOf(builders.createMessageHandler(remote, connection, blockHandlers))
 
   override def preStart(): Unit = {
     context.watch(messageHandler)
