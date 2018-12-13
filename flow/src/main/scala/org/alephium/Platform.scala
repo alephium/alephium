@@ -20,8 +20,8 @@ trait Platform extends App with StrictLogging {
   def mode: Mode
 
   def init(): Future[Http.ServerBinding] = {
-    val node  = mode.createNode(args)
-    val index = mode.getIndex(args)
+    val node  = mode.createNode
+    val index = mode.index
 
     connect(node, index)
     runServer(node, index)
@@ -63,6 +63,6 @@ trait Platform extends App with StrictLogging {
       }
     }
 
-    Http().bindAndHandle(route, "0.0.0.0", mode.getHttpPort(args))
+    Http().bindAndHandle(route, "0.0.0.0", mode.httpPort)
   }
 }
