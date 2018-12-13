@@ -49,7 +49,8 @@ class TcpHandler(builders: MessageHandler.Builder,
     extends BaseActor {
 
   val messageHandler: ActorRef =
-    context.actorOf(builders.createMessageHandler(remote, connection, blockHandlers))
+    context.actorOf(builders.createMessageHandler(remote, connection, blockHandlers),
+                    BaseActor.envalidActorName(s"MessageHandler-$remote"))
 
   override def preStart(): Unit = {
     context.watch(messageHandler)
