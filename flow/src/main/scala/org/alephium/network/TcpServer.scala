@@ -7,17 +7,22 @@ import akka.io.{IO, Tcp}
 import org.alephium.util.BaseActor
 
 object TcpServer {
-  def props(port: Int): Props = Props(new TcpServer(port))
+  def props(port: Int, peerManager: ActorRef): Props = Props(new TcpServer(port, peerManager))
+
+  sealed trait Command
+  case object Start extends Command
 }
 
-class TcpServer(port: Int) extends BaseActor {
+class TcpServer(port: Int, peerManager: ActorRef) extends BaseActor {
   import context.system
 
-  val peerManager: ActorRef = context.parent
+  override def receive: Receive = awaitStart
 
-  IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port))
-
-  override def receive: Receive = binding
+  def awaitStart: Receive = {
+    case TcpServer.Start =>
+      IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port))
+      context.become(binding)
+  }
 
   def binding: Receive = {
     case Tcp.Bound(localAddress) =>

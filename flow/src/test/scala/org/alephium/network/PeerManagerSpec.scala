@@ -11,11 +11,11 @@ import org.alephium.storage.HandlerUtils
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   trait Fixture {
+    val server        = TestProbe()
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
-    val port          = SocketUtil.temporaryLocalPort()
-    val peerManager   = system.actorOf(PeerManager.props(Mode.defaultBuilders, port))
+    val peerManager   = system.actorOf(PeerManager.props(Mode.defaultBuilders))
 
-    peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
+    peerManager ! PeerManager.Set(server.ref, blockHandlers)
   }
 
   behavior of "PeerManagerSpec"
@@ -24,9 +24,8 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   it should "add peer when received connection" in new Fixture {
     val remote     = SocketUtil.temporaryServerAddress()
-    val local      = SocketUtil.temporaryServerAddress()
     val connection = TestProbe()
-    peerManager.tell(Tcp.Connected(remote, local), connection.ref)
+    peerManager ! PeerManager.Connected(remote, connection.ref)
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers) =>
@@ -44,40 +43,30 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   }
 
   it should "try to send GetBlocks to peer" in {
-    val port       = SocketUtil.temporaryLocalPort()
     val remote     = SocketUtil.temporaryServerAddress()
     val tcpHandler = TestProbe()
 
+    val server        = TestProbe()
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
-    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders, port) {
+    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders) {
       peers += (remote -> tcpHandler.ref)
     }))
-    peerManager ! PeerManager.SetBlockHandlers(blockHandlers)
+    peerManager ! PeerManager.Set(server.ref, blockHandlers)
     peerManager ! PeerManager.Sync(remote, Seq.empty)
     tcpHandler.expectMsg(Message(GetBlocks(Seq.empty)))
   }
 
-  it should "stop if block pool stoped" in new Fixture {
+  it should "stop if server stopped" in new Fixture {
     watch(peerManager)
-    system.stop(blockHandlers.flowHandler)
-    expectTerminated(peerManager)
-  }
-
-  it should "stop if server stopped" in {
-    val port = SocketUtil.temporaryLocalPort()
-    system.actorOf(TcpServer.props(port))
-
-    val peerManager = system.actorOf(PeerManager.props(Mode.defaultBuilders, port))
-    watch(peerManager)
+    system.stop(server.ref)
     expectTerminated(peerManager)
   }
 
   it should "remove peer when tcp handler stopped" in new Fixture {
     val remote     = SocketUtil.temporaryServerAddress()
-    val local      = SocketUtil.temporaryServerAddress()
     val connection = TestProbe()
     watch(peerManager)
-    peerManager.tell(Tcp.Connected(remote, local), connection.ref)
+    peerManager ! PeerManager.Connected(remote, connection.ref)
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers1) =>

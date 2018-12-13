@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.client.Node
 import org.alephium.constant.Network
-import org.alephium.network.{MessageHandler, TcpHandler}
+import org.alephium.network.TcpHandler
 
 import scala.sys.process._
 
@@ -20,15 +20,14 @@ trait Mode {
 
   def index2Ip(index: Int): InetSocketAddress
 
-  def builders: TcpHandler.Builder with MessageHandler.Builder = Mode.defaultBuilders
+  def builders: TcpHandler.Builder = Mode.defaultBuilders
 
   def createNode: Node
 }
 
 object Mode {
 
-  def defaultBuilders: TcpHandler.Builder with MessageHandler.Builder =
-    new TcpHandler.Builder with MessageHandler.Builder
+  def defaultBuilders: TcpHandler.Builder = new TcpHandler.Builder {}
 
   class Aws extends Mode with StrictLogging {
     val port: Int = Network.port

@@ -1,5 +1,7 @@
 package org.alephium
 
+import java.time.Instant
+
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
@@ -28,12 +30,10 @@ trait Platform extends App with StrictLogging {
   }
 
   def connect(node: Node, index: Int): Unit = {
-    Thread.sleep(1000 * 60)
-
     if (index > 0) {
       val parentIndex = index / 2
       val remote      = mode.index2Ip(parentIndex)
-      node.peerManager ! PeerManager.Connect(remote)
+      node.peerManager ! PeerManager.Connect(remote, Instant.now().plusSeconds(100))
     }
   }
 

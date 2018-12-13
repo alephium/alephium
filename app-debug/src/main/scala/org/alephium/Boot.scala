@@ -1,20 +1,19 @@
 package org.alephium
 
 import java.net.InetSocketAddress
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import com.codahale.metrics.MetricRegistry
 
-import org.alephium.network.{MessageHandler, TcpHandler}
+import org.alephium.network.TcpHandler
 import org.alephium.storage.BlockHandlers
 
 object Boot extends Platform {
   override val mode = new Mode.Local(args(0).toInt) {
-    override def builders: TcpHandler.Builder with MessageHandler.Builder =
-      new TcpHandler.Builder with MessageHandler.Builder {
-        override def createMessageHandler(remote: InetSocketAddress,
-                                          connection: ActorRef,
-                                          blockHandlers: BlockHandlers): Props = {
-          Props(new MessageHandler(remote, connection, blockHandlers) {
+    override def builders: TcpHandler.Builder =
+      new TcpHandler.Builder {
+        override def createTcpHandler(remote: InetSocketAddress,
+                                      blockHandlers: BlockHandlers): Props = {
+          Props(new TcpHandler(remote, blockHandlers) {
 
             val delays = Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
 
