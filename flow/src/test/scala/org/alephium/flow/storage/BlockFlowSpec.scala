@@ -1,11 +1,9 @@
 package org.alephium.flow.storage
-
-import org.alephium.AlephiumSpec
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
-import org.alephium.util.Hex
+import org.alephium.util.{AlephiumSpec, Hex}
 
 import scala.annotation.tailrec
 

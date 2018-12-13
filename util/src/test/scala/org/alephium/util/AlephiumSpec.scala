@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.util
 
 import org.scalactic.Equality
 import org.scalatest.prop.GeneratorDrivenPropertyChecks

@@ -1,6 +1,5 @@
 package org.alephium.crypto
-
-import org.alephium.AlephiumSpec
+import org.alephium.util.AlephiumSpec
 
 class SignatureSpec extends AlephiumSpec {
   "ED25519" should "sign correctly" in {

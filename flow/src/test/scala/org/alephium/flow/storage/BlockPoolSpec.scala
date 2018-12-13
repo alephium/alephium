@@ -1,8 +1,7 @@
 package org.alephium.flow.storage
-
-import org.alephium.AlephiumSpec
 import org.alephium.flow.constant.Genesis
 import org.alephium.protocol.model.ModelGen
+import org.alephium.util.AlephiumSpec
 
 class BlockPoolSpec extends AlephiumSpec {
 
