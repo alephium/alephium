@@ -1,4 +1,5 @@
 package org.alephium.flow.storage
+
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.AlephiumSpec
 
