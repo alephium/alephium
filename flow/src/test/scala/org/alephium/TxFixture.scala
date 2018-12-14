@@ -27,8 +27,8 @@ trait TxFixture {
 
   private val test = json.hcursor.downField("test")
   val testPrivateKey: ED25519PrivateKey =
-    ED25519PrivateKey.unsafeFrom(Hex(test.get[String]("privateKey").right.get))
+    ED25519PrivateKey.unsafeFrom(Hex.unsafeFrom(test.get[String]("privateKey").right.get))
   val testPublicKey: ED25519PublicKey =
-    ED25519PublicKey.unsafeFrom(Hex(test.get[String]("publicKey").right.get))
+    ED25519PublicKey.unsafeFrom(Hex.unsafeFrom(test.get[String]("publicKey").right.get))
   val testBalance: BigInt = test.get[BigInt]("balance").right.get
 }
