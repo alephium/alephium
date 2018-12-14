@@ -50,10 +50,12 @@ object RandomBytes {
 
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
-      SecureRandom.getInstanceStrong.nextBytes(xs)
+      source.nextBytes(xs)
       unsafeFrom(ByteString(xs))
     }
 
     implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafeFrom, toBytes)
   }
+
+  val source: SecureRandom = SecureRandom.getInstanceStrong
 }

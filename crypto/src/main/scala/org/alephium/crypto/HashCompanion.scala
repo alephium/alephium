@@ -2,7 +2,6 @@ package org.alephium.crypto
 
 import scala.reflect.runtime.universe.TypeTag
 import java.nio.charset.Charset
-import java.security.SecureRandom
 
 import akka.util.ByteString
 import org.alephium.serde._
@@ -32,5 +31,5 @@ abstract class HashCompanion[T: TypeTag](unsafeFrom: ByteString => T, toBytes: T
     hash(serializer.serialize(input))
   }
 
-  def random: T = hash(ByteString(SecureRandom.getInstanceStrong.nextLong))
+  def random: T = hash(ByteString(RandomBytes.source.nextLong))
 }

@@ -5,6 +5,8 @@ import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.protocol.model.Block
 
 case class ChainIndex(from: Int, to: Int) {
+  def accept(block: Block): Boolean = accept(block.hash)
+
   def accept(hash: Keccak256): Boolean = {
     val target     = from * Network.groups + to
     val miningHash = Block.toMiningHash(hash)
