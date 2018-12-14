@@ -8,9 +8,9 @@ import org.bouncycastle.util.encoders.Hex
 trait RandomBytes {
   def bytes: ByteString
 
-  def lastByte: Byte = bytes(bytes.size - 1)
+  def last: Byte = bytes(bytes.size - 1)
 
-  def second2LastByte: Byte = {
+  def beforeLast: Byte = {
     val size = bytes.size
     assert(size >= 2)
     bytes(size - 2)
