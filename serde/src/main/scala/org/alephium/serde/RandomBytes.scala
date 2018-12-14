@@ -1,13 +1,11 @@
-package org.alephium.protocol.model
+package org.alephium.serde
 
 import scala.reflect.runtime.universe.{typeOf, TypeTag}
 import akka.util.ByteString
 import java.security.SecureRandom
 import org.bouncycastle.util.encoders.Hex
 
-import org.alephium.serde.Serde
-
-trait RandomId {
+trait RandomBytes {
   def bytes: ByteString
 
   override def hashCode(): Int = {
@@ -22,8 +20,8 @@ trait RandomId {
   }
 
   override def equals(obj: Any): Boolean = obj match {
-    case that: RandomId => bytes == that.bytes
-    case _              => false
+    case that: RandomBytes => bytes == that.bytes
+    case _                 => false
   }
 
   override def toString: String = {
@@ -33,20 +31,21 @@ trait RandomId {
   }
 }
 
-object RandomId {
-  abstract class Companion[T: TypeTag](val unsafeTo: ByteString => T, val from: T => ByteString) {
+object RandomBytes {
+  abstract class Companion[T: TypeTag](val unsafeFrom: ByteString => T,
+                                       val toBytes: T             => ByteString) {
     val name = typeOf[T].typeSymbol.name.toString
 
-    lazy val zero: T = unsafeTo(ByteString(Array.fill[Byte](length)(0)))
+    lazy val zero: T = unsafeFrom(ByteString(Array.fill[Byte](length)(0)))
 
     def length: Int
 
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
       SecureRandom.getInstanceStrong.nextBytes(xs)
-      unsafeTo(ByteString(xs))
+      unsafeFrom(ByteString(xs))
     }
 
-    implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafeTo, from)
+    implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafeFrom, toBytes)
   }
 }

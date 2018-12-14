@@ -1,11 +1,12 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+import org.alephium.serde.RandomBytes
 
 /** 160bits identifier of a Peer **/
-class PeerId private[PeerId] (val bytes: ByteString) extends RandomId
+class PeerId private[PeerId] (val bytes: ByteString) extends RandomBytes
 
-object PeerId extends RandomId.Companion[PeerId](new PeerId(_), _.bytes) {
+object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
   override def length: Int = peerIdLength
 
   /** Return the distance between two peers as the XOR of their identifier. **/
