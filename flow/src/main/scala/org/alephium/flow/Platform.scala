@@ -32,7 +32,8 @@ trait Platform extends App with StrictLogging {
     if (index > 0) {
       val parentIndex = index / 2
       val remote      = mode.index2Ip(parentIndex)
-      node.peerManager ! PeerManager.Connect(remote, Instant.now().plusSeconds(300))
+      val until       = Instant.now().plusMillis(Network.retryTimeout.toMillis)
+      node.peerManager ! PeerManager.Connect(remote, until)
     }
   }
 
