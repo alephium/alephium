@@ -1,32 +1,34 @@
 package org.alephium.mock
 
-import akka.actor.{Props, Timers}
+import akka.actor.{ActorRef, Props, Timers}
 import org.alephium.client.{Miner, Node}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.storage.BlockFlow.ChainIndex
-import org.alephium.storage.{AddBlockResult, ChainHandler, FlowHandler}
 import org.alephium.storage.ChainHandler.BlockOrigin.Local
+import org.alephium.storage.{AddBlockResult, ChainHandler, FlowHandler}
 
 import scala.annotation.tailrec
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 object MockMiner {
-  def props(address: ED25519PublicKey,
-            node: Node,
-            chainIndex: ChainIndex,
-            always: Boolean = true): Props =
-    Props(new MockMiner(address, node, chainIndex, always))
 
   object Timer
   case class MockMining(timestamp: Long)
+
+  trait Builder extends Miner.Builder {
+    override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex): Props =
+      Props(new MockMiner(address, node, chainIndex))
+  }
 }
 
-class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex, always: Boolean)
+class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
     extends Miner(address, node, chainIndex)
     with Timers {
   import node.blockHandlers
+
+  val chainHandler: ActorRef = blockHandlers.getHandler(chainIndex)
 
   override def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive = {
     case Miner.Nonce(_, _) =>
@@ -41,16 +43,12 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex, a
         }
       val sleepTs = nextTs - currentTs
       timers.startSingleTimer(MockMiner.Timer, MockMiner.MockMining(nextTs), sleepTs.millis)
+
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(deps, Seq.empty, nextTs, Long.MaxValue).get
-      val ratio = Random.nextDouble()
-      if (always || (ratio < 0.1)) {
-        log.info(s"A new block is mined at ${block.blockHeader.timestamp}")
-        val chainIndex = ChainIndex.fromHash(block.hash)
-        blockHandlers.getHandler(chainIndex) ! ChainHandler.AddBlocks(Seq(block), Local)
-      } else {
-        self ! AddBlockResult.Success
-      }
+      log.info(s"A new block ${block.shortHash} is mined at ${block.blockHeader.timestamp}")
+      chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
+
     case _: AddBlockResult =>
       blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect

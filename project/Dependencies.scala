@@ -1,9 +1,9 @@
 import sbt._
 
 object Version {
-  lazy val akka     = "2.5.12"
-  lazy val circe    = "0.9.3"
-  lazy val metrics  = "4.0.3"
+  lazy val akka    = "2.5.12"
+  lazy val circe   = "0.9.3"
+  lazy val metrics = "4.0.3"
 }
 
 object Dependencies {
@@ -22,5 +22,5 @@ object Dependencies {
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"     % "1.13.5" % Test
   lazy val scalatest       = "org.scalatest"              %% "scalatest"      % "3.0.5" % Test
 
-  def `scala-reflect`(scalaVersion: String) = "org.scala-lang"             % "scala-reflect"   % scalaVersion
+  def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 }
