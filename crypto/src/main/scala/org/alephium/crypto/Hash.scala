@@ -24,6 +24,10 @@ trait RandomBytes extends Bytes {
     case that: RandomBytes => bytes == that.bytes
     case _                 => false
   }
+
+  def last: Byte = bytes.last
+
+  def second2Last: Byte = bytes.apply(bytes.length - 2)
 }
 
 trait Hash[T <: RandomBytes] extends FixedSizeBytes[T] {
