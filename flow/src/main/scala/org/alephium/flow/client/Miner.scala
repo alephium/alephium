@@ -1,6 +1,6 @@
 package org.alephium.flow.client
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.flow.model.ChainIndex
@@ -37,6 +37,8 @@ object Miner {
 class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) extends BaseActor {
   import node.blockHandlers
 
+  val chainHandler: ActorRef = blockHandlers.getHandler(chainIndex)
+
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
@@ -55,15 +57,19 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
     case Miner.Nonce(from, to) =>
       tryMine(deps, transactions, from, to) match {
         case Some(block) =>
-          log.info(s"A new block is mined since $lastTs")
-          val chainIndex = ChainIndex.fromHash(block.hash)
-          blockHandlers.getHandler(chainIndex) ! ChainHandler.AddBlocks(Seq(block), Local)
+          val elapsed = System.currentTimeMillis() - lastTs
+          log.info(s"A new block ${block.shortHash} is mined, elapsed $elapsed ms")
+          chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)
       }
-    case _: AddBlockResult =>
+
+    case AddBlockResult.Success =>
       blockHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
+
+    case _: AddBlockResult.Failure =>
+      context stop self
   }
 
   def mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive =
@@ -98,7 +104,6 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
   }
 
   def isDifficult(block: Block): Boolean = {
-    val hash = block.miningHash
-    chainIndex.accept(hash) && hash.bytes(2) < 0 //TODO: improve this
+    chainIndex.accept(block.hash)
   }
 }

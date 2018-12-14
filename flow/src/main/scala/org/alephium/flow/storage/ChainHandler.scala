@@ -45,11 +45,10 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
           log.info(
             s"Total: $total; Index: $chainIndex; Height: $height/$blockNum; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
-        case AddBlockResult.AlreadyExisted =>
-          log.info(s"Received already included block")
-        case AddBlockResult.MissingDeps(deps) =>
-          log.error(s"Missing #${deps.size - 1} deps")
+        case error: AddBlockResult.Failure =>
+          log.info(s"Failed in adding new block: $error")
       }
+
       sender() ! result
   }
 }
