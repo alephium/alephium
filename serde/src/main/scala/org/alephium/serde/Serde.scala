@@ -21,6 +21,17 @@ trait Deserializer[T] { self =>
         if (rest.isEmpty) Success(output)
         else Failure(WrongFormatException.redundant(input.size - rest.size, input.size))
     }
+
+  def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
+    (input: ByteString) => {
+      self._deserialize(input).flatMap {
+        case (t, rest) =>
+          get(t) match {
+            case Some(u) => Success((u, rest))
+            case None    => Failure(new WrongFormatException(error(t)))
+          }
+      }
+    }
 }
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
