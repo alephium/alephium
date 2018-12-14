@@ -119,7 +119,7 @@ object Boilerplate {
       block"""
         |package org.alephium.serde
         |
-        |import org.alephium.AlephiumSpec
+        |import org.alephium.util.AlephiumSpec
         |import org.scalatest.TryValues._
         |
         |class ProductSerdeSpec extends AlephiumSpec {

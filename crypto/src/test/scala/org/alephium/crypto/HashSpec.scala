@@ -1,8 +1,8 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.alephium.AlephiumSpec
 import org.alephium.serde._
+import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
 import org.scalatest.TryValues._
 

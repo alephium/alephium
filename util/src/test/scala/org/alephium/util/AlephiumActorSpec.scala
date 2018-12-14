@@ -3,7 +3,6 @@ package org.alephium.util
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
-import org.alephium.AlephiumSpec
 import org.scalatest.BeforeAndAfterAll
 
 class AlephiumActorSpec(name: String)
