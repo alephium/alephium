@@ -13,6 +13,8 @@ trait Serializer[T] {
   def serialize(input: T): ByteString
 }
 
+object Serializer { def apply[T](implicit T: Serializer[T]): Serializer[T] = T }
+
 trait Deserializer[T] { self =>
   def _deserialize(input: ByteString): Try[(T, ByteString)]
 
@@ -34,6 +36,8 @@ trait Deserializer[T] { self =>
       }
     }
 }
+
+object Deserializer { def apply[T](implicit T: Deserializer[T]): Deserializer[T] = T }
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -135,7 +139,6 @@ object Serde extends ProductSerde {
       deserialize0(input, _.asByteBuffer.getLong())
   }
 
-  // TODO Where should we put those? (Could have trait we mix in there...)
   implicit val inetAddressSerde: Serde[InetAddress] =
     bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray), ia => ByteString(ia.getAddress))
 
@@ -162,6 +165,8 @@ object Serde extends ProductSerde {
       }
     }
   }
+
+  def apply[T](implicit T: Serde[T]): Serde[T] = T
 
   def bytesSerde(bytes: Int): Serde[ByteString] = new FixedSizeSerde[ByteString] {
     override val serdeSize: Int = bytes

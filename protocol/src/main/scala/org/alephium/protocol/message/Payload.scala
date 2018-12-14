@@ -19,23 +19,23 @@ object Payload {
   )
 
   implicit val serializer: Serializer[Payload] = {
-    case x: Ping       => implicitly[Serializer[Ping]].serialize(x)
-    case x: Pong       => implicitly[Serializer[Pong]].serialize(x)
-    case x: SendBlocks => implicitly[Serializer[SendBlocks]].serialize(x)
-    case x: GetBlocks  => implicitly[Serializer[GetBlocks]].serialize(x)
+    case x: Ping       => Serializer[Ping].serialize(x)
+    case x: Pong       => Serializer[Pong].serialize(x)
+    case x: SendBlocks => Serializer[SendBlocks].serialize(x)
+    case x: GetBlocks  => Serializer[GetBlocks].serialize(x)
   }
 
   def deserializer(cmdCode: Int): Deserializer[Payload] =
     (input: ByteString) =>
       cmdCode match {
         case Ping.cmdCode =>
-          implicitly[Serde[Ping]]._deserialize(input)
+          Serde[Ping]._deserialize(input)
         case Pong.cmdCode =>
-          implicitly[Serde[Pong]]._deserialize(input)
+          Serde[Pong]._deserialize(input)
         case SendBlocks.cmdCode =>
-          implicitly[Serde[SendBlocks]]._deserialize(input)
+          Serde[SendBlocks]._deserialize(input)
         case GetBlocks.cmdCode =>
-          implicitly[Serde[GetBlocks]]._deserialize(input)
+          Serde[GetBlocks]._deserialize(input)
         case _ => Failure(new WrongFormatException(s"Invalid cmd code: $cmdCode"))
     }
 }
