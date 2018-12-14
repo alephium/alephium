@@ -6,9 +6,9 @@ import java.time.Instant
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import org.alephium.crypto.Keccak256
-import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.flow.storage.BlockHandlers
 import org.alephium.flow.storage.ChainHandler.BlockOrigin
+import org.alephium.protocol.message.{GetBlocks, Message}
 import org.alephium.util.BaseActor
 
 import scala.collection.mutable
