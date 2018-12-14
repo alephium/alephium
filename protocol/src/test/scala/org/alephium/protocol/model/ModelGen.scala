@@ -7,6 +7,8 @@ import org.scalacheck.Gen
 object ModelGen {
   private val (sk, pk) = ED25519.generateKeyPair()
 
+  val maxMiningTarget = BigInt(1) << 256
+
   val txInputGen: Gen[TxInput] = for {
     index <- Gen.choose(0, 10)
   } yield TxInput(Keccak256.zero, index) // TODO: fixme: Has to use zero here to pass test on ubuntu
@@ -25,13 +27,13 @@ object ModelGen {
   val blockGen: Gen[Block] = for {
     txNum <- Gen.choose(0, 100)
     txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(Seq(Keccak256.zero), txs, 0)
+  } yield Block.from(Seq(Keccak256.zero), txs, maxMiningTarget, 0)
 
   def blockGenWith(deps: Seq[Keccak256]): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, txs, 0)
+    } yield Block.from(deps, txs, maxMiningTarget, 0)
 
   def chainGen(length: Int, block: Block): Gen[Seq[Block]] = chainGen(length, block.hash)
 
