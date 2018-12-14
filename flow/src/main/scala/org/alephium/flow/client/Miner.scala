@@ -1,9 +1,9 @@
 package org.alephium.flow.client
 
 import akka.actor.{ActorRef, Props}
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.constant.{Consensus, Network}
-import org.alephium.flow.model.ChainIndex
+import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, Transaction}
@@ -53,9 +53,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
       context become awaitStart
   }
 
-  protected def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive = {
+  protected def _mine(template: BlockTemplate, lastTs: Long): Receive = {
     case Miner.Nonce(from, to) =>
-      tryMine(deps, transactions, from, to) match {
+      tryMine(template, from, to) match {
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
           log.info(s"A new block ${block.shortHash} is mined, elapsed $elapsed ms")
@@ -72,29 +72,27 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
       context stop self
   }
 
-  def mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive =
-    _mine(deps, transactions, lastTs) orElse awaitStop
+  def mine(template: BlockTemplate, lastTs: Long): Receive =
+    _mine(template, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
-    case FlowHandler.BlockFlowTemplate(deps) =>
+    case FlowHandler.BlockFlowTemplate(deps, target) =>
       assert(deps.size == (2 * Network.groups - 1))
       val transaction = Transaction.coinbase(address, 1)
       val chainDep    = deps.view.takeRight(Network.groups)(chainIndex.to)
       val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
-      context become mine(deps, Seq(transaction), lastTs)
+      val template    = BlockTemplate(deps, target, Seq(transaction))
+      context become mine(template, lastTs)
       self ! Miner.Nonce(0, Network.nonceStep)
   }
 
   def collect: Receive = _collect orElse awaitStop
 
-  def tryMine(deps: Seq[Keccak256],
-              transactions: Seq[Transaction],
-              from: BigInt,
-              to: BigInt): Option[Block] = {
+  def tryMine(template: BlockTemplate, from: BigInt, to: BigInt): Option[Block] = {
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
-        val block = Block.from(deps, transactions, Consensus.maxMiningTarget, current)
+        val block = Block.from(template.deps, template.transactions, template.target, current)
         if (isDifficult(block)) Some(block)
         else iter(current + 1)
       } else None
