@@ -10,14 +10,12 @@ import org.openjdk.jmh.annotations._
 class HashBench {
 
   @Benchmark
-  def randomKeccak256(): Unit = {
+  def randomKeccak256(): Keccak256 = {
     Keccak256.random
-    ()
   }
 
   @Benchmark
-  def randomSha256(): Unit = {
+  def randomSha256(): Sha256 = {
     Sha256.random
-    ()
   }
 }
