@@ -9,4 +9,5 @@ object Consensus extends WithConfig {
 
   val blockTargetTime: Duration = config.getDuration("blockTargetTime")
   val blockSpanNum: Int         = config.getInt("blockSpanNum")
+  val blockConfirmNum: Int      = config.getInt("blockConfirmNum")
 }
