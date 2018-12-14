@@ -32,7 +32,7 @@ trait Platform extends App with StrictLogging {
     if (index > 0) {
       val parentIndex = index / 2
       val remote      = mode.index2Ip(parentIndex)
-      node.peerManager ! PeerManager.Connect(remote, Instant.now().plusSeconds(100))
+      node.peerManager ! PeerManager.Connect(remote, Instant.now().plusSeconds(300))
     }
   }
 
@@ -53,8 +53,10 @@ trait Platform extends App with StrictLogging {
 
         (0 until groups).foreach { to =>
           val chainIndex = ChainIndex(from, to)
-          val miner = node.system.actorOf(mode.builders.createMiner(publicKey, node, chainIndex),
-                                          s"MockMiner-$from-$to")
+          val props = mode.builders
+            .createMiner(publicKey, node, chainIndex)
+            .withDispatcher("akka.actor.mining-dispatcher")
+          val miner = node.system.actorOf(props, s"MockMiner-$from-$to")
           miner ! Miner.Start
         }
 
