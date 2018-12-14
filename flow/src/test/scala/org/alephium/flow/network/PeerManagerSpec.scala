@@ -59,6 +59,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   it should "stop if server stopped" in new Fixture {
     watch(peerManager)
+    server.expectMsg(TcpServer.Start)
     system.stop(server.ref)
     expectTerminated(peerManager)
   }
