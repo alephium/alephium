@@ -4,17 +4,33 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, HashMap}
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
 class ForksTree(root: ForksTree.Root) extends SingleChain {
 
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
+  private val tips: HashSet[Keccak256]                            = HashSet.empty
 
+  // Assuming that node is a tip node
   private def updateTable(node: ForksTree.TreeNode): Unit = {
-    blocksTable += node.block.hash -> node
+    assert(node.isLeaf)
+    val hash = node.block.hash
+
+    blocksTable += hash -> node
+
     node.block.transactions.foreach { transaction =>
       transactionsTable += transaction.hash -> transaction
+    }
+
+    node match {
+      case _: ForksTree.Root =>
+        tips.add(hash)
+        ()
+      case n: ForksTree.Node =>
+        tips.remove(n.parent.block.hash)
+        tips.add(hash)
+        ()
     }
   }
 
@@ -107,12 +123,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   }
 
   override def isTip(hash: Keccak256): Boolean = {
-    blocksTable.get(hash) match {
-      case Some(node) =>
-        node.isLeaf
-      case None =>
-        false
-    }
+    tips.contains(hash)
   }
 
   override def getBestTip: Keccak256 = {
@@ -120,7 +131,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   }
 
   override def getAllTips: Seq[Keccak256] = {
-    blocksTable.values.filter(_.isLeaf).map(_.block.hash).toSeq
+    tips.toSeq
   }
 
   override def getAllBlocks: Iterable[Block] = blocksTable.values.map(_.block)
