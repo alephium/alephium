@@ -1,4 +1,4 @@
-package org.alephium.protocol
+package org.alephium.constant
 
 import io.circe.Json
 import io.circe.parser.parse
@@ -29,7 +29,7 @@ object Genesis {
       }
     }
 
-    Block.genesis(transactions.toSeq)
+    Block.genesis(transactions.toSeq, Consensus.maxMiningTarget)
   }
 
   val block: Block                   = loadGenesis("genesis.json")

@@ -1,7 +1,7 @@
 package org.alephium.storage
 
 import org.alephium.AlephiumSpec
-import org.alephium.constant.Network
+import org.alephium.constant.{Consensus, Network}
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.Block
 import org.alephium.storage.BlockFlow.ChainIndex
@@ -114,7 +114,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, Seq.empty, nonce)
+      val block = Block.from(deps, Seq.empty, Consensus.maxMiningTarget, nonce)
       if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 
