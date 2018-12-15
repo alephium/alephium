@@ -1,5 +1,7 @@
 package org.alephium.protocol.model
 
+import java.net.InetSocketAddress
+
 import org.alephium.crypto._
 import org.scalacheck.Gen
 
@@ -50,4 +52,15 @@ object ModelGen {
           acc :+ newBlock
       }
     }
+
+  val peerId: Gen[PeerId] = Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
+
+  val peerAddress: Gen[PeerAddress] = for {
+    ip0  <- Gen.choose(0, 255)
+    ip1  <- Gen.choose(0, 255)
+    ip2  <- Gen.choose(0, 255)
+    ip3  <- Gen.choose(0, 255)
+    port <- Gen.choose(0, 65535)
+    id   <- peerId
+  } yield PeerAddress(id, new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port))
 }
