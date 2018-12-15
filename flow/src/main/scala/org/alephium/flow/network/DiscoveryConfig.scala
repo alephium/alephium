@@ -7,13 +7,13 @@ import org.alephium.protocol.model.PeerId
 case class DiscoveryConfig(
     udpPort: Int,
     peerId: PeerId,
-    /** Maximum number of peers to track. **/
+    /* Maximum number of peers to track. */
     peersMax: Int,
-    /** Maximum number of peers used for probing during a scan. **/
+    /* Maximum number of peers used for probing during a scan. */
     scanMax: Int,
-    /** Wait time between two scan. **/
+    /* Wait time between two scan. */
     scanFrequency: FiniteDuration,
-    /** Maximum number of peers returned from a query (`k` in original kademlia paper). **/
+    /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
     neighborsMax: Int
 ) {
 
