@@ -308,15 +308,15 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
 
-      val sum0 = vc.foldLeft(0)(_ + _)
+      val sum0 = vc.fold(0)(_ + _)
       sum0 is arr.sum
-      val sum1 = vc.foldLeft(1)(_ + _)
+      val sum1 = vc.fold(1)(_ + _)
       sum1 is arr.foldLeft(1)(_ + _)
 
-      val sum2 = vc.reduceLeft(_ + _)
+      val sum2 = vc.reduce(_ + _)
       sum2 is sum0
 
-      val sum3 = vc.reduceLeftBy(1 - _)(_ + _)
+      val sum3 = vc.reduceBy(1 - _)(_ + _)
       sum3 is arr.map(1 - _).sum
     }
   }

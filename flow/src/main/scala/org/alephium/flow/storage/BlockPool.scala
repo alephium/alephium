@@ -20,7 +20,7 @@ trait BlockPool {
 
   def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
     val blocks = locators.map(getBlocks)
-    blocks.foldLeft(AVector.empty[Block]) {
+    blocks.fold(AVector.empty[Block]) {
       case (acc, newBlocks) =>
         val toAdd = newBlocks.filterNot(acc.contains)
         acc ++ toAdd
