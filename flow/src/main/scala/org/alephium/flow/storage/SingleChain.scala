@@ -20,7 +20,13 @@ trait SingleChain extends BlockPool {
 sealed trait AddBlockResult
 
 object AddBlockResult {
-  case object Success                          extends AddBlockResult
-  case object AlreadyExisted                   extends AddBlockResult
-  case class MissingDeps(deps: Seq[Keccak256]) extends AddBlockResult
+  case object Success extends AddBlockResult
+
+  trait Failure extends AddBlockResult
+  case object AlreadyExisted extends Failure {
+    override def toString: String = "Block already exist"
+  }
+  case class MissingDeps(deps: Seq[Keccak256]) extends Failure {
+    override def toString: String = s"Missing #${deps.size - 1} deps"
+  }
 }

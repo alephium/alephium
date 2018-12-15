@@ -8,6 +8,14 @@ import org.bouncycastle.util.encoders.Hex
 trait RandomBytes {
   def bytes: ByteString
 
+  def lastByte: Byte = bytes(bytes.size - 1)
+
+  def second2LastByte: Byte = {
+    val size = bytes.size
+    assert(size >= 2)
+    bytes(size - 2)
+  }
+
   override def hashCode(): Int = {
     val size = bytes.size
 

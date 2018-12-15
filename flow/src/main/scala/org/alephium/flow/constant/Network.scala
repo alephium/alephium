@@ -2,11 +2,9 @@ package org.alephium.flow.constant
 
 import java.time.Duration
 
-import com.typesafe.config.ConfigFactory
 import org.alephium.protocol.model.Block
 
-object Network {
-  private val config = ConfigFactory.load().getConfig("alephium")
+object Network extends WithConfig {
 
   val port: Int               = config.getInt("port")
   val pingFrequency: Duration = config.getDuration("pingFrequency")
