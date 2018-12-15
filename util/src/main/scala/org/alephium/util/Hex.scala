@@ -11,7 +11,7 @@ object Hex {
     ByteString(BHex.decode(s))
   }
 
-  def toHexString(input: Seq[Byte]): String = {
+  def toHexString(input: IndexedSeq[Byte]): String = {
     BHex.toHexString(input.toArray)
   }
 

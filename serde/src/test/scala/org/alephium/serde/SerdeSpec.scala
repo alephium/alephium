@@ -3,13 +3,9 @@ package org.alephium.serde
 import akka.util.ByteString
 import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
 import org.alephium.util.{AVector, AlephiumSpec}
-import org.scalacheck.Gen
-import org.scalacheck.Arbitrary.arbByte
 import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSpec {
-
-  val bytesGen: Gen[AVector[Byte]] = Gen.listOf(arbByte.arbitrary).map(AVector.from)
 
   def checkException[T](serde: FixedSizeSerde[T]): Unit = {
     it should "throw correct exceptions when error occurs" in {
