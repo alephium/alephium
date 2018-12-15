@@ -2,6 +2,7 @@ package org.alephium.flow.constant
 
 import java.time.Duration
 
+import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 
 object Network extends WithConfig {
@@ -20,7 +21,9 @@ object Network extends WithConfig {
       case (from, to) =>
         val index = from * Network.groups + to
         val nonce = nonces.get(index)
-        Block.genesis(Seq.empty, Consensus.maxMiningTarget, BigInt(nonce))
+        val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, BigInt(nonce))
+        assert(ChainIndex(from, to).accept(block.hash))
+        block
     }
   }
 

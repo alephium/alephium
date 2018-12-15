@@ -1,13 +1,12 @@
 package org.alephium.mock
 
 import akka.actor.{Props, Timers}
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.constant.Consensus
-import org.alephium.flow.model.ChainIndex
+import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
-import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.protocol.model.Block
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -29,7 +28,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
     with Timers {
   import node.blockHandlers
 
-  override def _mine(deps: Seq[Keccak256], transactions: Seq[Transaction], lastTs: Long): Receive = {
+  override def _mine(template: BlockTemplate, lastTs: Long): Receive = {
     case Miner.Nonce(_, _) =>
       val delta     = 1000 * 30 + Random.nextInt(1000 * 60)
       val currentTs = System.currentTimeMillis()
@@ -44,7 +43,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
       timers.startSingleTimer(MockMiner.Timer, MockMiner.MockMining(nextTs), sleepTs.millis)
 
     case MockMiner.MockMining(nextTs) =>
-      val block = tryMine(deps, Seq.empty, nextTs, Long.MaxValue).get
+      val block = tryMine(template, nextTs, Long.MaxValue).get
       log.info(s"A new block ${block.shortHash} is mined at ${block.blockHeader.timestamp}")
       chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
 
@@ -56,15 +55,12 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)
       context stop self
   }
 
-  override def tryMine(deps: Seq[Keccak256],
-                       transactions: Seq[Transaction],
-                       nextTs: BigInt,
-                       to: BigInt): Option[Block] = {
+  override def tryMine(template: BlockTemplate, nextTs: BigInt, to: BigInt): Option[Block] = {
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val timestamp = System.currentTimeMillis()
-        val block     = Block.from(deps, timestamp, Consensus.maxMiningTarget, current)
+        val block     = Block.from(template.deps, timestamp, template.target, current)
         if (isDifficult(block)) Some(block)
         else iter(current + 1)
       } else None

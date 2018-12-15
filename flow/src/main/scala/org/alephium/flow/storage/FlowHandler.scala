@@ -21,7 +21,7 @@ object FlowHandler {
   case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
 
   sealed trait Event
-  case class BlockFlowTemplate(deps: Seq[Keccak256]) extends Event
+  case class BlockFlowTemplate(deps: Seq[Keccak256], target: BigInt) extends Event
 }
 
 // consider single chain for the moment
@@ -39,7 +39,9 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
       val tips = blockFlow.getAllTips
       sender() ! PeerManager.Sync(remote, tips)
     case PrepareBlockFlow(chainIndex) =>
-      val blockHashes = blockFlow.getBestDeps(chainIndex)
-      sender() ! BlockFlowTemplate(blockHashes)
+      val bestDeps    = blockFlow.getBestDeps(chainIndex)
+      val singleChain = blockFlow.getChain(chainIndex)
+      val target      = singleChain.getHashTarget(bestDeps.getChainHash)
+      sender() ! BlockFlowTemplate(bestDeps.deps, target)
   }
 }
