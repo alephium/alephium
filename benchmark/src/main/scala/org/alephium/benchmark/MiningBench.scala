@@ -6,6 +6,7 @@ import org.alephium.flow.constant.{Consensus, Network}
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 import org.alephium.serde.RandomBytes
+import org.alephium.util.AVector
 import org.openjdk.jmh.annotations._
 
 @BenchmarkMode(Array(Mode.Throughput))
@@ -15,7 +16,7 @@ class MiningBench {
   @Benchmark
   def mineGenesis(): Boolean = {
     val nonce = RandomBytes.source.nextInt()
-    val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, BigInt(nonce))
+    val block = Block.genesis(AVector.empty, Consensus.maxMiningTarget, BigInt(nonce))
     val i     = RandomBytes.source.nextInt(Network.groups)
     val j     = RandomBytes.source.nextInt(Network.groups)
     ChainIndex(i, j).accept(block)
