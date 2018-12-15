@@ -67,7 +67,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(sizeGen) { n =>
       val vector = AVector.tabulate[Int](n)(identity)
       checkState(vector, n)
-      vector.foreachIndexed { (elem, index) =>
+      vector.foreachWithIndex { (elem, index) =>
         elem is index
       }
     }
@@ -208,7 +208,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       checkEq(vc, buffer)
 
       val arr = new Array[A](vc.length)
-      vc.foreachIndexed { (elem, i) =>
+      vc.foreachWithIndex { (elem, i) =>
         arr(i) = elem
       }
       checkEq(vc, arr)
@@ -221,7 +221,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vc0.capacity is vc.length
       checkEq(vc0, vc.toArray)
 
-      val vc1 = vc.mapIndexed { (elem, i) =>
+      val vc1 = vc.mapWithIndex { (elem, i) =>
         vc0(i) is vc(i)
         elem
       }
@@ -322,16 +322,17 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     forAll(vectorGen) { vc =>
       val arr  = vc.toArray
       val scan = vc.scanLeft(0)(_ + _)
-      checkEq(scan, arr.scanLeft(0)(_ + _).tail)
+      checkEq(scan, arr.scanLeft(0)(_ + _))
     }
   }
 
-  it should "sum/min/max/minBy/maxBy" in new Fixture {
+  it should "sum/sumBy/min/max/minBy/maxBy" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       vc.sum is arr.sum
       vc.min is arr.min
       vc.max is arr.max
+      vc.sumBy(_ + 1) is arr.map(_ + 1).sum
       vc.maxBy(-_) is arr.maxBy(-_)
       vc.maxBy(_ + 1) is arr.maxBy(_ + 1)
       vc.minBy(-_) is arr.minBy(-_)
@@ -343,9 +344,9 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     forAll(sizeGen, sizeGen) { (n1, n2) =>
       val matrix = AVector.tabulate[Int](n1, n2)(_ + _)
       checkState(matrix, 0, n1, n1, n1, true)
-      matrix.foreachIndexed { (vector, index1) =>
+      matrix.foreachWithIndex { (vector, index1) =>
         checkState(vector, 0, n2, n2, n2, true)
-        vector.foreachIndexed { (elem, index2) =>
+        vector.foreachWithIndex { (elem, index2) =>
           elem is index1 + index2
         }
       }

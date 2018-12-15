@@ -1,7 +1,8 @@
 import sbt._
 
 /*
- * Copied, with some modifications, from circe
+ * Extracted, with some modifications, from circe
+ * https://github.com/circe/circe.git
  */
 object Boilerplate {
   import scala.StringContext._
