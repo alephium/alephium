@@ -2,6 +2,7 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto._
 import org.alephium.serde.{serialize, Serde}
+import org.alephium.util.AVector
 
 case class Transaction(
     unsigned: UnsignedTransaction,
@@ -21,7 +22,7 @@ object Transaction {
 
   def coinbase(address: ED25519PublicKey, value: BigInt): Transaction = {
     val txOutput = TxOutput(value, address)
-    val unsigned = UnsignedTransaction(Seq.empty, Seq(txOutput))
+    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, ED25519Signature.zero)
   }
 }

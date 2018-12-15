@@ -8,7 +8,7 @@ import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
 import org.alephium.protocol.model.Block
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 object ChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
@@ -16,7 +16,7 @@ object ChainHandler {
     Props(new ChainHandler(blockFlow, chainIndex, peerManager))
 
   sealed trait Command
-  case class AddBlocks(blocks: Seq[Block], origin: BlockOrigin) extends Command
+  case class AddBlocks(blocks: AVector[Block], origin: BlockOrigin) extends Command
 
   sealed trait BlockOrigin
 

@@ -1,8 +1,8 @@
 package org.alephium.protocol.message
 
 import org.scalacheck.Gen
-
 import org.alephium.protocol.model.ModelGen
+import org.alephium.util.AVector
 
 object DiscoveryMessageGen {
   import DiscoveryMessage._
@@ -28,7 +28,7 @@ object DiscoveryMessageGen {
   val neighbors: Gen[Neighbors] = for {
     cid    <- callId
     source <- Gen.listOf(ModelGen.peerAddress)
-  } yield Neighbors(cid, source)
+  } yield Neighbors(cid, AVector.from(source))
 
   val message: Gen[DiscoveryMessage] = Gen.oneOf(findNode, ping, pong, neighbors)
 }

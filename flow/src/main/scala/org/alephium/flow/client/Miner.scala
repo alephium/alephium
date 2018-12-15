@@ -8,7 +8,7 @@ import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, Transaction}
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 
@@ -21,7 +21,7 @@ object Miner {
   def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, nonce)
+      val block = Block.genesis(AVector.empty, Consensus.maxMiningTarget, nonce)
       if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
     }
 
@@ -62,7 +62,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
         case Some(block) =>
           val elapsed = System.currentTimeMillis() - lastTs
           log.info(s"A new block ${block.shortHash} is mined, elapsed $elapsed ms")
-          chainHandler ! ChainHandler.AddBlocks(Seq(block), Local)
+          chainHandler ! ChainHandler.AddBlocks(AVector(block), Local)
         case None =>
           self ! Miner.Nonce(to, 2 * to - from)
       }
@@ -80,11 +80,11 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(deps, target) =>
-      assert(deps.size == (2 * config.groups - 1))
+      assert(deps.length == (2 * config.groups - 1))
       val transaction = Transaction.coinbase(address, 1)
-      val chainDep    = deps.view.takeRight(config.groups)(chainIndex.to)
+      val chainDep    = deps.takeRight(config.groups)(chainIndex.to)
       val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
-      val template    = BlockTemplate(deps, target, Seq(transaction))
+      val template    = BlockTemplate(deps, target, AVector(transaction))
       context become mine(template, lastTs)
       self ! Miner.Nonce(0, config.nonceStep)
   }

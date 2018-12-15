@@ -4,6 +4,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
+import org.alephium.util.AVector
 
 trait MultiChain extends BlockPool {
   implicit val config: PlatformConfig
@@ -33,7 +34,7 @@ trait MultiChain extends BlockPool {
     getChain(hash).getBlock(hash)
   }
 
-  def getBlocks(locator: Keccak256): Seq[Block] = {
+  def getBlocks(locator: Keccak256): AVector[Block] = {
     getChain(locator).getBlocks(locator)
   }
 
@@ -49,5 +50,5 @@ trait MultiChain extends BlockPool {
     getChain(hash).getWeight(hash)
   }
 
-  def getBlockSlice(hash: Keccak256): Seq[Block] = getChain(hash).getBlockSlice(hash)
+  def getBlockSlice(hash: Keccak256): AVector[Block] = getChain(hash).getBlockSlice(hash)
 }

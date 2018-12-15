@@ -8,7 +8,7 @@ import org.scalatest.TryValues._
 
 class HashSpec extends AlephiumSpec {
 
-  def check[T <: RandomBytes](provider: HashCompanion[T], message: String, expected: Seq[Byte])(
+  def check[T <: RandomBytes](provider: HashCompanion[T], message: String, expected: ByteString)(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       val output = provider.hash(message)

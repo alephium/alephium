@@ -4,7 +4,7 @@ import io.circe.parser.parse
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.constant.{Consensus, Genesis}
 import org.alephium.protocol.model._
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
 import scala.io.Source
 
@@ -17,10 +17,10 @@ trait TxFixture {
     val txOutput2 = TxOutput(testBalance - value, testPublicKey)
     val txInput   = TxInput(Genesis.block.transactions.head.hash, 0)
     val transaction = Transaction.from(
-      UnsignedTransaction(Seq(txInput), Seq(txOutput1, txOutput2)),
+      UnsignedTransaction(AVector(txInput), AVector(txOutput1, txOutput2)),
       testPrivateKey
     )
-    Block.from(Seq(Genesis.block.hash), Seq(transaction), Consensus.maxMiningTarget, 0)
+    Block.from(AVector(Genesis.block.hash), AVector(transaction), Consensus.maxMiningTarget, 0)
   }
 
   private val json = parse(Source.fromResource("genesis.json").mkString).right.get

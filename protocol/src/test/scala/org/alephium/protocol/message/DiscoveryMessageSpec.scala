@@ -1,11 +1,10 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
-import org.scalacheck.{Arbitrary}
-
+import org.scalacheck.Arbitrary
 import org.alephium.protocol.model.{ModelGen, PeerId}
 import org.alephium.serde.{Deserializer, Serde, Serializer}
-import org.alephium.util.{AlephiumSpec, EnumerationMacros}
+import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code
@@ -15,7 +14,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
 
   it should "index all codes" in {
     val codes = EnumerationMacros.sealedInstancesOf[Code]
-    Code.values is codes.toList
+    Code.values is AVector.from(codes)
   }
 
   it should "support serde for all message types" in {

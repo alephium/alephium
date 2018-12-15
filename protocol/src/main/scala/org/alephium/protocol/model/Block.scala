@@ -2,8 +2,9 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.{Keccak256, WithKeccak256}
 import org.alephium.serde.Serde
+import org.alephium.util.AVector
 
-case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
+case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
     extends WithKeccak256[Block] {
   def miningHash: Keccak256 = Block.toMiningHash(this.hash)
 }
@@ -11,8 +12,8 @@ case class Block(blockHeader: BlockHeader, transactions: Seq[Transaction])
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.blockHeader, b.transactions))
 
-  def from(blockDeps: Seq[Keccak256],
-           transactions: Seq[Transaction],
+  def from(blockDeps: AVector[Keccak256],
+           transactions: AVector[Transaction],
            target: BigInt,
            nonce: BigInt): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
@@ -22,17 +23,17 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def from(blockDeps: Seq[Keccak256], timestamp: Long, target: BigInt, nonce: BigInt): Block = {
+  def from(blockDeps: AVector[Keccak256], timestamp: Long, target: BigInt, nonce: BigInt): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
-    val transactions = Seq.empty[Transaction]
+    val transactions = AVector.empty[Transaction]
     val txsHash      = Keccak256.hash(transactions)
     val blockHeader  = BlockHeader(blockDeps, txsHash, timestamp, target, nonce)
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: Seq[Transaction], target: BigInt, nonce: BigInt): Block = {
+  def genesis(transactions: AVector[Transaction], target: BigInt, nonce: BigInt): Block = {
     val txsHash     = Keccak256.hash(transactions)
-    val blockHeader = BlockHeader(Seq.empty, txsHash, 0, target, nonce)
+    val blockHeader = BlockHeader(AVector.empty, txsHash, 0, target, nonce)
     Block(blockHeader, transactions)
   }
 

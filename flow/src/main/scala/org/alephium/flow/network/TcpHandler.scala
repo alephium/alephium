@@ -12,7 +12,7 @@ import org.alephium.flow.storage.ChainHandler.BlockOrigin.Remote
 import org.alephium.flow.storage.{AddBlockResult, BlockHandlers, ChainHandler, FlowHandler}
 import org.alephium.protocol.message._
 import org.alephium.serde.NotEnoughBytesException
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -31,9 +31,9 @@ object TcpHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
 
-  def deserialize(data: ByteString): Try[(Seq[Message], ByteString)] = {
+  def deserialize(data: ByteString): Try[(AVector[Message], ByteString)] = {
     @tailrec
-    def iter(rest: ByteString, acc: Seq[Message]): Try[(Seq[Message], ByteString)] = {
+    def iter(rest: ByteString, acc: AVector[Message]): Try[(AVector[Message], ByteString)] = {
       Message.deserializer._deserialize(rest) match {
         case Success((message, newRest)) =>
           iter(newRest, acc :+ message)
@@ -43,7 +43,7 @@ object TcpHandler {
           Failure(e)
       }
     }
-    iter(data, Seq.empty)
+    iter(data, AVector.empty)
   }
 
   trait Builder {
@@ -152,7 +152,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
         context stop self
       }
     case SendBlocks(blocks) =>
-      log.debug(s"Received #${blocks.size} blocks")
+      log.debug(s"Received #${blocks.length} blocks")
       val block      = blocks.head
       val chainIndex = ChainIndex.fromHash(block.hash)
       val handler    = blockHandlers.getHandler(chainIndex)
