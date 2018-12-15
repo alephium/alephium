@@ -186,7 +186,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     filterImpl(p, false)
   }
 
-  def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
+  @inline private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
     foldLeft(AVector.empty[A]) { (acc, elem) =>
       if (p(elem) == target) acc :+ elem else acc
     }
