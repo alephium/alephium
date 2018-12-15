@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import akka.actor.ActorRef
-import org.alephium.flow.model.ChainIndex
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
 /*

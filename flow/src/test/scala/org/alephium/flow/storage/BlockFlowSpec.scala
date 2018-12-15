@@ -2,9 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.constant.Consensus
-import org.alephium.flow.model.ChainIndex
-import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
 import org.scalatest.Assertion
 
@@ -115,8 +113,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, AVector.empty[Transaction], Consensus.maxMiningTarget, nonce)
-      if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
+      val block = Block.from(deps, AVector.empty[Transaction], config.maxMiningTarget, nonce)
+      if (chainIndex.accept(block)) block else iter(nonce + 1)
     }
 
     iter(0)

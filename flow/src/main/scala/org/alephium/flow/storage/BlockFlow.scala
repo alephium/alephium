@@ -2,8 +2,8 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.model.{BlockDeps, ChainIndex}
-import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.flow.model.BlockDeps
+import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, Hex}
 
 import scala.reflect.ClassTag
@@ -48,7 +48,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     if (missingDeps.isEmpty) {
       val chainIndex = getIndex(block)
       val chain      = getChain(chainIndex)
-      val parent     = deps.takeRight(groups)(chainIndex.to)
+      val parent     = block.uncleHash(chainIndex.to)
       val weight     = calWeight(block)
       chain.add(block, parent, weight)
     } else {

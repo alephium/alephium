@@ -1,7 +1,7 @@
 package org.alephium.flow.model
 
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.{ChainIndex, ModelGen}
 import org.alephium.util.AlephiumSpec
 
 class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
@@ -13,7 +13,7 @@ class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
       val hash       = block.hash
       val miningHash = block.miningHash
       val index      = ChainIndex.fromHash(hash)
-      index.accept(hash) is true
+      index.accept(block) is true
 
       val hash2Int = BigInt(1, miningHash.bytes.takeRight(2).toArray)
       val rawIndex = (hash2Int % config.chainNum).toInt

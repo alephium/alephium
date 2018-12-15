@@ -26,20 +26,18 @@ akka {
 }
 
 alephium {
-  numZerosAtLeastInHash = 12
+  numZerosAtLeastInHash = 0
   blockTargetTime = 4 minutes
-  blockConfirmNum = 10
-  retargetInterval = 180 // number of blocks; about 12 hours
+  blockConfirmNum = 2
+  retargetInterval = 180 // 180 blocks; about 12 hours
 }
 
 alephium {
   port = 9973
   port = ${?port}
-  groups = 32
-  groups = ${?groups}
+  groups = 3
   pingFrequency = 300 second
   retryTimeout = 300 second
 
   nonceStep = 10000
 }
-

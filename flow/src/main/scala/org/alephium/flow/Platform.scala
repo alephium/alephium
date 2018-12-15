@@ -9,8 +9,8 @@ import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.Hex._
 
 import scala.concurrent.Future

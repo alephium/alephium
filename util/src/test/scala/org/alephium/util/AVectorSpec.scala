@@ -355,4 +355,10 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       }
     }
   }
+
+  it should "fill" in new Fixture {
+    val vc = AVector.fill(AVector.defaultSize)(AVector.defaultSize)
+    vc.length is AVector.defaultSize
+    vc.foreach(_ is AVector.defaultSize)
+  }
 }

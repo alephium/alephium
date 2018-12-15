@@ -387,6 +387,8 @@ object AVector {
   }
 
   @inline def tabulate[@sp A: ClassTag](n: Int)(f: Int => A): AVector[A] = {
+    assert(n >= 0)
+
     val arr = new Array[A](n)
     cfor(0)(_ < n, _ + 1) { i =>
       arr(i) = f(i)
@@ -395,7 +397,13 @@ object AVector {
   }
 
   def tabulate[@sp A: ClassTag](n1: Int, n2: Int)(f: (Int, Int) => A): AVector[AVector[A]] = {
+    assert(n1 >= 0 && n2 >= 0)
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
+  }
+
+  @inline def fill[@sp A: ClassTag](n: Int)(elem: A): AVector[A] = {
+    assert(n >= 0)
+    tabulate(n)(_ => elem)
   }
 
   def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {

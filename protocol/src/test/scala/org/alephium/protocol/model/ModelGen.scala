@@ -3,14 +3,13 @@ package org.alephium.protocol.model
 import java.net.InetSocketAddress
 
 import org.alephium.crypto._
+import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.util.AVector
 import org.scalacheck.Gen
 
 // TODO: rename as GenFixture
 object ModelGen {
   private val (sk, pk) = ED25519.generateKeyPair()
-
-  val maxMiningTarget = BigInt(1) << 256
 
   val txInputGen: Gen[TxInput] = for {
     index <- Gen.choose(0, 10)
@@ -27,28 +26,33 @@ object ModelGen {
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
   } yield Transaction.from(UnsignedTransaction(AVector.from(inputs), AVector.from(outputs)), sk)
 
-  val blockGen: Gen[Block] = for {
-    txNum <- Gen.choose(0, 100)
-    txs   <- Gen.listOfN(txNum, transactionGen)
-  } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), maxMiningTarget, 0)
-
-  def blockGenWith(deps: AVector[Keccak256]): Gen[Block] =
+  def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 100)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(deps, AVector.from(txs), maxMiningTarget, 0)
+    } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
-  def chainGen(length: Int, block: Block): Gen[AVector[Block]] = chainGen(length, block.hash)
+  def blockGenWith(deps: AVector[Keccak256])(implicit config: ConsensusConfig): Gen[Block] =
+    for {
+      txNum <- Gen.choose(0, 100)
+      txs   <- Gen.listOfN(txNum, transactionGen)
+    } yield Block.from(deps, AVector.from(txs), config.maxMiningTarget, 0)
 
-  def chainGen(length: Int): Gen[AVector[Block]] = chainGen(length, Keccak256.zero)
+  def chainGen(length: Int, block: Block)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
+    chainGen(length, block.hash)
 
-  def chainGen(length: Int, initialHash: Keccak256): Gen[AVector[Block]] =
+  def chainGen(length: Int)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
+    chainGen(length, Keccak256.zero)
+
+  def chainGen(length: Int, initialHash: Keccak256)(
+      implicit config: ConsensusConfig): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
       blocks.foldLeft(AVector.empty[Block]) {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
           val currentHeader = block.blockHeader
-          val newHeader     = currentHeader.copy(blockDeps = AVector(prevHash))
+          val deps          = AVector.fill(config.depsNum)(prevHash)
+          val newHeader     = currentHeader.copy(blockDeps = deps)
           val newBlock      = block.copy(blockHeader = newHeader)
           acc :+ newBlock
       }

@@ -2,9 +2,9 @@ package org.alephium.flow.client
 
 import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.{PeerManager, TcpHandler, TcpServer}
 import org.alephium.flow.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
 case class Node(
@@ -22,7 +22,7 @@ object Node {
   def apply(builders: Builder, name: String, port: Int, groups: Int)(
       implicit config: PlatformConfig): Node = {
 
-    val system    = ActorSystem(name)
+    val system    = ActorSystem(name, config.all)
     val blockFlow = BlockFlow()
 
     val peerManager  = system.actorOf(PeerManager.props(builders), "PeerManager")

@@ -4,10 +4,10 @@ import akka.actor.{Props, Timers}
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.model.{BlockTemplate, ChainIndex}
+import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 
 import scala.annotation.tailrec

@@ -1,13 +1,15 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.constant.Consensus
+import org.alephium.flow.PlatformConfig
 import org.alephium.util.AVector
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
 trait BlockHashChain extends BlockHashPool {
+
+  implicit def config: PlatformConfig
 
   protected def root: BlockHashChain.Root
 
@@ -47,7 +49,7 @@ trait BlockHashChain extends BlockHashPool {
   private def pruneDueto(newNode: BlockHashChain.TreeNode): Boolean = {
     val toCut = tips.filter { key =>
       val tipNode = blockHashesTable(key)
-      newNode.height >= tipNode.height + Consensus.blockConfirmNum
+      newNode.height >= tipNode.height + config.blockConfirmNum
     }
 
     toCut.foreach { key =>
@@ -81,7 +83,7 @@ trait BlockHashChain extends BlockHashPool {
         iter()
       } else if (confirmedBlocks.nonEmpty) {
         val lastConfirmed = confirmedBlocks.last
-        if (lastConfirmed.successors.size == 1 && (oldestTip.height >= lastConfirmed.height + Consensus.blockConfirmNum)) {
+        if (lastConfirmed.successors.size == 1 && (oldestTip.height >= lastConfirmed.height + config.blockConfirmNum)) {
           confirmedBlocks.append(lastConfirmed.successors.head)
           iter()
         }
