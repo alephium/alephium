@@ -38,12 +38,14 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
+          // TODO: refactor this into blockflow
           val total       = blockFlow.numBlocks
-          val blockNum    = chain.numBlocks
+          val weight      = chain.getWeight(block)
+          val blockNum    = chain.numBlocks - 1 // exclude genesis block
           val height      = chain.maxHeight
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(
-            s"Total: $total; Index: $chainIndex; Height: $height/$blockNum; Time elapsed: ${elapsedTime}ms")
+            s"Total: $total; Index: $chainIndex; Weight: $weight; Height: $height/$blockNum; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
         case error: AddBlockResult.Failure =>
           log.info(s"Failed in adding new block: $error")

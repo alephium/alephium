@@ -105,6 +105,7 @@ val commonSettings = Seq(
   scalaVersion := "2.12.5",
   parallelExecution in Test := false,
   scalacOptions := Seq(
+//    "-Xdisable-assertions", // TODO: use this properly
     "-deprecation",
     "-encoding",
     "utf-8",
