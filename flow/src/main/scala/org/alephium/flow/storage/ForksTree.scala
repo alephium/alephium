@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.annotation.tailrec
@@ -11,6 +12,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
   private val tips: HashSet[Keccak256]                            = HashSet.empty
+//  private val confirmedBlocks: Buffer[Keccak256]                  = Buffer.empty
 
   // Assuming that node is a tip node
   private def updateTable(node: ForksTree.TreeNode): Unit = {
@@ -31,6 +33,50 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
         tips.remove(n.parent.block.hash)
         tips.add(hash)
         ()
+    }
+
+    pruneDueto(node)
+
+    ()
+  }
+
+  private def removeFromTable(node: ForksTree.TreeNode): Unit = {
+    val hash = node.block.hash
+
+    blocksTable.remove(hash)
+
+    node.block.transactions.foreach { transaction =>
+      transactionsTable.remove(transaction.hash)
+    }
+
+    if (tips.contains(hash)) tips.remove(hash)
+    ()
+  }
+
+  private def pruneDueto(newNode: ForksTree.TreeNode): Boolean = {
+    val toCut = tips.filter { key =>
+      val tipNode = blocksTable(key)
+      newNode.height >= tipNode.height + Consensus.blockConfirmNum
+    }
+
+    toCut.foreach { key =>
+      val node = blocksTable(key)
+      pruneBranchFrom(node)
+    }
+    toCut.nonEmpty
+  }
+
+  @tailrec
+  private def pruneBranchFrom(node: ForksTree.TreeNode): Unit = {
+    removeFromTable(node)
+
+    node match {
+      case n: ForksTree.Node =>
+        val parent = n.parent
+        if (parent.successors.size == 1) {
+          pruneBranchFrom(parent)
+        }
+      case _: ForksTree.Root => ()
     }
   }
 
