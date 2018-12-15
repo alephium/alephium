@@ -5,6 +5,7 @@ import java.io.File
 import java.nio.file.{Path, Paths}
 
 import com.typesafe.config.{Config, ConfigFactory}
+import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Files}
 
@@ -67,7 +68,9 @@ class PlatformConfig(val underlying: Config) { self =>
       case (from, to) =>
         val index = from * self.groups + to
         val nonce = nonces.get(index)
-        Block.genesis(AVector.empty, constant.Consensus.maxMiningTarget, BigInt(nonce))
+        val block = Block.genesis(AVector.empty, constant.Consensus.maxMiningTarget, BigInt(nonce))
+        assert(ChainIndex(from, to).accept(block)(this))
+        block
     }
   }
 

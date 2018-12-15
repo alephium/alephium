@@ -10,7 +10,7 @@ case class BlockHeader(
     timestamp: Long,
     target: BigInt,
     nonce: BigInt
-)
+) extends WithKeccak256[BlockHeader]
 
 object BlockHeader {
 
