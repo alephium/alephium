@@ -36,7 +36,7 @@ class ForksTreeSpec extends AlephiumSpec {
       val blocksSize2 = forkstree.numBlocks
       val txSize2     = forkstree.numTransactions
       blocksSize1 + blocks.length is blocksSize2
-      txSize1 + blocks.map(_.transactions.length).sum is txSize2
+      txSize1 + blocks.sumBy(_.transactions.length) is txSize2
 
       checkConfirmedBlocks(forkstree, blocks)
     }

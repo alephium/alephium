@@ -18,15 +18,17 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
       case (from, to) => ForksTree(initialBlocks(from)(to))
     }
 
-  private def aggregate[T: ClassTag](f: SingleChain => T)(reduce: AVector[T] => T): T = {
-    reduce(singleChains.flatMap(_.map(f)))
+  private def aggregate[T: ClassTag](f: SingleChain => T)(op: (T, T) => T): T = {
+    singleChains.reduceLeftBy { chains =>
+      chains.reduceLeftBy(f)(op)
+    }(op)
   }
 
-  override def numBlocks: Int = aggregate(_.numBlocks)(_.sum)
+  override def numBlocks: Int = aggregate(_.numBlocks)(_ + _)
 
-  override def numTransactions: Int = aggregate(_.numTransactions)(_.sum)
+  override def numTransactions: Int = aggregate(_.numTransactions)(_ + _)
 
-  override def maxWeight: Int = aggregate(_.maxWeight)(_.max)
+  override def maxWeight: Int = aggregate(_.maxWeight)(math.max)
 
   def getChain(i: Int, j: Int): SingleChain = {
     assert(i >= 0 && i < groups && j >= 0 && j < groups)
@@ -56,8 +58,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val deps = block.blockHeader.blockDeps
     if (deps.isEmpty) 0
     else {
-      val weight1 = deps.dropRight(groups).map(calGroupWeight).sum
-      val weight2 = deps.takeRight(groups).map(getHeight).sum
+      val weight1 = deps.dropRight(groups).sumBy(calGroupWeight)
+      val weight2 = deps.takeRight(groups).sumBy(getHeight)
       weight1 + weight2 + 1
     }
   }
@@ -67,16 +69,18 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     val deps  = block.blockHeader.blockDeps
     if (deps.isEmpty) 0
     else {
-      deps.takeRight(groups).map(getHeight).sum + 1
+      deps.takeRight(groups).sumBy(getHeight) + 1
     }
   }
 
   override def getBestTip: Keccak256 = {
-    aggregate(_.getBestTip)(_.maxBy(hash => getWeight(hash)))
+    val ordering = Ordering.Int.on[Keccak256](getWeight)
+    aggregate(_.getBestTip)(ordering.max)
   }
 
-  override def getAllTips: AVector[Keccak256] =
-    aggregate(_.getAllTips)(_.foldLeft(AVector.empty[Keccak256])(_ ++ _))
+  override def getAllTips: AVector[Keccak256] = {
+    aggregate(_.getAllTips)(_ ++ _)
+  }
 
   def getRtips(tip: Keccak256, from: Int): Array[Keccak256] = {
     val rdeps = new Array[Keccak256](groups)

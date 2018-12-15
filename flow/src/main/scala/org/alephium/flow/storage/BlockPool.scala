@@ -55,16 +55,16 @@ trait BlockPool {
   def getTransaction(hash: Keccak256): Transaction
 
   def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
-    transaction.unsigned.inputs.map {
+    transaction.unsigned.inputs.sumBy {
       case TxInput(txHash, outputIndex) =>
         val tx       = getTransaction(txHash)
         val txOutput = tx.unsigned.outputs(outputIndex)
         if (txOutput.publicKey == address) txOutput.value else BigInt(0)
-    }.sum
+    }
   }
 
   def getTxOutputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
-    transaction.unsigned.outputs.filter(_.publicKey == address).map(_.value).sum
+    transaction.unsigned.outputs.filter(_.publicKey == address).sumBy(_.value)
   }
 
   def getBalance(transaction: Transaction, address: ED25519PublicKey): BigInt = {
@@ -72,13 +72,13 @@ trait BlockPool {
   }
 
   def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
-    block.transactions.map(transaction => getBalance(transaction, address)).sum
+    block.transactions.sumBy(transaction => getBalance(transaction, address))
   }
 
   // calculated from best chain
   def getBalance(address: ED25519PublicKey): (Keccak256, BigInt) = {
     val bestTip = getBestTip
-    val balance = getBestChain.map(block => getBalance(block, address)).sum
+    val balance = getBestChain.sumBy(block => getBalance(block, address))
     (bestTip, balance)
   }
 }
