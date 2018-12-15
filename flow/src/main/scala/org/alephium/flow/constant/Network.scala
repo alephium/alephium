@@ -9,9 +9,11 @@ object Network extends DefaultConfig {
 
   val port: Int               = config.getInt("port")
   val pingFrequency: Duration = config.getDuration("pingFrequency")
-  val groups: Int             = config.getInt("groups")
-  val nonceStep: BigInt       = config.getInt("nonceStep")
-  val chainNum: Int           = groups * groups
+  val retryTimeout: Duration  = config.getDuration("retryTimeout")
+
+  val groups: Int       = config.getInt("groups")
+  val nonceStep: BigInt = config.getInt("nonceStep")
+  val chainNum: Int     = groups * groups
 
   def loadBlockFlow(groups: Int): Seq[Seq[Block]] = {
     val nonces = config.getStringList("nonces")
