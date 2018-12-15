@@ -37,11 +37,6 @@ object AddBlockHeaderResult {
     override def toString: String = "BlockHeader already exist"
   }
 
-  sealed trait Incomplete extends AddBlockHeaderResult
-  case class MissingDeps(deps: AVector[Keccak256]) extends Incomplete {
-    override def toString: String = s"Missing #$deps.length deps"
-  }
-
   trait Error                                 extends AddBlockHeaderResult
   sealed trait VerificationError              extends Error
   case class IOErrorForHeader(error: IOError) extends Error
@@ -55,4 +50,8 @@ object AddBlockHeaderResult {
   case object InvalidDifficulty extends VerificationError {
     override def toString: String = "Difficulty is invalid"
   }
+  case class MissingDeps(deps: AVector[Keccak256]) extends VerificationError {
+    override def toString: String = s"Missing #$deps.length deps"
+  }
+
 }

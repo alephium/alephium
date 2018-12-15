@@ -9,9 +9,11 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
 object HeaderChainHandler {
-  def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
-      implicit config: PlatformConfig): Props =
-    Props(new HeaderChainHandler(blockFlow, chainIndex, peerManager))
+  def props(blockFlow: BlockFlow,
+            chainIndex: ChainIndex,
+            peerManager: ActorRef,
+            flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
+    Props(new HeaderChainHandler(blockFlow, chainIndex, peerManager, flowHandler))
 
   sealed trait Command
   case class AddHeaders(headers: AVector[BlockHeader], origin: DataOrigin)
@@ -19,7 +21,8 @@ object HeaderChainHandler {
 
 class HeaderChainHandler(val blockFlow: BlockFlow,
                          val chainIndex: ChainIndex,
-                         peerManager: ActorRef)(implicit val config: PlatformConfig)
+                         peerManager: ActorRef,
+                         flowHandler: ActorRef)(implicit val config: PlatformConfig)
     extends BaseActor
     with ChainHandlerLogger {
   import HeaderChainHandler._
@@ -31,20 +34,22 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
       // TODO: support more heads later
       assert(headers.length == 1)
       val header = headers.head
-      val result = blockFlow.add(header)
-      result match {
-        case AddBlockHeaderResult.Success =>
+      handleHeader(header, origin)
+  }
+
+  def handleHeader(header: BlockHeader, origin: DataOrigin): Unit = {
+    if (blockFlow.contains(header)) {
+      log.debug(s"Header already existed")
+    } else {
+      blockFlow.validate(header, fromBlock = false) match {
+        case Left(e) =>
+          log.debug(s"Failed in header validation: ${e.toString}")
+        case Right(_) =>
           logInfo(header)
           broadcast(header, origin)
-        case AddBlockHeaderResult.AlreadyExisted =>
-          log.debug(s"Header do already exists")
-        case x: AddBlockHeaderResult.Incomplete =>
-          // TODO: handle missing data
-          log.debug(s"No enough data to verify header: ${x.toString}")
-        case x: AddBlockHeaderResult.Error =>
-          log.warning(s"Failure while adding a new header: ${x.toString}")
+          flowHandler.tell(FlowHandler.AddHeader(header), sender())
       }
-      sender() ! result
+    }
   }
 
   def broadcast(header: BlockHeader, origin: DataOrigin): Unit = {

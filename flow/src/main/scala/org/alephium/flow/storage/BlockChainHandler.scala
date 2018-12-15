@@ -9,17 +9,20 @@ import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
 object BlockChainHandler {
-  def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
-      implicit config: PlatformConfig): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, peerManager))
+  def props(blockFlow: BlockFlow,
+            chainIndex: ChainIndex,
+            peerManager: ActorRef,
+            flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
+    Props(new BlockChainHandler(blockFlow, chainIndex, peerManager, flowHandler))
 
   sealed trait Command
   case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
 }
 
-// TODO: investigate concurrency in master branch
-class BlockChainHandler(val blockFlow: BlockFlow, val chainIndex: ChainIndex, peerManager: ActorRef)(
-    implicit val config: PlatformConfig)
+class BlockChainHandler(val blockFlow: BlockFlow,
+                        val chainIndex: ChainIndex,
+                        peerManager: ActorRef,
+                        flowHandler: ActorRef)(implicit val config: PlatformConfig)
     extends BaseActor
     with ChainHandlerLogger {
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
@@ -29,22 +32,26 @@ class BlockChainHandler(val blockFlow: BlockFlow, val chainIndex: ChainIndex, pe
       // TODO: support more blocks later
       assert(blocks.length == 1)
       val block = blocks.head
+      handleBlock(block, origin)
+  }
 
-      val result = blockFlow.add(block)
-      result match {
-        case AddBlockResult.Success =>
+  def handleBlock(block: Block, origin: DataOrigin): Unit = {
+    if (blockFlow.contains(block)) {
+      log.debug(s"Block already existed")
+    } else {
+      val validationResult = origin match {
+        case DataOrigin.LocalMining => Right(())
+        case _: DataOrigin.Remote   => blockFlow.validate(block)
+      }
+      validationResult match {
+        case Left(e) =>
+          log.debug(s"Failed in block validation: ${e.toString}")
+        case Right(_) =>
           logInfo(block.header)
           broadcast(block, origin)
-        case AddBlockResult.AlreadyExisted =>
-          log.debug(s"Block do already exists")
-        case x: AddBlockResult.Incomplete =>
-          // TODO: handle missing data
-          log.debug(s"No enough data to verify block: ${x.toString}")
-        case x: AddBlockResult.Error =>
-          log.warning(s"Failed in adding new block: ${x.toString}")
+          flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())
       }
-
-      sender() ! result
+    }
   }
 
   def broadcast(block: Block, origin: DataOrigin): Unit = {

@@ -138,11 +138,11 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block): Assertion = {
-    blockFlow.add(block) is AddBlockResult.Success
+    blockFlow.add(block).isRight is true
   }
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
-    blockFlow.add(header) is AddBlockHeaderResult.Success
+    blockFlow.add(header).isRight is true
   }
 
   def show(blockFlow: BlockFlow): String = {

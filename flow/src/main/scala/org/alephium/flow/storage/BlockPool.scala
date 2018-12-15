@@ -70,10 +70,6 @@ object AddBlockResult {
     override def toString: String = "Block already exist"
   }
 
-  // needs more data for verification
-  sealed trait Incomplete                                              extends AddBlockResult
-  case class HeaderIncomplete(result: AddBlockHeaderResult.Incomplete) extends Incomplete
-
   sealed trait Error                                         extends AddBlockResult
   case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
   case class IOErrorForBlock(error: IOError)                 extends Error

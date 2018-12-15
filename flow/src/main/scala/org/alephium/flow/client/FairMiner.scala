@@ -3,10 +3,11 @@ package org.alephium.flow.client
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.client.Miner.BlockAdded
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
+import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
@@ -81,24 +82,16 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
           val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
-          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
+          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
         case None =>
           refreshLastTask(to, template)
       }
     case flowTemplate: BlockFlowTemplate =>
       val blockTemplate = getBlockTemplate(flowTemplate)
       addNewTask(flowTemplate.index.to.value, blockTemplate)
-    case AddBlockResult.Success =>
-      node.allHandlers.blockHandlers.foreach {
-        case (chainIndex, handler) =>
-          if (handler == sender()) {
-            assert(chainIndex.from == config.mainGroup)
-            prepareTemplate(chainIndex.to.value)
-          }
-      }
-    case e: AddBlockResult =>
-      log.error(s"An error occured while adding a new block: ${e.toString}")
-      context stop self
+    case BlockAdded(chainIndex) =>
+      assert(chainIndex.from == config.mainGroup)
+      prepareTemplate(chainIndex.to.value)
   }
 
   def getBlockTemplate(flowTemplate: BlockFlowTemplate): BlockTemplate = {
