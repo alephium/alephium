@@ -3,7 +3,7 @@ package org.alephium.flow.storage
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
-import org.alephium.flow.constant.Network
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
@@ -11,7 +11,8 @@ import org.alephium.protocol.model.Block
 import org.alephium.util.BaseActor
 
 object ChainHandler {
-  def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef): Props =
+  def props(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
+      implicit config: PlatformConfig): Props =
     Props(new ChainHandler(blockFlow, chainIndex, peerManager))
 
   sealed trait Command
@@ -26,7 +27,8 @@ object ChainHandler {
 }
 
 // TODO: investigate concurrency in master branch
-class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)
+class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: ActorRef)(
+    implicit config: PlatformConfig)
     extends BaseActor {
   val chain: SingleChain = blockFlow.getChain(chainIndex)
 
@@ -39,7 +41,7 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          val total       = blockFlow.numBlocks - Network.chainNum // exclude genesis blocks
+          val total       = blockFlow.numBlocks - config.chainNum // exclude genesis blocks
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(block)}; Time elapsed: ${elapsedTime}ms")

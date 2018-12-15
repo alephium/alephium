@@ -9,7 +9,6 @@ import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.constant.Network
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.util.Hex._
@@ -32,7 +31,7 @@ trait Platform extends App with StrictLogging {
     if (index > 0) {
       val parentIndex = index / 2
       val remote      = mode.index2Ip(parentIndex)
-      val until       = Instant.now().plusMillis(Network.retryTimeout.toMillis)
+      val until       = Instant.now().plusMillis(mode.config.retryTimeout.toMillis)
       node.peerManager ! PeerManager.Connect(remote, until)
     }
   }
@@ -41,8 +40,9 @@ trait Platform extends App with StrictLogging {
     implicit val system           = node.system
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
+    implicit val config           = mode.config
 
-    val groups = Network.groups
+    val groups = mode.config.groups
     val from   = index % groups
 
     logger.info(s"index: $from")
