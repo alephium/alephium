@@ -7,7 +7,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 object Hex {
-  def apply(s: String): ByteString = {
+  def unsafeFrom(s: String): ByteString = {
     ByteString(BHex.decode(s))
   }
 
