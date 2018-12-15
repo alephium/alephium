@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
-import org.alephium.flow.constant.Genesis
-import org.alephium.protocol.model.ModelGen
+import org.alephium.flow.constant.{Consensus, Genesis}
+import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.AlephiumSpec
 
 class BlockPoolSpec extends AlephiumSpec {
@@ -17,7 +17,7 @@ class BlockPoolSpec extends AlephiumSpec {
 
   it should "add block correctly" in new Fixture {
     blockPool.numBlocks is 1
-    forAll(blockGen) { block =>
+    forAll(blockGen, minSuccessful(1)) { block =>
       val blocksSize1 = blockPool.numBlocks
       val txSize1     = blockPool.numTransactions
       blockPool.add(block, 0)
@@ -29,7 +29,7 @@ class BlockPoolSpec extends AlephiumSpec {
   }
 
   it should "add blocks correctly" in new Fixture {
-    forAll(chainGen) { blocks =>
+    forAll(chainGen, minSuccessful(1)) { blocks =>
       val blocksSize1 = blockPool.numBlocks
       val txSize1     = blockPool.numTransactions
       blocks.foreach(block => blockPool.add(block, 0))
@@ -37,6 +37,8 @@ class BlockPoolSpec extends AlephiumSpec {
       val txSize2     = blockPool.numTransactions
       blocksSize1 + blocks.size is blocksSize2
       txSize1 + blocks.map(_.transactions.length).sum is txSize2
+
+      checkConfirmedBlocks(blockPool, blocks)
     }
   }
 
@@ -57,6 +59,7 @@ class BlockPoolSpec extends AlephiumSpec {
       blockPool.getBestChain is genesis +: blocks
       blockPool.maxHeight is blocks.size
       blockPool.getAllTips is Seq(lastBlock.hash)
+      checkConfirmedBlocks(blockPool, blocks)
     }
   }
 
@@ -90,5 +93,19 @@ class BlockPoolSpec extends AlephiumSpec {
         blockPool.getAllTips.toSet is Set(longChain.last.hash)
       }
     }
+  }
+
+  def checkConfirmedBlocks(blockPool: SingleChain, newBlocks: Seq[Block]): Unit = {
+    newBlocks.indices.foreach { index =>
+      val height   = index + 1
+      val blockOpt = blockPool.getConfirmedBlock(height)
+      if (height + Consensus.blockConfirmNum <= newBlocks.size) {
+        blockOpt.get is newBlocks(index)
+      } else {
+        blockOpt.isEmpty
+      }
+    }
+    blockPool.getConfirmedBlock(-1).isEmpty
+    ()
   }
 }

@@ -14,6 +14,8 @@ trait SingleChain extends BlockPool {
 
   def add(block: Block, parent: Keccak256, weight: Int): AddBlockResult
 
+  def getConfirmedBlock(height: Int): Option[Block]
+
   def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean
 }
 

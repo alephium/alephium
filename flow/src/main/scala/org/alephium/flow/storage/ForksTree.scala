@@ -12,7 +12,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   private val blocksTable: HashMap[Keccak256, ForksTree.TreeNode] = HashMap.empty
   private val transactionsTable: HashMap[Keccak256, Transaction]  = HashMap.empty
   private val tips: HashSet[Keccak256]                            = HashSet.empty
-//  private val confirmedBlocks: Buffer[Keccak256]                  = Buffer.empty
+  private val confirmedBlocks: ArrayBuffer[ForksTree.TreeNode]    = ArrayBuffer.empty
 
   // Assuming that node is a tip node
   private def updateTable(node: ForksTree.TreeNode): Unit = {
@@ -36,6 +36,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     }
 
     pruneDueto(node)
+    confirmBlocks()
 
     ()
   }
@@ -80,6 +81,26 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     }
   }
 
+  private def confirmBlocks(): Unit = {
+    val oldestTip = tips.view.map(blocksTable).minBy(_.height)
+
+    @tailrec
+    def iter(): Unit = {
+      if (confirmedBlocks.isEmpty && root.successors.size == 1) {
+        confirmedBlocks.append(root)
+        iter()
+      } else if (confirmedBlocks.nonEmpty) {
+        val lastConfirmed = confirmedBlocks.last
+        if (lastConfirmed.successors.size == 1 && (oldestTip.height >= lastConfirmed.height + Consensus.blockConfirmNum)) {
+          confirmedBlocks.append(lastConfirmed.successors.head)
+          iter()
+        }
+      }
+    }
+
+    iter()
+  }
+
   private def postOrderTraverse(f: ForksTree.TreeNode => Unit): Unit = {
     def iter(node: ForksTree.TreeNode): Unit = {
       if (!node.isLeaf) node.successors.foreach(iter)
@@ -120,6 +141,12 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
   }
 
   override def getBlock(hash: Keccak256): Block = blocksTable(hash).block
+
+  override def getConfirmedBlock(height: Int): Option[Block] = {
+    if (height < confirmedBlocks.size && height >= 0) {
+      Some(confirmedBlocks(height).block)
+    } else None
+  }
 
   override def getBlocks(locator: Keccak256): Seq[Block] = {
     blocksTable.get(locator) match {
