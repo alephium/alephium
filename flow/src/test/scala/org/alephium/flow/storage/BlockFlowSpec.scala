@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.WithConfig
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
@@ -9,7 +9,7 @@ import org.alephium.util.{AlephiumSpec, Hex}
 
 import scala.annotation.tailrec
 
-class BlockFlowSpec extends AlephiumSpec with WithConfig {
+class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
   behavior of "BlockFlow"
 
   it should "compute correct blockflow height" in {

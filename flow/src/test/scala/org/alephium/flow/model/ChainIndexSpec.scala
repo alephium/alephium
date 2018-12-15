@@ -1,10 +1,10 @@
 package org.alephium.flow.model
 
-import org.alephium.flow.WithConfig
+import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.ModelGen
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec with WithConfig {
+class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
 
   behavior of "ChainIndex"
 

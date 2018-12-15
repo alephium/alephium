@@ -42,6 +42,14 @@ object PlatformConfig {
 
     new PlatformConfig(config.getConfig("alephium"))
   }
+
+  object Default {
+    val config: PlatformConfig = PlatformConfig.load()
+  }
+
+  trait Default {
+    implicit def config: PlatformConfig = Default.config
+  }
 }
 
 class PlatformConfig(val underlying: Config) { self =>
