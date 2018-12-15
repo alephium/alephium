@@ -12,10 +12,10 @@ object Network {
   val pingFrequency: Duration = config.getDuration("pingFrequency")
   val groups: Int             = config.getInt("groups")
   val nonceStep: BigInt       = config.getInt("nonceStep")
-  val chainNum                = groups * groups
+  val chainNum: Int           = groups * groups
 
   def loadBlockFlow(groups: Int): Seq[Seq[Block]] = {
-    val nonces = config.getIntList("nonces")
+    val nonces = config.getStringList("nonces")
     assert(nonces.size == Network.groups * Network.groups)
 
     Seq.tabulate(groups, groups) {
