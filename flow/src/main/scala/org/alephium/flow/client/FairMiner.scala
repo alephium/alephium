@@ -7,15 +7,31 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
-import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.util.Random
 
 object FairMiner {
-  def props(address: ED25519PublicKey, node: Node)(implicit config: PlatformConfig): Props =
-    Props(new FairMiner(address, node))
+  def props(node: Node)(implicit config: PlatformConfig): Props = {
+    val addresses = AVector.tabulate(config.groups) { i =>
+      val index          = GroupIndex(i)
+      val (_, publicKey) = GroupConfig.generateKeyForGroup(index)
+      publicKey
+    }
+    props(addresses, node)
+  }
+
+  def props(addresses: AVector[ED25519PublicKey], node: Node)(
+      implicit config: PlatformConfig): Props = {
+    require(addresses.length == config.groups)
+    addresses.foreachWithIndex { (address, i) =>
+      require(PeerId.fromPublicKey(address).groupIndex.value == i)
+    }
+    Props(new FairMiner(addresses, node))
+  }
 
   sealed trait Command
   case class MiningResult(
@@ -26,7 +42,8 @@ object FairMiner {
   ) extends Command
 }
 
-class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: PlatformConfig)
+class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
+    implicit val config: PlatformConfig)
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers
@@ -85,6 +102,8 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: Plat
   }
 
   def getBlockTemplate(flowTemplate: BlockFlowTemplate): BlockTemplate = {
+    assert(flowTemplate.index.from == config.mainGroup)
+    val address = addresses(flowTemplate.index.to.value)
     // scalastyle:off magic.number
     val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
     // scalastyle:on magic.number
