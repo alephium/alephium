@@ -29,7 +29,7 @@ object Genesis {
       }
     }
 
-    Block.genesis(transactions.toSeq, Consensus.maxMiningTarget)
+    Block.genesis(transactions.toSeq, Consensus.maxMiningTarget, 0)
   }
 
   val block: Block                   = loadGenesis("genesis.json")
