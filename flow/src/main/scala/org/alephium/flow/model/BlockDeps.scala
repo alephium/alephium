@@ -1,7 +1,7 @@
 package org.alephium.flow.model
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.constant.Network
+import org.alephium.flow.PlatformConfig
 
 /*
  * There are 2 * groups - 1 dependent hashes for each block
@@ -10,7 +10,7 @@ import org.alephium.flow.constant.Network
  */
 case class BlockDeps(chainIndex: ChainIndex, deps: Seq[Keccak256]) {
 
-  def getChainHash: Keccak256 = {
-    deps.view.takeRight(Network.groups)(chainIndex.to)
+  def getChainHash(implicit config: PlatformConfig): Keccak256 = {
+    deps.view.takeRight(config.groups)(chainIndex.to)
   }
 }

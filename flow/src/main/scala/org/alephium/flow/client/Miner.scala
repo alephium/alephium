@@ -2,7 +2,8 @@ package org.alephium.flow.client
 
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.constant.{Consensus, Network}
+import org.alephium.flow.PlatformConfig
+import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.{BlockTemplate, ChainIndex}
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
@@ -12,13 +13,12 @@ import org.alephium.util.BaseActor
 import scala.annotation.tailrec
 
 object Miner {
-
   sealed trait Command
   case object Start                          extends Command
   case object Stop                           extends Command
   case class Nonce(from: BigInt, to: BigInt) extends Command
 
-  def mineGenesis(chainIndex: ChainIndex): Block = {
+  def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, nonce)
@@ -29,12 +29,15 @@ object Miner {
   }
 
   trait Builder {
-    def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex): Props =
+    def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
+        implicit config: PlatformConfig): Props =
       Props(new Miner(address, node, chainIndex))
   }
 }
 
-class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) extends BaseActor {
+class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
+    implicit config: PlatformConfig)
+    extends BaseActor {
   import node.blockHandlers
 
   val chainHandler: ActorRef = blockHandlers.getHandler(chainIndex)
@@ -77,13 +80,13 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex) exten
 
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(deps, target) =>
-      assert(deps.size == (2 * Network.groups - 1))
+      assert(deps.size == (2 * config.groups - 1))
       val transaction = Transaction.coinbase(address, 1)
-      val chainDep    = deps.view.takeRight(Network.groups)(chainIndex.to)
+      val chainDep    = deps.view.takeRight(config.groups)(chainIndex.to)
       val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
       val template    = BlockTemplate(deps, target, Seq(transaction))
       context become mine(template, lastTs)
-      self ! Miner.Nonce(0, Network.nonceStep)
+      self ! Miner.Nonce(0, config.nonceStep)
   }
 
   def collect: Receive = _collect orElse awaitStop
