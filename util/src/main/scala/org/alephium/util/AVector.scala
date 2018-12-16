@@ -159,7 +159,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def foreachIndexed[U](f: (A, Int) => U): Unit = {
+  def foreachWithIndex[U](f: (A, Int) => U): Unit = {
     cfor(start)(_ < end, _ + 1) { i =>
       f(elems(i), i - start)
       ()
@@ -172,7 +172,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def mapIndexed[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
+  def mapWithIndex[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
     AVector.tabulate(length) { i =>
       f(apply(i), i)
     }
@@ -237,13 +237,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  // Note: the return vector does not include zero
   def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
-    val arr = new Array[B](length)
+    val arr = new Array[B](length + 1)
     var acc = zero
+    arr(0) = acc
     cfor(0)(_ < length, _ + 1) { i =>
       acc = op(acc, apply(i))
-      arr(i) = acc
+      arr(i + 1) = acc
     }
     AVector.unsafe(arr)
   }
@@ -256,6 +256,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def sum(implicit num: Numeric[A]): A = foldLeft(num.zero)(num.plus)
+
+  def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {
+    foldLeft(num.zero) { (sum, elem) =>
+      num.plus(sum, f(elem))
+    }
+  }
 
   def max(implicit cmp: Ordering[A]): A = {
     assert(nonEmpty)
@@ -324,11 +330,10 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def mkString(sep: String): String = mkString("", sep, "")
 
   override def equals(obj: Any): Boolean = obj match {
-    case that: AVector[_] =>
+    case that: AVector[A] =>
       if (length == that.length && ct == that.ct) {
-        val vc = that.asInstanceOf[AVector[A]]
         cfor(0)(_ < length, _ + 1) { i =>
-          if (apply(i) != vc(i)) return false
+          if (apply(i) != that(i)) return false
         }
         true
       } else false
