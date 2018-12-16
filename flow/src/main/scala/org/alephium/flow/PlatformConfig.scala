@@ -1,14 +1,12 @@
 package org.alephium.flow
 
 import java.time.Duration
-
-import java.io.{File}
+import java.io.File
 import java.nio.file.{Path, Paths}
 
 import com.typesafe.config.{Config, ConfigFactory}
-
 import org.alephium.protocol.model.Block
-import org.alephium.util.Files
+import org.alephium.util.{AVector, Files}
 
 object PlatformConfig {
   val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
@@ -61,7 +59,7 @@ class PlatformConfig(val underlying: Config) { self =>
 
   val chainNum: Int = groups * groups
 
-  def loadBlockFlow(groups: Int): Seq[Seq[Block]] = {
+  def loadBlockFlow(groups: Int): AVector[AVector[Block]] = {
     val nonces = underlying.getStringList("nonces")
     assert(nonces.size == self.groups * self.groups)
 
@@ -69,9 +67,9 @@ class PlatformConfig(val underlying: Config) { self =>
       case (from, to) =>
         val index = from * self.groups + to
         val nonce = nonces.get(index)
-        Block.genesis(Seq.empty, constant.Consensus.maxMiningTarget, BigInt(nonce))
+        Block.genesis(AVector.empty, constant.Consensus.maxMiningTarget, BigInt(nonce))
     }
   }
 
-  lazy val blocksForFlow: Seq[Seq[Block]] = loadBlockFlow(groups)
+  lazy val blocksForFlow: AVector[AVector[Block]] = loadBlockFlow(groups)
 }

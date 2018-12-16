@@ -1,6 +1,7 @@
 package org.alephium
 
 import akka.util.ByteString
+import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -20,9 +21,9 @@ package object serde {
 
   implicit val longSerde: Serde[Long] = LongSerde
 
-  implicit def seqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[Seq[T]] =
+  implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     dynamicSizeBytesSerde(serde)
 
   implicit val bigIntSerde: Serde[BigInt] =
-    seqSerde[Byte].xmap(bs => BigInt(bs.toArray), _.toByteArray)
+    avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
 }

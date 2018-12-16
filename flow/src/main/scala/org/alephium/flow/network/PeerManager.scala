@@ -10,7 +10,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.BlockHandlers
 import org.alephium.flow.storage.ChainHandler.BlockOrigin
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 import scala.collection.mutable
 
@@ -19,12 +19,12 @@ object PeerManager {
     Props(new PeerManager(builders))
 
   sealed trait Command
-  case class Set(server: ActorRef, blockhandlers: BlockHandlers)        extends Command
-  case class Connect(remote: InetSocketAddress, until: Instant)         extends Command
-  case class Connected(remote: InetSocketAddress, tcpHandler: ActorRef) extends Command
-  case class Sync(remote: InetSocketAddress, locators: Seq[Keccak256])  extends Command
-  case class BroadCast(message: Message, origin: BlockOrigin)           extends Command
-  case object GetPeers                                                  extends Command
+  case class Set(server: ActorRef, blockhandlers: BlockHandlers)           extends Command
+  case class Connect(remote: InetSocketAddress, until: Instant)            extends Command
+  case class Connected(remote: InetSocketAddress, tcpHandler: ActorRef)    extends Command
+  case class Sync(remote: InetSocketAddress, locators: AVector[Keccak256]) extends Command
+  case class BroadCast(message: Message, origin: BlockOrigin)              extends Command
+  case object GetPeers                                                     extends Command
 
   sealed trait Event
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event

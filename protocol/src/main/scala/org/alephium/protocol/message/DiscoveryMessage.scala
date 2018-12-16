@@ -1,9 +1,9 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
-
 import org.alephium.serde.{Deserializer, RandomBytes, Serde, Serializer}
 import org.alephium.protocol.model.{peerIdLength, PeerAddress, PeerId}
+import org.alephium.util.AVector
 
 /**
   *  Discovery RPC Protocol (Kademila based)
@@ -40,7 +40,7 @@ object DiscoveryMessage {
   }
 
   // Events
-  case class Neighbors(callId: CallId, peers: Seq[PeerAddress]) extends DiscoveryMessage
+  case class Neighbors(callId: CallId, peers: AVector[PeerAddress]) extends DiscoveryMessage
   object Neighbors extends Code {
     val serde: Serde[Neighbors] =
       Serde.forProduct2(Neighbors.apply, p => (p.callId, p.peers))
@@ -55,9 +55,9 @@ object DiscoveryMessage {
 
   sealed trait Code
   object Code {
-    val values: Seq[Code] = Seq(Ping, Pong, FindNode, Neighbors)
+    val values: AVector[Code] = AVector(Ping, Pong, FindNode, Neighbors)
 
-    val toByte: Map[Code, Byte]   = values.zipWithIndex.toMap.mapValues(_.toByte)
+    val toByte: Map[Code, Byte]   = values.toIterable.zipWithIndex.toMap.mapValues(_.toByte)
     val fromByte: Map[Byte, Code] = toByte.map(_.swap)
   }
 

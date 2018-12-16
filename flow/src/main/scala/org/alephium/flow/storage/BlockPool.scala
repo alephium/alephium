@@ -2,6 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
+import org.alephium.util.AVector
 
 trait BlockPool {
 
@@ -17,16 +18,16 @@ trait BlockPool {
   // Assuming the hash is in the pool
   def getBlock(hash: Keccak256): Block
 
-  def getBlocks(locators: Seq[Keccak256]): Seq[Block] = {
+  def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
     val blocks = locators.map(getBlocks)
-    blocks.foldLeft(Seq.empty[Block]) {
+    blocks.foldLeft(AVector.empty[Block]) {
       case (acc, newBlocks) =>
         val toAdd = newBlocks.filterNot(acc.contains)
         acc ++ toAdd
     }
   }
 
-  def getBlocks(locator: Keccak256): Seq[Block]
+  def getBlocks(locator: Keccak256): AVector[Block]
 
   def getHeight(hash: Keccak256): Int
   def getHeight(block: Block): Int = getHeight(block.hash)
@@ -34,9 +35,9 @@ trait BlockPool {
   def getWeight(hash: Keccak256): Int
   def getWeight(block: Block): Int = getWeight(block.hash)
 
-  // TODO: use ChainSlice instead of Seq[Block]
-  def getBlockSlice(hash: Keccak256): Seq[Block]
-  def getBlockSlice(block: Block): Seq[Block] = getBlockSlice(block.hash)
+  // TODO: use ChainSlice instead of AVector[Block]
+  def getBlockSlice(hash: Keccak256): AVector[Block]
+  def getBlockSlice(block: Block): AVector[Block] = getBlockSlice(block.hash)
 
   // Assuming the hash or block is in the pool
   def isTip(hash: Keccak256): Boolean
@@ -44,9 +45,9 @@ trait BlockPool {
 
   def getBestTip: Keccak256
 
-  def getBestChain: Seq[Block] = getBlockSlice(getBestTip)
+  def getBestChain: AVector[Block] = getBlockSlice(getBestTip)
 
-  def getAllTips: Seq[Keccak256]
+  def getAllTips: AVector[Keccak256]
 
   def getAllBlocks: Iterable[Block]
 
@@ -72,38 +73,6 @@ trait BlockPool {
 
   def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
     block.transactions.map(transaction => getBalance(transaction, address)).sum
-  }
-
-  def getUTXOs(address: ED25519PublicKey): (Keccak256, Seq[TxInput]) = {
-    val bestChain = getBestChain
-    val txosOI = for {
-      block             <- bestChain
-      transaction       <- block.transactions
-      (txOutput, index) <- transaction.unsigned.outputs.zipWithIndex
-      if txOutput.publicKey == address
-    } yield TxInput(transaction.hash, index)
-    val stxosOI = for {
-      block       <- bestChain
-      transaction <- block.transactions
-      txInput     <- transaction.unsigned.inputs
-    } yield txInput
-    (bestChain.last.hash, txosOI diff stxosOI)
-  }
-
-  // return a number of inputs with at lease value Aleph
-  def getUTXOs(address: ED25519PublicKey,
-               value: BigInt): Option[(Keccak256, Seq[TxInput], BigInt)] = {
-    val (header, utxos) = getUTXOs(address)
-    val values = utxos
-      .scanLeft(BigInt(0)) {
-        case (acc, TxInput(txHash, outputIndex)) =>
-          val tx       = getTransaction(txHash)
-          val txOutput = tx.unsigned.outputs(outputIndex)
-          acc + txOutput.value
-      }
-      .tail
-    val index = values.indexWhere(_ >= value)
-    if (index == -1) None else Some((header, utxos.take(index + 1), values(index)))
   }
 
   // calculated from best chain

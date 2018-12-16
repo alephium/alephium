@@ -3,6 +3,7 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.Block
+import org.alephium.util.AVector
 
 trait SingleChain extends BlockPool {
 
@@ -51,7 +52,7 @@ object AddBlockResult {
   case object AlreadyExisted extends Failure {
     override def toString: String = "Block already exist"
   }
-  case class MissingDeps(deps: Seq[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #${deps.size - 1} deps"
+  case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
+    override def toString: String = s"Missing #${deps.length - 1} deps"
   }
 }

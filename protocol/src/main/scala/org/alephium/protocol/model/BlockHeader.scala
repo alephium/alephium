@@ -2,9 +2,10 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto._
 import org.alephium.serde.Serde
+import org.alephium.util.AVector
 
 case class BlockHeader(
-    blockDeps: Seq[Keccak256],
+    blockDeps: AVector[Keccak256],
     txsHash: Keccak256,
     timestamp: Long,
     target: BigInt,

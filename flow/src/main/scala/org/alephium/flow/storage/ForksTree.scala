@@ -3,6 +3,7 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.util.AVector
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
@@ -135,7 +136,7 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
             updateTable(newNode)
             AddBlockResult.Success
           case None =>
-            AddBlockResult.MissingDeps(Seq(parentHash))
+            AddBlockResult.MissingDeps(AVector(parentHash))
         }
     }
   }
@@ -148,20 +149,21 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     } else None
   }
 
-  override def getBlocks(locator: Keccak256): Seq[Block] = {
+  override def getBlocks(locator: Keccak256): AVector[Block] = {
     blocksTable.get(locator) match {
       case Some(node) => getBlocksAfter(node)
-      case None       => Seq.empty[Block]
+      case None       => AVector.empty[Block]
     }
   }
 
-  private def getBlocksAfter(node: ForksTree.TreeNode): Seq[Block] = {
-    if (node.isLeaf) Seq.empty[Block]
+  private def getBlocksAfter(node: ForksTree.TreeNode): AVector[Block] = {
+    if (node.isLeaf) AVector.empty[Block]
     else {
-      node.successors.foldLeft(node.successors.map(_.block)) {
+      val buffer = node.successors.foldLeft(node.successors.map(_.block)) {
         case (blocks, successor) =>
-          blocks ++ getBlocksAfter(successor)
+          blocks ++ getBlocksAfter(successor).toIterable
       }
+      AVector.from(buffer)
     }
   }
 
@@ -175,23 +177,24 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     blocksTable(hash).weight
   }
 
-  private def getChain(node: ForksTree.TreeNode): Seq[ForksTree.TreeNode] = {
+  private def getChain(node: ForksTree.TreeNode): AVector[ForksTree.TreeNode] = {
     @tailrec
-    def iter(acc: Seq[ForksTree.TreeNode], current: ForksTree.TreeNode): Seq[ForksTree.TreeNode] = {
+    def iter(acc: AVector[ForksTree.TreeNode],
+             current: ForksTree.TreeNode): AVector[ForksTree.TreeNode] = {
       current match {
-        case n: ForksTree.Root => n +: acc
-        case n: ForksTree.Node => iter(current +: acc, n.parent)
+        case n: ForksTree.Root => acc :+ n
+        case n: ForksTree.Node => iter(acc :+ current, n.parent)
       }
     }
-    iter(Seq.empty, node)
+    iter(AVector.empty, node).reverse
   }
 
-  override def getBlockSlice(hash: Keccak256): Seq[Block] = {
+  override def getBlockSlice(hash: Keccak256): AVector[Block] = {
     blocksTable.get(hash) match {
       case Some(node) =>
         getChain(node).map(_.block)
       case None =>
-        Seq.empty
+        AVector.empty
     }
   }
 
@@ -203,8 +206,8 @@ class ForksTree(root: ForksTree.Root) extends SingleChain {
     getAllTips.map(blocksTable.apply).maxBy(_.height).block.hash
   }
 
-  override def getAllTips: Seq[Keccak256] = {
-    tips.toSeq
+  override def getAllTips: AVector[Keccak256] = {
+    AVector.from(tips)
   }
 
   override def getAllBlocks: Iterable[Block] = blocksTable.values.map(_.block)

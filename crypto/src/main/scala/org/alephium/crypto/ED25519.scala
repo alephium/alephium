@@ -2,6 +2,7 @@ package org.alephium.crypto
 
 import akka.util.ByteString
 import org.alephium.serde.RandomBytes
+import org.alephium.util.AVector
 import org.whispersystems.curve25519.Curve25519
 
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
@@ -60,7 +61,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
     sign(message.toArray, privateKey.bytes.toArray)
   }
 
-  override def sign(message: Seq[Byte], privateKey: ED25519PrivateKey): ED25519Signature = {
+  override def sign(message: AVector[Byte], privateKey: ED25519PrivateKey): ED25519Signature = {
     sign(message.toArray, privateKey.bytes.toArray)
   }
 
@@ -75,7 +76,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
     verify(message.toArray, signature.bytes.toArray, publicKey.bytes.toArray)
   }
 
-  override def verify(message: Seq[Byte],
+  override def verify(message: AVector[Byte],
                       signature: ED25519Signature,
                       publicKey: ED25519PublicKey): Boolean = {
     verify(message.toArray, signature.bytes.toArray, publicKey.bytes.toArray)

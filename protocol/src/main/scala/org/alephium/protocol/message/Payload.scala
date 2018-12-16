@@ -4,6 +4,7 @@ import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.Block
 import org.alephium.serde._
+import org.alephium.util.AVector
 
 import scala.util.Failure
 
@@ -34,9 +35,9 @@ object Payload {
 
   sealed trait Code
   object Code {
-    val values: Seq[Code] = Seq(Ping, Pong, SendBlocks, GetBlocks)
+    val values: AVector[Code] = AVector(Ping, Pong, SendBlocks, GetBlocks)
 
-    val toInt: Map[Code, Int]   = values.zipWithIndex.toMap
+    val toInt: Map[Code, Int]   = values.toIterable.zipWithIndex.toMap
     val fromInt: Map[Int, Code] = toInt.map(_.swap)
     def fromValue(value: Payload): Code = value match {
       case _: Ping       => Ping
@@ -59,13 +60,13 @@ object Pong extends Payload.Code {
   implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
-case class SendBlocks(blocks: Seq[Block]) extends Payload
+case class SendBlocks(blocks: AVector[Block]) extends Payload
 
 object SendBlocks extends Payload.Code {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
-case class GetBlocks(locators: Seq[Keccak256]) extends Payload
+case class GetBlocks(locators: AVector[Keccak256]) extends Payload
 
 object GetBlocks extends Payload.Code {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
