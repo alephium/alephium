@@ -2,48 +2,30 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
 import org.alephium.util.{AVector, Hex}
 
 import scala.reflect.ClassTag
 
-trait MultiChain extends BlockPool {
+// scalastyle:off number.of.methods
+trait MultiChain extends BlockPool with BlockHeaderPool {
   implicit def config: PlatformConfig
 
   def groups: Int
 
-  def blockChains: AVector[AVector[BlockChain]]
+  protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
 
-  protected def aggregate[T: ClassTag](f: BlockChain => T)(op: (T, T) => T): T = {
-    blockChains.reduceBy { chains =>
-      chains.reduceBy(f)(op)
-    }(op)
-  }
+  def numHashes: Int = aggregate(_.numHashes)(_ + _)
 
-  override def numHashes: Int = aggregate(_.numHashes)(_ + _)
+  def maxWeight: Int = aggregate(_.maxWeight)(math.max)
 
-  override def numTransactions: Int = aggregate(_.numTransactions)(_ + _)
+  def maxHeight: Int = aggregate(_.maxHeight)(math.max)
 
-  override def maxWeight: Int = aggregate(_.maxWeight)(math.max)
-
-  override def maxHeight: Int = aggregate(_.maxHeight)(math.max)
-
-  def getChain(i: Int, j: Int): BlockChain
-
-  def getChain(chainIndex: ChainIndex): BlockChain = {
-    getChain(chainIndex.from, chainIndex.to)
-  }
-
-  def getChain(block: Block): BlockChain = getChain(getIndex(block))
-
-  def getChain(hash: Keccak256): BlockChain = getChain(getIndex(hash))
-
-  def getIndex(block: Block): ChainIndex = {
-    getIndex(block.hash)
-  }
+  /* BlockHash apis */
 
   def contains(hash: Keccak256): Boolean = {
-    val chain = getChain(hash)
+    val index = ChainIndex.fromHash(hash)
+    val chain = getHashChain(index)
     chain.contains(hash)
   }
 
@@ -51,43 +33,78 @@ trait MultiChain extends BlockPool {
     ChainIndex.fromHash(hash)
   }
 
-  def add(block: Block): AddBlockResult
+  protected def getHashChain(from: Int, to: Int): BlockHashChain
 
-  override def add(block: Block, weight: Int): AddBlockResult = {
-    add(block, block.parentHash, weight)
+  def getHashChain(chainIndex: ChainIndex): BlockHashChain = {
+    getHashChain(chainIndex.from, chainIndex.to)
   }
 
-  override def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
-    val chain = getChain(block)
-    chain.add(block, parentHash, weight)
-  }
-
-  def getBlock(hash: Keccak256): Block = {
-    getChain(hash).getBlock(hash)
-  }
-
-  def getBlocks(locator: Keccak256): AVector[Block] = {
-    getChain(locator).getBlocks(locator)
+  def getHashChain(hash: Keccak256): BlockHashChain = {
+    val index = ChainIndex.fromHash(hash)
+    getHashChain(index.from, index.to)
   }
 
   def isTip(hash: Keccak256): Boolean = {
-    getChain(hash).isTip(hash)
+    getHashChain(hash).isTip(hash)
   }
 
   def getHeight(hash: Keccak256): Int = {
-    getChain(hash).getHeight(hash)
+    getHashChain(hash).getHeight(hash)
   }
 
   def getWeight(hash: Keccak256): Int = {
-    getChain(hash).getWeight(hash)
+    getHashChain(hash).getWeight(hash)
   }
 
-  override def getBlockSlice(hash: Keccak256): AVector[Block] = getChain(hash).getBlockSlice(hash)
+  def getAllBlockHashes: Iterable[Keccak256] = aggregate(_.getAllBlockHashes)(_ ++ _)
 
-  override def getAllBlockHashes: Iterable[Keccak256] = aggregate(_.getAllBlockHashes)(_ ++ _)
+  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] =
+    getHashChain(hash).getBlockHashSlice(hash)
 
-  override def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] =
-    getChain(hash).getBlockHashSlice(hash)
+  /* BlockHeader apis */
+
+  protected def getHeaderChain(from: Int, to: Int): BlockHeaderPool
+
+  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderPool = {
+    getHeaderChain(chainIndex.from, chainIndex.to)
+  }
+
+  def getHeaderChain(header: BlockHeader): BlockHeaderPool = {
+    getHeaderChain(header.chainIndex)
+  }
+
+  def getHeaderChain(hash: Keccak256): BlockHeaderPool = {
+    getHeaderChain(ChainIndex.fromHash(hash))
+  }
+
+  def getBlockHeader(hash: Keccak256): BlockHeader =
+    getHeaderChain(hash).getBlockHeader(hash)
+
+  def add(header: BlockHeader): AddBlockHeaderResult
+
+  /* BlockChain apis */
+
+  protected def getBlockChain(from: Int, to: Int): BlockChain
+
+  def getBlockChain(chainIndex: ChainIndex): BlockChain = {
+    getBlockChain(chainIndex.from, chainIndex.to)
+  }
+
+  def getBlockChain(block: Block): BlockChain = getBlockChain(block.chainIndex)
+
+  def getBlockChain(hash: Keccak256): BlockChain = {
+    getBlockChain(ChainIndex.fromHash(hash))
+  }
+
+  def getBlock(hash: Keccak256): Block = {
+    getBlockChain(hash).getBlock(hash)
+  }
+
+  def getBlocks(locator: Keccak256): AVector[Block] = {
+    getBlockChain(locator).getBlocks(locator)
+  }
+
+  def add(block: Block): AddBlockResult
 
   def getTransaction(hash: Keccak256): Transaction = ???
 
@@ -95,30 +112,31 @@ trait MultiChain extends BlockPool {
     val infos = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"($i, $j): ${getChain(i, j).maxHeight}/${getChain(i, j).numHashes - 1}"
+    } yield s"($i, $j): ${getHashChain(i, j).maxHeight}/${getHashChain(i, j).numHashes - 1}"
     infos.mkString("; ")
   }
 
   def getBlockInfo: String = {
     val blocks = for {
-      i     <- 0 until groups
-      j     <- 0 until groups
-      block <- getChain(i, j).getAllBlocks
-    } yield toJson(i, j, block)
+      i    <- 0 until groups
+      j    <- 0 until groups
+      hash <- getHashChain(i, j).getAllBlockHashes
+    } yield toJson(i, j, hash)
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
     val heights = for {
       i <- 0 until groups
       j <- 0 until groups
-    } yield s"""{"chainFrom":$i,"chainTo":$j,"height":${getChain(i, j).maxHeight}}"""
+    } yield s"""{"chainFrom":$i,"chainTo":$j,"height":${getHashChain(i, j).maxHeight}}"""
     val heightsJson = heights.mkString("[", ",", "]")
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
 
-  def toJson(from: Int, to: Int, block: Block): String = {
-    val timestamp = block.blockHeader.timestamp
-    val height    = getWeight(block)
-    val hash      = Hex.toHexString(block.hash.bytes).take(16)
-    val deps = block.blockHeader.blockDeps
+  def toJson(from: Int, to: Int, blockHash: Keccak256): String = {
+    val header    = getBlockHeader(blockHash)
+    val timestamp = header.timestamp
+    val height    = getWeight(blockHash)
+    val hash      = header.shortHash
+    val deps = header.blockDeps
       .map(h => "\"" + Hex.toHexString(h.bytes).take(16) + "\"")
       .mkString("[", ",", "]")
     s"""{"timestamp":$timestamp,"chainFrom":$from,"chainTo":$to,"height":"$height","hash":"$hash","deps":$deps}"""

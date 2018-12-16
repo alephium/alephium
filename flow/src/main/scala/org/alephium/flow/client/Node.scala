@@ -10,7 +10,7 @@ import org.alephium.util.AVector
 case class Node(
     name: String,
     port: Int,
-    chainIndex: ChainIndex,
+    mainGroup: Int,
     peerId: PeerId,
     system: ActorSystem,
     blockFlow: BlockFlow,
@@ -21,12 +21,12 @@ case class Node(
 object Node {
   type Builder = TcpHandler.Builder
 
-  def apply(builders: Builder, name: String, chainIndex: ChainIndex, port: Int, groups: Int)(
+  def apply(builders: Builder, name: String, mainGroup: Int, port: Int, groups: Int)(
       implicit config: PlatformConfig): Node = {
-    val peerId = PeerId.generateFor(chainIndex)
+    val peerId = PeerId.generateFor(mainGroup)
 
     val system    = ActorSystem(name, config.all)
-    val blockFlow = BlockFlow()
+    val blockFlow = BlockFlow(mainGroup)
 
     val peerManager  = system.actorOf(PeerManager.props(builders), "PeerManager")
     val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
@@ -39,6 +39,6 @@ object Node {
     val server        = system.actorOf(TcpServer.props(port, peerManager), "TcpServer")
     peerManager ! PeerManager.Set(server, blockHandlers)
 
-    Node(name, port, chainIndex, peerId, system, blockFlow, peerManager, blockHandlers)
+    Node(name, port, mainGroup, peerId, system, blockFlow, peerManager, blockHandlers)
   }
 }

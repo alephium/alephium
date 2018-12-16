@@ -28,10 +28,6 @@ trait BlockHeaderPool extends BlockHashPool {
   def getBlockHeaderSlice(bh: BlockHeader): AVector[BlockHeader] = getBlockHeaderSlice(bh.hash)
 
   def getBestBlockHeaderChain: AVector[BlockHeader] = getBlockHeaderSlice(getBestTip)
-
-  def getAllBlockHeaders: Iterable[BlockHeader] = {
-    getAllBlockHashes.map(getBlockHeader)
-  }
 }
 
 sealed trait AddBlockHeaderResult
@@ -44,7 +40,10 @@ object AddBlockHeaderResult {
     override def toString: String = "BlockHeader already exist"
   }
   case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #${deps.length - 1} deps"
+    override def toString: String = s"Missing #$deps.length deps"
+  }
+  case object InvalidIndex extends Failure {
+    override def toString: String = "Block header index is invalid"
   }
   case class Other(message: String) extends Failure {
     override def toString: String = s"Failed in adding blockheader: $message"
