@@ -95,6 +95,7 @@ lazy val serde = subProject("serde")
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val util = subProject("util")
+  .dependsOn(macros)
   .settings(
     libraryDependencies ++= Seq(
       akka,
@@ -103,10 +104,13 @@ lazy val util = subProject("util")
     )
   )
 
+lazy val macros = subProject("macros")
+  .settings(libraryDependencies += `scala-reflect`(scalaVersion.value))
+
 val commonSettings = Seq(
   organization := "org.alephium",
   version := "0.1.0-SNAPSHOT",
-  scalaVersion := "2.12.5",
+  scalaVersion := "2.12.6",
   parallelExecution in Test := false,
   scalacOptions := Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
