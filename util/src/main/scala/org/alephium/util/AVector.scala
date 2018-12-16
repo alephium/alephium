@@ -255,6 +255,18 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     -1
   }
 
+  def sorted(implicit ord: Ordering[A]): AVector[A] = {
+    val arr = toArray
+    scala.util.Sorting.quickSort(arr)
+    AVector.unsafe(arr)
+  }
+
+  def sortBy[B](f: A => B)(implicit ord: Ordering[B]): AVector[A] = {
+    val arr = toArray
+    scala.util.Sorting.quickSort(arr)(ord.on(f))
+    AVector.unsafe(arr)
+  }
+
   def sum(implicit num: Numeric[A]): A = foldLeft(num.zero)(num.plus)
 
   def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {

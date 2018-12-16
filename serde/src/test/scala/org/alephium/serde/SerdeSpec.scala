@@ -9,7 +9,7 @@ import org.scalatest.TryValues._
 
 class SerdeSpec extends AlephiumSpec {
 
-  implicit val bytesGen: Gen[AVector[Byte]] = Gen.listOf(arbByte.arbitrary).map(AVector.from)
+  val bytesGen: Gen[AVector[Byte]] = Gen.listOf(arbByte.arbitrary).map(AVector.from)
 
   def checkException[T](serde: FixedSizeSerde[T]): Unit = {
     it should "throw correct exceptions when error occurs" in {
@@ -84,7 +84,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for fixed size sequence" should "serde correctly" in {
-    forAll { input: AVector[Byte] =>
+    forAll(bytesGen) { input: AVector[Byte] =>
       {
         val serde  = Serde.fixedSizeBytesSerde(input.length, Serde[Byte])
         val output = serde.deserialize(serde.serialize(input)).success.value
@@ -105,7 +105,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for sequence" should "serde correctly" in {
-    forAll { input: AVector[Byte] =>
+    forAll(bytesGen) { input: AVector[Byte] =>
       val serde  = Serde.dynamicSizeBytesSerde(Serde[Byte])
       val output = serde.deserialize(serde.serialize(input)).success.value
       output is input

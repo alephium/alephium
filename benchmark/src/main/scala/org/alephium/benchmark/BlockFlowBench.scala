@@ -2,7 +2,7 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
-import org.alephium.flow.constant.Network
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.{BlockDeps, ChainIndex}
 import org.alephium.flow.storage.BlockFlow
 import org.alephium.serde.RandomBytes
@@ -12,14 +12,16 @@ import org.openjdk.jmh.annotations._
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 class BlockFlowBench {
-  val blockFlow: BlockFlow = BlockFlow()
+  import PlatformConfig.Default.config
+
+  val blockFlow: BlockFlow = BlockFlow()(config)
 
   // TODO: benchmark blockheader verification
 
   @Benchmark
   def findBestDeps(): BlockDeps = {
-    val i = RandomBytes.source.nextInt(Network.groups)
-    val j = RandomBytes.source.nextInt(Network.groups)
+    val i = RandomBytes.source.nextInt(config.groups)
+    val j = RandomBytes.source.nextInt(config.groups)
     blockFlow.getBestDeps(ChainIndex(i, j))
   }
 }

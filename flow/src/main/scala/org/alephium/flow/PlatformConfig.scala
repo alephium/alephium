@@ -63,7 +63,7 @@ class PlatformConfig(val underlying: Config) { self =>
     val nonces = underlying.getStringList("nonces")
     assert(nonces.size == self.groups * self.groups)
 
-    Seq.tabulate(groups, groups) {
+    AVector.tabulate(groups, groups) {
       case (from, to) =>
         val index = from * self.groups + to
         val nonce = nonces.get(index)
