@@ -13,12 +13,11 @@ import org.openjdk.jmh.annotations._
 class MiningBench {
 
   @Benchmark
-  def mineGenesis(): Unit = {
+  def mineGenesis(): Boolean = {
     val nonce = RandomBytes.source.nextInt()
     val block = Block.genesis(Seq.empty, Consensus.maxMiningTarget, BigInt(nonce))
     val i     = RandomBytes.source.nextInt(Network.groups)
     val j     = RandomBytes.source.nextInt(Network.groups)
     ChainIndex(i, j).accept(block)
-    ()
   }
 }
