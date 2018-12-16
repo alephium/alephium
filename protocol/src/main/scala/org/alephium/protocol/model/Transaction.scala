@@ -7,7 +7,7 @@ import org.alephium.util.AVector
 case class Transaction(
     unsigned: UnsignedTransaction,
     signature: ED25519Signature // TODO: support n2n transactions
-) extends WithKeccak256[Transaction] {
+) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = Keccak256.hash(serialize[Transaction](this))
 }
 

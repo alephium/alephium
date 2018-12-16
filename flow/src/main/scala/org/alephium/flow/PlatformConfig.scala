@@ -49,7 +49,7 @@ object PlatformConfig extends StrictLogging {
     ConfigFactory.parseFile(getUserFile).resolve()
   }
 
-  def loadNonceConfig(groups: Int): Config = {
+  def loadNoncesConfig(groups: Int): Config = {
     ConfigFactory.parseFile(getNoncesFile(groups)).resolve()
   }
 
@@ -57,7 +57,7 @@ object PlatformConfig extends StrictLogging {
     val user = loadUserConfig()
     val all = if (withNonces) {
       val groups = user.getInt("alephium.groups")
-      val nonces = loadNonceConfig(groups)
+      val nonces = loadNoncesConfig(groups)
       user.withFallback(nonces)
     } else user
     new PlatformConfig(all)

@@ -1,12 +1,12 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.{Keccak256, WithKeccak256}
+import org.alephium.crypto.{Keccak256, Keccak256Hash}
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
-    extends WithKeccak256[Block] {
+    extends Keccak256Hash[Block] {
   override def hash: Keccak256 = blockHeader.hash
 
   def miningHash: Keccak256 = Block.toMiningHash(this.hash)
