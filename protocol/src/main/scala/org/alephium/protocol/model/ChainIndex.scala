@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.ConsensusConfig
 
-case class ChainIndex(from: Int, to: Int) {
+class ChainIndex private (val from: Int, val to: Int) {
 
   def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
     val target = from * config.groups + to
@@ -15,8 +15,8 @@ case class ChainIndex(from: Int, to: Int) {
     }
   }
 
-  def relateTo(group: Int): Boolean = {
-    from == group || to == group
+  def relateTo(groupIndex: GroupIndex): Boolean = {
+    from == groupIndex.value || to == groupIndex.value
   }
 
   def toOneDim(implicit config: ConsensusConfig): Int = from * config.groups + to
@@ -24,9 +24,9 @@ case class ChainIndex(from: Int, to: Int) {
 
 object ChainIndex {
 
-  def fromInt(n: Int)(implicit config: ConsensusConfig): ChainIndex = {
-    val index = math.abs(n) % config.chainNum
-    ChainIndex(index / config.groups, index % config.groups)
+  def apply(from: Int, to: Int)(implicit config: ConsensusConfig): ChainIndex = {
+    assert(0 <= from && from < config.groups && 0 <= to && to < config.groups)
+    new ChainIndex(from, to)
   }
 
   def fromHash(hash: Keccak256)(implicit config: ConsensusConfig): ChainIndex = {
@@ -50,5 +50,10 @@ object ChainIndex {
     val last       = bytes.last
     val bigIndex   = (beforeLast & 0xFF) << 8 | (last & 0xFF)
     fromInt(bigIndex)
+  }
+
+  private def fromInt(n: Int)(implicit config: ConsensusConfig): ChainIndex = {
+    val index = math.abs(n) % config.chainNum
+    ChainIndex(index / config.groups, index % config.groups)
   }
 }
