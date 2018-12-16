@@ -1,4 +1,5 @@
 package org.alephium.flow.storage
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.constant.Consensus
 import org.alephium.protocol.model.Block
@@ -30,6 +31,14 @@ trait SingleChain extends BlockPool {
         retarget
       case None => Consensus.maxMiningTarget
     }
+  }
+
+  def show(block: Block): String = {
+    val shortHash = block.shortHash
+    val weight    = getWeight(block)
+    val blockNum  = numBlocks - 1 // exclude genesis block
+    val height    = getHeight(block)
+    s"Hash: $shortHash; Weight: $weight; Height: $height/$blockNum"
   }
 }
 
