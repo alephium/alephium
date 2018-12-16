@@ -16,12 +16,12 @@ class ForksTreeSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "add block correctly" in new Fixture {
-    forkstree.numBlocks is 1
+    forkstree.numHashes is 1
     forAll(blockGen, minSuccessful(1)) { block =>
-      val blocksSize1 = forkstree.numBlocks
+      val blocksSize1 = forkstree.numHashes
       val txSize1     = forkstree.numTransactions
       forkstree.add(block, 0)
-      val blocksSize2 = forkstree.numBlocks
+      val blocksSize2 = forkstree.numHashes
       val txSize2     = forkstree.numTransactions
       blocksSize1 + 1 is blocksSize2
       txSize1 + block.transactions.length is txSize2
@@ -30,10 +30,10 @@ class ForksTreeSpec extends AlephiumSpec with PlatformConfig.Default {
 
   it should "add blocks correctly" in new Fixture {
     forAll(chainGen, minSuccessful(1)) { blocks =>
-      val blocksSize1 = forkstree.numBlocks
+      val blocksSize1 = forkstree.numHashes
       val txSize1     = forkstree.numTransactions
       blocks.foreach(block => forkstree.add(block, 0))
-      val blocksSize2 = forkstree.numBlocks
+      val blocksSize2 = forkstree.numHashes
       val txSize2     = forkstree.numTransactions
       blocksSize1 + blocks.length is blocksSize2
       txSize1 + blocks.sumBy(_.transactions.length) is txSize2

@@ -93,7 +93,7 @@ trait BlockHashChain extends BlockHashPool {
     iter()
   }
 
-  override def numBlocks: Int = blockHashesTable.size
+  override def numHashes: Int = blockHashesTable.size
 
   override def maxWeight: Int = blockHashesTable.values.map(_.weight).max
 
@@ -121,6 +121,31 @@ trait BlockHashChain extends BlockHashPool {
 
   override def getAllTips: AVector[Keccak256] = {
     AVector.from(tips)
+  }
+
+  override def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
+    blockHashesTable.get(hash) match {
+      case Some(node) =>
+        getChain(node).map(_.blockHash)
+      case None =>
+        AVector.empty
+    }
+  }
+
+  private def getChain(node: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
+    @tailrec
+    def iter(acc: AVector[BlockHashChain.TreeNode],
+             current: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
+      current match {
+        case n: BlockHashChain.Root => acc :+ n
+        case n: BlockHashChain.Node => iter(acc :+ current, n.parent)
+      }
+    }
+    iter(AVector.empty, node).reverse
+  }
+
+  def getAllBlockHashes: Iterable[Keccak256] = {
+    blockHashesTable.values.map(_.blockHash)
   }
 
   def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = {
