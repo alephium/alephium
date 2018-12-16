@@ -7,7 +7,7 @@ import org.alephium.flow.client.Miner.BlockAdded
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.storage.BlockChainHandler
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
@@ -86,9 +86,6 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
         case None =>
           refreshLastTask(to, template)
       }
-    case flowTemplate: BlockFlowTemplate =>
-      val blockTemplate = getBlockTemplate(flowTemplate)
-      addNewTask(flowTemplate.index.to.value, blockTemplate)
     case BlockAdded(chainIndex) =>
       assert(chainIndex.from == config.mainGroup)
       prepareTemplate(chainIndex.to.value)
@@ -105,8 +102,10 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
 
   def prepareTemplate(to: Int): Unit = {
     assert(to >= 0 && to < config.groups)
-    val index = ChainIndex(config.mainGroup.value, to)
-    handlers.flowHandler ! FlowHandler.PrepareBlockFlow(index)
+    val index         = ChainIndex(config.mainGroup.value, to)
+    val flowTemplate  = node.blockFlow.prepareBlockFlowUnsafe(index)
+    val blockTemplate = getBlockTemplate(flowTemplate)
+    addNewTask(to, blockTemplate)
   }
 
   def startTask(to: Int, template: BlockTemplate): Unit = {
