@@ -17,4 +17,6 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
 
     BigInt(1, xs)
   }
+
+  def ordering(origin: PeerId): Ordering[PeerId] = Ordering.by(distance(origin, _))
 }
