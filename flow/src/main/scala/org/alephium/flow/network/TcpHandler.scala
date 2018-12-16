@@ -9,7 +9,7 @@ import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.PeerManager.PeerInfo
-import org.alephium.flow.storage.{AddBlockResult, AllHandlers, BlockChainHandler, FlowHandler}
+import org.alephium.flow.storage._
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
 import org.alephium.serde.NotEnoughBytesException
@@ -28,6 +28,9 @@ object TcpHandler {
   case class Connect(until: Instant)   extends Command
   case object Retry                    extends Command
   case object SendPing                 extends Command
+
+  def envelope(payload: Payload): Tcp.Write =
+    envelope(Message(payload))
 
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serializer.serialize(message))
@@ -54,14 +57,14 @@ object TcpHandler {
   }
 }
 
-class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
+class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
     implicit config: PlatformConfig)
     extends BaseActor
     with Timers {
 
   // Initialized once; use var for performance reason
   var connection: ActorRef = _
-  var peerId: PeerId       = _
+  var peerInfo: PeerInfo   = _
 
   def register(_connection: ActorRef): Unit = {
     connection = _connection
@@ -81,7 +84,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
   }
 
   def handshakeOut(): Unit = {
-    connection ! TcpHandler.envelope(Message(Hello(config.peerId)))
+    connection ! TcpHandler.envelope(Hello(config.peerId))
     context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
   }
 
@@ -92,10 +95,8 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
       if (hello.validate) {
-        connection ! TcpHandler.envelope(Message(HelloAck(config.peerId)))
-        val peerInfo = PeerInfo(peerId, remote, self)
-        context.parent ! PeerManager.Connected(hello.peerId, peerInfo)
-        startPingPong()
+        connection ! TcpHandler.envelope(HelloAck(config.peerId))
+        afterHandShake(hello.peerId)
       } else {
         log.info("Hello is invalid, closing connection")
         stop()
@@ -107,17 +108,21 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
 
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      if (!helloAck.validate) {
+      if (helloAck.validate) {
+        afterHandShake(helloAck.peerId)
+      } else {
         log.info("HelloAck is invalid, closing connection")
         stop()
-      } else {
-        val peerInfo = PeerInfo(peerId, remote, self)
-        context.parent ! PeerManager.Connected(helloAck.peerId, peerInfo)
-        startPingPong()
       }
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
+  }
+
+  def afterHandShake(peerId: PeerId): Unit = {
+    peerInfo = PeerInfo(peerId, remote, self)
+    context.parent ! PeerManager.Connected(peerId, peerInfo)
+    startPingPong()
   }
 
   def connecting(until: Instant): Receive = {
@@ -173,6 +178,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
       context stop self
   }
 
+  // TODO: make this safe by using types
   def handleOutMessage: Receive = {
     case message: Message =>
       connection ! TcpHandler.envelope(message)
@@ -183,13 +189,11 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
   def handleInternal: Receive = {
     case _: AddBlockResult =>
       () // TODO: handle error
+    case _: AddBlockHeaderResult =>
+      () // TODO: handle error
   }
 
   def handlePayload(payload: Payload): Unit = payload match {
-    case Hello(_, _, _) =>
-      ???
-    case HelloAck(_, _, _) =>
-      ???
     case Ping(nonce, timestamp) =>
       val delay = System.currentTimeMillis() - timestamp
       handlePing(nonce, delay)
@@ -203,20 +207,30 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
       }
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.length} blocks")
+      // TODO: support many blocks
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      val handler    = blockHandlers.getBlockHandler(chainIndex)
-
-      handler ! BlockChainHandler.AddBlocks(blocks, Remote(remote))
+      val handler    = allHandlers.getBlockHandler(chainIndex)
+      handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
-      blockHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
+      allHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
     case SendHeaders(headers) =>
       log.debug(s"Received #${headers.length} block headers")
-      ???
+      // TODO: support many headers
+      val header     = headers.head
+      val chainIndex = header.chainIndex
+      if (chainIndex.relateTo(config.mainGroup)) {
+        connection ! TcpHandler.envelope(GetBlocks(AVector(header.hash)))
+      } else {
+        val handler = allHandlers.getHeaderHandler(chainIndex)
+        handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
+      }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")
-      ???
+      allHandlers.flowHandler ! FlowHandler.GetHeadersAfter(locators)
+    case _ =>
+      log.warning(s"Got unexpected payload type")
   }
 
   private var pingNonce: Int = 0
@@ -224,7 +238,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
   def handlePing(nonce: Int, delay: Long): Unit = {
     // TODO: refuse ping if it's too frequent
     log.info(s"Ping received with ${delay}ms delay, response with pong")
-    connection ! TcpHandler.envelope(Message(Pong(nonce)))
+    connection ! TcpHandler.envelope(Pong(nonce))
   }
 
   def sendPing(): Unit = {
@@ -234,7 +248,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
     } else {
       pingNonce = Random.nextInt()
       val timestamp = System.currentTimeMillis()
-      connection ! TcpHandler.envelope(Message(Ping(pingNonce, timestamp)))
+      connection ! TcpHandler.envelope(Ping(pingNonce, timestamp))
     }
   }
 

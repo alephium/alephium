@@ -18,6 +18,8 @@ trait BlockHashPool {
 
   def isTip(hash: Keccak256): Boolean
 
+  def getHashesAfter(locator: Keccak256): AVector[Keccak256]
+
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]
 
   def getBestTip: Keccak256

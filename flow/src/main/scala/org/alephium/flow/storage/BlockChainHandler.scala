@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.PeerManager
-import org.alephium.protocol.message.{Message, SendBlocks}
+import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -36,7 +36,8 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(block.hash)}; Time elapsed: ${elapsedTime}ms")
-          peerManager ! PeerManager.BroadCast(Message(SendBlocks(blocks)), origin)
+          val headers = blocks.map(_.blockHeader)
+          peerManager ! PeerManager.BroadCast(Message(SendHeaders(headers)), origin)
         case error: AddBlockResult.Failure =>
           log.info(s"Failed in adding new block: $error")
       }
