@@ -44,4 +44,4 @@ elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs sudo kill 2> /dev/null")
 
 elif args.goal == 'genesis':
-    run('./app/target/universal/stage/bin/prepare-genesis ./app/src/main/resources/application.conf')
+    run('./app/target/universal/stage/bin/prepare-genesis')
