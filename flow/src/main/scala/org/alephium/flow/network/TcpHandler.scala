@@ -8,6 +8,7 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin.Remote
+import org.alephium.flow.network.PeerManager.PeerInfo
 import org.alephium.flow.storage.{AddBlockResult, AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
@@ -92,7 +93,8 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
     case hello: Hello =>
       if (hello.validate) {
         connection ! TcpHandler.envelope(Message(HelloAck(config.peerId)))
-        context.parent ! PeerManager.Connected(hello.peerId, self)
+        val peerInfo = PeerInfo(peerId, remote, self)
+        context.parent ! PeerManager.Connected(hello.peerId, peerInfo)
         startPingPong()
       } else {
         log.info("Hello is invalid, closing connection")
@@ -109,7 +111,8 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
         log.info("HelloAck is invalid, closing connection")
         stop()
       } else {
-        context.parent ! PeerManager.Connected(helloAck.peerId, self)
+        val peerInfo = PeerInfo(peerId, remote, self)
+        context.parent ! PeerManager.Connected(helloAck.peerId, peerInfo)
         startPingPong()
       }
     case err =>
