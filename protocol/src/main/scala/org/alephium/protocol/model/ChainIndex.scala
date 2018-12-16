@@ -6,11 +6,10 @@ import org.alephium.protocol.config.ConsensusConfig
 case class ChainIndex(from: Int, to: Int) {
 
   def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
-    val miningHash = block.miningHash
-    val target     = from * config.groups + to
-    val actual     = ChainIndex.hash2Index(miningHash)
+    val target = from * config.groups + to
+    val actual = ChainIndex.hash2Index(block.hash)
     actual == target && {
-      val current = BigInt(1, miningHash.bytes.toArray)
+      val current = BigInt(1, block.hash.bytes.toArray)
       current <= config.maxMiningTarget
     }
   }
@@ -21,10 +20,9 @@ case class ChainIndex(from: Int, to: Int) {
 object ChainIndex {
 
   def fromHash(hash: Keccak256)(implicit config: ConsensusConfig): ChainIndex = {
-    val miningHash = Block.toMiningHash(hash)
-    val target     = hash2Index(miningHash)
-    val from       = target / config.groups
-    val to         = target % config.groups
+    val target = hash2Index(hash)
+    val from   = target / config.groups
+    val to     = target % config.groups
     ChainIndex(from, to)
   }
 
