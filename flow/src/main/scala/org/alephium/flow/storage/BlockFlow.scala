@@ -13,7 +13,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
 
   override val blockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(groups, groups) {
-      case (from, to) => ForksTree(initialBlocks(from)(to))
+      case (from, to) => BlockChain.fromGenesis(initialBlocks(from)(to))
     }
 
   def getChain(i: Int, j: Int): BlockChain = {
