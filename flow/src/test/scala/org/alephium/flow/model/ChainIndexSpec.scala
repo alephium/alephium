@@ -1,10 +1,10 @@
 package org.alephium.flow.model
 
-import org.alephium.flow.constant.Network
+import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.ModelGen
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec {
+class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
 
   behavior of "ChainIndex"
 
@@ -16,9 +16,9 @@ class ChainIndexSpec extends AlephiumSpec {
       index.accept(hash) is true
 
       val hash2Int = BigInt(1, miningHash.bytes.takeRight(2).toArray)
-      val rawIndex = (hash2Int % Network.chainNum).toInt
-      index.from is rawIndex / Network.groups
-      index.to is rawIndex % Network.groups
+      val rawIndex = (hash2Int % config.chainNum).toInt
+      index.from is rawIndex / config.groups
+      index.to is rawIndex % config.groups
     }
   }
 }

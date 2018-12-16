@@ -6,6 +6,7 @@ import java.time.Instant
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.BlockHandlers
 import org.alephium.flow.storage.ChainHandler.BlockOrigin
 import org.alephium.protocol.message.{GetBlocks, Message}
@@ -14,7 +15,7 @@ import org.alephium.util.BaseActor
 import scala.collection.mutable
 
 object PeerManager {
-  def props(builders: TcpHandler.Builder): Props =
+  def props(builders: TcpHandler.Builder)(implicit config: PlatformConfig): Props =
     Props(new PeerManager(builders))
 
   sealed trait Command
@@ -29,7 +30,7 @@ object PeerManager {
   case class Peers(peers: Map[InetSocketAddress, ActorRef]) extends Event
 }
 
-class PeerManager(builders: TcpHandler.Builder) extends BaseActor {
+class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig) extends BaseActor {
   import PeerManager._
 
   // Initialized once; use var for performance reason

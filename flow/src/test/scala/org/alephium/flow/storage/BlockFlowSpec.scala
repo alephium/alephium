@@ -1,26 +1,26 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.constant.{Consensus, Network}
+import org.alephium.flow.PlatformConfig
+import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AlephiumSpec, Hex}
 
 import scala.annotation.tailrec
 
-class BlockFlowSpec extends AlephiumSpec {
-
+class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
   behavior of "BlockFlow"
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow()
-    Network.blocksForFlow.flatten.foreach { block =>
+    config.blocksForFlow.flatten.foreach { block =>
       blockFlow.getWeight(block) is 0
     }
   }
 
   it should "work for at least 2 user group when adding blocks sequentially" in {
-    if (Network.groups >= 2) {
+    if (config.groups >= 2) {
       val blockFlow = BlockFlow()
 
       val chainIndex1 = ChainIndex(0, 0)
@@ -46,7 +46,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
-    if (Network.groups >= 2) {
+    if (config.groups >= 2) {
       val blockFlow = BlockFlow()
 
       val newBlocks1 = for {
@@ -79,7 +79,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for 2 user group when there is forks" in {
-    if (Network.groups >= 2) {
+    if (config.groups >= 2) {
       val blockFlow = BlockFlow()
 
       val chainIndex1 = ChainIndex(0, 0)

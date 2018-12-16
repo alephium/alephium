@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.Props
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
@@ -11,7 +12,7 @@ import org.alephium.util.BaseActor
 
 object FlowHandler {
 
-  def props(blockFlow: BlockFlow): Props =
+  def props(blockFlow: BlockFlow)(implicit config: PlatformConfig): Props =
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
@@ -25,7 +26,7 @@ object FlowHandler {
 }
 
 // consider single chain for the moment
-class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
+class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends BaseActor {
   import FlowHandler._
 
   override def receive: Receive = {
