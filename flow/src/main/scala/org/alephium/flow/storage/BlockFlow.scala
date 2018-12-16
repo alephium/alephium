@@ -7,54 +7,10 @@ import org.alephium.flow.model.{BlockDeps, ValidationError}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
-import scala.reflect.ClassTag
-
-class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with FlowUtils {
-  import config.genesisBlocks
-
-  private def mainGroup: GroupIndex = config.mainGroup
-
-  override val groups = config.groups
-
-  private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
-    BlockChain.fromGenesisUnsafe(
-      genesisBlocks(if (k < mainGroup.value) k else k + 1)(mainGroup.value))
-  }
-  private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
-    BlockChain.fromGenesisUnsafe(genesisBlocks(mainGroup.value)(to))
-  }
-  private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
-    AVector.tabulate(groups, groups) {
-      case (from, to) =>
-        if (from == mainGroup.value) outBlockChains(to)
-        else if (to == mainGroup.value) {
-          inBlockChains(if (from < mainGroup.value) from else from - 1)
-        } else BlockHeaderChain.fromGenesisUnsafe(genesisBlocks(from)(to))
-    }
-
-  override protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T = {
-    blockHeaderChains.reduceBy { chains =>
-      chains.reduceBy(f)(op)
-    }(op)
-  }
-
-  override def numTransactions: Int = {
-    inBlockChains.sumBy(_.numTransactions) + outBlockChains.sumBy(_.numTransactions)
-  }
-
-  override protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
-    assert(from == mainGroup || to == mainGroup)
-    if (from == mainGroup) outBlockChains(to.value)
-    else inBlockChains(if (from.value < mainGroup.value) from.value else from.value - 1)
-  }
-
-  override protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool = {
-    blockHeaderChains(from.value)(to.value)
-  }
-
-  override protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain = {
-    blockHeaderChains(from.value)(to.value)
-  }
+class BlockFlow()(implicit val config: PlatformConfig)
+    extends MultiChain
+    with BlockFlowState
+    with FlowUtils {
 
   def add(block: Block): IOResult[Unit] = {
     val index  = block.chainIndex
@@ -155,7 +111,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     val deps   = header.blockDeps
     if (deps.isEmpty) {
       0 until groups foreach { k =>
-        if (k != from.value) rdeps(k) = genesisBlocks(k).head.hash
+        if (k != from.value) rdeps(k) = config.genesisBlocks(k).head.hash
       }
     } else {
       0 until groups foreach { k =>
@@ -206,7 +162,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
   private def getGroupDepsUnsafe(tip: Keccak256, from: GroupIndex): AVector[Keccak256] = {
     val deps = getBlockHeaderUnsafe(tip).blockDeps
     if (deps.isEmpty) {
-      genesisBlocks(from.value).map(_.hash)
+      config.genesisBlocks(from.value).map(_.hash)
     } else {
       deps.takeRight(groups)
     }
