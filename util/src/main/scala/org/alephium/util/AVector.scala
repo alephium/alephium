@@ -107,40 +107,47 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
-  def take(n: Int): AVector[A] = {
-    assert(n >= 0 && n <= length)
+  def slice(from: Int, until: Int): AVector[A] = {
+    assert(from >= 0 && from <= until && until <= length)
 
-    if (n == length) self
-    else {
-      AVector.unsafe(elems, start, start + n, false)
-    }
+    val newAppendable = if (until == length) appendable else false
+    AVector.unsafe(elems, start + from, start + until, newAppendable)
+  }
+
+  def take(n: Int): AVector[A] = {
+    slice(0, n)
+  }
+
+  def takeUpto(n: Int): AVector[A] = {
+    val m = math.min(n, length)
+    slice(0, m)
   }
 
   def drop(n: Int): AVector[A] = {
-    assert(n >= 0 && n <= length)
+    slice(n, length)
+  }
 
-    if (n == 0) self
-    else {
-      AVector.unsafe(elems, start + n, end, appendable)
-    }
+  def dropUpto(n: Int): AVector[A] = {
+    val m = math.min(n, length)
+    slice(m, length)
   }
 
   def takeRight(n: Int): AVector[A] = {
-    assert(n >= 0 && n <= length)
+    slice(length - n, length)
+  }
 
-    if (n == length) self
-    else {
-      AVector.unsafe(elems, end - n, end, appendable)
-    }
+  def takeRightUpto(n: Int): AVector[A] = {
+    val m = math.min(n, length)
+    slice(length - m, length)
   }
 
   def dropRight(n: Int): AVector[A] = {
-    assert(n >= 0 && n <= length)
+    slice(0, length - n)
+  }
 
-    if (n == 0) self
-    else {
-      AVector.unsafe(elems, start, end - n, false)
-    }
+  def dropRightUpto(n: Int): AVector[A] = {
+    val m = math.min(n, length)
+    slice(0, length - m)
   }
 
   def reverse: AVector[A] = {

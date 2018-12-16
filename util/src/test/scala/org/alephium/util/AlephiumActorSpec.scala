@@ -20,13 +20,15 @@ object AlephiumActorSpec {
     """
       |akka {
       |  loggers = ["akka.testkit.TestEventListener"]
-      |  stdout-loglevel = "OFF"
-      |  loglevel = "OFF"
+      |  stdout-loglevel = "WARNING"
+      |  loglevel = "WARNING"
       |
       |  actor {
       |    debug {
       |      unhandled = on
       |    }
+      |
+      |    guardian-supervisor-strategy = "org.alephium.util.LetItCrashStrategy"
       |  }
       |}
     """.stripMargin
