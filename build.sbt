@@ -40,6 +40,10 @@ lazy val `app-debug` = mainProject("app-debug")
     coverageEnabled := false
   )
 
+lazy val benchmark = mainProject("benchmark")
+  .enablePlugins(JmhPlugin)
+  .settings(scalacOptions += "-Xdisable-assertions")
+
 def subProject(path: String): Project = {
   baseProject(path)
     .settings(
