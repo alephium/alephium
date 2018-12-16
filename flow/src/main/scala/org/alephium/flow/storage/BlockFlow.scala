@@ -3,7 +3,7 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.{IOError, IOResult}
-import org.alephium.flow.model.BlockDeps
+import org.alephium.flow.model.{BlockDeps, ValidationError}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
@@ -64,15 +64,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     chain.add(block, parent, weight)
   }
 
-  def validate(block: Block): Either[AddBlockResult.Error, Unit] = {
-    validate(block.header, fromBlock = true).left.map(AddBlockResult.HeaderError)
-  }
-
-  protected def add(block: Block, index: ChainIndex): Either[AddBlockResult, Unit] = {
-    val chain  = getBlockChain(index)
-    val parent = block.uncleHash(index.to)
-    val weight = calWeightUnsafe(block)
-    chain.add(block, parent, weight).left.map(AddBlockResult.IOErrorForBlock)
+  def validate(block: Block): Either[ValidationError, Unit] = {
+    validate(block.header, fromBlock = true)
   }
 
   def add(block: Block, weight: Int): IOResult[Unit] = {
@@ -96,23 +89,22 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     }
   }
 
-  def validate(header: BlockHeader): Either[AddBlockHeaderResult.VerificationError, Unit] = {
+  def validate(header: BlockHeader): Either[ValidationError, Unit] = {
     validate(header, fromBlock = false)
   }
 
-  def validate(header: BlockHeader,
-               fromBlock: Boolean): Either[AddBlockHeaderResult.VerificationError, Unit] = {
+  def validate(header: BlockHeader, fromBlock: Boolean): Either[ValidationError, Unit] = {
     val index = header.chainIndex
     if (fromBlock ^ index.relateTo(mainGroup)) {
       // fromBlock = true, relate = false; fromBlock = false, relate = true
-      Left(AddBlockHeaderResult.InvalidGroup)
+      Left(ValidationError.InvalidGroup)
     } else if (!index.validateDiff(header)) {
-      Left(AddBlockHeaderResult.InvalidDifficulty)
+      Left(ValidationError.InvalidDifficulty)
     } else {
       val deps        = header.blockDeps
       val missingDeps = deps.filterNot(contains)
       if (missingDeps.isEmpty) Right(())
-      else Left(AddBlockHeaderResult.MissingDeps(missingDeps))
+      else Left(ValidationError.MissingDeps(missingDeps))
     }
   }
 

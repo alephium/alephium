@@ -5,7 +5,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
-import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
+import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -78,12 +78,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           }
       }
 
-    case AddBlockResult.Success =>
+    case _: Miner.BlockAdded =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
-
-    case _: AddBlockResult.Error =>
-      context stop self
   }
 
   def mine(template: BlockTemplate, lastTs: Long): Receive =
