@@ -7,7 +7,7 @@ import java.nio.file.{Path, Paths}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, ChainIndex, PeerId}
 import org.alephium.util.{AVector, Files}
 
 object PlatformConfig extends StrictLogging {
@@ -88,6 +88,13 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
   val groups: Int             = underlying.getInt("groups")
   val nonceStep: BigInt       = underlying.getInt("nonceStep")
   val retryTimeout: Duration  = underlying.getDuration("retryTimeout")
+
+  val mainGroup: Int = {
+    val myGroup = underlying.getInt("mainGroup")
+    assert(myGroup >= 0 && myGroup < groups)
+    myGroup
+  }
+  val peerId = PeerId.generateFor(mainGroup)(this)
 
   def loadBlockFlow(groups: Int): AVector[AVector[Block]] = {
     val nonces = underlying.getStringList("nonces")

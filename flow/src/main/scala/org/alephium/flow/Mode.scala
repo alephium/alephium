@@ -16,7 +16,10 @@ trait Mode extends PlatformConfig.Default {
   def index: Int
 
   def mainGroup: Int = {
-    math.abs(index) % config.groups
+    // Double check if index is matched with mainGroup
+    val groupIndex = math.abs(index) % config.groups
+    assert(groupIndex == config.mainGroup)
+    groupIndex
   }
 
   def httpPort: Int

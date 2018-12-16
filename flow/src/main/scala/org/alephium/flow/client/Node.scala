@@ -3,9 +3,8 @@ package org.alephium.flow.client
 import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.{PeerManager, TcpHandler, TcpServer}
-import org.alephium.flow.storage.{BlockFlow, BlockHandlers, ChainHandler, FlowHandler}
+import org.alephium.flow.storage._
 import org.alephium.protocol.model.{ChainIndex, PeerId}
-import org.alephium.util.AVector
 
 case class Node(
     name: String,
@@ -15,7 +14,7 @@ case class Node(
     system: ActorSystem,
     blockFlow: BlockFlow,
     peerManager: ActorRef,
-    blockHandlers: BlockHandlers
+    allHandlers: AllHandlers
 )
 
 object Node {
@@ -23,22 +22,39 @@ object Node {
 
   def apply(builders: Builder, name: String, mainGroup: Int, port: Int, groups: Int)(
       implicit config: PlatformConfig): Node = {
-    val peerId = PeerId.generateFor(mainGroup)
 
     val system    = ActorSystem(name, config.all)
-    val blockFlow = BlockFlow(mainGroup)
+    val blockFlow = BlockFlow()
 
-    val peerManager  = system.actorOf(PeerManager.props(builders), "PeerManager")
-    val blockHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
-    val chainHandlers = AVector.tabulate(groups, groups) {
-      case (from, to) =>
-        system.actorOf(ChainHandler.props(blockFlow, ChainIndex(from, to), peerManager),
-                       s"ChainHandler-$from-$to")
-    }
-    val blockHandlers = BlockHandlers(blockHandler, chainHandlers)
-    val server        = system.actorOf(TcpServer.props(port, peerManager), "TcpServer")
-    peerManager ! PeerManager.Set(server, blockHandlers)
+    val peerManager = system.actorOf(PeerManager.props(builders), "PeerManager")
+    val flowHandler = system.actorOf(FlowHandler.props(blockFlow), "BlockHandler")
+    val blockHandlers = (
+      for {
+        from <- 0 until groups
+        to   <- 0 until groups
+        if from == config.mainGroup || to == config.mainGroup
+      } yield {
+        val index = ChainIndex(from, to)
+        val handler = system.actorOf(BlockChainHandler.props(blockFlow, index, peerManager),
+                                     s"BlockChainHandler-$from-$to")
+        index -> handler
+      }
+    ).toMap
+    val headerHandlers = (for {
+      from <- 0 until groups
+      to   <- 0 until groups
+      if from != config.mainGroup && to != config.mainGroup
+    } yield {
+      val chainIndex = ChainIndex(from, to)
+      val headerHander = system.actorOf(
+        HeaderChainHandler.props(blockFlow, chainIndex, peerManager),
+        s"HeaderChainHandler-$from-$to")
+      chainIndex -> headerHander
+    }).toMap
+    val allHandlers = AllHandlers(flowHandler, blockHandlers, headerHandlers)
+    val server      = system.actorOf(TcpServer.props(port, peerManager), "TcpServer")
+    peerManager ! PeerManager.Set(server, allHandlers)
 
-    Node(name, port, mainGroup, peerId, system, blockFlow, peerManager, blockHandlers)
+    Node(name, port, mainGroup, config.peerId, system, blockFlow, peerManager, allHandlers)
   }
 }
