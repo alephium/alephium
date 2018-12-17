@@ -114,6 +114,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
+  def forall(f: A => Boolean): Boolean = {
+    foreach { a =>
+      if (!f(a)) { return false }
+    }
+    true
+  }
+
   def slice(from: Int, until: Int): AVector[A] = {
     assert(from >= 0 && from <= until && until <= length)
 
