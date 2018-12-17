@@ -1,8 +1,9 @@
 package org.alephium.protocol.model
 
+import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec with ConfigFixture {
+class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
 
   behavior of "ChainIndex"
 

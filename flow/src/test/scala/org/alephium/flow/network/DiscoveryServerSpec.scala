@@ -1,16 +1,18 @@
 package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import scala.concurrent.duration._
 
-import org.alephium.protocol.model.{GroupIndex, PeerAddress, PeerId}
+import org.alephium.protocol.config.GroupConfigFixture
+
+import scala.concurrent.duration._
+import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 import org.alephium.util.{AVector, AlephiumActorSpec}
 
 class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
 
   behavior of "DiscoveryServerSpec"
 
-  it should "discover 128 peers in 8 groups with a mean distance below 0.05" in {
+  it should "discover 128 peers in 8 groups with a mean distance below 0.05" in new GroupConfigFixture {
     val groups        = 8
     val networkSize   = 128
     val peersPerGroup = 1
@@ -18,11 +20,10 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     def createAddr(port: Int): InetSocketAddress =
       new InetSocketAddress(InetAddress.getLocalHost, port)
 
-    def createConfig(port: Int, peerId: PeerId, group: GroupIndex): DiscoveryConfig =
+    def createConfig(port: Int, peerId: PeerId): DiscoveryConfig =
       DiscoveryConfig(port,
                       groups,
                       peerId,
-                      group,
                       peersPerGroup,
                       scanMax           = 1,
                       neighborsPerGroup = 1,
@@ -30,15 +31,14 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
 
     def enumerate = 0 until networkSize
 
-    val groupIds = enumerate.map(i => GroupIndex.unsafe(i % groups))
-    val peerIds  = enumerate.map(_ => PeerId.generate)
-    val ports    = enumerate.map(i => 10000 + i)
+    val peerIds = enumerate.map(i => PeerId.generateFor(GroupIndex(i % groups)))
+    val ports   = enumerate.map(i => 10000 + i)
 
-    val bootstrapPeers = AVector(PeerAddress(peerIds(0), groupIds(0), createAddr(ports(0))))
+    val bootstrapPeers = AVector(PeerInfo(peerIds(0), createAddr(ports(0))))
 
     val actors = enumerate.map { i =>
-      val config = createConfig(ports(i), peerIds(i), groupIds(i))
-      system.actorOf(DiscoveryServer.props(config, if (i == 0) AVector.empty else bootstrapPeers),
+      val config = createConfig(ports(i), peerIds(i))
+      system.actorOf(DiscoveryServer.props(if (i == 0) AVector.empty else bootstrapPeers)(config),
                      ports(i).toString)
     }
 
@@ -69,7 +69,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
       val peerId = peerIds(i)
 
       val discovereds =
-        discoveries(i).flatMap(_.map(_.address.peerId)).sortBy(PeerId.distance(peerId, _))
+        discoveries(i).flatMap(_.map(_.info.id)).sortBy(PeerId.distance(peerId, _))
       val nearests = peerIds.sortBy(PeerId.distance(peerId, _))
       val rank = nearests.zipWithIndex.collectFirst {
         case (id, i) if discovereds.contains(id) => i

@@ -1,10 +1,7 @@
-package org.alephium.protocol.model
-
+package org.alephium.protocol.config
 import java.time.Duration
 
-import org.alephium.protocol.config.ConsensusConfig
-
-trait ConfigFixture {
+trait ConsensusConfigFixture {
 
   implicit val config = new ConsensusConfig {
     override val groups: Int = 3
