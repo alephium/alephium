@@ -15,20 +15,21 @@ object DiscoveryMessageGen {
   } yield FindNode(cid, source)
 
   val ping: Gen[Ping] = for {
-    cid    <- callId
-    source <- ModelGen.peerId
-  } yield Ping(cid, source)
+    cid         <- callId
+    source      <- ModelGen.peerId
+    sourceGroup <- ModelGen.groupGen_(1024)
+  } yield Ping(cid, source, sourceGroup)
 
   val pong: Gen[Pong] = for {
-    cid    <- callId
-    source <- ModelGen.peerId
-    target <- ModelGen.peerId
-  } yield Pong(cid, source, target)
+    cid         <- callId
+    target      <- ModelGen.peerId
+    targetGroup <- ModelGen.groupGen_(1024)
+  } yield Pong(cid, target, targetGroup)
 
   val neighbors: Gen[Neighbors] = for {
     cid    <- callId
-    source <- Gen.listOf(ModelGen.peerAddress)
-  } yield Neighbors(cid, AVector.from(source))
+    source <- Gen.listOf(Gen.listOf(ModelGen.peerAddress(1024)))
+  } yield Neighbors(cid, AVector.from(source.map(AVector.from)))
 
   val message: Gen[DiscoveryMessage] = Gen.oneOf(findNode, ping, pong, neighbors)
 }
