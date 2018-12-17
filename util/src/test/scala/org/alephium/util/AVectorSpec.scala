@@ -315,6 +315,9 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
       val sum2 = vc.reduceLeft(_ + _)
       sum2 is sum0
+
+      val sum3 = vc.reduceLeftBy(1 - _)(_ + _)
+      sum3 is arr.map(1 - _).sum
     }
   }
 
