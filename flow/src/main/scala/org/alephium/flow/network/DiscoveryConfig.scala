@@ -9,7 +9,7 @@ case class DiscoveryConfig(
     groups: Int,
     peerId: PeerId,
     group: GroupIndex,
-    /** Maximum number of peers to track. **/
+    /* Maximum number of peers to track. */
     peersPerGroup: Int,
     /* Maximum number of peers used for probing during a scan. */
     scanMax: Int,
