@@ -1,7 +1,6 @@
 package org.alephium.flow.network
 
 import akka.actor.{Props, Terminated}
-import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.flow.{Mode, PlatformConfig}
 import org.alephium.flow.network.PeerManager.GetPeers
@@ -21,8 +20,6 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
   behavior of "PeerManagerSpec"
 
-  // TODO: add tests for connecting to server
-
   it should "add peer when received connection" in new Fixture {
     val remote     = SocketUtil.temporaryServerAddress()
     val connection = TestProbe()
@@ -33,14 +30,6 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
         peers.size is 1
         peers.head._1 is remote
     }
-  }
-
-  it should "not add peer when connect failed" in new Fixture {
-    val remote  = SocketUtil.temporaryServerAddress()
-    val connect = Tcp.Connect(remote)
-    peerManager ! Tcp.CommandFailed(connect)
-    peerManager ! PeerManager.GetPeers
-    expectMsg(PeerManager.Peers(Map.empty))
   }
 
   it should "try to send GetBlocks to peer" in new PlatformConfig.Default {
