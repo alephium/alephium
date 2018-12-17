@@ -98,8 +98,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       log.debug(s"Broadcast message to ${toSend.size} peers")
       toSend.foreach(_.tcpHandler ! message)
     case Send(message, group) =>
-      val peerGroups = peers.values.map(_.index).mkString(",")
-      log.debug(s"Send message to $group; Peers: $peerGroups")
+      log.debug(s"""Send message to $group; Peers: ${availableGroups.mkString(",")}""")
       val peerInfo = peers.values.filter(_.id.groupIndex == group).head
       peerInfo.tcpHandler ! message
     case GetPeers =>
@@ -114,12 +113,18 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
       }
   }
 
+  def availableGroups: AVector[GroupIndex] = AVector.from(peers.values.map(_.index))
+
   def removePeer(tcpHandler: ActorRef): Unit = {
-    val toRemove = peers.view.filter(_._2.tcpHandler == tcpHandler)
-    toRemove.foreach {
-      case (remote, info) =>
-        context.unwatch(info.tcpHandler)
-        peers.remove(remote)
+    val toRemove = peers.collectFirst {
+      case (id, info) if info.tcpHandler == tcpHandler => id
+    }
+    toRemove match {
+      case Some(remote) =>
+        context.unwatch(tcpHandler)
+        peers -= remote
+      case None =>
+        log.debug("The tcpHandler to be removed is not among the peers")
     }
   }
 
