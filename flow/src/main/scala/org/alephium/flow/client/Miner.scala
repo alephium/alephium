@@ -3,11 +3,10 @@ package org.alephium.flow.client
 import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.constant.Consensus
-import org.alephium.flow.model.{BlockTemplate, ChainIndex}
+import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, ChainHandler, FlowHandler}
-import org.alephium.protocol.model.{Block, Transaction}
+import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
@@ -21,8 +20,8 @@ object Miner {
   def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.genesis(AVector.empty, Consensus.maxMiningTarget, nonce)
-      if (chainIndex.accept(block.hash)) block else iter(nonce + 1)
+      val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
+      if (chainIndex.accept(block)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -105,6 +104,6 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
   }
 
   def isDifficult(block: Block): Boolean = {
-    chainIndex.accept(block.hash)
+    chainIndex.accept(block)
   }
 }

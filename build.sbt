@@ -155,9 +155,10 @@ val commonSettings = Seq(
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
+  fork := true,
   Test / scalacOptions += "-Xcheckinit",
   Test / javaOptions += "-Xss2m",
-  fork := true,
+  Test / envVars += "ALEPHIUM_ENV" -> "test",
   run / javaOptions += "-Xmx4g -XX:+UseG1GC",
   scalafmtOnCompile := true,
   (compile in Compile) := {

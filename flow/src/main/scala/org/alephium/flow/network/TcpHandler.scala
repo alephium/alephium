@@ -7,7 +7,6 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.storage.ChainHandler.BlockOrigin.Remote
 import org.alephium.flow.storage.{AddBlockResult, BlockHandlers, ChainHandler, FlowHandler}
 import org.alephium.protocol.message._
@@ -154,7 +153,7 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.length} blocks")
       val block      = blocks.head
-      val chainIndex = ChainIndex.fromHash(block.hash)
+      val chainIndex = block.chainIndex
       val handler    = blockHandlers.getHandler(chainIndex)
 
       handler ! ChainHandler.AddBlocks(blocks, Remote(remote))

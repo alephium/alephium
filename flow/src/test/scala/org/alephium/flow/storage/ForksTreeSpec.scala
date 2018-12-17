@@ -1,17 +1,17 @@
 package org.alephium.flow.storage
 
-import org.alephium.flow.constant.{Consensus, Genesis}
+import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.{AVector, AlephiumSpec}
 
-class ForksTreeSpec extends AlephiumSpec {
+class ForksTreeSpec extends AlephiumSpec with PlatformConfig.Default {
 
   behavior of "ForksTree"
 
   trait Fixture {
-    val genesis   = Genesis.block
+    val genesis   = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val forkstree = ForksTree(genesis)
-    val blockGen  = ModelGen.blockGenWith(AVector(genesis.hash))
+    val blockGen  = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen  = ModelGen.chainGen(4, genesis)
   }
 
@@ -129,7 +129,7 @@ class ForksTreeSpec extends AlephiumSpec {
     newBlocks.indices.foreach { index =>
       val height   = index + 1
       val blockOpt = blockPool.getConfirmedBlock(height)
-      if (height + Consensus.blockConfirmNum <= newBlocks.length) {
+      if (height + config.blockConfirmNum <= newBlocks.length) {
         blockOpt.get is newBlocks(index)
       } else {
         blockOpt.isEmpty

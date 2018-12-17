@@ -4,10 +4,9 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.model.ChainIndex
 import org.alephium.flow.network.PeerManager
 import org.alephium.protocol.message.{Message, SendBlocks}
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
 object ChainHandler {

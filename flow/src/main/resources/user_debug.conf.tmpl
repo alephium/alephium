@@ -22,7 +22,28 @@ akka {
       }
       throughput = 1
     }
+
+    debug {
+      receive = on
+      autoreceive = on
+      lifecycle = on
+      unhandled = on
+    }
+
+    default-dispatcher.mailbox-requirement = "org.alephium.monitoring.MonitoringMailboxSemantics"
+    mailbox.requirements { "org.alephium.monitoring.MonitoringMailboxSemantics" = monitoring-mailbox }
   }
+}
+
+monitoring-mailbox {
+  mailbox-type = "org.alephium.monitoring.MonitoringMailbox"
+}
+
+alephium {
+  numZerosAtLeastInHash = 0
+  blockTargetTime = 4 minutes
+  blockConfirmNum = 10
+  retargetInterval = 180 // number of blocks; about 12 hours
 }
 
 alephium {
@@ -35,3 +56,4 @@ alephium {
 
   nonceStep = 10000
 }
+
