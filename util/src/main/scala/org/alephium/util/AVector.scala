@@ -187,7 +187,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   @inline private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
-    foldLeft(AVector.empty[A]) { (acc, elem) =>
+    fold(AVector.empty[A]) { (acc, elem) =>
       if (p(elem) == target) acc :+ elem else acc
     }
   }
@@ -196,13 +196,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   class WithFilter(p: A => Boolean) {
     def map[@sp B: ClassTag](f: A => B): AVector[B] = {
-      foldLeft(AVector.empty[B]) { (acc, elem) =>
+      fold(AVector.empty[B]) { (acc, elem) =>
         if (p(elem)) acc :+ f(elem) else acc
       }
     }
 
     def flatMap[@sp B: ClassTag](f: A => AVector[B]): AVector[B] = {
-      foldLeft(AVector.empty[B]) { (acc, elem) =>
+      fold(AVector.empty[B]) { (acc, elem) =>
         if (p(elem)) acc ++ f(elem) else acc
       }
     }
@@ -216,7 +216,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     def withFilter(q: A => Boolean): WithFilter = new WithFilter(elem => p(elem) && q(elem))
   }
 
-  def foldLeft[B](zero: B)(f: (B, A) => B): B = {
+  def fold[B](zero: B)(f: (B, A) => B): B = {
     var res = zero
     cfor(start)(_ < end, _ + 1) { i =>
       res = f(res, elems(i))
@@ -224,11 +224,11 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     res
   }
 
-  def reduceLeft(op: (A, A) => A): A = {
-    reduceLeftBy(identity)(op)
+  def reduce(op: (A, A) => A): A = {
+    reduceBy(identity)(op)
   }
 
-  def reduceLeftBy[B: ClassTag](f: A => B)(op: (B, B) => B): B = {
+  def reduceBy[B: ClassTag](f: A => B)(op: (B, B) => B): B = {
     assert(nonEmpty)
 
     var acc = f(elems(start))
@@ -239,7 +239,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def flatMap[B: ClassTag](f: A => AVector[B]): AVector[B] = {
-    foldLeft(AVector.empty[B]) { (acc, elem) =>
+    fold(AVector.empty[B]) { (acc, elem) =>
       acc ++ f(elem)
     }
   }
@@ -274,10 +274,10 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(arr)
   }
 
-  def sum(implicit num: Numeric[A]): A = foldLeft(num.zero)(num.plus)
+  def sum(implicit num: Numeric[A]): A = fold(num.zero)(num.plus)
 
   def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {
-    foldLeft(num.zero) { (sum, elem) =>
+    fold(num.zero) { (sum, elem) =>
       num.plus(sum, f(elem))
     }
   }
@@ -285,13 +285,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def max(implicit cmp: Ordering[A]): A = {
     assert(nonEmpty)
 
-    reduceLeft((x, y) => if (cmp.gteq(x, y)) x else y)
+    reduce((x, y) => if (cmp.gteq(x, y)) x else y)
   }
 
   def min(implicit cmp: Ordering[A]): A = {
     assert(nonEmpty)
 
-    reduceLeft((x, y) => if (cmp.lteq(x, y)) x else y)
+    reduce((x, y) => if (cmp.lteq(x, y)) x else y)
   }
 
   def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {

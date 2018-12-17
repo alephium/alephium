@@ -184,7 +184,7 @@ object Serde extends ProductSerde {
   def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] =
     new AVectorSerde[T](serde) {
       override def serialize(input: AVector[T]): ByteString = {
-        input.map(serde.serialize).foldLeft(ByteString.empty)(_ ++ _)
+        input.map(serde.serialize).fold(ByteString.empty)(_ ++ _)
       }
 
       override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
@@ -195,7 +195,7 @@ object Serde extends ProductSerde {
   def dynamicSizeBytesSerde[T: ClassTag](serde: Serde[T]): Serde[AVector[T]] =
     new AVectorSerde[T](serde) {
       override def serialize(input: AVector[T]): ByteString = {
-        input.map(serde.serialize).foldLeft(IntSerde.serialize(input.length))(_ ++ _)
+        input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)
       }
 
       override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
