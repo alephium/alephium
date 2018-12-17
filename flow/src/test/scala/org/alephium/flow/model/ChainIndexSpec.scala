@@ -10,12 +10,11 @@ class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
 
   it should "compute the correct index" in {
     forAll(ModelGen.blockGen, minSuccessful(1)) { block =>
-      val hash       = block.hash
-      val miningHash = block.miningHash
-      val index      = ChainIndex.fromHash(hash)
+      val hash  = block.hash
+      val index = ChainIndex.fromHash(hash)
       index.accept(block) is true
 
-      val hash2Int = BigInt(1, miningHash.bytes.takeRight(2).toArray)
+      val hash2Int = BigInt(1, hash.bytes.takeRight(2).toArray)
       val rawIndex = (hash2Int % config.chainNum).toInt
       index.from is rawIndex / config.groups
       index.to is rawIndex % config.groups
