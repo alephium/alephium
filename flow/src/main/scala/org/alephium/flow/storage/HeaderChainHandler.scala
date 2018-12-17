@@ -2,8 +2,8 @@ package org.alephium.flow.storage
 import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.PeerManager
-import org.alephium.protocol.message.{Message, SendHeaders}
+import org.alephium.flow.network.{PeerManager, TcpHandler}
+import org.alephium.protocol.message.SendHeaders
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -35,7 +35,7 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
           val elapsedTime = System.currentTimeMillis() - header.timestamp
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
-          peerManager ! PeerManager.BroadCast(Message(SendHeaders(headers)), origin)
+          peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
         case error: AddBlockHeaderResult.Failure =>
           log.warning(s"Failed in adding new header: ${error.toString}")
       }
