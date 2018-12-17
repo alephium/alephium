@@ -7,20 +7,20 @@ import org.alephium.util.AVector
 
 case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
     extends WithKeccak256[Block] {
+  override def hash: Keccak256 = blockHeader.hash
+
   def miningHash: Keccak256 = Block.toMiningHash(this.hash)
 
   def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
-    ChainIndex.fromHash(hash)
+    blockHeader.chainIndex
   }
 
   def parentHash(implicit config: ConsensusConfig): Keccak256 = {
-    uncleHash(chainIndex.to)
+    blockHeader.parentHash
   }
 
-  // when toIndex == chainIndex.to, it returns hash of parent
   def uncleHash(toIndex: Int)(implicit config: ConsensusConfig): Keccak256 = {
-    assert(toIndex == chainIndex.to)
-    blockHeader.blockDeps.takeRight(config.groups)(toIndex)
+    blockHeader.uncleHash(toIndex)
   }
 }
 

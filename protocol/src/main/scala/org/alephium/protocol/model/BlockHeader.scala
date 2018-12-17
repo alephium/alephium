@@ -1,7 +1,8 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto._
-import org.alephium.serde.Serde
+import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.serde._
 import org.alephium.util.AVector
 
 case class BlockHeader(
@@ -10,7 +11,24 @@ case class BlockHeader(
     timestamp: Long,
     target: BigInt,
     nonce: BigInt
-) extends WithKeccak256[BlockHeader]
+) extends WithKeccak256[BlockHeader] {
+
+  override val hash: Keccak256 = Keccak256.hash(serialize[BlockHeader](this))
+
+  def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
+    ChainIndex.fromHash(hash)
+  }
+
+  def parentHash(implicit config: ConsensusConfig): Keccak256 = {
+    uncleHash(chainIndex.to)
+  }
+
+  // when toIndex == chainIndex.to, it returns hash of parent
+  def uncleHash(toIndex: Int)(implicit config: ConsensusConfig): Keccak256 = {
+    assert(toIndex == chainIndex.to)
+    blockDeps.takeRight(config.groups)(toIndex)
+  }
+}
 
 object BlockHeader {
 

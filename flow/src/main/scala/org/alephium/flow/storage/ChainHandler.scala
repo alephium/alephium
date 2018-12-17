@@ -40,7 +40,7 @@ class ChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManager: Ac
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          val total       = blockFlow.numBlocks - config.chainNum // exclude genesis blocks
+          val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
           val elapsedTime = System.currentTimeMillis() - block.blockHeader.timestamp
           log.info(
             s"Index: $chainIndex; Total: $total; ${chain.show(block)}; Time elapsed: ${elapsedTime}ms")

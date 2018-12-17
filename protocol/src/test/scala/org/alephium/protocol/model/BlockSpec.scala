@@ -2,13 +2,12 @@ package org.alephium.protocol.model
 
 import java.time.Duration
 
-import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
 import org.scalatest.TryValues._
 
-class SerdeSpec extends AlephiumSpec {
+class BlockSpec extends AlephiumSpec {
 
   implicit val config = new ConsensusConfig {
     override val groups: Int = 3
@@ -32,8 +31,7 @@ class SerdeSpec extends AlephiumSpec {
 
   it should "hash" in {
     forAll(ModelGen.blockGen) { block =>
-      val hash = Keccak256.hash(serialize[Block](block))
-      hash is block.hash
+      block.hash is block.blockHeader.hash
     }
   }
 }

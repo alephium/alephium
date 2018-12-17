@@ -45,16 +45,26 @@ object PlatformConfig extends StrictLogging {
     file
   }
 
-  def load(): PlatformConfig = {
-    val user   = ConfigFactory.parseFile(getUserFile).resolve()
-    val groups = user.getInt("alephium.groups")
-    val nonces = ConfigFactory.parseFile(getNoncesFile(groups))
-    val all    = user.withFallback(nonces)
+  def loadUserConfig(): Config = {
+    ConfigFactory.parseFile(getUserFile).resolve()
+  }
+
+  def loadNonceConfig(groups: Int): Config = {
+    ConfigFactory.parseFile(getNoncesFile(groups)).resolve()
+  }
+
+  def load(withNonces: Boolean): PlatformConfig = {
+    val user = loadUserConfig()
+    val all = if (withNonces) {
+      val groups = user.getInt("alephium.groups")
+      val nonces = loadNonceConfig(groups)
+      user.withFallback(nonces)
+    } else user
     new PlatformConfig(all)
   }
 
   object Default {
-    val config: PlatformConfig = PlatformConfig.load()
+    val config: PlatformConfig = PlatformConfig.load(withNonces = true)
   }
 
   trait Default {

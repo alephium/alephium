@@ -9,7 +9,9 @@ import org.alephium.protocol.model.{Block, ChainIndex}
 
 import scala.collection.parallel.ParSeq
 
-object PrepareGenesis extends App with StrictLogging with PlatformConfig.Default {
+object PrepareGenesis extends App with StrictLogging {
+  implicit val config = PlatformConfig.load(withNonces = false)
+
   def createGenesisBlocks(groups: Int): ParSeq[Block] = {
     (0 until groups * groups).par.map { index =>
       val from = index / groups
