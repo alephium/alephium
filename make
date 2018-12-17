@@ -7,6 +7,16 @@ parser.add_argument('goal', type=str)
 
 args = parser.parse_args()
 
+def rpc_call(host, port, method, params):
+    json = """{{"jsonrpc":"2.0","id":"curltext","method":"{}","params": {}}}"""
+    cmd = """curl --data-binary '{}' -H 'content-type:text/plain;' http://{}:{}/"""
+    run(cmd.format(json.format(method, params), host, port))
+
+def rpc_call_all(method, params):
+    for node in range(0, int(os.environ['nodes'])):
+        port = 8080 + node
+        rpc_call('localhost', port, method, params)
+
 def run(cmd):
     print(cmd)
     os.system(cmd)
@@ -41,9 +51,7 @@ elif args.goal == 'run':
         run('mainGroup={} port={} bootstrap=localhost:9973 ALEPHIUM_HOME={} ./app/target/universal/stage/bin/boot &> {}/console.log &'.format(main_group, port, homedir, homedir))
 
 elif args.goal == 'mine':
-    for node in range(0, int(os.environ['nodes'])):
-        port = 8080 + node
-        run('curl -X PUT localhost:{}/mining'.format(port))
+    rpc_call_all("mining/start", "[]")
 
 elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs sudo kill 2> /dev/null")
