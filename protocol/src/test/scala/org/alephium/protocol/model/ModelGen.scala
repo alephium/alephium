@@ -79,13 +79,13 @@ object ModelGen {
       port <- Gen.choose(0, 65535)
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
 
-  def peerAddress(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerInfo] =
+  def peerInfo(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerInfo] =
     for {
       address <- socketAddress
       id      <- peerId(groupIndex)
     } yield PeerInfo(id, address)
 
-  def peerAddress: Gen[PeerInfo] =
+  def peerInfo: Gen[PeerInfo] =
     for {
       address <- socketAddress
       id      <- peerId
