@@ -57,7 +57,7 @@ class ForksTreeSpec extends AlephiumSpec {
       blockPool.isTip(headBlock) is false
       blockPool.isTip(lastBlock) is true
       blockPool.getBestTip is lastBlock.hash
-      blockPool.getBestChain is chain
+      blockPool.getBestBlockChain is chain
       blockPool.maxHeight is blocks.length
       blockPool.getAllTips is AVector(lastBlock.hash)
       checkConfirmedBlocks(blockPool, blocks)
@@ -89,7 +89,7 @@ class ForksTreeSpec extends AlephiumSpec {
         blockPool.isTip(longChain.head) is false
         blockPool.isTip(longChain.last) is true
         blockPool.getBestTip is longChain.last.hash
-        blockPool.getBestChain is AVector(genesis) ++ longChain
+        blockPool.getBestBlockChain is AVector(genesis) ++ longChain
         blockPool.maxHeight is longChain.length
         blockPool.getAllTips.toIterable.toSet is Set(longChain.last.hash)
       }
@@ -125,7 +125,7 @@ class ForksTreeSpec extends AlephiumSpec {
     }
   }
 
-  def checkConfirmedBlocks(blockPool: SingleChain, newBlocks: AVector[Block]): Unit = {
+  def checkConfirmedBlocks(blockPool: BlockChain, newBlocks: AVector[Block]): Unit = {
     newBlocks.indices.foreach { index =>
       val height   = index + 1
       val blockOpt = blockPool.getConfirmedBlock(height)

@@ -9,11 +9,11 @@ import org.alephium.util.AVector
 trait MultiChain extends BlockPool {
   implicit val config: PlatformConfig
 
-  def getChain(chainIndex: ChainIndex): SingleChain
+  def getChain(chainIndex: ChainIndex): BlockChain
 
-  def getChain(block: Block): SingleChain = getChain(getIndex(block))
+  def getChain(block: Block): BlockChain = getChain(getIndex(block))
 
-  def getChain(hash: Keccak256): SingleChain = getChain(getIndex(hash))
+  def getChain(hash: Keccak256): BlockChain = getChain(getIndex(hash))
 
   def getIndex(block: Block): ChainIndex = {
     getIndex(block.hash)

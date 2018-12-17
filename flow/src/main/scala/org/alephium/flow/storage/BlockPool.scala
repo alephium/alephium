@@ -4,15 +4,10 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.AVector
 
-trait BlockPool {
-
-  def numBlocks: Int
+trait BlockPool extends BlockHashPool {
 
   def numTransactions: Int
 
-  def maxWeight: Int
-
-  def contains(hash: Keccak256): Boolean
   def contains(block: Block): Boolean = contains(block.hash)
 
   // Assuming the hash is in the pool
@@ -29,25 +24,17 @@ trait BlockPool {
 
   def getBlocks(locator: Keccak256): AVector[Block]
 
-  def getHeight(hash: Keccak256): Int
   def getHeight(block: Block): Int = getHeight(block.hash)
 
-  def getWeight(hash: Keccak256): Int
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
   def getBlockSlice(hash: Keccak256): AVector[Block]
   def getBlockSlice(block: Block): AVector[Block] = getBlockSlice(block.hash)
 
-  // Assuming the hash or block is in the pool
-  def isTip(hash: Keccak256): Boolean
   def isTip(block: Block): Boolean = isTip(block.hash)
 
-  def getBestTip: Keccak256
-
-  def getBestChain: AVector[Block] = getBlockSlice(getBestTip)
-
-  def getAllTips: AVector[Keccak256]
+  def getBestBlockChain: AVector[Block] = getBlockSlice(getBestTip)
 
   def getAllBlocks: Iterable[Block]
 
@@ -78,7 +65,7 @@ trait BlockPool {
   // calculated from best chain
   def getBalance(address: ED25519PublicKey): (Keccak256, BigInt) = {
     val bestTip = getBestTip
-    val balance = getBestChain.sumBy(block => getBalance(block, address))
+    val balance = getBestBlockChain.sumBy(block => getBalance(block, address))
     (bestTip, balance)
   }
 }

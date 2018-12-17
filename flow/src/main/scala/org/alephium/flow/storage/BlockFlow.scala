@@ -13,12 +13,12 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
 
   val initialBlocks: AVector[AVector[Block]] = blocksForFlow
 
-  val singleChains: AVector[AVector[SingleChain]] =
+  val singleChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) => ForksTree(initialBlocks(from)(to))
     }
 
-  private def aggregate[T: ClassTag](f: SingleChain => T)(op: (T, T) => T): T = {
+  private def aggregate[T: ClassTag](f: BlockChain => T)(op: (T, T) => T): T = {
     singleChains.reduceBy { chains =>
       chains.reduceBy(f)(op)
     }(op)
@@ -30,12 +30,14 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
 
   override def maxWeight: Int = aggregate(_.maxWeight)(math.max)
 
-  def getChain(i: Int, j: Int): SingleChain = {
+  override def maxHeight: Int = aggregate(_.maxHeight)(math.max)
+
+  def getChain(i: Int, j: Int): BlockChain = {
     assert(i >= 0 && i < groups && j >= 0 && j < groups)
     singleChains(i)(j)
   }
 
-  def getChain(chainIndex: ChainIndex): SingleChain = {
+  def getChain(chainIndex: ChainIndex): BlockChain = {
     getChain(chainIndex.from, chainIndex.to)
   }
 

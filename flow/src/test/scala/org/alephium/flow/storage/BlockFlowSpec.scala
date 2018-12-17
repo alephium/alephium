@@ -6,6 +6,7 @@ import org.alephium.flow.constant.Consensus
 import org.alephium.flow.model.ChainIndex
 import org.alephium.protocol.model.{Block, Transaction}
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
+import org.scalatest.Assertion
 
 import scala.annotation.tailrec
 
@@ -25,22 +26,22 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
       val chainIndex1 = ChainIndex(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
-      blockFlow.add(block1)
+      addAndCheck(blockFlow, block1)
       blockFlow.getWeight(block1) is 1
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      blockFlow.add(block2)
+      addAndCheck(blockFlow, block2)
       blockFlow.getWeight(block2) is 2
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.add(block3)
+      addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 3
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
-      blockFlow.add(block4)
+      addAndCheck(blockFlow, block4)
       blockFlow.getWeight(block4) is 4
     }
   }
@@ -54,7 +55,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
-        blockFlow.add(block)
+        addAndCheck(blockFlow, block)
         blockFlow.getWeight(block) is 1
       }
 
@@ -63,7 +64,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
-        blockFlow.add(block)
+        addAndCheck(blockFlow, block)
         blockFlow.getWeight(block) is 4
       }
 
@@ -72,7 +73,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
-        blockFlow.add(block)
+        addAndCheck(blockFlow, block)
         blockFlow.getWeight(block) is 8
       }
     }
@@ -85,26 +86,26 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       val chainIndex1 = ChainIndex(0, 0)
       val block11     = mine(blockFlow, chainIndex1)
       val block12     = mine(blockFlow, chainIndex1)
-      blockFlow.add(block11)
-      blockFlow.add(block12)
+      addAndCheck(blockFlow, block11)
+      addAndCheck(blockFlow, block12)
       blockFlow.getWeight(block11) is 1
       blockFlow.getWeight(block12) is 1
 
       val block13 = mine(blockFlow, chainIndex1)
-      blockFlow.add(block13)
+      addAndCheck(blockFlow, block13)
       blockFlow.getWeight(block13) is 2
 
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
       val block22     = mine(blockFlow, chainIndex2)
-      blockFlow.add(block21)
-      blockFlow.add(block22)
+      addAndCheck(blockFlow, block21)
+      addAndCheck(blockFlow, block22)
       blockFlow.getWeight(block21) is 3
       blockFlow.getWeight(block22) is 3
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      blockFlow.add(block3)
+      addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 4
     }
   }
@@ -119,6 +120,10 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
     }
 
     iter(0)
+  }
+
+  def addAndCheck(blockFlow: BlockFlow, block: Block): Assertion = {
+    blockFlow.add(block) is AddBlockResult.Success
   }
 
   def show(blockFlow: BlockFlow): String = {
