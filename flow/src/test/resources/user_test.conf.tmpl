@@ -1,30 +1,3 @@
-akka {
-  loglevel = "DEBUG"
-  loggers = ["akka.event.slf4j.Slf4jLogger"]
-  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
-
-  io.tcp.register-timeout = 1m
-
-  actor {
-    default-dispatcher {
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-factor = 0.5
-      }
-      throughput = 1
-    }
-
-    mining-dispatcher {
-      type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-factor = 0.5
-      }
-      throughput = 1
-    }
-  }
-}
-
 alephium {
   numZerosAtLeastInHash = 0
   blockTargetTime = 4 minutes
