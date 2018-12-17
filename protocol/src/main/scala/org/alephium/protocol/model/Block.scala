@@ -17,7 +17,7 @@ case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
     blockHeader.parentHash
   }
 
-  def uncleHash(toIndex: Int)(implicit config: ConsensusConfig): Keccak256 = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: ConsensusConfig): Keccak256 = {
     blockHeader.uncleHash(toIndex)
   }
 }

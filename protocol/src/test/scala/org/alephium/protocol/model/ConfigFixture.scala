@@ -3,7 +3,6 @@ package org.alephium.protocol.model
 import java.time.Duration
 
 import org.alephium.protocol.config.ConsensusConfig
-import org.scalacheck.Gen
 
 trait ConfigFixture {
 
@@ -16,6 +15,4 @@ trait ConfigFixture {
     override def blockConfirmNum: Int       = 2
     override def retargetInterval: Int      = 180
   }
-
-  val groupGen = Gen.choose(0, config.groups - 1)
 }
