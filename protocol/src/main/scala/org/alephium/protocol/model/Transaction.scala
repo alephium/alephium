@@ -23,8 +23,9 @@ object Transaction {
   }
 
   def coinbase(address: ED25519PublicKey, value: BigInt): Transaction = {
+    val txInput  = TxInput(Keccak256.zero, -1)
     val txOutput = TxOutput(value, address)
-    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
+    val unsigned = UnsignedTransaction(AVector(txInput), AVector(txOutput))
     Transaction(unsigned, ED25519Signature.zero)
   }
 }

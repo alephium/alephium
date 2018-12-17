@@ -1,9 +1,10 @@
 package org.alephium.flow.storage
 
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockDeps
-import org.alephium.protocol.model.GroupIndex
-import org.alephium.util.AVector
+import org.alephium.protocol.model._
+import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
 
 import scala.reflect.ClassTag
 
@@ -22,6 +23,9 @@ trait BlockFlowState {
     val deps2 = config.genesisBlocks(mainGroup.value).map(_.hash)
     BlockDeps(deps1 ++ deps2)
   }
+
+  private val transactions = ConcurrentHashMap.empty[Keccak256, Transaction]
+  private val utxos        = ConcurrentHashSet.empty[TxInput]
 
   private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
     BlockChain.fromGenesisUnsafe(
@@ -66,4 +70,17 @@ trait BlockFlowState {
   def getBestDeps: BlockDeps = bestDeps
 
   def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
+
+  def updateUTXOs(block: Block): Unit = {
+    block.transactions.foreach { tx =>
+      transactions.put(tx.hash, tx) // TODO: use put later to be safer
+      tx.unsigned.inputs.foreach(utxos.removeIfExist) // TODO: use remove later to be safer
+      tx.unsigned.outputs.foreachWithIndex { (output, i) =>
+        val txInput = TxInput(tx.hash, i)
+        utxos.add(txInput)
+      }
+    }
+  }
+
+  def numUTXOs: Int = utxos.size
 }
