@@ -80,10 +80,12 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(deps, target) =>
       assert(deps.length == (2 * config.groups - 1))
-      val transaction = Transaction.coinbase(address, 1)
-      val chainDep    = deps.takeRight(config.groups)(chainIndex.to)
-      val lastTs      = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
-      val template    = BlockTemplate(deps, target, AVector(transaction))
+      // scalastyle:off magic.number
+      val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
+      val chainDep     = deps.takeRight(config.groups)(chainIndex.to)
+      val lastTs       = node.blockFlow.getBlock(chainDep).blockHeader.timestamp
+      val template     = BlockTemplate(deps, target, transactions)
+      // scalastyle:on magic.number
       context become mine(template, lastTs)
       self ! Miner.Nonce(0, config.nonceStep)
   }
@@ -94,16 +96,12 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
-        val block = Block.from(template.deps, template.transactions, template.target, current)
-        if (isDifficult(block)) Some(block)
+        val header = template.buildHeader(current)
+        if (chainIndex.accept(header)) Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }
 
     iter(from)
-  }
-
-  def isDifficult(block: Block): Boolean = {
-    chainIndex.accept(block)
   }
 }

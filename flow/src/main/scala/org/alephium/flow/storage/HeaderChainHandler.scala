@@ -37,7 +37,7 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManag
             s"Index: $chainIndex; Total: $total; ${chain.show(header.hash)}; Time elapsed: ${elapsedTime}ms")
           peerManager ! PeerManager.BroadCast(Message(SendHeaders(headers)), origin)
         case error: AddBlockHeaderResult.Failure =>
-          log.info(s"Failed in adding new header: $error")
+          log.warning(s"Failed in adding new header: ${error.toString}")
       }
       sender() ! result
   }
