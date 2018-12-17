@@ -11,7 +11,7 @@ case class BlockHeader(
     timestamp: Long,
     target: BigInt,
     nonce: BigInt
-) extends WithKeccak256[BlockHeader] {
+) extends Keccak256Hash[BlockHeader] {
 
   override val hash: Keccak256 = Keccak256.hash(serialize[BlockHeader](this))
 
