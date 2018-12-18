@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
 import org.scalatest.Assertion
 
@@ -54,7 +54,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
         val index = block.chainIndex
-        if (index.from == 0 || index.to == 0) {
+        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 1
         } else {
@@ -69,7 +69,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
         val index = block.chainIndex
-        if (index.from == 0 || index.to == 0) {
+        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 4
         } else {
@@ -84,7 +84,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
         val index = block.chainIndex
-        if (index.from == 0 || index.to == 0) {
+        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 8
         } else {

@@ -14,13 +14,13 @@ class ChainIndexSpec extends AlephiumSpec with ConfigFixture {
 
       val hash2Int = BigInt(1, hash.bytes.takeRight(2).toArray)
       val rawIndex = (hash2Int % config.chainNum).toInt
-      index.from is rawIndex / config.groups
-      index.to is rawIndex % config.groups
+      index.from.value is rawIndex / config.groups
+      index.to.value is rawIndex % config.groups
     }
   }
 
   it should "equalize same values" in {
-    forAll(groupGen, groupGen) { (from, to) =>
+    forAll(ModelGen.groupGen, ModelGen.groupGen) { (from, to) =>
       val index1 = ChainIndex(from, to)
       val index2 = ChainIndex(from, to)
       index1 is index2
