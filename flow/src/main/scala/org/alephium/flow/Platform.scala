@@ -54,7 +54,7 @@ trait Platform extends App with StrictLogging {
           val props = mode.builders
             .createMiner(publicKey, node, chainIndex)
             .withDispatcher("akka.actor.mining-dispatcher")
-          val miner = node.system.actorOf(props, s"MockMiner-$from-$to")
+          val miner = node.system.actorOf(props, s"Miner-$from-$to")
           miner ! Miner.Start
         }
 
