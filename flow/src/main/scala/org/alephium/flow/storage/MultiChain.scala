@@ -3,7 +3,7 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
 
@@ -154,10 +154,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def toJson(from: Int, to: Int, blockHash: Keccak256): String = {
     val header    = getBlockHeader(blockHash)
     val timestamp = header.timestamp
-    val height    = getWeight(blockHash)
+    val height    = getHeight(blockHash)
     val hash      = header.shortHex
     val deps = header.blockDeps
-      .map(h => "\"" + Hex.toHexString(h.bytes).take(16) + "\"")
+      .map(h => "\"" + h.shortHex + "\"")
       .mkString("[", ",", "]")
     s"""{"timestamp":$timestamp,"chainFrom":$from,"chainTo":$to,"height":"$height","hash":"$hash","deps":$deps}"""
   }

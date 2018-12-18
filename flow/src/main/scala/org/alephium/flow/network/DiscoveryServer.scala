@@ -91,7 +91,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
           handlePayload(sourceId, remote)(message.payload)
         case Failure(error) =>
           // TODO: handler error properly
-          log.info(
+          log.debug(
             s"${config.nodeId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
       }
   }
