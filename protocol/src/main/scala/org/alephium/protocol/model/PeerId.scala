@@ -1,14 +1,17 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.macros.HPC.cfor
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
 
+import scala.annotation.tailrec
+
 /** 160bits identifier of a Peer **/
 class PeerId private (val bytes: ByteString) extends RandomBytes {
   def groupIndex(implicit config: GroupConfig): GroupIndex = {
-    GroupIndex(math.abs(bytes.last.toInt) % config.groups)
+    GroupIndex((bytes.last & 0xFF) % config.groups)
   }
 
   def hammingDist(another: PeerId): Int = {
@@ -18,7 +21,8 @@ class PeerId private (val bytes: ByteString) extends RandomBytes {
 
 object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
   override def length: Int = peerIdLength
-  def bitLength: Int       = length * 8
+
+  def fromPublicKey(key: ED25519PublicKey): PeerId = new PeerId(key.bytes)
 
   /** Return the distance between two peers as the XOR of their identifier. **/
   def distance(p0: PeerId, p1: PeerId): BigInt = {
@@ -53,9 +57,13 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
   def generateFor(mainGroup: GroupIndex)(implicit config: GroupConfig): PeerId = {
     assert(mainGroup.value < config.groups)
 
-    val id = PeerId.generate
-    if (id.groupIndex == mainGroup) {
-      id
-    } else generateFor(mainGroup)
+    @tailrec
+    def iter(): PeerId = {
+      val id = PeerId.generate
+      if (id.groupIndex == mainGroup) {
+        id
+      } else iter()
+    }
+    iter()
   }
 }

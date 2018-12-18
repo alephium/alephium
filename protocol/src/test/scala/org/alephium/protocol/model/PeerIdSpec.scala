@@ -1,6 +1,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfigFixture}
 import org.alephium.serde.Serde
 import org.alephium.util.AlephiumSpec
 
@@ -47,6 +48,16 @@ class PeerIdSpec extends AlephiumSpec {
         xor = xor >> 1
       }
       PeerId.hammingDist(byte0, byte1) is distance
+    }
+  }
+
+  it should "be able to generate from ED25519 public key" in new GroupConfigFixture {
+    override def groups: Int = 9
+    (0 until 9).foreach { i =>
+      val groupIndex     = GroupIndex(i)
+      val (_, publicKey) = DiscoveryConfig.generateDiscoveryKeyPair(groupIndex)
+      val peerId         = PeerId.fromPublicKey(publicKey)
+      peerId.groupIndex is groupIndex
     }
   }
 }

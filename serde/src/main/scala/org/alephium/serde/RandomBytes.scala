@@ -3,7 +3,7 @@ package org.alephium.serde
 import scala.reflect.runtime.universe.{typeOf, TypeTag}
 import akka.util.ByteString
 import java.security.SecureRandom
-import org.bouncycastle.util.encoders.Hex
+import org.alephium.util.Hex
 
 trait RandomBytes {
   def bytes: ByteString
@@ -33,10 +33,12 @@ trait RandomBytes {
   }
 
   override def toString: String = {
-    val hex  = Hex.toHexString(bytes.toArray)
+    val hex  = Hex.toHexString(bytes)
     val name = this.getClass.getSimpleName
     s"""$name(hex"$hex")"""
   }
+
+  def shortHex: String = Hex.toHexString(bytes).take(8)
 }
 
 object RandomBytes {

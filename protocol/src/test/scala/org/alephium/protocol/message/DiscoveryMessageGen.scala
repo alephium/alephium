@@ -1,6 +1,6 @@
 package org.alephium.protocol.message
 
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.DiscoveryConfig
 import org.scalacheck.Gen
 import org.alephium.protocol.model.{GroupIndex, ModelGen}
 import org.alephium.util.AVector
@@ -10,34 +10,25 @@ import scala.collection.JavaConverters._
 object DiscoveryMessageGen {
   import DiscoveryMessage._
 
-  val callId: Gen[CallId] = Gen.resultOf[Unit, CallId](_ => CallId.generate)
-
   val findNode: Gen[FindNode] = for {
-    cid    <- callId
-    source <- ModelGen.peerId
     target <- ModelGen.peerId
-  } yield FindNode(cid, source, target)
+  } yield FindNode(target)
 
   val ping: Gen[Ping] =
     for {
-      cid    <- callId
-      source <- ModelGen.peerInfo
-    } yield Ping(cid, source)
+      source <- ModelGen.socketAddress
+    } yield Ping(source)
 
-  val pong: Gen[Pong] =
+  val pong: Gen[Pong] = Gen.map(_ => Pong())
+
+  def neighbors(implicit config: DiscoveryConfig): Gen[Neighbors] =
     for {
-      cid <- callId
-    } yield Pong(cid)
+      source <- Gen.sequence((0 until config.groups).map(i =>
+        Gen.listOf(ModelGen.peerInfo(GroupIndex(i)(config))(config))))
+    } yield Neighbors(AVector.from(source.asScala.map(AVector.from)))
 
-  def neighbors: Gen[Neighbors] =
+  def message(implicit config: DiscoveryConfig): Gen[DiscoveryMessage] =
     for {
-      _callId <- callId
-      _groups <- Gen.choose(2, 8)
-      config = new GroupConfig { override def groups: Int = _groups }
-      source <- Gen.sequence(
-        (0 until _groups).map(i => Gen.listOf(ModelGen.peerInfo(GroupIndex(i)(config))(config))))
-    } yield Neighbors(_callId, AVector.from(source.asScala.map(AVector.from)))
-
-  val message: Gen[DiscoveryMessage] =
-    Gen.oneOf(findNode, ping, pong, neighbors)
+      payload <- Gen.oneOf[Payload](findNode, ping, pong, neighbors)
+    } yield DiscoveryMessage.from(payload)
 }
