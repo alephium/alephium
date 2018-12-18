@@ -155,6 +155,8 @@ val commonSettings = Seq(
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
+  wartremoverErrors ++= Warts.all,
+  wartremoverWarnings ++= Warts.all,
   fork := true,
   Test / scalacOptions += "-Xcheckinit",
   Test / javaOptions += "-Xss2m",
