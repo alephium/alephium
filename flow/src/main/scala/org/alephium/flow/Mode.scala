@@ -61,9 +61,11 @@ object Mode {
       Node(builders, "Root")
   }
 
-  class Local(val port: Int) extends Mode {
+  class Local extends Mode {
+    val port: Int = config.port
+
     val index: Int = {
-      port - config.port
+      port - 9973
     }
 
     def httpPort: Int = 8080 + index

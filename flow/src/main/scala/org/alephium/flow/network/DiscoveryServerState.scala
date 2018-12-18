@@ -118,7 +118,7 @@ trait DiscoveryServerState {
       val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
       if (emptySlotNum > 0) emptySlotNum else 0
     }
-    bootstrap.takeUpto(emptySlotNum).foreach(fetchNeighbors)
+    bootstrap.takeUpto(emptySlotNum).foreach(tryPing)
   }
 
   def fetchNeighbors(peer: PeerInfo): Unit = {
@@ -142,6 +142,11 @@ trait DiscoveryServerState {
     }
   }
 
+  def tryPing(remote: InetSocketAddress): Unit = {
+    log.info(s"Ping $remote")
+    send(remote, Ping(config.nodeInfo.socketAddress))
+  }
+
   def handlePong(peerId: PeerId): Unit = {
     pendings.get(peerId) match {
       case Some(AwaitPong(remote, _)) =>
@@ -159,7 +164,7 @@ trait DiscoveryServerState {
           }
         }
       case None =>
-        log.debug(s"Uninvited pong message received")
+        log.debug(s"Not pending pong message received, might from bootstrap nodes")
     }
   }
 }

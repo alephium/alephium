@@ -49,7 +49,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val config1   = createConfig(groupSize, 1, port1, 1)
     val server1   = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
 
-    Thread.sleep(1000)
+    Thread.sleep(2000)
 
     val probo0 = TestProbe()
     server0.tell(DiscoveryServer.GetPeers, probo0.ref)
