@@ -33,13 +33,9 @@ object AnotherDiscoveryServer {
   case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
 
   sealed trait Command
-
-  sealed trait ExternalCommand       extends Command
-  case object GetPeers               extends ExternalCommand
-  case class Disable(peerId: PeerId) extends ExternalCommand
-
-  sealed trait InternalCommand extends Command
-  case object Scan             extends InternalCommand
+  case object GetPeers               extends Command
+  case class Disable(peerId: PeerId) extends Command
+  case object Scan                   extends Command
 
   sealed trait Event
   case class Peers(peers: AVector[AVector[PeerInfo]]) extends Event
@@ -68,7 +64,7 @@ class AnotherDiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
 
   IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.udpPort))
 
-  def receive: Receive = binding orElse handleExternal
+  def receive: Receive = binding orElse handleCommand
 
   def binding: Receive = {
     case Udp.Bound(_) =>
@@ -83,30 +79,7 @@ class AnotherDiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
       context stop self
   }
 
-  def ready: Receive = handleData orElse handleInternal orElse handleExternal
-
-  def handleExternal: Receive = {
-    case command: ExternalCommand => _handleExternal(command)
-  }
-
-  def _handleExternal(command: ExternalCommand): Unit = command match {
-    case GetPeers =>
-      sender() ! Peers(getActivePeers)
-    case Disable(peerId) =>
-      getBucket(peerId) -= peerId
-      ()
-  }
-
-  def handleInternal: Receive = {
-    case command: InternalCommand => _handleInternal(command)
-  }
-
-  def _handleInternal(command: InternalCommand): Unit = command match {
-    case Scan =>
-      log.debug("Scan the available peers")
-      cleanup()
-      scan()
-  }
+  def ready: Receive = handleData orElse handleCommand
 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
@@ -119,6 +92,18 @@ class AnotherDiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
           log.info(
             s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
       }
+  }
+
+  def handleCommand: Receive = {
+    case Scan =>
+      log.debug("Scan the available peers")
+      cleanup()
+      scan()
+    case GetPeers =>
+      sender() ! Peers(getActivePeers)
+    case Disable(peerId) =>
+      getBucket(peerId) -= peerId
+      ()
   }
 
   def handlePayload(sourceId: PeerId, remote: InetSocketAddress)(payload: Payload): Unit =
