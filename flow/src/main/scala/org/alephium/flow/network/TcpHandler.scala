@@ -134,8 +134,6 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
   def handleInternal: Receive = {
     case _: AddBlockResult =>
       () // TODO: handle error
-    //    case BlockHandler.SendBlocksAfter(_, blocks) =>
-    //      connection ! TcpHandler.envelope(Message(SendBlocks(blocks)))
   }
 
   def handlePayload(payload: Payload): Unit = payload match {
@@ -158,8 +156,14 @@ class TcpHandler(remote: InetSocketAddress, blockHandlers: BlockHandlers)(
 
       handler ! ChainHandler.AddBlocks(blocks, Remote(remote))
     case GetBlocks(locators) =>
-      log.debug(s"GetBlocks received: $locators")
+      log.debug(s"GetBlocks received: #${locators.length}")
       blockHandlers.flowHandler ! FlowHandler.GetBlocksAfter(locators)
+    case SendHeaders(headers) =>
+      log.debug(s"Received #${headers.length} block headers")
+      ???
+    case GetHeaders(locators) =>
+      log.debug(s"GetHeaders received: ${locators.length}")
+      ???
   }
 
   private var pingNonce: Int = 0

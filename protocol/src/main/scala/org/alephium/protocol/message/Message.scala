@@ -12,7 +12,7 @@ object Message {
 
   def apply[T <: Payload](payload: T): Message = {
     val header =
-      Header(Protocol.version, Payload.Code.toInt(Payload.Code.fromValue(payload)).toInt)
+      Header(Protocol.version, Payload.Code.fromValue(payload))
     apply(header, payload)
   }
 
