@@ -13,16 +13,18 @@ object HandlerUtils {
     val blockHandlers = (for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      if from == config.groups || to == config.groups
+      chainIndex = ChainIndex(from, to)
+      if chainIndex.relateTo(config.mainGroup)
     } yield {
-      ChainIndex(from, to) -> TestProbe().ref
+      chainIndex -> TestProbe().ref
     }).toMap
     val headerHandlers = (for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      if from != config.groups && to != config.groups
+      chainIndex = ChainIndex(from, to)
+      if !chainIndex.relateTo(config.mainGroup)
     } yield {
-      ChainIndex(from, to) -> TestProbe().ref
+      chainIndex -> TestProbe().ref
     }).toMap
     AllHandlers(flowHandler, blockHandlers, headerHandlers)
   }

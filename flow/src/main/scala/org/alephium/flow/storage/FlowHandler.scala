@@ -1,6 +1,6 @@
 package org.alephium.flow.storage
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.PeerManager
@@ -10,8 +10,8 @@ import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
 
-  def props(blockFlow: BlockFlow)(implicit config: PlatformConfig): Props =
-    Props(new FlowHandler(blockFlow))
+  def props(blockFlow: BlockFlow, peerManager: ActorRef)(implicit config: PlatformConfig): Props =
+    Props(new FlowHandler(blockFlow, peerManager))
 
   sealed trait Command
   case class GetBlocksAfter(locators: AVector[Keccak256])  extends Command
@@ -25,7 +25,8 @@ object FlowHandler {
 }
 
 // consider single chain for the moment
-class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends BaseActor {
+class FlowHandler(blockFlow: BlockFlow, peerManager: ActorRef)(implicit config: PlatformConfig)
+    extends BaseActor {
   import FlowHandler._
 
   override def receive: Receive = {
@@ -40,7 +41,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
     case PrepareSync(peerId) =>
       // TODO: improve sync algorithm
       val tips = blockFlow.getAllTips
-      sender() ! PeerManager.Sync(peerId, tips)
+      peerManager ! PeerManager.Sync(peerId, tips)
     case PrepareBlockFlow(chainIndex) =>
       val bestDeps    = blockFlow.getBestDeps(chainIndex)
       val singleChain = blockFlow.getBlockChain(chainIndex)
