@@ -1,10 +1,8 @@
-package org.alephium.flow.model
+package org.alephium.protocol.model
 
-import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{ChainIndex, ModelGen}
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
+class ChainIndexSpec extends AlephiumSpec with ConfigFixture {
 
   behavior of "ChainIndex"
 
@@ -19,5 +17,17 @@ class ChainIndexSpec extends AlephiumSpec with PlatformConfig.Default {
       index.from is rawIndex / config.groups
       index.to is rawIndex % config.groups
     }
+  }
+
+  it should "equalize same values" in {
+    forAll(groupGen, groupGen) { (from, to) =>
+      val index1 = ChainIndex(from, to)
+      val index2 = ChainIndex(from, to)
+      index1 is index2
+    }
+
+    val index1 = ChainIndex.unsafe(999999, 999999)
+    val index2 = ChainIndex.unsafe(999999, 999999)
+    index1 is index2
   }
 }

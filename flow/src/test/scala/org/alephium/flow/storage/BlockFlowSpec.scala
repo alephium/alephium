@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
 import org.scalatest.Assertion
 
@@ -13,8 +13,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow()
-    config.blocksForFlow.flatMap(identity).foreach { block =>
-      blockFlow.getWeight(block) is 0
+    config.genesisBlocks.flatMap(identity).foreach { block =>
+      blockFlow.getWeight(block.hash) is 0
     }
   }
 
@@ -29,8 +29,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block2)
-      blockFlow.getWeight(block2) is 2
+      addAndCheck(blockFlow, block2.blockHeader)
+      blockFlow.getWeight(block2.blockHeader) is 2
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
@@ -53,8 +53,14 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
-        addAndCheck(blockFlow, block)
-        blockFlow.getWeight(block) is 1
+        val index = block.chainIndex
+        if (index.from == 0 || index.to == 0) {
+          addAndCheck(blockFlow, block)
+          blockFlow.getWeight(block) is 1
+        } else {
+          addAndCheck(blockFlow, block.blockHeader)
+          blockFlow.getWeight(block.blockHeader) is 1
+        }
       }
 
       val newBlocks2 = for {
@@ -62,8 +68,14 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
-        addAndCheck(blockFlow, block)
-        blockFlow.getWeight(block) is 4
+        val index = block.chainIndex
+        if (index.from == 0 || index.to == 0) {
+          addAndCheck(blockFlow, block)
+          blockFlow.getWeight(block) is 4
+        } else {
+          addAndCheck(blockFlow, block.blockHeader)
+          blockFlow.getWeight(block.blockHeader) is 4
+        }
       }
 
       val newBlocks3 = for {
@@ -71,8 +83,14 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
-        addAndCheck(blockFlow, block)
-        blockFlow.getWeight(block) is 8
+        val index = block.chainIndex
+        if (index.from == 0 || index.to == 0) {
+          addAndCheck(blockFlow, block)
+          blockFlow.getWeight(block) is 8
+        } else {
+          addAndCheck(blockFlow, block.blockHeader)
+          blockFlow.getWeight(block.blockHeader) is 8
+        }
       }
     }
   }
@@ -96,8 +114,8 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
       val block22     = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block21)
-      addAndCheck(blockFlow, block22)
+      addAndCheck(blockFlow, block21.blockHeader)
+      addAndCheck(blockFlow, block22.blockHeader)
       blockFlow.getWeight(block21) is 3
       blockFlow.getWeight(block22) is 3
 
@@ -124,12 +142,16 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default {
     blockFlow.add(block) is AddBlockResult.Success
   }
 
+  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
+    blockFlow.add(header) is AddBlockHeaderResult.Success
+  }
+
   def show(blockFlow: BlockFlow): String = {
     blockFlow.getAllTips
       .map { tip =>
         val weight = blockFlow.getWeight(tip)
         val block  = blockFlow.getBlock(tip)
-        val index  = blockFlow.getIndex(block)
+        val index  = block.chainIndex
         val hash   = showHash(tip)
         val deps   = block.blockHeader.blockDeps.map(showHash).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
