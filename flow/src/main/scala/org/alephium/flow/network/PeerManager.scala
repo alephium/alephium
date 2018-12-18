@@ -10,7 +10,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.message.{GetBlocks, Message}
-import org.alephium.protocol.model.PeerId
+import org.alephium.protocol.model.{GroupIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.collection.mutable
@@ -30,7 +30,10 @@ object PeerManager {
   sealed trait Event
   case class Peers(peers: Map[PeerId, PeerInfo]) extends Event
 
-  case class PeerInfo(id: PeerId, index: Int, address: InetSocketAddress, tcpHandler: ActorRef)
+  case class PeerInfo(id: PeerId,
+                      index: GroupIndex,
+                      address: InetSocketAddress,
+                      tcpHandler: ActorRef)
   object PeerInfo {
     def apply(id: PeerId, address: InetSocketAddress, tcpHandler: ActorRef)(
         implicit config: PlatformConfig): PeerInfo = {

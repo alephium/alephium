@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.TcpHandler
+import org.alephium.protocol.model.GroupIndex
 
 import scala.sys.process._
 
@@ -15,9 +16,9 @@ trait Mode extends PlatformConfig.Default {
 
   def index: Int
 
-  def mainGroup: Int = {
+  def mainGroup: GroupIndex = {
     // Double check if index is matched with mainGroup
-    val groupIndex = math.abs(index) % config.groups
+    val groupIndex = GroupIndex(math.abs(index) % config.groups)
     assert(groupIndex == config.mainGroup)
     groupIndex
   }
