@@ -6,13 +6,17 @@ import org.alephium.protocol.config.ConsensusConfig
 
 class ChainIndex private (val from: Int, val to: Int) {
 
-  def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
+  def accept(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
     val target = from * config.groups + to
-    val actual = ChainIndex.hash2Index(block.hash)
+    val actual = ChainIndex.hash2Index(header.hash)
     actual == target && {
-      val current = BigInt(1, block.hash.bytes.toArray)
+      val current = BigInt(1, header.hash.bytes.toArray)
       current <= config.maxMiningTarget
     }
+  }
+
+  def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
+    accept(block.blockHeader) && (block.blockHeader.txsHash == Keccak256.hash(block.transactions))
   }
 
   def relateTo(groupIndex: GroupIndex): Boolean = {

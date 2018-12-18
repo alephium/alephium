@@ -63,9 +63,8 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     @tailrec
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
-        val timestamp = System.currentTimeMillis()
-        val block     = Block.from(template.deps, timestamp, template.target, current)
-        if (isDifficult(block)) Some(block)
+        val header = template.buildHeader(current)
+        if (chainIndex.accept(header)) Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }
