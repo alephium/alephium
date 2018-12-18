@@ -14,16 +14,16 @@ class NetworkSpec extends AlephiumSpec {
     val input     = "127.0.0.1:1000"
     val addresses = Network.parseAddresses(input)
     addresses.length is 1
-    addresses(0) is InetSocketAddress.createUnresolved("127.0.0.1", 1000)
+    addresses(0) is new InetSocketAddress("127.0.0.1", 1000)
   }
 
   it should "parse several addresses" in {
     val input     = "127.0.0.1:1000;127.0.0.1:1001;127.0.0.1:1002;127.0.0.1:1003"
     val addresses = Network.parseAddresses(input)
     addresses.length is 4
-    addresses(0) is InetSocketAddress.createUnresolved("127.0.0.1", 1000)
-    addresses(1) is InetSocketAddress.createUnresolved("127.0.0.1", 1001)
-    addresses(2) is InetSocketAddress.createUnresolved("127.0.0.1", 1002)
-    addresses(3) is InetSocketAddress.createUnresolved("127.0.0.1", 1003)
+    addresses(0) is new InetSocketAddress("127.0.0.1", 1000)
+    addresses(1) is new InetSocketAddress("127.0.0.1", 1001)
+    addresses(2) is new InetSocketAddress("127.0.0.1", 1002)
+    addresses(3) is new InetSocketAddress("127.0.0.1", 1003)
   }
 }
