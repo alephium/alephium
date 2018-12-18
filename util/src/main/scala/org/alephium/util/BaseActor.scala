@@ -1,7 +1,8 @@
 package org.alephium.util
 
-import akka.actor.SupervisorStrategy.{Resume, Stop}
-import akka.actor.{Actor, ActorLogging, OneForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
+import akka.actor._
+
+import scala.concurrent.duration.FiniteDuration
 
 trait BaseActor extends Actor with ActorLogging {
 
@@ -12,6 +13,13 @@ trait BaseActor extends Actor with ActorLogging {
 
   override def unhandled(message: Any): Unit = {
     log.warning(s"Unhandled message: $message")
+  }
+
+  // Note: no periodic scheduler, use Akka Timers instead which could be cancelled automatically
+  def scheduleOnce(receiver: ActorRef, message: Any, delay: FiniteDuration): Unit = {
+    context.system.scheduler
+      .scheduleOnce(delay, receiver, message)(context.dispatcher, context.self)
+    ()
   }
 }
 
@@ -41,12 +49,12 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
   val resumeStrategy = OneForOneStrategy() {
     case e: Throwable =>
       System.out.print(e.toString + "\n")
-      Resume
+      SupervisorStrategy.Resume
   }
 
   val stopStrategy = OneForOneStrategy() {
     case e: Throwable =>
       System.out.print(e + "\n")
-      Stop
+      SupervisorStrategy.Stop
   }
 }

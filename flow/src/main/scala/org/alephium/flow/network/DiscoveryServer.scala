@@ -2,7 +2,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
@@ -26,6 +26,8 @@ object DiscoveryServer {
       PeerStatus(info, now)
     }
   }
+
+  object Timer
 
   case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
 
@@ -54,10 +56,10 @@ object DiscoveryServer {
 class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     implicit val config: DiscoveryConfig)
     extends BaseActor
+    with Timers
     with DiscoveryServerState {
   import DiscoveryServer._
   import context.system
-  import context.dispatcher
 
   IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.udpPort))
 
@@ -69,7 +71,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       setSocket(sender())
       log.debug(s"bootstrap ndoes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
-      system.scheduler.schedule(config.scanFrequency, config.scanFrequency, self, Scan)
+      timers.startPeriodicTimer(Timer, Scan, config.scanFrequency)
       context.become(ready)
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
