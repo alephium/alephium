@@ -50,10 +50,10 @@ object ModelGen {
       blocks.foldLeft(AVector.empty[Block]) {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
-          val currentHeader = block.blockHeader
+          val currentHeader = block.header
           val deps          = AVector.fill(config.depsNum)(prevHash)
           val newHeader     = currentHeader.copy(blockDeps = deps)
-          val newBlock      = block.copy(blockHeader = newHeader)
+          val newBlock      = block.copy(header = newHeader)
           acc :+ newBlock
       }
     }

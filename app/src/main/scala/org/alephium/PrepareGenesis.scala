@@ -30,7 +30,7 @@ object PrepareGenesis extends App with StrictLogging {
       logger.warn(s"Nonces have already been generated in the config file")
     } else {
       val genesis = createGenesisBlocks(config.groups)
-      val nonces  = genesis.map(_.blockHeader.nonce)
+      val nonces  = genesis.map(_.header.nonce)
       val line    = s"alephium.$path = [${nonces.mkString(",")}]"
 
       val noncesPath = PlatformConfig.getNoncesFilePath(config.groups)

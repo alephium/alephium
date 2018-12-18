@@ -19,7 +19,7 @@ class BlockSpec extends AlephiumSpec with ConsensusConfigFixture {
 
   it should "hash" in {
     forAll(ModelGen.blockGen) { block =>
-      block.hash is block.blockHeader.hash
+      block.hash is block.header.hash
     }
   }
 }
