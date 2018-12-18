@@ -70,10 +70,7 @@ object DiscoveryMessage {
     }
   }
 
-  sealed trait Request  extends Payload
-  sealed trait Response extends Payload
-
-  case class Ping(sourceAddress: InetSocketAddress) extends Request
+  case class Ping(sourceAddress: InetSocketAddress) extends Payload
   object Ping extends Code[Ping] {
     private val serde = Serde.tuple1[InetSocketAddress]
 
@@ -85,7 +82,17 @@ object DiscoveryMessage {
     }
   }
 
-  case class FindNode(targetId: PeerId) extends Request
+  case class Pong() extends Payload
+  object Pong extends Code[Pong] {
+    def serialize(pong: Pong): ByteString = ByteString.empty
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
+      if (input.isEmpty) Success(Pong())
+      else Failure(WrongFormatException.redundant(0, input.length))
+    }
+  }
+
+  case class FindNode(targetId: PeerId) extends Payload
   object FindNode extends Code[FindNode] {
     private val serde = Serde.tuple1[PeerId]
 
@@ -96,17 +103,7 @@ object DiscoveryMessage {
       serde.deserialize(input).map(FindNode(_))
   }
 
-  case class Pong() extends Response
-  object Pong extends Code[Pong] {
-    def serialize(pong: Pong): ByteString = ByteString.empty
-
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
-      if (input.isEmpty) Success(Pong())
-      else Failure(WrongFormatException.redundant(0, input.length))
-    }
-  }
-
-  case class Neighbors(peers: AVector[AVector[PeerInfo]]) extends Response
+  case class Neighbors(peers: AVector[AVector[PeerInfo]]) extends Payload
   object Neighbors extends Code[Neighbors] {
     private val serde = Serde.tuple1[AVector[AVector[PeerInfo]]]
 

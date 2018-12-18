@@ -2,7 +2,7 @@ package org.alephium.flow
 
 import java.time.Duration
 import java.io.File
-import java.net.InetAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.{Path, Paths}
 
 import com.typesafe.config.{Config, ConfigFactory}
@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
 import org.alephium.protocol.config.{ConsensusConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
-import org.alephium.util.{AVector, Files}
+import org.alephium.util.{AVector, Files, Network}
 
 import scala.concurrent.duration._
 
@@ -100,6 +100,8 @@ class PlatformConfig(val all: Config) extends ConsensusConfig { self =>
   }
 
   lazy val discoveryConfig: DiscoveryConfig = loadDiscoveryConfig()
+  lazy val bootstrap: AVector[InetSocketAddress] =
+    Network.parseAddresses(underlying.getString("bootstrap"))
 
   def nodeId: PeerId = discoveryConfig.nodeId
 
