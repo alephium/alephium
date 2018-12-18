@@ -41,7 +41,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
       sender() ! PeerManager.Sync(remote, tips)
     case PrepareBlockFlow(chainIndex) =>
       val bestDeps    = blockFlow.getBestDeps(chainIndex)
-      val singleChain = blockFlow.getChain(chainIndex)
+      val singleChain = blockFlow.getBlockChain(chainIndex)
       val target      = singleChain.getHashTarget(bestDeps.getChainHash)
       sender() ! BlockFlowTemplate(bestDeps.deps, target)
   }

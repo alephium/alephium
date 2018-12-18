@@ -1,27 +1,10 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.protocol.model.{Block, BlockHeader, Transaction, TxInput}
+import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.AVector
 
-trait BlockPool extends BlockHeaderPool {
-
-  /* BlockHeader apis */
-
-  // Assuming the entity is in the pool
-  override def getBlockHeader(hash: Keccak256): BlockHeader = {
-    getBlock(hash).blockHeader
-  }
-
-  override def add(block: BlockHeader, weight: Int): AddBlockHeaderResult = {
-    AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
-  }
-
-  override def add(block: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
-    AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
-  }
-
-  /* Block apis */
+trait BlockPool extends BlockHashPool {
 
   def numTransactions: Int
 
@@ -58,8 +41,6 @@ trait BlockPool extends BlockHeaderPool {
   def isTip(block: Block): Boolean = isTip(block.hash)
 
   def getBestBlockChain: AVector[Block] = getBlockSlice(getBestTip)
-
-  def getAllBlocks: Iterable[Block] = getAllBlockHashes.map(getBlock)
 
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
@@ -103,7 +84,10 @@ object AddBlockResult {
     override def toString: String = "Block already exist"
   }
   case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #${deps.length - 1} deps"
+    override def toString: String = s"Missing #$deps.length deps"
+  }
+  case object InvalidIndex extends Failure {
+    override def toString: String = "Block index is invalid"
   }
   case class Other(message: String) extends Failure {
     override def toString: String = s"Failed in adding block: $message"

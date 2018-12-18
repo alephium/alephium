@@ -39,6 +39,12 @@ trait BlockHashChain extends BlockHashPool {
     ()
   }
 
+  protected def addHash(hash: Keccak256, parent: BlockHashChain.TreeNode, weight: Int): Unit = {
+    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight)
+    parent.successors += newNode
+    addNode(newNode)
+  }
+
   protected def removeNode(node: BlockHashChain.TreeNode): Unit = {
     val hash = node.blockHash
     blockHashesTable.remove(hash)
@@ -93,37 +99,37 @@ trait BlockHashChain extends BlockHashPool {
     iter()
   }
 
-  override def numHashes: Int = blockHashesTable.size
+  def numHashes: Int = blockHashesTable.size
 
-  override def maxWeight: Int = blockHashesTable.values.map(_.weight).max
+  def maxWeight: Int = blockHashesTable.values.map(_.weight).max
 
   def maxHeight: Int = blockHashesTable.values.map(_.height).max
 
-  override def contains(hash: Keccak256): Boolean = blockHashesTable.contains(hash)
+  def contains(hash: Keccak256): Boolean = blockHashesTable.contains(hash)
 
-  override def getHeight(hash: Keccak256): Int = {
+  def getHeight(hash: Keccak256): Int = {
     assert(contains(hash))
     blockHashesTable(hash).height
   }
 
-  override def getWeight(hash: Keccak256): Int = {
+  def getWeight(hash: Keccak256): Int = {
     assert(contains(hash))
     blockHashesTable(hash).weight
   }
 
-  override def isTip(hash: Keccak256): Boolean = {
+  def isTip(hash: Keccak256): Boolean = {
     tips.contains(hash)
   }
 
-  override def getBestTip: Keccak256 = {
+  def getBestTip: Keccak256 = {
     getAllTips.map(blockHashesTable.apply).maxBy(_.height).blockHash
   }
 
-  override def getAllTips: AVector[Keccak256] = {
+  def getAllTips: AVector[Keccak256] = {
     AVector.from(tips)
   }
 
-  override def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
+  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
     blockHashesTable.get(hash) match {
       case Some(node) =>
         getChain(node).map(_.blockHash)
