@@ -24,7 +24,8 @@ object PeerManager {
   case class Connect(remote: InetSocketAddress, until: Instant) extends Command
   case class Connected(peerId: PeerId, peerInfo: PeerInfo)      extends Command
   case class Sync(peerId: PeerId, locators: AVector[Keccak256]) extends Command
-  case class BroadCast(message: Message, origin: DataOrigin)    extends Command
+  case class BroadCast(message: Tcp.Write, origin: DataOrigin)  extends Command
+  case class Send(message: Tcp.Write, group: GroupIndex)        extends Command
   case object GetPeers                                          extends Command
 
   sealed trait Event
@@ -95,8 +96,12 @@ class PeerManager(builders: TcpHandler.Builder)(implicit config: PlatformConfig)
         case DataOrigin.Remote(remote) => peers.filterKeys(_ != remote).values
       }
       log.debug(s"Broadcast message to ${toSend.size} peers")
-      val write = TcpHandler.envelope(message)
-      toSend.foreach(_.tcpHandler ! write)
+      toSend.foreach(_.tcpHandler ! message)
+    case Send(message, group) =>
+      val peerGroups = peers.values.map(_.index).mkString(",")
+      log.debug(s"Send message to $group; Peers: $peerGroups")
+      val peerInfo = peers.values.filter(_.id.groupIndex == group).head
+      peerInfo.tcpHandler ! message
     case GetPeers =>
       sender() ! Peers(peers.toMap)
     case Terminated(child) =>
