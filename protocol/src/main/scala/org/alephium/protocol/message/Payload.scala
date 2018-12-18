@@ -7,65 +7,50 @@ import org.alephium.protocol.model.{Block, BlockHeader, PeerId}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-import scala.util.Failure
+import scala.util.Try
 
 sealed trait Payload
 
 object Payload {
-  implicit val serializer: Serializer[Payload] = {
-    case x: Hello       => Serializer[Hello].serialize(x)
-    case x: HelloAck    => Serializer[HelloAck].serialize(x)
-    case x: Ping        => Serializer[Ping].serialize(x)
-    case x: Pong        => Serializer[Pong].serialize(x)
-    case x: SendBlocks  => Serializer[SendBlocks].serialize(x)
-    case x: GetBlocks   => Serializer[GetBlocks].serialize(x)
-    case x: SendHeaders => Serializer[SendHeaders].serialize(x)
-    case x: GetHeaders  => Serializer[GetHeaders].serialize(x)
+  def serialize(payload: Payload): ByteString = {
+    val (code, data) = payload match {
+      case x: Hello       => (Hello, Serializer[Hello].serialize(x))
+      case x: HelloAck    => (HelloAck, Serializer[HelloAck].serialize(x))
+      case x: Ping        => (Ping, Serializer[Ping].serialize(x))
+      case x: Pong        => (Pong, Serializer[Pong].serialize(x))
+      case x: SendBlocks  => (SendBlocks, Serializer[SendBlocks].serialize(x))
+      case x: GetBlocks   => (GetBlocks, Serializer[GetBlocks].serialize(x))
+      case x: SendHeaders => (SendHeaders, Serializer[SendHeaders].serialize(x))
+      case x: GetHeaders  => (GetHeaders, Serializer[GetHeaders].serialize(x))
+    }
+    Serde[Int].serialize(Code.toInt(code)) ++ data
   }
 
-  def deserializer(cmdCode: Int): Deserializer[Payload] =
-    (input: ByteString) => {
-      Code.fromInt(cmdCode) match {
-        case Some(code) =>
-          code match {
-            case Hello =>
-              Serde[Hello]._deserialize(input)
-            case HelloAck =>
-              Serde[HelloAck]._deserialize(input)
-            case Ping =>
-              Serde[Ping]._deserialize(input)
-            case Pong =>
-              Serde[Pong]._deserialize(input)
-            case SendBlocks =>
-              Serde[SendBlocks]._deserialize(input)
-            case GetBlocks =>
-              Serde[GetBlocks]._deserialize(input)
-            case SendHeaders =>
-              Serde[SendHeaders]._deserialize(input)
-            case GetHeaders =>
-              Serde[GetHeaders]._deserialize(input)
-          }
-        case None => Failure(new WrongFormatException(s"Invalid cmd code: $cmdCode"))
+  val deserializerCode: Deserializer[Code] =
+    Serde[Int].validateGet(Code.fromInt, c => s"Invalid code $c")
+
+  def _deserialize(input: ByteString): Try[(Payload, ByteString)] = {
+    for {
+      (code, rest) <- deserializerCode._deserialize(input)
+      result <- code match {
+        case Hello       => Serde[Hello]._deserialize(rest)
+        case HelloAck    => Serde[HelloAck]._deserialize(rest)
+        case Ping        => Serde[Ping]._deserialize(rest)
+        case Pong        => Serde[Pong]._deserialize(rest)
+        case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
+        case GetBlocks   => Serde[GetBlocks]._deserialize(rest)
+        case SendHeaders => Serde[SendHeaders]._deserialize(rest)
+        case GetHeaders  => Serde[GetHeaders]._deserialize(rest)
       }
-    }
+    } yield result
+  }
 
   sealed trait Code
   object Code {
-    val values: AVector[Code] =
+    private val values: AVector[Code] =
       AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders)
+
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
-
-    def fromValue(value: Payload): Int = value match {
-      case _: Hello       => toInt(Hello)
-      case _: HelloAck    => toInt(HelloAck)
-      case _: Ping        => toInt(Ping)
-      case _: Pong        => toInt(Pong)
-      case _: SendBlocks  => toInt(SendBlocks)
-      case _: GetBlocks   => toInt(GetBlocks)
-      case _: SendHeaders => toInt(SendHeaders)
-      case _: GetHeaders  => toInt(GetHeaders)
-    }
-
     def fromInt(code: Int): Option[Code] =
       if (code >= 0 && code < values.length) Some(values(code)) else None
   }

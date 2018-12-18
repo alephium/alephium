@@ -117,7 +117,7 @@ object DiscoveryMessage {
         if (peers.length == config.groups) {
           val ok = peers.forallWithIndex { (peers, idx) =>
             peers.forall(info =>
-              info.id != config.peerId && info.id.groupIndex == GroupIndex.unsafe(idx))
+              info.id != config.nodeId && info.id.groupIndex == GroupIndex.unsafe(idx))
           }
           if (ok) Success(Neighbors(peers))
           else Failure(ValidationException(s"PeerInfos are invalid"))
@@ -136,12 +136,14 @@ object DiscoveryMessage {
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
 
-    val toInt: Map[Code[_], Int]   = values.toIterable.zipWithIndex.toMap
-    val fromInt: Map[Int, Code[_]] = toInt.map(_.swap)
+    val toInt: Map[Code[_], Int] = values.toIterable.zipWithIndex.toMap
+    def fromInt(code: Int): Option[Code[_]] = {
+      if (code >= 0 && code < values.length) Some(values(code)) else None
+    }
   }
 
   val deserializerCode: Deserializer[Code[_]] =
-    Serde[Int].validateGet(Code.fromInt.get, c => s"Invalid message code '$c'")
+    Serde[Int].validateGet(Code.fromInt, c => s"Invalid message code '$c'")
 
   def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
     val headerBytes  = Header.serialize(message.header)

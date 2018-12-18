@@ -26,7 +26,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     val local  = SocketUtil.temporaryServerAddress()
 
     val message = Message(SendBlocks(AVector.empty))
-    val data    = Message.serializer.serialize(message)
+    val data    = Message.serialize(message)
 
     val connection    = TestProbe("connection")
     val blockHandlers = HandlerUtils.createBlockHandlersProbe
@@ -52,9 +52,9 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserializer.deserialize(write.data).get
+        val message = Message.deserialize(write.data).get
         message.payload match {
-          case Hello(0, _, peerId) => peerId is config.peerId
+          case Hello(0, _, peerId) => peerId is config.nodeId
           case _                   => assert(false)
         }
       case _ => assert(false)
@@ -62,7 +62,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
     val randomId = PeerId.generate
     val helloAck = Message(HelloAck(randomId))
-    tcpHandler ! Tcp.Received(Message.serializer.serialize(helloAck))
+    tcpHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
   }
 
@@ -87,12 +87,12 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
     val randomId = PeerId.generate
     val hello    = Message(Hello(randomId))
-    tcpHandler ! Tcp.Received(Message.serializer.serialize(hello))
+    tcpHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserializer.deserialize(write.data).get
+        val message = Message.deserialize(write.data).get
         message.payload match {
-          case HelloAck(0, _, peerId) => peerId is config.peerId
+          case HelloAck(0, _, peerId) => peerId is config.nodeId
           case _                      => assert(false)
         }
       case _ => assert(false)
@@ -149,8 +149,8 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   trait SerdeFixture {
     val message1 = Message(Ping(1, System.currentTimeMillis()))
     val message2 = Message(Pong(2))
-    val bytes1   = Message.serializer.serialize(message1)
-    val bytes2   = Message.serializer.serialize(message2)
+    val bytes1   = Message.serialize(message1)
+    val bytes2   = Message.serialize(message2)
     val bytes    = bytes1 ++ bytes2
   }
 
@@ -198,7 +198,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     tcpHandler ! TcpHandler.SendPing
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        val message = Message.deserializer.deserialize(data).get
+        val message = Message.deserialize(data).get
         message.payload is a[Ping]
     }
   }
@@ -206,7 +206,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
   it should "reply pong to ping" in new PingPongFixture {
     val nonce    = Random.nextInt()
     val message1 = Message(Ping(nonce, System.currentTimeMillis()))
-    val data1    = Message.serializer.serialize(message1)
+    val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
     connection.expectMsg(TcpHandler.envelope(Message(Pong(nonce))))
   }
@@ -215,7 +215,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     watch(tcpHandler)
     val nonce    = Random.nextInt()
     val message1 = Message(Pong(nonce))
-    val data1    = Message.serializer.serialize(message1)
+    val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
     expectTerminated(tcpHandler)
   }
