@@ -15,6 +15,10 @@ case class ChainIndex(from: Int, to: Int) {
     }
   }
 
+  def relateTo(group: Int): Boolean = {
+    from == group || to == group
+  }
+
   def toOneDim(implicit config: ConsensusConfig): Int = from * config.groups + to
 }
 

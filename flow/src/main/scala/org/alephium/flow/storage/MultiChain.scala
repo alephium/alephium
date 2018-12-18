@@ -48,6 +48,9 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).isTip(hash)
   }
 
+  def getHashesAfter(locator: Keccak256): AVector[Keccak256] =
+    getHashChain(locator).getHashesAfter(locator)
+
   def getHeight(hash: Keccak256): Int = {
     getHashChain(hash).getHeight(hash)
   }
@@ -80,6 +83,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getBlockHeader(hash: Keccak256): BlockHeader =
     getHeaderChain(hash).getBlockHeader(hash)
 
+  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
+    getHeaderChain(locator).getHeadersAfter(locator)
+
+  def getHeadersAfter(locators: AVector[Keccak256]): AVector[BlockHeader] =
+    locators.flatMap(getHeadersAfter)
+
   def add(header: BlockHeader): AddBlockHeaderResult
 
   /* BlockChain apis */
@@ -100,9 +109,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(hash).getBlock(hash)
   }
 
-  def getBlocks(locator: Keccak256): AVector[Block] = {
-    getBlockChain(locator).getBlocks(locator)
+  def getBlocksAfter(locator: Keccak256): AVector[Block] = {
+    getBlockChain(locator).getBlocksAfter(locator)
   }
+
+  def getBlocksAfter(locators: AVector[Keccak256]): AVector[Block] =
+    locators.flatMap(getBlocksAfter)
 
   def add(block: Block): AddBlockResult
 

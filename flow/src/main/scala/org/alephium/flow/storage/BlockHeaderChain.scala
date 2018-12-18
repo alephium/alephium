@@ -33,6 +33,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
+  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
+    getHashesAfter(locator).map(getBlockHeader)
+
   protected def addHeader(header: BlockHeader): Unit = {
     blockHeadersTable += header.hash -> header
   }

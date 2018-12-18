@@ -118,9 +118,9 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
         blocks2.foreach(block => chain.contains(block) is true)
         chain.maxHeight is 4
         chain.maxWeight is 8
-        chain.getBlocks(blocks1.head.hash).length is 5
-        chain.getBlocks(blocks2.head.hash).length is 0
-        chain.getBlocks(blocks1.tail.head.hash).length is 3
+        chain.getBlocksAfter(blocks1.head.hash).length is 5
+        chain.getBlocksAfter(blocks2.head.hash).length is 0
+        chain.getBlocksAfter(blocks1.tail.head.hash).length is 3
       }
     }
   }
