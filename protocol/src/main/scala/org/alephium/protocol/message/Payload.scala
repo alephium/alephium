@@ -2,7 +2,8 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
-import org.alephium.protocol.model.{Block, BlockHeader}
+import org.alephium.protocol.Protocol
+import org.alephium.protocol.model.{Block, BlockHeader, PeerId}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -12,6 +13,8 @@ sealed trait Payload
 
 object Payload {
   implicit val serializer: Serializer[Payload] = {
+    case x: Hello       => Serializer[Hello].serialize(x)
+    case x: HelloAck    => Serializer[HelloAck].serialize(x)
     case x: Ping        => Serializer[Ping].serialize(x)
     case x: Pong        => Serializer[Pong].serialize(x)
     case x: SendBlocks  => Serializer[SendBlocks].serialize(x)
@@ -25,6 +28,10 @@ object Payload {
       Code.fromInt(cmdCode) match {
         case Some(code) =>
           code match {
+            case Hello =>
+              Serde[Hello]._deserialize(input)
+            case HelloAck =>
+              Serde[HelloAck]._deserialize(input)
             case Ping =>
               Serde[Ping]._deserialize(input)
             case Pong =>
@@ -44,10 +51,13 @@ object Payload {
 
   sealed trait Code
   object Code {
-    val values: AVector[Code] = AVector(Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders)
+    val values: AVector[Code] =
+      AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders)
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
 
     def fromValue(value: Payload): Int = value match {
+      case _: Hello       => toInt(Hello)
+      case _: HelloAck    => toInt(HelloAck)
       case _: Ping        => toInt(Ping)
       case _: Pong        => toInt(Pong)
       case _: SendBlocks  => toInt(SendBlocks)
@@ -58,6 +68,32 @@ object Payload {
 
     def fromInt(code: Int): Option[Code] =
       if (code >= 0 && code < values.length) Some(values(code)) else None
+  }
+}
+
+case class Hello(version: Int, timestamp: Long, peerId: PeerId) extends Payload {
+  def validate: Boolean = version == Protocol.version
+}
+
+object Hello extends Payload.Code {
+  implicit val serde: Serde[Hello] =
+    Serde.forProduct3(apply, p => (p.version, p.timestamp, p.peerId))
+
+  def apply(peerId: PeerId): Hello = {
+    Hello(Protocol.version, System.currentTimeMillis(), peerId)
+  }
+}
+
+case class HelloAck(version: Int, timestamp: Long, peerId: PeerId) extends Payload {
+  def validate: Boolean = version == Protocol.version
+}
+
+object HelloAck extends Payload.Code {
+  implicit val serde: Serde[HelloAck] =
+    Serde.forProduct3(apply, p => (p.version, p.timestamp, p.peerId))
+
+  def apply(peerId: PeerId): HelloAck = {
+    HelloAck(Protocol.version, System.currentTimeMillis(), peerId)
   }
 }
 

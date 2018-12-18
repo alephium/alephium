@@ -96,14 +96,6 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
       case None => config.maxMiningTarget
     }
   }
-
-  def show(block: Block): String = {
-    val shortHash = block.shortHash
-    val weight    = getWeight(block)
-    val blockNum  = numHashes - 1 // exclude genesis block
-    val height    = getHeight(block)
-    s"Hash: $shortHash; Weight: $weight; Height: $height/$blockNum"
-  }
 }
 
 object BlockChain {

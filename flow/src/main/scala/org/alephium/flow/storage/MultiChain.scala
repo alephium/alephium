@@ -135,7 +135,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     val header    = getBlockHeader(blockHash)
     val timestamp = header.timestamp
     val height    = getWeight(blockHash)
-    val hash      = header.shortHash
+    val hash      = header.shortHex
     val deps = header.blockDeps
       .map(h => "\"" + Hex.toHexString(h.bytes).take(16) + "\"")
       .mkString("[", ",", "]")
