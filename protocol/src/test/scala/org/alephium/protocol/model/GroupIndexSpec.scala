@@ -6,9 +6,9 @@ class GroupIndexSpec extends AlephiumSpec with ConfigFixture {
   behavior of "GroupIndex"
 
   it should "equalize same values" in {
-    forAll(groupGen) { n =>
-      val groupIndex1 = GroupIndex(n)(config)
-      val groupIndex2 = GroupIndex(n)(config)
+    forAll(ModelGen.groupGen) { n =>
+      val groupIndex1 = GroupIndex(n.value)(config)
+      val groupIndex2 = GroupIndex(n.value)(config)
       groupIndex1 is groupIndex2
     }
 

@@ -4,10 +4,10 @@ import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.ConsensusConfig
 
-class ChainIndex private (val from: Int, val to: Int) {
+class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
 
   def accept(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
-    val target = from * config.groups + to
+    val target = from.value * config.groups + to.value
     val actual = ChainIndex.hash2Index(header.hash)
     actual == target && {
       val current = BigInt(1, header.hash.bytes.toArray)
@@ -20,10 +20,10 @@ class ChainIndex private (val from: Int, val to: Int) {
   }
 
   def relateTo(groupIndex: GroupIndex): Boolean = {
-    from == groupIndex.value || to == groupIndex.value
+    from == groupIndex || to == groupIndex
   }
 
-  def toOneDim(implicit config: ConsensusConfig): Int = from * config.groups + to
+  def toOneDim(implicit config: ConsensusConfig): Int = from.value * config.groups + to.value
 
   override def equals(obj: Any): Boolean = obj match {
     case that: ChainIndex => from == that.from && to == that.to
@@ -31,7 +31,7 @@ class ChainIndex private (val from: Int, val to: Int) {
   }
 
   override def hashCode(): Int = {
-    from ^ to
+    from.value ^ to.value
   }
 
   override def toString: String = s"ChainIndex($from, $to)"
@@ -41,10 +41,15 @@ object ChainIndex {
 
   def apply(from: Int, to: Int)(implicit config: ConsensusConfig): ChainIndex = {
     assert(0 <= from && from < config.groups && 0 <= to && to < config.groups)
+    new ChainIndex(GroupIndex(from), GroupIndex(to))
+  }
+
+  def apply(from: GroupIndex, to: GroupIndex): ChainIndex = {
     new ChainIndex(from, to)
   }
 
-  def unsafe(from: Int, to: Int): ChainIndex = new ChainIndex(from, to)
+  def unsafe(from: Int, to: Int): ChainIndex =
+    new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
 
   def fromHash(hash: Keccak256)(implicit config: ConsensusConfig): ChainIndex = {
     bytes2Index(hash.bytes)

@@ -58,6 +58,9 @@ object ModelGen {
       }
     }
 
+  def groupGen(implicit config: ConsensusConfig): Gen[GroupIndex] =
+    Gen.choose(0, config.groups - 1).map(n => GroupIndex.apply(n))
+
   val peerId: Gen[PeerId] = Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
 
   val peerAddress: Gen[PeerAddress] = for {
