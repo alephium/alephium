@@ -18,7 +18,7 @@ trait DiscoveryServerState {
 
   def bootstrap: AVector[AVector[PeerInfo]]
 
-  import AnotherDiscoveryServer._
+  import DiscoveryServer._
 
   implicit val orderingPeerId: Ordering[PeerId] = PeerId.hammingOrder(config.peerId)
 

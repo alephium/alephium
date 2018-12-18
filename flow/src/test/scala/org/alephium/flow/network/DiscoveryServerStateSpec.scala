@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
 class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
-  import AnotherDiscoveryServerSpec._
+  import DiscoveryServerSpec._
   import DiscoveryMessage._
 
   trait Fixture { self =>
