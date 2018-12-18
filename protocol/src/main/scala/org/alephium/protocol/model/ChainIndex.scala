@@ -20,6 +20,17 @@ class ChainIndex private (val from: Int, val to: Int) {
   }
 
   def toOneDim(implicit config: ConsensusConfig): Int = from * config.groups + to
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: ChainIndex => from == that.from && to == that.to
+    case _                => false
+  }
+
+  override def hashCode(): Int = {
+    from ^ to
+  }
+
+  override def toString: String = s"ChainIndex($from, $to)"
 }
 
 object ChainIndex {
@@ -28,6 +39,8 @@ object ChainIndex {
     assert(0 <= from && from < config.groups && 0 <= to && to < config.groups)
     new ChainIndex(from, to)
   }
+
+  def unsafe(from: Int, to: Int): ChainIndex = new ChainIndex(from, to)
 
   def fromHash(hash: Keccak256)(implicit config: ConsensusConfig): ChainIndex = {
     bytes2Index(hash.bytes)
