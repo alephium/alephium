@@ -19,11 +19,14 @@ import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
   private val env = Env.resolve()
-  private val rootPath = env match {
-    case Env.Test =>
-      Files.tmpDir.resolve(s".alephium-${env.name}")
-    case _ =>
-      Files.homeDir.resolve(s".alephium-${env.name}")
+  private val rootPath = {
+    val dirName = s".alephium-${env.name}"
+    env match {
+      case Env.Test =>
+        Files.tmpDir.resolve(dirName)
+      case _ =>
+        Files.homeDir.resolve(dirName)
+    }
   }
 
   object Default extends PlatformConfig(env, rootPath)
@@ -95,7 +98,8 @@ trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusCo
     val noncesConfig = env match {
       case Env.Test => all
       case _ =>
-        ConfigFactory.parseFile(getNoncesFile(groups, numZerosAtLeastInHash)).resolve()
+        val noncesFile = getNoncesFile(groups, numZerosAtLeastInHash)
+        ConfigFactory.parseFile(noncesFile).resolve()
     }
     val nonces = noncesConfig.getStringList("nonces").asScala
     AVector.from(nonces.map(BigInt.apply))
@@ -166,21 +170,11 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     FiniteDuration(duration.toNanos, NANOSECONDS)
   }
 
-  val diskIO: DiskIO = {
-    DiskIO.create(rootPath) match {
-      case Left(error) =>
-        throw error
-      case Right(io) => io
-    }
-  }
+  val diskIO: DiskIO = DiskIO.createUnsafe(rootPath)
 
   val dbPath = rootPath.resolve("db")
   val headerDB: Database = {
     DiskIO.createDirUnsafe(dbPath)
-    Database.open(dbPath.resolve("headers"), new Options().setCreateIfMissing(true)) match {
-      case Left(error) =>
-        throw error
-      case Right(db) => db
-    }
+    Database.openUnafe(dbPath.resolve("headers"), new Options().setCreateIfMissing(true))
   }
 }

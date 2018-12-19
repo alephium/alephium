@@ -165,8 +165,9 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
             handle(message.payload)
           }
           context.become(handleWith(rest, next))
-        case Left(_) =>
-          log.info(s"Received corrupted data from $remote with serde exception; Closing connection")
+        case Left(e) =>
+          log.info(
+            s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
           stop()
       }
     case TcpHandler.SendPing => sendPing()

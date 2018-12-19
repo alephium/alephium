@@ -9,12 +9,14 @@ import org.alephium.serde._
 import org.rocksdb.{Options, RocksDB, RocksDBException}
 
 object Database {
-  def open(path: Path, options: Options): IOResult[Database] = {
-    execute {
-      RocksDB.loadLibrary()
-      val db = RocksDB.open(options, path.toString)
-      new Database(db)
-    }
+  def open(path: Path, options: Options): IOResult[Database] = execute {
+    openUnafe(path, options)
+  }
+
+  def openUnafe(path: Path, options: Options): Database = {
+    RocksDB.loadLibrary()
+    val db = RocksDB.open(options, path.toString)
+    new Database(db)
   }
 
   def dESTROY(path: Path, options: Options): IOResult[Unit] = execute {
@@ -23,12 +25,7 @@ object Database {
 
   @inline
   private def execute[T](f: => T): IOResult[T] = {
-    executeF(Right(f))
-  }
-
-  @inline
-  private def executeF[T](f: => IOResult[T]): IOResult[T] = {
-    try f
+    try Right(f)
     catch {
       case e: RocksDBException => Left(RocksDBExpt(e))
     }

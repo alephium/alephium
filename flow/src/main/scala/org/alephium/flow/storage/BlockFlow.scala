@@ -7,9 +7,8 @@ import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 import scala.reflect.ClassTag
-import scala.util.Try
 
-class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends MultiChain {
+class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   import config.genesisBlocks
 
   private def mainGroup: GroupIndex = config.mainGroup
@@ -86,7 +85,7 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
     val weight = calWeightUnsafe(block)
-    chain.add(block, parent, weight).left.map(AddBlockResult.IOError)
+    chain.add(block, parent, weight).left.map(AddBlockResult.IOErrorForBlock)
   }
 
   def add(block: Block, weight: Int): IOResult[Unit] = {
@@ -105,7 +104,8 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
       val result = for {
         _ <- checkCompleteness(header)
         _ <- validate(header, index)
-      } yield add(header, index)
+        _ <- add(header, index).left.map(AddBlockHeaderResult.IOErrorForHeader)
+      } yield ()
       result.fold(identity, _ => AddBlockHeaderResult.Success)
     }
   }
@@ -221,7 +221,7 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
     }
   }
 
-  private def updateRtips(rtips: Array[Keccak256], tip: Keccak256, from: GroupIndex): Unit = {
+  private def updateRtipsUnsafe(rtips: Array[Keccak256], tip: Keccak256, from: GroupIndex): Unit = {
     val newRtips = getRtipsUnsafe(tip, from)
     assert(rtips.length == newRtips.length)
     rtips.indices foreach { k =>
@@ -261,7 +261,7 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
             if (validTries.isEmpty) deps :+ rtips(k.value)
             else {
               val bestTry = validTries.maxBy(getWeight) // TODO: improve
-              updateRtips(rtips, bestTry, k)
+              updateRtipsUnsafe(rtips, bestTry, k)
               deps :+ bestTry
             }
           }
@@ -284,16 +284,16 @@ class BlockFlow(val diskIO: DiskIO)(implicit val config: PlatformConfig) extends
     BlockDeps(chainIndex, deps2)
   }
 
-  def getBestDeps(chainIndex: ChainIndex): Either[Throwable, BlockDeps] =
-    Try {
-      getBestDepsUnsafe(chainIndex)
-    }.toEither
+  def getBestDeps(chainIndex: ChainIndex): IOResult[BlockDeps] =
+    try {
+      Right(getBestDepsUnsafe(chainIndex))
+    } catch {
+      case e: Exception => Left(IOError.from(e))
+    }
 }
 
 object BlockFlow {
-  def apply()(implicit config: PlatformConfig): BlockFlow = {
-    new BlockFlow(config.diskIO)
-  }
+  def apply()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

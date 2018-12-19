@@ -8,15 +8,18 @@ import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
 object DiskIO {
-  def create(root: Path): IOResult[DiskIO] = {
-    for {
-      _ <- createDir(root)
-      diskIO = new DiskIO(root)
-      _ <- createDir(diskIO.blockFolder)
-    } yield diskIO
+  def create(root: Path): IOResult[DiskIO] = execute {
+    createUnsafe(root)
   }
 
-  def createDir(path: Path): IOResult[Unit] = executeIO {
+  def createUnsafe(root: Path): DiskIO = {
+    createDirUnsafe(root)
+    val diskIO = new DiskIO(root)
+    createDirUnsafe(diskIO.blockFolder)
+    diskIO
+  }
+
+  def createDir(path: Path): IOResult[Unit] = execute {
     createDirUnsafe(path)
   }
 
@@ -28,14 +31,14 @@ object DiskIO {
   }
 
   @inline
-  def executeIO[T](f: => T): IOResult[T] = {
+  def execute[T](f: => T): IOResult[T] = {
     try Right(f)
     catch { case e: Exception => Left(IOError.from(e)) }
   }
 }
 
 class DiskIO private (root: Path) {
-  import DiskIO.executeIO
+  import DiskIO.execute
 
   val blockFolder: Path = root.resolve("blocks")
 
@@ -53,7 +56,7 @@ class DiskIO private (root: Path) {
 
   def putBlock(block: Block): IOResult[Int] = {
     val data = serialize(block)
-    executeIO {
+    execute {
       val outPath = getBlockPath(block)
       val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
       out.write(data.toByteBuffer)
@@ -61,7 +64,7 @@ class DiskIO private (root: Path) {
   }
 
   def getBlock(blockHash: Keccak256): IOResult[Block] = {
-    val dataIOResult = executeIO {
+    val dataIOResult = execute {
       val inPath = getBlockPath(blockHash)
       val bytes  = Files.readAllBytes(inPath)
       ByteString.fromArrayUnsafe(bytes)
@@ -72,7 +75,7 @@ class DiskIO private (root: Path) {
   }
 
   def checkBlockFile(blockHash: Keccak256): Boolean = {
-    val result = executeIO {
+    val result = execute {
       val inPath = getBlockPath(blockHash)
       Files.isRegularFile(inPath)
     }
