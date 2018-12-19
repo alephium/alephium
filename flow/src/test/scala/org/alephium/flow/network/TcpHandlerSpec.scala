@@ -203,7 +203,7 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
     }
   }
 
-  it should "replay pong to ping" in new PingPongFixture {
+  it should "reply pong to ping" in new PingPongFixture {
     val nonce    = Random.nextInt()
     val message1 = Message(Ping(nonce, System.currentTimeMillis()))
     val data1    = Message.serializer.serialize(message1)

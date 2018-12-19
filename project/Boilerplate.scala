@@ -65,6 +65,7 @@ object Boilerplate {
   object GenProductSerde extends Template {
     override def filename(root: File): File = root / "org" / "alephium" / "ProductSerde.scala"
 
+    // scalastyle:off method.length
     override def content(tv: TemplateVals): String = {
       import tv._
 
@@ -103,9 +104,23 @@ object Boilerplate {
         +      } yield (pack(${`a..n`}), rest$arity)
         +    }
         +  }
+        +
+        +  final def tuple$arity[${`A..N`}](implicit $instances): Serde[(${`A..N`})] = new Serde[(${`A..N`})] {
+        +    override def serialize(input: (${`A..N`})): ByteString = {
+        +      val (${`a..n`}) = input
+        +      $serializes
+        +    }
+        +
+        +    override def _deserialize(rest0: ByteString): Try[((${`A..N`}), ByteString)] = {
+        +      for {
+        +        $deserializes
+        +      } yield ((${`a..n`}), rest$arity)
+        +    }
+        +  }
         |}
       """
     }
+    // scalastyle:on
   }
 
   object GenProductSerdeTest extends TemplateTest {
@@ -115,6 +130,7 @@ object Boilerplate {
       import tv._
 
       val fields   = synVals.map(v => s"$v: Int").mkString(", ")
+      val types    = arities.map(_ => "Int").mkString(", ")
       val accesses = synVals.map(v => s"t.$v").mkString(", ")
 
       block"""
@@ -132,10 +148,19 @@ object Boilerplate {
         +    implicit val serde: Serde[Test$arity] = Serde.forProduct$arity(apply, t => ($accesses))
         +  }
         +
-        +  it should "serde $arity fields correctly" in {
+        +  it should "serde $arity fields" in {
         +    forAll { ($fields) =>
         +      val input  = Test$arity(${`a..n`})
         +      val output = deserialize[Test$arity](serialize(input)).success.value
+        +      output is input
+        +    }
+        +  }
+        +
+        +  it should "serde $arity tuple" in {
+        +    forAll { ($fields) =>
+        +      val input  = (${`a..n`})
+        +      val serde = Serde.tuple$arity[$types]
+        +      val output = serde.deserialize(serde.serialize(input)).success.value
         +      output is input
         +    }
         +  }
