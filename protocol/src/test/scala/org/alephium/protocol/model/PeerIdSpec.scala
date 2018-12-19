@@ -4,6 +4,7 @@ import akka.util.ByteString
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfigFixture}
 import org.alephium.serde.Serde
 import org.alephium.util.AlephiumSpec
+import org.scalatest.EitherValues._
 
 class PeerIdSpec extends AlephiumSpec {
 
@@ -14,7 +15,7 @@ class PeerIdSpec extends AlephiumSpec {
         val value         = Serde.LongSerde.serialize(distance)
         val padding       = ByteString(Array.fill[Byte](PeerId.length - value.size)(0))
         val bytes         = padding ++ value
-        val distanceValue = PeerId.serde.deserialize(bytes).get
+        val distanceValue = PeerId.serde.deserialize(bytes).right.value
 
         PeerId.distance(zero, distanceValue) is distance
       }
