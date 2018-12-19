@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 
 import scala.concurrent.duration._
 
-object AnotherDiscoveryServerSpec {
+object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =
     new InetSocketAddress(InetAddress.getLocalHost, port)
 
@@ -35,27 +35,27 @@ object AnotherDiscoveryServerSpec {
   }
 }
 
-class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
-  import AnotherDiscoveryServerSpec._
+class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
+  import DiscoveryServerSpec._
 
   it should "discovery each other for two nodes" in {
     val groupSize = Gen.choose(2, 10).sample.get
     val port0     = SocketUtil.temporaryLocalPort(udp = true)
     val config0   = createConfig(groupSize, 0, port0, 1)
-    val server0   = system.actorOf(AnotherDiscoveryServer.props()(config0), "server0")
+    val server0   = system.actorOf(DiscoveryServer.props()(config0), "server0")
     val port1     = SocketUtil.temporaryLocalPort(udp = true)
     val config1   = createConfig(groupSize, 1, port1, 1)
     val bootstrap = PeerInfo(config0.peerId, createAddr(port0))
-    val server1   = system.actorOf(AnotherDiscoveryServer.props(bootstrap)(config1), "server1")
+    val server1   = system.actorOf(DiscoveryServer.props(bootstrap)(config1), "server1")
 
     Thread.sleep(1000)
 
     val probo0 = TestProbe()
-    server0.tell(AnotherDiscoveryServer.GetPeers, probo0.ref)
+    server0.tell(DiscoveryServer.GetPeers, probo0.ref)
     val probo1 = TestProbe()
-    server1.tell(AnotherDiscoveryServer.GetPeers, probo1.ref)
+    server1.tell(DiscoveryServer.GetPeers, probo1.ref)
     probo0.expectMsgPF(40.seconds) {
-      case AnotherDiscoveryServer.Peers(peers) =>
+      case DiscoveryServer.Peers(peers) =>
         peers.foreachWithIndex { (group, index) =>
           if (index == 1) {
             group.length is 1
@@ -66,7 +66,7 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
         }
     }
     probo1.expectMsgPF(40.seconds) {
-      case AnotherDiscoveryServer.Peers(peers) =>
+      case DiscoveryServer.Peers(peers) =>
         peers.foreachWithIndex { (group, index) =>
           if (index == 0) {
             group.length is 1
@@ -97,19 +97,19 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
     val bootstrap = PeerInfo(peerIds(0), createAddr(ports(0)))
     val actors = enumerate.map { i =>
       val config = configs(i)
-      system.actorOf(AnotherDiscoveryServer.props(bootstrap)(config), ports(i).toString)
+      system.actorOf(DiscoveryServer.props(bootstrap)(config), ports(i).toString)
     }
 
     Thread.sleep(1000)
 
     val discoveries = enumerate.map { i =>
-      actors(i) ! AnotherDiscoveryServer.GetPeers
+      actors(i) ! DiscoveryServer.GetPeers
 
-      val AnotherDiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
-        case AnotherDiscoveryServer.Peers(peers) =>
+      val DiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
+        case DiscoveryServer.Peers(peers) =>
           if (peers.forall(_.length >= peersPerGroup)) true
           else {
-            actors(i) ! AnotherDiscoveryServer.GetPeers
+            actors(i) ! DiscoveryServer.GetPeers
             false
           }
       }
