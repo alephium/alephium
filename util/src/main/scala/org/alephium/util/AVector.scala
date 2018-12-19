@@ -221,6 +221,17 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     filterImpl(p, false)
   }
 
+  def traverse[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
+    var result = AVector.empty[R]
+    foreach { elem =>
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => result = result :+ r
+      }
+    }
+    Right(result)
+  }
+
   @inline private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
     fold(AVector.empty[A]) { (acc, elem) =>
       if (p(elem) == target) acc :+ elem else acc

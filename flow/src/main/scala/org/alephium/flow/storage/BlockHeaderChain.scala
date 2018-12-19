@@ -33,7 +33,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
     getConfirmedHash(height) match {
-      case Some(hash) => headerDB.getHeader(hash).map(Option.apply)
+      case Some(hash) => headerDB.getHeader(hash).map(Some.apply)
       case None       => Right(None)
     }
   }

@@ -216,7 +216,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
         val handler = allHandlers.getBlockHandler(chainIndex)
         handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
       } else {
-        log.warning(s"Received blocks for wrong chain from ${peerInfo.address}")
+        log.warning(s"Received blocks for wrong chain ${chainIndex} from ${peerInfo.address}")
       }
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")

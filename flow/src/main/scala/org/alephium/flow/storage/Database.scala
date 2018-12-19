@@ -10,10 +10,10 @@ import org.rocksdb.{Options, RocksDB, RocksDBException}
 
 object Database {
   def open(path: Path, options: Options): IOResult[Database] = execute {
-    openUnafe(path, options)
+    openUnsafe(path, options)
   }
 
-  def openUnafe(path: Path, options: Options): Database = {
+  def openUnsafe(path: Path, options: Options): Database = {
     RocksDB.loadLibrary()
     val db = RocksDB.open(options, path.toString)
     new Database(db)
