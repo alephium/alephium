@@ -9,6 +9,7 @@ class SignatureSpec extends AlephiumSpec {
       val message  = AVector.from(_message)
       val (sk, pk) = ED25519.generateKeyPair()
       val sign     = ED25519.sign(message, sk)
+      ED25519Signature.isCanonical(sign.bytes) is true
       ED25519.verify(message, sign, pk) is true
     }
   }

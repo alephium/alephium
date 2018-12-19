@@ -4,11 +4,8 @@ import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.KeccakDigest
 import org.alephium.serde.RandomBytes
-import org.alephium.util.Hex
 
-class Keccak256(val bytes: ByteString) extends RandomBytes {
-  def shortHex: String = Hex.toHexString(bytes).take(8)
-}
+class Keccak256(val bytes: ByteString) extends RandomBytes
 
 object Keccak256
     extends HashCompanion[Keccak256](bs => {

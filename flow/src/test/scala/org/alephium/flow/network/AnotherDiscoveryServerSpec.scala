@@ -3,9 +3,9 @@ package org.alephium.flow.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
-import org.alephium.util.{AVector, AlephiumActorSpec}
+import org.alephium.util.AlephiumActorSpec
 import org.scalacheck.Gen
 
 import scala.concurrent.duration._
@@ -22,11 +22,12 @@ object AnotherDiscoveryServerSpec {
     implicit val groupconfig = new GroupConfig {
       val groups = groupSize
     }
-    val peerId = PeerId.generateFor(GroupIndex(groupIndex))
+    val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(GroupIndex(groupIndex))
     DiscoveryConfig(InetAddress.getLocalHost,
                     port,
                     groupSize,
-                    peerId,
+                    privateKey,
+                    publicKey,
                     peersPerGroup,
                     scanMax           = 1,
                     neighborsPerGroup = peersPerGroup,
@@ -41,10 +42,10 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
     val groupSize = Gen.choose(2, 10).sample.get
     val port0     = SocketUtil.temporaryLocalPort(udp = true)
     val config0   = createConfig(groupSize, 0, port0, 1)
-    val bootstrap = AVector(PeerInfo(config0.peerId, createAddr(port0)))
-    val server0   = system.actorOf(AnotherDiscoveryServer.props(AVector.empty)(config0), "server0")
+    val server0   = system.actorOf(AnotherDiscoveryServer.props()(config0), "server0")
     val port1     = SocketUtil.temporaryLocalPort(udp = true)
     val config1   = createConfig(groupSize, 1, port1, 1)
+    val bootstrap = PeerInfo(config0.peerId, createAddr(port0))
     val server1   = system.actorOf(AnotherDiscoveryServer.props(bootstrap)(config1), "server1")
 
     Thread.sleep(1000)
@@ -77,10 +78,11 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
     }
   }
 
-  it should "discover 128 peers in 8 groups with a mean distance below 0.05" in new GroupConfigFixture {
+  // TODO: move this to integration tests
+  ignore should "discover peers for small network" in new GroupConfigFixture {
     val groups        = 8
-    val networkSize   = 128
-    val peersPerGroup = 1
+    val networkSize   = 32
+    val peersPerGroup = 2
 
     def enumerate = 0 until networkSize
 
@@ -92,22 +94,22 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
     val peerIds = configs.map(_.peerId)
     val ports   = configs.map(_.udpPort)
 
-    val bootstrapPeers = AVector(PeerInfo(peerIds(0), createAddr(ports(0))))
-
+    val bootstrap = PeerInfo(peerIds(0), createAddr(ports(0)))
     val actors = enumerate.map { i =>
       val config = configs(i)
-      system.actorOf(DiscoveryServer.props(if (i == 0) AVector.empty else bootstrapPeers)(config),
-                     ports(i).toString)
+      system.actorOf(AnotherDiscoveryServer.props(bootstrap)(config), ports(i).toString)
     }
 
-    val discoveries = enumerate.map { i =>
-      actors(i) ! DiscoveryServer.GetPeers
+    Thread.sleep(1000)
 
-      val DiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
-        case DiscoveryServer.Peers(peers) =>
-          if (peers.flatMap(identity).length >= groups * peersPerGroup) true
+    val discoveries = enumerate.map { i =>
+      actors(i) ! AnotherDiscoveryServer.GetPeers
+
+      val AnotherDiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
+        case AnotherDiscoveryServer.Peers(peers) =>
+          if (peers.forall(_.length >= peersPerGroup)) true
           else {
-            actors(i) ! DiscoveryServer.GetPeers
+            actors(i) ! AnotherDiscoveryServer.GetPeers
             false
           }
       }
@@ -127,16 +129,16 @@ class AnotherDiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec"
       val peerId = peerIds(i)
 
       val discovereds =
-        discoveries(i).flatMap(_.map(_.info.id)).sortBy(PeerId.distance(peerId, _))
+        discoveries(i).flatMap(_.map(_.id)).sortBy(PeerId.distance(peerId, _))
       val nearests = peerIds.sortBy(PeerId.distance(peerId, _))
       val rank = nearests.zipWithIndex.collectFirst {
         case (id, i) if discovereds.contains(id) => i
       }
 
-      (rank.getOrElse(0) / networkSize.toDouble)
+      rank.getOrElse(0) / networkSize.toDouble
     }
 
     ranks.min isnot 0.0
-    ((ranks.sum / ranks.size) < 0.05)
+    assert((ranks.sum / ranks.size) < 0.10)
   }
 }
