@@ -38,8 +38,13 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
             s"Index: $chainIndex; Total: $total; ${chain.show(block.hash)}; Time elapsed: ${elapsedTime}ms")
           val headers = blocks.map(_.header)
           peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
-        case error: AddBlockResult.Failure =>
-          log.warning(s"Failed in adding new block: ${error.toString}")
+        case AddBlockResult.AlreadyExisted =>
+          log.debug(s"Block already existed")
+        case x: AddBlockResult.Incomplete =>
+          // TODO: handle missing data
+          log.debug(s"No enough data to verify block: ${x.toString}")
+        case x: AddBlockResult.Error =>
+          log.warning(s"Failed in adding new block: ${x.toString}")
       }
 
       sender() ! result

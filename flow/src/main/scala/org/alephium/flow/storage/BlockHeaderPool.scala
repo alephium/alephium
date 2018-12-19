@@ -11,9 +11,9 @@ trait BlockHeaderPool extends BlockHashPool {
   // Assuming the entity is in the pool
   def getBlockHeader(hash: Keccak256): BlockHeader
 
-  def add(header: BlockHeader, weight: Int): AddBlockHeaderResult
+  def add(header: BlockHeader, weight: Int): Unit
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit
 
   def getHeaders(locators: AVector[Keccak256]): AVector[BlockHeader] =
     locators.map(getBlockHeader)
@@ -38,19 +38,27 @@ trait BlockHeaderPool extends BlockHashPool {
 sealed trait AddBlockHeaderResult
 
 object AddBlockHeaderResult {
-  case object Success extends AddBlockHeaderResult
-
-  trait Failure extends AddBlockHeaderResult
-  case object AlreadyExisted extends Failure {
+  sealed trait OK     extends AddBlockHeaderResult
+  case object Success extends OK
+  case object AlreadyExisted extends OK {
     override def toString: String = "BlockHeader already exist"
   }
-  case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
+
+  sealed trait Incomplete extends AddBlockHeaderResult
+  case class MissingDeps(deps: AVector[Keccak256]) extends Incomplete {
     override def toString: String = s"Missing #$deps.length deps"
   }
-  case object InvalidIndex extends Failure {
-    override def toString: String = "Block header index is invalid"
-  }
-  case class Other(message: String) extends Failure {
+
+  trait Error                    extends AddBlockHeaderResult
+  sealed trait VerificationError extends Error
+  case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding blockheader: $message"
+  }
+
+  case object InvalidGroup extends VerificationError {
+    override def toString: String = "Block index is related to node's group"
+  }
+  case object InvalidDifficulty extends VerificationError {
+    override def toString: String = "Difficulty is invalid"
   }
 }

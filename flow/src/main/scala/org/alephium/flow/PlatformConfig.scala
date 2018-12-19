@@ -94,7 +94,7 @@ trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusCo
         val nonce      = nonces.get(index)
         val block      = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
         val chainIndex = ChainIndex(from, to)(this)
-        assert(chainIndex.accept(block)(this))
+        assert(chainIndex.validateDiff(block)(this))
         block
     }
   }
