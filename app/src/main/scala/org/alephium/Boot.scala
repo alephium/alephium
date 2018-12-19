@@ -1,8 +1,9 @@
 package org.alephium
 
-import org.alephium.flow.{Mode, Platform}
+import org.alephium.flow.Mode
+import org.alephium.rpc.RPCServer
 
-object Boot extends Platform {
+object Boot extends RPCServer {
   val mode = new Mode.Local
 
   init()

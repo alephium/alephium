@@ -159,8 +159,8 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def toJsonUnsafe(header: BlockHeader): String = {
     val index     = header.chainIndex
-    val from      = index.from
-    val to        = index.to
+    val from      = index.from.value
+    val to        = index.to.value
     val timestamp = header.timestamp
     val height    = getHeight(header)
     val hash      = header.shortHex
