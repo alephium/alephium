@@ -3,8 +3,10 @@ package org.alephium.flow.storage
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.{AVector, AlephiumSpec}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.EitherValues._
 
-class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
+class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
 
   behavior of "BlockChain"
 
@@ -12,6 +14,14 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
+  }
+
+  before {
+    DiskIO.createDir(config.diskIO.blockFolder).isRight is true
+  }
+
+  after {
+    TestUtils.cleanup(config.diskIO.blockFolder)
   }
 
   it should "add block correctly" in new Fixture {
@@ -53,12 +63,11 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
 
       chain0.getHeight(headBlock) is 0
       chain0.getHeight(lastBlock) is blocks.length
-      chain0.getBlockSlice(headBlock) is AVector(headBlock)
-      chain0.getBlockSlice(lastBlock) is chain
+      chain0.getBlockSlice(headBlock).right.value is AVector(headBlock)
+      chain0.getBlockSlice(lastBlock).right.value is chain
       chain0.isTip(headBlock) is false
       chain0.isTip(lastBlock) is true
       chain0.getBestTip is lastBlock.hash
-      chain0.getBestBlockChain is chain
       chain0.maxHeight is blocks.length
       chain0.getAllTips is AVector(lastBlock.hash)
       checkConfirmedBlocks(chain0, blocks)
@@ -73,8 +82,8 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
         shortChain.foreach(block => chain0.add(block, 0))
         chain0.getHeight(shortChain.head) is 1
         chain0.getHeight(shortChain.last) is shortChain.length
-        chain0.getBlockSlice(shortChain.head) is AVector(genesis, shortChain.head)
-        chain0.getBlockSlice(shortChain.last) is AVector(genesis) ++ shortChain
+        chain0.getBlockSlice(shortChain.head).right.value is AVector(genesis, shortChain.head)
+        chain0.getBlockSlice(shortChain.last).right.value is AVector(genesis) ++ shortChain
         chain0.isTip(shortChain.head) is false
         chain0.isTip(shortChain.last) is true
 
@@ -85,12 +94,11 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
         chain0.add(longChain.last, 0)
         chain0.getHeight(longChain.head) is 1
         chain0.getHeight(longChain.last) is longChain.length
-        chain0.getBlockSlice(longChain.head) is AVector(genesis, longChain.head)
-        chain0.getBlockSlice(longChain.last) is AVector(genesis) ++ longChain
+        chain0.getBlockSlice(longChain.head).right.value is AVector(genesis, longChain.head)
+        chain0.getBlockSlice(longChain.last).right.value is AVector(genesis) ++ longChain
         chain0.isTip(longChain.head) is false
         chain0.isTip(longChain.last) is true
         chain0.getBestTip is longChain.last.hash
-        chain0.getBestBlockChain is AVector(genesis) ++ longChain
         chain0.maxHeight is longChain.length
         chain0.getAllTips.toIterable.toSet is Set(longChain.last.hash)
       }
@@ -119,24 +127,24 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
         blocks2.foreach(block => chain.contains(block) is true)
         chain.maxHeight is 4
         chain.maxWeight is 8
-        chain.getBlocksAfter(blocks1.head.hash).length is 6
-        chain.getBlocksAfter(blocks2.head.hash).length is 1
-        chain.getBlocksAfter(blocks1.tail.head.hash).length is 4
+        chain.getHashesAfter(blocks1.head.hash).length is 6
+        chain.getHashesAfter(blocks2.head.hash).length is 1
+        chain.getHashesAfter(blocks1.tail.head.hash).length is 4
       }
     }
   }
 
   def checkConfirmedBlocks(chain: BlockChain, newBlocks: AVector[Block]): Unit = {
     newBlocks.indices.foreach { index =>
-      val height   = index + 1
-      val blockOpt = chain.getConfirmedBlock(height)
+      val height    = index + 1
+      val headerOpt = chain.getConfirmedHeader(height)
       if (height + config.blockConfirmNum <= newBlocks.length) {
-        blockOpt.get is newBlocks(index)
+        headerOpt.get is newBlocks(index).header
       } else {
-        blockOpt.isEmpty
+        headerOpt.isEmpty
       }
     }
-    chain.getConfirmedBlock(-1).isEmpty
+    chain.getConfirmedHeader(-1).isEmpty
     ()
   }
 

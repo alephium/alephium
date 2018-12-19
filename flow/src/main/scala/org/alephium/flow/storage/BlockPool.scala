@@ -11,33 +11,49 @@ trait BlockPool extends BlockHashPool {
   def contains(block: Block): Boolean = contains(block.hash)
 
   // Assuming the hash is in the pool
-  def getBlock(hash: Keccak256): Block
+  def getBlock(hash: Keccak256): Either[DiskIOError, Block]
 
   // Assuming the block is verified
-  def add(block: Block, weight: Int): Unit
+  def add(block: Block, weight: Int): Either[DiskIOError, Unit]
 
   // Assuming the block is verified
-  def add(block: Block, parentHash: Keccak256, weight: Int): Unit
+  def add(block: Block, parentHash: Keccak256, weight: Int): Either[DiskIOError, Unit]
 
-  def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
-    locators.map(getBlock)
+  // scalastyle:off return
+  def getBlocks(locators: AVector[Keccak256]): Either[DiskIOError, AVector[Block]] = {
+    var blocks = AVector.empty[Block]
+    locators.foreach { hash =>
+      if (contains(hash)) {
+        getBlock(hash) match {
+          case Left(error)  => return Left(error)
+          case Right(block) => blocks = blocks :+ block
+        }
+      }
+    }
+    Right(blocks)
   }
-
-  def getBlocksAfter(locator: Keccak256): AVector[Block]
+  // scalastyle:on return
 
   def getHeight(block: Block): Int = getHeight(block.hash)
 
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
-  def getBlockSlice(hash: Keccak256): AVector[Block] = {
-    getBlockHashSlice(hash).map(getBlock)
+  // scalastyle:off return
+  def getBlockSlice(hash: Keccak256): Either[DiskIOError, AVector[Block]] = {
+    var blocks = AVector.empty[Block]
+    getBlockHashSlice(hash).map { hash =>
+      getBlock(hash) match {
+        case Left(error)  => return Left(error)
+        case Right(block) => blocks = blocks :+ block
+      }
+    }
+    Right(blocks)
   }
-  def getBlockSlice(block: Block): AVector[Block] = getBlockSlice(block.hash)
+  // scalastyle:on return
+  def getBlockSlice(block: Block): Either[DiskIOError, AVector[Block]] = getBlockSlice(block.hash)
 
   def isTip(block: Block): Boolean = isTip(block.hash)
-
-  def getBestBlockChain: AVector[Block] = getBlockSlice(getBestTip)
 
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
@@ -62,13 +78,6 @@ trait BlockPool extends BlockHashPool {
   def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
     block.transactions.sumBy(transaction => getBalance(transaction, address))
   }
-
-  // calculated from best chain
-  def getBalance(address: ED25519PublicKey): (Keccak256, BigInt) = {
-    val bestTip = getBestTip
-    val balance = getBestBlockChain.sumBy(block => getBalance(block, address))
-    (bestTip, balance)
-  }
 }
 
 sealed trait AddBlockResult
@@ -86,6 +95,7 @@ object AddBlockResult {
 
   sealed trait Error                                         extends AddBlockResult
   case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
+  case class IOError(error: DiskIOError)                     extends Error
   case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding block: $message"
   }

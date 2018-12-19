@@ -31,6 +31,23 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   protected def addHeader(header: BlockHeader): Unit = {
     blockHeadersTable += header.hash -> header
   }
+
+  def getConfirmedHeader(height: Int): Option[BlockHeader] = {
+    getConfirmedHash(height).map(getBlockHeader)
+  }
+
+  def getHashTarget(hash: Keccak256): BigInt = {
+    val header    = getBlockHeader(hash)
+    val height    = getHeight(hash)
+    val refHeight = height - config.retargetInterval
+    getConfirmedHeader(refHeight) match {
+      case Some(refHeader) =>
+        val timeSpan = header.timestamp - refHeader.timestamp
+        val retarget = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
+        retarget
+      case None => config.maxMiningTarget
+    }
+  }
 }
 
 object BlockHeaderChain {

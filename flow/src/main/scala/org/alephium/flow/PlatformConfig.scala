@@ -3,20 +3,27 @@ package org.alephium.flow
 import java.time.Duration
 import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
+import org.alephium.flow.storage.DiskIO
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
-  private val env      = Env.resolve()
-  private val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
+  private val env = Env.resolve()
+  private val rootPath = env match {
+    case Env.Test =>
+      Files.tmpDir.resolve(s".alephium-${env.name}")
+    case _ =>
+      Files.homeDir.resolve(s".alephium-${env.name}")
+  }
 
   object Default extends PlatformConfig(env, rootPath)
 
@@ -56,6 +63,7 @@ trait PlatformConfigFiles extends StrictLogging {
     file
   }
 
+  DiskIO.createDirUnsafe(rootPath)
   val all      = ConfigFactory.parseFile(getUserFile).resolve()
   val alephium = all.getConfig("alephium")
 }
@@ -82,17 +90,25 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
 }
 
 trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
+  def loadNonces(): AVector[BigInt] = {
+    val noncesConfig = env match {
+      case Env.Test => all
+      case _ =>
+        ConfigFactory.parseFile(getNoncesFile(groups, numZerosAtLeastInHash)).resolve()
+    }
+    val nonces = noncesConfig.getStringList("nonces").asScala
+    AVector.from(nonces.map(BigInt.apply))
+  }
+
   def loadBlockFlow(): AVector[AVector[Block]] = {
-    val noncesConfig =
-      ConfigFactory.parseFile(getNoncesFile(groups, numZerosAtLeastInHash)).resolve()
-    val nonces = noncesConfig.getStringList("nonces")
-    assert(nonces.size == groups * groups)
+    val nonces = loadNonces()
+    assert(nonces.length == groups * groups)
 
     AVector.tabulate(groups, groups) {
       case (from, to) =>
         val index      = from * groups + to
-        val nonce      = nonces.get(index)
-        val block      = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
+        val nonce      = nonces(index)
+        val block      = Block.genesis(AVector.empty, maxMiningTarget, nonce)
         val chainIndex = ChainIndex(from, to)(this)
         assert(chainIndex.validateDiff(block)(this))
         block
@@ -145,5 +161,13 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   def getDuration(path: String): FiniteDuration = {
     val duration = alephium.getDuration(path)
     FiniteDuration(duration.toNanos, NANOSECONDS)
+  }
+
+  val diskIO: DiskIO = {
+    DiskIO.create(rootPath) match {
+      case Left(error) =>
+        throw new RuntimeException(error.toString)
+      case Right(io) => io
+    }
   }
 }
