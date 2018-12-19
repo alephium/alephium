@@ -21,7 +21,8 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
       new InetSocketAddress(InetAddress.getLocalHost, port)
 
     def createConfig(port: Int, peerId: PeerId): DiscoveryConfig =
-      DiscoveryConfig(port,
+      DiscoveryConfig(InetAddress.getLocalHost,
+                      port,
                       groups,
                       peerId,
                       peersPerGroup,

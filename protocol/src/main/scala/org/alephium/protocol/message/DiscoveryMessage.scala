@@ -23,10 +23,10 @@ object DiscoveryMessage {
     override def length: Int = peerIdLength
   }
 
-  trait Request extends DiscoveryMessage {
+  sealed trait Request extends DiscoveryMessage {
     def sourceId: PeerId
   }
-  trait Response extends DiscoveryMessage
+  sealed trait Response extends DiscoveryMessage
 
   case class FindNode(callId: CallId, sourceId: PeerId, targetId: PeerId) extends Request
   object FindNode extends Code[FindNode] {

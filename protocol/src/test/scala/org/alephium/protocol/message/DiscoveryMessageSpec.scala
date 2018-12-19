@@ -1,11 +1,9 @@
 package org.alephium.protocol.message
 
-import akka.util.ByteString
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage.Neighbors
 import org.scalacheck.Arbitrary
 import org.alephium.protocol.model.{ModelGen, PeerId}
-import org.alephium.serde.Serde
 import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
@@ -36,17 +34,4 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     }
   }
 
-  it should "properly compute distance" in {
-    forAll { (distance: Long) =>
-      whenever(distance > 0) {
-        val zero          = PeerId.zero
-        val value         = Serde.LongSerde.serialize(distance)
-        val padding       = ByteString(Array.fill[Byte](PeerId.length - value.size)(0))
-        val bytes         = padding ++ value
-        val distanceValue = PeerId.serde.deserialize(bytes).get
-
-        PeerId.distance(zero, distanceValue) is distance
-      }
-    }
-  }
 }

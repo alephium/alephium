@@ -158,7 +158,7 @@ class DiscoveryServer(bootstrapPeers: AVector[PeerInfo])(implicit config: Discov
             handlePong(socket, remote, peerId, group)
         }
 
-      case FindNode(callId, sourceId, targetId) =>
+      case FindNode(callId, _, targetId) =>
         val nearests = peers.map { xs =>
           AVector
             .from(xs.values)
@@ -192,7 +192,7 @@ class DiscoveryServer(bootstrapPeers: AVector[PeerInfo])(implicit config: Discov
       }
 
     if (peers.sumBy(_.size) < peersMax) {
-      call(socket, addr)(FindNode(_, config.peerId))
+      call(socket, addr)(FindNode(_, config.peerId, config.peerId))
     }
   }
 
