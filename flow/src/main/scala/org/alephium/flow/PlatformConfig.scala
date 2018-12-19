@@ -132,6 +132,7 @@ trait PDiscoveryConfig extends PlatformGroupConfig {
     val peersPerGroup           = discovery.getInt("peersPerGroup")
     val scanMaxPerGroup         = discovery.getInt("scanMaxPerGroup")
     val scanFrequency           = discovery.getDuration("scanFrequency").toMillis.millis
+    val scanFastFrequency       = discovery.getDuration("scanFastFrequency").toMillis.millis
     val neighborsPerGroup       = discovery.getInt("neighborsPerGroup")
     val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(mainGroup)(this)
     DiscoveryConfig(publicAddress,
@@ -142,6 +143,7 @@ trait PDiscoveryConfig extends PlatformGroupConfig {
                     peersPerGroup,
                     scanMaxPerGroup,
                     scanFrequency,
+                    scanFastFrequency,
                     neighborsPerGroup)
   }
 

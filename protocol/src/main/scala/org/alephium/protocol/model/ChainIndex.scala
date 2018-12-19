@@ -31,7 +31,7 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
     from.value ^ to.value
   }
 
-  override def toString: String = s"ChainIndex($from, $to)"
+  override def toString: String = s"ChainIndex(${from.value}, ${to.toString})"
 }
 
 object ChainIndex {

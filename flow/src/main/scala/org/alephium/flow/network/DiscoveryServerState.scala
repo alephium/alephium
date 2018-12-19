@@ -121,6 +121,12 @@ trait DiscoveryServerState {
     bootstrap.takeUpto(emptySlotNum).foreach(tryPing)
   }
 
+  def shouldScanFast(): Boolean = {
+    table.existsWithIndex { (bucket, index) =>
+      index != config.group.value && bucket.isEmpty
+    }
+  }
+
   def fetchNeighbors(peer: PeerInfo): Unit = {
     fetchNeighbors(peer.socketAddress)
   }
