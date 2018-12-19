@@ -16,22 +16,23 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
-  def getBlock(hash: Keccak256): Either[DiskIOError, Block] = {
+  def getBlock(hash: Keccak256): IOResult[Block] = {
     diskIO.getBlock(hash)
   }
 
-  def add(block: Block, weight: Int): Either[DiskIOError, Unit] = {
+  def add(block: Block, weight: Int): IOResult[Unit] = {
     add(block, block.parentHash, weight)
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): Either[DiskIOError, Unit] = {
+  def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     assert(!contains(block.hash) && contains(parentHash))
-    persistBlock(block).map { _ =>
-      add(block.header, parentHash, weight)
-    }
+    for {
+      _ <- persistBlock(block)
+      _ <- add(block.header, parentHash, weight)
+    } yield ()
   }
 
-  protected def persistBlock(block: Block): Either[DiskIOError, Unit] = {
+  protected def persistBlock(block: Block): IOResult[Unit] = {
     diskIO.putBlock(block).right.map(_ => ())
     // TODO: handle transactions later
 //    block.transactions.foreach { transaction =>
@@ -52,6 +53,7 @@ object BlockChain {
 
     new BlockChain {
       override val diskIO                              = _config.diskIO
+      override val database                            = _config.headerDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

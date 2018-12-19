@@ -8,7 +8,7 @@ import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
 object DiskIO {
-  def create(root: Path): Either[DiskIOError, DiskIO] = {
+  def create(root: Path): IOResult[DiskIO] = {
     for {
       _ <- createDir(root)
       diskIO = new DiskIO(root)
@@ -16,7 +16,7 @@ object DiskIO {
     } yield diskIO
   }
 
-  def createDir(path: Path): Either[DiskIOError, Unit] = executeIO {
+  def createDir(path: Path): IOResult[Unit] = executeIO {
     createDirUnsafe(path)
   }
 
@@ -28,9 +28,9 @@ object DiskIO {
   }
 
   @inline
-  def executeIO[T](f: => T): Either[DiskIOError, T] = {
+  def executeIO[T](f: => T): IOResult[T] = {
     try Right(f)
-    catch { case e: Exception => Left(DiskIOError.from(e)) }
+    catch { case e: Exception => Left(IOError.from(e)) }
   }
 }
 
@@ -51,7 +51,7 @@ class DiskIO private (root: Path) {
     blockFolder.resolve(blockHash.shortHex + ".dat")
   }
 
-  def putBlock(block: Block): Either[DiskIOError, Int] = {
+  def putBlock(block: Block): IOResult[Int] = {
     val data = serialize(block)
     executeIO {
       val outPath = getBlockPath(block)
@@ -60,22 +60,22 @@ class DiskIO private (root: Path) {
     }
   }
 
-  def getBlock(blockHash: Keccak256): Either[DiskIOError, Block] = {
-    val dataEither = executeIO {
+  def getBlock(blockHash: Keccak256): IOResult[Block] = {
+    val dataIOResult = executeIO {
       val inPath = getBlockPath(blockHash)
       val bytes  = Files.readAllBytes(inPath)
       ByteString.fromArrayUnsafe(bytes)
     }
-    dataEither.flatMap { data =>
-      deserialize[Block](data).left.map(DiskIOError.from)
+    dataIOResult.flatMap { data =>
+      deserialize[Block](data).left.map(IOError.from)
     }
   }
 
   def checkBlockFile(blockHash: Keccak256): Boolean = {
-    val resultEither = executeIO {
+    val result = executeIO {
       val inPath = getBlockPath(blockHash)
       Files.isRegularFile(inPath)
     }
-    resultEither.fold(_ => false, identity)
+    result.fold(_ => false, identity)
   }
 }

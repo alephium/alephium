@@ -8,33 +8,37 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def database: Database
 
-  def getBlockHeader(hash: Keccak256): DBResult[BlockHeader] = {
+  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] = {
     database.getHeader(hash)
   }
 
-  def add(blockHeader: BlockHeader, weight: Int): DBResult[Unit] = {
+  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader = {
+    database.getHeaderUnsafe(hash)
+  }
+
+  def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
     add(blockHeader, blockHeader.parentHash, weight)
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): DBResult[Unit] = {
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     assert(!contains(header.hash) && contains(parentHash))
     val parent = blockHashesTable(parentHash)
     addHash(header.hash, parent, weight)
     addHeader(header)
   }
 
-  protected def addHeader(header: BlockHeader): DBResult[Unit] = {
+  protected def addHeader(header: BlockHeader): IOResult[Unit] = {
     database.putHeader(header)
   }
 
-  def getConfirmedHeader(height: Int): DBResult[Option[BlockHeader]] = {
+  def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
     getConfirmedHash(height) match {
       case Some(hash) => database.getHeader(hash).map(Option.apply)
       case None       => Right(None)
     }
   }
 
-  def getHashTarget(hash: Keccak256): DBResult[BigInt] = {
+  def getHashTarget(hash: Keccak256): IOResult[BigInt] = {
     assert(contains(hash))
     getBlockHeader(hash).flatMap { header =>
       val height    = getHeight(hash)
