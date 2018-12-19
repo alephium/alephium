@@ -107,6 +107,20 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
+  def exists(f: A => Boolean): Boolean = {
+    foreach { a =>
+      if (f(a)) { return true }
+    }
+    false
+  }
+
+  def forall(f: A => Boolean): Boolean = {
+    foreach { a =>
+      if (!f(a)) { return false }
+    }
+    true
+  }
+
   def slice(from: Int, until: Int): AVector[A] = {
     assert(from >= 0 && from <= until && until <= length)
 
@@ -249,6 +263,14 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     fold(AVector.empty[B]) { (acc, elem) =>
       acc ++ f(elem)
     }
+  }
+
+  def flatMapWithIndex[B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
+    val (_, xs) = fold((0, AVector.empty[B])) {
+      case ((i, acc), elem) =>
+        (i + 1, acc ++ f(elem, i))
+    }
+    xs
   }
 
   def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {

@@ -2,7 +2,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 import org.alephium.serde.{Deserializer, RandomBytes, Serde, Serializer}
-import org.alephium.protocol.model.{peerIdLength, PeerAddress, PeerId}
+import org.alephium.protocol.model.{peerIdLength, GroupIndex, PeerAddress, PeerId}
 import org.alephium.util.AVector
 
 /**
@@ -33,24 +33,27 @@ object DiscoveryMessage {
   }
 
   /** Ping using the `PeerId` of the sender **/
-  case class Ping(callId: CallId, source: PeerId) extends DiscoveryMessage
+  case class Ping(callId: CallId, sourceId: PeerId, sourceGroup: GroupIndex)
+      extends DiscoveryMessage
   object Ping extends Code {
     val serde: Serde[Ping] =
-      Serde.forProduct2(Ping.apply, p => (p.callId, p.source))
+      Serde.forProduct3(Ping.apply, p => (p.callId, p.sourceId, p.sourceGroup))
   }
 
   // Events
-  case class Neighbors(callId: CallId, peers: AVector[PeerAddress]) extends DiscoveryMessage
+  case class Neighbors(callId: CallId, peers: AVector[AVector[PeerAddress]])
+      extends DiscoveryMessage
   object Neighbors extends Code {
     val serde: Serde[Neighbors] =
       Serde.forProduct2(Neighbors.apply, p => (p.callId, p.peers))
   }
 
-  /** Pong using the `sourceId` of the sender of the `Ping` and the `targetId` of the sender of `Pong` **/
-  case class Pong(callId: CallId, sourceId: PeerId, targetId: PeerId) extends DiscoveryMessage
+  /** Pong using the `targetId` and `targetGroup` of the sender of `Pong` **/
+  case class Pong(callId: CallId, targetId: PeerId, targetGroup: GroupIndex)
+      extends DiscoveryMessage
   object Pong extends Code {
     val serde: Serde[Pong] =
-      Serde.forProduct3(Pong.apply, p => (p.callId, p.sourceId, p.targetId))
+      Serde.forProduct3(Pong.apply, p => (p.callId, p.targetId, p.targetGroup))
   }
 
   sealed trait Code
@@ -67,6 +70,21 @@ object DiscoveryMessage {
   val deserializerVersion: Deserializer[Byte] =
     Serde[Byte]
       .validate(_ == version, v => s"Incompatible protocol version $v (expecting $version)")
+
+  def validate(msg: DiscoveryMessage)(peerId: PeerId, groups: Int): Boolean =
+    msg match {
+      case _: CallId          => true
+      case _: FindNode        => true
+      case Ping(_, id, group) => id != peerId && GroupIndex.validate(group, groups)
+      case Pong(_, id, group) => id != peerId && GroupIndex.validate(group, groups)
+      case Neighbors(_, peers) =>
+        peers.length == groups &&
+          (0 until groups)
+            .map { i =>
+              peers(i).forall(info => info.peerId != peerId && info.group.value == i)
+            }
+            .reduce(_ && _)
+    }
 
   implicit val deserializer: Deserializer[DiscoveryMessage] = (input0: ByteString) =>
     for {
