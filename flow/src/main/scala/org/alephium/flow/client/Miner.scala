@@ -83,11 +83,17 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       // scalastyle:off magic.number
       val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
       val chainDep     = deps.takeRight(config.groups)(chainIndex.to.value)
-      val lastTs       = node.blockFlow.getBlockHeader(chainDep).timestamp
-      val template     = BlockTemplate(deps, target, transactions)
       // scalastyle:on magic.number
-      context become mine(template, lastTs)
-      self ! Miner.Nonce(0, config.nonceStep)
+      node.blockFlow.getBlockHeader(chainDep) match {
+        case Left(e) =>
+          log.warning(e.toString)
+          allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+        case Right(header) =>
+          val lastTs   = header.timestamp
+          val template = BlockTemplate(deps, target, transactions)
+          context become mine(template, lastTs)
+          self ! Miner.Nonce(0, config.nonceStep)
+      }
   }
 
   def collect: Receive = _collect orElse awaitStop

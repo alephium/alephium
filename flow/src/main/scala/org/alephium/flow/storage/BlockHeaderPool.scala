@@ -9,30 +9,33 @@ trait BlockHeaderPool extends BlockHashPool {
   def contains(bh: BlockHeader): Boolean = contains(bh.hash)
 
   // Assuming the entity is in the pool
-  def getBlockHeader(hash: Keccak256): BlockHeader
+  def getBlockHeader(hash: Keccak256): DBResult[BlockHeader]
+  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader
 
-  def add(header: BlockHeader, weight: Int): Unit
+  def add(header: BlockHeader, weight: Int): DBResult[Unit]
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): DBResult[Unit]
 
-  def getHeaders(locators: AVector[Keccak256]): AVector[BlockHeader] =
-    locators.map(getBlockHeader)
-
-  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader]
+  // scalastyle:off return
+  def getHeaders(locators: AVector[Keccak256]): DBResult[AVector[BlockHeader]] = {
+    var blocks = AVector.empty[BlockHeader]
+    locators.foreach { hash =>
+      if (contains(hash)) {
+        getBlockHeader(hash) match {
+          case Left(error)  => return Left(error)
+          case Right(block) => blocks = blocks :+ block
+        }
+      }
+    }
+    Right(blocks)
+  }
+  // scalastyle:on return
 
   def getHeight(bh: BlockHeader): Int = getHeight(bh.hash)
 
   def getWeight(bh: BlockHeader): Int = getWeight(bh.hash)
 
   def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
-
-  def getBlockHeaderSlice(hash: Keccak256): AVector[BlockHeader] = {
-    getBlockHashSlice(hash).map(getBlockHeader)
-  }
-
-  def getBlockHeaderSlice(bh: BlockHeader): AVector[BlockHeader] = getBlockHeaderSlice(bh.hash)
-
-  def getBestBlockHeaderChain: AVector[BlockHeader] = getBlockHeaderSlice(getBestTip)
 }
 
 sealed trait AddBlockHeaderResult

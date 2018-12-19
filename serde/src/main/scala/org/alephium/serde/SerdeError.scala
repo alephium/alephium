@@ -1,6 +1,6 @@
 package org.alephium.serde
 
-sealed trait SerdeError {
+sealed trait SerdeError extends Exception {
   def message: String
 }
 

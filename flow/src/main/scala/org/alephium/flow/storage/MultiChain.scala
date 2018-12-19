@@ -80,14 +80,11 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHeaderChain(ChainIndex.from(hash))
   }
 
-  def getBlockHeader(hash: Keccak256): BlockHeader =
+  def getBlockHeader(hash: Keccak256): DBResult[BlockHeader] =
     getHeaderChain(hash).getBlockHeader(hash)
 
-  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
-    getHeaderChain(locator).getHeadersAfter(locator)
-
-  def getHeadersAfter(locators: AVector[Keccak256]): AVector[BlockHeader] =
-    locators.flatMap(getHeadersAfter)
+  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader =
+    getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
   def add(header: BlockHeader): AddBlockHeaderResult
 
@@ -130,7 +127,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
       i    <- 0 until groups
       j    <- 0 until groups
       hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
-    } yield toJson(i, j, hash)
+    } yield toJsonUnsafe(i, j, hash)
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
     val heights = for {
       i <- 0 until groups
@@ -144,8 +141,8 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
 
-  def toJson(from: Int, to: Int, blockHash: Keccak256): String = {
-    val header    = getBlockHeader(blockHash)
+  def toJsonUnsafe(from: Int, to: Int, blockHash: Keccak256): String = {
+    val header    = getBlockHeaderUnsafe(blockHash)
     val timestamp = header.timestamp
     val height    = getHeight(blockHash)
     val hash      = header.shortHex
