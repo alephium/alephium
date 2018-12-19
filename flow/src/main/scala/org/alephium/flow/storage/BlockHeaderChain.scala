@@ -43,17 +43,14 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getBlockHeader(hash).flatMap { header =>
       val height    = getHeight(hash)
       val refHeight = height - config.retargetInterval
-      getConfirmedHeader(refHeight)
-        .flatMap {
-          case Some(refHeader) => Right(refHeader)
-          case None =>
-            getBlockHeader(getParentHash(hash, refHeight))
-        }
-        .map { refHeader =>
+      if (refHeight >= 0) {
+        val refHash = getPredecessor(hash, refHeight)
+        getBlockHeader(refHash).map { refHeader =>
           val timeSpan = header.timestamp - refHeader.timestamp
           val retarget = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
           retarget
         }
+      } else Right(config.maxMiningTarget)
     }
   }
 }

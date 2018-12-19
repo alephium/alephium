@@ -48,15 +48,16 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    blockFlow.getBestDeps(chainIndex) match {
+    val singleChain = blockFlow.getBlockChain(chainIndex)
+    val result = for {
+      bestDeps <- blockFlow.getBestDeps(chainIndex)
+      target   <- singleChain.getHashTarget(bestDeps.getChainHash)
+    } yield BlockFlowTemplate(bestDeps.deps, target)
+    result match {
       case Left(error) =>
         log.warning(s"Failed in compute best deps: ${error.toString}")
-      case Right(bestDeps) =>
-        val singleChain = blockFlow.getBlockChain(chainIndex)
-        singleChain.getHashTarget(bestDeps.getChainHash) match {
-          case Left(e)       => log.warning(e.toString)
-          case Right(target) => sender() ! BlockFlowTemplate(bestDeps.deps, target)
-        }
+      case Right(message) =>
+        sender() ! message
     }
   }
 }
