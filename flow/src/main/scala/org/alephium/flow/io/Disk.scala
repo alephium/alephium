@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import java.nio.file.{Files, Path, StandardOpenOption => Option}
 

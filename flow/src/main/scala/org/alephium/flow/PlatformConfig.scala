@@ -7,8 +7,8 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
+import org.alephium.flow.io.{Database, Disk}
 import org.alephium.flow.network.DiscoveryConfig
-import org.alephium.flow.storage.{Database, Disk}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
