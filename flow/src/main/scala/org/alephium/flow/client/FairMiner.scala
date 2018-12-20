@@ -6,13 +6,11 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, BlockFlow}
-import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.util.Random
-import scala.concurrent.duration._
 
 object FairMiner {
   def props(address: ED25519PublicKey, node: Node)(implicit config: PlatformConfig): Props =
@@ -83,53 +81,6 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: Plat
     // scalastyle:on magic.number
     val blockTemplate = BlockTemplate(template.deps, template.target, transactions)
     actualMiner ! ActualMiner.Task(blockTemplate, chainIndex)
-  }
-}
-
-trait FairMinerState {
-  implicit def config: PlatformConfig
-
-  def blockFlow: BlockFlow
-
-  private val miningCounts        = Array.fill[BigInt](config.groups)(0)
-  private val taskRefreshDuration = 10.seconds.toMillis
-  private val taskRefreshTss      = Array.fill[Long](config.groups)(-1)
-  private val pendingTasks        = collection.mutable.Map.empty[Int, BlockFlowTemplate]
-
-  def initializeState(): Unit = {
-    (0 until config.groups).foreach(refresh)
-  }
-
-  def getMiningCount(to: Int): BigInt = miningCounts(to)
-
-  def increaseCounts(to: Int, count: BigInt): Unit = {
-    miningCounts(to) += count
-  }
-
-  def refresh(to: Int): Unit = {
-    assert(to >= 0 && to < config.groups)
-    val index    = ChainIndex(config.mainGroup.value, to)
-    val template = blockFlow.prepareBlockFlowUnsafe(index)
-    taskRefreshTss(to) = System.currentTimeMillis()
-    pendingTasks(to)   = template
-  }
-
-  def tryToRefresh(to: Int): Unit = {
-    val lastRefreshTs = taskRefreshTss(to)
-    val currentTs     = System.currentTimeMillis()
-    if (currentTs - lastRefreshTs > taskRefreshDuration) {
-      refresh(to)
-    }
-  }
-
-  def removeTask(to: Int): Unit = {
-    pendingTasks -= to
-  }
-
-  def pickNextTemplate(): (Int, BlockFlowTemplate) = {
-    val toTry    = pendingTasks.keys.minBy(miningCounts)
-    val template = pendingTasks(toTry)
-    (toTry, template)
   }
 }
 

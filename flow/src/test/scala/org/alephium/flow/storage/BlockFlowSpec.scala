@@ -1,23 +1,14 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, AlephiumSpec, Hex}
-import org.scalatest.{Assertion, BeforeAndAfter}
+import org.scalatest.Assertion
 
 import scala.annotation.tailrec
 
-class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
+class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
   behavior of "BlockFlow"
-
-  before {
-    DiskIO.createDir(config.diskIO.blockFolder).isRight is true
-  }
-
-  after {
-    TestUtils.cleanup(config.diskIO.blockFolder)
-  }
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow.createUnsafe()
