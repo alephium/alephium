@@ -70,10 +70,7 @@ object DiscoveryMessage {
     }
   }
 
-  sealed trait Request  extends Payload
-  sealed trait Response extends Payload
-
-  case class Ping(sourceAddress: InetSocketAddress) extends Request
+  case class Ping(sourceAddress: InetSocketAddress) extends Payload
   object Ping extends Code[Ping] {
     private val serde = Serde.tuple1[InetSocketAddress]
 
@@ -85,7 +82,17 @@ object DiscoveryMessage {
     }
   }
 
-  case class FindNode(targetId: PeerId) extends Request
+  case class Pong() extends Payload
+  object Pong extends Code[Pong] {
+    def serialize(pong: Pong): ByteString = ByteString.empty
+
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
+      if (input.isEmpty) Success(Pong())
+      else Failure(WrongFormatException.redundant(0, input.length))
+    }
+  }
+
+  case class FindNode(targetId: PeerId) extends Payload
   object FindNode extends Code[FindNode] {
     private val serde = Serde.tuple1[PeerId]
 
@@ -96,17 +103,7 @@ object DiscoveryMessage {
       serde.deserialize(input).map(FindNode(_))
   }
 
-  case class Pong() extends Response
-  object Pong extends Code[Pong] {
-    def serialize(pong: Pong): ByteString = ByteString.empty
-
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
-      if (input.isEmpty) Success(Pong())
-      else Failure(WrongFormatException.redundant(0, input.length))
-    }
-  }
-
-  case class Neighbors(peers: AVector[AVector[PeerInfo]]) extends Response
+  case class Neighbors(peers: AVector[AVector[PeerInfo]]) extends Payload
   object Neighbors extends Code[Neighbors] {
     private val serde = Serde.tuple1[AVector[AVector[PeerInfo]]]
 
@@ -117,7 +114,7 @@ object DiscoveryMessage {
         if (peers.length == config.groups) {
           val ok = peers.forallWithIndex { (peers, idx) =>
             peers.forall(info =>
-              info.id != config.peerId && info.id.groupIndex == GroupIndex.unsafe(idx))
+              info.id != config.nodeId && info.id.groupIndex == GroupIndex.unsafe(idx))
           }
           if (ok) Success(Neighbors(peers))
           else Failure(ValidationException(s"PeerInfos are invalid"))
@@ -136,12 +133,14 @@ object DiscoveryMessage {
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
 
-    val toInt: Map[Code[_], Int]   = values.toIterable.zipWithIndex.toMap
-    val fromInt: Map[Int, Code[_]] = toInt.map(_.swap)
+    val toInt: Map[Code[_], Int] = values.toIterable.zipWithIndex.toMap
+    def fromInt(code: Int): Option[Code[_]] = {
+      if (code >= 0 && code < values.length) Some(values(code)) else None
+    }
   }
 
   val deserializerCode: Deserializer[Code[_]] =
-    Serde[Int].validateGet(Code.fromInt.get, c => s"Invalid message code '$c'")
+    Serde[Int].validateGet(Code.fromInt, c => s"Invalid message code '$c'")
 
   def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
     val headerBytes  = Header.serialize(message.header)

@@ -6,20 +6,17 @@ import akka.actor.Props
 import akka.io.{IO, Udp}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
+import org.alephium.protocol.model.{PeerId, PeerInfo}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.util.{Failure, Success}
 
 object DiscoveryServer {
-  def props(bootstrap: AVector[AVector[PeerInfo]])(implicit config: DiscoveryConfig): Props =
+  def props(bootstrap: AVector[InetSocketAddress])(implicit config: DiscoveryConfig): Props =
     Props(new DiscoveryServer(bootstrap))
 
-  def props(peers: PeerInfo*)(implicit config: DiscoveryConfig): Props = {
-    val bootstrap = AVector.tabulate(config.groups) { i =>
-      AVector.from(peers.view.filter(_.id.groupIndex == GroupIndex(i)))
-    }
-    props(bootstrap)
+  def props(peers: InetSocketAddress*)(implicit config: DiscoveryConfig): Props = {
+    props(AVector.from(peers))
   }
 
   case class PeerStatus(info: PeerInfo, updateAt: Long)
@@ -54,7 +51,7 @@ object DiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class DiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
+class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     implicit val config: DiscoveryConfig)
     extends BaseActor
     with DiscoveryServerState {
@@ -70,7 +67,8 @@ class DiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
     case Udp.Bound(_) =>
       log.debug(s"UDP server bound successfully")
       setSocket(sender())
-      bootstrap.foreach(_.foreach(tryPing))
+      log.debug(s"bootstrap ndoes: ${bootstrap.mkString(";")}")
+      bootstrap.foreach(tryPing)
       system.scheduler.schedule(config.scanFrequency, config.scanFrequency, self, Scan)
       context.become(ready)
 
@@ -85,12 +83,14 @@ class DiscoveryServer(val bootstrap: AVector[AVector[PeerInfo]])(
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(data) match {
         case Success(message: DiscoveryMessage) =>
+          log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           val sourceId = PeerId.fromPublicKey(message.header.publicKey)
+          updateStatus(sourceId)
           handlePayload(sourceId, remote)(message.payload)
         case Failure(error) =>
           // TODO: handler error properly
           log.info(
-            s"${config.peerId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
+            s"${config.nodeId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
       }
   }
 

@@ -33,12 +33,12 @@ object TcpHandler {
     envelope(Message(payload))
 
   def envelope(message: Message): Tcp.Write =
-    Tcp.Write(Message.serializer.serialize(message))
+    Tcp.Write(Message.serialize(message))
 
   def deserialize(data: ByteString): Try[(AVector[Message], ByteString)] = {
     @tailrec
     def iter(rest: ByteString, acc: AVector[Message]): Try[(AVector[Message], ByteString)] = {
-      Message.deserializer._deserialize(rest) match {
+      Message._deserialize(rest) match {
         case Success((message, newRest)) =>
           iter(newRest, acc :+ message)
         case Failure(_: NotEnoughBytesException) =>
@@ -84,7 +84,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   }
 
   def handshakeOut(): Unit = {
-    connection ! TcpHandler.envelope(Hello(config.peerId))
+    connection ! TcpHandler.envelope(Hello(config.nodeId))
     context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
   }
 
@@ -95,7 +95,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
       if (hello.validate) {
-        connection ! TcpHandler.envelope(HelloAck(config.peerId))
+        connection ! TcpHandler.envelope(HelloAck(config.nodeId))
         afterHandShake(hello.peerId)
       } else {
         log.info("Hello is invalid, closing connection")
