@@ -107,10 +107,10 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     val bucket0 = peers0(groupIndex.value).map(p => peer.id.hammingDist(p.id)).toIterable.toList
     bucket0 is bucket0.sorted
 
-    val peers1 = state.getNeighbors(config.peerId)
+    val peers1 = state.getNeighbors(config.nodeId)
     peers1.sumBy(_.length) is peersPerGroup - 1
     val bucket1 =
-      peers1(groupIndex.value).map(p => config.peerId.hammingDist(p.id)).toIterable.toList
+      peers1(groupIndex.value).map(p => config.nodeId.hammingDist(p.id)).toIterable.toList
     bucket1 is bucket1.sorted
   }
 }

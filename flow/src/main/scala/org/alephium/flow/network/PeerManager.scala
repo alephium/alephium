@@ -66,13 +66,18 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
 
       server ! TcpServer.Start
       context.watch(server)
-      context.become(handle)
+
+      discoveryServer ! DiscoveryServer.GetPeers
+      context.become(awaitPeers orElse handle)
   }
 
   def awaitPeers: Receive = {
     case DiscoveryServer.Peers(discoveried) =>
-      if (discoveried.forall(_.length >= 1)) {
-        log.info("Discoveried enough peers for all groups")
+      log.info(s"Discoveried #${discoveried.sumBy(_.length)} peers")
+      val isEnough = discoveried.forallWithIndex { (peers, i) =>
+        i == config.mainGroup.value || peers.length >= 1
+      }
+      if (isEnough) {
         val until = Instant.now().plusMillis(config.retryTimeout.toMillis)
         discoveried.foreach { ps =>
           ps.foreach(peer => self ! Connect(peer.socketAddress, until))

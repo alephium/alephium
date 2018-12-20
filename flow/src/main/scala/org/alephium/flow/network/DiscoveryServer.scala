@@ -67,7 +67,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     case Udp.Bound(_) =>
       log.debug(s"UDP server bound successfully")
       setSocket(sender())
-      bootstrap.foreach(fetchNeighbors)
+      log.debug(s"bootstrap ndoes: ${bootstrap.mkString(";")}")
+      bootstrap.foreach(tryPing)
       system.scheduler.schedule(config.scanFrequency, config.scanFrequency, self, Scan)
       context.become(ready)
 
@@ -82,6 +83,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(data) match {
         case Success(message: DiscoveryMessage) =>
+          log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           val sourceId = PeerId.fromPublicKey(message.header.publicKey)
           updateStatus(sourceId)
           handlePayload(sourceId, remote)(message.payload)
