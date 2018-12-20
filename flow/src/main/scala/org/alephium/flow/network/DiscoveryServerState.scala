@@ -111,9 +111,11 @@ trait DiscoveryServerState {
   def scan(): Unit = {
     table.foreachWithIndex { (bucket, i) =>
       val sortedNeighbors =
-        AVector.from(bucket.values).sortBy(status => config.peerId.hammingDist(status.info.id))
-      sortedNeighbors.takeUpto(config.scanMax).foreach(status => fetchNeighbors(status.info))
-      val bootstrapNum = config.scanMax - sortedNeighbors.length
+        AVector.from(bucket.values).sortBy(status => config.nodeId.hammingDist(status.info.id))
+      sortedNeighbors
+        .takeUpto(config.scanMaxPerGroup)
+        .foreach(status => fetchNeighbors(status.info))
+      val bootstrapNum = config.scanMaxPerGroup - sortedNeighbors.length
       if (bootstrapNum > 0) {
         bootstrap(i).takeUpto(bootstrapNum).foreach(fetchNeighbors)
       }
@@ -121,7 +123,7 @@ trait DiscoveryServerState {
   }
 
   def fetchNeighbors(peer: PeerInfo): Unit = {
-    send(peer.socketAddress, FindNode(config.peerId))
+    send(peer.socketAddress, FindNode(config.nodeId))
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
@@ -146,7 +148,7 @@ trait DiscoveryServerState {
         if (bucket.size < config.neighborsPerGroup) {
           appendPeer(peer, bucket)
         } else {
-          val myself   = config.peerId
+          val myself   = config.nodeId
           val furthest = bucket.keys.minBy(myself.hammingDist)
           if (myself.hammingDist(peerId) < myself.hammingDist(furthest)) {
             bucket -= furthest

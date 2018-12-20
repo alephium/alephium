@@ -23,15 +23,17 @@ object DiscoveryServerSpec {
       val groups = groupSize
     }
     val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(GroupIndex(groupIndex))
-    DiscoveryConfig(InetAddress.getLocalHost,
-                    port,
-                    groupSize,
-                    privateKey,
-                    publicKey,
-                    peersPerGroup,
-                    scanMax           = 1,
-                    neighborsPerGroup = peersPerGroup,
-                    scanFrequency     = scanFrequency)
+    DiscoveryConfig(
+      InetAddress.getLocalHost,
+      port,
+      groupSize,
+      privateKey,
+      publicKey,
+      peersPerGroup,
+      scanMaxPerGroup   = 1,
+      neighborsPerGroup = peersPerGroup,
+      scanFrequency     = scanFrequency
+    )
   }
 }
 
@@ -45,7 +47,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val server0   = system.actorOf(DiscoveryServer.props()(config0), "server0")
     val port1     = SocketUtil.temporaryLocalPort(udp = true)
     val config1   = createConfig(groupSize, 1, port1, 1)
-    val bootstrap = PeerInfo(config0.peerId, createAddr(port0))
+    val bootstrap = PeerInfo(config0.nodeId, createAddr(port0))
     val server1   = system.actorOf(DiscoveryServer.props(bootstrap)(config1), "server1")
 
     Thread.sleep(1000)
@@ -91,7 +93,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
       val port       = 10000 + i
       createConfig(groups, groupIndex, port, peersPerGroup)
     }
-    val peerIds = configs.map(_.peerId)
+    val peerIds = configs.map(_.nodeId)
     val ports   = configs.map(_.udpPort)
 
     val bootstrap = PeerInfo(peerIds(0), createAddr(ports(0)))

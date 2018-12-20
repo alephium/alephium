@@ -11,7 +11,7 @@ object NotEnoughBytesException {
     new NotEnoughBytesException(s"Too few bytes: expected $expected, got $got")
 }
 
-class WrongFormatException(message: String) extends SerdeException(message)
+case class WrongFormatException(message: String) extends SerdeException(message)
 
 object WrongFormatException {
   def redundant(expected: Int, got: Int): WrongFormatException =
