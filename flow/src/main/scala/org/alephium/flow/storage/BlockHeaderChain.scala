@@ -43,7 +43,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
 object BlockHeaderChain {
   def fromGenesis(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
-    apply(genesis.blockHeader, 0, 0)
+    apply(genesis.header, 0, 0)
 
   def apply(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
       implicit _config: PlatformConfig): BlockHeaderChain = {

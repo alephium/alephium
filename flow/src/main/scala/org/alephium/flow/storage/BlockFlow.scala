@@ -61,7 +61,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     } else if (contains(block.hash)) {
       AddBlockResult.AlreadyExisted
     } else {
-      val deps        = block.blockHeader.blockDeps
+      val deps        = block.header.blockDeps
       val missingDeps = deps.filterNot(contains)
       if (missingDeps.isEmpty) {
         val chain  = getBlockChain(index)
@@ -113,7 +113,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   }
 
   private def calWeight(block: Block): Int = {
-    calWeight(block.blockHeader)
+    calWeight(block.header)
   }
 
   private def calWeight(header: BlockHeader): Int = {
