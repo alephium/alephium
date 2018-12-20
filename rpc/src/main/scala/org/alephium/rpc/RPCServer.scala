@@ -1,6 +1,7 @@
 package org.alephium.rpc
 
 import scala.concurrent.Future
+import java.time.Instant
 
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
@@ -27,6 +28,7 @@ trait RPCServer extends Platform with StrictLogging {
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
     implicit val config           = mode.config
+    implicit val rpcConfig        = RPCConfig.load(config.alephium)
 
     val groups = mode.config.groups
     val from   = mode.config.mainGroup.value
@@ -64,12 +66,18 @@ trait RPCServer extends Platform with StrictLogging {
 }
 
 object RPCServer {
-  def wsViewer(node: Node): Flow[Message, Message, Any] = {
+  def wsViewer(node: Node)(implicit rpc: RPCConfig): Flow[Message, Message, Any] = {
     Flow[Message]
       .collect {
         case requestJson: TextMessage =>
+          val now   = Instant.now()
+          val limit = now.minus(rpc.viewerBlockAgeLimit).toEpochMilli()
+
           val request = parse(requestJson.getStrictText)
-          val from    = request.flatMap(_.hcursor.get[Long]("from")).toOption.getOrElse(-1L)
+          val from = Math.max(
+            request.flatMap(_.hcursor.get[Long]("from")).toOption.getOrElse(limit),
+            limit
+          )
 
           val blocks = node.blockFlow.getBlocks
             .filter { case (_, _, header) => header.timestamp > from }
@@ -80,7 +88,6 @@ object RPCServer {
                 case ((i, j), hash, header) =>
                   node.blockFlow.toJson(i, j, hash, header)
               }
-              .sorted
               .mkString("[", ",", "]")
 
               val blocks = node.blockFlow.getHeaders(header => header.timestamp > from)
