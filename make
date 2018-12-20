@@ -7,8 +7,6 @@ parser.add_argument('goal', type=str)
 
 args = parser.parse_args()
 
-tempdir = tempfile.gettempdir()
-
 def run(cmd):
     print(cmd)
     os.system(cmd)
@@ -26,16 +24,21 @@ elif args.goal == 'benchmark':
     run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
 
 elif args.goal == 'run':
-    logdir = "{}/alephium-log".format(tempdir)
 
-    if not os.path.exists(logdir):
-        os.makedirs(logdir)
+    tempdir = tempfile.gettempdir()
 
     for node in range(0, int(os.environ['nodes'])):
         port = 9973 + node
         groups = int(os.getenv('groups'))
         main_group = node % groups
-        run('mainGroup={} port={} bootstrap=localhost:9973 ./app/target/universal/stage/bin/boot &> {}/{}.txt &'.format(main_group, port, logdir, port))
+
+        homedir = "{}/alephium/node-{}".format(tempdir, node)
+
+        if not os.path.exists(homedir):
+            os.makedirs(homedir)
+
+
+        run('mainGroup={} port={} bootstrap=localhost:9973 ALEPHIUM_HOME={} ./app/target/universal/stage/bin/boot &> {}/console.log &'.format(main_group, port, homedir, homedir))
 
 elif args.goal == 'mine':
     for node in range(0, int(os.environ['nodes'])):
