@@ -17,3 +17,5 @@ object WrongFormatException {
   def redundant(expected: Int, got: Int): WrongFormatException =
     new WrongFormatException(s"Too many bytes: expected $expected, got $got")
 }
+
+case class ValidationException(message: String) extends SerdeException(message)

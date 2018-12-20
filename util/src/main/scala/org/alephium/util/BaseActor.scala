@@ -39,10 +39,14 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
   }
 
   val resumeStrategy = OneForOneStrategy() {
-    case _: Throwable => Resume
+    case e: Throwable =>
+      System.out.print(e.toString + "\n")
+      Resume
   }
 
   val stopStrategy = OneForOneStrategy() {
-    case _: Throwable => Stop
+    case e: Throwable =>
+      System.out.print(e + "\n")
+      Stop
   }
 }

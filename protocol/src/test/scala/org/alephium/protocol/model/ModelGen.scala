@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import java.net.InetSocketAddress
 
 import org.alephium.crypto._
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.util.AVector
 import org.scalacheck.Gen
 
@@ -58,22 +58,36 @@ object ModelGen {
       }
     }
 
-  def groupGen(implicit config: ConsensusConfig): Gen[GroupIndex] =
+  def groupGen(implicit config: GroupConfig): Gen[GroupIndex] =
     groupGen_(config.groups)
 
   def groupGen_(groups: Int): Gen[GroupIndex] =
     Gen.choose(0, groups - 1).map(n => GroupIndex.unsafe(n))
 
-  val peerId: Gen[PeerId] = Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
+  def peerId: Gen[PeerId] =
+    Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
 
-  def peerAddress(groups: Int): Gen[PeerAddress] =
+  def peerId(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerId] =
+    Gen.resultOf[Unit, PeerId](_ => PeerId.generateFor(groupIndex))
+
+  def socketAddress: Gen[InetSocketAddress] =
     for {
-      ip0   <- Gen.choose(0, 255)
-      ip1   <- Gen.choose(0, 255)
-      ip2   <- Gen.choose(0, 255)
-      ip3   <- Gen.choose(0, 255)
-      port  <- Gen.choose(0, 65535)
-      id    <- peerId
-      group <- groupGen_(groups)
-    } yield PeerAddress(id, group, new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port))
+      ip0  <- Gen.choose(0, 255)
+      ip1  <- Gen.choose(0, 255)
+      ip2  <- Gen.choose(0, 255)
+      ip3  <- Gen.choose(0, 255)
+      port <- Gen.choose(0, 65535)
+    } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
+
+  def peerInfo(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerInfo] =
+    for {
+      address <- socketAddress
+      id      <- peerId(groupIndex)
+    } yield PeerInfo(id, address)
+
+  def peerInfo: Gen[PeerInfo] =
+    for {
+      address <- socketAddress
+      id      <- peerId
+    } yield PeerInfo(id, address)
 }
