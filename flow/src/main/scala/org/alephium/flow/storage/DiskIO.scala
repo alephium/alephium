@@ -35,10 +35,16 @@ object DiskIO {
     try Right(f)
     catch { case e: Exception => Left(IOError.from(e)) }
   }
+
+  @inline
+  def executeF[T](f: => IOResult[T]): IOResult[T] = {
+    try f
+    catch { case e: Exception => Left(IOError.from(e)) }
+  }
 }
 
 class DiskIO private (root: Path) {
-  import DiskIO.execute
+  import DiskIO.{execute, executeF}
 
   val blockFolder: Path = root.resolve("blocks")
 
@@ -54,12 +60,15 @@ class DiskIO private (root: Path) {
     blockFolder.resolve(blockHash.shortHex + ".dat")
   }
 
-  def putBlock(block: Block): IOResult[Int] = {
-    val data = serialize(block)
-    execute {
-      val outPath = getBlockPath(block)
-      val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
-      out.write(data.toByteBuffer)
+  def putBlock(block: Block): IOResult[Int] = executeF {
+    val data    = serialize(block)
+    val outPath = getBlockPath(block)
+    val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
+    try {
+      val length = out.write(data.toByteBuffer)
+      Right(length)
+    } catch { case e: Exception => Left(IOError.from(e)) } finally {
+      out.close()
     }
   }
 
