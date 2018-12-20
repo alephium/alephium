@@ -10,14 +10,14 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
 
   trait Fixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
-    val chain    = BlockChain.fromGenesis(genesis)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
   }
 
   it should "add block correctly" in new Fixture {
-    chain.numHashes is 1
-    forAll(blockGen, minSuccessful(1)) { block =>
+    forAll(blockGen) { block =>
+      val chain = BlockChain.fromGenesis(genesis)
+      chain.numHashes is 1
       val blocksSize1 = chain.numHashes
       val txSize1     = chain.numTransactions
       chain.add(block, 0)
@@ -29,7 +29,8 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "add blocks correctly" in new Fixture {
-    forAll(chainGen, minSuccessful(1)) { blocks =>
+    forAll(chainGen) { blocks =>
+      val chain       = BlockChain.fromGenesis(genesis)
       val blocksSize1 = chain.numHashes
       val txSize1     = chain.numTransactions
       blocks.foreach(block => chain.add(block, 0))
@@ -43,7 +44,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "work correctly for a chain of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, genesis), minSuccessful(1)) { blocks =>
+    forAll(ModelGen.chainGen(4, genesis)) { blocks =>
       val chain0 = BlockChain(genesis, 0, 0)
       blocks.foreach(block => chain0.add(block, 0))
       val headBlock = genesis
@@ -65,8 +66,8 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "work correctly with two chains of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, genesis), minSuccessful(1)) { longChain =>
-      forAll(ModelGen.chainGen(2, genesis), minSuccessful(1)) { shortChain =>
+    forAll(ModelGen.chainGen(4, genesis)) { longChain =>
+      forAll(ModelGen.chainGen(2, genesis)) { shortChain =>
         val chain0 = BlockChain(genesis, 0, 0)
 
         shortChain.foreach(block => chain0.add(block, 0))
@@ -97,7 +98,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "compute correct weights for a single chain" in {
-    forAll(ModelGen.chainGen(5), minSuccessful(1)) { blocks =>
+    forAll(ModelGen.chainGen(5)) { blocks =>
       val chain = createBlockChain(blocks.init)
       blocks.init.foreach(block => chain.contains(block) is true)
       chain.maxHeight is 3
@@ -110,8 +111,8 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default {
   }
 
   it should "compute corrent weights for two chains with same root" in {
-    forAll(ModelGen.chainGen(5), minSuccessful(1)) { blocks1 =>
-      forAll(ModelGen.chainGen(1, blocks1.head), minSuccessful(1)) { blocks2 =>
+    forAll(ModelGen.chainGen(5)) { blocks1 =>
+      forAll(ModelGen.chainGen(1, blocks1.head)) { blocks2 =>
         val chain = createBlockChain(blocks1)
         blocks2.foreach(block => chain.add(block, 0))
         blocks1.foreach(block => chain.contains(block) is true)
