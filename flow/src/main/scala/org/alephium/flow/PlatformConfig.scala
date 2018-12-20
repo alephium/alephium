@@ -92,6 +92,7 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
   val blockTargetTime: Duration = alephium.getDuration("blockTargetTime")
   val blockConfirmNum: Int      = alephium.getInt("blockConfirmNum")
   val retargetInterval: Int     = alephium.getInt("retargetInterval") // number of blocks for retarget
+  val expectedTimeSpan: Long    = retargetInterval * blockTargetTime.toMillis
 }
 
 trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
