@@ -134,14 +134,14 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     }
   }
 
-  def getBlockInfo: String = {
+  def getBlockInfoUnsafe: String = {
     val blocks = for {
       i    <- 0 until groups
       j    <- 0 until groups
       hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
     } yield {
       val header = getBlockHeaderUnsafe(hash)
-      toJsonUnsafe(header)
+      toJson(header)
     }
 
     val blocksJson = blocks.sorted.mkString("[", ",", "]")
@@ -157,7 +157,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
   }
 
-  def toJsonUnsafe(header: BlockHeader): String = {
+  def toJson(header: BlockHeader): String = {
     val index     = header.chainIndex
     val from      = index.from.value
     val to        = index.to.value

@@ -41,7 +41,7 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
           sender() ! Message(SendBlocks(blocks))
       }
     case GetBlockInfo =>
-      sender() ! blockFlow.getBlockInfo
+      sender() ! blockFlow.getBlockInfoUnsafe
     case PrepareBlockFlow(chainIndex) =>
       prepareBlockFlow(chainIndex)
   }

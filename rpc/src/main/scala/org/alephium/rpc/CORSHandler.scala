@@ -2,7 +2,7 @@ package org.alephium.rpc
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.server.{Route}
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.headers._
 
@@ -22,7 +22,4 @@ trait CORSHandler {
   def corsHandler(r: Route): Route = respondWithHeaders(corsResponseHeaders) {
     preflightRequestHandler ~ r
   }
-
-  def addCORSHeaders(response: HttpResponse): HttpResponse =
-    response.withHeaders(corsResponseHeaders)
 }
