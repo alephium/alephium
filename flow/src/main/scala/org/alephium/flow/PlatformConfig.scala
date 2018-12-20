@@ -8,7 +8,7 @@ import java.nio.file.Path
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
-import org.alephium.flow.storage.{Database, DiskIO}
+import org.alephium.flow.storage.{Database, Disk}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
@@ -68,7 +68,7 @@ trait PlatformConfigFiles extends StrictLogging {
     file
   }
 
-  DiskIO.createDirUnsafe(rootPath)
+  Disk.createDirUnsafe(rootPath)
   val all      = ConfigFactory.parseFile(getUserFile).resolve()
   val alephium = all.getConfig("alephium")
 }
@@ -172,11 +172,11 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     FiniteDuration(duration.toNanos, NANOSECONDS)
   }
 
-  val diskIO: DiskIO = DiskIO.createUnsafe(rootPath)
+  val disk: Disk = Disk.createUnsafe(rootPath)
 
   val dbPath = rootPath.resolve("db")
   val headerDB: Database = {
-    DiskIO.createDirUnsafe(dbPath)
+    Disk.createDirUnsafe(dbPath)
     val dbName = "headers-" + nodeId.shortHex
     Database.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
