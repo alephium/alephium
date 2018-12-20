@@ -5,12 +5,12 @@ import java.net.InetSocketAddress
 import akka.util.ByteString
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.serde.{Deserializer, Serde, ValidationException, WrongFormatException}
+import org.alephium.serde.{Deserializer, Serde, SerdeError, ValidationError, WrongFormatError}
+import org.alephium.serde.{Deserializer, Serde, SerdeError, ValidationError, WrongFormatError}
 import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 import org.alephium.util.AVector
 
 import scala.language.existentials
-import scala.util.{Failure, Success, Try}
 
 case class DiscoveryMessage(header: DiscoveryMessage.Header, payload: DiscoveryMessage.Payload)
 
@@ -29,17 +29,17 @@ object DiscoveryMessage {
     def serialize(header: Header): ByteString = serde.serialize((header.version, header.publicKey))
 
     def _deserialize(input: ByteString)(
-        implicit config: DiscoveryConfig): Try[(Header, ByteString)] = {
+        implicit config: DiscoveryConfig): Either[SerdeError, (Header, ByteString)] = {
       serde._deserialize(input).flatMap {
         case ((_version, publicKey), rest) =>
           if (_version == version) {
             if (publicKey != config.discoveryPublicKey) {
-              Success((Header(_version, publicKey), rest))
+              Right((Header(_version, publicKey), rest))
             } else {
-              Failure(ValidationException(s"Peer's public key is the same as ours"))
+              Left(ValidationError(s"Peer's public key is the same as ours"))
             }
           } else {
-            Failure(ValidationException(s"Invalid version: got ${_version}, expect: $version"))
+            Left(ValidationError(s"Invalid version: got ${_version}, expect: $version"))
           }
       }
     }
@@ -57,16 +57,17 @@ object DiscoveryMessage {
       Serde[Int].serialize(Code.toInt(code)) ++ data
     }
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Payload] = {
-      for {
-        (cmd, rest) <- deserializerCode._deserialize(input)
-        result <- cmd match {
-          case Ping      => Ping.deserialize(rest)
-          case Pong      => Pong.deserialize(rest)
-          case FindNode  => FindNode.deserialize(rest)
-          case Neighbors => Neighbors.deserialize(rest)
-        }
-      } yield result
+    def deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Either[SerdeError, Payload] = {
+      deserializerCode._deserialize(input).flatMap {
+        case (cmd, rest) =>
+          cmd match {
+            case Ping      => Ping.deserialize(rest)
+            case Pong      => Pong.deserialize(rest)
+            case FindNode  => FindNode.deserialize(rest)
+            case Neighbors => Neighbors.deserialize(rest)
+          }
+      }
     }
   }
 
@@ -77,7 +78,8 @@ object DiscoveryMessage {
     def serialize(ping: Ping): ByteString =
       serde.serialize(ping.sourceAddress)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Ping] = {
+    def deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Either[SerdeError, Ping] = {
       serde.deserialize(input).map(Ping(_))
     }
   }
@@ -86,9 +88,10 @@ object DiscoveryMessage {
   object Pong extends Code[Pong] {
     def serialize(pong: Pong): ByteString = ByteString.empty
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Pong] = {
-      if (input.isEmpty) Success(Pong())
-      else Failure(WrongFormatException.redundant(0, input.length))
+    def deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Either[SerdeError, Pong] = {
+      if (input.isEmpty) Right(Pong())
+      else Left(WrongFormatError.redundant(0, input.length))
     }
   }
 
@@ -99,7 +102,8 @@ object DiscoveryMessage {
     def serialize(data: FindNode): ByteString =
       serde.serialize(data.targetId)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[FindNode] =
+    def deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Either[SerdeError, FindNode] =
       serde.deserialize(input).map(FindNode(_))
   }
 
@@ -109,18 +113,18 @@ object DiscoveryMessage {
 
     def serialize(data: Neighbors): ByteString = serde.serialize(data.peers)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[Neighbors] = {
+    def deserialize(input: ByteString)(
+        implicit config: DiscoveryConfig): Either[SerdeError, Neighbors] = {
       serde.deserialize(input).flatMap { peers =>
         if (peers.length == config.groups) {
           val ok = peers.forallWithIndex { (peers, idx) =>
             peers.forall(info =>
               info.id != config.nodeId && info.id.groupIndex == GroupIndex.unsafe(idx))
           }
-          if (ok) Success(Neighbors(peers))
-          else Failure(ValidationException(s"PeerInfos are invalid"))
+          if (ok) Right(Neighbors(peers))
+          else Left(ValidationError(s"PeerInfos are invalid"))
         } else {
-          Failure(
-            ValidationException(s"Got ${peers.length} groups, expect ${config.groups} groups"))
+          Left(ValidationError(s"Got ${peers.length} groups, expect ${config.groups} groups"))
         }
       }
     }
@@ -128,7 +132,7 @@ object DiscoveryMessage {
 
   sealed trait Code[T] {
     def serialize(t: T): ByteString
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[T]
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Either[SerdeError, T]
   }
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
@@ -149,13 +153,18 @@ object DiscoveryMessage {
     headerBytes ++ signature.bytes ++ payloadBytes
   }
 
-  def deserialize(input: ByteString)(implicit config: DiscoveryConfig): Try[DiscoveryMessage] = {
+  def deserialize(input: ByteString)(
+      implicit config: DiscoveryConfig): Either[SerdeError, DiscoveryMessage] = {
     for {
-      (header, rest1)    <- Header._deserialize(input)
-      (signature, rest2) <- Serde[ED25519Signature]._deserialize(rest1)
+      headerPair <- Header._deserialize(input)
+      header = headerPair._1
+      rest1  = headerPair._2
+      signaturePair <- Serde[ED25519Signature]._deserialize(rest1)
+      signature = signaturePair._1
+      rest2     = signaturePair._2
       payload <- Payload.deserialize(rest2).flatMap { payload =>
-        if (ED25519.verify(rest2, signature, header.publicKey)) Success(payload)
-        else Failure(ValidationException(s"Invalid signature"))
+        if (ED25519.verify(rest2, signature, header.publicKey)) Right(payload)
+        else Left(ValidationError(s"Invalid signature"))
       }
     } yield DiscoveryMessage(header, payload)
   }

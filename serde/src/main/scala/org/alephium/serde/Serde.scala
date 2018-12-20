@@ -8,37 +8,6 @@ import org.alephium.util.AVector
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
-
-trait Serializer[T] {
-  def serialize(input: T): ByteString
-}
-
-object Serializer { def apply[T](implicit T: Serializer[T]): Serializer[T] = T }
-
-trait Deserializer[T] { self =>
-  def _deserialize(input: ByteString): Try[(T, ByteString)]
-
-  def deserialize(input: ByteString): Try[T] =
-    _deserialize(input).flatMap {
-      case (output, rest) =>
-        if (rest.isEmpty) Success(output)
-        else Failure(WrongFormatException.redundant(input.size - rest.size, input.size))
-    }
-
-  def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
-    (input: ByteString) => {
-      self._deserialize(input).flatMap {
-        case (t, rest) =>
-          get(t) match {
-            case Some(u) => Success((u, rest))
-            case None    => Failure(new WrongFormatException(error(t)))
-          }
-      }
-    }
-}
-
-object Deserializer { def apply[T](implicit T: Deserializer[T]): Deserializer[T] = T }
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -47,29 +16,29 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.serialize(from(input))
     }
 
-    override def _deserialize(input: ByteString): Try[(S, ByteString)] = {
+    override def _deserialize(input: ByteString): Either[SerdeError, (S, ByteString)] = {
       self._deserialize(input).map {
         case (t, rest) => (to(t), rest)
       }
     }
 
-    override def deserialize(input: ByteString): Try[S] = {
+    override def deserialize(input: ByteString): Either[SerdeError, S] = {
       self.deserialize(input).map(to)
     }
   }
 
-  def xfmap[S](to: T => Try[S], from: S => T): Serde[S] = new Serde[S] {
+  def xfmap[S](to: T => Either[SerdeError, S], from: S => T): Serde[S] = new Serde[S] {
     override def serialize(input: S): ByteString = {
       self.serialize(from(input))
     }
 
-    override def _deserialize(input: ByteString): Try[(S, ByteString)] = {
+    override def _deserialize(input: ByteString): Either[SerdeError, (S, ByteString)] = {
       self._deserialize(input).flatMap {
         case (t, rest) => to(t).map((_, rest))
       }
     }
 
-    override def deserialize(input: ByteString): Try[S] = {
+    override def deserialize(input: ByteString): Either[SerdeError, S] = {
       self.deserialize(input).flatMap(to)
     }
   }
@@ -77,22 +46,22 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   def validate(predicate: T => Boolean, error: T => String): Serde[T] = new Serde[T] {
     override def serialize(input: T): ByteString = self.serialize(input)
 
-    override def _deserialize(input: ByteString): Try[(T, ByteString)] = {
+    override def _deserialize(input: ByteString): Either[SerdeError, (T, ByteString)] = {
       // write explicitly for performance
       self._deserialize(input).flatMap {
         case (t, rest) =>
           if (predicate(t)) {
-            Success((t, rest))
-          } else Failure(new WrongFormatException(error(t)))
+            Right((t, rest))
+          } else Left(new WrongFormatError(error(t)))
       }
     }
 
-    override def deserialize(input: ByteString): Try[T] = {
+    override def deserialize(input: ByteString): Either[SerdeError, T] = {
       // write explicitly for performance
       self.deserialize(input).flatMap { t =>
         if (predicate(t)) {
-          Success(t)
-        } else Failure(new WrongFormatException(error(t)))
+          Right(t)
+        } else Left(new WrongFormatError(error(t)))
       }
     }
   }
@@ -101,21 +70,20 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
 trait FixedSizeSerde[T] extends Serde[T] {
   def serdeSize: Int
 
-  def deserialize0(input: ByteString, f: ByteString => T): Try[T] = Try {
+  def deserialize0(input: ByteString, f: ByteString => T): Either[SerdeError, T] =
     if (input.size == serdeSize) {
-      f(input)
+      Right(f(input))
     } else if (input.size > serdeSize) {
-      throw WrongFormatException.redundant(serdeSize, input.size)
+      Left(WrongFormatError.redundant(serdeSize, input.size))
     } else {
-      throw NotEnoughBytesException(serdeSize, input.size)
+      Left(NotEnoughBytesError(serdeSize, input.size))
     }
-  }
 
-  override def _deserialize(input: ByteString): Try[(T, ByteString)] =
+  override def _deserialize(input: ByteString): Either[SerdeError, (T, ByteString)] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map((_, rest))
-    } else Failure(NotEnoughBytesException(serdeSize, input.size))
+    } else Left(NotEnoughBytesError(serdeSize, input.size))
 }
 
 object Serde extends ProductSerde {
@@ -126,7 +94,7 @@ object Serde extends ProductSerde {
       ByteString(input)
     }
 
-    override def deserialize(input: ByteString): Try[Byte] =
+    override def deserialize(input: ByteString): Either[SerdeError, Byte] =
       deserialize0(input, _.apply(0))
   }
 
@@ -139,7 +107,7 @@ object Serde extends ProductSerde {
       ByteString.fromByteBuffer(buf)
     }
 
-    override def deserialize(input: ByteString): Try[Int] =
+    override def deserialize(input: ByteString): Either[SerdeError, Int] =
       deserialize0(input, _.asByteBuffer.getInt())
   }
 
@@ -152,7 +120,7 @@ object Serde extends ProductSerde {
       ByteString.fromByteBuffer(buf)
     }
 
-    override def deserialize(input: ByteString): Try[Long] =
+    override def deserialize(input: ByteString): Either[SerdeError, Long] =
       deserialize0(input, _.asByteBuffer.getLong())
   }
 
@@ -171,13 +139,13 @@ object Serde extends ProductSerde {
     @tailrec
     final def _deserialize(rest: ByteString,
                            itemCnt: Int,
-                           output: AVector[T]): Try[(AVector[T], ByteString)] = {
-      if (itemCnt == 0) Success((output, rest))
+                           output: AVector[T]): Either[SerdeError, (AVector[T], ByteString)] = {
+      if (itemCnt == 0) Right((output, rest))
       else {
         serde._deserialize(rest) match {
-          case Success((t, tRest)) =>
+          case Right((t, tRest)) =>
             _deserialize(tRest, itemCnt - 1, output :+ t)
-          case Failure(e) => Failure(e)
+          case Left(e) => Left(e)
         }
       }
     }
@@ -193,7 +161,7 @@ object Serde extends ProductSerde {
       bs
     }
 
-    override def deserialize(input: ByteString): Try[ByteString] =
+    override def deserialize(input: ByteString): Either[SerdeError, ByteString] =
       deserialize0(input, identity)
   }
 
@@ -203,7 +171,7 @@ object Serde extends ProductSerde {
         input.map(serde.serialize).fold(ByteString.empty)(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
+      override def _deserialize(input: ByteString): Either[SerdeError, (AVector[T], ByteString)] = {
         _deserialize(input, size, AVector.empty)
       }
     }
@@ -214,7 +182,7 @@ object Serde extends ProductSerde {
         input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): Try[(AVector[T], ByteString)] = {
+      override def _deserialize(input: ByteString): Either[SerdeError, (AVector[T], ByteString)] = {
         IntSerde._deserialize(input).flatMap {
           case (size, rest) =>
             _deserialize(rest, size, AVector.empty)

@@ -7,8 +7,6 @@ import org.alephium.protocol.model.{Block, BlockHeader, PeerId}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-import scala.util.Try
-
 sealed trait Payload
 
 object Payload {
@@ -29,20 +27,20 @@ object Payload {
   val deserializerCode: Deserializer[Code] =
     Serde[Int].validateGet(Code.fromInt, c => s"Invalid code $c")
 
-  def _deserialize(input: ByteString): Try[(Payload, ByteString)] = {
-    for {
-      (code, rest) <- deserializerCode._deserialize(input)
-      result <- code match {
-        case Hello       => Serde[Hello]._deserialize(rest)
-        case HelloAck    => Serde[HelloAck]._deserialize(rest)
-        case Ping        => Serde[Ping]._deserialize(rest)
-        case Pong        => Serde[Pong]._deserialize(rest)
-        case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
-        case GetBlocks   => Serde[GetBlocks]._deserialize(rest)
-        case SendHeaders => Serde[SendHeaders]._deserialize(rest)
-        case GetHeaders  => Serde[GetHeaders]._deserialize(rest)
-      }
-    } yield result
+  def _deserialize(input: ByteString): Either[SerdeError, (Payload, ByteString)] = {
+    deserializerCode._deserialize(input).flatMap {
+      case (code, rest) =>
+        code match {
+          case Hello       => Serde[Hello]._deserialize(rest)
+          case HelloAck    => Serde[HelloAck]._deserialize(rest)
+          case Ping        => Serde[Ping]._deserialize(rest)
+          case Pong        => Serde[Pong]._deserialize(rest)
+          case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
+          case GetBlocks   => Serde[GetBlocks]._deserialize(rest)
+          case SendHeaders => Serde[SendHeaders]._deserialize(rest)
+          case GetHeaders  => Serde[GetHeaders]._deserialize(rest)
+        }
+    }
   }
 
   sealed trait Code

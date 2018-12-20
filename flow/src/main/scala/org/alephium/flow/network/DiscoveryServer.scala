@@ -9,8 +9,6 @@ import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{PeerId, PeerInfo}
 import org.alephium.util.{AVector, BaseActor}
 
-import scala.util.{Failure, Success}
-
 object DiscoveryServer {
   def props(bootstrap: AVector[InetSocketAddress])(implicit config: DiscoveryConfig): Props =
     Props(new DiscoveryServer(bootstrap))
@@ -84,15 +82,15 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(data) match {
-        case Success(message: DiscoveryMessage) =>
+        case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           val sourceId = PeerId.fromPublicKey(message.header.publicKey)
           updateStatus(sourceId)
           handlePayload(sourceId, remote)(message.payload)
-        case Failure(error) =>
+        case Left(error) =>
           // TODO: handler error properly
           log.debug(
-            s"${config.nodeId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.getMessage}")
+            s"${config.nodeId} - Received corrupted UDP data from $remote (${data.size} bytes): ${error.message}")
       }
   }
 

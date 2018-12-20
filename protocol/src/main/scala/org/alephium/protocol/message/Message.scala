@@ -4,8 +4,6 @@ import akka.util.ByteString
 import org.alephium.protocol.Protocol
 import org.alephium.serde._
 
-import scala.util.{Failure, Success, Try}
-
 case class Message(header: Header, payload: Payload)
 
 object Message {
@@ -18,18 +16,22 @@ object Message {
     Serde[Header].serialize(message.header) ++ Payload.serialize(message.payload)
   }
 
-  def _deserialize(input: ByteString): Try[(Message, ByteString)] = {
+  def _deserialize(input: ByteString): Either[SerdeError, (Message, ByteString)] = {
     for {
-      (header, rest0)  <- Serde[Header]._deserialize(input)
-      (payload, rest1) <- Payload._deserialize(rest0)
+      headerPair <- Serde[Header]._deserialize(input)
+      header = headerPair._1
+      rest0  = headerPair._2
+      payloadPair <- Payload._deserialize(rest0)
+      payload = payloadPair._1
+      rest1   = payloadPair._2
     } yield (Message(header, payload), rest1)
   }
 
-  def deserialize(input: ByteString): Try[Message] = {
+  def deserialize(input: ByteString): Either[SerdeError, Message] = {
     _deserialize(input).flatMap {
       case (message, rest) =>
-        if (rest.isEmpty) Success(message)
-        else Failure(WrongFormatException(s"Too many bytes: #${rest.length} left"))
+        if (rest.isEmpty) Right(message)
+        else Left(WrongFormatError(s"Too many bytes: #${rest.length} left"))
     }
   }
 }
