@@ -16,7 +16,7 @@ case class BlockHeader(
   override val hash: Keccak256 = Keccak256.hash(serialize[BlockHeader](this))
 
   def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
-    ChainIndex.fromHash(hash)
+    ChainIndex.from(hash)
   }
 
   def parentHash(implicit config: ConsensusConfig): Keccak256 = {

@@ -137,7 +137,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       val current = Instant.now()
       if (current isBefore until) {
-        timers.startSingleTimer(TcpHandler.Timer, TcpHandler.Retry, 1.second)
+        scheduleOnce(self, TcpHandler.Retry, 1.second)
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}")
         stop()
@@ -257,7 +257,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   }
 
   def startPingPong(): Unit = {
-    timers.startSingleTimer(TcpHandler.Timer, TcpHandler.SendPing, config.pingFrequency)
+    timers.startPeriodicTimer(TcpHandler.Timer, TcpHandler.SendPing, config.pingFrequency)
   }
 
   def stop(): Unit = {

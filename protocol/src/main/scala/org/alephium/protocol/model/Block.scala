@@ -5,25 +5,25 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-case class Block(blockHeader: BlockHeader, transactions: AVector[Transaction])
+case class Block(header: BlockHeader, transactions: AVector[Transaction])
     extends Keccak256Hash[Block] {
-  override def hash: Keccak256 = blockHeader.hash
+  override def hash: Keccak256 = header.hash
 
   def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
-    blockHeader.chainIndex
+    header.chainIndex
   }
 
   def parentHash(implicit config: ConsensusConfig): Keccak256 = {
-    blockHeader.parentHash
+    header.parentHash
   }
 
   def uncleHash(toIndex: GroupIndex)(implicit config: ConsensusConfig): Keccak256 = {
-    blockHeader.uncleHash(toIndex)
+    header.uncleHash(toIndex)
   }
 }
 
 object Block {
-  implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.blockHeader, b.transactions))
+  implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
 
   def from(blockDeps: AVector[Keccak256],
            transactions: AVector[Transaction],

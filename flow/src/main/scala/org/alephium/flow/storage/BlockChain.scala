@@ -13,19 +13,19 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
 
   // Assuming the entity is in the pool
   def getBlockHeader(hash: Keccak256): BlockHeader = {
-    getBlock(hash).blockHeader
+    getBlock(hash).header
   }
 
-  def add(block: BlockHeader, weight: Int): AddBlockHeaderResult = {
+  def add(header: BlockHeader, weight: Int): AddBlockHeaderResult = {
     AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
   }
 
-  def add(block: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
     AddBlockHeaderResult.Other("add blockheader to block pool is not allowed")
   }
 
   def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
-    getBlocksAfter(locator).map(_.blockHeader)
+    getBlocksAfter(locator).map(_.header)
 
   /* BlockChain apis */
 
@@ -78,8 +78,8 @@ trait BlockChain extends BlockPool with BlockHeaderPool with BlockHashChain {
     val refHeight = height - config.retargetInterval
     getConfirmedBlock(refHeight) match {
       case Some(refBlock) =>
-        val timeSpan = block.blockHeader.timestamp - refBlock.blockHeader.timestamp
-        val retarget = block.blockHeader.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
+        val timeSpan = block.header.timestamp - refBlock.header.timestamp
+        val retarget = block.header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
         retarget
       case None => config.maxMiningTarget
     }

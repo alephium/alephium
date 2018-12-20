@@ -8,9 +8,9 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
   behavior of "ChainIndex"
 
   it should "compute the correct index" in {
-    forAll(ModelGen.blockGen, minSuccessful(1)) { block =>
+    forAll(ModelGen.blockGen) { block =>
       val hash  = block.hash
-      val index = ChainIndex.fromHash(hash)
+      val index = ChainIndex.from(hash)
       index.accept(block) is true
 
       val hash2Int = BigInt(1, hash.bytes.takeRight(2).toArray)

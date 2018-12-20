@@ -1,22 +1,21 @@
 package org.alephium.protocol.model
 
-import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.serde.RandomBytes
 
 class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
 
   def accept(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
-    val target = from.value * config.groups + to.value
-    val actual = ChainIndex.hash2Index(header.hash)
-    actual == target && {
+    val actual = header.chainIndex
+    from == actual.from && to == actual.to && {
       val current = BigInt(1, header.hash.bytes.toArray)
       current <= config.maxMiningTarget
     }
   }
 
   def accept(block: Block)(implicit config: ConsensusConfig): Boolean = {
-    accept(block.blockHeader) && (block.blockHeader.txsHash == Keccak256.hash(block.transactions))
+    accept(block.header) && (block.header.txsHash == Keccak256.hash(block.transactions))
   }
 
   def relateTo(groupIndex: GroupIndex): Boolean = {
@@ -51,31 +50,16 @@ object ChainIndex {
   def unsafe(from: Int, to: Int): ChainIndex =
     new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
 
-  def fromHash(hash: Keccak256)(implicit config: ConsensusConfig): ChainIndex = {
-    bytes2Index(hash.bytes)
-  }
-
-  def fromPeerId(peerId: PeerId)(implicit config: ConsensusConfig): ChainIndex = {
-    bytes2Index(peerId.bytes)
-  }
-
-  private[ChainIndex] def hash2Index(hash: Keccak256)(implicit config: ConsensusConfig): Int = {
-    val BigIndex = (hash.beforeLast & 0xFF) << 8 | (hash.last & 0xFF)
-    BigIndex % config.chainNum
-  }
-
-  private[ChainIndex] def bytes2Index(bytes: ByteString)(
-      implicit config: ConsensusConfig): ChainIndex = {
+  def from(randomBytes: RandomBytes)(implicit config: ConsensusConfig): ChainIndex = {
+    val bytes = randomBytes.bytes
     assert(bytes.length >= 2)
 
     val beforeLast = bytes(bytes.length - 2)
     val last       = bytes.last
     val bigIndex   = (beforeLast & 0xFF) << 8 | (last & 0xFF)
-    fromInt(bigIndex)
-  }
+    assert(bigIndex >= 0)
 
-  private def fromInt(n: Int)(implicit config: ConsensusConfig): ChainIndex = {
-    val index = math.abs(n) % config.chainNum
+    val index = bigIndex % config.chainNum
     ChainIndex(index / config.groups, index % config.groups)
   }
 }

@@ -61,7 +61,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
     } else if (contains(block.hash)) {
       AddBlockResult.AlreadyExisted
     } else {
-      val deps        = block.blockHeader.blockDeps
+      val deps        = block.header.blockDeps
       val missingDeps = deps.filterNot(contains)
       if (missingDeps.isEmpty) {
         val chain  = getBlockChain(index)
@@ -113,7 +113,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   }
 
   private def calWeight(block: Block): Int = {
-    calWeight(block.blockHeader)
+    calWeight(block.header)
   }
 
   private def calWeight(header: BlockHeader): Int = {
@@ -163,8 +163,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   }
 
   def isExtending(current: Keccak256, previous: Keccak256): Boolean = {
-    val index1 = ChainIndex.fromHash(current)
-    val index2 = ChainIndex.fromHash(previous)
+    val index1 = ChainIndex.from(current)
+    val index2 = ChainIndex.from(previous)
     assert(index1.from == index2.from)
 
     val chain = getHashChain(index2)
@@ -208,7 +208,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
 
   def getBestDeps(chainIndex: ChainIndex): BlockDeps = {
     val bestTip   = getBestTip
-    val bestIndex = ChainIndex.fromHash(bestTip)
+    val bestIndex = ChainIndex.from(bestTip)
     val rtips     = getRtips(bestTip, bestIndex.from)
     val deps1 = (0 until groups)
       .filter(_ != chainIndex.from.value)
