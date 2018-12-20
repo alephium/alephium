@@ -1,5 +1,7 @@
 package org.alephium.flow.network
 
+import java.net.InetSocketAddress
+
 import akka.event.LoggingAdapter
 import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
@@ -30,7 +32,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       implicit def config: DiscoveryConfig = self.config
       def log: LoggingAdapter              = system.log
 
-      def bootstrap: AVector[AVector[PeerInfo]] = AVector.empty
+      def bootstrap: AVector[InetSocketAddress] = AVector.empty
 
       setSocket(socketProbe.ref)
     }

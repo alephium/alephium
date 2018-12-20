@@ -16,7 +16,7 @@ trait DiscoveryServerState {
   implicit def config: DiscoveryConfig
   def log: LoggingAdapter
 
-  def bootstrap: AVector[AVector[PeerInfo]]
+  def bootstrap: AVector[InetSocketAddress]
 
   import DiscoveryServer._
 
@@ -109,21 +109,24 @@ trait DiscoveryServerState {
   }
 
   def scan(): Unit = {
-    table.foreachWithIndex { (bucket, i) =>
+    val emptySlotNum = table.sumBy { bucket =>
       val sortedNeighbors =
         AVector.from(bucket.values).sortBy(status => config.nodeId.hammingDist(status.info.id))
       sortedNeighbors
         .takeUpto(config.scanMaxPerGroup)
         .foreach(status => fetchNeighbors(status.info))
-      val bootstrapNum = config.scanMaxPerGroup - sortedNeighbors.length
-      if (bootstrapNum > 0) {
-        bootstrap(i).takeUpto(bootstrapNum).foreach(fetchNeighbors)
-      }
+      val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
+      if (emptySlotNum > 0) emptySlotNum else 0
     }
+    bootstrap.takeUpto(emptySlotNum).foreach(fetchNeighbors)
   }
 
   def fetchNeighbors(peer: PeerInfo): Unit = {
-    send(peer.socketAddress, FindNode(config.nodeId))
+    fetchNeighbors(peer.socketAddress)
+  }
+
+  def fetchNeighbors(remote: InetSocketAddress): Unit = {
+    send(remote, FindNode(config.nodeId))
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {

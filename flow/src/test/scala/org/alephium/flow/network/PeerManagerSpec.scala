@@ -19,11 +19,12 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   }
 
   trait Fixture extends PeerFixture {
-    val server        = TestProbe()
-    val blockHandlers = HandlerUtils.createBlockHandlersProbe
-    val peerManager   = system.actorOf(PeerManager.props(Mode.defaultBuilders))
+    val server          = TestProbe()
+    val discoveryServer = TestProbe()
+    val blockHandlers   = HandlerUtils.createBlockHandlersProbe
+    val peerManager     = system.actorOf(PeerManager.props(Mode.defaultBuilders))
 
-    peerManager ! PeerManager.Set(server.ref, blockHandlers)
+    peerManager ! PeerManager.Set(server.ref, blockHandlers, discoveryServer.ref)
   }
 
   behavior of "PeerManagerSpec"
@@ -33,18 +34,19 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers) =>
-        peers.size is 1
-        peers.head._1 is peerId
+        peers.sumBy(_.length) is 1
+        peers(peerId.groupIndex.value).head.id is peerId
     }
   }
 
   it should "try to send GetBlocks to peer" in new PeerFixture {
-    val server        = TestProbe()
-    val blockHandlers = HandlerUtils.createBlockHandlersProbe
+    val server          = TestProbe()
+    val discoveryServer = TestProbe()
+    val blockHandlers   = HandlerUtils.createBlockHandlersProbe
     val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders) {
-      peers += (peerId -> peerInfo)
+      addPeer(peerInfo)
     }))
-    peerManager ! PeerManager.Set(server.ref, blockHandlers)
+    peerManager ! PeerManager.Set(server.ref, blockHandlers, discoveryServer.ref)
     peerManager ! PeerManager.Sync(peerId, AVector.empty)
     tcpHandler.expectMsg(Message(GetBlocks(AVector.empty)))
   }
@@ -62,9 +64,10 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
     peerManager ! PeerManager.GetPeers
     expectMsgPF() {
       case PeerManager.Peers(peers1) =>
-        peers1.size is 1
-        peers1.head._1 is peerId
-        val handler = peers1.head._2.tcpHandler
+        peers1.sumBy(_.length) is 1
+        val peerInfo = peers1(peerId.groupIndex.value).head
+        peerInfo.id is peerId
+        val handler = peerInfo.tcpHandler
         watch(handler)
         system.stop(handler)
         expectMsgPF() {
@@ -73,7 +76,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
             peerManager ! GetPeers
             expectMsgPF() {
               case PeerManager.Peers(peers2) =>
-                peers2.isEmpty is true
+                peers2.sumBy(_.length) is 0
             }
         }
     }
