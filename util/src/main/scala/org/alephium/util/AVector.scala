@@ -114,6 +114,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
+  def existsWithIndex(f: (A, Int) => Boolean): Boolean = {
+    foreachWithIndex { (a, i) =>
+      if (f(a, i)) { return true }
+    }
+    false
+  }
+
   def forall(f: A => Boolean): Boolean = {
     foreach { a =>
       if (!f(a)) { return false }
@@ -212,6 +219,17 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def filterNot(p: A => Boolean): AVector[A] = {
     filterImpl(p, false)
+  }
+
+  def traverse[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
+    var result = AVector.empty[R]
+    foreach { elem =>
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => result = result :+ r
+      }
+    }
+    Right(result)
   }
 
   @inline private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {

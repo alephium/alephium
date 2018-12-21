@@ -3,20 +3,32 @@ package org.alephium.flow
 import java.time.Duration
 import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.network.DiscoveryConfig
+import org.alephium.flow.storage.{Database, DiskIO}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
+import org.rocksdb.Options
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
-  private val env      = Env.resolve()
-  private val rootPath = Paths.get(System.getProperty("user.home"), ".alephium")
+  private val env = Env.resolve()
+  private val rootPath = {
+    env match {
+      case Env.Prod =>
+        Files.homeDir.resolve(".alephium")
+      case Env.Debug =>
+        Files.homeDir.resolve(s".alephium-${env.name}")
+      case Env.Test =>
+        Files.tmpDir.resolve(s".alephium-${env.name}")
+    }
+  }
 
   object Default extends PlatformConfig(env, rootPath)
 
@@ -48,7 +60,7 @@ trait PlatformConfigFiles extends StrictLogging {
 
     val env      = Env.resolve()
     val filename = s"user_${env.name}.conf"
-    val path     = rootPath.resolve(filename)
+    val path     = rootPath.resolve("user.conf")
     logger.info(s"using conf file $path")
 
     val file = path.toFile
@@ -56,6 +68,7 @@ trait PlatformConfigFiles extends StrictLogging {
     file
   }
 
+  DiskIO.createDirUnsafe(rootPath)
   val all      = ConfigFactory.parseFile(getUserFile).resolve()
   val alephium = all.getConfig("alephium")
 }
@@ -82,19 +95,28 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
 }
 
 trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
+  def loadNonces(): AVector[BigInt] = {
+    val noncesConfig = env match {
+      case Env.Test => all
+      case _ =>
+        val noncesFile = getNoncesFile(groups, numZerosAtLeastInHash)
+        ConfigFactory.parseFile(noncesFile).resolve()
+    }
+    val nonces = noncesConfig.getStringList("nonces").asScala
+    AVector.from(nonces.map(BigInt.apply))
+  }
+
   def loadBlockFlow(): AVector[AVector[Block]] = {
-    val noncesConfig =
-      ConfigFactory.parseFile(getNoncesFile(groups, numZerosAtLeastInHash)).resolve()
-    val nonces = noncesConfig.getStringList("nonces")
-    assert(nonces.size == groups * groups)
+    val nonces = loadNonces()
+    assert(nonces.length == groups * groups)
 
     AVector.tabulate(groups, groups) {
       case (from, to) =>
         val index      = from * groups + to
-        val nonce      = nonces.get(index)
-        val block      = Block.genesis(AVector.empty, maxMiningTarget, BigInt(nonce))
+        val nonce      = nonces(index)
+        val block      = Block.genesis(AVector.empty, maxMiningTarget, nonce)
         val chainIndex = ChainIndex(from, to)(this)
-        assert(chainIndex.accept(block)(this))
+        assert(chainIndex.validateDiff(block)(this))
         block
     }
   }
@@ -116,6 +138,7 @@ trait PDiscoveryConfig extends PlatformGroupConfig {
     val peersPerGroup           = discovery.getInt("peersPerGroup")
     val scanMaxPerGroup         = discovery.getInt("scanMaxPerGroup")
     val scanFrequency           = discovery.getDuration("scanFrequency").toMillis.millis
+    val scanFastFrequency       = discovery.getDuration("scanFastFrequency").toMillis.millis
     val neighborsPerGroup       = discovery.getInt("neighborsPerGroup")
     val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(mainGroup)(this)
     DiscoveryConfig(publicAddress,
@@ -126,6 +149,7 @@ trait PDiscoveryConfig extends PlatformGroupConfig {
                     peersPerGroup,
                     scanMaxPerGroup,
                     scanFrequency,
+                    scanFastFrequency,
                     neighborsPerGroup)
   }
 
@@ -145,5 +169,14 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   def getDuration(path: String): FiniteDuration = {
     val duration = alephium.getDuration(path)
     FiniteDuration(duration.toNanos, NANOSECONDS)
+  }
+
+  val diskIO: DiskIO = DiskIO.createUnsafe(rootPath)
+
+  val dbPath = rootPath.resolve("db")
+  val headerDB: Database = {
+    DiskIO.createDirUnsafe(dbPath)
+    val dbName = "headers-" + nodeId.shortHex
+    Database.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
 }

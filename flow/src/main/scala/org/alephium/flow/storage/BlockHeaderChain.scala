@@ -3,41 +3,55 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{Block, BlockHeader}
-import org.alephium.util.AVector
-
-import scala.collection.mutable.HashMap
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
-  protected val blockHeadersTable: HashMap[Keccak256, BlockHeader] = HashMap.empty
 
-  def getBlockHeader(hash: Keccak256): BlockHeader = {
-    blockHeadersTable(hash)
+  def headerDB: Database
+
+  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] = {
+    headerDB.getHeader(hash)
   }
 
-  def add(blockHeader: BlockHeader, weight: Int): AddBlockHeaderResult = {
+  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader = {
+    headerDB.getHeaderUnsafe(hash)
+  }
+
+  def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
     add(blockHeader, blockHeader.parentHash, weight)
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
-    blockHeadersTable.get(header.hash) match {
-      case Some(_) => AddBlockHeaderResult.AlreadyExisted
-      case None =>
-        blockHashesTable.get(parentHash) match {
-          case Some(parent) =>
-            addHash(header.hash, parent, weight)
-            addHeader(header)
-            AddBlockHeaderResult.Success
-          case None =>
-            AddBlockHeaderResult.MissingDeps(AVector(parentHash))
-        }
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+    assert(!contains(header.hash) && contains(parentHash))
+    val parent = blockHashesTable(parentHash)
+    addHash(header.hash, parent, weight)
+    addHeader(header)
+  }
+
+  protected def addHeader(header: BlockHeader): IOResult[Unit] = {
+    headerDB.putHeader(header)
+  }
+
+  def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
+    getConfirmedHash(height) match {
+      case Some(hash) => headerDB.getHeader(hash).map(Some.apply)
+      case None       => Right(None)
     }
   }
 
-  def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =
-    getHashesAfter(locator).map(getBlockHeader)
-
-  protected def addHeader(header: BlockHeader): Unit = {
-    blockHeadersTable += header.hash -> header
+  def getHashTarget(hash: Keccak256): IOResult[BigInt] = {
+    assert(contains(hash))
+    getBlockHeader(hash).flatMap { header =>
+      val height    = getHeight(hash)
+      val refHeight = height - config.retargetInterval
+      if (refHeight >= 0) {
+        val refHash = getPredecessor(hash, refHeight)
+        getBlockHeader(refHash).map { refHeader =>
+          val timeSpan = header.timestamp - refHeader.timestamp
+          val retarget = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
+          retarget
+        }
+      } else Right(config.maxMiningTarget)
+    }
   }
 }
 
@@ -50,6 +64,7 @@ object BlockHeaderChain {
     val rootNode = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight)
 
     new BlockHeaderChain {
+      override val headerDB: Database                  = _config.headerDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

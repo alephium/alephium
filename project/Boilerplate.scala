@@ -75,18 +75,18 @@ object Boilerplate {
         .map { case (v, t) => s"serde$t.serialize($v)" }
         .mkString(" ++ ")
 
+      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}._2"
       val deserializes = arities
-        .zip(synVals)
         .zip(synTypes)
-        .map { case ((n, v), t) => s"($v, rest${n + 1}) <- serde$t._deserialize(rest$n)" }
+        .map { case (n, t) => s"pair$n <- serde$t._deserialize(${rest(n)})" }
         .mkString("; ")
+
+      val deVals = arities.map(n => s"pair$n._1").mkString(", ")
 
       block"""
         |package org.alephium.serde
         |
         |import akka.util.ByteString
-        |
-        |import scala.util.Try
         |
         |private[serde] trait ProductSerde {
         +
@@ -98,10 +98,10 @@ object Boilerplate {
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest0: ByteString): Try[(T, ByteString)] = {
+        +    override def _deserialize(rest: ByteString): Either[SerdeError, (T, ByteString)] = {
         +      for {
         +        $deserializes
-        +      } yield (pack(${`a..n`}), rest$arity)
+        +      } yield (pack($deVals), pair${arity - 1}._2)
         +    }
         +  }
         +
@@ -111,10 +111,10 @@ object Boilerplate {
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest0: ByteString): Try[((${`A..N`}), ByteString)] = {
+        +    override def _deserialize(rest: ByteString): Either[SerdeError, ((${`A..N`}), ByteString)] = {
         +      for {
         +        $deserializes
-        +      } yield ((${`a..n`}), rest$arity)
+        +      } yield (($deVals), pair${arity - 1}._2)
         +    }
         +  }
         |}
@@ -137,7 +137,7 @@ object Boilerplate {
         |package org.alephium.serde
         |
         |import org.alephium.util.AlephiumSpec
-        |import org.scalatest.TryValues._
+        |import org.scalatest.EitherValues._
         |
         |class ProductSerdeSpec extends AlephiumSpec {
         |
@@ -151,7 +151,7 @@ object Boilerplate {
         +  it should "serde $arity fields" in {
         +    forAll { ($fields) =>
         +      val input  = Test$arity(${`a..n`})
-        +      val output = deserialize[Test$arity](serialize(input)).success.value
+        +      val output = deserialize[Test$arity](serialize(input)).right.value
         +      output is input
         +    }
         +  }
@@ -160,7 +160,7 @@ object Boilerplate {
         +    forAll { ($fields) =>
         +      val input  = (${`a..n`})
         +      val serde = Serde.tuple$arity[$types]
-        +      val output = serde.deserialize(serde.serialize(input)).success.value
+        +      val output = serde.deserialize(serde.serialize(input)).right.value
         +      output is input
         +    }
         +  }

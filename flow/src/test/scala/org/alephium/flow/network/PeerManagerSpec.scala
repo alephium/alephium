@@ -1,13 +1,12 @@
 package org.alephium.flow.network
 
-import akka.actor.{Props, Terminated}
+import akka.actor.Terminated
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.flow.{Mode, PlatformConfig}
 import org.alephium.flow.network.PeerManager.{GetPeers, PeerInfo}
-import org.alephium.flow.storage.HandlerUtils
-import org.alephium.protocol.message.{GetBlocks, Message}
+import org.alephium.flow.storage.TestUtils
 import org.alephium.protocol.model.PeerId
-import org.alephium.util.{AVector, AlephiumActorSpec}
+import org.alephium.util.AlephiumActorSpec
 
 class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
 
@@ -21,7 +20,7 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
   trait Fixture extends PeerFixture {
     val server          = TestProbe()
     val discoveryServer = TestProbe()
-    val blockHandlers   = HandlerUtils.createBlockHandlersProbe
+    val blockHandlers   = TestUtils.createBlockHandlersProbe
     val peerManager     = system.actorOf(PeerManager.props(Mode.defaultBuilders))
 
     peerManager ! PeerManager.Set(server.ref, blockHandlers, discoveryServer.ref)
@@ -37,18 +36,6 @@ class PeerManagerSpec extends AlephiumActorSpec("PeerManagerSpec") {
         peers.sumBy(_.length) is 1
         peers(peerId.groupIndex.value).head.id is peerId
     }
-  }
-
-  it should "try to send GetBlocks to peer" in new PeerFixture {
-    val server          = TestProbe()
-    val discoveryServer = TestProbe()
-    val blockHandlers   = HandlerUtils.createBlockHandlersProbe
-    val peerManager = system.actorOf(Props(new PeerManager(Mode.defaultBuilders) {
-      addPeer(peerInfo)
-    }))
-    peerManager ! PeerManager.Set(server.ref, blockHandlers, discoveryServer.ref)
-    peerManager ! PeerManager.Sync(peerId, AVector.empty)
-    tcpHandler.expectMsg(Message(GetBlocks(AVector.empty)))
   }
 
   it should "stop if server stopped" in new Fixture {

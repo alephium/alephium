@@ -11,31 +11,29 @@ trait BlockPool extends BlockHashPool {
   def contains(block: Block): Boolean = contains(block.hash)
 
   // Assuming the hash is in the pool
-  def getBlock(hash: Keccak256): Block
+  def getBlock(hash: Keccak256): IOResult[Block]
 
-  def add(block: Block, weight: Int): AddBlockResult
+  // Assuming the block is verified
+  def add(block: Block, weight: Int): IOResult[Unit]
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult
+  // Assuming the block is verified
+  def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
-  def getBlocks(locators: AVector[Keccak256]): AVector[Block] = {
-    locators.map(getBlock)
+  def getBlocks(locators: AVector[Keccak256]): IOResult[AVector[Block]] = {
+    locators.filter(contains).traverse(getBlock)
   }
-
-  def getBlocksAfter(locator: Keccak256): AVector[Block]
 
   def getHeight(block: Block): Int = getHeight(block.hash)
 
   def getWeight(block: Block): Int = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
-  def getBlockSlice(hash: Keccak256): AVector[Block] = {
-    getBlockHashSlice(hash).map(getBlock)
+  def getBlockSlice(hash: Keccak256): IOResult[AVector[Block]] = {
+    getBlockHashSlice(hash).traverse(getBlock)
   }
-  def getBlockSlice(block: Block): AVector[Block] = getBlockSlice(block.hash)
+  def getBlockSlice(block: Block): IOResult[AVector[Block]] = getBlockSlice(block.hash)
 
   def isTip(block: Block): Boolean = isTip(block.hash)
-
-  def getBestBlockChain: AVector[Block] = getBlockSlice(getBestTip)
 
   // TODO: have a safe version
   def getTransaction(hash: Keccak256): Transaction
@@ -60,31 +58,25 @@ trait BlockPool extends BlockHashPool {
   def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
     block.transactions.sumBy(transaction => getBalance(transaction, address))
   }
-
-  // calculated from best chain
-  def getBalance(address: ED25519PublicKey): (Keccak256, BigInt) = {
-    val bestTip = getBestTip
-    val balance = getBestBlockChain.sumBy(block => getBalance(block, address))
-    (bestTip, balance)
-  }
 }
 
 sealed trait AddBlockResult
 
 object AddBlockResult {
-  case object Success extends AddBlockResult
-
-  trait Failure extends AddBlockResult
-  case object AlreadyExisted extends Failure {
+  sealed trait OK     extends AddBlockResult
+  case object Success extends OK
+  case object AlreadyExisted extends OK {
     override def toString: String = "Block already exist"
   }
-  case class MissingDeps(deps: AVector[Keccak256]) extends Failure {
-    override def toString: String = s"Missing #$deps.length deps"
-  }
-  case object InvalidIndex extends Failure {
-    override def toString: String = "Block index is invalid"
-  }
-  case class Other(message: String) extends Failure {
+
+  // needs more data for verification
+  sealed trait Incomplete                                              extends AddBlockResult
+  case class HeaderIncomplete(result: AddBlockHeaderResult.Incomplete) extends Incomplete
+
+  sealed trait Error                                         extends AddBlockResult
+  case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
+  case class IOErrorForBlock(error: IOError)                 extends Error
+  case class Other(message: String) extends Error {
     override def toString: String = s"Failed in adding block: $message"
   }
 }

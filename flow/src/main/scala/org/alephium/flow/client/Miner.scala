@@ -21,7 +21,7 @@ object Miner {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
-      if (chainIndex.accept(block)) block else iter(nonce + 1)
+      if (chainIndex.validateDiff(block)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -70,7 +70,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
 
-    case _: AddBlockResult.Failure =>
+    case _: AddBlockResult.Error =>
       context stop self
   }
 
@@ -83,11 +83,17 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       // scalastyle:off magic.number
       val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
       val chainDep     = deps.takeRight(config.groups)(chainIndex.to.value)
-      val lastTs       = node.blockFlow.getBlock(chainDep).header.timestamp
-      val template     = BlockTemplate(deps, target, transactions)
       // scalastyle:on magic.number
-      context become mine(template, lastTs)
-      self ! Miner.Nonce(0, config.nonceStep)
+      node.blockFlow.getBlockHeader(chainDep) match {
+        case Left(e) =>
+          log.warning(e.toString)
+          allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+        case Right(header) =>
+          val lastTs   = header.timestamp
+          val template = BlockTemplate(deps, target, transactions)
+          context become mine(template, lastTs)
+          self ! Miner.Nonce(0, config.nonceStep)
+      }
   }
 
   def collect: Receive = _collect orElse awaitStop
@@ -97,7 +103,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val header = template.buildHeader(current)
-        if (chainIndex.accept(header)) Some(Block(header, template.transactions))
+        if (chainIndex.validateDiff(header)) Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }

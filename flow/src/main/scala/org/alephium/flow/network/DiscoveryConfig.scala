@@ -20,12 +20,13 @@ case class DiscoveryConfig(
     scanMaxPerGroup: Int,
     /* Wait time between two scan. */
     scanFrequency: FiniteDuration,
+    scanFastFrequency: FiniteDuration,
     /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
     neighborsPerGroup: Int
 ) extends DC {
 
   /** Duration we wait before considering a peer dead. **/
-  def peersTimeout: FiniteDuration = scanFrequency * 4
+  def peersTimeout: FiniteDuration = scanFrequency * 3
 
   def udpAddress: InetSocketAddress = nodeInfo.socketAddress
 

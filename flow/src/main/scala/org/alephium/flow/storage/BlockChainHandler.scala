@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{PeerManager, TcpHandler}
-import org.alephium.protocol.message.SendHeaders
+import org.alephium.protocol.message.{SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -32,16 +32,29 @@ class BlockChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, peerManage
       val result = blockFlow.add(block)
       result match {
         case AddBlockResult.Success =>
-          val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
-          val elapsedTime = System.currentTimeMillis() - block.header.timestamp
-          log.info(
-            s"Index: $chainIndex; Total: $total; ${chain.show(block.hash)}; Time elapsed: ${elapsedTime}ms")
-          val headers = blocks.map(_.header)
-          peerManager ! PeerManager.BroadCast(TcpHandler.envelope(SendHeaders(headers)), origin)
-        case error: AddBlockResult.Failure =>
-          log.warning(s"Failed in adding new block: ${error.toString}")
+          logInfo(block)
+          broadcast(block, origin)
+        case AddBlockResult.AlreadyExisted =>
+          log.debug(s"Block already existed")
+        case x: AddBlockResult.Incomplete =>
+          // TODO: handle missing data
+          log.debug(s"No enough data to verify block: ${x.toString}")
+        case x: AddBlockResult.Error =>
+          log.warning(s"Failed in adding new block: ${x.toString}")
       }
 
       sender() ! result
+  }
+
+  def logInfo(block: Block): Unit = {
+    val total       = blockFlow.numHashes - config.chainNum // exclude genesis blocks
+    val elapsedTime = System.currentTimeMillis() - block.header.timestamp
+    log.info(s"$chainIndex; total: $total; ${chain.show(block.hash)}; elapsed: ${elapsedTime}ms")
+  }
+
+  def broadcast(block: Block, origin: DataOrigin): Unit = {
+    val blockMessage  = TcpHandler.envelope(SendBlocks(AVector(block)))
+    val headerMessage = TcpHandler.envelope(SendHeaders(AVector(block.header)))
+    peerManager ! PeerManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
   }
 }

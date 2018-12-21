@@ -100,7 +100,8 @@ lazy val util = subProject("util")
     libraryDependencies ++= Seq(
       akka,
       bcprov,
-      `scala-reflect`(scalaVersion.value)
+      `scala-reflect`(scalaVersion.value),
+      rocksdb
     )
   )
 
