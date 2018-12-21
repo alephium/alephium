@@ -16,13 +16,13 @@ trait FlowUtils extends MultiChain {
     for {
       bestDeps <- getBestDeps(chainIndex)
       target   <- singleChain.getHashTarget(bestDeps.getChainHash)
-    } yield BlockFlowTemplate(bestDeps.deps, target)
+    } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target)
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDepsUnsafe(chainIndex)
     val target      = singleChain.getHashTargetUnsafe(bestDeps.getChainHash)
-    BlockFlowTemplate(bestDeps.deps, target)
+    BlockFlowTemplate(chainIndex, bestDeps.deps, target)
   }
 }
