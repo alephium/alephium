@@ -20,7 +20,7 @@ trait BlockHashChain extends BlockHashPool {
   protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
 
   protected def addNode(node: BlockHashChain.TreeNode): Unit = {
-    assert(node.isLeaf)
+    assert(node.isLeaf && !contains(node.blockHash))
 
     val hash = node.blockHash
     blockHashesTable.put(hash, node)
