@@ -137,15 +137,13 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
   def checkConfirmedBlocks(chain: BlockChain, newBlocks: AVector[Block]): Unit = {
     newBlocks.indices.foreach { index =>
       val height    = index + 1
-      val headerOpt = chain.getConfirmedHeader(height)
+      val headerOpt = chain.getConfirmedHeader(height).right.value
       if (height + config.blockConfirmNum <= newBlocks.length) {
         headerOpt.get is newBlocks(index).header
       } else {
         headerOpt.isEmpty
       }
     }
-    chain.getConfirmedHeader(-1).isEmpty
-    ()
   }
 
   def createBlockChain(blocks: AVector[Block]): BlockChain = {

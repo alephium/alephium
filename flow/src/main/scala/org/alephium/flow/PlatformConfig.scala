@@ -169,16 +169,17 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   val diskIO: DiskIO = {
     DiskIO.create(rootPath) match {
       case Left(error) =>
-        throw new RuntimeException(error.toString)
+        throw error
       case Right(io) => io
     }
   }
 
   val dbPath = rootPath.resolve("db")
   val headerDB: Database = {
+    DiskIO.createDirUnsafe(dbPath)
     Database.open(dbPath.resolve("headers"), new Options().setCreateIfMissing(true)) match {
       case Left(error) =>
-        throw new RuntimeException(error.toString)
+        throw error
       case Right(db) => db
     }
   }

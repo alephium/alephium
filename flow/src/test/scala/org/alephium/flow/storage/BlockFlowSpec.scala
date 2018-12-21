@@ -135,7 +135,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val deps = blockFlow.getBestDeps(chainIndex).deps
+    val deps = blockFlow.getBestDepsUnsafe(chainIndex).deps
 
     @tailrec
     def iter(nonce: BigInt): Block = {
@@ -158,7 +158,7 @@ class BlockFlowSpec extends AlephiumSpec with PlatformConfig.Default with Before
     blockFlow.getAllTips
       .map { tip =>
         val weight = blockFlow.getWeight(tip)
-        val header = blockFlow.getBlockHeader(tip)
+        val header = blockFlow.getBlockHeaderUnsafe(tip)
         val index  = header.chainIndex
         val hash   = showHash(tip)
         val deps   = header.blockDeps.map(showHash).mkString("-")

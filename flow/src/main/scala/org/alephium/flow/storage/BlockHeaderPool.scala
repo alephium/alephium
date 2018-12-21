@@ -9,15 +9,15 @@ trait BlockHeaderPool extends BlockHashPool {
   def contains(bh: BlockHeader): Boolean = contains(bh.hash)
 
   // Assuming the entity is in the pool
-  def getBlockHeader(hash: Keccak256): DBResult[BlockHeader]
+  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader]
   def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader
 
-  def add(header: BlockHeader, weight: Int): DBResult[Unit]
+  def add(header: BlockHeader, weight: Int): IOResult[Unit]
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): DBResult[Unit]
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
   // scalastyle:off return
-  def getHeaders(locators: AVector[Keccak256]): DBResult[AVector[BlockHeader]] = {
+  def getHeaders(locators: AVector[Keccak256]): IOResult[AVector[BlockHeader]] = {
     var blocks = AVector.empty[BlockHeader]
     locators.foreach { hash =>
       if (contains(hash)) {
