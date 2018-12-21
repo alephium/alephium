@@ -10,13 +10,17 @@ import org.alephium.serde._
 object DiskIO {
   def create(root: Path): Either[DiskIOError, DiskIO] = {
     for {
-      _ <- createDirIfNot(root)
+      _ <- createDir(root)
       diskIO = new DiskIO(root)
-      _ <- createDirIfNot(diskIO.blockFolder)
+      _ <- createDir(diskIO.blockFolder)
     } yield diskIO
   }
 
-  def createDirIfNot(path: Path): Either[DiskIOError, Unit] = executeIO {
+  def createDir(path: Path): Either[DiskIOError, Unit] = executeIO {
+    createDirUnsafe(path)
+  }
+
+  def createDirUnsafe(path: Path): Unit = {
     if (!Files.exists(path)) {
       Files.createDirectory(path)
     }
