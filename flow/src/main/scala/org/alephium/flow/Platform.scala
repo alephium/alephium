@@ -2,11 +2,17 @@ package org.alephium.flow
 
 import java.time.Instant
 
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives.{complete, path, put}
+import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Flow}
+
 import com.typesafe.scalalogging.StrictLogging
+
+import io.circe.parser._
+
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.PeerManager
@@ -60,8 +66,37 @@ trait Platform extends App with StrictLogging {
 
         complete((StatusCodes.Accepted, "Start mining"))
       }
-    }
+    } ~
+      path("viewer") {
+        get {
+          handleWebSocketMessages(viewerService(node))
+        }
+      }
 
     Http().bindAndHandle(route, "0.0.0.0", mode.httpPort)
+  }
+
+  def viewerService(node: Node): Flow[Message, Message, Any] = {
+    Flow[Message]
+      .collect {
+        case requestJson: TextMessage =>
+          val request = parse(requestJson.getStrictText)
+          val from    = request.flatMap(_.hcursor.get[Long]("from")).toOption.getOrElse(-1L)
+
+          val blocks = node.blockFlow.getHeaders(_.timestamp > from)
+
+          val json = {
+            val blocksJson = blocks
+              .map { header =>
+                node.blockFlow.toJsonUnsafe(header)
+              }
+              .sorted
+              .mkString("[", ",", "]")
+
+            s"""{"blocks":$blocksJson}"""
+          }
+
+          TextMessage(json)
+      }
   }
 }
