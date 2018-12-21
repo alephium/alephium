@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import akka.util.ByteString
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Files}
 import org.rocksdb.Options
 import org.scalacheck.Arbitrary
 import org.scalatest.Assertion
@@ -10,9 +10,9 @@ import org.scalatest.EitherValues._
 class DatabaseSpec extends AlephiumSpec {
 
   trait Fixture {
-    val tmpdir         = Files.tmpDir
-    def dbname: String = "foo"
-    def dbPath: String = tmpdir + "/" + dbname
+    val tmpdir = Files.tmpDir
+    val dbname = "foo"
+    val dbPath = tmpdir.resolve(dbname)
 
     val db = Database.open(dbPath, new Options().setCreateIfMissing(true)).right.value
 

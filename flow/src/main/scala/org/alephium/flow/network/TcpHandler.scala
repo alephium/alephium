@@ -233,7 +233,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")
-      allHandlers.flowHandler ! FlowHandler.GetHeadersAfter(locators)
+      allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
     case _ =>
       log.warning(s"Got unexpected payload type")
   }
