@@ -87,7 +87,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader =
     getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
-  def add(header: BlockHeader): AddBlockHeaderResult
+  def add(header: BlockHeader): IOResult[Unit]
 
   /* BlockChain apis */
 
@@ -107,7 +107,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(hash).getBlock(hash)
   }
 
-  def add(block: Block): AddBlockResult
+  def add(block: Block): IOResult[Unit]
 
   def getTransaction(hash: Keccak256): Transaction = ???
 

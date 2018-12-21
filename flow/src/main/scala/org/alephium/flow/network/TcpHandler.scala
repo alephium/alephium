@@ -148,11 +148,11 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   def handleWith(unaligned: ByteString,
                  current: Payload => Unit,
                  next: Payload    => Unit): Receive = {
-    handleEvent(unaligned, current, next) orElse handleOutMessage orElse handleInternal
+    handleEvent(unaligned, current, next) orElse handleOutMessage
   }
 
   def handleWith(unaligned: ByteString, handle: Payload => Unit): Receive = {
-    handleEvent(unaligned, handle, handle) orElse handleOutMessage orElse handleInternal
+    handleEvent(unaligned, handle, handle) orElse handleOutMessage
   }
 
   def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
@@ -186,13 +186,6 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       connection ! TcpHandler.envelope(message)
     case write: Tcp.Write =>
       connection ! write
-  }
-
-  def handleInternal: Receive = {
-    case _: AddBlockResult =>
-      () // TODO: handle error
-    case _: AddBlockHeaderResult =>
-      () // TODO: handle error
   }
 
   def handlePayload(payload: Payload): Unit = payload match {
