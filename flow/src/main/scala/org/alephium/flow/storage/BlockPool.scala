@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.flow.io.{IOError, IOResult}
+import org.alephium.flow.io.IOResult
 import org.alephium.protocol.model.{Block, Transaction, TxInput}
 import org.alephium.util.AVector
 
@@ -58,22 +58,5 @@ trait BlockPool extends BlockHashPool {
 
   def getBalance(block: Block, address: ED25519PublicKey): BigInt = {
     block.transactions.sumBy(transaction => getBalance(transaction, address))
-  }
-}
-
-sealed trait AddBlockResult
-
-object AddBlockResult {
-  sealed trait OK     extends AddBlockResult
-  case object Success extends OK
-  case object AlreadyExisted extends OK {
-    override def toString: String = "Block already exist"
-  }
-
-  sealed trait Error                                         extends AddBlockResult
-  case class HeaderError(result: AddBlockHeaderResult.Error) extends Error
-  case class IOErrorForBlock(error: IOError)                 extends Error
-  case class Other(message: String) extends Error {
-    override def toString: String = s"Failed in adding block: $message"
   }
 }

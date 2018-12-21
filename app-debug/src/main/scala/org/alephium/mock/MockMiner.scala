@@ -6,7 +6,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
-import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
+import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 
@@ -49,12 +49,9 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
       blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
 
-    case AddBlockResult.Success =>
+    case _: Miner.BlockAdded =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
-
-    case _: AddBlockResult.Error =>
-      context stop self
   }
 
   override def tryMine(template: BlockTemplate, nextTs: BigInt, to: BigInt): Option[Block] = {
