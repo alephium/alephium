@@ -69,7 +69,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       setSocket(sender())
       log.debug(s"bootstrap ndoes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
-      timers.startPeriodicTimer(Timer, Scan, config.scanFrequency)
+      scheduleOnce(self, Scan, config.scanFastFrequency)
       context.become(ready)
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
@@ -99,6 +99,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       log.debug("Scan the available peers")
       cleanup()
       scan()
+      if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
+      else scheduleOnce(self, Scan, config.scanFrequency)
     case GetPeers =>
       sender() ! Peers(getActivePeers)
     case Disable(peerId) =>

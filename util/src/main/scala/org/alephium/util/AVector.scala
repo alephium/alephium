@@ -114,6 +114,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
+  def existsWithIndex(f: (A, Int) => Boolean): Boolean = {
+    foreachWithIndex { (a, i) =>
+      if (f(a, i)) { return true }
+    }
+    false
+  }
+
   def forall(f: A => Boolean): Boolean = {
     foreach { a =>
       if (!f(a)) { return false }
