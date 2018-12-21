@@ -20,12 +20,13 @@ import scala.concurrent.duration._
 object PlatformConfig extends StrictLogging {
   private val env = Env.resolve()
   private val rootPath = {
-    val dirName = s".alephium-${env.name}"
     env match {
+      case Env.Prod =>
+        Files.homeDir.resolve(".alephium")
+      case Env.Debug =>
+        Files.homeDir.resolve(s".alephium-${env.name}")
       case Env.Test =>
-        Files.tmpDir.resolve(dirName)
-      case _ =>
-        Files.homeDir.resolve(dirName)
+        Files.tmpDir.resolve(s".alephium-${env.name}")
     }
   }
 
@@ -59,7 +60,7 @@ trait PlatformConfigFiles extends StrictLogging {
 
     val env      = Env.resolve()
     val filename = s"user_${env.name}.conf"
-    val path     = rootPath.resolve(filename)
+    val path     = rootPath.resolve("user.conf")
     logger.info(s"using conf file $path")
 
     val file = path.toFile
@@ -176,6 +177,6 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   val headerDB: Database = {
     DiskIO.createDirUnsafe(dbPath)
     val dbName = "headers-" + nodeId.shortHex
-    Database.openUnafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
+    Database.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
 }

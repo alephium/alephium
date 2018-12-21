@@ -29,12 +29,9 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
       val chain = BlockChain.fromGenesis(genesis)
       chain.numHashes is 1
       val blocksSize1 = chain.numHashes
-//      val txSize1     = chain.numTransactions
       chain.add(block, 0)
       val blocksSize2 = chain.numHashes
-//      val txSize2     = chain.numTransactions
       blocksSize1 + 1 is blocksSize2
-//      txSize1 + block.transactions.length is txSize2
     }
   }
 
@@ -42,12 +39,9 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
     forAll(chainGen) { blocks =>
       val chain       = BlockChain.fromGenesis(genesis)
       val blocksSize1 = chain.numHashes
-//      val txSize1     = chain.numTransactions
       blocks.foreach(block => chain.add(block, 0))
       val blocksSize2 = chain.numHashes
-//      val txSize2     = chain.numTransactions
       blocksSize1 + blocks.length is blocksSize2
-//      txSize1 + blocks.sumBy(_.transactions.length) is txSize2
 
       checkConfirmedBlocks(chain, blocks)
     }
