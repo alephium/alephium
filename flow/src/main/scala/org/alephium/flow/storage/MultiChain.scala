@@ -111,18 +111,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getTransaction(hash: Keccak256): Transaction = ???
 
-  def getInfo: String = {
-    val infos = for {
-      i <- 0 until groups
-      j <- 0 until groups
-    } yield {
-      val gi = GroupIndex(i)
-      val gj = GroupIndex(j)
-      s"($i, $j): ${getHashChain(gi, gj).maxHeight}/${getHashChain(gi, gj).numHashes - 1}"
-    }
-    infos.mkString("; ")
-  }
-
   def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
     for {
       i    <- 0 until groups
@@ -133,41 +121,5 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     } yield {
       header
     }
-  }
-
-  def getBlockInfoUnsafe: String = {
-    val blocks = for {
-      i    <- 0 until groups
-      j    <- 0 until groups
-      hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
-    } yield {
-      val header = getBlockHeaderUnsafe(hash)
-      toJson(header)
-    }
-
-    val blocksJson = blocks.sorted.mkString("[", ",", "]")
-    val heights = for {
-      i <- 0 until groups
-      j <- 0 until groups
-    } yield {
-      val gi = GroupIndex(i)
-      val gj = GroupIndex(j)
-      s"""{"chainFrom":$i,"chainTo":$j,"height":${getHashChain(gi, gj).maxHeight}}"""
-    }
-    val heightsJson = heights.mkString("[", ",", "]")
-    s"""{"blocks":$blocksJson,"heights":$heightsJson}"""
-  }
-
-  def toJson(header: BlockHeader): String = {
-    val index     = header.chainIndex
-    val from      = index.from.value
-    val to        = index.to.value
-    val timestamp = header.timestamp
-    val height    = getHeight(header)
-    val hash      = header.shortHex
-    val deps = header.blockDeps
-      .map(h => "\"" + h.shortHex + "\"")
-      .mkString("[", ",", "]")
-    s"""{"timestamp":$timestamp,"chainFrom":$from,"chainTo":$to,"height":"$height","hash":"$hash","deps":$deps}"""
   }
 }

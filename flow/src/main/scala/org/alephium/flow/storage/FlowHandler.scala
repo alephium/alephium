@@ -14,7 +14,6 @@ object FlowHandler {
   sealed trait Command
   case class GetBlocks(hashes: AVector[Keccak256])    extends Command
   case class GetHeaders(hashes: AVector[Keccak256])   extends Command
-  case object GetBlockInfo                            extends Command
   case class PrepareSync(peerId: PeerId)              extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex) extends Command
 
@@ -41,8 +40,6 @@ class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
         case Right(blocks) =>
           sender() ! Message(SendBlocks(blocks))
       }
-    case GetBlockInfo =>
-      sender() ! blockFlow.getBlockInfoUnsafe
     case PrepareBlockFlow(chainIndex) =>
       prepareBlockFlow(chainIndex)
   }
