@@ -6,14 +6,14 @@ import org.alephium.protocol.model.{Block, BlockHeader}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  def database: Database
+  def headerDB: Database
 
   def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] = {
-    database.getHeader(hash)
+    headerDB.getHeader(hash)
   }
 
   def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader = {
-    database.getHeaderUnsafe(hash)
+    headerDB.getHeaderUnsafe(hash)
   }
 
   def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
@@ -28,12 +28,12 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
-    database.putHeader(header)
+    headerDB.putHeader(header)
   }
 
   def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
     getConfirmedHash(height) match {
-      case Some(hash) => database.getHeader(hash).map(Option.apply)
+      case Some(hash) => headerDB.getHeader(hash).map(Option.apply)
       case None       => Right(None)
     }
   }
@@ -67,7 +67,7 @@ object BlockHeaderChain {
     val rootNode = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight)
 
     new BlockHeaderChain {
-      override val database: Database                  = _config.headerDB
+      override val headerDB: Database                  = _config.headerDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
