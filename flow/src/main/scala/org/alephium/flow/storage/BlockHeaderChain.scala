@@ -14,23 +14,15 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     blockHeadersTable(hash)
   }
 
-  def add(blockHeader: BlockHeader, weight: Int): AddBlockHeaderResult = {
+  def add(blockHeader: BlockHeader, weight: Int): Unit = {
     add(blockHeader, blockHeader.parentHash, weight)
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
-    blockHeadersTable.get(header.hash) match {
-      case Some(_) => AddBlockHeaderResult.AlreadyExisted
-      case None =>
-        blockHashesTable.get(parentHash) match {
-          case Some(parent) =>
-            addHash(header.hash, parent, weight)
-            addHeader(header)
-            AddBlockHeaderResult.Success
-          case None =>
-            AddBlockHeaderResult.MissingDeps(AVector(parentHash))
-        }
-    }
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit = {
+    assert(!contains(header.hash) && contains(parentHash))
+    val parent = blockHashesTable(parentHash)
+    addHash(header.hash, parent, weight)
+    addHeader(header)
   }
 
   def getHeadersAfter(locator: Keccak256): AVector[BlockHeader] =

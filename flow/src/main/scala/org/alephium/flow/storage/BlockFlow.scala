@@ -55,59 +55,89 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain {
   }
 
   def add(block: Block): AddBlockResult = {
-    val index = block.chainIndex
-    if (index.from != mainGroup && index.to != mainGroup) {
-      AddBlockResult.InvalidIndex
-    } else if (contains(block.hash)) {
+    if (contains(block.hash)) {
       AddBlockResult.AlreadyExisted
     } else {
-      val deps        = block.header.blockDeps
-      val missingDeps = deps.filterNot(contains)
-      if (missingDeps.isEmpty) {
-        val chain  = getBlockChain(index)
-        val parent = block.uncleHash(index.to)
-        val weight = calWeight(block)
-        chain.add(block, parent, weight)
-      } else {
-        AddBlockResult.MissingDeps(missingDeps)
-      }
+      val index = block.chainIndex
+      val result = for {
+        _ <- checkCompleteness(block)
+        _ <- validate(block, index)
+      } yield add(block, index)
+      result.fold(identity, _ => AddBlockResult.Success)
     }
   }
 
-  def add(block: Block, weight: Int): AddBlockResult = {
+  def checkCompleteness(block: Block): Either[AddBlockResult.Incomplete, Unit] = {
+    checkCompleteness(block.header).left.map(AddBlockResult.HeaderIncomplete)
+  }
+
+  def validate(block: Block, index: ChainIndex): Either[AddBlockResult.Error, Unit] = {
+    if (index.from != mainGroup && index.to != mainGroup) {
+      Left(AddBlockResult.HeaderError(AddBlockHeaderResult.InvalidGroup))
+    } else if (!index.validateDiff(block)) {
+      Left(AddBlockResult.HeaderError(AddBlockHeaderResult.InvalidDifficulty))
+    } else {
+      Right(())
+    }
+  }
+
+  protected def add(block: Block, index: ChainIndex): Unit = {
+    val chain  = getBlockChain(index)
+    val parent = block.uncleHash(index.to)
+    val weight = calWeight(block)
+    chain.add(block, parent, weight)
+  }
+
+  def add(block: Block, weight: Int): Unit = {
     add(block, block.parentHash, weight)
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): AddBlockResult = {
+  def add(block: Block, parentHash: Keccak256, weight: Int): Unit = {
     val chain = getBlockChain(block)
     chain.add(block, parentHash, weight)
   }
 
   def add(header: BlockHeader): AddBlockHeaderResult = {
-    val index = header.chainIndex
-    if (index.from == mainGroup || index.to == mainGroup) {
-      AddBlockHeaderResult.Other("Block is expected, not BlockHeader")
-    } else if (contains(header.hash)) {
+    if (contains(header.hash)) {
       AddBlockHeaderResult.AlreadyExisted
     } else {
-      val deps        = header.blockDeps
-      val missingDeps = deps.filterNot(contains)
-      if (missingDeps.isEmpty) {
-        val chain  = getHeaderChain(index)
-        val parent = header.uncleHash(index.to)
-        val weight = calWeight(header)
-        chain.add(header, parent, weight)
-      } else {
-        AddBlockHeaderResult.MissingDeps(missingDeps)
-      }
+      val index = header.chainIndex
+      val result = for {
+        _ <- checkCompleteness(header)
+        _ <- validate(header, index)
+      } yield add(header, index)
+      result.fold(identity, _ => AddBlockHeaderResult.Success)
     }
   }
 
-  def add(header: BlockHeader, weight: Int): AddBlockHeaderResult = {
+  def validate(header: BlockHeader,
+               index: ChainIndex): Either[AddBlockHeaderResult.VerificationError, Unit] = {
+    if (index.from == mainGroup || index.to == mainGroup) {
+      Left(AddBlockHeaderResult.InvalidGroup)
+    } else if (!index.validateDiff(header)) {
+      Left(AddBlockHeaderResult.InvalidDifficulty)
+    } else Right(())
+  }
+
+  def checkCompleteness(header: BlockHeader): Either[AddBlockHeaderResult.Incomplete, Unit] = {
+    val deps        = header.blockDeps
+    val missingDeps = deps.filterNot(contains)
+    if (missingDeps.isEmpty) Right(())
+    else Left(AddBlockHeaderResult.MissingDeps(missingDeps))
+  }
+
+  protected def add(header: BlockHeader, index: ChainIndex): Unit = {
+    val chain  = getHeaderChain(index)
+    val parent = header.uncleHash(index.to)
+    val weight = calWeight(header)
+    chain.add(header, parent, weight)
+  }
+
+  def add(header: BlockHeader, weight: Int): Unit = {
     add(header, header.parentHash, weight)
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): AddBlockHeaderResult = {
+  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): Unit = {
     val chain = getHeaderChain(header)
     chain.add(header, parentHash, weight)
   }
