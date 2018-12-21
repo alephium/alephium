@@ -37,12 +37,12 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
           logInfo(header)
           broadcast(header, origin)
         case AddBlockHeaderResult.AlreadyExisted =>
-          log.debug(s"Header already existed")
+          log.debug(s"Header do already exists")
         case x: AddBlockHeaderResult.Incomplete =>
           // TODO: handle missing data
           log.debug(s"No enough data to verify header: ${x.toString}")
         case x: AddBlockHeaderResult.Error =>
-          log.warning(s"Failed in adding new header: ${x.toString}")
+          log.warning(s"Failure while adding a new header: ${x.toString}")
       }
       sender() ! result
   }

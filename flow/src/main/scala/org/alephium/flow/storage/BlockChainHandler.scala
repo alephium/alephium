@@ -36,7 +36,7 @@ class BlockChainHandler(val blockFlow: BlockFlow, val chainIndex: ChainIndex, pe
           logInfo(block.header)
           broadcast(block, origin)
         case AddBlockResult.AlreadyExisted =>
-          log.debug(s"Block already existed")
+          log.debug(s"Block do already exists")
         case x: AddBlockResult.Incomplete =>
           // TODO: handle missing data
           log.debug(s"No enough data to verify block: ${x.toString}")

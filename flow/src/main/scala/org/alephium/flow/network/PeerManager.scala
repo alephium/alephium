@@ -77,7 +77,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
 
   def awaitPeers: Receive = {
     case DiscoveryServer.Peers(discoveried) =>
-      log.info(s"Discoveried #${discoveried.sumBy(_.length)} peers")
+      log.info(s"Discovered #${discoveried.sumBy(_.length)} peers")
       val isEnough = discoveried.forallWithIndex { (peers, i) =>
         i == config.mainGroup.value || peers.length >= 1
       }
@@ -100,7 +100,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
     case Connected(peerId, peerInfo) =>
       context.watch(peerInfo.tcpHandler)
       addPeer(peerInfo)
-      log.info(s"Connected to $peerId@${peerInfo.address}, now $peersSize peers")
+      log.info(s"Connected to $peerId@${peerInfo.address} ($peersSize peers in total)")
     case Tcp.Connected(remote, _) =>
       val connection  = sender()
       val handlerName = BaseActor.envalidActorName(s"TcpHandler-$remote")
@@ -109,11 +109,11 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
       tcpHandler ! TcpHandler.Set(connection)
     case BroadCastBlock(block, blockMsg, headerMsg, origin) =>
       assert(block.chainIndex.relateTo(config.mainGroup))
-      log.debug(s"Broadcast block/header to peers")
+      log.debug(s"Broadcasting block/header to peers")
       broadcastBlock(block, blockMsg, headerMsg, origin)
     case BroadCastHeader(header, headerMsg, origin) =>
       assert(!header.chainIndex.relateTo(config.mainGroup))
-      log.debug(s"Broadcast header to peers")
+      log.debug(s"Broadcasting header to peers")
       broadcastHeader(header, headerMsg, origin)
     case GetPeers =>
       sender() ! Peers(getPeers)
@@ -123,7 +123,7 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
         unwatchAndStop()
       } else {
         removePeer(child)
-        log.debug(s"Peer connection closed, removing peer, $peersSize peers left")
+        log.debug(s"Peer connection closed, removing peer ($peersSize peers left)")
       }
   }
 
