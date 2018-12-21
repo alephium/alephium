@@ -4,15 +4,15 @@ import java.util.concurrent.{ConcurrentHashMap => JCHashMap}
 
 import scala.collection.JavaConverters._
 
-object CopyOnWriteSet {
-  def empty[K]: CopyOnWriteSet[K] = {
+object ConcurrentHashSet {
+  def empty[K]: ConcurrentHashSet[K] = {
     val s = new JCHashMap[K, Boolean]()
-    new CopyOnWriteSet[K](s)
+    new ConcurrentHashSet[K](s)
   }
 }
 
 // Only suitable for small sets
-class CopyOnWriteSet[K](s: JCHashMap[K, Boolean]) {
+class ConcurrentHashSet[K](s: JCHashMap[K, Boolean]) {
   def contains(k: K): Boolean = s.containsKey(k)
 
   def add(k: K): Unit = {
