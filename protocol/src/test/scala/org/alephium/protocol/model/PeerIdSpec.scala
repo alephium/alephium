@@ -1,26 +1,9 @@
 package org.alephium.protocol.model
 
-import akka.util.ByteString
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfigFixture}
-import org.alephium.serde.Serde
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.util.AlephiumSpec
-import org.scalatest.EitherValues._
 
 class PeerIdSpec extends AlephiumSpec {
-
-  it should "compute xor distance" in {
-    forAll { distance: Long =>
-      whenever(distance > 0) {
-        val zero          = PeerId.zero
-        val value         = Serde.LongSerde.serialize(distance)
-        val padding       = ByteString(Array.fill[Byte](PeerId.length - value.size)(0))
-        val bytes         = padding ++ value
-        val distanceValue = PeerId.serde.deserialize(bytes).right.value
-
-        PeerId.distance(zero, distanceValue) is distance
-      }
-    }
-  }
 
   it should "compute hamming distance for peer ids" in {
     forAll(ModelGen.peerId, ModelGen.peerId) { (id0, id1) =>
@@ -56,7 +39,7 @@ class PeerIdSpec extends AlephiumSpec {
     override def groups: Int = 9
     (0 until 9).foreach { i =>
       val groupIndex     = GroupIndex(i)
-      val (_, publicKey) = DiscoveryConfig.generateDiscoveryKeyPair(groupIndex)
+      val (_, publicKey) = GroupConfig.generateKeyForGroup(groupIndex)
       val peerId         = PeerId.fromPublicKey(publicKey)
       peerId.groupIndex is groupIndex
     }

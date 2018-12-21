@@ -28,8 +28,7 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
     implicit val rpcConfig        = RPCConfig.load(config.alephium)
 
     val miner = {
-      val publicKey = config.discoveryConfig.discoveryPublicKey
-      val props     = FairMiner.props(publicKey, node).withDispatcher("akka.actor.mining-dispatcher")
+      val props = FairMiner.props(node).withDispatcher("akka.actor.mining-dispatcher")
       system.actorOf(props, s"FairMiner")
     }
 

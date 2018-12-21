@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 
 // TODO: rename as GenFixture
 object ModelGen {
-  private val (sk, pk) = ED25519.generateKeyPair()
+  private val (sk, pk) = ED25519.generatePriPub()
 
   val txInputGen: Gen[TxInput] = for {
     index <- Gen.choose(0, 10)

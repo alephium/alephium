@@ -3,7 +3,7 @@ package org.alephium.flow.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture, DiscoveryConfig => DC}
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{GroupIndex, PeerId}
 import org.alephium.util.AlephiumActorSpec
 import org.scalacheck.Gen
@@ -22,7 +22,7 @@ object DiscoveryServerSpec {
     implicit val groupconfig = new GroupConfig {
       val groups = groupSize
     }
-    val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(GroupIndex(groupIndex))
+    val (privateKey, publicKey) = GroupConfig.generateKeyForGroup(GroupIndex(groupIndex))
     DiscoveryConfig(
       InetAddress.getLocalHost,
       port,
@@ -130,8 +130,8 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
       val peerId = peerIds(i)
 
       val discovereds =
-        discoveries(i).flatMap(_.map(_.id)).sortBy(PeerId.distance(peerId, _))
-      val nearests = peerIds.sortBy(PeerId.distance(peerId, _))
+        discoveries(i).flatMap(_.map(_.id)).sortBy(PeerId.hammingDist(peerId, _))
+      val nearests = peerIds.sortBy(PeerId.hammingDist(peerId, _))
       val rank = nearests.zipWithIndex.collectFirst {
         case (id, i) if discovereds.contains(id) => i
       }

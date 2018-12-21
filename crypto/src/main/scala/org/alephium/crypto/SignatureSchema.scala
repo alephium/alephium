@@ -12,7 +12,7 @@ trait Signature extends RandomBytes
 
 trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Signature] {
 
-  def generateKeyPair(): (D, Q)
+  def generatePriPub(): (D, Q)
 
   def sign(message: ByteString, privateKey: D): S
 

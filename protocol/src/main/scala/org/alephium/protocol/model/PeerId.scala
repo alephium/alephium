@@ -24,17 +24,6 @@ object PeerId extends RandomBytes.Companion[PeerId](new PeerId(_), _.bytes) {
 
   def fromPublicKey(key: ED25519PublicKey): PeerId = new PeerId(key.bytes)
 
-  /** Return the distance between two peers as the XOR of their identifier. **/
-  def distance(p0: PeerId, p1: PeerId): BigInt = {
-    val xs = Array.tabulate[Byte](length) { i =>
-      (p0.bytes(i) ^ p1.bytes(i)).toByte
-    }
-
-    BigInt(1, xs)
-  }
-
-  def ordering(origin: PeerId): Ordering[PeerId] = Ordering.by(distance(origin, _))
-
   def hammingDist(peerId0: PeerId, peerId1: PeerId): Int = {
     val bytes0 = peerId0.bytes
     val bytes1 = peerId1.bytes
