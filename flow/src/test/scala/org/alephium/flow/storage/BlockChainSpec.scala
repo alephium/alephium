@@ -1,12 +1,10 @@
 package org.alephium.flow.storage
 
-import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.{AVector, AlephiumSpec}
-import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
-class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
+class BlockChainSpec extends AlephiumSpec with BlockFlowFixture {
 
   behavior of "BlockChain"
 
@@ -14,14 +12,6 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
-  }
-
-  before {
-    DiskIO.createDir(config.diskIO.blockFolder).isRight is true
-  }
-
-  after {
-    TestUtils.cleanup(config.diskIO.blockFolder)
   }
 
   it should "add block correctly" in new Fixture {
