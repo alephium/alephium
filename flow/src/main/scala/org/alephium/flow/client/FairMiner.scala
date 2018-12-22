@@ -5,8 +5,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.storage.BlockChainHandler
-import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
+import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, BlockFlow}
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -22,13 +21,10 @@ object FairMiner {
       extends Command
 }
 
-class FairMiner(address: ED25519PublicKey, node: Node)(implicit config: PlatformConfig)
-    extends BaseActor {
-  val miningCounts = Array.fill[BigInt](config.groups)(0)
-  val pendingTasks = Array.tabulate[BlockFlowTemplate](config.groups) { to =>
-    val index = ChainIndex(config.mainGroup.value, to)
-    node.blockFlow.prepareBlockFlowUnsafe(index)
-  }
+class FairMiner(address: ED25519PublicKey, node: Node)(implicit val config: PlatformConfig)
+    extends BaseActor
+    with FairMinerState {
+  val blockFlow: BlockFlow  = node.blockFlow
   val actualMiner: ActorRef = context.actorOf(ActualMiner.props)
 
   def receive: Receive = awaitStart
@@ -36,8 +32,9 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit config: Platform
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
-      startOneTask()
-      context become (awaitMining orElse awaitStop)
+      initializeState()
+      startNewTask()
+      context become (handleMining orElse awaitStop)
   }
 
   def awaitStop: Receive = {
@@ -46,34 +43,39 @@ class FairMiner(address: ED25519PublicKey, node: Node)(implicit config: Platform
       context become awaitStart
   }
 
-  def awaitMining: Receive = {
+  def handleMining: Receive = {
     case FairMiner.MiningResult(blockOpt, chainIndex, miningCount) =>
       val to = chainIndex.to.value
-      miningCounts(to) = miningCounts(to) + miningCount
-      blockOpt.foreach { block =>
-        val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
-        val miningCount  = miningCounts(to)
-        log.info(
-          s"A new block ${block.shortHex} is mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
-        blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
+      increaseCounts(to, miningCount)
+      blockOpt match {
+        case Some(block) =>
+          val miningCount = getMiningCount(to)
+          removeTask(to)
+          log.debug(
+            s"""MiningCounts: ${(0 until config.groups).map(getMiningCount).mkString(",")}""")
+          log.info(
+            s"A new block ${block.shortHex} is mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
+          val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
+          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
+        case None => tryToRefresh(to)
       }
-      startOneTask()
+      startNewTask()
+    case AddBlockResult.Success =>
+      node.allHandlers.blockHandlers.foreach {
+        case (chainIndex, handler) =>
+          if (handler == sender()) {
+            assert(chainIndex.from == config.mainGroup)
+            refresh(chainIndex.to.value)
+          }
+      }
+    case e: AddBlockResult =>
+      log.error(s"Error in adding new block: ${e.toString}")
+      context stop self
   }
 
-  def prepareTask(to: Int): Unit = {
-    val index    = ChainIndex(config.mainGroup.value, to)
-    val template = pendingTasks(to)
-    mine(template, index)
-  }
-
-  def startOneTask(): Unit = {
-    val toTry    = miningCounts.zipWithIndex.minBy(_._1)._2
-    val index    = ChainIndex(config.mainGroup.value, toTry)
-    val template = pendingTasks(toTry)
-    mine(template, index)
-  }
-
-  def mine(template: BlockFlowTemplate, chainIndex: ChainIndex): Unit = {
+  def startNewTask(): Unit = {
+    val (to, template) = pickNextTemplate()
+    val chainIndex     = ChainIndex(config.mainGroup.value, to)
     // scalastyle:off magic.number
     val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
     // scalastyle:on magic.number
