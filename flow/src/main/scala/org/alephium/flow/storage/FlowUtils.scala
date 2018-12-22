@@ -7,22 +7,26 @@ import org.alephium.protocol.model.ChainIndex
 
 trait FlowUtils extends MultiChain {
 
-  def getBestDepsUnsafe(chainIndex: ChainIndex): BlockDeps
+  def getBestDeps: BlockDeps
 
-  def getBestDeps(chainIndex: ChainIndex): IOResult[BlockDeps]
+  def calBestDeps(): IOResult[BlockDeps]
+
+  def calBestDepsUnsafe(): BlockDeps
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
+    assert(chainIndex.from == config.mainGroup)
     val singleChain = getBlockChain(chainIndex)
+    val bestDeps    = getBestDeps
     for {
-      bestDeps <- getBestDeps(chainIndex)
-      target   <- singleChain.getHashTarget(bestDeps.getChainHash)
+      target <- singleChain.getHashTarget(bestDeps.getChainHash(chainIndex.to))
     } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target)
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
+    assert(chainIndex.from == config.mainGroup)
     val singleChain = getBlockChain(chainIndex)
-    val bestDeps    = getBestDepsUnsafe(chainIndex)
-    val target      = singleChain.getHashTargetUnsafe(bestDeps.getChainHash)
+    val bestDeps    = getBestDeps
+    val target      = singleChain.getHashTargetUnsafe(bestDeps.getChainHash(chainIndex.to))
     BlockFlowTemplate(chainIndex, bestDeps.deps, target)
   }
 }

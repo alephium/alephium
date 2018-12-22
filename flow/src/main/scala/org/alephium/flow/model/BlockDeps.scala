@@ -2,7 +2,7 @@ package org.alephium.flow.model
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.AVector
 
 /*
@@ -10,9 +10,9 @@ import org.alephium.util.AVector
  * The first groups - 1 hashes are for the other groups
  * The last groups hashes are for the chains related to the target group
  */
-case class BlockDeps(chainIndex: ChainIndex, deps: AVector[Keccak256]) {
+case class BlockDeps(deps: AVector[Keccak256]) {
 
-  def getChainHash(implicit config: PlatformConfig): Keccak256 = {
-    deps.takeRight(config.groups)(chainIndex.to.value)
+  def getChainHash(to: GroupIndex)(implicit config: PlatformConfig): Keccak256 = {
+    deps.takeRight(config.groups)(to.value)
   }
 }
