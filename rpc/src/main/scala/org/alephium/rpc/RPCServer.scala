@@ -84,7 +84,7 @@ object RPCServer extends StrictLogging {
                 case Some(ts) => Math.max(ts, limit)
               }
 
-              val blocks = node.blockFlow.getHeaders(header => header.timestamp > from)
+              val blocks = node.blockFlow.getHeadersUnsafe(header => header.timestamp > from)
 
               val json = {
                 val blocksJson = blocks

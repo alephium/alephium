@@ -122,7 +122,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     infos.mkString("; ")
   }
 
-  def getHeaders(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
+  def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
     for {
       i    <- 0 until groups
       j    <- 0 until groups
