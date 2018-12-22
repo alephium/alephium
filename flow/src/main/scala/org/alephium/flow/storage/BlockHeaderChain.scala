@@ -48,12 +48,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     val header    = getBlockHeaderUnsafe(hash)
     val height    = getHeight(hash)
     val refHeight = height - config.retargetInterval
-    if (refHeight >= 0) {
+    if (refHeight > 0) {
       val refHash   = getPredecessor(hash, refHeight)
       val refHeader = getBlockHeaderUnsafe(refHash)
       val timeSpan  = header.timestamp - refHeader.timestamp
-      val retarget  = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
-      retarget
+      getTarget(header, timeSpan)
     } else config.maxMiningTarget
   }
 
@@ -62,15 +61,18 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getBlockHeader(hash).flatMap { header =>
       val height    = getHeight(hash)
       val refHeight = height - config.retargetInterval
-      if (refHeight >= 0) {
+      if (refHeight > 0) {
         val refHash = getPredecessor(hash, refHeight)
         getBlockHeader(refHash).map { refHeader =>
           val timeSpan = header.timestamp - refHeader.timestamp
-          val retarget = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
-          retarget
+          getTarget(header, timeSpan)
         }
       } else Right(config.maxMiningTarget)
     }
+  }
+
+  def getTarget(header: BlockHeader, timeSpan: Long): BigInt = {
+    header.target * timeSpan / config.expectedTimeSpan
   }
 }
 
