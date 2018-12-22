@@ -1,6 +1,7 @@
 package org.alephium.util
 
 import akka.actor._
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -38,6 +39,8 @@ object BaseActor {
 
 final class DefaultStrategy extends SupervisorStrategyConfigurator {
 
+  val logger = LoggerFactory.getLogger(this.getClass)
+
   override def create(): SupervisorStrategy = {
     val env = System.getenv("ALEPHIUM_ENV")
     env match {
@@ -48,13 +51,13 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
 
   val resumeStrategy = OneForOneStrategy() {
     case e: Throwable =>
-      System.out.print(e.toString + "\n")
+      logger.error("Unhandled throwable", e)
       SupervisorStrategy.Resume
   }
 
   val stopStrategy = OneForOneStrategy() {
     case e: Throwable =>
-      System.out.print(e + "\n")
+      logger.error("Unhandled throwable", e)
       SupervisorStrategy.Stop
   }
 }

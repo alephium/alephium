@@ -107,6 +107,7 @@ lazy val util = subProject("util")
   .settings(
     libraryDependencies ++= Seq(
       akka,
+      `akka-slf4j`,
       bcprov,
       `scala-reflect`(scalaVersion.value),
       rocksdb
