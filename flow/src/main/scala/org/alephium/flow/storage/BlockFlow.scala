@@ -18,13 +18,14 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val parent = block.uncleHash(index.to)
     val weight = calWeightUnsafe(block)
     chain.add(block, parent, weight).map { _ =>
-      updateStateForNewBlock()
+      updateStateFor(block)
     }
   }
 
-  private def updateStateForNewBlock(): Unit = {
+  private def updateStateFor(block: Block): Unit = {
     val bestDeps = calBestDepsUnsafe()
     updateBestDeps(bestDeps)
+    updateUTXOs(block)
   }
 
   def validate(block: Block): Either[ValidationError, Unit] = {

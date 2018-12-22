@@ -94,12 +94,14 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
     val total = blockFlow.numHashes - config.chainNum // exclude genesis blocks
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
+    val utxos = blockFlow.numUTXOs
     val heights = for {
       i <- 0 until config.groups
       j <- 0 until config.groups
       height = blockFlow.getHashChain(ChainIndex(i, j)).maxHeight
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
-    log.info(s"$index; total: $total; ${chain.show(header.hash)}; heights: $heightsInfo")
+    log.info(
+      s"$index; total: $total; utxos: $utxos; ${chain.show(header.hash)}; heights: $heightsInfo")
   }
 }
