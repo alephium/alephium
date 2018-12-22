@@ -38,6 +38,20 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
+  def getHashTargetUnsafe(hash: Keccak256): BigInt = {
+    assert(contains(hash))
+    val header    = getBlockHeaderUnsafe(hash)
+    val height    = getHeight(hash)
+    val refHeight = height - config.retargetInterval
+    if (refHeight >= 0) {
+      val refHash   = getPredecessor(hash, refHeight)
+      val refHeader = getBlockHeaderUnsafe(refHash)
+      val timeSpan  = header.timestamp - refHeader.timestamp
+      val retarget  = header.target * config.retargetInterval * config.blockTargetTime.toMillis / timeSpan
+      retarget
+    } else config.maxMiningTarget
+  }
+
   def getHashTarget(hash: Keccak256): IOResult[BigInt] = {
     assert(contains(hash))
     getBlockHeader(hash).flatMap { header =>

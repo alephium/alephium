@@ -2,14 +2,13 @@ package org.alephium.flow.storage
 
 import akka.actor.Props
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{ChainIndex, PeerId}
 import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
 
-  def props(blockFlow: BlockFlow)(implicit config: PlatformConfig): Props =
+  def props(blockFlow: BlockFlow): Props =
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
@@ -23,7 +22,7 @@ object FlowHandler {
   case class BlockFlowTemplate(deps: AVector[Keccak256], target: BigInt) extends Event
 }
 
-class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends BaseActor {
+class FlowHandler(blockFlow: BlockFlow) extends BaseActor {
   import FlowHandler._
 
   override def receive: Receive = {
@@ -48,12 +47,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    val singleChain = blockFlow.getBlockChain(chainIndex)
-    val result = for {
-      bestDeps <- blockFlow.getBestDeps(chainIndex)
-      target   <- singleChain.getHashTarget(bestDeps.getChainHash)
-    } yield BlockFlowTemplate(bestDeps.deps, target)
-    result match {
+    val template = blockFlow.prepareBlockFlow(chainIndex)
+    template match {
       case Left(error) =>
         log.warning(s"Failed in compute best deps: ${error.toString}")
       case Right(message) =>
