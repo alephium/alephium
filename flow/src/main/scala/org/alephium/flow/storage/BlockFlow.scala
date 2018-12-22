@@ -16,10 +16,11 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
   override val groups = config.groups
 
   private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
-    BlockChain.fromGenesis(genesisBlocks(if (k < mainGroup.value) k else k + 1)(mainGroup.value))
+    BlockChain.fromGenesisUnsafe(
+      genesisBlocks(if (k < mainGroup.value) k else k + 1)(mainGroup.value))
   }
   private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
-    BlockChain.fromGenesis(genesisBlocks(mainGroup.value)(to))
+    BlockChain.fromGenesisUnsafe(genesisBlocks(mainGroup.value)(to))
   }
   private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
@@ -27,7 +28,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
         if (from == mainGroup.value) outBlockChains(to)
         else if (to == mainGroup.value) {
           inBlockChains(if (from < mainGroup.value) from else from - 1)
-        } else BlockHeaderChain.fromGenesis(genesisBlocks(from)(to))
+        } else BlockHeaderChain.fromGenesisUnsafe(genesisBlocks(from)(to))
     }
 
   override protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T = {
@@ -293,7 +294,7 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
 }
 
 object BlockFlow {
-  def apply()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
+  def createUnsafe()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }
