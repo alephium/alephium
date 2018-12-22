@@ -23,12 +23,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     assert(!contains(header.hash) && contains(parentHash))
     val parent = blockHashesTable(parentHash)
-    addHash(header.hash, parent, weight)
-    addHeader(header)
+    addHeader(header).map { _ =>
+      addHash(header.hash, parent, weight)
+    }
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
     headerDB.putHeader(header)
+  }
+
+  protected def addHeaderUnsafe(header: BlockHeader): Unit = {
+    headerDB.putHeaderUnsafe(header)
   }
 
   def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
@@ -70,10 +75,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 }
 
 object BlockHeaderChain {
-  def fromGenesis(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
-    apply(genesis.header, 0, 0)
+  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
+    createUnsafe(genesis.header, 0, 0)
 
-  def apply(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
+  private def createUnsafe(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
       implicit _config: PlatformConfig): BlockHeaderChain = {
     val rootNode = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight)
 
@@ -82,8 +87,8 @@ object BlockHeaderChain {
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
+      this.addHeaderUnsafe(rootHeader)
       this.addNode(rootNode)
-      this.addHeader(rootHeader)
     }
   }
 }

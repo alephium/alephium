@@ -39,8 +39,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformConfig)
     extends BaseActor {
   import node.allHandlers
-  var totalMiningCount = 0 // This counts how many mining tasks got run so far
-  var taskStartingTime = 0l // This is the starting time for current task
+  var totalMiningCount    = 0 // This counts how many mining tasks got run so far
+  var taskStartingTime    = 0l // This is the starting time for current task
+  val taskRefreshDuration = 5.seconds.toMillis
 
   val blockHandler: ActorRef = allHandlers.getBlockHandler(chainIndex)
 
@@ -68,7 +69,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
             s"A new block ${block.shortHex} is mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
         case None =>
-          if (System.currentTimeMillis() - taskStartingTime >= 5.seconds.toMillis) {
+          if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
             allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
             context become collect
           } else {

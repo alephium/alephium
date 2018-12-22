@@ -26,7 +26,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
 
   it should "add block correctly" in new Fixture {
     forAll(blockGen) { block =>
-      val chain = BlockChain.fromGenesis(genesis)
+      val chain = BlockChain.fromGenesisUnsafe(genesis)
       chain.numHashes is 1
       val blocksSize1 = chain.numHashes
       chain.add(block, 0)
@@ -37,7 +37,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
 
   it should "add blocks correctly" in new Fixture {
     forAll(chainGen) { blocks =>
-      val chain       = BlockChain.fromGenesis(genesis)
+      val chain       = BlockChain.fromGenesisUnsafe(genesis)
       val blocksSize1 = chain.numHashes
       blocks.foreach(block => chain.add(block, 0))
       val blocksSize2 = chain.numHashes
@@ -49,7 +49,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
 
   it should "work correctly for a chain of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis)) { blocks =>
-      val chain0 = BlockChain(genesis, 0, 0)
+      val chain0 = BlockChain.fromGenesisUnsafe(genesis)
       blocks.foreach(block => chain0.add(block, 0))
       val headBlock = genesis
       val lastBlock = blocks.last
@@ -71,7 +71,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
   it should "work correctly with two chains of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis)) { longChain =>
       forAll(ModelGen.chainGen(2, genesis)) { shortChain =>
-        val chain0 = BlockChain(genesis, 0, 0)
+        val chain0 = BlockChain.fromGenesisUnsafe(genesis)
 
         shortChain.foreach(block => chain0.add(block, 0))
         chain0.getHeight(shortChain.head) is 1
@@ -142,7 +142,7 @@ class BlockChainSpec extends AlephiumSpec with PlatformConfig.Default with Befor
 
   def createBlockChain(blocks: AVector[Block]): BlockChain = {
     assert(blocks.nonEmpty)
-    val chain = BlockChain(blocks.head, 0, 0)
+    val chain = BlockChain.fromGenesisUnsafe(blocks.head)
     blocks.toIterable.zipWithIndex.tail foreach {
       case (block, index) =>
         chain.add(block, index * 2)
