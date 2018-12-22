@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <appender name="ERRFILE" class="ch.qos.logback.core.FileAppender">
-        <file>alephium-errors.log</file>
+        <file>${ALEPHIUM_HOME}/logs/alephium-errors.log</file>
         <append>true</append>
         <encoder>
             <pattern>%date{MM/dd HH:mm:ss} %-5level[%.15thread] %logger{1} %msg%n</pattern>
@@ -9,18 +9,22 @@
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>WARN</level>
         </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>alephium-errors.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
     </appender>
 
     <appender name="LOGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>alephium.log</file>
+        <file>${ALEPHIUM_HOME}/logs/alephium.log</file>
         <append>true</append>
         <encoder>
             <pattern>%date{MM/dd HH:mm:ss} %-5level[%.15thread] %logger{1} %msg%n</pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <!-- rollover daily -->
             <fileNamePattern>alphium.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <!-- each file should be at most 100MB, keep 60 days worth of history, but at most 20GB -->
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>60</maxHistory>
             <totalSizeCap>2GB</totalSizeCap>
@@ -39,8 +43,8 @@
 
     <root>
         <appender-ref ref="CONSOLE"/>
-        <!--<appender-ref ref="ERRFILE"/>-->
-        <!--<appender-ref ref="LOGFILE"/>-->
+        <appender-ref ref="ERRFILE"/>
+        <appender-ref ref="LOGFILE"/>
     </root>
 
 </configuration>
