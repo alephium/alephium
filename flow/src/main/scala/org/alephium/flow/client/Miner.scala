@@ -1,6 +1,7 @@
 package org.alephium.flow.client
 
 import akka.actor.{ActorRef, Props}
+import akka.util.ByteString
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
@@ -11,6 +12,7 @@ import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
+import scala.util.Random
 
 object Miner {
   sealed trait Command
@@ -90,7 +92,8 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     case FlowHandler.BlockFlowTemplate(_, deps, target) =>
       assert(deps.length == (2 * config.groups - 1))
       // scalastyle:off magic.number
-      val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
+      val data         = ByteString.fromInts(Random.nextInt())
+      val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _, data))
       val chainDep     = deps.takeRight(config.groups)(chainIndex.to.value)
       // scalastyle:on magic.number
       node.blockFlow.getBlockHeader(chainDep) match {

@@ -1,11 +1,19 @@
 package org.alephium.protocol.model
 
+import akka.util.ByteString
 import org.alephium.crypto._
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util.AVector
 
+/*
+ * For the moment, if a transaction does not have any input, then it's a coinbase transaction
+ * In this way, we could pad many coinbase transactions into one block without hacking any code
+ * TODO: we will evolve it to use only one coinbase transaction
+ *
+ */
 case class Transaction(
     unsigned: UnsignedTransaction,
+    data: ByteString,
     signature: ED25519Signature // TODO: support n2n transactions
 ) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = Keccak256.hash(serialize[Transaction](this))
@@ -13,19 +21,19 @@ case class Transaction(
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct2(Transaction.apply, t => (t.unsigned, t.signature))
+    Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.signature))
 
   def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
     val message   = serialize(unsigned)
     val signature = ED25519.sign(message, privateKey)
-    Transaction(unsigned, signature)
+    Transaction(unsigned, ByteString.empty, signature)
   }
 
-  def coinbase(address: ED25519PublicKey, value: BigInt): Transaction = {
+  def coinbase(address: ED25519PublicKey, value: BigInt, data: ByteString): Transaction = {
     val txInput  = TxInput(Keccak256.zero, -1)
     val txOutput = TxOutput(value, address)
     val unsigned = UnsignedTransaction(AVector(txInput), AVector(txOutput))
-    Transaction(unsigned, ED25519Signature.zero)
+    Transaction(unsigned, data, ED25519Signature.zero)
   }
 }
