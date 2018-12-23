@@ -2,6 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.io.{Disk, IOResult}
 import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.collection.mutable.HashMap

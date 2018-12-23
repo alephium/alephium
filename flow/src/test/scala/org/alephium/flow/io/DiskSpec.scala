@@ -1,7 +1,8 @@
-package org.alephium.flow.storage
+package org.alephium.flow.io
 
 import java.nio.file.Files
 
+import org.alephium.flow.storage.TestUtils
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
 import org.alephium.serde._
@@ -11,7 +12,7 @@ import org.scalatest.EitherValues._
 class DiskSpec extends AlephiumSpec {
 
   trait Fixture {
-    val root = AFiles.tmpDir.resolve(".alephium-test")
+    val root = AFiles.tmpDir.resolve(".alephium-test-diskspec")
     val disk = Disk.create(root).right.value
   }
 
@@ -20,8 +21,8 @@ class DiskSpec extends AlephiumSpec {
     Files.exists(disk.blockFolder) is true
     Disk.create(root).isRight is true
 
-    TestUtils.cleanup(root)
-    Files.exists(root) is false
+    TestUtils.clear(root)
+    Files.exists(root) is true
     Files.exists(disk.blockFolder) is false
   }
 
@@ -33,6 +34,6 @@ class DiskSpec extends AlephiumSpec {
       disk.checkBlockFile(block.hash) is true
       disk.getBlock(block.hash).right.value is block
     }
-    TestUtils.cleanup(root)
+    TestUtils.clear(root)
   }
 }
