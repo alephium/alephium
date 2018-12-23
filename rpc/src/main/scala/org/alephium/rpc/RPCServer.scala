@@ -1,6 +1,5 @@
 package org.alephium.rpc
 
-import scala.concurrent.Future
 import java.time.Instant
 
 import akka.http.scaladsl.Http
@@ -11,92 +10,82 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Flow
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.parser._
-import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.{Mode, Platform}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
+import org.alephium.flow.{Mode, Platform}
 import org.alephium.rpc.model.ViewerQuery
-import org.alephium.util.Hex._
+
+import scala.concurrent.Future
 
 trait RPCServer extends Platform with CORSHandler with StrictLogging {
   import RPCServer._
 
   def mode: Mode
 
-  def runServer(node: Node): Future[Unit] = {
+  def runServer(): Future[Unit] = {
+    val node = mode.node
+
     implicit val system           = node.system
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
     implicit val config           = mode.config
     implicit val rpcConfig        = RPCConfig.load(config.alephium)
 
-    val from = mode.config.mainGroup.value
-
-    logger.info(s"index: ${mode.index}, group: $from")
-
-    val route = path("mining") {
+    val miningRoute = path("mining") {
       put {
-        val publicKey: ED25519PublicKey = ED25519PublicKey.unsafeFrom(
-          hex"2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1d")
-        val props = FairMiner.props(publicKey, node)
-        val miner = node.system.actorOf(props, s"FairMiner")
+        val publicKey = config.discoveryConfig.discoveryPublicKey
+        val props     = FairMiner.props(publicKey, node)
+        val miner     = system.actorOf(props, s"FairMiner")
         miner ! Miner.Start
 
         complete((StatusCodes.Accepted, "Start mining"))
       }
-    } ~
-      corsHandler(path("viewer") {
-        get {
-          handleWebSocketMessages(wsViewer(node))
-        }
-      })
+    }
 
-    Http()
-      .bindAndHandle(route, "0.0.0.0", mode.httpPort)
-      .map(_ => ())
+    val viewerRoute = corsHandler(path("viewer") {
+      get {
+        handleWebSocketMessages(wsViewer(node))
+      }
+    })
+
+    val route = miningRoute ~ viewerRoute
+
+    Http().bindAndHandle(route, "0.0.0.0", mode.httpPort).map(_ => ())
   }
-
 }
 
 object RPCServer extends StrictLogging {
+  private val failure = TextMessage("""{"error": "Bad request"}"""")
+
+  private def handleQuery(text: String, node: Node)(implicit rpc: RPCConfig) = {
+    decode[ViewerQuery](text) match {
+      case Right(query) =>
+        val now        = Instant.now()
+        val lowerBound = now.minus(rpc.viewerBlockAgeLimit).toEpochMilli
+
+        val from = query.from match {
+          case Some(ts) => Math.max(ts, lowerBound)
+          case None     => lowerBound
+        }
+
+        val headers = node.blockFlow.getHeadersUnsafe(header => header.timestamp > from)
+        val json = headers
+          .map(node.blockFlow.toJson)
+          .mkString("""{"blocks":[""", ",", "]}")
+        TextMessage(json)
+
+      case Left(e) =>
+        logger.info(s"Decode error for request test: $text: ${e.toString}")
+        failure
+    }
+  }
 
   def wsViewer(node: Node)(implicit rpc: RPCConfig): Flow[Message, Message, Any] = {
-    val failure = TextMessage("""{"error": "Bad request"}"""")
-
-    Flow[Message]
-      .collect {
-        case request: TextMessage.Strict =>
-          val now   = Instant.now()
-          val limit = now.minus(rpc.viewerBlockAgeLimit).toEpochMilli()
-
-          decode[ViewerQuery](request.text) match {
-            case Right(query) =>
-              val from = query.from match {
-                case None     => limit
-                case Some(ts) => Math.max(ts, limit)
-              }
-
-              val blocks = node.blockFlow.getHeadersUnsafe(header => header.timestamp > from)
-
-              val json = {
-                val blocksJson = blocks
-                  .map { header =>
-                    node.blockFlow.toJsonUnsafe(header)
-                  }
-                  .mkString("[", ",", "]")
-
-                s"""{"blocks":$blocksJson}"""
-              }
-
-              TextMessage(json)
-
-            case Left(_) =>
-              logger.info(s"Received non-valid RPC viewer request query: ${request}")
-              failure
-          }
-
-        case request =>
-          logger.info(s"Received non-valid RPC viewer request: ${request}")
-          failure
-      }
+    Flow[Message].collect {
+      case request: TextMessage.Strict =>
+        handleQuery(request.text, node)
+      case request: TextMessage.Streamed =>
+        logger.info(s"Received non-valid RPC viewer request: $request")
+        failure
+    }
   }
 }
