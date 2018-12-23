@@ -25,7 +25,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
   private def updateStateFor(block: Block): Unit = {
     val bestDeps = calBestDepsUnsafe()
     updateBestDeps(bestDeps)
-    updateUTXOs(block)
+    updateTxs(block)
   }
 
   def validate(block: Block): Either[ValidationError, Unit] = {
