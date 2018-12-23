@@ -71,10 +71,10 @@ trait BlockFlowState {
 
   def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
 
-  def updateUTXOs(block: Block): Unit = {
+  def updateTxs(block: Block): Unit = {
     block.transactions.foreach { tx =>
-      transactions.put(tx.hash, tx) // TODO: use put later to be safer
-      tx.unsigned.inputs.foreach(utxos.removeIfExist) // TODO: use remove later to be safer
+      transactions.put(tx.hash, tx)
+      tx.unsigned.inputs.foreach(utxos.remove)
       tx.unsigned.outputs.foreachWithIndex { (output, i) =>
         val txInput = TxInput(tx.hash, i)
         utxos.add(txInput)

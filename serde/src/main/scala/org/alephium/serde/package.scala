@@ -20,6 +20,8 @@ package object serde {
 
   implicit val longSerde: Serde[Long] = LongSerde
 
+  implicit val bytestringSerde: Serde[ByteString] = ByteStringSerde
+
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     dynamicSizeBytesSerde(serde)
 

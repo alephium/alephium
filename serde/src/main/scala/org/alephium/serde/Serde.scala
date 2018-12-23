@@ -124,6 +124,23 @@ object Serde extends ProductSerde {
       deserialize0(input, _.asByteBuffer.getLong())
   }
 
+  object ByteStringSerde extends Serde[ByteString] {
+    override def serialize(input: ByteString): ByteString = {
+      IntSerde.serialize(input.size) ++ input
+    }
+
+    override def _deserialize(input: ByteString): Either[SerdeError, (ByteString, ByteString)] = {
+      IntSerde._deserialize(input).flatMap {
+        case (size, rest) =>
+          if (rest.size >= size) {
+            Right(rest.splitAt(size))
+          } else {
+            Left(NotEnoughBytesError(size, rest.size))
+          }
+      }
+    }
+  }
+
   implicit val inetAddressSerde: Serde[InetAddress] =
     bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray), ia => ByteString(ia.getAddress))
 

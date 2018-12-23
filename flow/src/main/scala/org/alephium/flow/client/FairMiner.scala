@@ -1,6 +1,7 @@
 package org.alephium.flow.client
 
 import akka.actor.{ActorRef, Props}
+import akka.util.ByteString
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner.BlockAdded
@@ -95,7 +96,8 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     assert(flowTemplate.index.from == config.mainGroup)
     val address = addresses(flowTemplate.index.to.value)
     // scalastyle:off magic.number
-    val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
+    val data         = ByteString.fromInts(Random.nextInt())
+    val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _, data))
     // scalastyle:on magic.number
     BlockTemplate(flowTemplate.deps, flowTemplate.target, transactions)
   }
