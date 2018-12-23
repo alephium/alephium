@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.AVector
 

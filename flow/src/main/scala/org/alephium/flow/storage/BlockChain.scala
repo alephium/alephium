@@ -2,13 +2,14 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.io.{Disk, IOResult}
 import org.alephium.protocol.model.{Block, Transaction}
 
 import scala.collection.mutable.HashMap
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
-  def diskIO: DiskIO
+  def disk: Disk
 
   protected val transactionsTable: HashMap[Keccak256, Transaction] = HashMap.empty
 
@@ -17,7 +18,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
   def getBlock(hash: Keccak256): IOResult[Block] = {
-    diskIO.getBlock(hash)
+    disk.getBlock(hash)
   }
 
   def add(block: Block, weight: Int): IOResult[Unit] = {
@@ -33,12 +34,12 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
-    diskIO.putBlock(block).right.map(_ => ())
+    disk.putBlock(block).right.map(_ => ())
     // TODO: handle transactions later
   }
 
   protected def persistBlockUnsafe(block: Block): Unit = {
-    diskIO.putBlockUnsafe(block)
+    disk.putBlockUnsafe(block)
     ()
   }
 }
@@ -53,7 +54,7 @@ object BlockChain {
     val rootNode = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight)
 
     new BlockChain {
-      override val diskIO                              = _config.diskIO
+      override val disk                                = _config.disk
       override val headerDB                            = _config.headerDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode

@@ -1,5 +1,5 @@
 package org.alephium.flow
 
-package object storage {
+package object io {
   type IOResult[T] = Either[IOError, T]
 }

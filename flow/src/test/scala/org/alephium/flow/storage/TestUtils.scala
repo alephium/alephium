@@ -33,9 +33,11 @@ object TestUtils {
     AllHandlers(flowHandler, blockHandlers, headerHandlers)
   }
 
-  def cleanup(path: Path): Unit = {
+  // remove all the content under the path; the path itself would be kept
+  def clear(path: Path): Unit = {
     if (path.startsWith(AFiles.tmpDir)) {
-      Files.walk(path).sorted(Comparator.reverseOrder[Path]).forEach(p => Files.delete(p))
-    }
+      val subFiles = Files.walk(path).sorted(Comparator.reverseOrder[Path]).toArray.init
+      subFiles.foreach(p => Files.delete(p.asInstanceOf[Path]))
+    } else throw new RuntimeException("Only files under tmp dir could be cleared")
   }
 }
