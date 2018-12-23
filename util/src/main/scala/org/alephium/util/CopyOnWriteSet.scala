@@ -1,22 +1,22 @@
 package org.alephium.util
 
-import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.{ConcurrentHashMap => JCHashMap}
 
 import scala.collection.JavaConverters._
 
 object CopyOnWriteSet {
   def empty[K]: CopyOnWriteSet[K] = {
-    val s = new CopyOnWriteArraySet[K]()
+    val s = new JCHashMap[K, Boolean]()
     new CopyOnWriteSet[K](s)
   }
 }
 
 // Only suitable for small sets
-class CopyOnWriteSet[K](s: CopyOnWriteArraySet[K]) {
-  def contains(k: K): Boolean = s.contains(k)
+class CopyOnWriteSet[K](s: JCHashMap[K, Boolean]) {
+  def contains(k: K): Boolean = s.containsKey(k)
 
   def add(k: K): Unit = {
-    s.add(k)
+    s.put(k, true)
     ()
   }
 
@@ -30,5 +30,5 @@ class CopyOnWriteSet[K](s: CopyOnWriteArraySet[K]) {
     ()
   }
 
-  def iterator: Iterator[K] = s.iterator().asScala
+  def iterator: Iterator[K] = s.keys().asScala
 }

@@ -89,7 +89,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     _mine(template, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
-    case FlowHandler.BlockFlowTemplate(deps, target) =>
+    case FlowHandler.BlockFlowTemplate(_, deps, target) =>
       assert(deps.length == (2 * config.groups - 1))
       // scalastyle:off magic.number
       val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _))
