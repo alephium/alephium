@@ -103,7 +103,7 @@ trait DiscoveryServerState {
   }
 
   private def appendPeer(peer: PeerInfo, bucket: mutable.HashMap[PeerId, PeerStatus]): Unit = {
-    log.debug(s"Add a new peer $peer")
+    log.debug(s"Adding a new peer: $peer")
     bucket += peer.id -> PeerStatus.fromInfo(peer)
     fetchNeighbors(peer)
   }
@@ -142,14 +142,14 @@ trait DiscoveryServerState {
 
   def tryPing(peer: PeerInfo): Unit = {
     if (isUnknown(peer.id) && isPendingAvailable) {
-      log.info(s"Ping $peer")
+      log.info(s"Sending Ping to $peer")
       send(peer.socketAddress, Ping(config.nodeInfo.socketAddress))
       pendings += (peer.id -> AwaitPong(peer.socketAddress, System.currentTimeMillis()))
     }
   }
 
   def tryPing(remote: InetSocketAddress): Unit = {
-    log.info(s"Ping $remote")
+    log.info(s"Sending Ping to $remote")
     send(remote, Ping(config.nodeInfo.socketAddress))
   }
 
@@ -170,7 +170,7 @@ trait DiscoveryServerState {
           }
         }
       case None =>
-        log.debug(s"Not pending pong message received, might from bootstrap nodes")
+        log.debug(s"Received Pong from $peerId without pending request, ignored.")
     }
   }
 }
