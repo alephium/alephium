@@ -1,8 +1,8 @@
 package org.alephium.util
 
-class CopyOnWriteSetSpec extends AlephiumSpec {
+class ConcurrentHashSetSpec extends AlephiumSpec {
   trait Fixture {
-    val set = CopyOnWriteSet.empty[Int]
+    val set = ConcurrentHashSet.empty[Int]
   }
 
   it should "add / remove /contains" in new Fixture {
