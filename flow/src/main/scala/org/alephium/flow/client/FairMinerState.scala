@@ -1,24 +1,24 @@
 package org.alephium.flow.client
 
+import akka.actor.ActorRef
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.storage.BlockFlow
-import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.flow.model.BlockTemplate
+import org.alephium.util.AVector
 
 import scala.concurrent.duration._
 
 trait FairMinerState {
   implicit def config: PlatformConfig
 
-  def blockFlow: BlockFlow
+  protected def actualMiners: AVector[ActorRef]
 
   protected val miningCounts        = Array.fill[BigInt](config.groups)(0)
-  protected val taskRefreshDuration = 10.seconds.toMillis
+  protected val taskRefreshDuration = config.groups.seconds.toMillis
   protected val taskRefreshTss      = Array.fill[Long](config.groups)(-1)
-  protected val pendingTasks        = collection.mutable.Map.empty[Int, BlockFlowTemplate]
+  protected val pendingTasks        = collection.mutable.Map.empty[Int, BlockTemplate]
 
-  def initializeState(): Unit = {
-    (0 until config.groups).foreach(refresh)
+  def initialize(): Unit = {
+    (0 until config.groups).foreach(prepareTemplate)
   }
 
   def getMiningCount(to: Int): BigInt = miningCounts(to)
@@ -27,29 +27,45 @@ trait FairMinerState {
     miningCounts(to) += count
   }
 
-  def refresh(to: Int): Unit = {
+  def refreshLastTask(to: Int, template: BlockTemplate): Unit = {
     assert(to >= 0 && to < config.groups)
-    val index    = ChainIndex(config.mainGroup.value, to)
-    val template = blockFlow.prepareBlockFlowUnsafe(index)
-    taskRefreshTss(to) = System.currentTimeMillis()
-    pendingTasks(to)   = template
-  }
-
-  def tryToRefresh(to: Int): Unit = {
     val lastRefreshTs = taskRefreshTss(to)
     val currentTs     = System.currentTimeMillis()
     if (currentTs - lastRefreshTs > taskRefreshDuration) {
-      refresh(to)
+      prepareTemplate(to)
+    } else {
+      addTask(to, template)
     }
   }
 
-  def removeTask(to: Int): Unit = {
-    pendingTasks -= to
+  def addNewTask(to: Int, template: BlockTemplate): Unit = {
+    taskRefreshTss(to) = System.currentTimeMillis()
+    addTask(to, template)
   }
 
-  def pickNextTemplate(): (Int, BlockFlowTemplate) = {
-    val toTry    = pendingTasks.keys.minBy(miningCounts)
-    val template = pendingTasks(toTry)
-    (toTry, template)
+  def addTask(to: Int, template: BlockTemplate): Unit = {
+    assert(!pendingTasks.contains(to))
+    pendingTasks(to) = template
+    startNewTasks()
   }
+
+  protected def pickTasks(): Iterable[(Int, BlockTemplate)] = {
+    val minCount = miningCounts.min
+    val toTries  = pendingTasks.keys.filter(to => miningCounts(to) < minCount + config.nonceStep)
+    toTries.map { to =>
+      val template = pendingTasks(to)
+      pendingTasks -= to
+      (to, template)
+    }
+  }
+
+  protected def startNewTasks(): Unit = {
+    pickTasks().foreach {
+      case (to, template) => startTask(to, template)
+    }
+  }
+
+  def prepareTemplate(to: Int): Unit
+
+  def startTask(to: Int, template: BlockTemplate): Unit
 }
