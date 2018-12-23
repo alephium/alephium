@@ -27,9 +27,14 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
 
   def contains(k: K): Boolean = m.containsKey(k)
 
-  def put(k: K, v: V): Unit = {
+  def add(k: K, v: V): Unit = {
     val result = m.put(k, v)
     assert(result == null)
+  }
+
+  def put(k: K, v: V): Unit = {
+    m.put(k, v)
+    ()
   }
 
   def remove(k: K): Unit = {

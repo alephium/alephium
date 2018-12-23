@@ -8,9 +8,9 @@ class ConcurrentHashMapSpec extends AlephiumSpec {
   it should "put / remove /contains" in new Fixture {
     forAll { (k: Int, v: Long) =>
       map.contains(k) is false
-      map.put(k, v)
+      map.add(k, v)
       map.contains(k) is true
-      assertThrows[AssertionError](map.put(k, v))
+      assertThrows[AssertionError](map.add(k, v))
       map.remove(k)
       map.contains(k) is false
       assertThrows[AssertionError](map.remove(k))
@@ -19,9 +19,9 @@ class ConcurrentHashMapSpec extends AlephiumSpec {
   }
 
   it should "foreach / reduce" in new Fixture {
-    map.put(0, 0)
-    map.put(1, 2)
-    map.put(2, 4)
+    map.add(0, 0)
+    map.add(1, 2)
+    map.add(2, 4)
 
     var sum = 0l
     map.foreachValue(sum += _)
@@ -32,5 +32,9 @@ class ConcurrentHashMapSpec extends AlephiumSpec {
     map.reduceValuesBy(identity)(math.min) is 0
     map.reduceValuesBy(-_)(math.max) is 0
     map.reduceValuesBy(-_)(math.min) is -4
+
+    assertThrows[AssertionError](map.add(0, 0))
+    map.put(0, 1)
+    map.reduceValuesBy(identity)(_ + _) is 7
   }
 }
