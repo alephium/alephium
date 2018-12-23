@@ -27,7 +27,7 @@ trait BlockHashPool {
 
   def getAllTips: AVector[Keccak256]
 
-  def getAllBlockHashes: Iterable[Keccak256]
+  def getAllBlockHashes: Iterator[Keccak256]
 
   def show(hash: Keccak256): String = {
     val shortHash = hash.shortHex

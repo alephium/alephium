@@ -60,7 +60,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).getWeight(hash)
   }
 
-  def getAllBlockHashes: Iterable[Keccak256] = aggregate(_.getAllBlockHashes)(_ ++ _)
+  def getAllBlockHashes: Iterator[Keccak256] = aggregate(_.getAllBlockHashes)(_ ++ _)
 
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] =
     getHashChain(hash).getBlockHashSlice(hash)
