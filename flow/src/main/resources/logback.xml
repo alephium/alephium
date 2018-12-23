@@ -24,7 +24,7 @@
             <pattern>%date{MM/dd HH:mm:ss} %-5level[%.15thread] %logger{1} %msg%n</pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>alphium.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <fileNamePattern>${ALEPHIUM_HOME}/logs/alephium.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>60</maxHistory>
             <totalSizeCap>2GB</totalSizeCap>
