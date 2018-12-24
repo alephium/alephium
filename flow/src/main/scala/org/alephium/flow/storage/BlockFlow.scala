@@ -17,7 +17,14 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
     val weight = calWeightUnsafe(block)
-    chain.add(block, parent, weight)
+    chain.add(block, parent, weight).map { _ =>
+      updateStateForNewBlock()
+    }
+  }
+
+  private def updateStateForNewBlock(): Unit = {
+    val bestDeps = calBestDepsUnsafe()
+    updateBestDeps(bestDeps)
   }
 
   def validate(block: Block): Either[ValidationError, Unit] = {
@@ -38,11 +45,18 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val parent = header.uncleHash(index.to)
     try {
       val weight = calWeightUnsafe(header)
-      chain.add(header, parent, weight)
+      chain.add(header, parent, weight).map { _ =>
+        updateStateForNewHeader()
+      }
     } catch {
       case e: Exception =>
         Left(IOError.from(e))
     }
+  }
+
+  private def updateStateForNewHeader(): Unit = {
+    val bestDeps = calBestDepsUnsafe()
+    updateBestDeps(bestDeps)
   }
 
   def validate(header: BlockHeader): Either[ValidationError, Unit] = {
@@ -168,12 +182,12 @@ class BlockFlow()(implicit val config: PlatformConfig)
     }
   }
 
-  def getBestDepsUnsafe(chainIndex: ChainIndex): BlockDeps = {
+  def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
     val bestTip   = getBestTip
     val bestIndex = ChainIndex.from(bestTip)
     val rtips     = getRtipsUnsafe(bestTip, bestIndex.from)
     val deps1 = (0 until groups)
-      .filter(_ != chainIndex.from.value)
+      .filter(_ != group.value)
       .foldLeft(AVector.empty[Keccak256]) {
         case (deps, _k) =>
           val k = GroupIndex(_k)
@@ -192,13 +206,13 @@ class BlockFlow()(implicit val config: PlatformConfig)
             }
           }
       }
-    val groupTip  = rtips(chainIndex.from.value)
-    val groupDeps = getGroupDepsUnsafe(groupTip, chainIndex.from)
+    val groupTip  = rtips(group.value)
+    val groupDeps = getGroupDepsUnsafe(groupTip, group)
     val deps2 = (0 until groups)
       .foldLeft(deps1) {
         case (deps, _l) =>
           val l          = GroupIndex(_l)
-          val chain      = getHashChain(chainIndex.from, l)
+          val chain      = getHashChain(group, l)
           val toTries    = chain.getAllTips
           val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l.value), tip))
           if (validTries.isEmpty) deps :+ groupDeps(l.value)
@@ -207,12 +221,14 @@ class BlockFlow()(implicit val config: PlatformConfig)
             deps :+ bestTry
           }
       }
-    BlockDeps(chainIndex, deps2)
+    BlockDeps(deps2)
   }
 
-  def getBestDeps(chainIndex: ChainIndex): IOResult[BlockDeps] =
+  def calBestDepsUnsafe(): BlockDeps = calBestDepsUnsafe(config.mainGroup)
+
+  def calBestDeps(): IOResult[BlockDeps] =
     try {
-      Right(getBestDepsUnsafe(chainIndex))
+      Right(calBestDepsUnsafe())
     } catch {
       case e: Exception => Left(IOError.from(e))
     }

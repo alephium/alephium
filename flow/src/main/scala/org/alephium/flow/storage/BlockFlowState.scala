@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.model.BlockDeps
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.AVector
 
@@ -12,6 +13,15 @@ trait BlockFlowState {
   def mainGroup: GroupIndex = config.mainGroup
 
   val groups = config.groups
+
+  private var bestDeps = {
+    val deps1 = AVector.tabulate(groups - 1) { i =>
+      if (i < mainGroup.value) config.genesisBlocks(i).head.hash
+      else config.genesisBlocks(i + 1).head.hash
+    }
+    val deps2 = config.genesisBlocks(mainGroup.value).map(_.hash)
+    BlockDeps(deps1 ++ deps2)
+  }
 
   private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
     BlockChain.fromGenesisUnsafe(
@@ -52,4 +62,8 @@ trait BlockFlowState {
   protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain = {
     blockHeaderChains(from.value)(to.value)
   }
+
+  def getBestDeps: BlockDeps = bestDeps
+
+  def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
 }
