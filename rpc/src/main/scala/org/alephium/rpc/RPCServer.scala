@@ -41,12 +41,12 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
       case "mining/start" =>
         req =>
           miner ! Miner.Start
-          req.success(Json.Null)
+          req.successful()
 
       case "mining/stop" =>
         req =>
           miner ! Miner.Stop
-          req.success(Json.Null)
+          req.successful()
     }
 
     val route = corsHandler(JsonRPCHandler.route(rpcHandler))

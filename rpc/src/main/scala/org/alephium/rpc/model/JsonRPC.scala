@@ -50,6 +50,7 @@ object JsonRPC {
   }
 
   case class Request(id: Json, method: String, params: Json) {
+    def successful(): Response          = Response.Success(id, Json.True)
     def success(result: Json): Response = Response.Success(id, result)
     def failure(error: Error): Response = Response.Failure(id, error)
   }
