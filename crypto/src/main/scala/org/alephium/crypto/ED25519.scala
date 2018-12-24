@@ -50,7 +50,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
   val generator: BigInt = BigInt(
     "7237005577332262213973186563042994240857116359379907606001950938285454250989")
 
-  override def generateKeyPair(): (ED25519PrivateKey, ED25519PublicKey) = {
+  override def generatePriPub(): (ED25519PrivateKey, ED25519PublicKey) = {
     val keyPair    = curve25519.generateKeyPair()
     val privateKey = ED25519PrivateKey.unsafeFrom(ByteString(keyPair.getPrivateKey))
     val publicKey  = ED25519PublicKey.unsafeFrom(ByteString(keyPair.getPublicKey))

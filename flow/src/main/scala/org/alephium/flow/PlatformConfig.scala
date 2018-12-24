@@ -9,7 +9,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.io.{Database, Disk}
 import org.alephium.flow.network.DiscoveryConfig
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
 import org.rocksdb.Options
@@ -141,7 +141,7 @@ trait PDiscoveryConfig extends PlatformGroupConfig {
     val scanFrequency           = discovery.getDuration("scanFrequency").toMillis.millis
     val scanFastFrequency       = discovery.getDuration("scanFastFrequency").toMillis.millis
     val neighborsPerGroup       = discovery.getInt("neighborsPerGroup")
-    val (privateKey, publicKey) = DC.generateDiscoveryKeyPair(mainGroup)(this)
+    val (privateKey, publicKey) = GroupConfig.generateKeyForGroup(mainGroup)(this)
     DiscoveryConfig(publicAddress,
                     udpPort,
                     groups,
