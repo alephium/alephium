@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
@@ -16,6 +16,7 @@ object Miner {
   sealed trait Command
   case object Start                          extends Command
   case object Stop                           extends Command
+  case class BlockAdded(index: ChainIndex)   extends Command
   case class Nonce(from: BigInt, to: BigInt) extends Command
 
   def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
@@ -67,7 +68,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           val elapsed = System.currentTimeMillis() - lastTs
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
-          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
+          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
             allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

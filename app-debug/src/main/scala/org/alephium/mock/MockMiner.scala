@@ -5,7 +5,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{AddBlockResult, BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
@@ -47,7 +47,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs, Long.MaxValue).get
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
-      blockHandler ! BlockChainHandler.AddBlocks(AVector(block), Local)
+      blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
 
     case AddBlockResult.Success =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

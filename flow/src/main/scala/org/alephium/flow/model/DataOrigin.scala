@@ -7,7 +7,7 @@ sealed trait DataOrigin {
 }
 
 object DataOrigin {
-  case object Local extends DataOrigin {
+  case object LocalMining extends DataOrigin {
     override def isNot(peerId: PeerId): Boolean = true
   }
   case class Remote(peerId: PeerId) extends DataOrigin {

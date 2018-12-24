@@ -56,31 +56,16 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     blockHeaderChains(from.value)(to.value)
   }
 
-  def add(block: Block): AddBlockResult = {
-    if (contains(block.hash)) {
-      AddBlockResult.AlreadyExisted
-    } else {
-      val index = block.chainIndex
-      val result = for {
-        _ <- checkCompleteness(block)
-        _ <- validate(block, index)
-      } yield add(block, index)
-      result.fold(identity, _ => AddBlockResult.Success)
-    }
+  def add(block: Block): IOResult[Unit] = {
+    val index  = block.chainIndex
+    val chain  = getBlockChain(index)
+    val parent = block.uncleHash(index.to)
+    val weight = calWeightUnsafe(block)
+    chain.add(block, parent, weight)
   }
 
-  def checkCompleteness(block: Block): Either[AddBlockResult.Incomplete, Unit] = {
-    checkCompleteness(block.header).left.map(AddBlockResult.HeaderIncomplete)
-  }
-
-  def validate(block: Block, index: ChainIndex): Either[AddBlockResult.Error, Unit] = {
-    if (index.from != mainGroup && index.to != mainGroup) {
-      Left(AddBlockResult.HeaderError(AddBlockHeaderResult.InvalidGroup))
-    } else if (!index.validateDiff(block)) {
-      Left(AddBlockResult.HeaderError(AddBlockHeaderResult.InvalidDifficulty))
-    } else {
-      Right(())
-    }
+  def validate(block: Block): Either[AddBlockResult.Error, Unit] = {
+    validate(block.header, fromBlock = true).left.map(AddBlockResult.HeaderError)
   }
 
   protected def add(block: Block, index: ChainIndex): Either[AddBlockResult, Unit] = {
@@ -98,37 +83,8 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     ???
   }
 
-  def add(header: BlockHeader): AddBlockHeaderResult = {
-    if (contains(header.hash)) {
-      AddBlockHeaderResult.AlreadyExisted
-    } else {
-      val index = header.chainIndex
-      val result = for {
-        _ <- checkCompleteness(header)
-        _ <- validate(header, index)
-        _ <- add(header, index).left.map(AddBlockHeaderResult.IOErrorForHeader)
-      } yield ()
-      result.fold(identity, _ => AddBlockHeaderResult.Success)
-    }
-  }
-
-  def validate(header: BlockHeader,
-               index: ChainIndex): Either[AddBlockHeaderResult.VerificationError, Unit] = {
-    if (index.from == mainGroup || index.to == mainGroup) {
-      Left(AddBlockHeaderResult.InvalidGroup)
-    } else if (!index.validateDiff(header)) {
-      Left(AddBlockHeaderResult.InvalidDifficulty)
-    } else Right(())
-  }
-
-  def checkCompleteness(header: BlockHeader): Either[AddBlockHeaderResult.Incomplete, Unit] = {
-    val deps        = header.blockDeps
-    val missingDeps = deps.filterNot(contains)
-    if (missingDeps.isEmpty) Right(())
-    else Left(AddBlockHeaderResult.MissingDeps(missingDeps))
-  }
-
-  protected def add(header: BlockHeader, index: ChainIndex): IOResult[Unit] = {
+  def add(header: BlockHeader): IOResult[Unit] = {
+    val index  = header.chainIndex
     val chain  = getHeaderChain(index)
     val parent = header.uncleHash(index.to)
     try {
@@ -137,6 +93,26 @@ class BlockFlow()(implicit val config: PlatformConfig) extends MultiChain with F
     } catch {
       case e: Exception =>
         Left(IOError.from(e))
+    }
+  }
+
+  def validate(header: BlockHeader): Either[AddBlockHeaderResult.VerificationError, Unit] = {
+    validate(header, fromBlock = false)
+  }
+
+  def validate(header: BlockHeader,
+               fromBlock: Boolean): Either[AddBlockHeaderResult.VerificationError, Unit] = {
+    val index = header.chainIndex
+    if (fromBlock ^ index.relateTo(mainGroup)) {
+      // fromBlock = true, relate = false; fromBlock = false, relate = true
+      Left(AddBlockHeaderResult.InvalidGroup)
+    } else if (!index.validateDiff(header)) {
+      Left(AddBlockHeaderResult.InvalidDifficulty)
+    } else {
+      val deps        = header.blockDeps
+      val missingDeps = deps.filterNot(contains)
+      if (missingDeps.isEmpty) Right(())
+      else Left(AddBlockHeaderResult.MissingDeps(missingDeps))
     }
   }
 
