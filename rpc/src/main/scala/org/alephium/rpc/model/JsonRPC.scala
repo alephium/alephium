@@ -28,11 +28,11 @@ object JsonRPC {
       id: Json,
       method: String,
       params: Json,
-      version: String
+      jsonrpc: String
   ) {
     def failure(error: Error): Response = Response.Failure(id, error)
     def validate(handler: Handler): Either[Error, Request] = {
-      if (version == JsonRPC.version) {
+      if (jsonrpc == JsonRPC.version) {
         if (handler.isDefinedAt(method)) {
           Right(Request(id, method, params))
         } else {
@@ -50,6 +50,7 @@ object JsonRPC {
   }
 
   case class Request(id: Json, method: String, params: Json) {
+    def successful(): Response          = Response.Success(id, Json.True)
     def success(result: Json): Response = Response.Success(id, result)
     def failure(error: Error): Response = Response.Failure(id, error)
   }
