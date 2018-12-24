@@ -13,6 +13,8 @@ object ConcurrentHashSet {
 
 // Only suitable for small sets
 class ConcurrentHashSet[K](s: JCHashMap[K, Boolean]) {
+  def size: Int = s.size()
+
   def contains(k: K): Boolean = s.containsKey(k)
 
   def add(k: K): Unit = {
