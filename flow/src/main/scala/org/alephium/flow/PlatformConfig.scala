@@ -41,6 +41,31 @@ trait PlatformConfigFiles extends StrictLogging {
   def env: Env
   def rootPath: Path
 
+  def getConfigFile[A](name: String)(create: File => A): File = {
+    val directory = rootPath.toFile
+    if (!directory.exists) directory.mkdir()
+
+    val path = rootPath.resolve(s"$name.conf")
+    logger.info(s"Using $name configuration file at $path")
+
+    val file = path.toFile
+    if (!file.exists) {
+      create(file)
+    }
+    file
+  }
+
+  def getConfigSystem(): File =
+    getConfigFile("system") { file =>
+      val env      = Env.resolve()
+      val filename = s"system_${env.name}.conf"
+      Files.copyFromResource(s"/$filename.tmpl", file.toPath)
+      file.setWritable(false)
+    }
+
+  def getConfigUser(): File =
+    getConfigFile("user")(_.createNewFile)
+
   def getNoncesPath(groups: Int, leadingZeros: Int): Path =
     rootPath.resolve(s"nonces-$groups-$leadingZeros.conf")
 
@@ -54,22 +79,15 @@ trait PlatformConfigFiles extends StrictLogging {
     file
   }
 
-  def getUserFile(): File = {
-    val directory = rootPath.toFile
-    if (!directory.exists) directory.mkdir()
-
-    val env      = Env.resolve()
-    val filename = s"user_${env.name}.conf"
-    val path     = rootPath.resolve("user.conf")
-    logger.info(s"Using configuration file at $path")
-
-    val file = path.toFile
-    if (!file.exists) Files.copyFromResource(s"/$filename.tmpl", path)
-    file
+  def parseConfig(): Config = {
+    ConfigFactory
+      .parseFile(getConfigUser)
+      .withFallback(ConfigFactory.parseFile(getConfigSystem))
+      .resolve()
   }
 
   Disk.createDirUnsafe(rootPath)
-  val all      = ConfigFactory.parseFile(getUserFile).resolve()
+  val all      = parseConfig()
   val alephium = all.getConfig("alephium")
 }
 
