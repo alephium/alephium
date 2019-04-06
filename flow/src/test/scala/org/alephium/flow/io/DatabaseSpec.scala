@@ -1,6 +1,8 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
+import org.alephium.protocol.config.ConsensusConfigFixture
+import org.alephium.protocol.model.{ModelGen, TxOutputPoint}
 import org.alephium.util.{AlephiumSpec, Files}
 import org.rocksdb.Options
 import org.scalacheck.Arbitrary
@@ -42,31 +44,42 @@ class DatabaseSpec extends AlephiumSpec {
     postTest()
   }
 
-  it should "create entities" in new Fixture {
-    val (key0, value0) = generate()
-    val (key1, value1) = generate()
-    val (key2, value2) = generate()
-    db.getOpt(key0).right.value is None
-    db.getOpt(key1).right.value is None
-    db.getOpt(key2).right.value is None
-    db.put(key0, value0).isRight is true
-    db.put(key1, value1).isRight is true
-    db.put(key2, value2).isRight is true
-    db.get(key0).right.value is value0
-    db.get(key1).right.value is value1
-    db.get(key2).right.value is value2
-    db.getOpt(key0).right.value.get is value0
-    db.getOpt(key1).right.value.get is value1
-    db.getOpt(key2).right.value.get is value2
-    postTest()
-  }
-
   it should "delete entities" in new Fixture {
     val (key, value) = generate()
     db.put(key, value).isRight is true
     db.exists(key).right.value is true
     db.delete(key).isRight is true
     db.exists(key).right.value is false
+    postTest()
+  }
+
+  it should "work for transactions" in new Fixture with ConsensusConfigFixture {
+    forAll(ModelGen.blockGen) { block =>
+      val header = block.header
+      val hash   = block.hash
+      db.putHeader(header).isRight is true
+      db.getHeader(hash).right.value is header
+      db.getHeaderOpt(hash).right.value.get is header
+      db.deleteHeader(hash).isRight is true
+      db.getHeader(hash).isLeft is true
+      db.getHeaderOpt(hash).right.value is None
+    }
+    postTest()
+  }
+
+  it should "work for utxo" in new Fixture with ConsensusConfigFixture {
+    forAll(ModelGen.transactionGen) { transaction =>
+      val hash = transaction.hash
+      transaction.unsigned.outputs.foreachWithIndex { (output, index) =>
+        val outputPoint = TxOutputPoint(hash, index)
+        db.putUTXO(outputPoint, output)
+        db.getUTXO(outputPoint).right.value is output
+        db.getUTXOOpt(outputPoint).right.value.get is output
+        db.deleteUTXO(outputPoint).isRight is true
+        db.getUTXO(outputPoint).isLeft is true
+        db.getUTXOOpt(outputPoint).right.value is None
+      }
+    }
     postTest()
   }
 }
