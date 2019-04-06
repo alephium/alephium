@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, TxOutput, TxOutputPoint}
 import org.alephium.serde._
 import org.rocksdb.{Options, RocksDB, RocksDBException}
 
@@ -133,5 +133,37 @@ class Database private (val path: Path, db: RocksDB) {
 
   def deleteHeaderUnsafe(hash: Keccak256): Unit = {
     deleteUnsafe(hash.bytes)
+  }
+
+  def getUTXO(outputPoint: TxOutputPoint): IOResult[TxOutput] = execute {
+    getUTXOUnsafe(outputPoint)
+  }
+
+  def getUTXOUnsafe(txOutputPoint: TxOutputPoint): TxOutput = {
+    val key  = serialize(txOutputPoint)
+    val data = getUnsafe(key)
+    deserialize[TxOutput](data) match {
+      case Left(e)         => throw e
+      case Right(txOutput) => txOutput
+    }
+  }
+
+  def putUTXO(outputPoint: TxOutputPoint, output: TxOutput): IOResult[Unit] = execute {
+    putUTXOUnsafe(outputPoint, output)
+  }
+
+  def putUTXOUnsafe(outputPoint: TxOutputPoint, output: TxOutput): Unit = {
+    val key  = serialize(outputPoint)
+    val data = serialize(output)
+    putUnsafe(key, data)
+  }
+
+  def deleteUTXO(txOutputPoint: TxOutputPoint): IOResult[Unit] = execute {
+    deleteUTXOUnsafe(txOutputPoint)
+  }
+
+  def deleteUTXOUnsafe(txOutputPoint: TxOutputPoint): Unit = {
+    val key = serialize(txOutputPoint)
+    deleteUnsafe(key)
   }
 }
