@@ -19,10 +19,6 @@ object Disk {
     disk
   }
 
-  def createDir(path: Path): IOResult[Unit] = execute {
-    createDirUnsafe(path)
-  }
-
   def createDirUnsafe(path: Path): Unit = {
     if (!Files.exists(path)) {
       Files.createDirectory(path)

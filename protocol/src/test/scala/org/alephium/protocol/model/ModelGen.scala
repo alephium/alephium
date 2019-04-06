@@ -11,9 +11,10 @@ import org.scalacheck.Gen
 object ModelGen {
   private val (sk, pk) = ED25519.generatePriPub()
 
-  val txInputGen: Gen[TxInput] = for {
+  val txInputGen: Gen[TxOutputPoint] = for {
     index <- Gen.choose(0, 10)
-  } yield TxInput(Keccak256.zero, index) // TODO: fixme: Has to use zero here to pass test on ubuntu
+  } yield
+    TxOutputPoint(Keccak256.zero, index) // TODO: fixme: Has to use zero here to pass test on ubuntu
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose(0, 100)

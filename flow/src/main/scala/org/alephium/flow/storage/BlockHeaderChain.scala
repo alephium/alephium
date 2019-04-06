@@ -86,7 +86,7 @@ object BlockHeaderChain {
     val rootNode = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight)
 
     new BlockHeaderChain {
-      override val headerDB: Database                  = _config.headerDB
+      override val headerDB: Database                  = _config.db
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

@@ -8,6 +8,6 @@ import org.scalatest.BeforeAndAfter
 trait BlockFlowFixture extends AlephiumSpec with PlatformConfig.Default with BeforeAndAfter {
   after {
     TestUtils.clear(config.disk.blockFolder)
-    Database.dESTROY(config.headerDB)
+    Database.dESTROY(config.db)
   }
 }
