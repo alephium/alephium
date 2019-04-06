@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.IOResult
-import org.alephium.protocol.model.{Block, Transaction, TxInput}
+import org.alephium.protocol.model.{Block, Transaction, TxOutputPoint}
 import org.alephium.util.AVector
 
 trait BlockPool extends BlockHashPool {
@@ -41,7 +41,7 @@ trait BlockPool extends BlockHashPool {
 
   def getTxInputValue(transaction: Transaction, address: ED25519PublicKey): BigInt = {
     transaction.unsigned.inputs.sumBy {
-      case TxInput(txHash, outputIndex) =>
+      case TxOutputPoint(txHash, outputIndex) =>
         val tx       = getTransaction(txHash)
         val txOutput = tx.unsigned.outputs(outputIndex)
         if (txOutput.publicKey == address) txOutput.value else BigInt(0)

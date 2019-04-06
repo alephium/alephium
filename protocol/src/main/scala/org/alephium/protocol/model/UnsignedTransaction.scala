@@ -4,12 +4,12 @@ import akka.util.ByteString
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
-case class UnsignedTransaction(inputs: AVector[TxInput], outputs: AVector[TxOutput])
+case class UnsignedTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] = new Serde[UnsignedTransaction] {
-    val inputsSerde: Serde[AVector[TxInput]]   = Serde[AVector[TxInput]]
-    val outputsSerde: Serde[AVector[TxOutput]] = Serde[AVector[TxOutput]]
+    val inputsSerde: Serde[AVector[TxOutputPoint]] = Serde[AVector[TxOutputPoint]]
+    val outputsSerde: Serde[AVector[TxOutput]]     = Serde[AVector[TxOutput]]
 
     override def serialize(input: UnsignedTransaction): ByteString = {
       inputsSerde.serialize(input.inputs) ++

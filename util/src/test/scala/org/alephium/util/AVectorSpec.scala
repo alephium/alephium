@@ -247,13 +247,23 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
-  it should "traverse" in new Fixture {
+  trait FixtureF extends Fixture {
     def alwaysRight: A => Either[Unit, A] = Right.apply
     def alwaysLeft: A  => Either[Unit, A] = _ => Left(())
+
+    def doNothing: A => Either[Unit, Unit] = _ => Right(())
+  }
+
+  it should "traverse" in new FixtureF {
     forAll(vectorGen) { vc =>
-      val vc0 = vc.traverse(alwaysRight).right.value
-      vc0 is vc
+      vc.traverse(alwaysRight).right.value is vc
       vc.traverse(alwaysLeft).isLeft is true
+    }
+  }
+
+  it should "foreachF" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      vc.foreachF[Unit](doNothing).isRight is true
     }
   }
 

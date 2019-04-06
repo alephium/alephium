@@ -17,15 +17,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
     val weight = calWeightUnsafe(block)
-    chain.add(block, parent, weight).map { _ =>
-      updateStateFor(block)
-    }
-  }
-
-  private def updateStateFor(block: Block): Unit = {
-    val bestDeps = calBestDepsUnsafe()
-    updateBestDeps(bestDeps)
-    updateTxs(block)
+    for {
+      _        <- chain.add(block, parent, weight)
+      bestDeps <- calBestDeps().map(deps => { updateBestDeps(deps); deps })
+      _        <- updateTxs(block)
+    } yield ()
   }
 
   def validate(block: Block): Either[ValidationError, Unit] = {

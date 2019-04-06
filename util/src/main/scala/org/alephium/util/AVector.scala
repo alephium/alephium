@@ -232,6 +232,26 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(result)
   }
 
+  def foreachF[L](f: A => Either[L, Unit]): Either[L, Unit] = {
+    foreach { elem =>
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(_) => ()
+      }
+    }
+    Right(())
+  }
+
+  def foreachWithIndexF[L](f: (A, Int) => Either[L, Unit]): Either[L, Unit] = {
+    foreachWithIndex { (elem, i) =>
+      f(elem, i) match {
+        case Left(l)  => return Left(l)
+        case Right(_) => ()
+      }
+    }
+    Right(())
+  }
+
   @inline private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
     fold(AVector.empty[A]) { (acc, elem) =>
       if (p(elem) == target) acc :+ elem else acc

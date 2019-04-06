@@ -1,10 +1,10 @@
 package org.alephium.flow.storage
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
+import org.alephium.util.{AVector, ConcurrentHashSet}
 
 import scala.reflect.ClassTag
 
@@ -24,8 +24,7 @@ trait BlockFlowState {
     BlockDeps(deps1 ++ deps2)
   }
 
-  private val transactions = ConcurrentHashMap.empty[Keccak256, Transaction]
-  private val utxos        = ConcurrentHashSet.empty[TxInput]
+  private val utxos = ConcurrentHashSet.empty[TxOutputPoint]
 
   private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
     BlockChain.fromGenesisUnsafe(
@@ -71,14 +70,15 @@ trait BlockFlowState {
 
   def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
 
-  def updateTxs(block: Block): Unit = {
-    block.transactions.foreach { tx =>
-      transactions.put(tx.hash, tx)
-      tx.unsigned.inputs.foreach(utxos.remove)
-      tx.unsigned.outputs.foreachWithIndex { (output, i) =>
-        val txInput = TxInput(tx.hash, i)
-        utxos.add(txInput)
-      }
+  def updateTxs(block: Block): IOResult[Unit] = {
+    block.transactions.foreachF { tx =>
+      for {
+        _ <- tx.unsigned.inputs.foreachF(config.db.deleteUTXO)
+        _ <- tx.unsigned.outputs.foreachWithIndexF { (output, i) =>
+          val outputPoint = TxOutputPoint(tx.hash, i)
+          config.db.putUTXO(outputPoint, output)
+        }
+      } yield ()
     }
   }
 
