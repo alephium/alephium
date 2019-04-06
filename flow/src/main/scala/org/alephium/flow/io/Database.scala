@@ -49,23 +49,36 @@ class Database private (val path: Path, db: RocksDB) {
 
   def closeUnsafe(): Unit = db.close()
 
-  def getOpt(key: ByteString): IOResult[Option[ByteString]] = execute {
-    getOptUnsafe(key)
+  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = execute {
+    getOptUnsafe[V](key)
   }
 
-  def getOptUnsafe(key: ByteString): Option[ByteString] = {
+  def getOptUnsafe[V: Serde](key: ByteString): Option[V] = {
     val result = db.get(key.toArray)
-    if (result == null) None else Some(ByteString.fromArrayUnsafe(result))
+    if (result == null) None
+    else {
+      val data = ByteString.fromArrayUnsafe(result)
+      deserialize[V](data) match {
+        case Left(e)  => throw e
+        case Right(v) => Some(v)
+      }
+    }
   }
 
-  def get(key: ByteString): IOResult[ByteString] = execute {
-    getUnsafe(key)
+  def get[V: Serde](key: ByteString): IOResult[V] = execute {
+    getUnsafe[V](key)
   }
 
-  def getUnsafe(key: ByteString): ByteString = {
+  def getUnsafe[V: Serde](key: ByteString): V = {
     val result = db.get(key.toArray)
     if (result == null) throw RocksDBExpt.keyNotFound.e
-    else ByteString.fromArrayUnsafe(result)
+    else {
+      val data = ByteString.fromArrayUnsafe(result)
+      deserialize[V](data) match {
+        case Left(e)  => throw e
+        case Right(v) => v
+      }
+    }
   }
 
   def exists(key: ByteString): IOResult[Boolean] = execute {
@@ -77,12 +90,12 @@ class Database private (val path: Path, db: RocksDB) {
     result != null
   }
 
-  def put(key: ByteString, value: ByteString): IOResult[Unit] = execute {
+  def put[V: Serde](key: ByteString, value: V): IOResult[Unit] = execute {
     putUnsafe(key, value)
   }
 
-  def putUnsafe(key: ByteString, value: ByteString): Unit = {
-    db.put(key.toArray, value.toArray)
+  def putUnsafe[V: Serde](key: ByteString, value: V): Unit = {
+    db.put(key.toArray, serialize(value).toArray)
   }
 
   def delete(key: ByteString): IOResult[Unit] = execute {
@@ -93,39 +106,23 @@ class Database private (val path: Path, db: RocksDB) {
     db.delete(key.toArray)
   }
 
-  def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] = execute {
-    getHeaderOptUnsafe(hash)
-  }
+  def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
+    getOpt(hash.bytes)
 
-  def getHeaderOptUnsafe(hash: Keccak256): Option[BlockHeader] = {
-    val dataOpt = getOptUnsafe(hash.bytes)
-    dataOpt.fold[Option[BlockHeader]](None) { data =>
-      deserialize[BlockHeader](data) match {
-        case Left(e)       => throw e
-        case Right(header) => Some(header)
-      }
-    }
-  }
+  def getHeaderOptUnsafe(hash: Keccak256): Option[BlockHeader] =
+    getOptUnsafe[BlockHeader](hash.bytes)
 
-  def getHeader(hash: Keccak256): IOResult[BlockHeader] = execute {
-    getHeaderUnsafe(hash)
-  }
+  def getHeader(hash: Keccak256): IOResult[BlockHeader] =
+    get[BlockHeader](hash.bytes)
 
-  def getHeaderUnsafe(hash: Keccak256): BlockHeader = {
-    val data = getUnsafe(hash.bytes)
-    deserialize[BlockHeader](data) match {
-      case Left(e)       => throw e
-      case Right(header) => header
-    }
-  }
+  def getHeaderUnsafe(hash: Keccak256): BlockHeader =
+    getUnsafe[BlockHeader](hash.bytes)
 
-  def putHeader(header: BlockHeader): IOResult[Unit] = {
-    put(header.hash.bytes, serialize(header))
-  }
+  def putHeader(header: BlockHeader): IOResult[Unit] =
+    put[BlockHeader](header.hash.bytes, header)
 
-  def putHeaderUnsafe(header: BlockHeader): Unit = {
-    putUnsafe(header.hash.bytes, serialize(header))
-  }
+  def putHeaderUnsafe(header: BlockHeader): Unit =
+    putUnsafe[BlockHeader](header.hash.bytes, header)
 
   def deleteHeader(hash: Keccak256): IOResult[Unit] = {
     delete(hash.bytes)
@@ -135,35 +132,27 @@ class Database private (val path: Path, db: RocksDB) {
     deleteUnsafe(hash.bytes)
   }
 
-  def getUTXO(outputPoint: TxOutputPoint): IOResult[TxOutput] = execute {
-    getUTXOUnsafe(outputPoint)
-  }
+  def getUTXOOpt(outputPoint: TxOutputPoint): IOResult[Option[TxOutput]] =
+    getOpt[TxOutput](serialize(outputPoint))
 
-  def getUTXOUnsafe(txOutputPoint: TxOutputPoint): TxOutput = {
-    val key  = serialize(txOutputPoint)
-    val data = getUnsafe(key)
-    deserialize[TxOutput](data) match {
-      case Left(e)         => throw e
-      case Right(txOutput) => txOutput
-    }
-  }
+  def getUTXOOptUnsafe(outputPoint: TxOutputPoint): Option[TxOutput] =
+    getOptUnsafe[TxOutput](serialize(outputPoint))
 
-  def putUTXO(outputPoint: TxOutputPoint, output: TxOutput): IOResult[Unit] = execute {
-    putUTXOUnsafe(outputPoint, output)
-  }
+  def getUTXO(outputPoint: TxOutputPoint): IOResult[TxOutput] =
+    get[TxOutput](serialize(outputPoint))
 
-  def putUTXOUnsafe(outputPoint: TxOutputPoint, output: TxOutput): Unit = {
-    val key  = serialize(outputPoint)
-    val data = serialize(output)
-    putUnsafe(key, data)
-  }
+  def getUTXOUnsafe(txOutputPoint: TxOutputPoint): TxOutput =
+    getUnsafe[TxOutput](serialize(txOutputPoint))
 
-  def deleteUTXO(txOutputPoint: TxOutputPoint): IOResult[Unit] = execute {
-    deleteUTXOUnsafe(txOutputPoint)
-  }
+  def putUTXO(outputPoint: TxOutputPoint, output: TxOutput): IOResult[Unit] =
+    put[TxOutput](serialize(outputPoint), output)
 
-  def deleteUTXOUnsafe(txOutputPoint: TxOutputPoint): Unit = {
-    val key = serialize(txOutputPoint)
-    deleteUnsafe(key)
-  }
+  def putUTXOUnsafe(outputPoint: TxOutputPoint, output: TxOutput): Unit =
+    putUnsafe[TxOutput](serialize(outputPoint), output)
+
+  def deleteUTXO(txOutputPoint: TxOutputPoint): IOResult[Unit] =
+    delete(serialize(txOutputPoint))
+
+  def deleteUTXOUnsafe(txOutputPoint: TxOutputPoint): Unit =
+    deleteUnsafe(serialize(txOutputPoint))
 }
