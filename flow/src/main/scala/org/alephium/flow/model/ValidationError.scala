@@ -7,7 +7,7 @@ sealed trait ValidationError extends Error
 
 object ValidationError {
   case object InvalidGroup extends ValidationError {
-    override def toString: String = "Block index is related to node's group"
+    override def toString: String = "Invalid group, current group or external group expected"
   }
   case object InvalidDifficulty extends ValidationError {
     override def toString: String = "Difficulty is invalid"
