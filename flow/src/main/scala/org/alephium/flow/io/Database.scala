@@ -98,10 +98,12 @@ class Database private (val path: Path, db: RocksDB) {
     db.put(key.toArray, serialize(value).toArray)
   }
 
+  // TODO: should we check the existence of the key?
   def delete(key: ByteString): IOResult[Unit] = execute {
     deleteUnsafe(key)
   }
 
+  // TODO: should we check the existence of the key?
   def deleteUnsafe(key: ByteString): Unit = {
     db.delete(key.toArray)
   }
