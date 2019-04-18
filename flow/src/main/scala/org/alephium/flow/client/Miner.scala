@@ -25,7 +25,7 @@ object Miner {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
-      if (chainIndex.validateDiff(block)) block else iter(nonce + 1)
+      if (block.preValidate(chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -116,7 +116,8 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val header = template.buildHeader(current)
-        if (chainIndex.validateDiff(header)) Some(Block(header, template.transactions))
+        if (header.preValidate(chainIndex))
+          Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }

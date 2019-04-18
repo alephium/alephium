@@ -4,18 +4,6 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.serde.RandomBytes
 
 class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
-  def validateDiff(header: BlockHeader)(implicit config: ConsensusConfig): Boolean = {
-    val actual = header.chainIndex
-    from == actual.from && to == actual.to && {
-      val current = BigInt(1, header.hash.bytes.toArray)
-      current <= config.maxMiningTarget
-    }
-  }
-
-  def validateDiff(block: Block)(implicit config: ConsensusConfig): Boolean = {
-    validateDiff(block.header)
-  }
-
   def relateTo(groupIndex: GroupIndex): Boolean = {
     from == groupIndex || to == groupIndex
   }

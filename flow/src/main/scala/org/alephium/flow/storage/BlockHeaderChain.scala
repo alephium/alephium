@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.io.{Database, IOResult}
+import org.alephium.flow.io.{Database, IOError, IOResult}
 import org.alephium.protocol.model.{Block, BlockHeader}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
@@ -58,17 +58,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   def getHashTarget(hash: Keccak256): IOResult[BigInt] = {
-    assert(contains(hash))
-    getBlockHeader(hash).flatMap { header =>
-      val height    = getHeight(hash)
-      val refHeight = height - config.retargetInterval
-      if (refHeight > 0) {
-        val refHash = getPredecessor(hash, refHeight)
-        getBlockHeader(refHash).map { refHeader =>
-          val timeSpan = header.timestamp - refHeader.timestamp
-          getTarget(header, timeSpan)
-        }
-      } else Right(config.maxMiningTarget)
+    try {
+      Right(getHashTargetUnsafe(hash))
+    } catch {
+      case e: Exception => Left(IOError.from(e))
     }
   }
 
