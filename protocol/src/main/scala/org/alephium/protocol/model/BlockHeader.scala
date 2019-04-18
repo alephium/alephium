@@ -28,6 +28,22 @@ case class BlockHeader(
     assert(toIndex == chainIndex.to)
     blockDeps.takeRight(config.groups)(toIndex.value)
   }
+
+  def validateDiff: Boolean = {
+    val current = BigInt(1, hash.bytes.toArray)
+    assert(current >= 0)
+    current <= target
+  }
+
+  def validateIndex(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+    val actual = chainIndex
+    target.from == actual.from && target.to == actual.to
+  }
+
+  // Note: the target is not validated here
+  def preValidate(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+    validateIndex(target) && validateDiff
+  }
 }
 
 object BlockHeader {

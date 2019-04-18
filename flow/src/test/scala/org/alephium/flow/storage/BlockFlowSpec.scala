@@ -142,7 +142,7 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.from(deps, AVector.empty[Transaction], config.maxMiningTarget, nonce)
-      if (chainIndex.validateDiff(block)) block else iter(nonce + 1)
+      if (block.preValidate(chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)

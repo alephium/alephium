@@ -20,6 +20,19 @@ case class Block(header: BlockHeader, transactions: AVector[Transaction])
   def uncleHash(toIndex: GroupIndex)(implicit config: ConsensusConfig): Keccak256 = {
     header.uncleHash(toIndex)
   }
+
+  def validateDiff: Boolean = {
+    header.validateDiff
+  }
+
+  def validateIndex(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+    header.validateIndex(target)
+  }
+
+  // Note: the target is not validated here
+  def preValidate(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+    validateIndex(target) && validateDiff
+  }
 }
 
 object Block {

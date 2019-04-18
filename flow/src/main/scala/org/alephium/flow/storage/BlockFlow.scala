@@ -65,7 +65,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
     if (fromBlock ^ index.relateTo(mainGroup)) {
       // fromBlock = true, relate = false; fromBlock = false, relate = true
       Left(ValidationError.InvalidGroup)
-    } else if (!index.validateDiff(header)) {
+    } else if (!header.validateDiff) {
       Left(ValidationError.InvalidDifficulty)
     } else {
       val deps        = header.blockDeps

@@ -144,7 +144,7 @@ class ActualMiner(index: ChainIndex)(implicit config: PlatformConfig) extends Ba
     def iter(current: BigInt): Option[(Block, BigInt)] = {
       if (current < nonceEnd) {
         val header = template.buildHeader(current)
-        if (index.validateDiff(header))
+        if (header.preValidate(index))
           Some((Block(header, template.transactions), current - nonceStart + 1))
         else iter(current + 1)
       } else None
