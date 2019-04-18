@@ -19,6 +19,6 @@ class MiningBench extends PlatformConfig.Default {
     val block = Block.genesis(AVector.empty, config.maxMiningTarget, BigInt(nonce))
     val i     = RandomBytes.source.nextInt(config.groups)
     val j     = RandomBytes.source.nextInt(config.groups)
-    ChainIndex(i, j).validateDiff(block)(config)
+    block.preValidate(ChainIndex(i, j))
   }
 }

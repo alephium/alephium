@@ -59,7 +59,8 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val header = template.buildHeader(current)
-        if (chainIndex.validateDiff(header)) Some(Block(header, template.transactions))
+        if (header.preValidate(chainIndex))
+          Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
     }

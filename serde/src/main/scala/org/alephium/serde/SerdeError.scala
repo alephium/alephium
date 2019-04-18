@@ -1,5 +1,6 @@
 package org.alephium.serde
 
+// TODO: refactor this to follow a good practice of defining exception
 sealed trait SerdeError extends Exception {
   def message: String
 }
