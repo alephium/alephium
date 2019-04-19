@@ -21,6 +21,8 @@ trait BlockHashPool {
   // The return includes locator
   def getHashesAfter(locator: Keccak256): AVector[Keccak256]
 
+  def getPredecessor(hash: Keccak256, height: Int): Keccak256
+
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]
 
   def getBestTip: Keccak256
