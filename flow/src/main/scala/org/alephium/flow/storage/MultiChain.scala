@@ -52,6 +52,9 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getHashesAfter(locator: Keccak256): AVector[Keccak256] =
     getHashChain(locator).getHashesAfter(locator)
 
+  def getPredecessor(hash: Keccak256, height: Int): Keccak256 =
+    getHashChain(hash).getPredecessor(hash, height)
+
   def getHeight(hash: Keccak256): Int = {
     getHashChain(hash).getHeight(hash)
   }
