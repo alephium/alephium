@@ -111,7 +111,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
           s"$span seconds"
       }
     }
-    log.info(
-      s"$index; total: $total; utxos: $utxos; ${chain.show(header.hash)}; heights: $heightsInfo; targetRate: $targetRate, timeSpan: $timeSpan")
+    log.info(s"$index; total: $total; utxos: $utxos; ${chain
+      .show(header.hash)}; heights: $heightsInfo; targetRate: $targetRate, timeSpan: $timeSpan")
   }
 }
