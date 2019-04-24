@@ -54,7 +54,4 @@ elif args.goal == 'mine':
     rpc_call_all("mining/start", "[]")
 
 elif args.goal == 'kill':
-    run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs sudo kill 2> /dev/null")
-
-elif args.goal == 'genesis':
-    run('mainGroup=0 ./app/target/universal/stage/bin/prepare-genesis')
+    run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
