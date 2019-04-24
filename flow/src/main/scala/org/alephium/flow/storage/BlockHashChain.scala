@@ -38,8 +38,11 @@ trait BlockHashChain extends BlockHashPool {
     ()
   }
 
-  protected def addHash(hash: Keccak256, parent: BlockHashChain.TreeNode, weight: Int): Unit = {
-    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight)
+  protected def addHash(hash: Keccak256,
+                        parent: BlockHashChain.TreeNode,
+                        weight: Int,
+                        timestamp: Long): Unit = {
+    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight, timestamp)
     parent.successors += newNode
     addNode(newNode)
   }
@@ -235,6 +238,7 @@ object BlockHashChain {
     val successors: ArrayBuffer[Node]
     val height: Int
     val weight: Int
+    val timestamp: Long
 
     def isRoot: Boolean
     def isLeaf: Boolean = successors.isEmpty
@@ -244,14 +248,15 @@ object BlockHashChain {
       blockHash: Keccak256,
       successors: ArrayBuffer[Node],
       height: Int,
-      weight: Int
+      weight: Int,
+      timestamp: Long
   ) extends TreeNode {
     override def isRoot: Boolean = true
   }
 
   object Root {
-    def apply(blockHash: Keccak256, height: Int, weight: Int): Root =
-      Root(blockHash, ArrayBuffer.empty, height, weight)
+    def apply(blockHash: Keccak256, height: Int, weight: Int, timestamp: Long): Root =
+      Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
   }
 
   case class Node(
@@ -259,14 +264,19 @@ object BlockHashChain {
       parent: TreeNode,
       successors: ArrayBuffer[Node],
       height: Int,
-      weight: Int
+      weight: Int,
+      timestamp: Long
   ) extends TreeNode {
     def isRoot: Boolean = false
   }
 
   object Node {
-    def apply(blockHash: Keccak256, parent: TreeNode, height: Int, weight: Int): Node = {
-      new Node(blockHash, parent, ArrayBuffer.empty, height, weight)
+    def apply(blockHash: Keccak256,
+              parent: TreeNode,
+              height: Int,
+              weight: Int,
+              timestamp: Long): Node = {
+      new Node(blockHash, parent, ArrayBuffer.empty, height, weight, timestamp)
     }
   }
 }
