@@ -25,7 +25,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     assert(!contains(header.hash) && contains(parentHash))
     val parent = blockHashesTable(parentHash)
     addHeader(header).map { _ =>
-      addHash(header.hash, parent, weight)
+      addHash(header.hash, parent, weight, header.timestamp)
     }
   }
 
@@ -37,6 +37,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     headerDB.putHeaderUnsafe(header)
   }
 
+  // TODO: remove this
   def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
     getConfirmedHash(height) match {
       case Some(hash) => headerDB.getHeader(hash).map(Some.apply)
@@ -76,7 +77,8 @@ object BlockHeaderChain {
 
   private def createUnsafe(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
       implicit _config: PlatformConfig): BlockHeaderChain = {
-    val rootNode = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight)
+    val timestamp = rootHeader.timestamp
+    val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
       override val headerDB: Database                  = _config.db

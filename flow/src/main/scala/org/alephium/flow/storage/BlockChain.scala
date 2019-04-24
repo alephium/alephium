@@ -51,7 +51,8 @@ object BlockChain {
 
   private def createUnsafe(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
       implicit _config: PlatformConfig): BlockChain = {
-    val rootNode = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight)
+    val timestamp = rootBlock.header.timestamp
+    val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
     new BlockChain {
       override val disk                                = _config.disk
