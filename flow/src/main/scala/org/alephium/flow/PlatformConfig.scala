@@ -14,7 +14,7 @@ import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
 import org.alephium.util.{AVector, Env, Files, Network}
 import org.rocksdb.Options
 
-import scala.collection.JavaConverters._
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
@@ -34,6 +34,17 @@ object PlatformConfig extends StrictLogging {
 
   trait Default {
     implicit def config: PlatformConfig = Default
+  }
+
+  def mineGenesis(chainIndex: ChainIndex)(implicit config: ConsensusConfig): Block = {
+    @tailrec
+    def iter(nonce: BigInt): Block = {
+      val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
+      // Note: we do not validate difficulty target here
+      if (block.validateIndex(chainIndex)) block else iter(nonce + 1)
+    }
+
+    iter(0)
   }
 }
 
@@ -114,29 +125,10 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
 }
 
 trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
-  def loadNonces(): AVector[BigInt] = {
-    val noncesConfig = env match {
-      case Env.Test => all
-      case _ =>
-        val noncesFile = getNoncesFile(groups, numZerosAtLeastInHash)
-        ConfigFactory.parseFile(noncesFile).resolve()
-    }
-    val nonces = noncesConfig.getStringList("nonces").asScala
-    AVector.from(nonces.map(BigInt.apply))
-  }
-
   def loadBlockFlow(): AVector[AVector[Block]] = {
-    val nonces = loadNonces()
-    assert(nonces.length == groups * groups)
-
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        val index      = from * groups + to
-        val nonce      = nonces(index)
-        val block      = Block.genesis(AVector.empty, maxMiningTarget, nonce)
-        val chainIndex = ChainIndex(from, to)(this)
-        assert(block.preValidate(chainIndex)(this))
-        block
+        PlatformConfig.mineGenesis(ChainIndex(from, to)(this))(this)
     }
   }
 
