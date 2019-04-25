@@ -89,8 +89,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
           handlePayload(sourceId, remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
-          log.debug(
-            s"Received corrupted UDP data from $remote (${data.size} bytes): ${error.message}")
+          log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): ${error}")
       }
   }
 
