@@ -60,7 +60,7 @@ class BlockHashChainSpec extends AlephiumSpec with PlatformConfig.Default { Self
     calHashTarget(currentNode.blockHash, 9999) is 9999
 
     addNewHash(config.medianTimeInterval + 1)
-    val expected = (BigInt(9999) * config.timeSpanMin / config.expectedTimeSpan)
+    val expected = BigInt(9999) * config.timeSpanMin / config.expectedTimeSpan
     calHashTarget(currentNode.blockHash, 9999) is expected
   }
 }

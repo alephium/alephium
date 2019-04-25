@@ -101,7 +101,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
       height = blockFlow.getHashChain(ChainIndex(i, j)).maxHeight
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
-    val targetRatio = BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)
+    val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
     val timeSpan = {
       val parentHash = chain.getPredecessor(header.hash, chain.getHeight(header) - 1)
       chain.getBlockHeader(parentHash) match {

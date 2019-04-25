@@ -36,13 +36,13 @@ trait ChainDifficultyAdjustment extends BlockHashPool {
       parent  <- node.parentOpt
       median2 <- calMedianBlockTime(parent)
     } yield {
-      var timeSpan = median1 - median2
+      var timeSpan = config.expectedTimeSpan + (median1 - median2 - config.expectedTimeSpan) / 4
       if (timeSpan < config.timeSpanMin) {
         timeSpan = config.timeSpanMin
       } else if (timeSpan > config.timeSpanMax) {
         timeSpan = config.timeSpanMax
       }
-      currentTarget * timeSpan / config.expectedTimeSpan
+      reTarget(currentTarget, timeSpan)
     }
 
     targetOpt.fold(currentTarget)(identity)
