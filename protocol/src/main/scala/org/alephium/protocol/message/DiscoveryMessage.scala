@@ -5,8 +5,7 @@ import java.net.InetSocketAddress
 import akka.util.ByteString
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.serde.{Deserializer, Serde, SerdeError, ValidationError, WrongFormatError}
-import org.alephium.serde.{Deserializer, Serde, SerdeError, ValidationError, WrongFormatError}
+import org.alephium.serde.{Deserializer, Serde, SerdeError}
 import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
 import org.alephium.util.AVector
 
@@ -36,10 +35,10 @@ object DiscoveryMessage {
             if (publicKey != config.discoveryPublicKey) {
               Right((Header(_version, publicKey), rest))
             } else {
-              Left(ValidationError(s"Peer's public key is the same as ours"))
+              Left(SerdeError.validation(s"Peer's public key is the same as ours"))
             }
           } else {
-            Left(ValidationError(s"Invalid version: got ${_version}, expect: $version"))
+            Left(SerdeError.validation(s"Invalid version: got ${_version}, expect: $version"))
           }
       }
     }
@@ -91,7 +90,7 @@ object DiscoveryMessage {
     def deserialize(input: ByteString)(
         implicit config: DiscoveryConfig): Either[SerdeError, Pong] = {
       if (input.isEmpty) Right(Pong())
-      else Left(WrongFormatError.redundant(0, input.length))
+      else Left(SerdeError.redundant(0, input.length))
     }
   }
 
@@ -122,9 +121,9 @@ object DiscoveryMessage {
               info.id != config.nodeId && info.id.groupIndex == GroupIndex.unsafe(idx))
           }
           if (ok) Right(Neighbors(peers))
-          else Left(ValidationError(s"PeerInfos are invalid"))
+          else Left(SerdeError.validation(s"PeerInfos are invalid"))
         } else {
-          Left(ValidationError(s"Got ${peers.length} groups, expect ${config.groups} groups"))
+          Left(SerdeError.validation(s"Got ${peers.length} groups, expect ${config.groups} groups"))
         }
       }
     }
@@ -164,7 +163,7 @@ object DiscoveryMessage {
       rest2     = signaturePair._2
       payload <- Payload.deserialize(rest2).flatMap { payload =>
         if (ED25519.verify(rest2, signature, header.publicKey)) Right(payload)
-        else Left(ValidationError(s"Invalid signature"))
+        else Left(SerdeError.validation(s"Invalid signature"))
       }
     } yield DiscoveryMessage(header, payload)
   }

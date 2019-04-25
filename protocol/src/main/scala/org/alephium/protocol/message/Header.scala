@@ -1,7 +1,7 @@
 package org.alephium.protocol.message
 
 import org.alephium.protocol.Protocol
-import org.alephium.serde.{Serde, WrongFormatError}
+import org.alephium.serde.{Serde, SerdeError}
 
 case class Header(version: Int)
 
@@ -13,7 +13,8 @@ object Header {
         version =>
           if (version == Protocol.version) Right(Header(version))
           else
-            Left(WrongFormatError(s"Invalid version, got $version, expect ${Protocol.version}")),
+            Left(
+              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}")),
         header => header.version
       )
 }
