@@ -48,7 +48,7 @@ elif args.goal == 'run':
         if not os.path.exists(homedir):
             os.makedirs(homedir)
 
-        run('mainGroup={} port={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/boot &> {}/console.log &'.format(main_group, port, bootstrap, homedir, homedir))
+        run('mainGroup={} port={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(main_group, port, bootstrap, homedir, homedir))
 
 elif args.goal == 'mine':
     rpc_call_all("mining/start", "[]")

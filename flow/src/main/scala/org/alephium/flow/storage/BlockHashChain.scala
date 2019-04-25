@@ -7,6 +7,7 @@ import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
+// scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool {
 
   implicit def config: PlatformConfig
@@ -229,7 +230,51 @@ trait BlockHashChain extends BlockHashPool {
       Some(confirmedHashes(height).blockHash)
     } else None
   }
+
+  protected def calMedianBlockTime(node: BlockHashChain.TreeNode): Option[Long] = {
+    if (node.height < config.medianTimeInterval) None
+    else {
+      var cur = node
+      val timestamps = Array.fill(config.medianTimeInterval) {
+        val timestamp = cur.timestamp
+        cur = cur.parentOpt.get
+        timestamp
+      }
+      Some(calMedian(timestamps))
+    }
+  }
+
+  protected def calMedian(timestamps: Array[Long]): Long = {
+    scala.util.Sorting.quickSort(timestamps)
+    timestamps(timestamps.length / 2)
+  }
+
+  // DigiShield DAA
+  protected def calHashTarget(hash: Keccak256, currentTarget: BigInt): BigInt = {
+    assert(contains(hash))
+    val node = blockHashesTable(hash)
+    val targetOpt = for {
+      median1 <- calMedianBlockTime(node)
+      parent  <- node.parentOpt
+      median2 <- calMedianBlockTime(parent)
+    } yield {
+      var timeSpan = median1 - median2
+      if (timeSpan < config.timeSpanMin) {
+        timeSpan = config.timeSpanMin
+      } else if (timeSpan > config.timeSpanMax) {
+        timeSpan = config.timeSpanMax
+      }
+      currentTarget * timeSpan / config.expectedTimeSpan
+    }
+
+    targetOpt.fold(currentTarget)(identity)
+  }
+
+  protected def reTarget(currentTarget: BigInt, timeSpan: Long): BigInt = {
+    currentTarget * timeSpan / config.expectedTimeSpan
+  }
 }
+// scalastyle:on
 
 object BlockHashChain {
 
@@ -242,6 +287,8 @@ object BlockHashChain {
 
     def isRoot: Boolean
     def isLeaf: Boolean = successors.isEmpty
+
+    def parentOpt: Option[TreeNode]
   }
 
   case class Root(
@@ -252,6 +299,8 @@ object BlockHashChain {
       timestamp: Long
   ) extends TreeNode {
     override def isRoot: Boolean = true
+
+    override def parentOpt: Option[TreeNode] = None
   }
 
   object Root {
@@ -267,7 +316,9 @@ object BlockHashChain {
       weight: Int,
       timestamp: Long
   ) extends TreeNode {
-    def isRoot: Boolean = false
+    override def isRoot: Boolean = false
+
+    override def parentOpt: Option[TreeNode] = Some(parent)
   }
 
   object Node {
