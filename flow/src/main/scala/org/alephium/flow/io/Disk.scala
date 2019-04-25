@@ -29,13 +29,13 @@ object Disk {
   @inline
   def execute[T](f: => T): IOResult[T] = {
     try Right(f)
-    catch { case e: Exception => Left(IOError.from(e)) }
+    catch { case e: Exception => Left(IOError(e)) }
   }
 
   @inline
   def executeF[T](f: => IOResult[T]): IOResult[T] = {
     try f
-    catch { case e: Exception => Left(IOError.from(e)) }
+    catch { case e: Exception => Left(IOError(e)) }
   }
 }
 
@@ -63,7 +63,7 @@ class Disk private (root: Path) {
     try {
       val length = out.write(data.toByteBuffer)
       Right(length)
-    } catch { case e: Exception => Left(IOError.from(e)) } finally {
+    } catch { case e: Exception => Left(IOError(e)) } finally {
       out.close()
     }
   }
@@ -87,7 +87,7 @@ class Disk private (root: Path) {
       ByteString.fromArrayUnsafe(bytes)
     }
     dataIOResult.flatMap { data =>
-      deserialize[Block](data).left.map(IOError.from)
+      deserialize[Block](data).left.map(IOError(_))
     }
   }
 

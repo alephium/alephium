@@ -61,7 +61,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     try {
       Right(getHashTargetUnsafe(hash))
     } catch {
-      case e: Exception => Left(IOError.from(e))
+      case e: Exception => Left(IOError(e))
     }
   }
 
