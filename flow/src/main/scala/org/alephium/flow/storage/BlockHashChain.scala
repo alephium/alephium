@@ -7,15 +7,17 @@ import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-trait BlockHashChain extends BlockHashPool {
+trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   implicit def config: PlatformConfig
 
   protected def root: BlockHashChain.Root
 
-  protected val blockHashesTable = ConcurrentHashMap.empty[Keccak256, BlockHashChain.TreeNode]
-  protected val tips             = ConcurrentHashSet.empty[Keccak256]
-  protected val confirmedHashes  = ArrayBuffer.empty[BlockHashChain.TreeNode]
+  protected override val blockHashesTable =
+    ConcurrentHashMap.empty[Keccak256, BlockHashChain.TreeNode]
+
+  protected val tips            = ConcurrentHashSet.empty[Keccak256]
+  protected val confirmedHashes = ArrayBuffer.empty[BlockHashChain.TreeNode]
 
   protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
 
@@ -38,8 +40,11 @@ trait BlockHashChain extends BlockHashPool {
     ()
   }
 
-  protected def addHash(hash: Keccak256, parent: BlockHashChain.TreeNode, weight: Int): Unit = {
-    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight)
+  protected def addHash(hash: Keccak256,
+                        parent: BlockHashChain.TreeNode,
+                        weight: Int,
+                        timestamp: Long): Unit = {
+    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight, timestamp)
     parent.successors += newNode
     addNode(newNode)
   }
@@ -235,23 +240,29 @@ object BlockHashChain {
     val successors: ArrayBuffer[Node]
     val height: Int
     val weight: Int
+    val timestamp: Long
 
     def isRoot: Boolean
     def isLeaf: Boolean = successors.isEmpty
+
+    def parentOpt: Option[TreeNode]
   }
 
   case class Root(
       blockHash: Keccak256,
       successors: ArrayBuffer[Node],
       height: Int,
-      weight: Int
+      weight: Int,
+      timestamp: Long
   ) extends TreeNode {
     override def isRoot: Boolean = true
+
+    override def parentOpt: Option[TreeNode] = None
   }
 
   object Root {
-    def apply(blockHash: Keccak256, height: Int, weight: Int): Root =
-      Root(blockHash, ArrayBuffer.empty, height, weight)
+    def apply(blockHash: Keccak256, height: Int, weight: Int, timestamp: Long): Root =
+      Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
   }
 
   case class Node(
@@ -259,14 +270,21 @@ object BlockHashChain {
       parent: TreeNode,
       successors: ArrayBuffer[Node],
       height: Int,
-      weight: Int
+      weight: Int,
+      timestamp: Long
   ) extends TreeNode {
-    def isRoot: Boolean = false
+    override def isRoot: Boolean = false
+
+    override def parentOpt: Option[TreeNode] = Some(parent)
   }
 
   object Node {
-    def apply(blockHash: Keccak256, parent: TreeNode, height: Int, weight: Int): Node = {
-      new Node(blockHash, parent, ArrayBuffer.empty, height, weight)
+    def apply(blockHash: Keccak256,
+              parent: TreeNode,
+              height: Int,
+              weight: Int,
+              timestamp: Long): Node = {
+      new Node(blockHash, parent, ArrayBuffer.empty, height, weight, timestamp)
     }
   }
 }
