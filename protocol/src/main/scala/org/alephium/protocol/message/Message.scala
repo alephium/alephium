@@ -31,7 +31,7 @@ object Message {
     _deserialize(input).flatMap {
       case (message, rest) =>
         if (rest.isEmpty) Right(message)
-        else Left(WrongFormatError(s"Too many bytes: #${rest.length} left"))
+        else Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
     }
   }
 }

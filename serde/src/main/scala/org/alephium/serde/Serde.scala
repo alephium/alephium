@@ -52,7 +52,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
         case (t, rest) =>
           if (predicate(t)) {
             Right((t, rest))
-          } else Left(new WrongFormatError(error(t)))
+          } else Left(SerdeError.wrongFormat(error(t)))
       }
     }
 
@@ -61,7 +61,7 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.deserialize(input).flatMap { t =>
         if (predicate(t)) {
           Right(t)
-        } else Left(new WrongFormatError(error(t)))
+        } else Left(SerdeError.wrongFormat(error(t)))
       }
     }
   }
@@ -74,16 +74,16 @@ trait FixedSizeSerde[T] extends Serde[T] {
     if (input.size == serdeSize) {
       Right(f(input))
     } else if (input.size > serdeSize) {
-      Left(WrongFormatError.redundant(serdeSize, input.size))
+      Left(SerdeError.redundant(serdeSize, input.size))
     } else {
-      Left(NotEnoughBytesError(serdeSize, input.size))
+      Left(SerdeError.notEnoughBytes(serdeSize, input.size))
     }
 
   override def _deserialize(input: ByteString): Either[SerdeError, (T, ByteString)] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map((_, rest))
-    } else Left(NotEnoughBytesError(serdeSize, input.size))
+    } else Left(SerdeError.notEnoughBytes(serdeSize, input.size))
 }
 
 object Serde extends ProductSerde {
@@ -135,7 +135,7 @@ object Serde extends ProductSerde {
           if (rest.size >= size) {
             Right(rest.splitAt(size))
           } else {
-            Left(NotEnoughBytesError(size, rest.size))
+            Left(SerdeError.notEnoughBytes(size, rest.size))
           }
       }
     }

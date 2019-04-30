@@ -47,7 +47,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
       }
     } catch {
       case e: Exception =>
-        Left(IOError.from(e))
+        Left(IOError(e))
     }
   }
 
@@ -227,7 +227,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
     try {
       Right(calBestDepsUnsafe())
     } catch {
-      case e: Exception => Left(IOError.from(e))
+      case e: Exception => Left(IOError(e))
     }
 }
 

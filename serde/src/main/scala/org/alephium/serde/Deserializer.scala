@@ -9,7 +9,7 @@ trait Deserializer[T] { self =>
     _deserialize(input).flatMap {
       case (output, rest) =>
         if (rest.isEmpty) Right(output)
-        else Left(WrongFormatError.redundant(input.size - rest.size, input.size))
+        else Left(SerdeError.redundant(input.size - rest.size, input.size))
     }
 
   def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
@@ -18,7 +18,7 @@ trait Deserializer[T] { self =>
         case (t, rest) =>
           get(t) match {
             case Some(u) => Right((u, rest))
-            case None    => Left(new WrongFormatError(error(t)))
+            case None    => Left(SerdeError.wrongFormat(error(t)))
           }
       }
     }

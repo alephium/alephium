@@ -1,22 +1,18 @@
 package org.alephium.serde
 
-// TODO: refactor this to follow a good practice of defining exception
-sealed trait SerdeError extends Exception {
-  def message: String
+sealed abstract class SerdeError(message: String) extends Exception(message)
+
+object SerdeError {
+  case class NotEnoughBytes private (message: String) extends SerdeError(message)
+  case class WrongFormat private (message: String)    extends SerdeError(message)
+  case class Validation private (message: String)     extends SerdeError(message)
+
+  def notEnoughBytes(expected: Int, got: Int): NotEnoughBytes =
+    NotEnoughBytes(s"Too few bytes: expected $expected, got $got")
+
+  def redundant(expected: Int, got: Int): WrongFormat =
+    WrongFormat(s"Too many bytes: expected $expected, got $got")
+
+  def validation(message: String): Validation   = Validation(message)
+  def wrongFormat(message: String): WrongFormat = WrongFormat(message)
 }
-
-case class NotEnoughBytesError(message: String) extends SerdeError
-
-object NotEnoughBytesError {
-  def apply(expected: Int, got: Int): NotEnoughBytesError =
-    new NotEnoughBytesError(s"Too few bytes: expected $expected, got $got")
-}
-
-case class WrongFormatError(message: String) extends SerdeError
-
-object WrongFormatError {
-  def redundant(expected: Int, got: Int): WrongFormatError =
-    new WrongFormatError(s"Too many bytes: expected $expected, got $got")
-}
-
-case class ValidationError(message: String) extends SerdeError

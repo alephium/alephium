@@ -12,7 +12,7 @@ import org.alephium.flow.network.PeerManager.PeerInfo
 import org.alephium.flow.storage._
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
-import org.alephium.serde.{NotEnoughBytesError, SerdeError}
+import org.alephium.serde.SerdeError
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
@@ -42,7 +42,7 @@ object TcpHandler {
       Message._deserialize(rest) match {
         case Right((message, newRest)) =>
           iter(newRest, acc :+ message)
-        case Left(_: NotEnoughBytesError) =>
+        case Left(_: SerdeError.NotEnoughBytes) =>
           Right((acc, rest))
         case Left(e) =>
           Left(e)
