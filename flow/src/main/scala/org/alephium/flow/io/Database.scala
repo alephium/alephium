@@ -35,7 +35,7 @@ object Database {
   private def execute[T](f: => T): IOResult[T] = {
     try Right(f)
     catch {
-      case e: RocksDBException => Left(RocksDBExpt(e))
+      case e: RocksDBException => Left(IOError.RocksDB(e))
     }
   }
 }
@@ -71,7 +71,7 @@ class Database private (val path: Path, db: RocksDB) {
 
   def getUnsafe[V: Serde](key: ByteString): V = {
     val result = db.get(key.toArray)
-    if (result == null) throw RocksDBExpt.keyNotFound.e
+    if (result == null) throw IOError.RocksDB.keyNotFound.e
     else {
       val data = ByteString.fromArrayUnsafe(result)
       deserialize[V](data) match {

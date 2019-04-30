@@ -3,26 +3,26 @@ package org.alephium.flow.io
 import org.alephium.serde.SerdeError
 import org.rocksdb.RocksDBException
 
-sealed trait IOError extends Exception {
-  def e: Exception
-  override def toString: String = e.toString
-}
+sealed abstract class IOError(reason: Throwable) extends Exception(reason)
+
 object IOError {
-  def from(expt: Exception): IOError = expt match {
-    case e: java.io.IOException => IOExpt(e)
-    case e: RocksDBException    => RocksDBExpt(e)
-    case e: SerdeError          => SerdeExpt(e)
-    case e                      => OtherExpt(e)
+
+  case class JavaIO(e: java.io.IOException) extends IOError(e)
+
+  case class RocksDB(e: RocksDBException) extends IOError(e)
+
+  object RocksDB {
+    val keyNotFound = RocksDB(new RocksDBException("key not found"))
+  }
+
+  case class Serde(e: SerdeError) extends IOError(e)
+
+  case class Other(e: Throwable) extends IOError(e)
+
+  def apply(t: Throwable): IOError = t match {
+    case e: java.io.IOException => JavaIO(e)
+    case e: RocksDBException    => RocksDB(e)
+    case e: SerdeError          => Serde(e)
+    case _                      => Other(t)
   }
 }
-
-case class IOExpt(e: java.io.IOException) extends IOError
-
-case class RocksDBExpt(e: RocksDBException) extends IOError
-object RocksDBExpt {
-  val keyNotFound = RocksDBExpt(new RocksDBException("key not found"))
-}
-
-case class SerdeExpt(e: SerdeError) extends IOError
-
-case class OtherExpt(e: Exception) extends IOError
