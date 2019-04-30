@@ -48,13 +48,10 @@ elif args.goal == 'run':
         if not os.path.exists(homedir):
             os.makedirs(homedir)
 
-        run('mainGroup={} port={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/boot &> {}/console.log &'.format(main_group, port, bootstrap, homedir, homedir))
+        run('mainGroup={} port={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(main_group, port, bootstrap, homedir, homedir))
 
 elif args.goal == 'mine':
     rpc_call_all("mining/start", "[]")
 
 elif args.goal == 'kill':
-    run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs sudo kill 2> /dev/null")
-
-elif args.goal == 'genesis':
-    run('mainGroup=0 ./app/target/universal/stage/bin/prepare-genesis')
+    run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")

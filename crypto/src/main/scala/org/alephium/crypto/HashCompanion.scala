@@ -31,5 +31,9 @@ abstract class HashCompanion[T: TypeTag](unsafeFrom: ByteString => T, toBytes: T
     hash(serializer.serialize(input))
   }
 
-  def random: T = hash(ByteString(RandomBytes.source.nextLong))
+  def random: T = {
+    val input = Array.fill[Byte](8)(0)
+    RandomBytes.source.nextBytes(input)
+    hash(input.toSeq)
+  }
 }
