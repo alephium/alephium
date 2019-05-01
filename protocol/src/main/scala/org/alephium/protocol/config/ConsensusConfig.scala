@@ -9,5 +9,4 @@ trait ConsensusConfig extends GroupConfig {
 
   def blockTargetTime: Duration
   def blockConfirmNum: Int
-  def retargetInterval: Int
 }

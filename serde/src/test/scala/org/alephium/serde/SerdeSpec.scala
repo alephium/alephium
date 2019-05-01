@@ -12,9 +12,9 @@ class SerdeSpec extends AlephiumSpec {
       forAll { inputs: Array[Byte] =>
         lazy val exception = serde.deserialize(ByteString(inputs)).left.value
         if (inputs.length < serde.serdeSize) {
-          exception is a[NotEnoughBytesError]
+          exception is a[SerdeError.NotEnoughBytes]
         } else if (inputs.length > serde.serdeSize) {
-          exception is a[WrongFormatError]
+          exception is a[SerdeError.WrongFormat]
         }
       }
     }
@@ -97,13 +97,13 @@ class SerdeSpec extends AlephiumSpec {
       {
         val serde     = Serde.fixedSizeBytesSerde(input.length + 1, Serde[Byte])
         val exception = serde.deserialize(ByteString(input.toArray)).left.value
-        exception is a[NotEnoughBytesError]
+        exception is a[SerdeError.NotEnoughBytes]
       }
 
       if (input.nonEmpty) {
         val serde     = Serde.fixedSizeBytesSerde(input.length - 1, Serde[Byte])
         val exception = serde.deserialize(ByteString(input.toArray)).left.value
-        exception is a[WrongFormatError]
+        exception is a[SerdeError.WrongFormat]
       }
     }
   }
