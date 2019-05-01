@@ -120,8 +120,7 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
 
   val blockTargetTime: Duration = alephium.getDuration("blockTargetTime")
   val blockConfirmNum: Int      = alephium.getInt("blockConfirmNum")
-  val retargetInterval: Int     = alephium.getInt("retargetInterval") // number of blocks for retarget
-  val expectedTimeSpan: Long    = retargetInterval * blockTargetTime.toMillis
+  val expectedTimeSpan: Long    = blockTargetTime.toMillis
 
   // Digi Shields Difficulty Adjustment
   val medianTimeInterval = 11

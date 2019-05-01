@@ -11,7 +11,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.PeerId
-import org.alephium.serde.WrongFormatError
+import org.alephium.serde.SerdeError
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalatest.EitherValues._
 
@@ -173,9 +173,9 @@ class TcpHandlerSpec extends AlephiumActorSpec("TcpHandlerSpec") {
 
   it should "fail when data is corrupted" in new SerdeFixture {
     val exception1 = TcpHandler.deserialize(bytes.tail).left.value
-    exception1 is a[WrongFormatError]
+    exception1 is a[SerdeError.WrongFormat]
     val exception2 = TcpHandler.deserialize(bytes1 ++ bytes2.tail).left.value
-    exception2 is a[WrongFormatError]
+    exception2 is a[SerdeError.WrongFormat]
   }
 
   behavior of "ping/ping protocol"
