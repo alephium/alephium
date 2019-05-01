@@ -10,6 +10,5 @@ trait ConsensusConfigFixture {
     override def maxMiningTarget: BigInt    = (BigInt(1) << 256) - 1
     override def blockTargetTime: Duration  = Duration.ofMinutes(4)
     override def blockConfirmNum: Int       = 2
-    override def retargetInterval: Int      = 180
   }
 }
