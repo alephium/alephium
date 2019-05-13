@@ -400,6 +400,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     minA
   }
 
+  def replace(i: Int, a: A): AVector[A] = {
+    val arr = Array.ofDim[A](length)
+    arr(i) = a
+    AVector.unsafe(arr)
+  }
+
   def toArray: Array[A] = {
     val arr = new Array[A](length)
     System.arraycopy(elems, start, arr, 0, length)
@@ -452,7 +458,9 @@ object AVector {
   def empty[@sp A: ClassTag]: AVector[A] = ofSize[A](defaultSize)
 
   def apply[@sp A: ClassTag](elems: A*): AVector[A] = {
-    unsafe(elems.toArray)
+    val array = Array.ofDim[A](if (elems.length <= defaultSize) defaultSize else elems.length)
+    elems.copyToArray(array)
+    unsafe(array, 0, elems.length, true)
   }
 
   def ofSize[@sp A: ClassTag](n: Int): AVector[A] = {
