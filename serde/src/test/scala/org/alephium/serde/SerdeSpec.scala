@@ -3,6 +3,7 @@ package org.alephium.serde
 import akka.util.ByteString
 import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
 import org.alephium.util.{AVector, AlephiumSpec}
+import org.scalacheck.Gen
 import org.scalatest.EitherValues._
 
 class SerdeSpec extends AlephiumSpec {
@@ -113,6 +114,21 @@ class SerdeSpec extends AlephiumSpec {
       val serde  = Serde.dynamicSizeBytesSerde(Serde[Byte])
       val output = serde.deserialize(serde.serialize(input)).right.value
       output is input
+    }
+  }
+
+  "Serde for option" should "work" in {
+    forAll(Gen.option(Gen.choose(0, Int.MaxValue))) { input =>
+      deserialize[Option[Int]](serialize(input)).right.value is input
+    }
+  }
+
+  "Serde for either" should "work" in {
+    forAll { (left: Int, right: Long) =>
+      val input1: Either[Int, Long] = Left(left)
+      deserialize[Either[Int, Long]](serialize(input1)).right.value is input1
+      val input2: Either[Int, Long] = Right(right)
+      deserialize[Either[Int, Long]](serialize(input2)).right.value is input2
     }
   }
 
