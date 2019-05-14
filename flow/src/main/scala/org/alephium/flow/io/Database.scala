@@ -2,13 +2,14 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{BlockHeader, TxOutput, TxOutputPoint}
 import org.alephium.serde._
-import org.rocksdb.{Options, RocksDB, RocksDBException}
+import org.rocksdb.{Options, RocksDB}
 
 object Database {
+  import RocksDBStorage.execute
+
   def open(path: Path, options: Options): IOResult[Database] = execute {
     openUnsafe(path, options)
   }
@@ -30,84 +31,9 @@ object Database {
   def dESTROYUnsafe(db: Database): Unit = {
     RocksDB.destroyDB(db.path.toString, new Options())
   }
-
-  @inline
-  private def execute[T](f: => T): IOResult[T] = {
-    try Right(f)
-    catch {
-      case e: RocksDBException => Left(IOError.RocksDB(e))
-    }
-  }
 }
 
-class Database private (val path: Path, db: RocksDB) {
-  import Database._
-
-  def close(): IOResult[Unit] = execute {
-    db.close()
-  }
-
-  def closeUnsafe(): Unit = db.close()
-
-  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = execute {
-    getOptUnsafe[V](key)
-  }
-
-  def getOptUnsafe[V: Serde](key: ByteString): Option[V] = {
-    val result = db.get(key.toArray)
-    if (result == null) None
-    else {
-      val data = ByteString.fromArrayUnsafe(result)
-      deserialize[V](data) match {
-        case Left(e)  => throw e
-        case Right(v) => Some(v)
-      }
-    }
-  }
-
-  def get[V: Serde](key: ByteString): IOResult[V] = execute {
-    getUnsafe[V](key)
-  }
-
-  def getUnsafe[V: Serde](key: ByteString): V = {
-    val result = db.get(key.toArray)
-    if (result == null) throw IOError.RocksDB.keyNotFound.e
-    else {
-      val data = ByteString.fromArrayUnsafe(result)
-      deserialize[V](data) match {
-        case Left(e)  => throw e
-        case Right(v) => v
-      }
-    }
-  }
-
-  def exists(key: ByteString): IOResult[Boolean] = execute {
-    existsUnsafe(key)
-  }
-
-  def existsUnsafe(key: ByteString): Boolean = {
-    val result = db.get(key.toArray)
-    result != null
-  }
-
-  def put[V: Serde](key: ByteString, value: V): IOResult[Unit] = execute {
-    putUnsafe(key, value)
-  }
-
-  def putUnsafe[V: Serde](key: ByteString, value: V): Unit = {
-    db.put(key.toArray, serialize(value).toArray)
-  }
-
-  // TODO: should we check the existence of the key?
-  def delete(key: ByteString): IOResult[Unit] = execute {
-    deleteUnsafe(key)
-  }
-
-  // TODO: should we check the existence of the key?
-  def deleteUnsafe(key: ByteString): Unit = {
-    db.delete(key.toArray)
-  }
-
+class Database(path: Path, db: RocksDB) extends RocksDBStorage(path, db) {
   def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
     getOpt(hash.bytes)
 
