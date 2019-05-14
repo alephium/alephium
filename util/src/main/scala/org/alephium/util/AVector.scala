@@ -401,6 +401,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def replace(i: Int, a: A): AVector[A] = {
+    assert(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)
     arr(i) = a
     AVector.unsafe(arr)
