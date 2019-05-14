@@ -306,7 +306,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
         val index = Random.nextInt(vc.length)
         val vc1   = vc.replace(index, vc.head)
         vc.indices.foreach { i =>
-          if (i == index) vc1(i) == vc.head else vc1(i) == vc(i)
+          if (i == index) vc1(i) is vc.head else vc1(i) is vc(i)
         }
       }
     }
