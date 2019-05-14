@@ -4,7 +4,11 @@ import akka.util.ByteString
 import org.alephium.serde.Serde
 
 trait KeyValueStorage {
+  def getRaw(key: ByteString): IOResult[ByteString]
+
   def get[V: Serde](key: ByteString): IOResult[V]
+
+  def getOptRaw(key: ByteString): IOResult[Option[ByteString]]
 
   def getOpt[V: Serde](key: ByteString): IOResult[Option[V]]
 
@@ -12,5 +16,5 @@ trait KeyValueStorage {
 
   def put[V: Serde](key: ByteString, value: V): IOResult[Unit]
 
-  def remove(key: ByteString): IOResult[Unit]
+  def delete(key: ByteString): IOResult[Unit]
 }
