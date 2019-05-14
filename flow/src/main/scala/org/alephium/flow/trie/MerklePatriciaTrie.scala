@@ -82,7 +82,7 @@ object MerklePatriciaTrie {
           }
           twoNibbles.toByte
         }
-        ByteString(nibbles)
+        ByteString.fromArrayUnsafe(nibbles)
       }
 
       def decodeFlag(flag: Byte): (Int, Boolean) = {
@@ -95,7 +95,7 @@ object MerklePatriciaTrie {
           val byte = nibbles(i / 2)
           if (i % 2 == 0) getHighNibble(byte) else getLowNibble(byte)
         }
-        ByteString(bytes)
+        ByteString.fromArrayUnsafe(bytes)
       }
 
       val childrenSerde: Serde[AVector[Option[Keccak256]]] = {
@@ -176,16 +176,11 @@ class MerklePatriciaTrie[K: Serde, V: Serde](var rootHash: Keccak256, storage: K
     }
   }
 
-  def getNode(hash: Keccak256): IOResult[Node] = storage.get(hash.bytes).flatMap { data =>
-    deserialize[Node](data) match {
-      case Left(e)  => Left(IOError.Serde(e))
-      case Right(n) => Right(n)
-    }
-  }
+  def getNode(hash: Keccak256): IOResult[Node] = storage.get[Node](hash.bytes)
 
   def persist(result: TrieUpdateActions): IOResult[Unit] = {
     result.toAdd.foreachF { node =>
-      storage.remove(node.hash.bytes, node.serialized)
+      storage.putRaw(node.hash.bytes, node.serialized)
     }
   }
 

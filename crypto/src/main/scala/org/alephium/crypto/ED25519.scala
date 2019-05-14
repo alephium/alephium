@@ -52,8 +52,8 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
 
   override def generatePriPub(): (ED25519PrivateKey, ED25519PublicKey) = {
     val keyPair    = curve25519.generateKeyPair()
-    val privateKey = ED25519PrivateKey.unsafeFrom(ByteString(keyPair.getPrivateKey))
-    val publicKey  = ED25519PublicKey.unsafeFrom(ByteString(keyPair.getPublicKey))
+    val privateKey = ED25519PrivateKey.unsafeFrom(ByteString.fromArrayUnsafe(keyPair.getPrivateKey))
+    val publicKey  = ED25519PublicKey.unsafeFrom(ByteString.fromArrayUnsafe(keyPair.getPublicKey))
     (privateKey, publicKey)
   }
 
@@ -67,7 +67,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
 
   private def sign(message: Array[Byte], privateKey: Array[Byte]): ED25519Signature = {
     val signature = curve25519.calculateSignature(privateKey, message)
-    ED25519Signature.unsafeFrom(ByteString(signature))
+    ED25519Signature.unsafeFrom(ByteString.fromArrayUnsafe(signature))
   }
 
   override def verify(message: ByteString,

@@ -142,7 +142,8 @@ object Serde extends ProductSerde {
   }
 
   implicit val inetAddressSerde: Serde[InetAddress] =
-    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray), ia => ByteString(ia.getAddress))
+    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray),
+                       ia => ByteString.fromArrayUnsafe(ia.getAddress))
 
   implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
     forProduct2[InetAddress, Int, InetSocketAddress](
