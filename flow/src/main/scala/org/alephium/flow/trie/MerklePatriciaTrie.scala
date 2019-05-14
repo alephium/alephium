@@ -150,9 +150,13 @@ object MerklePatriciaTrie {
     }
   }
 
+  val genesisKey = Keccak256.zero
+  val genesisNode = {
+    val genesisPath = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
+    LeafNode(genesisPath, ByteString.empty)
+  }
+
   def create(storage: KeyValueStorage): MerklePatriciaTrie = {
-    val genesisPath = Node.SerdeNode.decodeNibbles(Keccak256.zero.bytes, Keccak256.length * 2)
-    val genesisNode = LeafNode(genesisPath, ByteString.empty)
     storage.put[Node](genesisNode.hash.bytes, genesisNode)
     new MerklePatriciaTrie(genesisNode.hash, storage)
   }
@@ -160,7 +164,7 @@ object MerklePatriciaTrie {
 
 // TODO: batch mode
 class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
-  import MerklePatriciaTrie.{BranchNode, LeafNode, MPTException, Node, TrieUpdateActions}
+  import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions}
 
   def applyActions(result: TrieUpdateActions): IOResult[Unit] = {
     result.toAdd
@@ -180,10 +184,11 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   def getOpt(hash: Keccak256, nibbles: ByteString): IOResult[Option[ByteString]] = {
     getNode(hash) flatMap {
       case BranchNode(path, children) =>
+        assert(nibbles.length > path.length)
         if (path == nibbles.take(path.length)) {
-          children(nibbles(0) & 0xFF) match {
+          children(nibbles(path.length) & 0xFF) match {
             case Some(childHash) =>
-              getOpt(childHash, nibbles.tail)
+              getOpt(childHash, nibbles.drop(path.length + 1))
             case None =>
               Right(None)
           }
@@ -207,17 +212,14 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   def remove(hash: Keccak256, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     getNode(hash) flatMap {
       case node @ BranchNode(path, children) =>
-        if (nibbles.length > path.length) {
-          val nibble   = nibbles(path.length) & 0xFF
-          val childOpt = children(nibble)
-          if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
-            val restNibbles = nibbles.drop(path.length + 1)
-            val childHash   = childOpt.get
-            remove(childHash, restNibbles) flatMap { result =>
-              handleChildUpdateResult(hash, node, nibble, result)
-            }
-          } else {
-            Left(MerklePatriciaTrie.removalNoKey)
+        assert(nibbles.length > path.length)
+        val nibble   = nibbles(path.length) & 0xFF
+        val childOpt = children(nibble)
+        if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
+          val restNibbles = nibbles.drop(path.length + 1)
+          val childHash   = childOpt.get
+          remove(childHash, restNibbles) flatMap { result =>
+            handleChildUpdateResult(hash, node, nibble, result)
           }
         } else {
           Left(MerklePatriciaTrie.removalNoKey)
@@ -239,7 +241,7 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
     val childOptHash = result.newNodeOpt.map(_.hash)
     val newChildren  = children.replace(nibble, childOptHash)
     if (childOptHash.isEmpty && newChildren.map(_.fold(0)(_ => 1)).sum == 1) {
-      val onlyChildIndex = children.indexWhere(_.nonEmpty)
+      val onlyChildIndex = newChildren.indexWhere(_.nonEmpty)
       val onlyChildHash  = children(onlyChildIndex).get
       getNode(onlyChildHash) map { onlyChild =>
         val newNode  = onlyChild.preExtend(branchNode.path :+ onlyChildIndex.toByte)
@@ -269,6 +271,7 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   }
 
   def put(hash: Keccak256, nibbles: ByteString, value: ByteString): IOResult[TrieUpdateActions] = {
+    assert(nibbles.nonEmpty)
     getNode(hash) flatMap { node =>
       val path = node.path
       assert(path.length <= nibbles.length)
