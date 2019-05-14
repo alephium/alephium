@@ -17,6 +17,18 @@ object RocksDBStorage {
     new RocksDBStorage(path, db)
   }
 
+  def dESTROY(path: Path, options: Options = new Options()): IOResult[Unit] = execute {
+    RocksDB.destroyDB(path.toString, options)
+  }
+
+  def dESTROY(db: Database): IOResult[Unit] = execute {
+    dESTROYUnsafe(db)
+  }
+
+  def dESTROYUnsafe(db: Database): Unit = {
+    RocksDB.destroyDB(db.path.toString, new Options())
+  }
+
   @inline
   def execute[T](f: => T): IOResult[T] = {
     try Right(f)
