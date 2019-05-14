@@ -30,7 +30,7 @@ object MerklePatriciaTrie {
       BranchNode(prefix ++ path, children)
     }
     def preCut(n: Int): BranchNode = {
-      assert(n < path.length)
+      assert(n <= path.length)
       BranchNode(path.drop(n), children)
     }
   }
@@ -50,7 +50,7 @@ object MerklePatriciaTrie {
                node1: Node,
                nibble2: Int,
                node2: Node): BranchNode = {
-      assert(nibble1 != nibble2)
+      assert(nibble1 != nibble2 && nibble1 < 16 && nibble2 < 16)
       val array = Array.fill[Option[Keccak256]](16)(None)
       array(nibble1) = Some(node1.hash)
       array(nibble2) = Some(node2.hash)
@@ -134,6 +134,8 @@ object MerklePatriciaTrie {
     def keyNotFound(action: String): MPTException = MPTException("Key not found in " ++ action)
   }
 
+  private val removalNoKey = IOError.Other(MPTException.keyNotFound("removal"))
+
   def getHighNibble(byte: Byte): Byte = {
     ((byte & 0xF0) >> 4).toByte
   }
@@ -150,7 +152,7 @@ object MerklePatriciaTrie {
 
   def create(storage: KeyValueStorage): MerklePatriciaTrie = {
     val genesisPath = Node.SerdeNode.decodeNibbles(Keccak256.zero.bytes, Keccak256.length * 2)
-    val genesisNode = LeafNode(genesisPath, Keccak256.zero.bytes)
+    val genesisNode = LeafNode(genesisPath, ByteString.empty)
     storage.put[Node](genesisNode.hash.bytes, genesisNode)
     new MerklePatriciaTrie(genesisNode.hash, storage)
   }
@@ -205,22 +207,26 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   def remove(hash: Keccak256, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     getNode(hash) flatMap {
       case node @ BranchNode(path, children) =>
-        val nibble   = nibbles(path.length) & 0xFF
-        val childOpt = children(nibble)
-        if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
-          val restNibbles = nibbles.drop(path.length + 1)
-          val childHash   = childOpt.get
-          remove(childHash, restNibbles) flatMap { result =>
-            handleChildUpdateResult(hash, node, nibble, result)
+        if (nibbles.length > path.length) {
+          val nibble   = nibbles(path.length) & 0xFF
+          val childOpt = children(nibble)
+          if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
+            val restNibbles = nibbles.drop(path.length + 1)
+            val childHash   = childOpt.get
+            remove(childHash, restNibbles) flatMap { result =>
+              handleChildUpdateResult(hash, node, nibble, result)
+            }
+          } else {
+            Left(MerklePatriciaTrie.removalNoKey)
           }
         } else {
-          Left(IOError.Other(MPTException.keyNotFound("removal")))
+          Left(MerklePatriciaTrie.removalNoKey)
         }
       case leaf @ LeafNode(path, _) =>
         if (path == nibbles) {
           Right(TrieUpdateActions(None, AVector(leaf.hash), AVector.empty))
         } else {
-          Left(IOError.Other(MPTException.keyNotFound("removal")))
+          Left(MerklePatriciaTrie.removalNoKey)
         }
     }
   }
@@ -248,8 +254,9 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
           if (oldChildOptHash.isEmpty) result.toDelete :+ branchHash
           else result.toDelete ++ AVector(oldChildOptHash.get, branchHash)
         Right(TrieUpdateActions(Some(newBranchNode), toDelete, result.toAdd :+ newBranchNode))
-      } else
+      } else {
         Right(TrieUpdateActions(None, result.toDelete, result.toAdd))
+      }
     }
   }
 
@@ -283,6 +290,7 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
                   TrieUpdateActions(Some(newBranch), AVector(hash), AVector(newBranch, newLeaf)))
             }
           case leaf: LeafNode =>
+            assert(path.length == nibbles.length)
             val newLeaf = LeafNode(path, value)
             Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
         }
