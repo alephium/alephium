@@ -7,15 +7,6 @@ import org.alephium.serde._
 import org.alephium.util.AVector
 
 object MerklePatriciaTrie {
-
-  def getHighNibble(byte: Byte): Byte = {
-    ((byte & 0xF0) >> 4).toByte
-  }
-
-  def getLowNibble(byte: Byte): Byte = {
-    (byte & 0x0F).toByte
-  }
-
   /* branch [encodedPath, v0, ..., v15]
    * leaf   [encodedPath, data]
    * the length of encodedPath varies from 0 to 64
@@ -135,7 +126,6 @@ object MerklePatriciaTrie {
     }
   }
 
-  case class TrieDBActions(toDelete: AVector[Node], toAdd: AVector[Node])
   case class TrieUpdateActions(newNodeOpt: Option[Node],
                                toDelete: AVector[Keccak256],
                                toAdd: AVector[Node])
@@ -144,16 +134,41 @@ object MerklePatriciaTrie {
     def keyNotFound(action: String): MPTException = MPTException("Key not found in " ++ action)
   }
 
+  def getHighNibble(byte: Byte): Byte = {
+    ((byte & 0xF0) >> 4).toByte
+  }
+
+  def getLowNibble(byte: Byte): Byte = {
+    (byte & 0x0F).toByte
+  }
+
   def hash2Nibbles(hash: Keccak256): ByteString = {
     hash.bytes.flatMap { byte =>
       ByteString(getHighNibble(byte), getLowNibble(byte))
     }
   }
+
+  def create(storage: KeyValueStorage): MerklePatriciaTrie = {
+    val genesisPath = Node.SerdeNode.decodeNibbles(Keccak256.zero.bytes, Keccak256.length * 2)
+    val genesisNode = LeafNode(genesisPath, Keccak256.zero.bytes)
+    storage.put[Node](genesisNode.hash.bytes, genesisNode)
+    new MerklePatriciaTrie(genesisNode.hash, storage)
+  }
 }
 
 // TODO: batch mode
-class MerklePatriciaTrie[K: Serde, V: Serde](var rootHash: Keccak256, storage: KeyValueStorage) {
+class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   import MerklePatriciaTrie.{BranchNode, LeafNode, MPTException, Node, TrieUpdateActions}
+
+  def applyActions(result: TrieUpdateActions): IOResult[Unit] = {
+    result.toAdd
+      .foreachF { node =>
+        storage.putRaw(node.hash.bytes, node.serialized)
+      }
+      .map { _ =>
+        result.newNodeOpt.foreach(newNode => rootHash = newNode.hash)
+      }
+  }
 
   def getOpt(key: Keccak256): IOResult[Option[ByteString]] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
@@ -178,21 +193,13 @@ class MerklePatriciaTrie[K: Serde, V: Serde](var rootHash: Keccak256, storage: K
 
   def getNode(hash: Keccak256): IOResult[Node] = storage.get[Node](hash.bytes)
 
-  def persist(result: TrieUpdateActions): IOResult[Unit] = {
-    result.toAdd.foreachF { node =>
-      storage.putRaw(node.hash.bytes, node.serialized)
-    }
-  }
-
   // assume that the key exists in the trie
   def remove(key: Keccak256): IOResult[Unit] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
     for {
       result <- remove(rootHash, nibbles)
-      _      <- persist(result)
-    } yield {
-      result.newNodeOpt.foreach(root => rootHash = root.hash)
-    }
+      _      <- applyActions(result)
+    } yield ()
   }
 
   def remove(hash: Keccak256, nibbles: ByteString): IOResult[TrieUpdateActions] = {
@@ -250,10 +257,8 @@ class MerklePatriciaTrie[K: Serde, V: Serde](var rootHash: Keccak256, storage: K
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
     for {
       result <- put(rootHash, nibbles, value)
-      _      <- persist(result)
-    } yield {
-      result.newNodeOpt.foreach(root => rootHash = root.hash)
-    }
+      _      <- applyActions(result)
+    } yield ()
   }
 
   def put(hash: Keccak256, nibbles: ByteString, value: ByteString): IOResult[TrieUpdateActions] = {
