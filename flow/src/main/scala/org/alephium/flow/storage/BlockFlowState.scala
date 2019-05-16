@@ -70,13 +70,14 @@ trait BlockFlowState {
 
   def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
 
+  // TODO: bulk update & atomic update
   def updateTxs(block: Block): IOResult[Unit] = {
     block.transactions.foreachF { tx =>
       for {
-        _ <- tx.unsigned.inputs.foreachF(config.db.deleteUTXO)
+        _ <- tx.unsigned.inputs.foreachF(input => config.trie.remove(input))
         _ <- tx.unsigned.outputs.foreachWithIndexF { (output, i) =>
           val outputPoint = TxOutputPoint(tx.hash, i)
-          config.db.putUTXO(outputPoint, output)
+          config.trie.put(outputPoint, output)
         }
       } yield ()
     }

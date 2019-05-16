@@ -16,7 +16,7 @@ case class Transaction(
     data: ByteString,
     signature: ED25519Signature // TODO: support n2n transactions
 ) extends Keccak256Hash[Transaction] {
-  override val hash: Keccak256 = Keccak256.hash(serialize[Transaction](this))
+  override val hash: Keccak256 = _getHash
 }
 
 object Transaction {
