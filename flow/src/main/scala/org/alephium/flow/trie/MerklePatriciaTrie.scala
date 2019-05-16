@@ -1,7 +1,7 @@
 package org.alephium.flow.trie
 
 import akka.util.ByteString
-import org.alephium.crypto.Keccak256
+import org.alephium.crypto.{Keccak256, Keccak256Hash}
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -200,6 +200,10 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
 
   def getNode(hash: Keccak256): IOResult[Node] = storage.get[Node](hash.bytes)
 
+  def remove[K <: Keccak256Hash[_]](key: K): IOResult[Unit] = {
+    remove(key.hash)
+  }
+
   // assume that the key exists in the trie
   def remove(key: Keccak256): IOResult[Unit] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
@@ -260,6 +264,10 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
         Right(TrieUpdateActions(None, result.toDelete, result.toAdd))
       }
     }
+  }
+
+  def put[K <: Keccak256Hash[_], V: Serde](key: K, value: V): IOResult[Unit] = {
+    put(key.hash, serialize[V](value))
   }
 
   def put(key: Keccak256, value: ByteString): IOResult[Unit] = {
