@@ -2,12 +2,12 @@ package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.io.{Database, IOResult}
+import org.alephium.flow.io.{HeaderDB, IOResult}
 import org.alephium.protocol.model.{Block, BlockHeader}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  def headerDB: Database
+  def headerDB: HeaderDB
 
   def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] = {
     headerDB.getHeader(hash)
@@ -66,7 +66,7 @@ object BlockHeaderChain {
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
-      override val headerDB: Database                  = _config.db
+      override val headerDB: HeaderDB                  = _config.headerDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

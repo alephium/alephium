@@ -2,21 +2,21 @@ package org.alephium.flow.io
 
 import akka.util.ByteString
 import org.alephium.protocol.config.ConsensusConfigFixture
-import org.alephium.protocol.model.{ModelGen, TxOutputPoint}
+import org.alephium.protocol.model.ModelGen
 import org.alephium.util.{AlephiumSpec, Files}
 import org.rocksdb.Options
 import org.scalacheck.Arbitrary
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-class DatabaseSpec extends AlephiumSpec {
+class HeaderDBSpec extends AlephiumSpec {
 
   trait Fixture {
     val tmpdir = Files.tmpDir
     val dbname = "foo"
     val dbPath = tmpdir.resolve(dbname)
 
-    val db = Database.open(dbPath, new Options().setCreateIfMissing(true)).right.value
+    val db = HeaderDB.open(dbPath, new Options().setCreateIfMissing(true)).right.value
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary
@@ -27,12 +27,12 @@ class DatabaseSpec extends AlephiumSpec {
 
     def postTest(): Assertion = {
       db.close()
-      Database.dESTROY(dbPath, new Options()).isRight is true
+      HeaderDB.dESTROY(dbPath, new Options()).isRight is true
     }
   }
 
   it should "create database" in new Fixture {
-    Database.open(dbPath, new Options().setErrorIfExists(true)).isLeft is true
+    HeaderDB.open(dbPath, new Options().setErrorIfExists(true)).isLeft is true
     postTest()
   }
 
@@ -63,22 +63,6 @@ class DatabaseSpec extends AlephiumSpec {
       db.deleteHeader(hash).isRight is true
       db.getHeader(hash).isLeft is true
       db.getHeaderOpt(hash).right.value is None
-    }
-    postTest()
-  }
-
-  it should "work for utxo" in new Fixture with ConsensusConfigFixture {
-    forAll(ModelGen.transactionGen) { transaction =>
-      val hash = transaction.hash
-      transaction.unsigned.outputs.foreachWithIndex { (output, index) =>
-        val outputPoint = TxOutputPoint(hash, index)
-        db.putUTXO(outputPoint, output)
-        db.getUTXO(outputPoint).right.value is output
-        db.getUTXOOpt(outputPoint).right.value.get is output
-        db.deleteUTXO(outputPoint).isRight is true
-        db.getUTXO(outputPoint).isLeft is true
-        db.getUTXOOpt(outputPoint).right.value is None
-      }
     }
     postTest()
   }
