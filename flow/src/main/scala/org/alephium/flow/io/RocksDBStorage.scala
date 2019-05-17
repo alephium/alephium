@@ -21,11 +21,11 @@ object RocksDBStorage {
     RocksDB.destroyDB(path.toString, options)
   }
 
-  def dESTROY(db: Database): IOResult[Unit] = execute {
+  def dESTROY(db: HeaderDB): IOResult[Unit] = execute {
     dESTROYUnsafe(db)
   }
 
-  def dESTROYUnsafe(db: Database): Unit = {
+  def dESTROYUnsafe(db: HeaderDB): Unit = {
     RocksDB.destroyDB(db.path.toString, new Options())
   }
 

@@ -7,7 +7,7 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.flow.io.{Database, Disk}
+import org.alephium.flow.io.{Disk, HeaderDB}
 import org.alephium.flow.network.DiscoveryConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
@@ -196,14 +196,14 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     Disk.createDirUnsafe(path)
     path
   }
-  val db: Database = {
+  val headerDB: HeaderDB = {
     val dbName = "all-" + nodeId.shortHex
-    Database.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
+    HeaderDB.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
   val trie: MerklePatriciaTrie = {
     val dbName = "trie-" + nodeId.shortHex
     val storage =
-      Database.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
+      HeaderDB.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
     MerklePatriciaTrie.create(storage)
   }
 }
