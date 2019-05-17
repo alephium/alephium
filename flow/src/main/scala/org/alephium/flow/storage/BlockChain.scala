@@ -56,7 +56,7 @@ object BlockChain {
 
     new BlockChain {
       override val disk                                = _config.disk
-      override val headerDB                            = _config.db
+      override val headerDB                            = _config.headerDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
