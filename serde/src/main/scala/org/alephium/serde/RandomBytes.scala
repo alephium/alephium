@@ -46,14 +46,14 @@ object RandomBytes {
                                        val toBytes: T             => ByteString) {
     val name = typeOf[T].typeSymbol.name.toString
 
-    lazy val zero: T = unsafeFrom(ByteString(Array.fill[Byte](length)(0)))
+    lazy val zero: T = unsafeFrom(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0)))
 
     def length: Int
 
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
       source.nextBytes(xs)
-      unsafeFrom(ByteString(xs))
+      unsafeFrom(ByteString.fromArrayUnsafe(xs))
     }
 
     implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafeFrom, toBytes)

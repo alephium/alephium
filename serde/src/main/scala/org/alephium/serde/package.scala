@@ -22,8 +22,14 @@ package object serde {
 
   implicit val bytestringSerde: Serde[ByteString] = ByteStringSerde
 
+  implicit def optionSerde[T](implicit serde: Serde[T]): Serde[Option[T]] =
+    new OptionSerde[T](serde)
+
+  implicit def eitherSerde[A, B](implicit serdeA: Serde[A], serdeB: Serde[B]): Serde[Either[A, B]] =
+    new EitherSerde[A, B](serdeA, serdeB)
+
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
-    dynamicSizeBytesSerde(serde)
+    dynamicSizeSerde(serde)
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))

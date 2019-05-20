@@ -16,15 +16,15 @@ abstract class HashCompanion[T: TypeTag](unsafeFrom: ByteString => T, toBytes: T
     _provider.update(input.toArray, 0, input.length)
     val res = new Array[Byte](length)
     _provider.doFinal(res, 0)
-    unsafeFrom(ByteString(res))
+    unsafeFrom(ByteString.fromArrayUnsafe(res))
   }
 
   def hash(input: String): T = {
-    hash(ByteString(input))
+    hash(ByteString.fromString(input))
   }
 
   def hash(input: String, charset: Charset): T = {
-    hash(ByteString(input, charset))
+    hash(ByteString.fromString(input, charset))
   }
 
   def hash[S](input: S)(implicit serializer: Serializer[S]): T = {

@@ -300,6 +300,16 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "replace" in new Fixture {
+    forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
+      val index = Random.nextInt(vc.length)
+      val vc1   = vc.replace(index, vc.head)
+      vc.indices.foreach { i =>
+        if (i == index) vc1(i) is vc.head else vc1(i) is vc(i)
+      }
+    }
+  }
+
   it should "convert to array" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
@@ -322,6 +332,15 @@ class BooleanAVectorSpec extends AVectorSpec[Boolean]
 class StringAVectorSpec  extends AVectorSpec[String]
 class DoubleAVectorSpec  extends AVectorSpec[Double]
 class IntAVectorSpec extends AVectorSpec[Int] {
+
+  it should "create vector from array" in new Fixture {
+    val vc0 = AVector(0 until AVector.defaultSize - 1: _*)
+    vc0.length is AVector.defaultSize - 1
+    vc0.capacity is AVector.defaultSize
+    val vc1 = AVector(0 until AVector.defaultSize + 1: _*)
+    vc1.length is AVector.defaultSize + 1
+    vc1.capacity is AVector.defaultSize + 1
+  }
 
   it should "withFilter" in new Fixture {
     forAll(vectorGen, Arbitrary.arbInt.arbitrary) { (vc: AVector[Int], n: Int) =>

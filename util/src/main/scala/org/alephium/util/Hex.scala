@@ -8,7 +8,7 @@ import scala.reflect.macros.blackbox
 
 object Hex {
   def unsafeFrom(s: String): ByteString = {
-    ByteString(BHex.decode(s))
+    ByteString.fromArrayUnsafe(BHex.decode(s))
   }
 
   def toHexString(input: IndexedSeq[Byte]): String = {
