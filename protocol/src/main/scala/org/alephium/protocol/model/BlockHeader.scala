@@ -13,7 +13,7 @@ case class BlockHeader(
     nonce: BigInt
 ) extends Keccak256Hash[BlockHeader] {
 
-  override val hash: Keccak256 = Keccak256.hash(serialize[BlockHeader](this))
+  override val hash: Keccak256 = _getHash
 
   def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
     ChainIndex.from(hash)

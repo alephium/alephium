@@ -19,10 +19,10 @@ object IOError {
 
   case class Other(e: Throwable) extends IOError(e)
 
+  // Don't catch other exceptions; dangerous
   def apply(t: Throwable): IOError = t match {
     case e: java.io.IOException => JavaIO(e)
     case e: RocksDBException    => RocksDB(e)
     case e: SerdeError          => Serde(e)
-    case _                      => Other(t)
   }
 }
