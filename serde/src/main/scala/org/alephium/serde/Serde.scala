@@ -153,18 +153,30 @@ object Serde extends ProductSerde {
       isa => (isa.getAddress, isa.getPort)
     )
 
+  private object Flags {
+    val none: Int  = 0
+    val some: Int  = 1
+    val left: Int  = 0
+    val right: Int = 1
+
+    val noneB: Byte  = none.toByte
+    val someB: Byte  = some.toByte
+    val leftB: Byte  = left.toByte
+    val rightB: Byte = right.toByte
+  }
+
   class OptionSerde[T](serde: Serde[T]) extends Serde[Option[T]] {
     override def serialize(input: Option[T]): ByteString = input match {
-      case None    => ByteSerde.serialize(0.toByte)
-      case Some(t) => ByteSerde.serialize(1.toByte) ++ serde.serialize(t)
+      case None    => ByteSerde.serialize(Flags.noneB)
+      case Some(t) => ByteSerde.serialize(Flags.someB) ++ serde.serialize(t)
     }
 
     override def _deserialize(input: ByteString): Either[SerdeError, (Option[T], ByteString)] = {
       ByteSerde._deserialize(input).flatMap {
         case (flag, rest) =>
-          if (flag == 0) {
+          if (flag == Flags.none) {
             Right((None, rest))
-          } else if (flag == 1) {
+          } else if (flag == Flags.some) {
             serde._deserialize(rest).map { case (t, r) => (Some(t), r) }
           } else {
             Left(SerdeError.wrongFormat(s"expect 0 or 1 for option flag"))
@@ -175,16 +187,16 @@ object Serde extends ProductSerde {
 
   class EitherSerde[A, B](serdeA: Serde[A], serdeB: Serde[B]) extends Serde[Either[A, B]] {
     override def serialize(input: Either[A, B]): ByteString = input match {
-      case Left(a)  => ByteSerde.serialize(0.toByte) ++ serdeA.serialize(a)
-      case Right(b) => ByteSerde.serialize(1.toByte) ++ serdeB.serialize(b)
+      case Left(a)  => ByteSerde.serialize(Flags.leftB) ++ serdeA.serialize(a)
+      case Right(b) => ByteSerde.serialize(Flags.rightB) ++ serdeB.serialize(b)
     }
 
     override def _deserialize(input: ByteString): Either[SerdeError, (Either[A, B], ByteString)] = {
       ByteSerde._deserialize(input).flatMap {
         case (flag, rest) =>
-          if (flag == 0) {
+          if (flag == Flags.left) {
             serdeA._deserialize(rest).map { case (a, r) => (Left(a), r) }
-          } else if (flag == 1) {
+          } else if (flag == Flags.right) {
             serdeB._deserialize(rest).map { case (b, r) => (Right(b), r) }
           } else {
             Left(SerdeError.wrongFormat(s"expect 0 or 1 for either flag"))
@@ -223,8 +235,7 @@ object Serde extends ProductSerde {
       deserialize0(input, identity)
   }
 
-  // TODO: rename this
-  def fixedSizeBytesSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] =
+  def fixedSizeSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] =
     new AVectorSerde[T](serde) {
       override def serialize(input: AVector[T]): ByteString = {
         input.map(serde.serialize).fold(ByteString.empty)(_ ++ _)
@@ -235,7 +246,7 @@ object Serde extends ProductSerde {
       }
     }
 
-  def dynamicSizeBytesSerde[T: ClassTag](serde: Serde[T]): Serde[AVector[T]] =
+  def dynamicSizeSerde[T: ClassTag](serde: Serde[T]): Serde[AVector[T]] =
     new AVectorSerde[T](serde) {
       override def serialize(input: AVector[T]): ByteString = {
         input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)

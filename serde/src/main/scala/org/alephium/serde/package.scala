@@ -29,7 +29,7 @@ package object serde {
     new EitherSerde[A, B](serdeA, serdeB)
 
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
-    dynamicSizeBytesSerde(serde)
+    dynamicSizeSerde(serde)
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
