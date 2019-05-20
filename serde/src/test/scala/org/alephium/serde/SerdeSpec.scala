@@ -91,18 +91,18 @@ class SerdeSpec extends AlephiumSpec {
   "Serde for fixed size sequence" should "serde correctly" in {
     forAll(bytesGen) { input: AVector[Byte] =>
       {
-        val serde  = Serde.fixedSizeBytesSerde(input.length, Serde[Byte])
+        val serde  = Serde.fixedSizeSerde(input.length, Serde[Byte])
         val output = serde.deserialize(serde.serialize(input)).right.value
         output is input
       }
       {
-        val serde     = Serde.fixedSizeBytesSerde(input.length + 1, Serde[Byte])
+        val serde     = Serde.fixedSizeSerde(input.length + 1, Serde[Byte])
         val exception = serde.deserialize(ByteString(input.toArray)).left.value
         exception is a[SerdeError.NotEnoughBytes]
       }
 
       if (input.nonEmpty) {
-        val serde     = Serde.fixedSizeBytesSerde(input.length - 1, Serde[Byte])
+        val serde     = Serde.fixedSizeSerde(input.length - 1, Serde[Byte])
         val exception = serde.deserialize(ByteString(input.toArray)).left.value
         exception is a[SerdeError.WrongFormat]
       }
@@ -111,7 +111,7 @@ class SerdeSpec extends AlephiumSpec {
 
   "Serde for sequence" should "serde correctly" in {
     forAll(bytesGen) { input: AVector[Byte] =>
-      val serde  = Serde.dynamicSizeBytesSerde(Serde[Byte])
+      val serde  = Serde.dynamicSizeSerde(Serde[Byte])
       val output = serde.deserialize(serde.serialize(input)).right.value
       output is input
     }

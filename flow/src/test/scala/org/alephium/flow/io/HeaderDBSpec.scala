@@ -27,7 +27,7 @@ class HeaderDBSpec extends AlephiumSpec {
 
     def postTest(): Assertion = {
       db.close()
-      HeaderDB.dESTROY(dbPath, new Options()).isRight is true
+      RocksDBStorage.dESTROY(dbPath, new Options()).isRight is true
     }
   }
 

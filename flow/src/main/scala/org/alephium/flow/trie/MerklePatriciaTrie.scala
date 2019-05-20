@@ -91,7 +91,7 @@ object MerklePatriciaTrie {
 
       val childrenSerde: Serde[AVector[Option[Keccak256]]] = {
         val bsOptSerde: Serde[Option[Keccak256]] = optionSerde
-        Serde.fixedSizeBytesSerde(16, bsOptSerde)
+        Serde.fixedSizeSerde(16, bsOptSerde)
       }
 
       override def serialize(node: Node): ByteString = node match {
@@ -204,7 +204,6 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
     remove(key.hash)
   }
 
-  // assume that the key exists in the trie
   def remove(key: Keccak256): IOResult[Unit] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
     for {
