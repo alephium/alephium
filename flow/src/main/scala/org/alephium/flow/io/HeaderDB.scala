@@ -18,18 +18,6 @@ object HeaderDB {
     val db = RocksDB.open(options, path.toString)
     new HeaderDB(path, db)
   }
-
-  def dESTROY(path: Path, options: Options): IOResult[Unit] = execute {
-    RocksDB.destroyDB(path.toString, options)
-  }
-
-  def dESTROY(db: HeaderDB): IOResult[Unit] = execute {
-    dESTROYUnsafe(db)
-  }
-
-  def dESTROYUnsafe(db: HeaderDB): Unit = {
-    RocksDB.destroyDB(db.path.toString, new Options())
-  }
 }
 
 class HeaderDB(path: Path, db: RocksDB) extends RocksDBStorage(path, db) {

@@ -301,13 +301,11 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "replace" in new Fixture {
-    forAll(vectorGen0) { vc =>
-      if (vc.nonEmpty) {
-        val index = Random.nextInt(vc.length)
-        val vc1   = vc.replace(index, vc.head)
-        vc.indices.foreach { i =>
-          if (i == index) vc1(i) is vc.head else vc1(i) is vc(i)
-        }
+    forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
+      val index = Random.nextInt(vc.length)
+      val vc1   = vc.replace(index, vc.head)
+      vc.indices.foreach { i =>
+        if (i == index) vc1(i) is vc.head else vc1(i) is vc(i)
       }
     }
   }
