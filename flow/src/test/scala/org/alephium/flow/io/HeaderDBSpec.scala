@@ -12,11 +12,12 @@ import org.scalatest.EitherValues._
 class HeaderDBSpec extends AlephiumSpec {
 
   trait Fixture {
-    val tmpdir = Files.tmpDir
-    val dbname = "foo"
-    val dbPath = tmpdir.resolve(dbname)
+    val tmpdir    = Files.tmpDir
+    val dbname    = "foo"
+    val dbPath    = tmpdir.resolve(dbname)
+    val dbOptions = RocksDBStorage.Settings.default(RocksDBStorage.Compaction.HDD, columns = 1)
 
-    val db = HeaderDB.open(dbPath, new Options().setCreateIfMissing(true)).right.value
+    val db = HeaderDB.open(dbPath, dbOptions).right.value
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary
