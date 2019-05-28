@@ -4,9 +4,64 @@ import java.nio.file.Path
 
 import akka.util.ByteString
 import org.alephium.serde._
-import org.rocksdb.{Options, RocksDB}
+import org.rocksdb.{BlockBasedTableConfig, LRUCache, Options, RateLimiter, ReadOptions, RocksDB}
+import org.rocksdb.util.SizeUnit
 
 object RocksDBStorage {
+  case class Compaction(
+      initialFileSize: Long,
+      blockSize: Long,
+      writeRateLimit: Option[Long]
+  )
+
+  object Compaction {
+    import SizeUnit._
+
+    val SSD = Compaction(
+      initialFileSize = 64 * MB,
+      blockSize       = 16 * KB,
+      writeRateLimit  = None
+    )
+
+    val HDD = Compaction(
+      initialFileSize = 256 * MB,
+      blockSize       = 64 * KB,
+      writeRateLimit  = Some(16 * MB)
+    )
+  }
+
+  object Settings {
+    val MaxOpenFiles: Int  = 512
+    val BytesPerSync: Long = 1048576
+    val MemoryBudget: Long = 128 * SizeUnit.MB
+
+    def default(compaction: Compaction, columns: Int): Options = {
+      val memoryBudgetPerCol = MemoryBudget / columns
+
+      val options = new Options()
+        .setUseFsync(false)
+        .setCreateIfMissing(true)
+        .setMaxOpenFiles(MaxOpenFiles)
+        .setKeepLogFileNum(1)
+        .setBytesPerSync(BytesPerSync)
+        .setDbWriteBufferSize(memoryBudgetPerCol / 2)
+        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime().availableProcessors()))
+        .setTargetFileSizeBase(compaction.initialFileSize)
+        .setTableFormatConfig(
+          new BlockBasedTableConfig()
+            .setBlockCacheSize(compaction.blockSize)
+            .setBlockCache(new LRUCache(MemoryBudget / 3))
+        )
+
+      compaction.writeRateLimit match {
+        case Some(rateLimit) => options.setRateLimiter(new RateLimiter(rateLimit))
+        case None            => options
+      }
+    }
+  }
+
+  val readOptions = (new ReadOptions).setVerifyChecksums(false)
+
   def open(path: Path, options: Options): IOResult[RocksDBStorage] = execute {
     openUnsafe(path, options)
   }
@@ -14,7 +69,7 @@ object RocksDBStorage {
   def openUnsafe(path: Path, options: Options): RocksDBStorage = {
     RocksDB.loadLibrary()
     val db = RocksDB.open(options, path.toString)
-    new RocksDBStorage(path, db)
+    new RocksDBStorage(path, db, readOptions)
   }
 
   def dESTROY(path: Path, options: Options = new Options()): IOResult[Unit] = execute {
@@ -38,7 +93,8 @@ object RocksDBStorage {
   }
 }
 
-class RocksDBStorage(val path: Path, db: RocksDB) extends KeyValueStorage {
+class RocksDBStorage(val path: Path, db: RocksDB, readOptions: ReadOptions)
+    extends KeyValueStorage {
   import RocksDBStorage._
 
   def close(): IOResult[Unit] = execute {
@@ -52,7 +108,7 @@ class RocksDBStorage(val path: Path, db: RocksDB) extends KeyValueStorage {
   }
 
   def getRawUnsafe(key: ByteString): ByteString = {
-    val result = db.get(key.toArray)
+    val result = db.get(readOptions, key.toArray)
     if (result == null) throw IOError.RocksDB.keyNotFound.e
     else ByteString.fromArrayUnsafe(result)
   }
