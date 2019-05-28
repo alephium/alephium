@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.BlockHeader
-import org.rocksdb.{Options, RocksDB}
+import org.rocksdb.{Options, ReadOptions, RocksDB}
 
 object HeaderDB {
   import RocksDBStorage.execute
@@ -16,11 +16,12 @@ object HeaderDB {
   def openUnsafe(path: Path, options: Options): HeaderDB = {
     RocksDB.loadLibrary()
     val db = RocksDB.open(options, path.toString)
-    new HeaderDB(path, db)
+    new HeaderDB(path, db, RocksDBStorage.readOptions)
   }
 }
 
-class HeaderDB(path: Path, db: RocksDB) extends RocksDBStorage(path, db) {
+class HeaderDB(path: Path, db: RocksDB, readOptions: ReadOptions)
+    extends RocksDBStorage(path, db, readOptions) {
   def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
     getOpt(hash.bytes)
 
