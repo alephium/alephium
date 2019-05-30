@@ -111,10 +111,9 @@ class PeerManager(builders: TcpHandler.Builder)(implicit val config: PlatformCon
       assert(block.chainIndex.relateTo(config.mainGroup))
       log.debug(s"Broadcasting block/header to peers")
       broadcastBlock(block, blockMsg, headerMsg, origin)
-    case BroadCastHeader(header, headerMsg, origin) =>
+    case BroadCastHeader(header, _, _) =>
+      // Note: broadcast header only after we introduce cliques
       assert(!header.chainIndex.relateTo(config.mainGroup))
-      log.debug(s"Broadcasting header to peers")
-      broadcastHeader(header, headerMsg, origin)
     case GetPeers =>
       sender() ! Peers(getPeers)
     case Terminated(child) =>
