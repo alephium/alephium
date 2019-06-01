@@ -8,7 +8,7 @@ import org.alephium.flow.client.Miner.BlockAdded
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.storage.BlockChainHandler
+import org.alephium.flow.storage.{AllHandlers, BlockChainHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
@@ -54,7 +54,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
       case (fromShift, to) =>
         val from = config.groupFrom + fromShift
         val props = ActualMiner
-          .props(ChainIndex(from, to))
+          .props(ChainIndex(from, to), node.allHandlers)
           .withDispatcher("akka.actor.mining-dispatcher")
         context.actorOf(props)
     }
@@ -86,8 +86,6 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
           log.debug(s"MiningCounts: $countsToString")
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
-          val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
-          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
         case None =>
           refreshLastTask(fromShift, to, template)
       }
@@ -122,20 +120,24 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
 }
 
 object ActualMiner {
-  def props(index: ChainIndex)(implicit config: PlatformConfig): Props =
-    Props(new ActualMiner(index))
+  def props(index: ChainIndex, allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+    Props(new ActualMiner(index, allHandlers))
 
   sealed trait Command
   case class Task(template: BlockTemplate) extends Command
 }
 
-class ActualMiner(index: ChainIndex)(implicit config: PlatformConfig) extends BaseActor {
+class ActualMiner(index: ChainIndex, allHandlers: AllHandlers)(implicit config: PlatformConfig)
+    extends BaseActor {
   import ActualMiner._
 
   override def receive: Receive = {
     case Task(template) =>
       mine(template) match {
         case Some((block, miningCount)) =>
+          val blockHandler   = allHandlers.getBlockHandler(index)
+          val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
+          blockHandler.forward(handlerMessage)
           context.sender() ! FairMiner.MiningResult(Some(block), index, miningCount, template)
         case None =>
           context.sender() ! FairMiner.MiningResult(None, index, config.nonceStep, template)
