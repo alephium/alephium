@@ -85,6 +85,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def +:(elem: A): AVector[A] = {
+    val arr = new Array[A](length + 1)
+    arr(0) = elem
+    System.arraycopy(elems, start, arr, 1, length)
+    AVector.unsafe(arr)
+  }
+
   def ++(that: AVector[A]): AVector[A] = {
     val newLength = length + that.length
     if (appendable) {
@@ -486,8 +493,11 @@ object AVector {
   }
 
   @inline def fill[@sp A: ClassTag](n: Int)(elem: => A): AVector[A] = {
-    assert(n >= 0)
     tabulate(n)(_ => elem)
+  }
+
+  @inline def fill[@sp A: ClassTag](n1: Int, n2: Int)(elem: => A): AVector[AVector[A]] = {
+    tabulate(n1, n2)((_, _) => elem)
   }
 
   def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {

@@ -30,7 +30,7 @@ object FairMiner {
       implicit config: PlatformConfig): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
-      require(PeerId.fromPublicKey(address).groupIndex.value == i)
+      require(GroupIndex.from(address).value == i)
     }
     Props(new FairMiner(addresses, node))
   }
@@ -49,12 +49,15 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers
-  val actualMiners: AVector[ActorRef] = AVector.tabulate(config.groups) { to =>
-    val props = ActualMiner
-      .props(ChainIndex(config.mainGroup.value, to))
-      .withDispatcher("akka.actor.mining-dispatcher")
-    context.actorOf(props)
-  }
+  val actualMiners: AVector[AVector[ActorRef]] =
+    AVector.tabulate(config.groupNumPerBroker, config.groups) {
+      case (shift, to) =>
+        val from = config.groupFrom + shift
+        val props = ActualMiner
+          .props(ChainIndex(from, to))
+          .withDispatcher("akka.actor.mining-dispatcher")
+        context.actorOf(props)
+    }
 
   def receive: Receive = awaitStart
 
@@ -73,27 +76,30 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
 
   def handleMining: Receive = {
     case FairMiner.MiningResult(blockOpt, chainIndex, miningCount, template) =>
-      val to = chainIndex.to.value
-      increaseCounts(to, miningCount)
+      assert(config.brokerId.contains(chainIndex.from))
+      val fromShift = chainIndex.from.value - config.groupFrom
+      val to        = chainIndex.to.value
+      increaseCounts(fromShift, to, miningCount)
       blockOpt match {
         case Some(block) =>
-          val miningCount = getMiningCount(to)
-          log.debug(
-            s"""MiningCounts: ${(0 until config.groups).map(getMiningCount).mkString(",")}""")
+          val miningCount = getMiningCount(fromShift, to)
+          log.debug(s"MiningCounts: $countsToString")
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
           val blockHandler = node.allHandlers.getBlockHandler(chainIndex)
           blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
         case None =>
-          refreshLastTask(to, template)
+          refreshLastTask(fromShift, to, template)
       }
     case BlockAdded(chainIndex) =>
-      assert(chainIndex.from == config.mainGroup)
-      prepareTemplate(chainIndex.to.value)
+      assert(config.brokerId.contains(chainIndex.from))
+      val fromShift = chainIndex.from.value - config.groupFrom
+      val to        = chainIndex.to.value
+      prepareTemplate(fromShift, to)
   }
 
   def getBlockTemplate(flowTemplate: BlockFlowTemplate): BlockTemplate = {
-    assert(flowTemplate.index.from == config.mainGroup)
+    assert(config.brokerId.contains(flowTemplate.index.from))
     val address = addresses(flowTemplate.index.to.value)
     // scalastyle:off magic.number
     val data         = ByteString.fromInts(Random.nextInt())
@@ -102,16 +108,16 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     BlockTemplate(flowTemplate.deps, flowTemplate.target, transactions)
   }
 
-  def prepareTemplate(to: Int): Unit = {
-    assert(to >= 0 && to < config.groups)
-    val index         = ChainIndex(config.mainGroup.value, to)
+  def prepareTemplate(fromShift: Int, to: Int): Unit = {
+    assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
+    val index         = ChainIndex(config.groupFrom + fromShift, to)
     val flowTemplate  = node.blockFlow.prepareBlockFlowUnsafe(index)
     val blockTemplate = getBlockTemplate(flowTemplate)
-    addNewTask(to, blockTemplate)
+    addNewTask(fromShift, to, blockTemplate)
   }
 
-  def startTask(to: Int, template: BlockTemplate): Unit = {
-    actualMiners(to) ! ActualMiner.Task(template)
+  def startTask(from: Int, to: Int, template: BlockTemplate): Unit = {
+    actualMiners(from)(to) ! ActualMiner.Task(template)
   }
 }
 

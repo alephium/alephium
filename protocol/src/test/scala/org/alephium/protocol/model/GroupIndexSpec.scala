@@ -8,8 +8,8 @@ class GroupIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
 
   it should "equalize same values" in {
     forAll(ModelGen.groupGen) { n =>
-      val groupIndex1 = GroupIndex(n.value)(config)
-      val groupIndex2 = GroupIndex(n.value)(config)
+      val groupIndex1 = GroupIndex(n.value)(consensusConfig)
+      val groupIndex2 = GroupIndex(n.value)(consensusConfig)
       groupIndex1 is groupIndex2
     }
 

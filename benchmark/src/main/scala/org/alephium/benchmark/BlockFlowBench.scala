@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.storage.BlockFlow
+import org.alephium.protocol.model.GroupIndex
 import org.openjdk.jmh.annotations._
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -18,6 +19,6 @@ class BlockFlowBench extends PlatformConfig.Default {
 
   @Benchmark
   def findBestDeps(): BlockDeps = {
-    blockFlow.calBestDepsUnsafe()
+    blockFlow.calBestDepsUnsafe(GroupIndex(0))
   }
 }

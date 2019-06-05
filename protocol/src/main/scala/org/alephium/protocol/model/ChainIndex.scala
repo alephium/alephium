@@ -1,14 +1,14 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.serde.RandomBytes
 
 class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
-  def relateTo(groupIndex: GroupIndex): Boolean = {
-    from == groupIndex || to == groupIndex
+  def relateTo(brokerId: BrokerId)(implicit config: CliqueConfig): Boolean = {
+    brokerId.contains(from) || brokerId.contains(to)
   }
 
-  def toOneDim(implicit config: ConsensusConfig): Int = from.value * config.groups + to.value
+  def toOneDim(implicit config: GroupConfig): Int = from.value * config.groups + to.value
 
   override def equals(obj: Any): Boolean = obj match {
     case that: ChainIndex => from == that.from && to == that.to
@@ -24,7 +24,7 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
 
 object ChainIndex {
 
-  def apply(from: Int, to: Int)(implicit config: ConsensusConfig): ChainIndex = {
+  def apply(from: Int, to: Int)(implicit config: GroupConfig): ChainIndex = {
     assert(0 <= from && from < config.groups && 0 <= to && to < config.groups)
     new ChainIndex(GroupIndex(from), GroupIndex(to))
   }
@@ -36,7 +36,7 @@ object ChainIndex {
   def unsafe(from: Int, to: Int): ChainIndex =
     new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
 
-  def from(randomBytes: RandomBytes)(implicit config: ConsensusConfig): ChainIndex = {
+  def from(randomBytes: RandomBytes)(implicit config: GroupConfig): ChainIndex = {
     val bytes = randomBytes.bytes
     assert(bytes.length >= 2)
 

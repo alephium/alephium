@@ -4,9 +4,10 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
+import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{PeerId, PeerInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{AVector, BaseActor}
 
 object DiscoveryServer {
@@ -17,9 +18,9 @@ object DiscoveryServer {
     props(AVector.from(peers))
   }
 
-  case class PeerStatus(info: PeerInfo, updateAt: Long)
+  case class PeerStatus(info: CliqueInfo, updateAt: Long)
   object PeerStatus {
-    def fromInfo(info: PeerInfo): PeerStatus = {
+    def fromInfo(info: CliqueInfo): PeerStatus = {
       val now = System.currentTimeMillis
       PeerStatus(info, now)
     }
@@ -30,12 +31,12 @@ object DiscoveryServer {
   case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
 
   sealed trait Command
-  case object GetPeers               extends Command
-  case class Disable(peerId: PeerId) extends Command
-  case object Scan                   extends Command
+  case object GetPeers                   extends Command
+  case class Disable(cliqueId: CliqueId) extends Command
+  case object Scan                       extends Command
 
   sealed trait Event
-  case class Peers(peers: AVector[AVector[PeerInfo]]) extends Event
+  case class Peers(peers: AVector[CliqueInfo]) extends Event
 }
 
 /*
@@ -59,9 +60,17 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   import DiscoveryServer._
   import context.system
 
-  IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.udpPort))
+  def receive: Receive = awaitCliqueInfo
 
-  def receive: Receive = binding orElse handleCommand
+  var selfCliqueInfo: CliqueInfo = _
+
+  def awaitCliqueInfo: Receive = {
+    case cliqueInfo: CliqueInfo =>
+      selfCliqueInfo = cliqueInfo
+
+      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.publicAddress.getPort))
+      context become (binding orElse handleCommand)
+  }
 
   def binding: Receive = {
     case Udp.Bound(_) =>
@@ -84,12 +93,12 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       DiscoveryMessage.deserialize(data) match {
         case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
-          val sourceId = PeerId.fromPublicKey(message.header.publicKey)
+          val sourceId = CliqueId.fromBytesUnsafe(message.header.publicKey.bytes)
           updateStatus(sourceId)
           handlePayload(sourceId, remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
-          log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): ${error}")
+          log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
       }
   }
 
@@ -103,25 +112,24 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     case GetPeers =>
       sender() ! Peers(getActivePeers)
     case Disable(peerId) =>
-      getBucket(peerId) -= peerId
+      table -= peerId
       ()
   }
 
-  def handlePayload(sourceId: PeerId, remote: InetSocketAddress)(payload: Payload): Unit =
+  def handlePayload(sourceId: CliqueId, remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
       case Ping(sourceAddress) =>
-        send(sourceAddress, Pong())
-        tryPing(PeerInfo(sourceId, sourceAddress))
-      case Pong() =>
-        handlePong(sourceId)
+        send(sourceAddress, Pong(selfCliqueInfo))
+      case Pong(cliqueInfo) =>
+        handlePong(cliqueInfo)
       case FindNode(targetId) =>
         val sourceAddress = getPeer(sourceId) match {
-          case Some(source) => source.socketAddress
+          case Some(source) => source.masterAddress
           case None         => remote
         }
         val neighbors = getNeighbors(targetId)
         send(sourceAddress, Neighbors(neighbors))
       case Neighbors(peers) =>
-        peers.foreach(_.foreach(tryPing))
+        peers.foreach(tryPing)
     }
 }

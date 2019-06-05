@@ -18,9 +18,9 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val parent = block.uncleHash(index.to)
     val weight = calWeightUnsafe(block)
     for {
-      _        <- chain.add(block, parent, weight)
-      bestDeps <- calBestDeps().map(deps => { updateBestDeps(deps); deps })
-      _        <- updateTxs(block)
+      _ <- chain.add(block, parent, weight)
+      _ <- calBestDeps()
+      _ <- updateTxs(block)
     } yield ()
   }
 
@@ -52,8 +52,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
   }
 
   private def updateStateForNewHeader(): Unit = {
-    val bestDeps = calBestDepsUnsafe()
-    updateBestDeps(bestDeps)
+    calBestDepsUnsafe()
   }
 
   def validate(header: BlockHeader): Either[ValidationError, Unit] = {
@@ -62,7 +61,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
 
   def validate(header: BlockHeader, fromBlock: Boolean): Either[ValidationError, Unit] = {
     val index = header.chainIndex
-    if (fromBlock ^ index.relateTo(mainGroup)) {
+    if (fromBlock ^ index.relateTo(config.brokerId)) {
       // fromBlock = true, relate = false; fromBlock = false, relate = true
       Left(ValidationError.InvalidGroup)
     } else if (!header.validateDiff) {
@@ -221,9 +220,12 @@ class BlockFlow()(implicit val config: PlatformConfig)
     BlockDeps(deps2)
   }
 
-  def calBestDepsUnsafe(): BlockDeps = calBestDepsUnsafe(config.mainGroup)
+  def calBestDepsUnsafe(): Unit = config.groupFrom until config.groupUntil foreach { mainGroup =>
+    val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
+    updateBestDeps(mainGroup, deps)
+  }
 
-  def calBestDeps(): IOResult[BlockDeps] =
+  def calBestDeps(): IOResult[Unit] =
     try {
       Right(calBestDepsUnsafe())
     } catch {
