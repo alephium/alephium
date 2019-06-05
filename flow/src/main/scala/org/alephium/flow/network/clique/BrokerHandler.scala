@@ -1,33 +1,27 @@
-package org.alephium.flow.network
+package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
-import java.time.Instant
 
 import akka.actor.{ActorRef, Props, Timers}
-import akka.io.{IO, Tcp}
+import akka.io.Tcp
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin.Remote
-import org.alephium.flow.network.PeerManager.PeerInfo
-import org.alephium.flow.storage._
+import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.storage.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.PeerId
+import org.alephium.protocol.model.{BrokerId, CliqueId, CliqueInfo}
 import org.alephium.serde.SerdeError
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
 import scala.util.Random
 
-object TcpHandler {
-
+object BrokerHandler {
   object Timer
 
   sealed trait Command
-  case class Set(connection: ActorRef) extends Command
-  case class Connect(until: Instant)   extends Command
-  case object Retry                    extends Command
-  case object SendPing                 extends Command
+  case object SendPing extends Command
 
   def envelope(payload: Payload): Tcp.Write =
     envelope(Message(payload))
@@ -52,40 +46,35 @@ object TcpHandler {
   }
 
   trait Builder {
-    def createTcpHandler(remote: InetSocketAddress, blockHandlers: AllHandlers)(
-        implicit config: PlatformConfig): Props =
-      Props(new TcpHandler(remote, blockHandlers))
+    def createInboundBrokerHandler(
+        selfCliqueInfo: CliqueInfo,
+        connection: ActorRef,
+        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+      Props(new InboundBrokerHandler(selfCliqueInfo, connection, blockHandlers))
+
+    def createOutboundBrokerHandler(
+        selfCliqueInfo: CliqueInfo,
+        cliqueId: CliqueId,
+        brokerId: BrokerId,
+        remote: InetSocketAddress,
+        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+      Props(new OutboundBrokerHandler(selfCliqueInfo, cliqueId, brokerId, remote, blockHandlers))
   }
 }
 
-class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
-    implicit config: PlatformConfig)
-    extends BaseActor
-    with Timers {
+trait BrokerHandler extends BaseActor with Timers {
 
-  // Initialized once; use var for performance reason
-  var connection: ActorRef = _
-  var peerInfo: PeerInfo   = _
+  implicit def config: PlatformConfig
 
-  def register(_connection: ActorRef): Unit = {
-    connection = _connection
-    connection ! Tcp.Register(self)
-  }
-
-  override def receive: Receive = awaitInit
-
-  def awaitInit: Receive = {
-    case TcpHandler.Set(_connection) =>
-      register(_connection)
-      handshakeOut()
-
-    case TcpHandler.Connect(until: Instant) =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remote)
-      context.become(connecting(until))
-  }
+  def selfCliqueInfo: CliqueInfo
+  def cliqueInfo: CliqueInfo
+  def brokerId: BrokerId
+  def remote: InetSocketAddress
+  def connection: ActorRef
+  def allHandlers: AllHandlers
 
   def handshakeOut(): Unit = {
-    connection ! TcpHandler.envelope(Hello(config.nodeId))
+    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo, config.brokerId))
     context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
   }
 
@@ -93,11 +82,17 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
     context become handleWith(ByteString.empty, awaitHello, handlePayload)
   }
 
+  def afterHandShake(): Unit = {
+    context.parent ! CliqueManager.Connected(cliqueInfo, brokerId)
+    startPingPong()
+  }
+
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
       if (hello.validate) {
-        connection ! TcpHandler.envelope(HelloAck(config.nodeId))
-        afterHandShake(hello.peerId)
+        connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo, config.brokerId))
+        handle(hello.cliqueInfo, hello.brokerIndex)
+        afterHandShake()
       } else {
         log.info("Hello is invalid, closing connection")
         stop()
@@ -107,10 +102,13 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       stop()
   }
 
+  def handle(cliqueInfo: CliqueInfo, brokerIndex: Int): Unit
+
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
       if (helloAck.validate) {
-        afterHandShake(helloAck.peerId)
+        handle(helloAck.cliqueInfo, helloAck.brokerIndex)
+        afterHandShake()
       } else {
         log.info("HelloAck is invalid, closing connection")
         stop()
@@ -118,31 +116,6 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
-  }
-
-  def afterHandShake(peerId: PeerId): Unit = {
-    peerInfo = PeerInfo(peerId, remote, self)
-    context.parent ! PeerManager.Connected(peerId, peerInfo)
-    startPingPong()
-  }
-
-  def connecting(until: Instant): Receive = {
-    case TcpHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remote)
-
-    case _: Tcp.Connected =>
-      val _connection = sender()
-      register(_connection)
-      handshakeIn()
-
-    case Tcp.CommandFailed(c: Tcp.Connect) =>
-      val current = Instant.now()
-      if (current isBefore until) {
-        scheduleOnce(self, TcpHandler.Retry, 1.second)
-      } else {
-        log.info(s"Cannot connect to ${c.remoteAddress}")
-        stop()
-      }
   }
 
   def handleWith(unaligned: ByteString,
@@ -157,7 +130,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
 
   def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
     case Tcp.Received(data) =>
-      TcpHandler.deserialize(unaligned ++ data) match {
+      BrokerHandler.deserialize(unaligned ++ data) match {
         case Right((messages, rest)) =>
           messages.foreach { message =>
             val cmdName = message.payload.getClass.getSimpleName
@@ -170,7 +143,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
             s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
           stop()
       }
-    case TcpHandler.SendPing => sendPing()
+    case BrokerHandler.SendPing => sendPing()
     case event: Tcp.ConnectionClosed =>
       if (event.isErrorClosed) {
         log.debug(s"Connection closed with error: ${event.getErrorCause}")
@@ -183,7 +156,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   // TODO: make this safe by using types
   def handleOutMessage: Receive = {
     case message: Message =>
-      connection ! TcpHandler.envelope(message)
+      connection ! BrokerHandler.envelope(message)
     case write: Tcp.Write =>
       connection ! write
   }
@@ -205,11 +178,11 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       // TODO: support many blocks
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      if (chainIndex.relateTo(config.mainGroup)) {
+      if (chainIndex.relateTo(config.brokerId)) {
         val handler = allHandlers.getBlockHandler(chainIndex)
-        handler ! BlockChainHandler.AddBlocks(blocks, Remote(peerInfo.id))
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(cliqueInfo.id))
       } else {
-        log.warning(s"Received blocks for wrong chain ${chainIndex} from ${peerInfo.address}")
+        log.warning(s"Received blocks for wrong chain $chainIndex from $remote")
       }
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
@@ -219,11 +192,11 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
       // TODO: support many headers
       val header     = headers.head
       val chainIndex = header.chainIndex
-      if (!chainIndex.relateTo(config.mainGroup)) {
+      if (!chainIndex.relateTo(config.brokerId)) {
         val handler = allHandlers.getHeaderHandler(chainIndex)
-        handler ! HeaderChainHandler.AddHeaders(headers, Remote(peerInfo.id))
+        handler ! HeaderChainHandler.AddHeaders(headers)
       } else {
-        log.warning(s"Received headers for wrong chain from ${peerInfo.address}")
+        log.warning(s"Received headers for wrong chain from $remote")
       }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")
@@ -237,7 +210,7 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
   def handlePing(nonce: Int, delay: Long): Unit = {
     // TODO: refuse ping if it's too frequent
     log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
-    connection ! TcpHandler.envelope(Pong(nonce))
+    connection ! BrokerHandler.envelope(Pong(nonce))
   }
 
   def sendPing(): Unit = {
@@ -247,12 +220,12 @@ class TcpHandler(remote: InetSocketAddress, allHandlers: AllHandlers)(
     } else {
       pingNonce = Random.nextInt()
       val timestamp = System.currentTimeMillis()
-      connection ! TcpHandler.envelope(Ping(pingNonce, timestamp))
+      connection ! BrokerHandler.envelope(Ping(pingNonce, timestamp))
     }
   }
 
   def startPingPong(): Unit = {
-    timers.startPeriodicTimer(TcpHandler.Timer, TcpHandler.SendPing, config.pingFrequency)
+    timers.startPeriodicTimer(BrokerHandler.Timer, BrokerHandler.SendPing, config.pingFrequency)
   }
 
   def stop(): Unit = {

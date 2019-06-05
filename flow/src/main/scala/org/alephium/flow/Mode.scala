@@ -2,7 +2,7 @@ package org.alephium.flow
 
 import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.network.TcpHandler
+import org.alephium.flow.network.clique.BrokerHandler
 
 // scalastyle:off magic.number
 trait Mode extends PlatformConfig.Default {
@@ -17,23 +17,23 @@ trait Mode extends PlatformConfig.Default {
 
 object Mode {
 
-  type Builder = TcpHandler.Builder with Miner.Builder
+  type Builder = BrokerHandler.Builder with Miner.Builder
 
-  def defaultBuilders: Builder = new TcpHandler.Builder with Miner.Builder
+  def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
 
   class Aws extends Mode with StrictLogging {
-    val port: Int = config.port
+    val port: Int = config.publicAddress.getPort
 
     val httpPort: Int = 8080
 
-    override val node: Node = Node.createUnsafe(builders, "Root")
+    override val node: Node = Node(builders, "Root")
   }
 
   class Local extends Mode {
-    val port: Int = config.port
+    val port: Int = config.publicAddress.getPort
 
     def httpPort: Int = 8080 + (port - 9973)
 
-    override val node: Node = Node.createUnsafe(builders, "Root")
+    override val node: Node = Node(builders, "Root")
   }
 }

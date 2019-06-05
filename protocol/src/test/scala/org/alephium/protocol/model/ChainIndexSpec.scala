@@ -12,9 +12,9 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
       val index = block.chainIndex
 
       val hash2Int = BigInt(1, block.hash.bytes.takeRight(2).toArray)
-      val rawIndex = (hash2Int % config.chainNum).toInt
-      index.from.value is rawIndex / config.groups
-      index.to.value is rawIndex % config.groups
+      val rawIndex = (hash2Int % consensusConfig.chainNum).toInt
+      index.from.value is rawIndex / consensusConfig.groups
+      index.to.value is rawIndex % consensusConfig.groups
     }
   }
 

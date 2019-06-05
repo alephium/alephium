@@ -3,7 +3,7 @@ package org.alephium.protocol.message
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Protocol
-import org.alephium.protocol.model.{Block, BlockHeader, PeerId}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerId, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -54,29 +54,33 @@ object Payload {
   }
 }
 
-case class Hello(version: Int, timestamp: Long, peerId: PeerId) extends Payload {
-  def validate: Boolean = version == Protocol.version
+case class Hello(version: Int, timestamp: Long, cliqueInfo: CliqueInfo, brokerIndex: Int)
+    extends Payload {
+  def validate: Boolean =
+    version == Protocol.version && brokerIndex >= 0 && brokerIndex < cliqueInfo.brokerNum
 }
 
 object Hello extends Payload.Code {
   implicit val serde: Serde[Hello] =
-    Serde.forProduct3(apply, p => (p.version, p.timestamp, p.peerId))
+    Serde.forProduct4(apply, p => (p.version, p.timestamp, p.cliqueInfo, p.brokerIndex))
 
-  def apply(peerId: PeerId): Hello = {
-    Hello(Protocol.version, System.currentTimeMillis(), peerId)
+  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): Hello = {
+    Hello(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId.value)
   }
 }
 
-case class HelloAck(version: Int, timestamp: Long, peerId: PeerId) extends Payload {
-  def validate: Boolean = version == Protocol.version
+case class HelloAck(version: Int, timestamp: Long, cliqueInfo: CliqueInfo, brokerIndex: Int)
+    extends Payload {
+  def validate: Boolean =
+    version == Protocol.version && brokerIndex >= 0 && brokerIndex < cliqueInfo.brokerNum
 }
 
 object HelloAck extends Payload.Code {
   implicit val serde: Serde[HelloAck] =
-    Serde.forProduct3(apply, p => (p.version, p.timestamp, p.peerId))
+    Serde.forProduct4(apply, p => (p.version, p.timestamp, p.cliqueInfo, p.brokerIndex))
 
-  def apply(peerId: PeerId): HelloAck = {
-    HelloAck(Protocol.version, System.currentTimeMillis(), peerId)
+  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): HelloAck = {
+    HelloAck(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId.value)
   }
 }
 
