@@ -22,6 +22,9 @@ package object serde {
 
   implicit val bytestringSerde: Serde[ByteString] = ByteStringSerde
 
+  implicit val stringSerde: Serde[String] =
+    ByteStringSerde.xmap(_.utf8String, ByteString.fromString)
+
   implicit def optionSerde[T](implicit serde: Serde[T]): Serde[Option[T]] =
     new OptionSerde[T](serde)
 

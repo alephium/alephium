@@ -1,7 +1,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto.{Keccak256, Keccak256Hash}
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
@@ -9,15 +9,15 @@ case class Block(header: BlockHeader, transactions: AVector[Transaction])
     extends Keccak256Hash[Block] {
   override def hash: Keccak256 = header.hash
 
-  def chainIndex(implicit config: ConsensusConfig): ChainIndex = {
+  def chainIndex(implicit config: GroupConfig): ChainIndex = {
     header.chainIndex
   }
 
-  def parentHash(implicit config: ConsensusConfig): Keccak256 = {
+  def parentHash(implicit config: GroupConfig): Keccak256 = {
     header.parentHash
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: ConsensusConfig): Keccak256 = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Keccak256 = {
     header.uncleHash(toIndex)
   }
 
@@ -25,12 +25,12 @@ case class Block(header: BlockHeader, transactions: AVector[Transaction])
     header.validateDiff
   }
 
-  def validateIndex(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+  def validateIndex(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
     header.validateIndex(target)
   }
 
   // Note: the target is not validated here
-  def preValidate(target: ChainIndex)(implicit config: ConsensusConfig): Boolean = {
+  def preValidate(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
     validateIndex(target) && validateDiff
   }
 }

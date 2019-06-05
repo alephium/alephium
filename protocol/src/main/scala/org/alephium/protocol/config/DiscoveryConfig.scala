@@ -1,15 +1,33 @@
 package org.alephium.protocol.config
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.protocol.model.{GroupIndex, PeerId}
+import java.net.InetSocketAddress
 
-trait DiscoveryConfig extends GroupConfig {
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+
+import scala.concurrent.duration.FiniteDuration
+
+// TODO: refactor this as two configs
+trait DiscoveryConfig extends GroupConfig with CliqueConfig {
+  def publicAddress: InetSocketAddress
 
   def discoveryPrivateKey: ED25519PrivateKey
 
   def discoveryPublicKey: ED25519PublicKey
 
-  val nodeId: PeerId = PeerId.fromPublicKey(discoveryPublicKey)
+  /* Maximum number of peers to track. */
+  def peersPerGroup: Int
 
-  val group: GroupIndex = nodeId.groupIndex(this)
+  /* Maximum number of peers used for probing during a scan. */
+  def scanMaxPerGroup: Int
+
+  /* Wait time between two scan. */
+  def scanFrequency: FiniteDuration
+
+  def scanFastFrequency: FiniteDuration
+
+  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
+  def neighborsPerGroup: Int
+
+  /** Duration we wait before considering a peer dead. **/
+  def peersTimeout: FiniteDuration = scanFrequency * 3
 }

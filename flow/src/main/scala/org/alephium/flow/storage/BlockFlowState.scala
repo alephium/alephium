@@ -11,34 +11,41 @@ import scala.reflect.ClassTag
 trait BlockFlowState {
   implicit def config: PlatformConfig
 
-  def mainGroup: GroupIndex = config.mainGroup
-
   val groups = config.groups
 
-  private var bestDeps = {
+  private val bestDeps = Array.tabulate(config.groupNumPerBroker) { fromShift =>
+    val mainGroup = config.groupFrom + fromShift
     val deps1 = AVector.tabulate(groups - 1) { i =>
-      if (i < mainGroup.value) config.genesisBlocks(i).head.hash
+      if (i < mainGroup) config.genesisBlocks(i).head.hash
       else config.genesisBlocks(i + 1).head.hash
     }
-    val deps2 = config.genesisBlocks(mainGroup.value).map(_.hash)
+    val deps2 = config.genesisBlocks(mainGroup).map(_.hash)
     BlockDeps(deps1 ++ deps2)
   }
 
   private val utxos = ConcurrentHashSet.empty[TxOutputPoint]
 
-  private val inBlockChains: AVector[BlockChain] = AVector.tabulate(groups - 1) { k =>
-    BlockChain.fromGenesisUnsafe(
-      config.genesisBlocks(if (k < mainGroup.value) k else k + 1)(mainGroup.value))
-  }
-  private val outBlockChains: AVector[BlockChain] = AVector.tabulate(groups) { to =>
-    BlockChain.fromGenesisUnsafe(config.genesisBlocks(mainGroup.value)(to))
-  }
+  private val inBlockChains: AVector[AVector[BlockChain]] =
+    AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
+      val mainGroup = config.groupFrom + toShift
+      val fromIndex = if (k < config.groupFrom) k else k + config.groupFrom
+      BlockChain.fromGenesisUnsafe(config.genesisBlocks(fromIndex)(mainGroup))
+    }
+  private val outBlockChains: AVector[AVector[BlockChain]] =
+    AVector.tabulate(config.groupNumPerBroker, groups) { (fromShift, to) =>
+      val mainGroup = config.groupFrom + fromShift
+      BlockChain.fromGenesisUnsafe(config.genesisBlocks(mainGroup)(to))
+    }
   private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        if (from == mainGroup.value) outBlockChains(to)
-        else if (to == mainGroup.value) {
-          inBlockChains(if (from < mainGroup.value) from else from - 1)
+        if (config.brokerId.containsRaw(from)) {
+          val fromShift = from - config.groupFrom
+          outBlockChains(fromShift)(to)
+        } else if (config.brokerId.containsRaw(to)) {
+          val toShift   = to - config.groupFrom
+          val fromIndex = if (from < config.groupFrom) from else from + config.groupNumPerBroker
+          inBlockChains(toShift)(fromIndex)
         } else BlockHeaderChain.fromGenesisUnsafe(config.genesisBlocks(from)(to))
     }
 
@@ -49,13 +56,19 @@ trait BlockFlowState {
   }
 
   def numTransactions: Int = {
-    inBlockChains.sumBy(_.numTransactions) + outBlockChains.sumBy(_.numTransactions)
+    inBlockChains.sumBy(_.sumBy(_.numTransactions)) +
+      outBlockChains.sumBy(_.sumBy(_.numTransactions))
   }
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
-    assert(from == mainGroup || to == mainGroup)
-    if (from == mainGroup) outBlockChains(to.value)
-    else inBlockChains(if (from.value < mainGroup.value) from.value else from.value - 1)
+    assert(config.brokerId.contains(from) || config.brokerId.contains(to))
+    if (config.brokerId.contains(from)) outBlockChains(from.value - config.groupFrom)(to.value)
+    else {
+      val fromIndex =
+        if (from.value < config.groupFrom) from.value
+        else from.value - config.groupNumPerBroker
+      inBlockChains(to.value)(fromIndex)
+    }
   }
 
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool = {
@@ -66,9 +79,16 @@ trait BlockFlowState {
     blockHeaderChains(from.value)(to.value)
   }
 
-  def getBestDeps: BlockDeps = bestDeps
+  def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
+    val groupShift = groupIndex.value - config.groupFrom
+    bestDeps(groupShift)
+  }
 
-  def updateBestDeps(deps: BlockDeps): Unit = bestDeps = deps
+  def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
+    assert(config.brokerId.containsRaw(mainGroup))
+    val groupShift = mainGroup - config.groupFrom
+    bestDeps(groupShift) = deps
+  }
 
   // TODO: bulk update & atomic update
   def updateTxs(block: Block): IOResult[Unit] = {
