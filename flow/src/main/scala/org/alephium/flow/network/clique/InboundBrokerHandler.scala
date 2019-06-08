@@ -30,9 +30,8 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
   override def receive: Receive = handleWith(ByteString.empty, awaitHelloAck, handlePayload)
 
-  def handle(_cliqueInfo: CliqueInfo, brokerIndex: Int): Unit = {
+  def handle(_cliqueInfo: CliqueInfo, brokerId: BrokerId): Unit = {
     cliqueInfo = _cliqueInfo
-    brokerId   = BrokerId.unsafe(brokerIndex)
-    remote     = cliqueInfo.peers(brokerIndex)
+    remote     = cliqueInfo.peers(brokerId.value)
   }
 }

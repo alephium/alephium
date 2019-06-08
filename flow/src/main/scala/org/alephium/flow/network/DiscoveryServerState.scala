@@ -36,7 +36,7 @@ trait DiscoveryServerState {
   }
 
   def getNeighbors(target: CliqueId): AVector[CliqueInfo] = {
-    val candidates = if (target == config.cliqueId) {
+    val candidates = if (target == selfCliqueInfo.id) {
       AVector.from(table.values.map(_.info))
     } else {
       AVector.from(table.values.map(_.info).filter(_.id != target)) :+ selfCliqueInfo
@@ -98,7 +98,7 @@ trait DiscoveryServerState {
 
   def scan(): Unit = {
     val sortedNeighbors =
-      AVector.from(table.values).sortBy(status => config.cliqueId.hammingDist(status.info.id))
+      AVector.from(table.values).sortBy(status => selfCliqueInfo.id.hammingDist(status.info.id))
     sortedNeighbors
       .takeUpto(config.scanMaxPerGroup)
       .foreach(status => fetchNeighbors(status.info))
@@ -116,7 +116,7 @@ trait DiscoveryServerState {
   }
 
   def fetchNeighbors(remote: InetSocketAddress): Unit = {
-    send(remote, FindNode(config.cliqueId))
+    send(remote, FindNode(selfCliqueInfo.id))
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
@@ -127,14 +127,14 @@ trait DiscoveryServerState {
   def tryPing(cliqueInfo: CliqueInfo): Unit = {
     if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
       log.info(s"Sending Ping to $cliqueInfo")
-      send(cliqueInfo.masterAddress, Ping(config.publicAddress))
+      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo))
       pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, System.currentTimeMillis()))
     }
   }
 
   def tryPing(remote: InetSocketAddress): Unit = {
     log.info(s"Sending Ping to $remote")
-    send(remote, Ping(config.publicAddress))
+    send(remote, Ping(selfCliqueInfo))
   }
 
   def handlePong(cliqueInfo: CliqueInfo): Unit = {
@@ -153,7 +153,7 @@ trait DiscoveryServerState {
   }
 
   def tryInsert(cliqueInfo: CliqueInfo): Unit = {
-    val myself   = config.cliqueId
+    val myself   = selfCliqueInfo.id
     val furthest = table.keys.maxBy(myself.hammingDist)
     if (myself.hammingDist(cliqueInfo.id) < myself.hammingDist(furthest)) {
       table -= furthest

@@ -31,12 +31,12 @@ object DiscoveryServer {
   case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
 
   sealed trait Command
-  case object GetPeers                   extends Command
+  case object GetPeerCliques             extends Command
   case class Disable(cliqueId: CliqueId) extends Command
   case object Scan                       extends Command
 
   sealed trait Event
-  case class Peers(peers: AVector[CliqueInfo]) extends Event
+  case class PeerCliques(peers: AVector[CliqueInfo]) extends Event
 }
 
 /*
@@ -73,8 +73,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   }
 
   def binding: Receive = {
-    case Udp.Bound(_) =>
-      log.debug(s"UDP server bound successfully")
+    case Udp.Bound(address) =>
+      log.debug(s"UDP server bound to $address")
       setSocket(sender())
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
@@ -109,8 +109,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       scan()
       if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
       else scheduleOnce(self, Scan, config.scanFrequency)
-    case GetPeers =>
-      sender() ! Peers(getActivePeers)
+    case GetPeerCliques =>
+      sender() ! PeerCliques(getActivePeers)
     case Disable(peerId) =>
       table -= peerId
       ()
@@ -118,8 +118,9 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
 
   def handlePayload(sourceId: CliqueId, remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
-      case Ping(sourceAddress) =>
-        send(sourceAddress, Pong(selfCliqueInfo))
+      case Ping(cliqueInfo) =>
+        send(cliqueInfo.masterAddress, Pong(selfCliqueInfo))
+        tryPing(cliqueInfo)
       case Pong(cliqueInfo) =>
         handlePong(cliqueInfo)
       case FindNode(targetId) =>

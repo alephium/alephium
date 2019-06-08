@@ -6,7 +6,6 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 import scala.concurrent.duration._
@@ -48,7 +47,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
 
   def awaitCliqueInfo(connection: ActorRef, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
-      BrokerConnector.deserializeTry[CliqueInfo](unaligned ++ data) match {
+      BrokerConnector.deserializeCliqueInfo(unaligned ++ data) match {
         case Right(Some((cliqueInfo, rest))) =>
           assert(rest.isEmpty)
           connection ! BrokerConnector.Ready

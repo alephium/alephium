@@ -3,6 +3,7 @@ package org.alephium.protocol.message
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Protocol
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Block, BlockHeader, BrokerId, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -27,18 +28,41 @@ object Payload {
   val deserializerCode: Deserializer[Code] =
     Serde[Int].validateGet(Code.fromInt, c => s"Invalid code $c")
 
-  def _deserialize(input: ByteString): Either[SerdeError, (Payload, ByteString)] = {
+  def _deserialize(input: ByteString)(
+      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
     deserializerCode._deserialize(input).flatMap {
       case (code, rest) =>
         code match {
-          case Hello       => Serde[Hello]._deserialize(rest)
-          case HelloAck    => Serde[HelloAck]._deserialize(rest)
+          case Hello       => _deserializeHello(rest)
+          case HelloAck    => _deserializeHelloAck(rest)
           case Ping        => Serde[Ping]._deserialize(rest)
           case Pong        => Serde[Pong]._deserialize(rest)
           case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
           case GetBlocks   => Serde[GetBlocks]._deserialize(rest)
           case SendHeaders => Serde[SendHeaders]._deserialize(rest)
           case GetHeaders  => Serde[GetHeaders]._deserialize(rest)
+        }
+    }
+  }
+
+  def _deserializeHello(input: ByteString)(
+      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
+    HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
+      case (unsafe, rest) =>
+        unsafe.validate(new Hello(_, _, _, _)) match {
+          case Left(error)  => Left(SerdeError.validation(error))
+          case Right(hello) => Right((hello, rest))
+        }
+    }
+  }
+
+  def _deserializeHelloAck(input: ByteString)(
+      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
+    HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
+      case (unsafe, rest) =>
+        unsafe.validate(new HelloAck(_, _, _, _)) match {
+          case Left(error)  => Left(SerdeError.validation(error))
+          case Right(hello) => Right((hello, rest))
         }
     }
   }
@@ -54,33 +78,65 @@ object Payload {
   }
 }
 
-case class Hello(version: Int, timestamp: Long, cliqueInfo: CliqueInfo, brokerIndex: Int)
-    extends Payload {
-  def validate: Boolean =
-    version == Protocol.version && brokerIndex >= 0 && brokerIndex < cliqueInfo.brokerNum
-}
+sealed trait HandShake extends Payload
 
-object Hello extends Payload.Code {
-  implicit val serde: Serde[Hello] =
-    Serde.forProduct4(apply, p => (p.version, p.timestamp, p.cliqueInfo, p.brokerIndex))
-
-  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): Hello = {
-    Hello(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId.value)
+object HandShake {
+  class Unsafe(val version: Int,
+               val timestamp: Long,
+               val cliqueInfoUnsafe: CliqueInfo.Unsafe,
+               val brokerIndex: Int) {
+    def validate[T](build: (Int, Long, CliqueInfo, BrokerId) => T)(
+        implicit config: GroupConfig): Either[String, T] = {
+      if (version != Protocol.version) {
+        Left(s"Invalid protoco version: got $version, expect ${Protocol.version}")
+      } else if (timestamp <= 0) {
+        Left(s"Invalid timestamp: got $timestamp, expect positive number")
+      } else {
+        cliqueInfoUnsafe.validate match {
+          case Left(message) => Left(message)
+          case Right(cliqueInfo) =>
+            if (brokerIndex < 0 || brokerIndex >= cliqueInfo.brokerNum) {
+              Left(
+                s"Invalid brokerIndex: got $brokerIndex, should >= 0 and < ${cliqueInfo.brokerNum}")
+            } else Right(build(version, timestamp, cliqueInfo, BrokerId.unsafe(brokerIndex)))
+        }
+      }
+    }
+  }
+  object Unsafe {
+    implicit val serde: Serde[Unsafe] = Serde.forProduct4(
+      new Unsafe(_, _, _, _),
+      t => (t.version, t.timestamp, t.cliqueInfoUnsafe, t.brokerIndex))
   }
 }
 
-case class HelloAck(version: Int, timestamp: Long, cliqueInfo: CliqueInfo, brokerIndex: Int)
-    extends Payload {
-  def validate: Boolean =
-    version == Protocol.version && brokerIndex >= 0 && brokerIndex < cliqueInfo.brokerNum
+class Hello(val version: Int,
+            val timestamp: Long,
+            val cliqueInfo: CliqueInfo,
+            val brokerId: BrokerId)
+    extends HandShake
+
+object Hello extends Payload.Code {
+  implicit val serializer: Serializer[Hello] =
+    Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueInfo, t.brokerId))
+
+  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): Hello = {
+    new Hello(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId)
+  }
 }
 
+class HelloAck(val version: Int,
+               val timestamp: Long,
+               val cliqueInfo: CliqueInfo,
+               val brokerId: BrokerId)
+    extends HandShake
+
 object HelloAck extends Payload.Code {
-  implicit val serde: Serde[HelloAck] =
-    Serde.forProduct4(apply, p => (p.version, p.timestamp, p.cliqueInfo, p.brokerIndex))
+  implicit val serializer: Serializer[HelloAck] =
+    Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueInfo, t.brokerId))
 
   def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): HelloAck = {
-    HelloAck(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId.value)
+    new HelloAck(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId)
   }
 }
 
