@@ -33,7 +33,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
     case CliqueManager.Connect(cliqueId, brokerId, remote) =>
       val name = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$brokerId-$remote")
       val props =
-        OutboundBrokerHandler.props(selfCliqueInfo, cliqueId, brokerId, remote, allHandlers)
+        OutboundBrokerHandler.props(selfCliqueInfo, brokerId, remote, allHandlers)
       context.actorOf(props, name)
       ()
     case CliqueManager.Connected(cliqueInfo, brokerId) =>

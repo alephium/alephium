@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.protocol.model.{BrokerId, CliqueId}
+import org.alephium.protocol.model.BrokerId
 import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
 import org.scalatest.EitherValues._
 
@@ -34,7 +34,6 @@ class DiscoveryMessageSpec extends AlephiumSpec {
       val groups: Int            = self.groups
       val brokerNum: Int         = self.brokerNum
       val groupNumPerBroker: Int = self.groupNumPerBroker
-      val cliqueId: CliqueId     = CliqueId.generate
       val brokerId: BrokerId     = self.brokerId
       val isMaster: Boolean      = self.isMaster
 
@@ -55,14 +54,14 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def groups: Int            = 4
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1
-    def brokerId: BrokerId     = BrokerId(0)
+    def brokerId: BrokerId     = BrokerId.unsafe(0)
     def isMaster: Boolean      = true
 
     val peerFixture = new DiscoveryConfigFixture {
       def groups: Int            = 4
       def brokerNum: Int         = 4
       def groupNumPerBroker: Int = 1
-      def brokerId: BrokerId     = BrokerId(0)
+      def brokerId: BrokerId     = BrokerId.unsafe(0)
       def isMaster: Boolean      = false
     }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>

@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BrokerId, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
@@ -38,7 +39,7 @@ object BrokerConnector {
   }
 
   def deserializeTry[T](input: ByteString)(
-      implicit serde: Serde[T]): Either[SerdeError, Option[(T, ByteString)]] = {
+      implicit serde: Serde[T]): SerdeResult[Option[(T, ByteString)]] = {
     serde._deserialize(input) match {
       case Right((t, rest))                   => Right(Some((t, rest)))
       case Left(_: SerdeError.NotEnoughBytes) => Right(None)
@@ -46,8 +47,18 @@ object BrokerConnector {
     }
   }
 
-  def envolop[T](input: T)(implicit serde: Serde[T]): Tcp.Write = {
-    Tcp.Write(serde.serialize(input))
+  def deserializeCliqueInfo(input: ByteString)(
+      implicit config: GroupConfig): SerdeResult[Option[(CliqueInfo, ByteString)]] = {
+    CliqueInfo.Unsafe.serde._deserialize(input) match {
+      case Right((t, rest)) =>
+        t.validate.fold(e => Left(SerdeError.validation(e)), i => Right(Some((i, rest))))
+      case Left(_: SerdeError.NotEnoughBytes) => Right(None)
+      case Left(e)                            => Left(e)
+    }
+  }
+
+  def envolop[T](input: T)(implicit serializer: Serializer[T]): Tcp.Write = {
+    Tcp.Write(serializer.serialize(input))
   }
 }
 

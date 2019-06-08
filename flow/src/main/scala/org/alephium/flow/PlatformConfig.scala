@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.crypto.ED25519
 import org.alephium.flow.io.{Disk, HeaderDB}
 import org.alephium.flow.trie.MerklePatriciaTrie
-import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
+import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Env, Files, Network}
 import org.rocksdb.Options
@@ -37,8 +37,7 @@ object PlatformConfig extends StrictLogging {
     implicit def config: PlatformConfig = Default
   }
 
-  def mineGenesis(chainIndex: ChainIndex)(
-      implicit config: GroupConfig with ConsensusConfig): Block = {
+  def mineGenesis(chainIndex: ChainIndex)(implicit config: ConsensusConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
@@ -90,8 +89,8 @@ trait PlatformConfigFiles extends StrictLogging {
   val all      = parseConfig()
   val alephium = all.getConfig("alephium")
 
-  def getDuration(path: String): FiniteDuration = {
-    val duration = alephium.getDuration(path)
+  def getDuration(config: Config, path: String): FiniteDuration = {
+    val duration = config.getDuration(path)
     FiniteDuration(duration.toNanos, NANOSECONDS)
   }
 }
@@ -100,17 +99,23 @@ trait PlatformGroupConfig extends PlatformConfigFiles with GroupConfig {
   val groups: Int = alephium.getInt("groups")
 }
 
-trait PlatformCliqueConfig extends PlatformConfigFiles with GroupConfig with CliqueConfig {
-  def groupConfigRaw: Config = alephium.getConfig("clique").resolve
+trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
+  def cliqueConfigRaw: Config = alephium.getConfig("clique").resolve()
 
-  val brokerNum: Int         = groupConfigRaw.getInt("brokerNum")
-  val groupNumPerBroker: Int = groupConfigRaw.getInt("groupNumPerBroker")
-  val cliqueId: CliqueId = {
-    val idRaw = groupConfigRaw.getString("cliqueId")
-    CliqueId.fromStringUnsafe(idRaw)
-  }
+  val brokerNum: Int         = cliqueConfigRaw.getInt("brokerNum")
+  val groupNumPerBroker: Int = cliqueConfigRaw.getInt("groupNumPerBroker")
   val brokerId: BrokerId = {
-    val myId = groupConfigRaw.getInt("brokerId")
+    val myId = cliqueConfigRaw.getInt("brokerId")
+    assert(0 <= myId && myId * groupNumPerBroker < groups)
+    BrokerId(myId)(this)
+  }
+}
+
+trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {
+  def brokerConfigRaw: Config = alephium.getConfig("broker").resolve()
+
+  val brokerId: BrokerId = {
+    val myId = brokerConfigRaw.getInt("brokerId")
     assert(0 <= myId && myId * groupNumPerBroker < groups)
     BrokerId(myId)(this)
   }
@@ -119,11 +124,11 @@ trait PlatformCliqueConfig extends PlatformConfigFiles with GroupConfig with Cli
 trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
   def consensusConfigRaw: Config = alephium.getConfig("consensus").resolve
 
-  val numZerosAtLeastInHash: Int = alephium.getInt("numZerosAtLeastInHash")
+  val numZerosAtLeastInHash: Int = consensusConfigRaw.getInt("numZerosAtLeastInHash")
   val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-  val blockTargetTime: Duration = alephium.getDuration("blockTargetTime")
-  val blockConfirmNum: Int      = alephium.getInt("blockConfirmNum")
+  val blockTargetTime: Duration = consensusConfigRaw.getDuration("blockTargetTime")
+  val blockConfirmNum: Int      = consensusConfigRaw.getInt("blockConfirmNum")
   val expectedTimeSpan: Long    = blockTargetTime.toMillis
 
   // Digi Shields Difficulty Adjustment
@@ -137,7 +142,7 @@ trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
 trait PlatformMiningConfig extends PlatformConfigFiles {
   def miningConfigRaw: Config = alephium.getConfig("mining").resolve()
 
-  val nonceStep: BigInt = alephium.getInt("nonceStep")
+  val nonceStep: BigInt = miningConfigRaw.getInt("nonceStep")
 }
 
 trait PlatformNetworkConfig extends PlatformConfigFiles {
@@ -148,8 +153,8 @@ trait PlatformNetworkConfig extends PlatformConfigFiles {
     new InetSocketAddress(left, right.toInt)
   }
 
-  val pingFrequency: FiniteDuration    = getDuration("pingFrequency")
-  val retryTimeout: FiniteDuration     = getDuration("retryTimeout")
+  val pingFrequency: FiniteDuration    = getDuration(networkConfigRaw, "pingFrequency")
+  val retryTimeout: FiniteDuration     = getDuration(networkConfigRaw, "retryTimeout")
   val publicAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("publicAddress"))
   val masterAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("masterAddress"))
 }
@@ -170,8 +175,8 @@ trait PlatformDiscoveryConfig extends PlatformGroupConfig with PlatformNetworkCo
 
   val peersPerGroup                             = discoveryConfig.getInt("peersPerGroup")
   val scanMaxPerGroup                           = discoveryConfig.getInt("scanMaxPerGroup")
-  val scanFrequency                             = discoveryConfig.getDuration("scanFrequency").toMillis.millis
-  val scanFastFrequency                         = discoveryConfig.getDuration("scanFastFrequency").toMillis.millis
+  val scanFrequency                             = getDuration(discoveryConfig, "scanFrequency")
+  val scanFastFrequency                         = getDuration(discoveryConfig, "scanFastFrequency")
   val neighborsPerGroup                         = discoveryConfig.getInt("neighborsPerGroup")
   val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
 

@@ -46,7 +46,9 @@ class CliqueCoordinator()(implicit config: PlatformConfig) extends BaseActor {
 
   private def cliqueInfo: CliqueInfo = {
     val addresses = AVector.from(brokerAddresses.map(_.get))
-    CliqueInfo(CliqueId.generate, addresses, config.groupNumPerBroker)
+    CliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
+                      addresses,
+                      config.groupNumPerBroker)
   }
 
   val readys = Array.fill(brokerNum)(false)

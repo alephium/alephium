@@ -3,9 +3,9 @@ package org.alephium.serde
 import akka.util.ByteString
 
 trait Deserializer[T] { self =>
-  def _deserialize(input: ByteString): Either[SerdeError, (T, ByteString)]
+  def _deserialize(input: ByteString): SerdeResult[(T, ByteString)]
 
-  def deserialize(input: ByteString): Either[SerdeError, T] =
+  def deserialize(input: ByteString): SerdeResult[T] =
     _deserialize(input).flatMap {
       case (output, rest) =>
         if (rest.isEmpty) Right(output)

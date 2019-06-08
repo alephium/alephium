@@ -51,8 +51,8 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   val handlers = node.allHandlers
   val actualMiners: AVector[AVector[ActorRef]] =
     AVector.tabulate(config.groupNumPerBroker, config.groups) {
-      case (shift, to) =>
-        val from = config.groupFrom + shift
+      case (fromShift, to) =>
+        val from = config.groupFrom + fromShift
         val props = ActualMiner
           .props(ChainIndex(from, to))
           .withDispatcher("akka.actor.mining-dispatcher")
@@ -116,8 +116,8 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     addNewTask(fromShift, to, blockTemplate)
   }
 
-  def startTask(from: Int, to: Int, template: BlockTemplate): Unit = {
-    actualMiners(from)(to) ! ActualMiner.Task(template)
+  def startTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
+    actualMiners(fromShift)(to) ! ActualMiner.Task(template)
   }
 }
 

@@ -1,23 +1,34 @@
 alephium {
-  numZerosAtLeastInHash = 0
-  blockTargetTime = 4 minutes
-  blockConfirmNum = 2
-
-  port = 9973
-  port = ${?port}
   groups = 3
-  pingFrequency = 300 second
-  retryTimeout = 300 second
 
-  nonceStep = 10000
+  clique {
+    brokerNum = 3
+    groupNumPerBroker = 1
+    cliqueId = "a3ef2854a720a29ba4085deb1648fcf3"
+  }
 
-  mainGroup = 0
-  mainGroup = ${?mainGroup}
+  broker {
+    brokerId = 0
+  }
+
+  consensus {
+    numZerosAtLeastInHash = 0
+    blockTargetTime = 4 minutes
+    blockConfirmNum = 2
+  }
+
+  mining {
+    nonceStep = 10000
+  }
+
+  network {
+    pingFrequency = 300 second
+    retryTimeout = 300 second
+    publicAddress = "localhost:9973"
+    masterAddress = "localhost:9972"
+  }
 
   discovery {
-    publicAddress = "localhost"
-    publicAddress = ${?publicAddress}
-    udpPort = ${alephium.port}
     peersPerGroup = 16
     scanMaxPerGroup = 8
     scanFrequency = 120.seconds

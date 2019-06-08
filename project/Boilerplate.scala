@@ -59,7 +59,7 @@ object Boilerplate {
     override def maxArity: Int = maxArityTest
   }
 
-  val templatesSrc: Seq[Template]  = Seq(GenProductSerde)
+  val templatesSrc: Seq[Template]  = Seq(GenProductSerde, GenProductSerializer)
   val templatesTest: Seq[Template] = Seq(GenProductSerdeTest)
 
   object GenProductSerde extends Template {
@@ -69,7 +69,8 @@ object Boilerplate {
     override def content(tv: TemplateVals): String = {
       import tv._
 
-      val instances = synTypes.map(t => s"serde$t: Serde[$t]").mkString(", ")
+      val serInstances   = synTypes.map(t => s"ser$t: Serializer[$t]").mkString(", ")
+      val serdeInstances = synTypes.map(t => s"serde$t: Serde[$t]").mkString(", ")
       val serializes = synVals
         .zip(synTypes)
         .map { case (v, t) => s"serde$t.serialize($v)" }
@@ -91,30 +92,80 @@ object Boilerplate {
         |private[serde] trait ProductSerde {
         +
         +  final def forProduct$arity[${`A..N`}, T](pack: (${`A..N`}) => T, unpack: T => (${`A..N`}))(implicit
-        +    $instances
+        +    $serdeInstances
         +  ): Serde[T] = new Serde[T] {
         +    override def serialize(input: T): ByteString = {
         +      val (${`a..n`}) = unpack(input)
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest: ByteString): Either[SerdeError, (T, ByteString)] = {
+        +    override def _deserialize(rest: ByteString): SerdeResult[(T, ByteString)] = {
         +      for {
         +        $deserializes
         +      } yield (pack($deVals), pair${arity - 1}._2)
         +    }
         +  }
         +
-        +  final def tuple$arity[${`A..N`}](implicit $instances): Serde[(${`A..N`})] = new Serde[(${`A..N`})] {
+        +  final def tuple$arity[${`A..N`}](implicit $serdeInstances): Serde[(${`A..N`})] = new Serde[(${`A..N`})] {
         +    override def serialize(input: (${`A..N`})): ByteString = {
         +      val (${`a..n`}) = input
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest: ByteString): Either[SerdeError, ((${`A..N`}), ByteString)] = {
+        +    override def _deserialize(rest: ByteString): SerdeResult[((${`A..N`}), ByteString)] = {
         +      for {
         +        $deserializes
         +      } yield (($deVals), pair${arity - 1}._2)
+        +    }
+        +  }
+        |}
+      """
+    }
+    // scalastyle:on
+  }
+
+  object GenProductSerializer extends Template {
+    override def filename(root: File): File = root / "org" / "alephium" / "ProductSerializer.scala"
+
+    // scalastyle:off method.length
+    override def content(tv: TemplateVals): String = {
+      import tv._
+
+      val serInstances   = synTypes.map(t => s"serde$t: Serializer[$t]").mkString(", ")
+      val serdeInstances = synTypes.map(t => s"serde$t: Serde[$t]").mkString(", ")
+      val serializes = synVals
+        .zip(synTypes)
+        .map { case (v, t) => s"serde$t.serialize($v)" }
+        .mkString(" ++ ")
+
+      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}._2"
+      val deserializes = arities
+        .zip(synTypes)
+        .map { case (n, t) => s"pair$n <- serde$t._deserialize(${rest(n)})" }
+        .mkString("; ")
+
+      val deVals = arities.map(n => s"pair$n._1").mkString(", ")
+
+      block"""
+        |package org.alephium.serde
+        |
+        |import akka.util.ByteString
+        |
+        |private[serde] trait ProductSerializer {
+        +
+        +  final def forProduct$arity[${`A..N`}, T](unpack: T => (${`A..N`}))(implicit
+        +    $serInstances
+        +  ): Serializer[T] = new Serializer[T] {
+        +    override def serialize(input: T): ByteString = {
+        +      val (${`a..n`}) = unpack(input)
+        +      $serializes
+        +    }
+        +  }
+        +
+        +  final def tuple$arity[${`A..N`}](implicit $serInstances): Serializer[(${`A..N`})] = new Serializer[(${`A..N`})] {
+        +    override def serialize(input: (${`A..N`})): ByteString = {
+        +      val (${`a..n`}) = input
+        +      $serializes
         +    }
         +  }
         |}

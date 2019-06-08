@@ -76,7 +76,7 @@ object ModelGen {
       groupNumPerBroker <- groupNumPerBrokerGen
       peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddress)
       cid               <- cliqueId
-    } yield CliqueInfo(cid, AVector.from(peers), groupNumPerBroker)
+    } yield CliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
   }
 
   val socketAddress: Gen[InetSocketAddress] =

@@ -9,9 +9,10 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.storage.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerId, CliqueId, CliqueInfo}
-import org.alephium.serde.SerdeError
+import org.alephium.protocol.model.{BrokerId, CliqueInfo}
+import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
@@ -29,10 +30,11 @@ object BrokerHandler {
   def envelope(message: Message): Tcp.Write =
     Tcp.Write(Message.serialize(message))
 
-  def deserialize(data: ByteString): Either[SerdeError, (AVector[Message], ByteString)] = {
+  def deserialize(data: ByteString)(
+      implicit config: GroupConfig): SerdeResult[(AVector[Message], ByteString)] = {
     @tailrec
     def iter(rest: ByteString,
-             acc: AVector[Message]): Either[SerdeError, (AVector[Message], ByteString)] = {
+             acc: AVector[Message]): SerdeResult[(AVector[Message], ByteString)] = {
       Message._deserialize(rest) match {
         case Right((message, newRest)) =>
           iter(newRest, acc :+ message)
@@ -54,11 +56,10 @@ object BrokerHandler {
 
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
-        cliqueId: CliqueId,
         brokerId: BrokerId,
         remote: InetSocketAddress,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(new OutboundBrokerHandler(selfCliqueInfo, cliqueId, brokerId, remote, blockHandlers))
+      Props(new OutboundBrokerHandler(selfCliqueInfo, brokerId, remote, blockHandlers))
   }
 }
 
@@ -89,30 +90,20 @@ trait BrokerHandler extends BaseActor with Timers {
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
-      if (hello.validate) {
-        connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo, config.brokerId))
-        handle(hello.cliqueInfo, hello.brokerIndex)
-        afterHandShake()
-      } else {
-        log.info("Hello is invalid, closing connection")
-        stop()
-      }
+      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo, config.brokerId))
+      handle(hello.cliqueInfo, hello.brokerId)
+      afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
   }
 
-  def handle(cliqueInfo: CliqueInfo, brokerIndex: Int): Unit
+  def handle(cliqueInfo: CliqueInfo, brokerId: BrokerId): Unit
 
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      if (helloAck.validate) {
-        handle(helloAck.cliqueInfo, helloAck.brokerIndex)
-        afterHandShake()
-      } else {
-        log.info("HelloAck is invalid, closing connection")
-        stop()
-      }
+      handle(helloAck.cliqueInfo, helloAck.brokerId)
+      afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
