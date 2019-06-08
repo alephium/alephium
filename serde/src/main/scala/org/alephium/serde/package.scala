@@ -8,10 +8,12 @@ import scala.reflect.ClassTag
 package object serde {
   import Serde._
 
+  type SerdeResult[T] = Either[SerdeError, T]
+
   def serialize[T](input: T)(implicit serializer: Serde[T]): ByteString =
     serializer.serialize(input)
 
-  def deserialize[T](input: ByteString)(implicit deserializer: Serde[T]): Either[SerdeError, T] =
+  def deserialize[T](input: ByteString)(implicit deserializer: Serde[T]): SerdeResult[T] =
     deserializer.deserialize(input)
 
   implicit val byteSerde: Serde[Byte] = ByteSerde
@@ -33,6 +35,14 @@ package object serde {
 
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     dynamicSizeSerde(serde)
+
+  implicit def avectorSerializer[T: ClassTag](
+      implicit serializer: Serializer[T]): Serializer[AVector[T]] =
+    new AVectorSerializer[T](serializer)
+
+  implicit def avectorDeserializer[T: ClassTag](
+      implicit deserializer: Deserializer[T]): Deserializer[AVector[T]] =
+    new AVectorDeserializer[T](deserializer)
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))

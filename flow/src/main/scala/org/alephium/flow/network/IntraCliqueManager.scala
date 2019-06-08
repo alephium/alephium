@@ -39,7 +39,6 @@ class IntraCliqueManager(builder: BrokerHandler.Builder, cliqueInfo: CliqueInfo)
           if (index >= config.brokerId.value) {
             IO(Tcp)(context.system) ! Tcp.Connect(address)
             val props = builder.createOutboundBrokerHandler(cliqueInfo,
-                                                            config.cliqueId,
                                                             BrokerId.unsafe(index),
                                                             address,
                                                             allHandlers)
@@ -58,12 +57,11 @@ class IntraCliqueManager(builder: BrokerHandler.Builder, cliqueInfo: CliqueInfo)
         context.actorOf(InboundBrokerHandler.props(cliqueInfo, sender(), allHandlers), name)
       } else if (index > config.brokerId.value && index < cliqueInfo.peers.length) {
         context.actorOf(
-          OutboundBrokerHandler
-            .props(cliqueInfo, config.cliqueId, BrokerId.unsafe(index), remote, allHandlers))
+          OutboundBrokerHandler.props(cliqueInfo, BrokerId.unsafe(index), remote, allHandlers))
       }
       ()
     case CliqueManager.Connected(_cliqueInfo, brokerId) =>
-      if (_cliqueInfo.id == config.cliqueId) {
+      if (_cliqueInfo.id == cliqueInfo.id) {
         val newBrokers = brokers + (brokerId.value -> sender())
         if (newBrokers.size == cliqueInfo.peers.length - 1) {
           context become handle(brokers)

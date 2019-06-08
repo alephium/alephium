@@ -12,10 +12,8 @@ object DiscoveryMessageGen {
     target <- ModelGen.cliqueId
   } yield FindNode(target)
 
-  val ping: Gen[Ping] =
-    for {
-      source <- ModelGen.socketAddress
-    } yield Ping(source)
+  def ping(implicit config: GroupConfig): Gen[Ping] =
+    ModelGen.cliqueInfo.map(Ping.apply)
 
   def pong(implicit config: GroupConfig): Gen[Pong] =
     ModelGen.cliqueInfo.map(Pong.apply)

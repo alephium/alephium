@@ -7,6 +7,7 @@ import org.scalatest.Assertion
 
 import scala.annotation.tailrec
 
+// TODO: test for more groups
 class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
   behavior of "BlockFlow"
 

@@ -37,9 +37,10 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       def bootstrap: AVector[InetSocketAddress] = AVector.empty
 
       def selfCliqueInfo: CliqueInfo =
-        CliqueInfo(CliqueId.generate,
-                   AVector.tabulate(config.brokerNum)(_ => ModelGen.socketAddress.sample.get),
-                   config.groupNumPerBroker)
+        CliqueInfo.unsafe(
+          CliqueId.generate,
+          AVector.tabulate(config.brokerNum)(_ => ModelGen.socketAddress.sample.get),
+          config.groupNumPerBroker)
 
       setSocket(socketProbe.ref)
     }

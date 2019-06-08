@@ -28,7 +28,7 @@ trait BlockFlowState {
   private val inBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
       val mainGroup = config.groupFrom + toShift
-      val fromIndex = if (k < config.groupFrom) k else k + config.groupFrom
+      val fromIndex = if (k < config.groupFrom) k else k + config.groupNumPerBroker
       BlockChain.fromGenesisUnsafe(config.genesisBlocks(fromIndex)(mainGroup))
     }
   private val outBlockChains: AVector[AVector[BlockChain]] =
@@ -44,7 +44,7 @@ trait BlockFlowState {
           outBlockChains(fromShift)(to)
         } else if (config.brokerId.containsRaw(to)) {
           val toShift   = to - config.groupFrom
-          val fromIndex = if (from < config.groupFrom) from else from + config.groupNumPerBroker
+          val fromIndex = if (from < config.groupFrom) from else from - config.groupNumPerBroker
           inBlockChains(toShift)(fromIndex)
         } else BlockHeaderChain.fromGenesisUnsafe(config.genesisBlocks(from)(to))
     }

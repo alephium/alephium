@@ -106,7 +106,7 @@ object MerklePatriciaTrie {
           (flag +: nibbles) ++ bytestringSerde.serialize(n.data)
       }
 
-      override def _deserialize(input: ByteString): Either[SerdeError, (Node, ByteString)] = {
+      override def _deserialize(input: ByteString): SerdeResult[(Node, ByteString)] = {
         byteSerde._deserialize(input).flatMap {
           case (flag, rest) =>
             val (length, isLeaf) = SerdeNode.decodeFlag(flag)

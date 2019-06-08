@@ -35,8 +35,10 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
       actualMiners(fromShift)(to) ! ActualMiner.Task(template)
     }
 
-    miningCounts.length is config.groups
-    taskRefreshTss.length is config.groups
+    miningCounts.length is config.groupNumPerBroker
+    miningCounts.foreach(_.length is config.groups)
+    taskRefreshTss.length is config.groupNumPerBroker
+    taskRefreshTss.foreach(_.length is config.groups)
     pendingTasks.isEmpty is true
 
     initialize()

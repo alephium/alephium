@@ -1,11 +1,9 @@
 package org.alephium.protocol.message
 
-import java.net.InetSocketAddress
-
 import akka.util.ByteString
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
-import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig}
-import org.alephium.serde.{Deserializer, Serde, SerdeError}
+import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.serde._
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
@@ -28,7 +26,7 @@ object DiscoveryMessage {
     def serialize(header: Header): ByteString = serde.serialize((header.version, header.publicKey))
 
     def _deserialize(input: ByteString)(
-        implicit config: DiscoveryConfig): Either[SerdeError, (Header, ByteString)] = {
+        implicit config: DiscoveryConfig): SerdeResult[(Header, ByteString)] = {
       serde._deserialize(input).flatMap {
         case ((_version, publicKey), rest) =>
           if (_version == version) {
@@ -56,8 +54,7 @@ object DiscoveryMessage {
       Serde[Int].serialize(Code.toInt(code)) ++ data
     }
 
-    def deserialize(input: ByteString)(
-        implicit config: DiscoveryConfig): Either[SerdeError, Payload] = {
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Payload] = {
       deserializerCode._deserialize(input).flatMap {
         case (cmd, rest) =>
           cmd match {
@@ -70,26 +67,25 @@ object DiscoveryMessage {
     }
   }
 
-  case class Ping(sourceAddress: InetSocketAddress) extends Payload
+  case class Ping(cliqueInfo: CliqueInfo) extends Payload
   object Ping extends Code[Ping] {
-    private val serde = Serde.tuple1[InetSocketAddress]
-
     def serialize(ping: Ping): ByteString =
-      serde.serialize(ping.sourceAddress)
+      implicitly[Serializer[CliqueInfo]].serialize(ping.cliqueInfo)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig,
-                                       cliqueConfig: CliqueConfig): Either[SerdeError, Ping] = {
-      serde.deserialize(input).map(Ping(_))
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Ping] = {
+      val unsafe = implicitly[Serde[CliqueInfo.Unsafe]].deserialize(input)
+      unsafe.flatMap(_.validate.left.map(SerdeError.validation)).map(Ping.apply)
     }
   }
 
   case class Pong(cliqueInfo: CliqueInfo) extends Payload
   object Pong extends Code[Pong] {
-    def serialize(pong: Pong): ByteString = implicitly[Serde[CliqueInfo]].serialize(pong.cliqueInfo)
+    def serialize(pong: Pong): ByteString =
+      implicitly[Serializer[CliqueInfo]].serialize(pong.cliqueInfo)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig,
-                                       cliqueConfig: CliqueConfig): Either[SerdeError, Pong] = {
-      implicitly[Serde[CliqueInfo]].deserialize(input).map(Pong.apply)
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Pong] = {
+      val unsafe = implicitly[Serde[CliqueInfo.Unsafe]].deserialize(input)
+      unsafe.flatMap(_.validate.left.map(SerdeError.validation)).map(Pong.apply)
     }
   }
 
@@ -100,32 +96,30 @@ object DiscoveryMessage {
     def serialize(data: FindNode): ByteString =
       serde.serialize(data.targetId)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig,
-                                       cliqueConfig: CliqueConfig): Either[SerdeError, FindNode] =
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[FindNode] =
       serde.deserialize(input).map(FindNode(_))
   }
 
   case class Neighbors(peers: AVector[CliqueInfo]) extends Payload
   object Neighbors extends Code[Neighbors] {
-    private val serde = Serde.tuple1[AVector[CliqueInfo]]
+    private val serializer = avectorSerializer[CliqueInfo]
 
-    def serialize(data: Neighbors): ByteString = serde.serialize(data.peers)
+    def serialize(data: Neighbors): ByteString = serializer.serialize(data.peers)
 
-    def deserialize(input: ByteString)(
-        implicit config: DiscoveryConfig,
-        cliqueConfig: CliqueConfig): Either[SerdeError, Neighbors] = {
-      serde.deserialize(input).flatMap { peers =>
-        val ok = peers.forall(_.id != config.cliqueId)
-        if (ok) Right(Neighbors(peers))
-        else Left(SerdeError.validation(s"PeerInfos are invalid"))
+    private val deserializer = avectorDeserializer[CliqueInfo.Unsafe]
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Neighbors] = {
+      deserializer.deserialize(input).flatMap { peers =>
+        peers.traverse(_.validate) match {
+          case Left(message) => Left(SerdeError.validation(message))
+          case Right(infos)  => Right(Neighbors(infos))
+        }
       }
     }
   }
 
   sealed trait Code[T] {
     def serialize(t: T): ByteString
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig,
-                                       cliqueConfig: CliqueConfig): Either[SerdeError, T]
+    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[T]
   }
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
@@ -147,7 +141,7 @@ object DiscoveryMessage {
   }
 
   def deserialize(input: ByteString)(
-      implicit config: DiscoveryConfig): Either[SerdeError, DiscoveryMessage] = {
+      implicit config: DiscoveryConfig): SerdeResult[DiscoveryMessage] = {
     for {
       headerPair <- Header._deserialize(input)
       header = headerPair._1
