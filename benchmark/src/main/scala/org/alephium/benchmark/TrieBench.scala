@@ -3,11 +3,12 @@ package org.alephium.benchmark
 import java.util.concurrent.TimeUnit
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.RocksDBStorage
+import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.util.Files
 import org.openjdk.jmh.annotations._
-import org.rocksdb.Options
+
+import RocksDBStorage.ColumnFamily
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -18,7 +19,15 @@ class TrieBench {
   private val dbname = "trie"
   private val dbPath = tmpdir.resolve(dbname)
 
-  private val db = RocksDBStorage.openUnsafe(dbPath, new Options().setCreateIfMissing(true))
+  val dbStorage: RocksDBStorage = {
+    val files = dbPath.toFile.listFiles
+    if (files != null) {
+      files.foreach(_.delete)
+    }
+
+    RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
+  }
+  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
   val trie = MerklePatriciaTrie.create(db)
 

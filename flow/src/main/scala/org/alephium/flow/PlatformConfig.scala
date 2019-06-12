@@ -7,13 +7,8 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-<<<<<<< HEAD
 import org.alephium.crypto.ED25519
-import org.alephium.flow.io.{Disk, HeaderDB}
-=======
-import org.alephium.flow.io.{Disk, HeaderDB, RocksDBStorage}
-import org.alephium.flow.network.DiscoveryConfig
->>>>>>> f740202... Introduce default parameters for RocksDB.
+import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model._
@@ -195,6 +190,8 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     with PlatformBrokerConfig
     with PlatformDiscoveryConfig { self =>
 
+  import RocksDBStorage.ColumnFamily
+
   val disk: Disk = Disk.createUnsafe(rootPath)
 
   val dbPath = {
@@ -202,16 +199,11 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     Disk.createDirUnsafe(path)
     path
   }
-  val dbOptions = RocksDBStorage.Settings.default(RocksDBStorage.Compaction.HDD, columns = 1)
+  val dbStorage =
+    RocksDBStorage.openUnsafe(dbPath.resolve(brokerId.toString), RocksDBStorage.Compaction.HDD)
 
-  val headerDB: HeaderDB = {
-    val dbName = "all-" + nodeId.shortHex
-    HeaderDB.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
-  }
-  val trie: MerklePatriciaTrie = {
-    val dbName = "trie-" + brokerId.value
-    val storage =
-      HeaderDB.openUnsafe(dbPath.resolve(dbName), dbOptions)
-    MerklePatriciaTrie.create(storage)
-  }
+  val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
+
+  val trie: MerklePatriciaTrie =
+    MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie))
 }

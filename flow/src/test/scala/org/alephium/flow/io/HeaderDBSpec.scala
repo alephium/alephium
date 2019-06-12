@@ -4,20 +4,21 @@ import akka.util.ByteString
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
 import org.alephium.util.{AlephiumSpec, Files}
-import org.rocksdb.Options
 import org.scalacheck.Arbitrary
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
+import RocksDBStorage.ColumnFamily
+
 class HeaderDBSpec extends AlephiumSpec {
 
   trait Fixture {
-    val tmpdir    = Files.tmpDir
-    val dbname    = "foo"
-    val dbPath    = tmpdir.resolve(dbname)
-    val dbOptions = RocksDBStorage.Settings.default(RocksDBStorage.Compaction.HDD, columns = 1)
+    val tmpdir = Files.tmpDir
+    val dbname = "foo"
+    val dbPath = tmpdir.resolve(dbname)
 
-    val db = HeaderDB.open(dbPath, dbOptions).right.value
+    val dbStorage    = RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
+    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary
@@ -27,13 +28,13 @@ class HeaderDBSpec extends AlephiumSpec {
     }
 
     def postTest(): Assertion = {
-      db.close()
-      RocksDBStorage.dESTROY(dbPath, new Options()).isRight is true
+      dbStorage.close()
+      RocksDBStorage.dESTROY(dbPath).isRight is true
     }
   }
 
   it should "create database" in new Fixture {
-    HeaderDB.open(dbPath, new Options().setErrorIfExists(true)).isLeft is true
+    RocksDBStorage.open(dbPath, RocksDBStorage.Compaction.HDD).isLeft is true
     postTest()
   }
 

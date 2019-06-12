@@ -2,10 +2,9 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.RocksDBStorage
+import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.serde._
 import org.alephium.util.{AVector, AlephiumSpec, Files}
-import org.rocksdb.Options
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
@@ -79,12 +78,16 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   behavior of "Merkle Patricia Trie"
 
   trait TrieFixture {
+    import RocksDBStorage.ColumnFamily
+
     private val tmpdir = Files.tmpDir
     private val dbname = "trie"
     private val dbPath = tmpdir.resolve(dbname)
 
-    private val db = RocksDBStorage.openUnsafe(dbPath, new Options().setCreateIfMissing(true))
+    private val storage =
+      RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
+    val db   = HeaderDB(storage, ColumnFamily.Trie)
     val trie = MerklePatriciaTrie.create(db)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (Keccak256, ByteString) = {
@@ -94,7 +97,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     protected def postTest(): Assertion = {
-      db.close()
+      storage.close()
       RocksDBStorage.dESTROY(dbPath).isRight is true
     }
   }
