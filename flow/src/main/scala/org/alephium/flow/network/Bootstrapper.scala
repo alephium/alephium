@@ -33,9 +33,9 @@ class Bootstrapper(builder: BrokerHandler.Builder,
   def awaitCliqueInfo: Receive = {
     case cliqueInfo: CliqueInfo =>
       val intraCliqueManager = context.system.actorOf(IntraCliqueManager.props(builder, cliqueInfo))
+      cliqueManager ! CliqueManager.Start(cliqueInfo, intraCliqueManager)
       server ! cliqueManager
       discoveryServer ! cliqueInfo
-      cliqueManager ! CliqueManager.Start(cliqueInfo, intraCliqueManager)
       context stop self
     case c: Tcp.Connected =>
       sink.forward(c)
