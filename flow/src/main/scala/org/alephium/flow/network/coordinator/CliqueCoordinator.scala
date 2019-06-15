@@ -1,12 +1,10 @@
 package org.alephium.flow.network.coordinator
 
-import java.net.InetSocketAddress
-
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.protocol.model.CliqueInfo
+import org.alephium.util.BaseActor
 
 object CliqueCoordinator {
   def props()(implicit config: PlatformConfig): Props = Props(new CliqueCoordinator())
@@ -15,59 +13,43 @@ object CliqueCoordinator {
   case class CliqueReady(info: CliqueInfo) extends Event
 }
 
-class CliqueCoordinator()(implicit config: PlatformConfig) extends BaseActor {
+class CliqueCoordinator()(implicit val config: PlatformConfig)
+    extends BaseActor
+    with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers
-
-  val brokerNum        = config.brokerNum
-  val brokerAddresses  = Array.fill[Option[InetSocketAddress]](brokerNum)(None)
-  val brokerConnectors = Array.fill[Option[ActorRef]](brokerNum)(None)
-  val brokerCandidates = scala.collection.mutable.Set.empty[ActorRef]
 
   def awaitBrokers: Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
       val connection = sender()
-      val connector  = context.actorOf(BrokerConnector.props(connection), "CliqueCoordinator")
-      brokerCandidates.add(connector)
+      context.actorOf(BrokerConnector.props(connection), "CliqueCoordinator")
       ()
-    case BrokerConnector.BrokerInfo(id, address) =>
-      if (brokerAddresses(id.value).isEmpty) {
-        brokerAddresses(id.value)  = Some(address)
-        brokerConnectors(id.value) = Some(sender())
-        brokerCandidates.remove(sender())
+    case info: BrokerConnector.BrokerInfo =>
+      if (addBrokerInfo(info, sender())) {
         context watch sender()
       }
-      if (!brokerAddresses.exists(_.isEmpty)) {
-        val connectors = brokerConnectors.map(_.get)
-        connectors.foreach(_ ! cliqueInfo)
+      if (isBrokerInfoFull) {
+        broadcast(buildCliqueInfo)
         context become awaitReady
       }
   }
 
-  private def cliqueInfo: CliqueInfo = {
-    val addresses = AVector.from(brokerAddresses.map(_.get))
-    CliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
-                      addresses,
-                      config.groupNumPerBroker)
-  }
-
-  val readys = Array.fill(brokerNum)(false)
   def awaitReady: Receive = {
     case BrokerConnector.Ack(id) =>
-      readys(id) = true
-      if (readys.forall(identity)) {
-        context.parent ! cliqueInfo
-        brokerConnectors.foreach(_.get ! BrokerConnector.Ready)
-        context become awaitTerminated
+      if (0 <= id && id < config.brokerNum) {
+        setReady(id)
+        if (isAllReady) {
+          context.parent ! buildCliqueInfo
+          broadcast(BrokerConnector.Ready)
+          context become awaitTerminated
+        }
       }
   }
 
-  val closeds = Array.fill(brokerNum)(false)
   def awaitTerminated: Receive = {
-    case Terminated(broker) =>
-      val id = brokerConnectors.indexWhere(_.get == broker)
-      if (id != -1) closeds(id) = true
-      if (readys.forall(identity)) {
+    case Terminated(actor) =>
+      setClose(actor)
+      if (isAllClosed) {
         context stop self
       }
   }

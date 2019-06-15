@@ -157,6 +157,8 @@ trait PlatformNetworkConfig extends PlatformConfigFiles {
   val retryTimeout: FiniteDuration     = getDuration(networkConfigRaw, "retryTimeout")
   val publicAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("publicAddress"))
   val masterAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("masterAddress"))
+
+  val isMaster: Boolean = publicAddress == masterAddress
 }
 
 trait PlatformGenesisConfig extends PlatformConsensusConfig {
@@ -191,7 +193,6 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     with PlatformGenesisConfig
     with PlatformCliqueConfig
     with PlatformDiscoveryConfig { self =>
-  val isMaster: Boolean = publicAddress == masterAddress
 
   val disk: Disk = Disk.createUnsafe(rootPath)
 
