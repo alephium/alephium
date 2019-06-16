@@ -36,19 +36,22 @@ elif args.goal == 'benchmark':
 elif args.goal == 'run':
 
     tempdir = tempfile.gettempdir()
+    groups = int(os.getenv('groups'))
+    nodes = int(os.environ['nodes'])
 
-    for node in range(0, int(os.environ['nodes'])):
+    for node in range(0, nodes):
         port = 9973 + node
-        groups = int(os.getenv('groups'))
-        main_group = node % groups
-        bootstrap =  "" if node == 0 else "localhost:9973"
+        publicAddress = "localhost:" + str(port)
+        masterAddress = "localhost:" + str(9973)
+        brokerNum = groups
+        brokerId = node
 
         homedir = "{}/alephium/node-{}".format(tempdir, node)
 
         if not os.path.exists(homedir):
             os.makedirs(homedir)
 
-        run('mainGroup={} port={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(main_group, port, bootstrap, homedir, homedir))
+        run('brokerNum={} brokerId={} publicAddress={} masterAddress={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, homedir, homedir))
 
 elif args.goal == 'mine':
     rpc_call_all("mining/start", "[]")
