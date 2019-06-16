@@ -23,8 +23,10 @@ class Bootstrapper(builder: BrokerHandler.Builder,
     extends BaseActor {
 
   val sink = if (config.isMaster) {
-    context.actorOf(CliqueCoordinator.props(), "SelfCliqueCoordinator")
+    log.debug("Start as CliqueCoordinator")
+    context.actorOf(CliqueCoordinator.props(), "CliqueCoordinator")
   } else {
+    log.debug("Start as Broker")
     context.actorOf(Broker.props(), "Broker")
   }
 

@@ -104,11 +104,6 @@ trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
 
   val brokerNum: Int         = cliqueConfigRaw.getInt("brokerNum")
   val groupNumPerBroker: Int = cliqueConfigRaw.getInt("groupNumPerBroker")
-  val brokerId: BrokerId = {
-    val myId = cliqueConfigRaw.getInt("brokerId")
-    assert(0 <= myId && myId * groupNumPerBroker < groups)
-    BrokerId(myId)(this)
-  }
 }
 
 trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {
@@ -192,6 +187,7 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     with PlatformMiningConfig
     with PlatformGenesisConfig
     with PlatformCliqueConfig
+    with PlatformBrokerConfig
     with PlatformDiscoveryConfig { self =>
 
   val disk: Disk = Disk.createUnsafe(rootPath)
