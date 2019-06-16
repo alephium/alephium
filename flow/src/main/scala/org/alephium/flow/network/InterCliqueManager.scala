@@ -31,13 +31,13 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
       context.actorOf(InboundBrokerHandler.props(selfCliqueInfo, sender(), allHandlers), name)
       ()
     case CliqueManager.Connect(cliqueId, brokerId, remote) =>
-      val name = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$brokerId-$remote")
-      val props =
-        OutboundBrokerHandler.props(selfCliqueInfo, brokerId, remote, allHandlers)
+      val name  = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$brokerId-$remote")
+      val props = OutboundBrokerHandler.props(selfCliqueInfo, brokerId, remote, allHandlers)
       context.actorOf(props, name)
       ()
     case CliqueManager.Connected(cliqueInfo, brokerId) =>
-      if (config.brokerId.intersect(cliqueInfo, brokerId))
+      if (config.brokerId.intersect(cliqueInfo, brokerId)) {
         brokers += sender()
+      }
   }
 }

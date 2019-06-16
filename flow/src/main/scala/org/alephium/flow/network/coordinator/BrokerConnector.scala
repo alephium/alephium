@@ -23,7 +23,6 @@ object BrokerConnector {
   sealed trait Event
   case class BrokerInfo(id: BrokerId, address: InetSocketAddress) extends Event // TODO: verify id
   case class Ack(id: Int)                                         extends Event
-  case class Closed(id: Int)                                      extends Event
 
   object BrokerInfo {
     implicit val serde: Serde[BrokerInfo] = Serde
@@ -87,8 +86,7 @@ class BrokerConnector(connection: ActorRef) extends BaseActor {
   def await[E: Serde](unaligned: ByteString, next: => Unit): Receive = {
     case Tcp.Received(data) =>
       deserializeTry[E](unaligned ++ data) match {
-        case Right(Some((event, rest))) =>
-          assert(rest.isEmpty)
+        case Right(Some((event, _))) =>
           context.parent ! event
           next
         case Right(None) =>

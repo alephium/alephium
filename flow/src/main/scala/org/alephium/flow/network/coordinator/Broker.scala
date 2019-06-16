@@ -18,8 +18,7 @@ object Broker {
 }
 
 class Broker()(implicit config: PlatformConfig) extends BaseActor {
-  val remote = config.masterAddress
-  IO(Tcp)(context.system) ! Tcp.Connect(remote)
+  IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
   def until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
 
@@ -27,12 +26,13 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
 
   def awaitMaster(until: Instant): Receive = {
     case Broker.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remote)
+      IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
     case _: Tcp.Connected =>
       val connection = sender()
       connection ! Tcp.Register(self)
-      connection ! BrokerConnector.BrokerInfo(config.brokerId, config.publicAddress)
+      val info = BrokerConnector.BrokerInfo(config.brokerId, config.publicAddress)
+      connection ! BrokerConnector.envolop(info)
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -48,8 +48,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
   def awaitCliqueInfo(connection: ActorRef, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeCliqueInfo(unaligned ++ data) match {
-        case Right(Some((cliqueInfo, rest))) =>
-          assert(rest.isEmpty)
+        case Right(Some((cliqueInfo, _))) =>
           connection ! BrokerConnector.Ready
           context.parent ! cliqueInfo
           context.stop(self)
@@ -57,7 +56,6 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
           context become awaitCliqueInfo(connection, unaligned ++ data)
         case Left(e) =>
           log.info(s"Received corrupted data; error: ${e.toString}; Closing connection")
-//          connection ! BrokerConnector.Failed
           context stop self
       }
   }
