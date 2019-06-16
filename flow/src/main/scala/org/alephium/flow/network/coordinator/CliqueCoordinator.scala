@@ -25,6 +25,7 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
       context.actorOf(BrokerConnector.props(connection), "CliqueCoordinator")
       ()
     case info: BrokerConnector.BrokerInfo =>
+      log.debug(s"Received broker info from ${info.address} id: ${info.id}")
       if (addBrokerInfo(info, sender())) {
         context watch sender()
       }
@@ -36,6 +37,7 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
 
   def awaitReady: Receive = {
     case BrokerConnector.Ack(id) =>
+      log.debug(s"Broker $id is ready")
       if (0 <= id && id < config.brokerNum) {
         setReady(id)
         if (isAllReady) {

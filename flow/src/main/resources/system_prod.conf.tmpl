@@ -32,17 +32,16 @@ akka {
     guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
   }
 }
-
 alephium {
   groups = 32
   groups = ${?groups}
 
   clique {
     brokerNum = 32
+    brokerNum = ${?groups}
     brokerNum = ${?brokerNum}
     groupNumPerBroker = 1
     groupNumPerBroker = ${?groupNumPerBroker}
-    cliqueId = ${cliqueId}
   }
 
   broker {
@@ -63,8 +62,7 @@ alephium {
   network {
     pingFrequency = 300 second
     retryTimeout = 300 second
-    publicAddress = "localhost:9973"
-    publicAddress = ${?publicAddress}
+    publicAddress = ${publicAddress}
     masterAddress = ${masterAddress}
   }
 

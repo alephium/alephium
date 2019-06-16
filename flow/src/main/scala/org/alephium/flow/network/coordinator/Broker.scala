@@ -29,6 +29,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
       IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
     case _: Tcp.Connected =>
+      log.debug(s"Connected to master: ${config.masterAddress}")
       val connection = sender()
       connection ! Tcp.Register(self)
       val info = BrokerConnector.BrokerInfo(config.brokerId, config.publicAddress)
