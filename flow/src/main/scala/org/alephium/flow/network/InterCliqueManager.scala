@@ -39,5 +39,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
       if (config.brokerId.intersect(cliqueInfo, brokerId)) {
         brokers += sender()
       }
+    case message: CliqueManager.BroadCastBlock =>
+      brokers.foreach(_ ! message.blockMsg)
   }
 }
