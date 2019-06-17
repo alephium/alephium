@@ -21,6 +21,7 @@ class Bootstrapper(builder: BrokerHandler.Builder,
                    discoveryServer: ActorRef,
                    cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
+  server ! TcpServer.Start(self)
 
   val sink = if (config.isMaster) {
     log.debug("Start as CliqueCoordinator")

@@ -14,6 +14,7 @@ object BrokerConnector {
   def props(connection: ActorRef): Props = Props(new BrokerConnector(connection))
 
   sealed trait Command
+  //TODO: move this to Coordinator
   case object Ready extends Command {
     implicit val serde: Serde[Ready.type] = intSerde.xfmap[Ready.type](
       raw => if (raw == 0) Right(Ready) else Left(SerdeError.wrongFormat(s"Expecting 0 got $raw")),

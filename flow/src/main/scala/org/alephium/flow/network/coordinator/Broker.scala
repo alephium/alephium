@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
+import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 import scala.concurrent.duration._
@@ -50,11 +51,27 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeCliqueInfo(unaligned ++ data) match {
         case Right(Some((cliqueInfo, _))) =>
-          connection ! BrokerConnector.Ready
+          log.debug("Received clique info from master")
+          val ack = BrokerConnector.Ack(config.brokerId.value)
+          connection ! BrokerConnector.envolop(ack)
+          context become awaitReady(cliqueInfo, ByteString.empty)
+        case Right(None) =>
+          context become awaitCliqueInfo(connection, unaligned ++ data)
+        case Left(e) =>
+          log.info(s"Received corrupted data; error: ${e.toString}; Closing connection")
+          context stop self
+      }
+  }
+
+  def awaitReady(cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
+    case Tcp.Received(data) =>
+      BrokerConnector.deserializeTry[BrokerConnector.Ready.type](unaligned ++ data) match {
+        case Right(Some((_, _))) =>
+          log.debug("Received ready message from master")
           context.parent ! cliqueInfo
           context.stop(self)
         case Right(None) =>
-          context become awaitCliqueInfo(connection, unaligned ++ data)
+          context become awaitReady(cliqueInfo, unaligned ++ data)
         case Left(e) =>
           log.info(s"Received corrupted data; error: ${e.toString}; Closing connection")
           context stop self

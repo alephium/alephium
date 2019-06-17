@@ -30,12 +30,13 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
         context watch sender()
       }
       if (isBrokerInfoFull) {
+        log.debug(s"Broadcast clique info")
         broadcast(buildCliqueInfo)
-        context become awaitReady
+        context become awaitAck
       }
   }
 
-  def awaitReady: Receive = {
+  def awaitAck: Receive = {
     case BrokerConnector.Ack(id) =>
       log.debug(s"Broker $id is ready")
       if (0 <= id && id < config.brokerNum) {
