@@ -6,18 +6,20 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{Block, BrokerId, CliqueId, CliqueInfo}
 import org.alephium.util.BaseActor
 
 object CliqueManager {
-  def props()(implicit config: PlatformConfig): Props =
-    Props(new CliqueManager())
+  def props(builder: BrokerHandler.Builder)(implicit config: PlatformConfig): Props =
+    Props(new CliqueManager(builder))
 
   sealed trait Command
-  case class Start(cliqueInfo: CliqueInfo, intraCliqueManager: ActorRef) extends Command
+  case class Start(cliqueInfo: CliqueInfo) extends Command
   case class Connect(cliqueId: CliqueId, brokerId: BrokerId, remote: InetSocketAddress)
       extends Command
+  // TODO: simplify this
   case class BroadCastBlock(
       block: Block,
       blockMsg: Tcp.Write,
@@ -29,7 +31,8 @@ object CliqueManager {
   case class Connected(cliqueInfo: CliqueInfo, brokerId: BrokerId) extends Command
 }
 
-class CliqueManager()(implicit config: PlatformConfig) extends BaseActor {
+class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformConfig)
+    extends BaseActor {
   import CliqueManager._
 
   var allHandlers: AllHandlers = _
@@ -43,18 +46,31 @@ class CliqueManager()(implicit config: PlatformConfig) extends BaseActor {
   }
 
   def awaitStart: Receive = {
-    case Start(cliqueInfo, intraCliqueManager) =>
+    case Start(cliqueInfo) =>
+      log.debug("Start intra and inter clique managers")
+      val intraCliqueManager =
+        context.actorOf(IntraCliqueManager.props(builder, cliqueInfo, allHandlers),
+                        "IntraCliqueManager")
       val interCliqueManager =
         context.actorOf(InterCliqueManager.props(cliqueInfo, allHandlers), "InterCliqueManager")
-      context.watch(intraCliqueManager)
+      context become awaitIntraCliqueReady(intraCliqueManager, interCliqueManager)
+  }
+
+  def awaitIntraCliqueReady(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
+    case IntraCliqueManager.Ready =>
+      log.debug(s"Intra clique manager is ready")
       context become handleWith(intraCliqueManager, interCliqueManager)
+    case c: Tcp.Connected =>
+      intraCliqueManager.forward(c)
   }
 
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
-    case broadcast: CliqueManager.BroadCastBlock =>
-      intraCliqueManager ! broadcast
-      interCliqueManager ! broadcast
+    case message: CliqueManager.BroadCastBlock =>
+      intraCliqueManager ! message
+      interCliqueManager ! message
     case c: Connect =>
       interCliqueManager ! c
+    case c: Tcp.Connected =>
+      interCliqueManager.forward(c)
   }
 }

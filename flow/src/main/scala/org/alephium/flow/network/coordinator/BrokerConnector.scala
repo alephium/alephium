@@ -79,8 +79,7 @@ class BrokerConnector(connection: ActorRef) extends BaseActor {
   def forwardReady: Receive = {
     case ready: Ready.type =>
       connection ! envolop(ready)
-      connection ! Tcp.Close
-    case Tcp.Closed =>
+    case Tcp.PeerClosed =>
       context stop self
   }
 

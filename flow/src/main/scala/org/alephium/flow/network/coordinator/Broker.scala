@@ -54,7 +54,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
           log.debug("Received clique info from master")
           val ack = BrokerConnector.Ack(config.brokerId.value)
           connection ! BrokerConnector.envolop(ack)
-          context become awaitReady(cliqueInfo, ByteString.empty)
+          context become awaitReady(connection, cliqueInfo, ByteString.empty)
         case Right(None) =>
           context become awaitCliqueInfo(connection, unaligned ++ data)
         case Left(e) =>
@@ -63,18 +63,25 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
       }
   }
 
-  def awaitReady(cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
+  def awaitReady(connection: ActorRef, cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeTry[BrokerConnector.Ready.type](unaligned ++ data) match {
         case Right(Some((_, _))) =>
           log.debug("Received ready message from master")
-          context.parent ! cliqueInfo
-          context.stop(self)
+          connection ! Tcp.ConfirmedClose
+          context become awaitClose(cliqueInfo)
         case Right(None) =>
-          context become awaitReady(cliqueInfo, unaligned ++ data)
+          context become awaitReady(connection, cliqueInfo, unaligned ++ data)
         case Left(e) =>
           log.info(s"Received corrupted data; error: ${e.toString}; Closing connection")
           context stop self
       }
+  }
+
+  def awaitClose(cliqueInfo: CliqueInfo): Receive = {
+    case Tcp.ConfirmedClosed =>
+      log.debug("Close connection to master")
+      context.parent ! cliqueInfo
+      context.stop(self)
   }
 }
