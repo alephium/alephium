@@ -159,6 +159,13 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "insert element to the head of the vector" in new Fixture {
+    forAll(vectorGen, ab.arbitrary) { (vc: AVector[A], a: A) =>
+      val vc1 = a +: vc
+      checkEq(vc1, a +: vc.toArray)
+    }
+  }
+
   it should "append elements" in new Fixture {
     forAll(vectorGen, vectorGen) { (vc0: AVector[A], vc1: AVector[A]) =>
       val vc = vc0 ++ vc1

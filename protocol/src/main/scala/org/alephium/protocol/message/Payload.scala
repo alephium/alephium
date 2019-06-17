@@ -33,8 +33,8 @@ object Payload {
     deserializerCode._deserialize(input).flatMap {
       case (code, rest) =>
         code match {
-          case Hello       => _deserializeHello(rest)
-          case HelloAck    => _deserializeHelloAck(rest)
+          case Hello       => _deserializeHandShake(new Hello(_, _, _, _))(rest)
+          case HelloAck    => _deserializeHandShake(new HelloAck(_, _, _, _))(rest)
           case Ping        => Serde[Ping]._deserialize(rest)
           case Pong        => Serde[Pong]._deserialize(rest)
           case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
@@ -45,22 +45,11 @@ object Payload {
     }
   }
 
-  def _deserializeHello(input: ByteString)(
-      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
+  def _deserializeHandShake[T <: Payload](build: (Int, Long, CliqueInfo, BrokerId) => T)(
+      input: ByteString)(implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
     HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
       case (unsafe, rest) =>
-        unsafe.validate(new Hello(_, _, _, _)) match {
-          case Left(error)  => Left(SerdeError.validation(error))
-          case Right(hello) => Right((hello, rest))
-        }
-    }
-  }
-
-  def _deserializeHelloAck(input: ByteString)(
-      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
-    HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
-      case (unsafe, rest) =>
-        unsafe.validate(new HelloAck(_, _, _, _)) match {
+        unsafe.validate(build) match {
           case Left(error)  => Left(SerdeError.validation(error))
           case Right(hello) => Right((hello, rest))
         }

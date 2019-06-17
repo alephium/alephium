@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import java.net.InetSocketAddress
 
 import org.alephium.crypto._
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
 import org.alephium.util.AVector
 import org.scalacheck.Gen
 
@@ -59,17 +59,22 @@ object ModelGen {
       }
     }
 
-  def groupGen(implicit config: GroupConfig): Gen[GroupIndex] =
-    groupGen_(config.groups)
+  def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
+    groupIndexGen(config.groups)
 
-  def groupGen_(groups: Int): Gen[GroupIndex] =
+  def groupIndexGen(groups: Int): Gen[GroupIndex] =
     Gen.choose(0, groups - 1).map(n => GroupIndex.unsafe(n))
 
   def cliqueId: Gen[CliqueId] =
     Gen.resultOf[Unit, CliqueId](_ => CliqueId.generate)
 
-  def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] =
+  def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] = {
     Gen.oneOf((1 to config.groups).filter(config.groups % _ == 0))
+  }
+
+  def brokerIdGen(implicit config: CliqueConfig): Gen[BrokerId] = {
+    Gen.choose(0, config.brokerNum - 1).map(BrokerId.apply)
+  }
 
   def cliqueInfo(implicit config: GroupConfig): Gen[CliqueInfo] = {
     for {
