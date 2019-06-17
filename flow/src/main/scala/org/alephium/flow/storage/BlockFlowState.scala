@@ -67,7 +67,8 @@ trait BlockFlowState {
       val fromIndex =
         if (from.value < config.groupFrom) from.value
         else from.value - config.groupNumPerBroker
-      inBlockChains(to.value)(fromIndex)
+      val toShift = to.value - config.groupFrom
+      inBlockChains(toShift)(fromIndex)
     }
   }
 
