@@ -65,7 +65,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
 
   def awaitReady(connection: ActorRef, cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
-      BrokerConnector.deserializeTry[BrokerConnector.Ready.type](unaligned ++ data) match {
+      BrokerConnector.deserializeTry[CliqueCoordinator.Ready.type](unaligned ++ data) match {
         case Right(Some((_, _))) =>
           log.debug("Received ready message from master")
           connection ! Tcp.ConfirmedClose

@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.io.{IO, Tcp}
 import akka.testkit.TestProbe
 import org.alephium.util.AlephiumActorSpec
+
 trait TcpIntegration { _: AlephiumActorSpec =>
 
   def bindServer(server: InetSocketAddress): Tcp.Bound = {

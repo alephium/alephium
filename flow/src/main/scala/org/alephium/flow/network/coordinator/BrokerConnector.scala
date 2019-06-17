@@ -13,14 +13,6 @@ import org.alephium.util.BaseActor
 object BrokerConnector {
   def props(connection: ActorRef): Props = Props(new BrokerConnector(connection))
 
-  sealed trait Command
-  //TODO: move this to Coordinator
-  case object Ready extends Command {
-    implicit val serde: Serde[Ready.type] = intSerde.xfmap[Ready.type](
-      raw => if (raw == 0) Right(Ready) else Left(SerdeError.wrongFormat(s"Expecting 0 got $raw")),
-      _   => 0)
-  }
-
   sealed trait Event
   case class BrokerInfo(id: BrokerId, address: InetSocketAddress) extends Event // TODO: verify id
   case class Ack(id: Int)                                         extends Event
@@ -77,7 +69,7 @@ class BrokerConnector(connection: ActorRef) extends BaseActor {
   }
 
   def forwardReady: Receive = {
-    case ready: Ready.type =>
+    case ready: CliqueCoordinator.Ready.type =>
       connection ! envolop(ready)
     case Tcp.PeerClosed =>
       context stop self

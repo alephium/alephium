@@ -13,6 +13,8 @@ class BootstrapperSpec extends AlephiumActorSpec("BootstrapperSpec") {
 
     val bootstrapper = system.actorOf(
       Bootstrapper.props(serverProb.ref, discoveryServerProb.ref, cliqueManagerProb.ref))
+    serverProb.expectMsg(TcpServer.Start(bootstrapper))
+    watch(bootstrapper)
 
     val cliqueInfo = ModelGen.cliqueInfo.sample.get
     bootstrapper ! cliqueInfo
@@ -20,5 +22,6 @@ class BootstrapperSpec extends AlephiumActorSpec("BootstrapperSpec") {
     cliqueManagerProb.expectMsgType[CliqueManager.Start]
     serverProb.expectMsg(cliqueManagerProb.ref)
     discoveryServerProb.expectMsg(cliqueInfo)
+    expectTerminated(bootstrapper)
   }
 }

@@ -18,9 +18,15 @@ class BrokerSpec extends AlephiumActorSpec("BrokerSpec") {
     connection.expectMsgType[Tcp.Write]
 
     val randomInfo = ModelGen.cliqueInfo.sample.get
-    val data       = BrokerConnector.envolop(randomInfo).data
-    broker.tell(Tcp.Received(data), connection.ref)
-    connection.expectMsgType[BrokerConnector.Ready.type]
+    val infoData   = BrokerConnector.envolop(randomInfo).data
+    broker.tell(Tcp.Received(infoData), connection.ref)
+    connection.expectMsgType[Tcp.Write]
+
+    val ready = BrokerConnector.envolop(CliqueCoordinator.Ready).data
+    broker.tell(Tcp.Received(ready), connection.ref)
+    connection.expectMsg(Tcp.ConfirmedClose)
+
+    broker ! Tcp.ConfirmedClosed
     expectTerminated(broker)
   }
 }
