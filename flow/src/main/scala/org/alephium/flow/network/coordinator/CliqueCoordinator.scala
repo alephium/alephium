@@ -42,17 +42,19 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
       if (0 <= id && id < config.brokerNum) {
         setReady(id)
         if (isAllReady) {
-          context.parent ! buildCliqueInfo
+          log.debug("All the brokers are ready")
           broadcast(BrokerConnector.Ready)
-          context become awaitTerminated
+          context become awaitTerminated(buildCliqueInfo)
         }
       }
   }
 
-  def awaitTerminated: Receive = {
+  def awaitTerminated(cliqueInfo: CliqueInfo): Receive = {
     case Terminated(actor) =>
       setClose(actor)
       if (isAllClosed) {
+        log.debug("All the brokers are closed")
+        context.parent ! cliqueInfo
         context stop self
       }
   }

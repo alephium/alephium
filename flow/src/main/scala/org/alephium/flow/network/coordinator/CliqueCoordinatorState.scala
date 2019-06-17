@@ -59,7 +59,7 @@ trait CliqueCoordinatorState {
   }
   def isAllClosed: Boolean = closeds.forall(identity)
   def setClose(actor: ActorRef): Unit = {
-    val id = brokerConnectors.indexWhere(_.get == actor)
+    val id = brokerConnectors.indexWhere(opt => opt.nonEmpty && opt.get == actor)
     if (id != -1) closeds(id) = true
   }
 }

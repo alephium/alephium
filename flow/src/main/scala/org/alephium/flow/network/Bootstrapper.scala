@@ -3,23 +3,18 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.network.coordinator.{Broker, CliqueCoordinator}
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 object Bootstrapper {
-  def props(builder: BrokerHandler.Builder,
-            server: ActorRef,
-            discoveryServer: ActorRef,
-            cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
-    Props(new Bootstrapper(builder, server, discoveryServer, cliqueManager))
+  def props(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
+      implicit config: PlatformConfig): Props =
+    Props(new Bootstrapper(server, discoveryServer, cliqueManager))
 }
 
-class Bootstrapper(builder: BrokerHandler.Builder,
-                   server: ActorRef,
-                   discoveryServer: ActorRef,
-                   cliqueManager: ActorRef)(implicit config: PlatformConfig)
+class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
+    implicit config: PlatformConfig)
     extends BaseActor {
   server ! TcpServer.Start(self)
 
@@ -35,8 +30,7 @@ class Bootstrapper(builder: BrokerHandler.Builder,
 
   def awaitCliqueInfo: Receive = {
     case cliqueInfo: CliqueInfo =>
-      val intraCliqueManager = context.system.actorOf(IntraCliqueManager.props(builder, cliqueInfo))
-      cliqueManager ! CliqueManager.Start(cliqueInfo, intraCliqueManager)
+      cliqueManager ! CliqueManager.Start(cliqueInfo)
       server ! cliqueManager
       discoveryServer ! cliqueInfo
       context stop self
