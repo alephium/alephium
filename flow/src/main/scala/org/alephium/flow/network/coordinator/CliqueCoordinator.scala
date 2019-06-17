@@ -4,13 +4,18 @@ import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.CliqueInfo
+import org.alephium.serde._
 import org.alephium.util.BaseActor
 
 object CliqueCoordinator {
   def props()(implicit config: PlatformConfig): Props = Props(new CliqueCoordinator())
 
   sealed trait Event
-  case class CliqueReady(info: CliqueInfo) extends Event
+  case object Ready extends Event {
+    implicit val serde: Serde[Ready.type] = intSerde.xfmap[Ready.type](
+      raw => if (raw == 0) Right(Ready) else Left(SerdeError.wrongFormat(s"Expecting 0 got $raw")),
+      _   => 0)
+  }
 }
 
 class CliqueCoordinator()(implicit val config: PlatformConfig)
@@ -43,7 +48,7 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
         setReady(id)
         if (isAllReady) {
           log.debug("All the brokers are ready")
-          broadcast(BrokerConnector.Ready)
+          broadcast(CliqueCoordinator.Ready)
           context become awaitTerminated(buildCliqueInfo)
         }
       }

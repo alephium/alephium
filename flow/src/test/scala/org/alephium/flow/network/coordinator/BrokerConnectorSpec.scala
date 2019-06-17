@@ -28,10 +28,10 @@ class BrokerConnectorSpec extends AlephiumActorSpec("BrokerConnector") {
     val ackData = BrokerConnector.envolop(BrokerConnector.Ack(randomId.value)).data
     brokerConnector.tell(Tcp.Received(ackData), connection.ref)
 
-    brokerConnector ! BrokerConnector.Ready
+    brokerConnector ! CliqueCoordinator.Ready
     brokerConnector.tell(Tcp.Closed, connection.ref)
     connection.expectMsgType[Tcp.Write]
-    connection.expectMsgType[Tcp.CloseCommand]
+    brokerConnector ! Tcp.PeerClosed
     expectTerminated(brokerConnector)
   }
 }
