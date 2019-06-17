@@ -16,7 +16,7 @@ trait CliqueCoordinatorState {
 
   def addBrokerInfo(info: BrokerConnector.BrokerInfo, sender: ActorRef): Boolean = {
     val id = info.id.value
-    if (brokerAddresses(id).isEmpty) {
+    if (id != config.brokerId.value && brokerAddresses(id).isEmpty) {
       brokerAddresses(id)  = Some(info.address)
       brokerConnectors(id) = Some(sender)
       true
@@ -24,26 +24,40 @@ trait CliqueCoordinatorState {
   }
 
   def isBrokerInfoFull: Boolean = {
-    !brokerAddresses.exists(_.isEmpty)
+    brokerAddresses.zipWithIndex.forall {
+      case (opt, idx) => opt.nonEmpty || idx == config.brokerId.value
+    }
   }
 
   def broadcast[T](message: T): Unit = {
-    brokerConnectors.foreach(_.get ! message)
+    brokerConnectors.zipWithIndex.foreach {
+      case (opt, idx) => if (idx != config.brokerId.value) opt.get ! message
+    }
   }
 
   protected def buildCliqueInfo: CliqueInfo = {
-    val addresses = AVector.from(brokerAddresses.map(_.get))
+    val addresses = AVector.tabulate(config.brokerNum) { i =>
+      if (i == config.brokerId.value) config.publicAddress else brokerAddresses(i).get
+    }
     CliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
                       addresses,
                       config.groupNumPerBroker)
   }
 
-  val readys: Array[Boolean]  = Array.fill(brokerNum)(false)
-  def setReady(id: Int): Unit = readys(id) = true
+  val readys: Array[Boolean] = {
+    val result = Array.fill(brokerNum)(false)
+    result(config.brokerId.value) = true
+    result
+  }
   def isAllReady: Boolean     = readys.forall(identity)
+  def setReady(id: Int): Unit = readys(id) = true
 
-  val closeds: Array[Boolean] = Array.fill(brokerNum)(false)
-  def isAllClosed: Boolean    = closeds.forall(identity)
+  val closeds: Array[Boolean] = {
+    val result = Array.fill(brokerNum)(false)
+    result(config.brokerId.value) = true
+    result
+  }
+  def isAllClosed: Boolean = closeds.forall(identity)
   def setClose(actor: ActorRef): Unit = {
     val id = brokerConnectors.indexWhere(_.get == actor)
     if (id != -1) closeds(id) = true

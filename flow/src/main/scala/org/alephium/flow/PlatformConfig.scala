@@ -104,6 +104,7 @@ trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
 
   val brokerNum: Int         = cliqueConfigRaw.getInt("brokerNum")
   val groupNumPerBroker: Int = cliqueConfigRaw.getInt("groupNumPerBroker")
+  assert(brokerNum * groupNumPerBroker == groups)
 }
 
 trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {
