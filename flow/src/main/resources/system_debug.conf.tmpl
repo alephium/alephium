@@ -56,7 +56,6 @@ alephium {
     brokerNum = ${?brokerNum}
     groupNumPerBroker = 1
     groupNumPerBroker = ${?groupNumPerBroker}
-    cliqueId = ${cliqueId}
   }
 
   broker {
@@ -77,7 +76,6 @@ alephium {
   network {
     pingFrequency = 300 second
     retryTimeout = 300 second
-    publicAddress = "localhost:9973"
     publicAddress = ${?publicAddress}
     masterAddress = ${masterAddress}
   }

@@ -19,7 +19,7 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
   }
 
   it should "equalize same values" in {
-    forAll(ModelGen.groupGen, ModelGen.groupGen) { (from, to) =>
+    forAll(ModelGen.groupIndexGen, ModelGen.groupIndexGen) { (from, to) =>
       val index1 = ChainIndex(from, to)
       val index2 = ChainIndex(from, to)
       index1 is index2
