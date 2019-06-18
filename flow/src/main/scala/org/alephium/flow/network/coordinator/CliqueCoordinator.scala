@@ -3,6 +3,7 @@ package org.alephium.flow.network.coordinator
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
+import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.serde._
 import org.alephium.util.BaseActor
@@ -27,7 +28,8 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
       val connection = sender()
-      context.actorOf(BrokerConnector.props(connection), "CliqueCoordinator")
+      val name       = BaseActor.envalidActorName(s"Broker-$remote")
+      context.actorOf(BrokerConnector.props(connection), name)
       ()
     case info: BrokerConnector.BrokerInfo =>
       log.debug(s"Received broker info from ${info.address} id: ${info.id}")
@@ -36,6 +38,7 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
       }
       if (isBrokerInfoFull) {
         log.debug(s"Broadcast clique info")
+        context.parent ! Bootstrapper.ForwardConnection
         broadcast(buildCliqueInfo)
         context become awaitAck
       }

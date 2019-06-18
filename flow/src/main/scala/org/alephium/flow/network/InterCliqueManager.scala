@@ -23,9 +23,11 @@ object InterCliqueManager {
 class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
     implicit config: PlatformConfig)
     extends BaseActor {
-  val brokers = collection.mutable.Set.empty[ActorRef]
+  val brokers = collection.mutable.HashMap.empty[CliqueId, ActorRef]
 
-  override def receive: Receive = {
+  override def receive: Receive = handleMessage orElse handleConnection
+
+  def handleConnection: Receive = {
     case c: Tcp.Connected =>
       val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
       context.actorOf(InboundBrokerHandler.props(selfCliqueInfo, sender(), allHandlers), name)
@@ -37,9 +39,17 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
       ()
     case CliqueManager.Connected(cliqueInfo, brokerId) =>
       if (config.brokerId.intersect(cliqueInfo, brokerId)) {
-        brokers += sender()
+        brokers += cliqueInfo.id -> sender()
       }
+  }
+
+  def handleMessage: Receive = {
     case message: CliqueManager.BroadCastBlock =>
-      brokers.foreach(_ ! message.blockMsg)
+      brokers.foreach {
+        case (cliqueId, broker) =>
+          if (!message.origin.isFrom(cliqueId)) {
+            broker ! message.blockMsg
+          }
+      }
   }
 }
