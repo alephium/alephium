@@ -9,7 +9,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{Block, BrokerId, CliqueId, CliqueInfo}
-import org.alephium.util.BaseActor
+import org.alephium.util.{AVector, BaseActor}
 
 object CliqueManager {
   def props(builder: BrokerHandler.Builder)(implicit config: PlatformConfig): Props =
@@ -35,6 +35,8 @@ class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformCon
     extends BaseActor {
   import CliqueManager._
 
+  type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
+
   var allHandlers: AllHandlers = _
 
   override def receive: Receive = awaitAllHandlers
@@ -42,10 +44,10 @@ class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformCon
   def awaitAllHandlers: Receive = {
     case _allHandlers: AllHandlers =>
       allHandlers = _allHandlers
-      context become awaitStart
+      context become awaitStart(AVector.empty)
   }
 
-  def awaitStart: Receive = {
+  def awaitStart(pool: ConnectionPool): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
@@ -53,7 +55,14 @@ class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformCon
                         "IntraCliqueManager")
       val interCliqueManager =
         context.actorOf(InterCliqueManager.props(cliqueInfo, allHandlers), "InterCliqueManager")
+      pool.foreach {
+        case (connection, message) =>
+          intraCliqueManager.tell(message, connection)
+      }
       context become awaitIntraCliqueReady(intraCliqueManager, interCliqueManager)
+    case c: Tcp.Connected =>
+      val pair = (sender(), c)
+      context become awaitStart(pool :+ pair)
   }
 
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {

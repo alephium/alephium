@@ -30,8 +30,9 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
   override def receive: Receive = handleWith(ByteString.empty, awaitHelloAck, handlePayload)
 
-  def handle(_cliqueInfo: CliqueInfo, brokerId: BrokerId): Unit = {
+  def handle(_cliqueInfo: CliqueInfo, _brokerId: BrokerId): Unit = {
     cliqueInfo = _cliqueInfo
+    brokerId   = _brokerId
     remote     = cliqueInfo.peers(brokerId.value)
   }
 }
