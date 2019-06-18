@@ -11,11 +11,17 @@ object Bootstrapper {
   def props(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
       implicit config: PlatformConfig): Props =
     Props(new Bootstrapper(server, discoveryServer, cliqueManager))
+
+  sealed trait Command
+  case object ForwardConnection extends Command
 }
 
+// TODO: close this properly
 class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
     implicit config: PlatformConfig)
     extends BaseActor {
+  import Bootstrapper._
+
   server ! TcpServer.Start(self)
 
   val sink = if (config.isMaster) {
@@ -26,15 +32,32 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
     context.actorOf(Broker.props(), "Broker")
   }
 
-  override def receive: Receive = awaitCliqueInfo
+  override def receive: Receive =
+    if (config.isMaster) prepareForCoordinator else awaitInfo
 
-  def awaitCliqueInfo: Receive = {
-    case cliqueInfo: CliqueInfo =>
-      cliqueManager ! CliqueManager.Start(cliqueInfo)
-      server ! cliqueManager
-      discoveryServer ! cliqueInfo
-      context stop self
+  def prepareForBroker: Receive = {
+    case c: Tcp.Connected =>
+      if (c.remoteAddress == config.masterAddress) {
+        sink.forward(c)
+        server ! cliqueManager
+        context become awaitInfo
+      }
+  }
+
+  def prepareForCoordinator: Receive = {
     case c: Tcp.Connected =>
       sink.forward(c)
+    case ForwardConnection =>
+      server ! cliqueManager
+      context become awaitInfo
+  }
+
+  def awaitInfo: Receive = {
+    case cliqueInfo: CliqueInfo =>
+      cliqueManager ! CliqueManager.Start(cliqueInfo)
+      discoveryServer ! cliqueInfo
+    case c: Tcp.Connected =>
+      log.debug(s"Forward connection to clique manager")
+      cliqueManager.forward(c)
   }
 }
