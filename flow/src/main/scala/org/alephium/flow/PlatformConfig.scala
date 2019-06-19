@@ -154,7 +154,7 @@ trait PlatformNetworkConfig extends PlatformConfigFiles {
   val publicAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("publicAddress"))
   val masterAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("masterAddress"))
 
-  val isMaster: Boolean = publicAddress == masterAddress
+  val isCoordinator: Boolean = publicAddress == masterAddress
 }
 
 trait PlatformGenesisConfig extends PlatformConsensusConfig {
