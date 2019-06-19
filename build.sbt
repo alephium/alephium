@@ -119,7 +119,7 @@ lazy val macros = subProject("macros")
 
 val commonSettings = Seq(
   organization := "org.alephium",
-  version := "0.1.1-SNAPSHOT",
+  version := "0.1.1",
   scalaVersion := "2.12.6",
   parallelExecution in Test := false,
   scalacOptions := Seq(
