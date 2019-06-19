@@ -48,11 +48,10 @@ monitoring-mailbox {
 }
 
 alephium {
-  groups = 32
-  groups = ${?groups}
+  groups = ${groups}
 
   clique {
-    brokerNum = 32
+    brokerNum = ${groups}
     brokerNum = ${?brokerNum}
   }
 
