@@ -1,6 +1,6 @@
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.crypto.ED25519
@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 
 object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =
-    new InetSocketAddress("localhost", port)
+    new InetSocketAddress(InetAddress.getLocalHost, port)
 
   def createConfig(groupSize: Int,
                    groupIndex: Int,
@@ -34,7 +34,7 @@ object DiscoveryServerSpec {
       val brokerNum: Int         = groupSize
       val groupNumPerBroker: Int = 1
       val brokerId: BrokerId     = BrokerId.unsafe(groupIndex)
-      val isMaster: Boolean      = false
+      val isCoordinator: Boolean = false
     }
   }
 }

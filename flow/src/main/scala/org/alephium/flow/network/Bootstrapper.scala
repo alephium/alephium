@@ -24,7 +24,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
 
   server ! TcpServer.Start(self)
 
-  val sink = if (config.isMaster) {
+  val sink = if (config.isCoordinator) {
     log.debug("Start as CliqueCoordinator")
     context.actorOf(CliqueCoordinator.props(), "CliqueCoordinator")
   } else {
@@ -33,7 +33,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
   }
 
   override def receive: Receive =
-    if (config.isMaster) prepareForCoordinator else awaitInfo
+    if (config.isCoordinator) prepareForCoordinator else awaitInfo
 
   def prepareForBroker: Receive = {
     case c: Tcp.Connected =>

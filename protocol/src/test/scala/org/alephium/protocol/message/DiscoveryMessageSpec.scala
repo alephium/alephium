@@ -28,14 +28,14 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def brokerNum: Int
     def groupNumPerBroker: Int
     def brokerId: BrokerId
-    def isMaster: Boolean
+    def isCoordinator: Boolean
 
     implicit val config: DiscoveryConfig = new DiscoveryConfig {
       val groups: Int            = self.groups
       val brokerNum: Int         = self.brokerNum
       val groupNumPerBroker: Int = self.groupNumPerBroker
       val brokerId: BrokerId     = self.brokerId
-      val isMaster: Boolean      = self.isMaster
+      val isCoordinator: Boolean = self.isCoordinator
 
       def publicAddress: InetSocketAddress       = new InetSocketAddress(1)
       val (privateKey, publicKey)                = ED25519.generatePriPub()
@@ -55,14 +55,14 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1
     def brokerId: BrokerId     = BrokerId.unsafe(0)
-    def isMaster: Boolean      = true
+    def isCoordinator: Boolean = true
 
     val peerFixture = new DiscoveryConfigFixture {
       def groups: Int            = 4
       def brokerNum: Int         = 4
       def groupNumPerBroker: Int = 1
       def brokerId: BrokerId     = BrokerId.unsafe(0)
-      def isMaster: Boolean      = false
+      def isCoordinator: Boolean = false
     }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)

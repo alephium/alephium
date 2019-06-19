@@ -5,7 +5,7 @@ import org.alephium.protocol.model.BrokerId
 trait BrokerConfig extends CliqueConfig {
   def brokerId: BrokerId
 
-  def isMaster: Boolean
+  def isCoordinator: Boolean
 
   lazy val groupFrom: Int = brokerId.value * groupNumPerBroker
 
