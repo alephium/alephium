@@ -102,9 +102,9 @@ trait PlatformGroupConfig extends PlatformConfigFiles with GroupConfig {
 trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
   def cliqueConfigRaw: Config = alephium.getConfig("clique").resolve()
 
-  val brokerNum: Int         = cliqueConfigRaw.getInt("brokerNum")
-  val groupNumPerBroker: Int = cliqueConfigRaw.getInt("groupNumPerBroker")
-  assert(brokerNum * groupNumPerBroker == groups)
+  val brokerNum: Int = cliqueConfigRaw.getInt("brokerNum")
+  require(groups % brokerNum == 0)
+  val groupNumPerBroker: Int = groups / brokerNum
 }
 
 trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {

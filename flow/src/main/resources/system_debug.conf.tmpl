@@ -54,8 +54,6 @@ alephium {
   clique {
     brokerNum = 32
     brokerNum = ${?brokerNum}
-    groupNumPerBroker = 1
-    groupNumPerBroker = ${?groupNumPerBroker}
   }
 
   broker {
@@ -63,7 +61,7 @@ alephium {
   }
 
   consensus {
-    numZerosAtLeastInHash = 9
+    numZerosAtLeastInHash = 18
     numZerosAtLeastInHash = ${?zeros}
     blockTargetTime = 4 minutes
     blockConfirmNum = 10

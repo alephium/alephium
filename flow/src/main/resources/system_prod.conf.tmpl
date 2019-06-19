@@ -32,6 +32,7 @@ akka {
     guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
   }
 }
+
 alephium {
   groups = 32
   groups = ${?groups}
@@ -40,8 +41,6 @@ alephium {
     brokerNum = 32
     brokerNum = ${?groups}
     brokerNum = ${?brokerNum}
-    groupNumPerBroker = 1
-    groupNumPerBroker = ${?groupNumPerBroker}
   }
 
   broker {
@@ -49,7 +48,7 @@ alephium {
   }
 
   consensus {
-    numZerosAtLeastInHash = 9
+    numZerosAtLeastInHash = 18
     numZerosAtLeastInHash = ${?zeros}
     blockTargetTime = 4 minutes
     blockConfirmNum = 10
