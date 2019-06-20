@@ -20,7 +20,6 @@ object GroupConfig {
 }
 
 trait GroupConfig {
-
   def groups: Int
 
   def chainNum: Int = groups * groups

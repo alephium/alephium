@@ -2,16 +2,16 @@ package org.alephium.flow
 
 import java.time.Duration
 import java.io.File
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
+import org.alephium.crypto.ED25519
 import org.alephium.flow.io.{Disk, HeaderDB}
-import org.alephium.flow.network.DiscoveryConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex, PeerId}
+import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Env, Files, Network}
 import org.rocksdb.Options
 
@@ -78,19 +78,6 @@ trait PlatformConfigFiles extends StrictLogging {
   def getConfigUser(): File =
     getConfigFile("user")(_.createNewFile)
 
-  def getNoncesPath(groups: Int, leadingZeros: Int): Path =
-    rootPath.resolve(s"nonces-$groups-$leadingZeros.conf")
-
-  def getNoncesFile(groups: Int, leadingZeros: Int): File = {
-    val path = getNoncesPath(groups, leadingZeros)
-    val file = path.toFile
-    if (!file.exists()) {
-      logger.error(s"Nonces file not found at $path")
-      System.exit(1)
-    }
-    file
-  }
-
   def parseConfig(): Config = {
     ConfigFactory
       .parseFile(getConfigUser)
@@ -101,26 +88,43 @@ trait PlatformConfigFiles extends StrictLogging {
   Disk.createDirUnsafe(rootPath)
   val all      = parseConfig()
   val alephium = all.getConfig("alephium")
+
+  def getDuration(config: Config, path: String): FiniteDuration = {
+    val duration = config.getDuration(path)
+    FiniteDuration(duration.toNanos, NANOSECONDS)
+  }
 }
 
 trait PlatformGroupConfig extends PlatformConfigFiles with GroupConfig {
   val groups: Int = alephium.getInt("groups")
+}
 
-  val mainGroup: GroupIndex = {
-    val myGroup = alephium.getInt("mainGroup")
-    assert(myGroup >= 0 && myGroup < groups)
-    GroupIndex(myGroup)(this)
+trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
+  def cliqueConfigRaw: Config = alephium.getConfig("clique").resolve()
+
+  val brokerNum: Int = cliqueConfigRaw.getInt("brokerNum")
+  require(groups % brokerNum == 0)
+  val groupNumPerBroker: Int = groups / brokerNum
+}
+
+trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {
+  def brokerConfigRaw: Config = alephium.getConfig("broker").resolve()
+
+  val brokerId: BrokerId = {
+    val myId = brokerConfigRaw.getInt("brokerId")
+    assert(0 <= myId && myId * groupNumPerBroker < groups)
+    BrokerId(myId)(this)
   }
 }
 
-trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
-  protected def alephium: Config
+trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
+  def consensusConfigRaw: Config = alephium.getConfig("consensus").resolve
 
-  val numZerosAtLeastInHash: Int = alephium.getInt("numZerosAtLeastInHash")
+  val numZerosAtLeastInHash: Int = consensusConfigRaw.getInt("numZerosAtLeastInHash")
   val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-  val blockTargetTime: Duration = alephium.getDuration("blockTargetTime")
-  val blockConfirmNum: Int      = alephium.getInt("blockConfirmNum")
+  val blockTargetTime: Duration = consensusConfigRaw.getDuration("blockTargetTime")
+  val blockConfirmNum: Int      = consensusConfigRaw.getInt("blockConfirmNum")
   val expectedTimeSpan: Long    = blockTargetTime.toMillis
 
   // Digi Shields Difficulty Adjustment
@@ -131,7 +135,29 @@ trait PlatformConsensusConfig extends PlatformGroupConfig with ConsensusConfig {
   val timeSpanMax: Long  = expectedTimeSpan * (100 + diffAdjustUpMax) / 100
 }
 
-trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusConfig {
+trait PlatformMiningConfig extends PlatformConfigFiles {
+  def miningConfigRaw: Config = alephium.getConfig("mining").resolve()
+
+  val nonceStep: BigInt = miningConfigRaw.getInt("nonceStep")
+}
+
+trait PlatformNetworkConfig extends PlatformConfigFiles {
+  def networkConfigRaw: Config = alephium.getConfig("network").resolve()
+
+  def parseAddress(s: String): InetSocketAddress = {
+    val List(left, right) = s.split(':').toList
+    new InetSocketAddress(left, right.toInt)
+  }
+
+  val pingFrequency: FiniteDuration    = getDuration(networkConfigRaw, "pingFrequency")
+  val retryTimeout: FiniteDuration     = getDuration(networkConfigRaw, "retryTimeout")
+  val publicAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("publicAddress"))
+  val masterAddress: InetSocketAddress = parseAddress(networkConfigRaw.getString("masterAddress"))
+
+  val isCoordinator: Boolean = publicAddress == masterAddress
+}
+
+trait PlatformGenesisConfig extends PlatformConsensusConfig {
   def loadBlockFlow(): AVector[AVector[Block]] = {
     AVector.tabulate(groups, groups) {
       case (from, to) =>
@@ -142,52 +168,28 @@ trait PlatformGenesisConfig extends PlatformConfigFiles with PlatformConsensusCo
   lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow()
 }
 
-trait PDiscoveryConfig extends PlatformGroupConfig {
-  lazy val discoveryConfig: DiscoveryConfig = loadDiscoveryConfig()
+trait PlatformDiscoveryConfig extends PlatformGroupConfig with PlatformNetworkConfig with DC {
+  def discoveryConfig: Config = alephium.getConfig("discovery").resolve()
+
+  val peersPerGroup                             = discoveryConfig.getInt("peersPerGroup")
+  val scanMaxPerGroup                           = discoveryConfig.getInt("scanMaxPerGroup")
+  val scanFrequency                             = getDuration(discoveryConfig, "scanFrequency")
+  val scanFastFrequency                         = getDuration(discoveryConfig, "scanFastFrequency")
+  val neighborsPerGroup                         = discoveryConfig.getInt("neighborsPerGroup")
+  val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
+
   lazy val bootstrap: AVector[InetSocketAddress] =
     Network.parseAddresses(alephium.getString("bootstrap"))
-  def nodeId: PeerId = discoveryConfig.nodeId
-
-  def loadDiscoveryConfig(): DiscoveryConfig = {
-    val discovery = alephium.getConfig("discovery").resolve()
-    discovery.resolve()
-    val publicAddress           = InetAddress.getByName(discovery.getString("publicAddress"))
-    val udpPort                 = discovery.getInt("udpPort")
-    val peersPerGroup           = discovery.getInt("peersPerGroup")
-    val scanMaxPerGroup         = discovery.getInt("scanMaxPerGroup")
-    val scanFrequency           = discovery.getDuration("scanFrequency").toMillis.millis
-    val scanFastFrequency       = discovery.getDuration("scanFastFrequency").toMillis.millis
-    val neighborsPerGroup       = discovery.getInt("neighborsPerGroup")
-    val (privateKey, publicKey) = GroupConfig.generateKeyForGroup(mainGroup)(this)
-    DiscoveryConfig(publicAddress,
-                    udpPort,
-                    groups,
-                    privateKey,
-                    publicKey,
-                    peersPerGroup,
-                    scanMaxPerGroup,
-                    scanFrequency,
-                    scanFastFrequency,
-                    neighborsPerGroup)
-  }
-
 }
 
 class PlatformConfig(val env: Env, val rootPath: Path)
     extends PlatformGroupConfig
     with PlatformConsensusConfig
+    with PlatformMiningConfig
     with PlatformGenesisConfig
-    with PDiscoveryConfig { self =>
-
-  val port: Int                     = alephium.getInt("port")
-  val pingFrequency: FiniteDuration = getDuration("pingFrequency")
-  val nonceStep: BigInt             = alephium.getInt("nonceStep")
-  val retryTimeout: FiniteDuration  = getDuration("retryTimeout")
-
-  def getDuration(path: String): FiniteDuration = {
-    val duration = alephium.getDuration(path)
-    FiniteDuration(duration.toNanos, NANOSECONDS)
-  }
+    with PlatformCliqueConfig
+    with PlatformBrokerConfig
+    with PlatformDiscoveryConfig { self =>
 
   val disk: Disk = Disk.createUnsafe(rootPath)
 
@@ -197,11 +199,11 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     path
   }
   val headerDB: HeaderDB = {
-    val dbName = "all-" + nodeId.shortHex
+    val dbName = "all-" + brokerId.value
     HeaderDB.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
   }
   val trie: MerklePatriciaTrie = {
-    val dbName = "trie-" + nodeId.shortHex
+    val dbName = "trie-" + brokerId.value
     val storage =
       HeaderDB.openUnsafe(dbPath.resolve(dbName), new Options().setCreateIfMissing(true))
     MerklePatriciaTrie.create(storage)

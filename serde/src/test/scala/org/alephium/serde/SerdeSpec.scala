@@ -72,11 +72,17 @@ class SerdeSpec extends AlephiumSpec {
 
   checkException(LongSerde)
 
-  "Serde for ByteString" should "serialize correctlly" in {
+  "Serde for ByteString" should "serialize correctly" in {
     deserialize[ByteString](serialize(ByteString.empty)).right.value is ByteString.empty
     forAll { n: Int =>
       val bs = ByteString.fromInts(n)
       deserialize[ByteString](serialize(bs)).right.value is bs
+    }
+  }
+
+  "Serde for String" should "serialize correctly" in {
+    forAll { s: String =>
+      deserialize[String](serialize(s)).right.value is s
     }
   }
 

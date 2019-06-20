@@ -2,6 +2,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 import org.alephium.protocol.Protocol
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
 case class Message(header: Header, payload: Payload)
@@ -16,7 +17,8 @@ object Message {
     Serde[Header].serialize(message.header) ++ Payload.serialize(message.payload)
   }
 
-  def _deserialize(input: ByteString): Either[SerdeError, (Message, ByteString)] = {
+  def _deserialize(input: ByteString)(
+      implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {
       headerPair <- Serde[Header]._deserialize(input)
       header = headerPair._1
@@ -27,7 +29,7 @@ object Message {
     } yield (Message(header, payload), rest1)
   }
 
-  def deserialize(input: ByteString): Either[SerdeError, Message] = {
+  def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Message] = {
     _deserialize(input).flatMap {
       case (message, rest) =>
         if (rest.isEmpty) Right(message)

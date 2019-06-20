@@ -1,7 +1,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
-import org.alephium.serde.{Serde, SerdeError}
+import org.alephium.serde._
 import org.alephium.util.AVector
 
 case class UnsignedTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
@@ -16,8 +16,7 @@ object UnsignedTransaction {
         outputsSerde.serialize(input.outputs)
     }
 
-    override def _deserialize(
-        input: ByteString): Either[SerdeError, (UnsignedTransaction, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[(UnsignedTransaction, ByteString)] = {
       for {
         inputsPair <- inputsSerde._deserialize(input)
         inputs = inputsPair._1

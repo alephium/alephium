@@ -1,16 +1,16 @@
 package org.alephium.flow.model
 
-import org.alephium.protocol.model.PeerId
+import org.alephium.protocol.model.CliqueId
 
 sealed trait DataOrigin {
-  def isNot(peerId: PeerId): Boolean
+  def isFrom(another: CliqueId): Boolean
 }
 
 object DataOrigin {
   case object LocalMining extends DataOrigin {
-    override def isNot(peerId: PeerId): Boolean = true
+    override def isFrom(another: CliqueId): Boolean = false
   }
-  case class Remote(peerId: PeerId) extends DataOrigin {
-    override def isNot(that: PeerId): Boolean = this.peerId != that
+  case class Remote(cliqueId: CliqueId) extends DataOrigin {
+    override def isFrom(another: CliqueId): Boolean = cliqueId == another
   }
 }

@@ -3,8 +3,9 @@ package org.alephium.flow.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
-import org.alephium.protocol.model.{GroupIndex, PeerId}
+import org.alephium.crypto.ED25519
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.model.{BrokerId, CliqueInfo, ModelGen}
 import org.alephium.util.AlephiumActorSpec
 import org.scalacheck.Gen
 
@@ -17,129 +18,67 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    groupIndex: Int,
                    port: Int,
-                   peersPerGroup: Int,
-                   scanFrequency: FiniteDuration = 500.millis): DiscoveryConfig = {
-    implicit val groupconfig = new GroupConfig {
-      val groups = groupSize
+                   _peersPerGroup: Int,
+                   _scanFrequency: FiniteDuration = 500.millis): DiscoveryConfig = {
+    new DiscoveryConfig {
+      val publicAddress: InetSocketAddress          = new InetSocketAddress("localhost", port)
+      val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
+
+      val peersPerGroup: Int                = _peersPerGroup
+      val scanMaxPerGroup: Int              = 1
+      val scanFrequency: FiniteDuration     = _scanFrequency
+      val scanFastFrequency: FiniteDuration = _scanFrequency
+      val neighborsPerGroup: Int            = _peersPerGroup
+
+      val groups: Int            = groupSize
+      val brokerNum: Int         = groupSize
+      val groupNumPerBroker: Int = 1
+      val brokerId: BrokerId     = BrokerId.unsafe(groupIndex)
+      val isCoordinator: Boolean = false
     }
-    val (privateKey, publicKey) = GroupConfig.generateKeyForGroup(GroupIndex(groupIndex))
-    DiscoveryConfig(
-      InetAddress.getLocalHost,
-      port,
-      groupSize,
-      privateKey,
-      publicKey,
-      peersPerGroup,
-      scanMaxPerGroup   = 1,
-      neighborsPerGroup = peersPerGroup,
-      scanFrequency     = scanFrequency,
-      scanFastFrequency = scanFrequency
-    )
   }
 }
 
 class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
   import DiscoveryServerSpec._
 
-  it should "discovery each other for two nodes" in {
-    val groupSize = Gen.choose(2, 10).sample.get
-    val port0     = SocketUtil.temporaryLocalPort(udp = true)
-    val config0   = createConfig(groupSize, 0, port0, 1)
-    val server0   = system.actorOf(DiscoveryServer.props()(config0), "server0")
-    val port1     = SocketUtil.temporaryLocalPort(udp = true)
-    val config1   = createConfig(groupSize, 1, port1, 1)
-    val server1   = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
+  def generateCliqueInfo(master: InetSocketAddress)(implicit config: GroupConfig): CliqueInfo = {
+    val randomInfo = ModelGen.cliqueInfo.sample.get
+    val newPeers   = randomInfo.peers.replace(0, master)
+    val newInfo    = randomInfo.copy(peers = newPeers)
+    newInfo.masterAddress is master
+    newInfo
+  }
+
+  it should "discovery each other for two cliques" in new GroupConfigFixture {
+    val groups      = Gen.choose(2, 10).sample.get
+    val port0       = SocketUtil.temporaryLocalPort(udp = true)
+    val cliqueInfo0 = generateCliqueInfo(createAddr(port0))
+    val config0     = createConfig(groups, 0, port0, 1)
+    val server0     = system.actorOf(DiscoveryServer.props()(config0), "server0")
+    val port1       = SocketUtil.temporaryLocalPort(udp = true)
+    val cliqueInfo1 = generateCliqueInfo(createAddr(port1))
+    val config1     = createConfig(groups, 1, port1, 1)
+    val server1     = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
+
+    server0 ! cliqueInfo0
+    server1 ! cliqueInfo1
 
     Thread.sleep(2000)
 
     val probo0 = TestProbe()
-    server0.tell(DiscoveryServer.GetPeers, probo0.ref)
+    server0.tell(DiscoveryServer.GetPeerCliques, probo0.ref)
     val probo1 = TestProbe()
-    server1.tell(DiscoveryServer.GetPeers, probo1.ref)
+    server1.tell(DiscoveryServer.GetPeerCliques, probo1.ref)
     probo0.expectMsgPF(40.seconds) {
-      case DiscoveryServer.Peers(peers) =>
-        peers.foreachWithIndex { (group, index) =>
-          if (index == 1) {
-            group.length is 1
-            group.head is config1.nodeInfo
-          } else {
-            group.length is 0
-          }
-        }
+      case DiscoveryServer.PeerCliques(peers) =>
+        peers.length is 1
+        peers.head is cliqueInfo1
     }
     probo1.expectMsgPF(40.seconds) {
-      case DiscoveryServer.Peers(peers) =>
-        peers.foreachWithIndex { (group, index) =>
-          if (index == 0) {
-            group.length is 1
-            group.head is config0.nodeInfo
-          } else {
-            group.length is 0
-          }
-        }
+      case DiscoveryServer.PeerCliques(peers) =>
+        peers.length is 1
+        peers.head is cliqueInfo0
     }
-  }
-
-  // TODO: move this to integration tests
-  ignore should "discover peers for small network" in new GroupConfigFixture {
-    val groups        = 8
-    val networkSize   = 32
-    val peersPerGroup = 2
-
-    def enumerate = 0 until networkSize
-
-    val configs = enumerate.map { i =>
-      val groupIndex = i % groups
-      val port       = 10000 + i
-      createConfig(groups, groupIndex, port, peersPerGroup)
-    }
-    val peerIds = configs.map(_.nodeId)
-    val ports   = configs.map(_.udpPort)
-
-    val actors = enumerate.map { i =>
-      val config = configs(i)
-      system.actorOf(DiscoveryServer.props(createAddr(ports(0)))(config), ports(i).toString)
-    }
-
-    Thread.sleep(1000)
-
-    val discoveries = enumerate.map { i =>
-      actors(i) ! DiscoveryServer.GetPeers
-
-      val DiscoveryServer.Peers(peers) = fishForMessage(10.seconds, "discovery") {
-        case DiscoveryServer.Peers(peers) =>
-          if (peers.forall(_.length >= peersPerGroup)) true
-          else {
-            actors(i) ! DiscoveryServer.GetPeers
-            false
-          }
-      }
-
-      peers
-    }
-
-    // Ensure total group diversity
-    enumerate.foreach { i =>
-      discoveries(i).foreach { xs =>
-        xs.length is peersPerGroup
-      }
-    }
-
-    // Compute distance ranking (1.0 farest, 0.0 closest)
-    val ranks = enumerate.map { i =>
-      val peerId = peerIds(i)
-
-      val discovereds =
-        discoveries(i).flatMap(_.map(_.id)).sortBy(PeerId.hammingDist(peerId, _))
-      val nearests = peerIds.sortBy(PeerId.hammingDist(peerId, _))
-      val rank = nearests.zipWithIndex.collectFirst {
-        case (id, i) if discovereds.contains(id) => i
-      }
-
-      rank.getOrElse(0) / networkSize.toDouble
-    }
-
-    ranks.min isnot 0.0
-    assert((ranks.sum / ranks.size) < 0.10)
   }
 }

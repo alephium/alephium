@@ -3,7 +3,7 @@ import java.time.Duration
 
 trait ConsensusConfigFixture {
 
-  implicit val config = new ConsensusConfig {
+  implicit val consensusConfig = new ConsensusConfig {
     override val groups: Int = 3
 
     override def numZerosAtLeastInHash: Int = 0

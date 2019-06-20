@@ -3,7 +3,8 @@ package org.alephium.flow.storage
 import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.{PeerManager, TcpHandler}
+import org.alephium.flow.network.clique.BrokerHandler
+import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.message.{SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
@@ -11,9 +12,9 @@ import org.alephium.util.{AVector, BaseActor}
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
-            peerManager: ActorRef,
+            cliqueManager: ActorRef,
             flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, peerManager, flowHandler))
+    Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
   case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
@@ -21,7 +22,7 @@ object BlockChainHandler {
 
 class BlockChainHandler(val blockFlow: BlockFlow,
                         val chainIndex: ChainIndex,
-                        peerManager: ActorRef,
+                        cliqueManager: ActorRef,
                         flowHandler: ActorRef)(implicit val config: PlatformConfig)
     extends BaseActor
     with ChainHandlerLogger {
@@ -55,8 +56,8 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   }
 
   def broadcast(block: Block, origin: DataOrigin): Unit = {
-    val blockMessage  = TcpHandler.envelope(SendBlocks(AVector(block)))
-    val headerMessage = TcpHandler.envelope(SendHeaders(AVector(block.header)))
-    peerManager ! PeerManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
+    val blockMessage  = BrokerHandler.envelope(SendBlocks(AVector(block)))
+    val headerMessage = BrokerHandler.envelope(SendHeaders(AVector(block.header)))
+    cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
   }
 }

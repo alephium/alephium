@@ -34,25 +34,36 @@ akka {
 }
 
 alephium {
-  numZerosAtLeastInHash = 9
-  blockTargetTime = 4 minutes
-  blockConfirmNum = 10
+  groups = ${groups}
 
-  port = 9973
-  port = ${?port}
-  groups = 32
-  groups = ${?groups}
-  pingFrequency = 300 second
-  retryTimeout = 300 second
+  clique {
+    brokerNum = ${groups}
+    brokerNum = ${?brokerNum}
+  }
 
-  nonceStep = 10000
+  broker {
+    brokerId = ${brokerId}
+  }
 
-  mainGroup = ${?mainGroup}
+  consensus {
+    numZerosAtLeastInHash = 18
+    numZerosAtLeastInHash = ${?zeros}
+    blockTargetTime = 4 minutes
+    blockConfirmNum = 10
+  }
+
+  mining {
+    nonceStep = 10000
+  }
+
+  network {
+    pingFrequency = 300 second
+    retryTimeout = 300 second
+    publicAddress = ${publicAddress}
+    masterAddress = ${masterAddress}
+  }
 
   discovery {
-    publicAddress = "localhost"
-    publicAddress = ${?publicAddress}
-    udpPort = ${alephium.port}
     peersPerGroup = 16
     scanMaxPerGroup = 8
     scanFrequency = 120.seconds

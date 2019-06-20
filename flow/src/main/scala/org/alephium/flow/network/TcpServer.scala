@@ -7,34 +7,39 @@ import akka.io.{IO, Tcp}
 import org.alephium.util.BaseActor
 
 object TcpServer {
-  def props(port: Int, peerManager: ActorRef): Props = Props(new TcpServer(port, peerManager))
+  def props(port: Int): Props = Props(new TcpServer(port))
 
   sealed trait Command
-  case object Start extends Command
+  case class Start(bootstrapper: ActorRef) extends Command
+
+  sealed trait Event
+  case object Bound extends Event
 }
 
-class TcpServer(port: Int, peerManager: ActorRef) extends BaseActor {
+class TcpServer(port: Int) extends BaseActor {
   import context.system
 
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
-    case TcpServer.Start =>
+    case TcpServer.Start(bootstrapper) =>
       IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port))
-      context.become(binding)
+      context.become(binding(bootstrapper))
   }
 
-  def binding: Receive = {
+  def binding(bootstrapper: ActorRef): Receive = {
     case Tcp.Bound(localAddress) =>
       log.debug(s"Server bound to $localAddress")
-      context.become(ready)
+      context.become(workFor(bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.warning(s"Binding failed")
       context stop self
   }
 
-  def ready: Receive = {
+  def workFor(actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
-      peerManager.forward(c)
+      actor.forward(c)
+    case another: ActorRef =>
+      context become workFor(another)
   }
 }
