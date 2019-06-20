@@ -6,4 +6,6 @@ trait Serializer[T] {
   def serialize(input: T): ByteString
 }
 
-object Serializer { def apply[T](implicit T: Serializer[T]): Serializer[T] = T }
+object Serializer extends ProductSerializer {
+  def apply[T](implicit T: Serializer[T]): Serializer[T] = T
+}

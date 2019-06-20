@@ -18,7 +18,7 @@ object TestUtils {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex(from, to)
-      if chainIndex.relateTo(config.mainGroup)
+      if chainIndex.relateTo(config.brokerId)
     } yield {
       chainIndex -> TestProbe().ref
     }).toMap
@@ -26,7 +26,7 @@ object TestUtils {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex(from, to)
-      if !chainIndex.relateTo(config.mainGroup)
+      if !chainIndex.relateTo(config.brokerId)
     } yield {
       chainIndex -> TestProbe().ref
     }).toMap

@@ -13,6 +13,6 @@ object ValidationError {
     override def toString: String = "Difficulty is invalid"
   }
   case class MissingDeps(deps: AVector[Keccak256]) extends ValidationError {
-    override def toString: String = s"Missing #$deps.length deps"
+    override def toString: String = s"Missing #${deps.length} deps"
   }
 }

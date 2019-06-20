@@ -10,62 +10,73 @@ import scala.concurrent.duration._
 trait FairMinerState {
   implicit def config: PlatformConfig
 
-  protected def actualMiners: AVector[ActorRef]
+  protected def actualMiners: AVector[AVector[ActorRef]]
 
-  protected val miningCounts        = Array.fill[BigInt](config.groups)(0)
+  protected val miningCounts        = Array.fill[BigInt](config.groupNumPerBroker, config.groups)(0)
   protected val taskRefreshDuration = config.groups.seconds.toMillis
-  protected val taskRefreshTss      = Array.fill[Long](config.groups)(-1)
-  protected val pendingTasks        = collection.mutable.Map.empty[Int, BlockTemplate]
+  protected val taskRefreshTss      = Array.fill[Long](config.groupNumPerBroker, config.groups)(-1)
+  protected val pendingTasks        = collection.mutable.Map.empty[(Int, Int), BlockTemplate]
 
   def initialize(): Unit = {
-    (0 until config.groups).foreach(prepareTemplate)
-  }
-
-  def getMiningCount(to: Int): BigInt = miningCounts(to)
-
-  def increaseCounts(to: Int, count: BigInt): Unit = {
-    miningCounts(to) += count
-  }
-
-  def refreshLastTask(to: Int, template: BlockTemplate): Unit = {
-    assert(to >= 0 && to < config.groups)
-    val lastRefreshTs = taskRefreshTss(to)
-    val currentTs     = System.currentTimeMillis()
-    if (currentTs - lastRefreshTs > taskRefreshDuration) {
-      prepareTemplate(to)
-    } else {
-      addTask(to, template)
+    for {
+      fromShift <- 0 until config.groupNumPerBroker
+      to        <- 0 until config.groups
+    } {
+      prepareTemplate(fromShift, to)
     }
   }
 
-  def addNewTask(to: Int, template: BlockTemplate): Unit = {
-    taskRefreshTss(to) = System.currentTimeMillis()
-    addTask(to, template)
+  def getMiningCount(fromShift: Int, to: Int): BigInt = miningCounts(fromShift)(to)
+
+  def countsToString: String = {
+    miningCounts.map(_.mkString(",")).mkString(",")
   }
 
-  def addTask(to: Int, template: BlockTemplate): Unit = {
-    assert(!pendingTasks.contains(to))
-    pendingTasks(to) = template
+  def increaseCounts(fromShift: Int, to: Int, count: BigInt): Unit = {
+    miningCounts(fromShift)(to) += count
+  }
+
+  def refreshLastTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
+    assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
+    val lastRefreshTs = taskRefreshTss(fromShift)(to)
+    val currentTs     = System.currentTimeMillis()
+    if (currentTs - lastRefreshTs > taskRefreshDuration) {
+      prepareTemplate(fromShift, to)
+    } else {
+      addTask(fromShift, to, template)
+    }
+  }
+
+  def addNewTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
+    taskRefreshTss(fromShift)(to) = System.currentTimeMillis()
+    addTask(fromShift, to, template)
+  }
+
+  def addTask(from: Int, to: Int, template: BlockTemplate): Unit = {
+    assert(!pendingTasks.contains((from, to)))
+    pendingTasks((from, to)) = template
     startNewTasks()
   }
 
-  protected def pickTasks(): Iterable[(Int, BlockTemplate)] = {
-    val minCount = miningCounts.min
-    val toTries  = pendingTasks.keys.filter(to => miningCounts(to) < minCount + config.nonceStep)
-    toTries.map { to =>
-      val template = pendingTasks(to)
-      pendingTasks -= to
-      (to, template)
+  protected def pickTasks(): Iterable[((Int, Int), BlockTemplate)] = {
+    val minCount = miningCounts.map(_.min).min
+    val toTries = pendingTasks.keys.filter {
+      case (fromShift, to) => miningCounts(fromShift)(to) < minCount + config.nonceStep
+    }
+    toTries.map { key =>
+      val template = pendingTasks(key)
+      pendingTasks -= key
+      (key, template)
     }
   }
 
   protected def startNewTasks(): Unit = {
     pickTasks().foreach {
-      case (to, template) => startTask(to, template)
+      case ((fromShift, to), template) => startTask(fromShift, to, template)
     }
   }
 
-  def prepareTemplate(to: Int): Unit
+  def prepareTemplate(fromShift: Int, to: Int): Unit
 
-  def startTask(to: Int, template: BlockTemplate): Unit
+  def startTask(fromShift: Int, to: Int, template: BlockTemplate): Unit
 }

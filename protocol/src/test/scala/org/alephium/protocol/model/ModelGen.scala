@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import java.net.InetSocketAddress
 
 import org.alephium.crypto._
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
 import org.alephium.util.AVector
 import org.scalacheck.Gen
 
@@ -59,19 +59,32 @@ object ModelGen {
       }
     }
 
-  def groupGen(implicit config: GroupConfig): Gen[GroupIndex] =
-    groupGen_(config.groups)
+  def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
+    groupIndexGen(config.groups)
 
-  def groupGen_(groups: Int): Gen[GroupIndex] =
+  def groupIndexGen(groups: Int): Gen[GroupIndex] =
     Gen.choose(0, groups - 1).map(n => GroupIndex.unsafe(n))
 
-  def peerId: Gen[PeerId] =
-    Gen.resultOf[Unit, PeerId](_ => PeerId.generate)
+  def cliqueId: Gen[CliqueId] =
+    Gen.resultOf[Unit, CliqueId](_ => CliqueId.generate)
 
-  def peerId(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerId] =
-    Gen.resultOf[Unit, PeerId](_ => PeerId.generateFor(groupIndex))
+  def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] = {
+    Gen.oneOf((1 to config.groups).filter(config.groups % _ == 0))
+  }
 
-  def socketAddress: Gen[InetSocketAddress] =
+  def brokerIdGen(implicit config: CliqueConfig): Gen[BrokerId] = {
+    Gen.choose(0, config.brokerNum - 1).map(BrokerId.apply)
+  }
+
+  def cliqueInfo(implicit config: GroupConfig): Gen[CliqueInfo] = {
+    for {
+      groupNumPerBroker <- groupNumPerBrokerGen
+      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddress)
+      cid               <- cliqueId
+    } yield CliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
+  }
+
+  val socketAddress: Gen[InetSocketAddress] =
     for {
       ip0  <- Gen.choose(0, 255)
       ip1  <- Gen.choose(0, 255)
@@ -79,16 +92,4 @@ object ModelGen {
       ip3  <- Gen.choose(0, 255)
       port <- Gen.choose(0, 65535)
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
-
-  def peerInfo(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PeerInfo] =
-    for {
-      address <- socketAddress
-      id      <- peerId(groupIndex)
-    } yield PeerInfo(id, address)
-
-  def peerInfo: Gen[PeerInfo] =
-    for {
-      address <- socketAddress
-      id      <- peerId
-    } yield PeerInfo(id, address)
 }

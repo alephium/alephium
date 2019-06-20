@@ -5,8 +5,9 @@ import java.net.InetSocketAddress
 import akka.event.LoggingAdapter
 import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
+import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{ModelGen, PeerInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
@@ -35,9 +36,15 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
 
       def bootstrap: AVector[InetSocketAddress] = AVector.empty
 
+      def selfCliqueInfo: CliqueInfo =
+        CliqueInfo.unsafe(
+          CliqueId.generate,
+          AVector.tabulate(config.brokerNum)(_ => ModelGen.socketAddress.sample.get),
+          config.groupNumPerBroker)
+
       setSocket(socketProbe.ref)
     }
-    val peer = ModelGen.peerInfo.sample.get
+    val peerClique: CliqueInfo = ModelGen.cliqueInfo.sample.get
 
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
@@ -49,48 +56,48 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       }
     }
 
-    def addToTable(peer: PeerInfo): Assertion = {
-      state.tryPing(peer)
-      state.isPending(peer.id) is true
-      state.handlePong(peer.id)
-      state.isInTable(peer.id) is true
+    def addToTable(cliqueInfo: CliqueInfo): Assertion = {
+      state.tryPing(cliqueInfo)
+      state.isPending(cliqueInfo.id) is true
+      state.handlePong(cliqueInfo)
+      state.isInTable(cliqueInfo.id) is true
     }
   }
 
   it should "add peer into pending list when just pinged the peer" in new Fixture {
-    state.getActivePeers.sumBy(_.length) is 0
-    state.isUnknown(peer.id) is true
-    state.isPending(peer.id) is false
+    state.getActivePeers.length is 0
+    state.isUnknown(peerClique.id) is true
+    state.isPending(peerClique.id) is false
     state.isPendingAvailable is true
-    state.tryPing(peer)
+    state.tryPing(peerClique)
     expectPayload[Ping]
-    state.isUnknown(peer.id) is false
-    state.isPending(peer.id) is true
+    state.isUnknown(peerClique.id) is false
+    state.isPending(peerClique.id) is true
   }
 
   trait PingedFixture extends Fixture {
-    state.tryPing(peer)
+    state.tryPing(peerClique)
     expectPayload[Ping]
-    state.isInTable(peer.id) is false
+    state.isInTable(peerClique.id) is false
   }
 
   it should "remove peer from pending list when received pong back" in new PingedFixture {
-    state.handlePong(peer.id)
+    state.handlePong(peerClique)
     expectPayload[FindNode]
-    state.isUnknown(peer.id) is false
-    state.isPending(peer.id) is false
-    state.isInTable(peer.id) is true
+    state.isUnknown(peerClique.id) is false
+    state.isPending(peerClique.id) is false
+    state.isInTable(peerClique.id) is true
   }
 
   it should "clean up everything if timeout is negative" in new Fixture {
     override def scanFrequency: FiniteDuration = (-1).millis
 
-    addToTable(peer)
-    val peer0 = ModelGen.peerInfo.sample.get
+    addToTable(peerClique)
+    val peer0 = ModelGen.cliqueInfo.sample.get
     state.tryPing(peer0)
     state.isPending(peer0.id) is true
     state.cleanup()
-    state.isInTable(peer.id) is false
+    state.isInTable(peerClique.id) is false
     state.isPending(peer0.id) is false
   }
 
@@ -98,20 +105,14 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   it should "sort neighbors with respect to target" in new Fixture {
     override def peersPerGroup: Int = 4
 
-    state.getActivePeers.sumBy(_.length) is 0
-    val groupIndex = config.nodeInfo.group
-    val toAdds     = Gen.listOfN(peersPerGroup - 1, ModelGen.peerInfo(groupIndex)).sample.get
+    state.getActivePeers.length is 0
+    val toAdds = Gen.listOfN(peersPerGroup - 1, ModelGen.cliqueInfo).sample.get
     toAdds.foreach(addToTable)
 
-    val peers0 = state.getNeighbors(peer.id)
-    peers0.sumBy(_.length) is peersPerGroup
-    val bucket0 = peers0(groupIndex.value).map(p => peer.id.hammingDist(p.id)).toIterable.toList
+    val peers0 = state.getNeighbors(peerClique.id)
+    peers0.length is peersPerGroup
+    val bucket0 =
+      peers0.map(p => peerClique.id.hammingDist(p.id)).toIterable.toList
     bucket0 is bucket0.sorted
-
-    val peers1 = state.getNeighbors(config.nodeId)
-    peers1.sumBy(_.length) is peersPerGroup - 1
-    val bucket1 =
-      peers1(groupIndex.value).map(p => config.nodeId.hammingDist(p.id)).toIterable.toList
-    bucket1 is bucket1.sorted
   }
 }

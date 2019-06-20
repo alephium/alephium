@@ -5,134 +5,118 @@ import java.net.InetSocketAddress
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter
 import akka.io.Udp
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{GroupIndex, PeerId, PeerInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.AVector
 
 import scala.collection.mutable
 
 trait DiscoveryServerState {
-  implicit def config: DiscoveryConfig
+  implicit def config: GroupConfig with DiscoveryConfig
   def log: LoggingAdapter
 
   def bootstrap: AVector[InetSocketAddress]
+  def selfCliqueInfo: CliqueInfo
 
   import DiscoveryServer._
 
   private var socket: ActorRef = _
-  private val table            = AVector.fill(config.groups)(mutable.HashMap.empty[PeerId, PeerStatus])
-  private val pendings         = mutable.HashMap.empty[PeerId, AwaitPong]
+  protected val table          = mutable.HashMap.empty[CliqueId, PeerStatus]
+  private val pendings         = mutable.HashMap.empty[CliqueId, AwaitPong]
   private val pendingMax       = 2 * config.groups * config.neighborsPerGroup
 
   def setSocket(s: ActorRef): Unit = {
     socket = s
   }
 
-  def getActivePeers: AVector[AVector[PeerInfo]] = {
-    table.map { bucket =>
-      AVector.from(bucket.values.map(_.info))
+  def getActivePeers: AVector[CliqueInfo] = {
+    AVector.from(table.values.map(_.info))
+  }
+
+  def getNeighbors(target: CliqueId): AVector[CliqueInfo] = {
+    val candidates = if (target == selfCliqueInfo.id) {
+      AVector.from(table.values.map(_.info))
+    } else {
+      AVector.from(table.values.map(_.info).filter(_.id != target)) :+ selfCliqueInfo
     }
+    candidates.sortBy(info => target.hammingDist(info.id)).takeUpto(config.neighborsPerGroup)
   }
 
-  def getNeighbors(target: PeerId): AVector[AVector[PeerInfo]] = {
-    table.mapWithIndex { (bucket, i) =>
-      val peers = if (config.nodeInfo.group == GroupIndex(i)) {
-        AVector.from(bucket.values.map(_.info)) :+ config.nodeInfo
-      } else AVector.from(bucket.values.map(_.info))
-
-      peers
-        .filter(_.id != target)
-        .sortBy(peer => target.hammingDist(peer.id))
-        .takeUpto(config.neighborsPerGroup)
-    }
+  def isInTable(cliqueId: CliqueId): Boolean = {
+    table.contains(cliqueId)
   }
 
-  def getBucket(peerId: PeerId): mutable.HashMap[PeerId, PeerStatus] = {
-    val peerGroup = peerId.groupIndex
-    table(peerGroup.value)
+  def isPending(cliqueId: CliqueId): Boolean = {
+    pendings.contains(cliqueId)
   }
 
-  def isInTable(peerId: PeerId): Boolean = {
-    getBucket(peerId).contains(peerId)
-  }
-
-  def isPending(peerId: PeerId): Boolean = {
-    pendings.contains(peerId)
-  }
-
-  def isUnknown(peerId: PeerId): Boolean = !isInTable(peerId) && !isPending(peerId)
+  def isUnknown(cliqueId: CliqueId): Boolean = !isInTable(cliqueId) && !isPending(cliqueId)
 
   def isPendingAvailable: Boolean = pendings.size < pendingMax
 
-  def getPeer(peerId: PeerId): Option[PeerInfo] = {
-    getBucket(peerId).get(peerId).map(_.info)
+  def getPeer(cliqueId: CliqueId): Option[CliqueInfo] = {
+    table.get(cliqueId).map(_.info)
   }
 
-  def getPending(peerId: PeerId): Option[AwaitPong] = {
-    pendings.get(peerId)
+  def getPending(cliqueId: CliqueId): Option[AwaitPong] = {
+    pendings.get(cliqueId)
   }
 
-  def updateStatus(peerId: PeerId): Unit = {
-    val bucket = getBucket(peerId)
-    bucket.get(peerId) match {
+  def updateStatus(cliqueId: CliqueId): Unit = {
+    table.get(cliqueId) match {
       case Some(status) =>
-        bucket(peerId) = status.copy(updateAt = System.currentTimeMillis())
+        table(cliqueId) = status.copy(updateAt = System.currentTimeMillis())
       case None => ()
     }
   }
 
-  def getPendingStatus(peerId: PeerId): Option[AwaitPong] = {
-    pendings.get(peerId)
+  def getPendingStatus(cliqueId: CliqueId): Option[AwaitPong] = {
+    pendings.get(cliqueId)
   }
 
   def cleanup(): Unit = {
     val now = System.currentTimeMillis()
-    table.foreach { bucket =>
-      val toRemove = bucket.values
-        .filter(status => now - status.updateAt > config.peersTimeout.toMillis)
-        .map(_.info.id)
-        .toSet
-      bucket --= toRemove
-    }
+    val toRemove = table.values
+      .filter(status => now - status.updateAt > config.peersTimeout.toMillis)
+      .map(_.info.id)
+      .toSet
+    table --= toRemove
 
     val deadPendings = pendings.collect {
-      case (peerId, status) if now - status.pingAt > config.peersTimeout.toMillis => peerId
+      case (cliqueId, status) if now - status.pingAt > config.peersTimeout.toMillis => cliqueId
     }
     pendings --= deadPendings
   }
 
-  private def appendPeer(peer: PeerInfo, bucket: mutable.HashMap[PeerId, PeerStatus]): Unit = {
-    log.debug(s"Adding a new peer: $peer")
-    bucket += peer.id -> PeerStatus.fromInfo(peer)
-    fetchNeighbors(peer)
+  private def appendPeer(cliqueInfo: CliqueInfo): Unit = {
+    log.debug(s"Adding a new peer: $cliqueInfo")
+    table += cliqueInfo.id -> PeerStatus.fromInfo(cliqueInfo)
+    fetchNeighbors(cliqueInfo)
   }
 
   def scan(): Unit = {
-    val emptySlotNum = table.sumBy { bucket =>
-      val sortedNeighbors =
-        AVector.from(bucket.values).sortBy(status => config.nodeId.hammingDist(status.info.id))
-      sortedNeighbors
-        .takeUpto(config.scanMaxPerGroup)
-        .foreach(status => fetchNeighbors(status.info))
-      val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
-      if (emptySlotNum > 0) emptySlotNum else 0
-    }
+    val sortedNeighbors =
+      AVector.from(table.values).sortBy(status => selfCliqueInfo.id.hammingDist(status.info.id))
+    sortedNeighbors
+      .takeUpto(config.scanMaxPerGroup)
+      .foreach(status => fetchNeighbors(status.info))
+    val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
+    if (emptySlotNum > 0) emptySlotNum else 0
     bootstrap.takeUpto(emptySlotNum).foreach(tryPing)
   }
 
   def shouldScanFast(): Boolean = {
-    table.existsWithIndex { (bucket, index) =>
-      index != config.group.value && bucket.isEmpty
-    }
+    table.isEmpty
   }
 
-  def fetchNeighbors(peer: PeerInfo): Unit = {
-    fetchNeighbors(peer.socketAddress)
+  def fetchNeighbors(info: CliqueInfo): Unit = {
+    fetchNeighbors(info.masterAddress)
   }
 
   def fetchNeighbors(remote: InetSocketAddress): Unit = {
-    send(remote, FindNode(config.nodeId))
+    send(remote, FindNode(selfCliqueInfo.id))
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
@@ -140,37 +124,40 @@ trait DiscoveryServerState {
     socket ! Udp.Send(DiscoveryMessage.serialize(message), remote)
   }
 
-  def tryPing(peer: PeerInfo): Unit = {
-    if (isUnknown(peer.id) && isPendingAvailable) {
-      log.info(s"Sending Ping to $peer")
-      send(peer.socketAddress, Ping(config.nodeInfo.socketAddress))
-      pendings += (peer.id -> AwaitPong(peer.socketAddress, System.currentTimeMillis()))
+  def tryPing(cliqueInfo: CliqueInfo): Unit = {
+    if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
+      log.info(s"Sending Ping to $cliqueInfo")
+      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo))
+      pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, System.currentTimeMillis()))
     }
   }
 
   def tryPing(remote: InetSocketAddress): Unit = {
     log.info(s"Sending Ping to $remote")
-    send(remote, Ping(config.nodeInfo.socketAddress))
+    send(remote, Ping(selfCliqueInfo))
   }
 
-  def handlePong(peerId: PeerId): Unit = {
-    pendings.get(peerId) match {
-      case Some(AwaitPong(remote, _)) =>
-        pendings.remove(peerId)
-        val peer   = PeerInfo(peerId, remote)
-        val bucket = getBucket(peerId)
-        if (bucket.size < config.neighborsPerGroup) {
-          appendPeer(peer, bucket)
+  def handlePong(cliqueInfo: CliqueInfo): Unit = {
+    val cliqueId = cliqueInfo.id
+    pendings.get(cliqueId) match {
+      case Some(AwaitPong(_, _)) =>
+        pendings.remove(cliqueId)
+        if (table.size < config.neighborsPerGroup) {
+          appendPeer(cliqueInfo)
         } else {
-          val myself   = config.nodeId
-          val furthest = bucket.keys.minBy(myself.hammingDist)
-          if (myself.hammingDist(peerId) < myself.hammingDist(furthest)) {
-            bucket -= furthest
-            appendPeer(peer, bucket)
-          }
+          tryInsert(cliqueInfo)
         }
       case None =>
-        log.debug(s"Received Pong from $peerId without pending request, ignored.")
+        log.debug(s"Received Pong from $cliqueId without pending request, ignored.")
+    }
+  }
+
+  def tryInsert(cliqueInfo: CliqueInfo): Unit = {
+    val myself   = selfCliqueInfo.id
+    val furthest = table.keys.maxBy(myself.hammingDist)
+    if (myself.hammingDist(cliqueInfo.id) < myself.hammingDist(furthest)) {
+      table -= furthest
+      appendPeer(cliqueInfo)
     }
   }
 }

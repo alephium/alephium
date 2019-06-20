@@ -1,31 +1,27 @@
 package org.alephium.protocol.message
 
-import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.scalacheck.Gen
-import org.alephium.protocol.model.{GroupIndex, ModelGen}
+import org.alephium.protocol.model.ModelGen
 import org.alephium.util.AVector
-
-import scala.collection.JavaConverters._
 
 object DiscoveryMessageGen {
   import DiscoveryMessage._
 
   val findNode: Gen[FindNode] = for {
-    target <- ModelGen.peerId
+    target <- ModelGen.cliqueId
   } yield FindNode(target)
 
-  val ping: Gen[Ping] =
-    for {
-      source <- ModelGen.socketAddress
-    } yield Ping(source)
+  def ping(implicit config: GroupConfig): Gen[Ping] =
+    ModelGen.cliqueInfo.map(Ping.apply)
 
-  val pong: Gen[Pong] = Gen.map(_ => Pong())
+  def pong(implicit config: GroupConfig): Gen[Pong] =
+    ModelGen.cliqueInfo.map(Pong.apply)
 
-  def neighbors(implicit config: DiscoveryConfig): Gen[Neighbors] =
+  def neighbors(implicit config: GroupConfig): Gen[Neighbors] =
     for {
-      source <- Gen.sequence((0 until config.groups).map(i =>
-        Gen.listOf(ModelGen.peerInfo(GroupIndex(i)(config))(config))))
-    } yield Neighbors(AVector.from(source.asScala.map(AVector.from)))
+      infos <- Gen.listOf(ModelGen.cliqueInfo)
+    } yield Neighbors(AVector.from(infos))
 
   def message(implicit config: DiscoveryConfig): Gen[DiscoveryMessage] =
     for {

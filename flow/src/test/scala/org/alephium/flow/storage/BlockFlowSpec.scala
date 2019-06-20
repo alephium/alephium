@@ -7,6 +7,7 @@ import org.scalatest.Assertion
 
 import scala.annotation.tailrec
 
+// TODO: test for more groups
 class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
   behavior of "BlockFlow"
 
@@ -25,25 +26,25 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
       val block1      = mine(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block1)
       blockFlow.getWeight(block1) is 1
-      checkInBestDeps(blockFlow, block1)
+      checkInBestDeps(GroupIndex(0), blockFlow, block1)
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block2.header)
       blockFlow.getWeight(block2.header) is 2
-      checkInBestDeps(blockFlow, block2)
+      checkInBestDeps(GroupIndex(0), blockFlow, block2)
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 3
-      checkInBestDeps(blockFlow, block3)
+      checkInBestDeps(GroupIndex(0), blockFlow, block3)
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
       addAndCheck(blockFlow, block4)
       blockFlow.getWeight(block4) is 4
-      checkInBestDeps(blockFlow, block4)
+      checkInBestDeps(GroupIndex(0), blockFlow, block4)
     }
   }
 
@@ -65,7 +66,7 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
           blockFlow.getWeight(block.header) is 1
         }
       }
-      checkInBestDeps(blockFlow, newBlocks1)
+      checkInBestDeps(GroupIndex(0), blockFlow, newBlocks1)
 
       val newBlocks2 = for {
         i <- 0 to 1
@@ -81,7 +82,7 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
           blockFlow.getWeight(block.header) is 4
         }
       }
-      checkInBestDeps(blockFlow, newBlocks2)
+      checkInBestDeps(GroupIndex(0), blockFlow, newBlocks2)
 
       val newBlocks3 = for {
         i <- 0 to 1
@@ -97,7 +98,7 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
           blockFlow.getWeight(block.header) is 8
         }
       }
-      checkInBestDeps(blockFlow, newBlocks3)
+      checkInBestDeps(GroupIndex(0), blockFlow, newBlocks3)
     }
   }
 
@@ -112,12 +113,12 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
       addAndCheck(blockFlow, block12)
       blockFlow.getWeight(block11) is 1
       blockFlow.getWeight(block12) is 1
-      checkInBestDeps(blockFlow, IndexedSeq(block11, block12))
+      checkInBestDeps(GroupIndex(0), blockFlow, IndexedSeq(block11, block12))
 
       val block13 = mine(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block13)
       blockFlow.getWeight(block13) is 2
-      checkInBestDeps(blockFlow, block13)
+      checkInBestDeps(GroupIndex(0), blockFlow, block13)
 
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
@@ -126,13 +127,13 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
       addAndCheck(blockFlow, block22.header)
       blockFlow.getWeight(block21) is 3
       blockFlow.getWeight(block22) is 3
-      checkInBestDeps(blockFlow, IndexedSeq(block21, block22))
+      checkInBestDeps(GroupIndex(0), blockFlow, IndexedSeq(block21, block22))
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 4
-      checkInBestDeps(blockFlow, block3)
+      checkInBestDeps(GroupIndex(0), blockFlow, block3)
     }
   }
 
@@ -152,12 +153,14 @@ class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
     blockFlow.add(block).isRight is true
   }
 
-  def checkInBestDeps(blockFlow: BlockFlow, block: Block): Assertion = {
-    blockFlow.getBestDeps.deps.contains(block.hash) is true
+  def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
+    blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }
 
-  def checkInBestDeps(blockFlow: BlockFlow, blocks: IndexedSeq[Block]): Assertion = {
-    val bestDeps = blockFlow.getBestDeps.deps
+  def checkInBestDeps(groupIndex: GroupIndex,
+                      blockFlow: BlockFlow,
+                      blocks: IndexedSeq[Block]): Assertion = {
+    val bestDeps = blockFlow.getBestDeps(groupIndex).deps
     blocks.exists { block =>
       bestDeps.contains(block.hash)
     } is true
