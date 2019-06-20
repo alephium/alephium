@@ -26,8 +26,7 @@ case class AllHandlers(flowHandler: ActorRef,
 object AllHandlers {
   def build(system: ActorSystem, cliqueManager: ActorRef, blockFlow: BlockFlow)(
       implicit config: PlatformConfig): AllHandlers = {
-    val flowProps =
-      FlowHandler.props(blockFlow).withDispatcher("akka.actor.flow-handler-dispatcher")
+    val flowProps      = FlowHandler.props(blockFlow)
     val flowHandler    = system.actorOf(flowProps, "FlowHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
