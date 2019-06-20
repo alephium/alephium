@@ -1,5 +1,7 @@
 package org.alephium.flow.storage
 
+import java.io.IOException
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.{IOError, IOResult}
@@ -16,11 +18,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val index  = block.chainIndex
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
-    val weight = calWeightUnsafe(block)
     for {
-      _ <- chain.add(block, parent, weight)
-      _ <- calBestDeps()
-      _ <- updateTxs(block)
+      weight <- calWeight(block)
+      _      <- chain.add(block, parent, weight)
+      _      <- calBestDeps()
+      _      <- updateTxs(block)
     } yield ()
   }
 
@@ -40,19 +42,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val index  = header.chainIndex
     val chain  = getHeaderChain(index)
     val parent = header.uncleHash(index.to)
-    try {
-      val weight = calWeightUnsafe(header)
-      chain.add(header, parent, weight).map { _ =>
-        updateStateForNewHeader()
-      }
-    } catch {
-      case e: Exception =>
-        Left(IOError(e))
-    }
-  }
-
-  private def updateStateForNewHeader(): Unit = {
-    calBestDepsUnsafe()
+    for {
+      weight <- calWeight(header)
+      _      <- chain.add(header, parent, weight)
+      _      <- calBestDeps()
+    } yield ()
   }
 
   def validate(header: BlockHeader): Either[ValidationError, Unit] = {
@@ -82,9 +76,14 @@ class BlockFlow()(implicit val config: PlatformConfig)
     ???
   }
 
-  private def calWeightUnsafe(block: Block): Int = {
-    calWeightUnsafe(block.header)
+  private def calWeight(block: Block): IOResult[Int] = {
+    calWeight(block.header)
   }
+
+  private def calWeight(header: BlockHeader): IOResult[Int] =
+    try { Right(calWeightUnsafe(header)) } catch {
+      case e: IOException => Left(IOError(e))
+    }
 
   private def calWeightUnsafe(header: BlockHeader): Int = {
     val deps = header.blockDeps
