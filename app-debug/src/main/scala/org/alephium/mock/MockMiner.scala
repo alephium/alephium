@@ -49,7 +49,11 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
       blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
 
-    case _: Miner.BlockAdded =>
+    case Miner.UpdateTemplate =>
+      allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+      context become collect
+
+    case Miner.MinedBlockAdded(_) =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
