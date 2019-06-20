@@ -8,12 +8,13 @@ import org.alephium.flow.client.Miner.BlockAdded
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.storage.{AllHandlers, BlockChainHandler}
+import org.alephium.flow.storage.BlockChainHandler
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
+import scala.concurrent.Future
 import scala.util.Random
 
 object FairMiner {
@@ -42,6 +43,23 @@ object FairMiner {
       miningCount: BigInt,
       template: BlockTemplate
   ) extends Command
+
+  def mine(index: ChainIndex, template: BlockTemplate)(
+      implicit config: PlatformConfig): Option[(Block, BigInt)] = {
+    val nonceStart = BigInt(Random.nextInt(Integer.MAX_VALUE))
+    val nonceEnd   = nonceStart + config.nonceStep
+
+    @tailrec
+    def iter(current: BigInt): Option[(Block, BigInt)] = {
+      if (current < nonceEnd) {
+        val header = template.buildHeader(current)
+        if (header.preValidate(index))
+          Some((Block(header, template.transactions), current - nonceStart + 1))
+        else iter(current + 1)
+      } else None
+    }
+    iter(nonceStart)
+  }
 }
 
 class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
@@ -49,15 +67,6 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers
-  val actualMiners: AVector[AVector[ActorRef]] =
-    AVector.tabulate(config.groupNumPerBroker, config.groups) {
-      case (fromShift, to) =>
-        val from = config.groupFrom + fromShift
-        val props = ActualMiner
-          .props(ChainIndex(from, to), node.allHandlers)
-          .withDispatcher("akka.actor.mining-dispatcher")
-        context.actorOf(props)
-    }
 
   def receive: Receive = awaitStart
 
@@ -114,49 +123,19 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     addNewTask(fromShift, to, blockTemplate)
   }
 
-  def startTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
-    actualMiners(fromShift)(to) ! ActualMiner.Task(template)
-  }
-}
-
-object ActualMiner {
-  def props(index: ChainIndex, allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-    Props(new ActualMiner(index, allHandlers))
-
-  sealed trait Command
-  case class Task(template: BlockTemplate) extends Command
-}
-
-class ActualMiner(index: ChainIndex, allHandlers: AllHandlers)(implicit config: PlatformConfig)
-    extends BaseActor {
-  import ActualMiner._
-
-  override def receive: Receive = {
-    case Task(template) =>
-      mine(template) match {
+  def startTask(fromShift: Int,
+                to: Int,
+                template: BlockTemplate,
+                blockHandler: ActorRef): Future[Unit] =
+    Future {
+      val index = ChainIndex.unsafe(fromShift + config.groupFrom, to)
+      FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
-          val blockHandler   = allHandlers.getBlockHandler(index)
           val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
-          blockHandler.forward(handlerMessage)
-          context.sender() ! FairMiner.MiningResult(Some(block), index, miningCount, template)
+          blockHandler.tell(handlerMessage, self)
+          self ! FairMiner.MiningResult(Some(block), index, miningCount, template)
         case None =>
-          context.sender() ! FairMiner.MiningResult(None, index, config.nonceStep, template)
+          self ! FairMiner.MiningResult(None, index, config.nonceStep, template)
       }
-  }
-
-  def mine(template: BlockTemplate): Option[(Block, BigInt)] = {
-    val nonceStart = BigInt(Random.nextInt(Integer.MAX_VALUE))
-    val nonceEnd   = nonceStart + config.nonceStep
-
-    @tailrec
-    def iter(current: BigInt): Option[(Block, BigInt)] = {
-      if (current < nonceEnd) {
-        val header = template.buildHeader(current)
-        if (header.preValidate(index))
-          Some((Block(header, template.transactions), current - nonceStart + 1))
-        else iter(current + 1)
-      } else None
-    }
-    iter(nonceStart)
-  }
+    }(context.dispatcher)
 }

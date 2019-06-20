@@ -4,11 +4,13 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.storage.{BlockFlow, BlockFlowFixture}
+import org.alephium.flow.storage.{AllHandlers, BlockFlow, BlockFlowFixture, TestUtils}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalacheck.Gen
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockFlowFixture { Spec =>
@@ -16,9 +18,8 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
   trait Fixture extends FairMinerState {
     override implicit def config: PlatformConfig = Spec.config
     val blockFlow: BlockFlow                     = BlockFlow.createUnsafe()
+    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe
     val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
-    override val actualMiners: AVector[AVector[ActorRef]] =
-      AVector.tabulate(config.groupNumPerBroker, config.groups)(probes(_)(_).ref)
 
     def prepareBlockTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex(config.groupFrom + fromShift, to)
@@ -31,8 +32,11 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
       addNewTask(fromShift, to, blockTemplate)
     }
 
-    override def startTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
-      actualMiners(fromShift)(to) ! ActualMiner.Task(template)
+    override def startTask(fromShift: Int,
+                           to: Int,
+                           template: BlockTemplate,
+                           blockHandler: ActorRef): Future[Unit] = Future {
+      probes(fromShift)(to).ref ! template
     }
 
     miningCounts.length is config.groupNumPerBroker
@@ -46,7 +50,7 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
 
   it should "initialize correctly" in new Fixture {
     pendingTasks.size is 0
-    probes.foreach(_.foreach(_.expectMsgType[ActualMiner.Task]))
+    probes.foreach(_.foreach(_.expectMsgType[BlockTemplate]))
   }
 
   it should "handle mining counts correctly" in new Fixture {
@@ -75,17 +79,17 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
   }
 
   it should "refresh last task correctly" in new Fixture {
-    probes.foreach(_.foreach(_.expectMsgType[ActualMiner.Task]))
+    probes.foreach(_.foreach(_.expectMsgType[BlockTemplate]))
     forAll(Gen.choose(0, config.groupNumPerBroker - 1), Gen.choose(0, config.groups - 1)) {
       (fromShift, to) =>
         val template = prepareBlockTemplate(fromShift, to)
         refreshLastTask(fromShift, to, template)
-        probes(fromShift)(to).expectMsgType[ActualMiner.Task]
+        probes(fromShift)(to).expectMsgType[BlockTemplate]
     }
   }
 
   it should "pick up correct task" in new Fixture {
-    probes.foreach(_.foreach(_.expectMsgType[ActualMiner.Task]))
+    probes.foreach(_.foreach(_.expectMsgType[BlockTemplate]))
     val fromShift = Random.nextInt(config.groupNumPerBroker)
     val to        = Random.nextInt(config.groups)
     (0 until config.groups).foreach { i =>
@@ -94,7 +98,7 @@ class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockF
     }
     (0 until config.groups).foreach { i =>
       if (i != to) probes(fromShift)(i).expectNoMessage()
-      else probes(fromShift)(i).expectMsgType[ActualMiner.Task]
+      else probes(fromShift)(i).expectMsgType[BlockTemplate]
     }
   }
 }
