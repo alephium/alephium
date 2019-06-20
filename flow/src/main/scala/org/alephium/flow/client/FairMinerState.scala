@@ -6,29 +6,23 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.ChainIndex
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
-
 trait FairMinerState {
   implicit def config: PlatformConfig
 
   def handlers: AllHandlers
 
-  protected val miningCounts        = Array.fill[BigInt](config.groupNumPerBroker, config.groups)(0)
-  protected val taskRefreshDuration = config.groups.seconds.toMillis
-  protected val taskRefreshTss      = Array.fill[Long](config.groupNumPerBroker, config.groups)(-1)
-  protected val pendingTasks        = collection.mutable.Map.empty[(Int, Int), BlockTemplate]
-
-  def initialize(): Unit = {
-    for {
-      fromShift <- 0 until config.groupNumPerBroker
-      to        <- 0 until config.groups
-    } {
-      prepareTemplate(fromShift, to)
-    }
-  }
+  protected val miningCounts = Array.fill[BigInt](config.groupNumPerBroker, config.groups)(0)
+  protected val running      = Array.fill(config.groupNumPerBroker, config.groups)(false)
+  protected lazy val pendingTasks =
+    Array.tabulate(config.groupNumPerBroker, config.groups)(prepareTemplate)
 
   def getMiningCount(fromShift: Int, to: Int): BigInt = miningCounts(fromShift)(to)
+
+  def isRunning(fromShift: Int, to: Int): Boolean = running(fromShift)(to)
+
+  def setRunning(fromShift: Int, to: Int): Unit = running(fromShift)(to) = true
+
+  def setIdle(fromShift: Int, to: Int): Unit = running(fromShift)(to) = false
 
   def countsToString: String = {
     miningCounts.map(_.mkString(",")).mkString(",")
@@ -38,53 +32,40 @@ trait FairMinerState {
     miningCounts(fromShift)(to) += count
   }
 
-  def refreshLastTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
-    assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
-    val lastRefreshTs = taskRefreshTss(fromShift)(to)
-    val currentTs     = System.currentTimeMillis()
-    if (currentTs - lastRefreshTs > taskRefreshDuration) {
-      prepareTemplate(fromShift, to)
-    } else {
-      addTask(fromShift, to, template)
+  def updateTasks(): Unit = {
+    for {
+      fromShift <- 0 until config.groupNumPerBroker
+      to        <- 0 until config.groups
+    } {
+      val blockTemplate = prepareTemplate(fromShift, to)
+      pendingTasks(fromShift)(to) = blockTemplate
     }
   }
 
-  def addNewTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
-    taskRefreshTss(fromShift)(to) = System.currentTimeMillis()
-    addTask(fromShift, to, template)
-  }
-
-  def addTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
-    assert(!pendingTasks.contains((fromShift, to)))
-    pendingTasks((fromShift, to)) = template
-    startNewTasks()
-  }
-
-  protected def pickTasks(): Iterable[((Int, Int), BlockTemplate)] = {
+  protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
     val minCount = miningCounts.map(_.min).min
-    val toTries = pendingTasks.keys.filter {
-      case (fromShift, to) => miningCounts(fromShift)(to) < minCount + config.nonceStep
-    }
-    toTries.map { key =>
-      val template = pendingTasks(key)
-      pendingTasks -= key
-      (key, template)
+    for {
+      fromShift <- 0 until config.groupNumPerBroker
+      to        <- 0 until config.groups
+      if {
+        (miningCounts(fromShift)(to) <= minCount + config.nonceStep) && !isRunning(fromShift, to)
+      }
+    } yield {
+      (fromShift, to, pendingTasks(fromShift)(to))
     }
   }
 
   protected def startNewTasks(): Unit = {
     pickTasks().foreach {
-      case ((fromShift, to), template) =>
+      case (fromShift, to, template) =>
         val index        = ChainIndex.unsafe(fromShift + config.groupFrom, to)
         val blockHandler = handlers.getBlockHandler(index)
         startTask(fromShift, to, template, blockHandler)
+        setRunning(fromShift, to)
     }
   }
 
-  def prepareTemplate(fromShift: Int, to: Int): Unit
+  def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
 
-  def startTask(fromShift: Int,
-                to: Int,
-                template: BlockTemplate,
-                blockHandler: ActorRef): Future[Unit]
+  def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit
 }

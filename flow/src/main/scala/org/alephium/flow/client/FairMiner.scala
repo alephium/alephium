@@ -4,18 +4,16 @@ import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.client.Miner.BlockAdded
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
-import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.storage.BlockChainHandler
+import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 object FairMiner {
   def props(node: Node)(implicit config: PlatformConfig): Props = {
@@ -37,12 +35,8 @@ object FairMiner {
   }
 
   sealed trait Command
-  case class MiningResult(
-      blockOpt: Option[Block],
-      chainIndex: ChainIndex,
-      miningCount: BigInt,
-      template: BlockTemplate
-  ) extends Command
+  case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: BigInt)
+      extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
       implicit config: PlatformConfig): Option[(Block, BigInt)] = {
@@ -67,13 +61,14 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers
+  handlers.flowHandler ! FlowHandler.Register(self)
 
   def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
-      initialize()
+      startNewTasks()
       context become (handleMining orElse awaitStop)
   }
 
@@ -84,7 +79,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   }
 
   def handleMining: Receive = {
-    case FairMiner.MiningResult(blockOpt, chainIndex, miningCount, template) =>
+    case FairMiner.MiningResult(blockOpt, chainIndex, miningCount) =>
       assert(config.brokerId.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - config.groupFrom
       val to        = chainIndex.to.value
@@ -96,46 +91,50 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
         case None =>
-          refreshLastTask(fromShift, to, template)
+          setIdle(fromShift, to)
+          startNewTasks()
       }
-    case BlockAdded(chainIndex) =>
-      assert(config.brokerId.contains(chainIndex.from))
+    case Miner.UpdateTemplate =>
+      updateTasks()
+    case Miner.MinedBlockAdded(chainIndex) =>
       val fromShift = chainIndex.from.value - config.groupFrom
       val to        = chainIndex.to.value
-      prepareTemplate(fromShift, to)
+      updateTasks()
+      setIdle(fromShift, to)
+      startNewTasks()
   }
 
-  def getBlockTemplate(flowTemplate: BlockFlowTemplate): BlockTemplate = {
-    assert(config.brokerId.contains(flowTemplate.index.from))
-    val address = addresses(flowTemplate.index.to.value)
+  private val fakeTransactions = AVector.tabulate(config.groups) { to =>
+    val address = addresses(to)
+    val data    = ByteString.fromInts(Random.nextInt())
     // scalastyle:off magic.number
-    val data         = ByteString.fromInts(Random.nextInt())
     val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _, data))
     // scalastyle:on magic.number
-    BlockTemplate(flowTemplate.deps, flowTemplate.target, transactions)
+    transactions
   }
 
-  def prepareTemplate(fromShift: Int, to: Int): Unit = {
+  def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
-    val index         = ChainIndex(config.groupFrom + fromShift, to)
-    val flowTemplate  = node.blockFlow.prepareBlockFlowUnsafe(index)
-    val blockTemplate = getBlockTemplate(flowTemplate)
-    addNewTask(fromShift, to, blockTemplate)
+    val index        = ChainIndex(config.groupFrom + fromShift, to)
+    val flowTemplate = node.blockFlow.prepareBlockFlowUnsafe(index)
+    BlockTemplate(flowTemplate.deps, flowTemplate.target, fakeTransactions(to))
   }
 
-  def startTask(fromShift: Int,
-                to: Int,
-                template: BlockTemplate,
-                blockHandler: ActorRef): Future[Unit] =
-    Future {
+  def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit = {
+    val task = Future {
       val index = ChainIndex.unsafe(fromShift + config.groupFrom, to)
       FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
           val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
-          blockHandler.tell(handlerMessage, self)
-          self ! FairMiner.MiningResult(Some(block), index, miningCount, template)
+          blockHandler ! handlerMessage
+          self ! FairMiner.MiningResult(Some(block), index, miningCount)
         case None =>
-          self ! FairMiner.MiningResult(None, index, config.nonceStep, template)
+          self ! FairMiner.MiningResult(None, index, config.nonceStep)
       }
     }(context.dispatcher)
+    task.onComplete {
+      case Success(_) => ()
+      case Failure(e) => log.debug("Mining task failed", e)
+    }(context.dispatcher)
+  }
 }
