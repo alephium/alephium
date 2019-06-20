@@ -3,14 +3,16 @@ package org.alephium.flow.client
 import akka.actor.ActorRef
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.util.AVector
+import org.alephium.flow.storage.AllHandlers
+import org.alephium.protocol.model.ChainIndex
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 trait FairMinerState {
   implicit def config: PlatformConfig
 
-  protected def actualMiners: AVector[AVector[ActorRef]]
+  def handlers: AllHandlers
 
   protected val miningCounts        = Array.fill[BigInt](config.groupNumPerBroker, config.groups)(0)
   protected val taskRefreshDuration = config.groups.seconds.toMillis
@@ -52,9 +54,9 @@ trait FairMinerState {
     addTask(fromShift, to, template)
   }
 
-  def addTask(from: Int, to: Int, template: BlockTemplate): Unit = {
-    assert(!pendingTasks.contains((from, to)))
-    pendingTasks((from, to)) = template
+  def addTask(fromShift: Int, to: Int, template: BlockTemplate): Unit = {
+    assert(!pendingTasks.contains((fromShift, to)))
+    pendingTasks((fromShift, to)) = template
     startNewTasks()
   }
 
@@ -72,11 +74,17 @@ trait FairMinerState {
 
   protected def startNewTasks(): Unit = {
     pickTasks().foreach {
-      case ((fromShift, to), template) => startTask(fromShift, to, template)
+      case ((fromShift, to), template) =>
+        val index        = ChainIndex.unsafe(fromShift + config.groupFrom, to)
+        val blockHandler = handlers.getBlockHandler(index)
+        startTask(fromShift, to, template, blockHandler)
     }
   }
 
   def prepareTemplate(fromShift: Int, to: Int): Unit
 
-  def startTask(fromShift: Int, to: Int, template: BlockTemplate): Unit
+  def startTask(fromShift: Int,
+                to: Int,
+                template: BlockTemplate,
+                blockHandler: ActorRef): Future[Unit]
 }
