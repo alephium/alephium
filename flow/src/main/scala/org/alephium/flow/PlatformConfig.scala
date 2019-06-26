@@ -202,8 +202,8 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   val dbStorage =
     RocksDBStorage.openUnsafe(dbPath.resolve(brokerId.toString), RocksDBStorage.Compaction.HDD)
 
-  val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
+  val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
 
   val trie: MerklePatriciaTrie =
-    MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie))
+    MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, dbStorage.readOptions))
 }

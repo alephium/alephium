@@ -87,7 +87,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     private val storage =
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
-    val db   = HeaderDB(storage, ColumnFamily.Trie)
+    val db   = HeaderDB(storage, ColumnFamily.Trie, storage.readOptions)
     val trie = MerklePatriciaTrie.create(db)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (Keccak256, ByteString) = {
