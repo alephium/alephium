@@ -27,7 +27,7 @@ class TrieBench {
 
     RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
   }
-  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
+  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
 
   val trie = MerklePatriciaTrie.create(db)
 

@@ -1,15 +1,21 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
+import org.rocksdb.ReadOptions
 import org.alephium.serde._
 
 object RocksDBColumn {
-  def apply(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily): RocksDBColumn =
-    new RocksDBColumn(storage, cf)
+  def apply(storage: RocksDBStorage,
+            cf: RocksDBStorage.ColumnFamily,
+            readOptions: ReadOptions): RocksDBColumn =
+    new RocksDBColumn(storage, cf, readOptions)
 }
 
-class RocksDBColumn(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily)
-    extends KeyValueStorage {
+class RocksDBColumn(
+    storage: RocksDBStorage,
+    cf: RocksDBStorage.ColumnFamily,
+    readOptions: ReadOptions
+) extends KeyValueStorage {
 
   import RocksDBStorage.execute
 
@@ -20,7 +26,7 @@ class RocksDBColumn(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily)
   }
 
   def getRawUnsafe(key: ByteString): ByteString = {
-    val result = storage.db.get(handle, storage.readOptions, key.toArray)
+    val result = storage.db.get(handle, readOptions, key.toArray)
     if (result == null) throw IOError.RocksDB.keyNotFound.e
     else ByteString.fromArrayUnsafe(result)
   }
