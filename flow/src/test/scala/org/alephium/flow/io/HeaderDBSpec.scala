@@ -18,7 +18,7 @@ class HeaderDBSpec extends AlephiumSpec {
     val dbPath = tmpdir.resolve(dbname)
 
     val dbStorage    = RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
-    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
+    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary

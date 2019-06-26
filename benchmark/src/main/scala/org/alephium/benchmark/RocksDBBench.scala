@@ -32,7 +32,7 @@ class RocksDBBench {
     RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
   }
 
-  val db: RocksDBColumn = RocksDBColumn(dbStorage, ColumnFamily.All)
+  val db: RocksDBColumn = RocksDBColumn(dbStorage, ColumnFamily.All, dbStorage.readOptions)
 
   @Benchmark
   def randomInsertAndLookup(): Unit = {
