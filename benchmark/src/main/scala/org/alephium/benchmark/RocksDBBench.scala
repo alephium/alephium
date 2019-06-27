@@ -59,7 +59,8 @@ class RocksDBBench {
   def createDB(name: String,
                databaseOptions: DBOptions,
                columnOptions: ColumnFamilyOptions): RocksDBColumn = {
-    val path = tmpdir.resolve(s"bench-$name")
+    val id   = Random.alphanumeric.take(12).mkString
+    val path = tmpdir.resolve(s"bench-$name-$id")
 
     val files = path.toFile.listFiles
     if (files != null) {
