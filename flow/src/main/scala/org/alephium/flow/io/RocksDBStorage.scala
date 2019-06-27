@@ -2,30 +2,141 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import akka.util.ByteString
-import org.alephium.serde._
-import org.rocksdb.{Options, RocksDB}
+import org.alephium.util.AVector
+import org.rocksdb.{BlockBasedTableConfig, ColumnFamilyDescriptor, ColumnFamilyHandle, Options}
+import org.rocksdb.{ColumnFamilyOptions, DBOptions, LRUCache, RateLimiter, ReadOptions, RocksDB}
+import org.rocksdb.util.SizeUnit
 
 object RocksDBStorage {
-  def open(path: Path, options: Options): IOResult[RocksDBStorage] = execute {
-    openUnsafe(path, options)
-  }
-
-  def openUnsafe(path: Path, options: Options): RocksDBStorage = {
+  {
     RocksDB.loadLibrary()
-    val db = RocksDB.open(options, path.toString)
-    new RocksDBStorage(path, db)
   }
 
-  def dESTROY(path: Path, options: Options = new Options()): IOResult[Unit] = execute {
-    RocksDB.destroyDB(path.toString, options)
+  sealed abstract class ColumnFamily(val name: String)
+
+  object ColumnFamily {
+
+    case object All  extends ColumnFamily("all")
+    case object Trie extends ColumnFamily("trie")
+
+    val values: AVector[ColumnFamily] = AVector(All, Trie)
   }
 
-  def dESTROY(db: HeaderDB): IOResult[Unit] = execute {
+  case class Compaction(
+      initialFileSize: Long,
+      blockSize: Long,
+      writeRateLimit: Option[Long]
+  )
+
+  object Compaction {
+    import SizeUnit._
+
+    val SSD = Compaction(
+      initialFileSize = 64 * MB,
+      blockSize       = 16 * KB,
+      writeRateLimit  = None
+    )
+
+    val HDD = Compaction(
+      initialFileSize = 256 * MB,
+      blockSize       = 64 * KB,
+      writeRateLimit  = Some(16 * MB)
+    )
+  }
+
+  object Settings {
+    // TODO All options should become part of configuration
+    val MaxOpenFiles: Int           = 512
+    val BytesPerSync: Long          = 1 * SizeUnit.MB
+    val MemoryBudget: Long          = 128 * SizeUnit.MB
+    val WriteBufferMemoryRatio: Int = 2
+    val BlockCacheMemoryRatio: Int  = 3
+    val CPURatio: Int               = 2
+
+    val readOptions = (new ReadOptions).setVerifyChecksums(false)
+
+    val columns            = ColumnFamily.values.length
+    val memoryBudgetPerCol = MemoryBudget / columns
+
+    def databaseOptions(compaction: Compaction): DBOptions =
+      databaseOptionsForBudget(compaction, memoryBudgetPerCol)
+
+    def databaseOptionsForBudget(compaction: Compaction, memoryBudgetPerCol: Long): DBOptions = {
+      val options = new DBOptions()
+        .setUseFsync(false)
+        .setCreateIfMissing(true)
+        .setCreateMissingColumnFamilies(true)
+        .setMaxOpenFiles(MaxOpenFiles)
+        .setKeepLogFileNum(1)
+        .setBytesPerSync(BytesPerSync)
+        .setDbWriteBufferSize(memoryBudgetPerCol / WriteBufferMemoryRatio)
+        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime().availableProcessors() / CPURatio))
+
+      compaction.writeRateLimit match {
+        case Some(rateLimit) => options.setRateLimiter(new RateLimiter(rateLimit))
+        case None            => options
+      }
+    }
+
+    def columnOptions(compaction: Compaction): ColumnFamilyOptions =
+      columnOptionsForBudget(compaction, memoryBudgetPerCol)
+
+    def columnOptionsForBudget(compaction: Compaction,
+                               memoryBudgetPerCol: Long): ColumnFamilyOptions = {
+      import scala.collection.JavaConverters._
+
+      (new ColumnFamilyOptions)
+        .setLevelCompactionDynamicLevelBytes(true)
+        .setTableFormatConfig(
+          new BlockBasedTableConfig()
+            .setBlockSize(compaction.blockSize)
+            .setBlockCache(new LRUCache(MemoryBudget / BlockCacheMemoryRatio))
+            .setCacheIndexAndFilterBlocks(true)
+            .setPinL0FilterAndIndexBlocksInCache(true)
+        )
+        .optimizeLevelStyleCompaction(memoryBudgetPerCol)
+        .setTargetFileSizeBase(compaction.initialFileSize)
+        .setCompressionPerLevel(Nil.asJava)
+    }
+  }
+
+  def open(path: Path, compaction: Compaction): IOResult[RocksDBStorage] = execute {
+    openUnsafe(path, compaction)
+  }
+
+  def openUnsafe(path: Path, compaction: Compaction): RocksDBStorage =
+    openUnsafeWithOptions(path,
+                          Settings.databaseOptions(compaction),
+                          Settings.columnOptions(compaction))
+
+  def openUnsafeWithOptions(path: Path,
+                            databaseOptions: DBOptions,
+                            columnOptions: ColumnFamilyOptions): RocksDBStorage = {
+    import scala.collection.JavaConverters._
+
+    val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
+    val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
+      new ColumnFamilyDescriptor(name.getBytes, columnOptions)
+    }
+
+    val db =
+      RocksDB.open(databaseOptions,
+                   path.toString,
+                   descriptors.toIterable.toList.asJava,
+                   handles.asJava)
+
+    new RocksDBStorage(path, db, AVector.fromIterator(handles.toIterator))
+  }
+
+  def dESTROY(path: Path): IOResult[Unit] = execute {
+    RocksDB.destroyDB(path.toString, new Options())
+  }
+
+  def dESTROY(db: RocksDBStorage): IOResult[Unit] = execute {
     dESTROYUnsafe(db)
   }
 
-  def dESTROYUnsafe(db: HeaderDB): Unit = {
+  def dESTROYUnsafe(db: RocksDBStorage): Unit = {
     RocksDB.destroyDB(db.path.toString, new Options())
   }
 
@@ -38,95 +149,15 @@ object RocksDBStorage {
   }
 }
 
-class RocksDBStorage(val path: Path, db: RocksDB) extends KeyValueStorage {
+class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
   import RocksDBStorage._
+
+  def handle(cf: ColumnFamily): ColumnFamilyHandle =
+    cfHandles(ColumnFamily.values.indexWhere(_ == cf))
 
   def close(): IOResult[Unit] = execute {
     db.close()
   }
 
   def closeUnsafe(): Unit = db.close()
-
-  def getRaw(key: ByteString): IOResult[ByteString] = execute {
-    getRawUnsafe(key)
-  }
-
-  def getRawUnsafe(key: ByteString): ByteString = {
-    val result = db.get(key.toArray)
-    if (result == null) throw IOError.RocksDB.keyNotFound.e
-    else ByteString.fromArrayUnsafe(result)
-  }
-
-  def get[V: Serde](key: ByteString): IOResult[V] = execute {
-    getUnsafe[V](key)
-  }
-
-  def getUnsafe[V: Serde](key: ByteString): V = {
-    val data = getRawUnsafe(key)
-    deserialize[V](data) match {
-      case Left(e)  => throw e
-      case Right(v) => v
-    }
-  }
-
-  def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = execute {
-    getOptRawUnsafe(key)
-  }
-
-  def getOptRawUnsafe(key: ByteString): Option[ByteString] = {
-    val result = db.get(key.toArray)
-    if (result == null) None
-    else {
-      Some(ByteString.fromArrayUnsafe(result))
-    }
-  }
-
-  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = execute {
-    getOptUnsafe[V](key)
-  }
-
-  def getOptUnsafe[V: Serde](key: ByteString): Option[V] = {
-    getOptRawUnsafe(key) map { data =>
-      deserialize[V](data) match {
-        case Left(e)  => throw e
-        case Right(v) => v
-      }
-    }
-  }
-
-  def exists(key: ByteString): IOResult[Boolean] = execute {
-    existsUnsafe(key)
-  }
-
-  def existsUnsafe(key: ByteString): Boolean = {
-    val result = db.get(key.toArray)
-    result != null
-  }
-
-  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = execute {
-    putRawUnsafe(key, value)
-  }
-
-  def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
-    db.put(key.toArray, value.toArray)
-  }
-
-  def put[V: Serde](key: ByteString, value: V): IOResult[Unit] = {
-    putRaw(key, serialize(value))
-  }
-
-  def putUnsafe[V: Serde](key: ByteString, value: V): Unit = {
-    putRawUnsafe(key, serialize(value))
-  }
-
-  // TODO: should we check the existence of the key?
-  def delete(key: ByteString): IOResult[Unit] = execute {
-    deleteUnsafe(key)
-  }
-
-  // TODO: should we check the existence of the key?
-  def deleteUnsafe(key: ByteString): Unit = {
-    db.delete(key.toArray)
-  }
-
 }
