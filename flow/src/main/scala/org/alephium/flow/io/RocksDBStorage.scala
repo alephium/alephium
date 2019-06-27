@@ -58,7 +58,10 @@ object RocksDBStorage {
     val columns            = ColumnFamily.values.length
     val memoryBudgetPerCol = MemoryBudget / columns
 
-    def databaseOptions(compaction: Compaction): DBOptions = {
+    def databaseOptions(compaction: Compaction): DBOptions =
+      databaseOptionsForBudget(compaction, memoryBudgetPerCol)
+
+    def databaseOptionsForBudget(compaction: Compaction, memoryBudgetPerCol: Long): DBOptions = {
       val options = new DBOptions()
         .setUseFsync(false)
         .setCreateIfMissing(true)
@@ -75,7 +78,11 @@ object RocksDBStorage {
       }
     }
 
-    def columnOptions(compaction: Compaction): ColumnFamilyOptions = {
+    def columnOptions(compaction: Compaction): ColumnFamilyOptions =
+      columnOptionsForBudget(compaction, memoryBudgetPerCol)
+
+    def columnOptionsForBudget(compaction: Compaction,
+                               memoryBudgetPerCol: Long): ColumnFamilyOptions = {
       import scala.collection.JavaConverters._
 
       (new ColumnFamilyOptions)
@@ -97,17 +104,23 @@ object RocksDBStorage {
     openUnsafe(path, compaction)
   }
 
-  def openUnsafe(path: Path, compaction: Compaction): RocksDBStorage = {
+  def openUnsafe(path: Path, compaction: Compaction): RocksDBStorage =
+    openUnsafeWithOptions(path,
+                          Settings.databaseOptions(compaction),
+                          Settings.columnOptions(compaction))
+
+  def openUnsafeWithOptions(path: Path,
+                            databaseOptions: DBOptions,
+                            columnOptions: ColumnFamilyOptions): RocksDBStorage = {
     import scala.collection.JavaConverters._
 
-    val handles       = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
-    val columnOptions = Settings.columnOptions(compaction)
+    val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
     val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
       new ColumnFamilyDescriptor(name.getBytes, columnOptions)
     }
 
     val db =
-      RocksDB.open(Settings.databaseOptions(compaction),
+      RocksDB.open(databaseOptions,
                    path.toString,
                    descriptors.toIterable.toList.asJava,
                    handles.asJava)
