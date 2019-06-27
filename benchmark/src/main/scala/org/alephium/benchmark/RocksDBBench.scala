@@ -72,9 +72,11 @@ class RocksDBBench {
     RocksDBColumn(storage, ColumnFamily.All, storage.readOptions)
   }
 
-  def createDBForBudget(name: String, memoryBudgetPerCol: Long): RocksDBColumn =
+  def createDBForBudget(name: String,
+                        compaction: Compaction,
+                        memoryBudgetPerCol: Long): RocksDBColumn =
     createDB(name,
-             Settings.databaseOptionsForBudget(Compaction.SSD, memoryBudgetPerCol),
+             Settings.databaseOptionsForBudget(compaction, memoryBudgetPerCol),
              Settings.columnOptionsForBudget(Compaction.SSD, memoryBudgetPerCol))
 
   @Benchmark
@@ -101,19 +103,47 @@ class RocksDBBench {
 
   @Benchmark
   def ssdSettingsFor128(): Unit = {
-    val db: RocksDBColumn = createDBForBudget("ssd-128", 128 * SizeUnit.MB)
+    val db: RocksDBColumn = createDBForBudget("ssd-128", Compaction.SSD, 128 * SizeUnit.MB)
     randomInsertAndLookup(db)
   }
 
   @Benchmark
   def ssdSettingsFor256(): Unit = {
-    val db: RocksDBColumn = createDBForBudget("ssd-256", 256 * SizeUnit.MB)
+    val db: RocksDBColumn = createDBForBudget("ssd-256", Compaction.SSD, 256 * SizeUnit.MB)
     randomInsertAndLookup(db)
   }
 
   @Benchmark
   def ssdSettingsFor512(): Unit = {
-    val db: RocksDBColumn = createDBForBudget("ssd-512", 512 * SizeUnit.MB)
+    val db: RocksDBColumn = createDBForBudget("ssd-512", Compaction.SSD, 512 * SizeUnit.MB)
+    randomInsertAndLookup(db)
+  }
+
+  @Benchmark
+  def hddSettings(): Unit = {
+    val db: RocksDBColumn =
+      createDB("hdd",
+               Settings.databaseOptions(Compaction.HDD),
+               Settings.columnOptions(Compaction.HDD))
+
+    randomInsertAndLookup(db)
+  }
+
+  @Benchmark
+  def hddSettingsFor128(): Unit = {
+    val db: RocksDBColumn = createDBForBudget("hdd-128", Compaction.HDD, 128 * SizeUnit.MB)
+    randomInsertAndLookup(db)
+  }
+
+  @Benchmark
+  def hddSettingsFor256(): Unit = {
+    val db: RocksDBColumn = createDBForBudget("hdd-256", Compaction.HDD, 256 * SizeUnit.MB)
+    randomInsertAndLookup(db)
+  }
+
+  @Benchmark
+  def hddSettingsFor512(): Unit = {
+    val db: RocksDBColumn = createDBForBudget("hdd-512", Compaction.HDD, 512 * SizeUnit.MB)
     randomInsertAndLookup(db)
   }
 }
