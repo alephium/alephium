@@ -1,26 +1,20 @@
 package org.alephium.flow.io
 
-import java.nio.file.Path
+import org.rocksdb.ReadOptions
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.BlockHeader
-import org.rocksdb.{Options, RocksDB}
+
+import RocksDBStorage.ColumnFamily
 
 object HeaderDB {
-  import RocksDBStorage.execute
-
-  def open(path: Path, options: Options): IOResult[HeaderDB] = execute {
-    openUnsafe(path, options)
-  }
-
-  def openUnsafe(path: Path, options: Options): HeaderDB = {
-    RocksDB.loadLibrary()
-    val db = RocksDB.open(options, path.toString)
-    new HeaderDB(path, db)
+  def apply(storage: RocksDBStorage, cf: ColumnFamily, readOptions: ReadOptions): HeaderDB = {
+    new HeaderDB(storage, cf, readOptions)
   }
 }
 
-class HeaderDB(path: Path, db: RocksDB) extends RocksDBStorage(path, db) {
+class HeaderDB(val storage: RocksDBStorage, cf: ColumnFamily, readOptions: ReadOptions)
+    extends RocksDBColumn(storage, cf, readOptions) {
   def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
     getOpt(hash.bytes)
 
