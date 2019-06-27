@@ -8,7 +8,7 @@ import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.util.Files
 import org.openjdk.jmh.annotations._
 
-import RocksDBStorage.ColumnFamily
+import RocksDBStorage.{ColumnFamily, Settings}
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -27,7 +27,7 @@ class TrieBench {
 
     RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
   }
-  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
+  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
   val trie = MerklePatriciaTrie.create(db)
 

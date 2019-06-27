@@ -125,7 +125,7 @@ object RocksDBStorage {
                    descriptors.toIterable.toList.asJava,
                    handles.asJava)
 
-    new RocksDBStorage(path, db, Settings.readOptions, AVector.fromIterator(handles.toIterator))
+    new RocksDBStorage(path, db, AVector.fromIterator(handles.toIterator))
   }
 
   def dESTROY(path: Path): IOResult[Unit] = execute {
@@ -149,10 +149,7 @@ object RocksDBStorage {
   }
 }
 
-class RocksDBStorage(val path: Path,
-                     val db: RocksDB,
-                     val readOptions: ReadOptions,
-                     cfHandles: AVector[ColumnFamilyHandle]) {
+class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
   import RocksDBStorage._
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
