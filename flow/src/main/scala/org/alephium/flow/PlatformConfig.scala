@@ -190,7 +190,7 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     with PlatformBrokerConfig
     with PlatformDiscoveryConfig { self =>
 
-  import RocksDBStorage.ColumnFamily
+  import RocksDBStorage.{ColumnFamily, Settings}
 
   val disk: Disk = Disk.createUnsafe(rootPath)
 
@@ -202,8 +202,8 @@ class PlatformConfig(val env: Env, val rootPath: Path)
   val dbStorage =
     RocksDBStorage.openUnsafe(dbPath.resolve(brokerId.toString), RocksDBStorage.Compaction.HDD)
 
-  val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
+  val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
   val trie: MerklePatriciaTrie =
-    MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, dbStorage.readOptions))
+    MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, Settings.readOptions))
 }

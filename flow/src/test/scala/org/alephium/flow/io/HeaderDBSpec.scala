@@ -8,7 +8,7 @@ import org.scalacheck.Arbitrary
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import RocksDBStorage.ColumnFamily
+import RocksDBStorage.{ColumnFamily, Settings}
 
 class HeaderDBSpec extends AlephiumSpec {
 
@@ -18,7 +18,7 @@ class HeaderDBSpec extends AlephiumSpec {
     val dbPath = tmpdir.resolve(dbname)
 
     val dbStorage    = RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
-    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, dbStorage.readOptions)
+    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary
