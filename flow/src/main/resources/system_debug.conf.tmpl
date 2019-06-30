@@ -23,12 +23,6 @@ akka {
       throughput = 1
     }
 
-    flow-handler-dispatcher {
-      type = "PinnedDispatcher"
-      executor = "thread-pool-executor"
-      thread-pool-executor.allow-core-timeout = off
-    }
-
     guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
 
     debug {

@@ -1,6 +1,6 @@
 package org.alephium.flow.storage
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner
@@ -20,16 +20,20 @@ object FlowHandler {
   case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
+  case class Register(miner: ActorRef)                  extends Command
 
   sealed trait Event
   case class BlockFlowTemplate(index: ChainIndex, deps: AVector[Keccak256], target: BigInt)
       extends Event
 }
 
+// Queue all the work related to miner, rpc server, etc. in this actor
 class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends BaseActor {
   import FlowHandler._
 
-  override def receive: Receive = {
+  override def receive: Receive = handleWith(None)
+
+  def handleWith(minerOpt: Option[ActorRef]): Receive = {
     case GetHeaders(locators) =>
       blockFlow.getHeaders(locators) match {
         case Left(error) =>
@@ -47,9 +51,11 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
     case PrepareBlockFlow(chainIndex) =>
       prepareBlockFlow(chainIndex)
     case AddHeader(header: BlockHeader) =>
-      handleHeader(header)
+      handleHeader(minerOpt, header)
     case AddBlock(block, origin) =>
-      handleBlock(block, origin)
+      handleBlock(minerOpt, block, origin)
+    case Register(miner) =>
+      context become handleWith(Some(miner))
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
@@ -63,27 +69,31 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
     }
   }
 
-  def handleHeader(header: BlockHeader): Unit = {
+  def handleHeader(minerOpt: Option[ActorRef], header: BlockHeader): Unit = {
     if (!blockFlow.contains(header)) {
       blockFlow.add(header) match {
         case Left(e) =>
           // TODO: handle IOError
           log.error(s"Failed in adding new header: ${e.toString}")
         case Right(_) =>
+          minerOpt.foreach(_ ! Miner.UpdateTemplate)
           logInfo(header)
       }
     }
   }
 
-  def handleBlock(block: Block, origin: DataOrigin): Unit = {
+  def handleBlock(minerOpt: Option[ActorRef], block: Block, origin: DataOrigin): Unit = {
     if (!blockFlow.contains(block)) {
       blockFlow.add(block) match {
         case Left(e) =>
           // TODO: handle IOError
           log.error(s"Failed in adding new block: ${e.toString}")
         case Right(_) =>
-          if (origin == DataOrigin.LocalMining) {
-            sender() ! Miner.BlockAdded(block.chainIndex)
+          origin match {
+            case DataOrigin.LocalMining =>
+              minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
+            case _: DataOrigin.Remote =>
+              minerOpt.foreach(_ ! Miner.UpdateTemplate)
           }
           logInfo(block.header)
       }

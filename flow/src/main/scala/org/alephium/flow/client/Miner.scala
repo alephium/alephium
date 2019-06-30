@@ -16,10 +16,11 @@ import scala.util.Random
 
 object Miner {
   sealed trait Command
-  case object Start                          extends Command
-  case object Stop                           extends Command
-  case class BlockAdded(index: ChainIndex)   extends Command
-  case class Nonce(from: BigInt, to: BigInt) extends Command
+  case object Start                             extends Command
+  case object Stop                              extends Command
+  case object UpdateTemplate                    extends Command
+  case class MinedBlockAdded(index: ChainIndex) extends Command
+  case class Nonce(from: BigInt, to: BigInt)    extends Command
 
   def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
     @tailrec
@@ -80,7 +81,11 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           }
       }
 
-    case _: Miner.BlockAdded =>
+    case Miner.UpdateTemplate =>
+      allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
+      context become collect
+
+    case Miner.MinedBlockAdded(_) =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
       context become collect
   }
