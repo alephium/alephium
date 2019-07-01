@@ -52,30 +52,31 @@ trait PlatformConfigFiles extends StrictLogging {
   def env: Env
   def rootPath: Path
 
-  def getConfigFile[A](name: String)(create: File => A): File = {
+  def getConfigFile(name: String): File = {
     val directory = rootPath.toFile
     if (!directory.exists) directory.mkdir()
 
     val path = rootPath.resolve(s"$name.conf")
     logger.info(s"Using $name configuration file at $path")
 
-    val file = path.toFile
-    if (!file.exists) {
-      create(file)
-    }
+    path.toFile
+  }
+
+  def getConfigSystem(): File = {
+    val file     = getConfigFile("system")
+    val env      = Env.resolve()
+    val filename = s"system_${env.name}.conf"
+    if (file.exists) { file.delete }
+    Files.copyFromResource(s"/$filename.tmpl", file.toPath)
+    file.setWritable(false)
     file
   }
 
-  def getConfigSystem(): File =
-    getConfigFile("system") { file =>
-      val env      = Env.resolve()
-      val filename = s"system_${env.name}.conf"
-      Files.copyFromResource(s"/$filename.tmpl", file.toPath)
-      file.setWritable(false)
-    }
-
-  def getConfigUser(): File =
-    getConfigFile("user")(_.createNewFile)
+  def getConfigUser(): File = {
+    val file = getConfigFile("user")
+    if (!file.exists) { file.createNewFile }
+    file
+  }
 
   def parseConfig(): Config = {
     ConfigFactory
