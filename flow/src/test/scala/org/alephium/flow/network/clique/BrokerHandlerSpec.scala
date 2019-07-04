@@ -9,7 +9,7 @@ import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerId, CliqueInfo, ModelGen}
+import org.alephium.protocol.model.{CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalatest.EitherValues._
@@ -59,14 +59,14 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
           case hello: Hello =>
             hello.version is 0
             hello.cliqueInfo is localCliqueInfo
-            hello.brokerId is config.brokerId
+            hello.brokerId is config.brokerId.value
           case _ => assert(false)
         }
       case _ => assert(false)
     }
 
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomId         = BrokerId(Random.nextInt(randomCliqueInfo.brokerNum))
+    val randomId         = Random.nextInt(randomCliqueInfo.brokerNum)
     val helloAck         = Message(HelloAck(randomCliqueInfo, randomId))
     inboundBrokerHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
@@ -77,7 +77,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
     val builder = new BrokerHandler.Builder {
       override def createOutboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
-          brokerId: BrokerId,
+          brokerId: Int,
           remote: InetSocketAddress,
           blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props = {
         Props(new OutboundBrokerHandler(selfCliqueInfo, brokerId, remote, blockHandlers) {
@@ -88,7 +88,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
       }
     }
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomBrokerId   = BrokerId(0)
+    val randomBrokerId   = 0
     val outboundBrokerHandler = system.actorOf(
       builder.createOutboundBrokerHandler(localCliqueInfo, randomBrokerId, remote, blockHandlers))
 
@@ -103,7 +103,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
         message.payload match {
           case ack: HelloAck =>
             ack.cliqueInfo is localCliqueInfo
-            ack.brokerId is config.brokerId
+            ack.brokerId is config.brokerId.value
           case _ => assert(false)
         }
       case _ => assert(false)
