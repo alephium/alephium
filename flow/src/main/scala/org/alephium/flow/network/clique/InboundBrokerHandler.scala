@@ -8,7 +8,7 @@ import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.message.Hello
-import org.alephium.protocol.model.CliqueInfo
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 
 object InboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo, connection: ActorRef, allHandlers: AllHandlers)(
@@ -22,17 +22,19 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
     extends BrokerHandler {
 
   var cliqueInfo: CliqueInfo    = _
+  var remoteBroker: BrokerInfo  = _
   var remoteIndex: Int          = _
   var remote: InetSocketAddress = _
 
   connection ! Tcp.Register(self)
-  connection ! BrokerHandler.envelope(Hello(selfCliqueInfo, config.brokerId.value))
+  connection ! BrokerHandler.envelope(Hello(selfCliqueInfo, config.brokerInfo.id))
 
   override def receive: Receive = handleWith(ByteString.empty, awaitHelloAck, handlePayload)
 
   def handle(_cliqueInfo: CliqueInfo, _remoteIndex: Int): Unit = {
-    cliqueInfo  = _cliqueInfo
-    remoteIndex = _remoteIndex
-    remote      = cliqueInfo.peers(_remoteIndex)
+    cliqueInfo   = _cliqueInfo
+    remoteIndex  = _remoteIndex
+    remote       = cliqueInfo.peers(_remoteIndex)
+    remoteBroker = BrokerInfo.apply(_remoteIndex, _cliqueInfo.groupNumPerBroker, remote)
   }
 }

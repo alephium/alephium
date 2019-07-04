@@ -11,10 +11,12 @@ import scala.reflect.ClassTag
 trait BlockFlowState {
   implicit def config: PlatformConfig
 
+  def brokerInfo: BrokerInfo
+
   val groups = config.groups
 
   private val bestDeps = Array.tabulate(config.groupNumPerBroker) { fromShift =>
-    val mainGroup = config.groupFrom + fromShift
+    val mainGroup = brokerInfo.groupFrom + fromShift
     val deps1 = AVector.tabulate(groups - 1) { i =>
       if (i < mainGroup) config.genesisBlocks(i).head.hash
       else config.genesisBlocks(i + 1).head.hash
@@ -27,24 +29,24 @@ trait BlockFlowState {
 
   private val inBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
-      val mainGroup = config.groupFrom + toShift
-      val fromIndex = if (k < config.groupFrom) k else k + config.groupNumPerBroker
+      val mainGroup = brokerInfo.groupFrom + toShift
+      val fromIndex = if (k < brokerInfo.groupFrom) k else k + config.groupNumPerBroker
       BlockChain.fromGenesisUnsafe(config.genesisBlocks(fromIndex)(mainGroup))
     }
   private val outBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(config.groupNumPerBroker, groups) { (fromShift, to) =>
-      val mainGroup = config.groupFrom + fromShift
+      val mainGroup = brokerInfo.groupFrom + fromShift
       BlockChain.fromGenesisUnsafe(config.genesisBlocks(mainGroup)(to))
     }
   private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        if (config.brokerId.containsRaw(from)) {
-          val fromShift = from - config.groupFrom
+        if (brokerInfo.containsRaw(from)) {
+          val fromShift = from - brokerInfo.groupFrom
           outBlockChains(fromShift)(to)
-        } else if (config.brokerId.containsRaw(to)) {
-          val toShift   = to - config.groupFrom
-          val fromIndex = if (from < config.groupFrom) from else from - config.groupNumPerBroker
+        } else if (brokerInfo.containsRaw(to)) {
+          val toShift   = to - brokerInfo.groupFrom
+          val fromIndex = if (from < brokerInfo.groupFrom) from else from - config.groupNumPerBroker
           inBlockChains(toShift)(fromIndex)
         } else BlockHeaderChain.fromGenesisUnsafe(config.genesisBlocks(from)(to))
     }
@@ -61,13 +63,14 @@ trait BlockFlowState {
   }
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
-    assert(config.brokerId.contains(from) || config.brokerId.contains(to))
-    if (config.brokerId.contains(from)) outBlockChains(from.value - config.groupFrom)(to.value)
+    assert(brokerInfo.contains(from) || brokerInfo.contains(to))
+    if (brokerInfo.contains(from))
+      outBlockChains(from.value - brokerInfo.groupFrom)(to.value)
     else {
       val fromIndex =
-        if (from.value < config.groupFrom) from.value
+        if (from.value < brokerInfo.groupFrom) from.value
         else from.value - config.groupNumPerBroker
-      val toShift = to.value - config.groupFrom
+      val toShift = to.value - brokerInfo.groupFrom
       inBlockChains(toShift)(fromIndex)
     }
   }
@@ -81,13 +84,13 @@ trait BlockFlowState {
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
-    val groupShift = groupIndex.value - config.groupFrom
+    val groupShift = groupIndex.value - brokerInfo.groupFrom
     bestDeps(groupShift)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
-    assert(config.brokerId.containsRaw(mainGroup))
-    val groupShift = mainGroup - config.groupFrom
+    assert(brokerInfo.containsRaw(mainGroup))
+    val groupShift = mainGroup - brokerInfo.groupFrom
     bestDeps(groupShift) = deps
   }
 

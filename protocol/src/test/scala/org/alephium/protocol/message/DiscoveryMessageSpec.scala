@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.protocol.model.BrokerId
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
 import org.scalatest.EitherValues._
 
@@ -27,17 +27,16 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def groups: Int
     def brokerNum: Int
     def groupNumPerBroker: Int
-    def brokerId: BrokerId
+    def publicAddress: InetSocketAddress = new InetSocketAddress(1)
+    def brokerInfo: BrokerInfo
     def isCoordinator: Boolean
 
     implicit val config: DiscoveryConfig = new DiscoveryConfig {
       val groups: Int            = self.groups
       val brokerNum: Int         = self.brokerNum
       val groupNumPerBroker: Int = self.groupNumPerBroker
-      val brokerId: BrokerId     = self.brokerId
-      val isCoordinator: Boolean = self.isCoordinator
 
-      def publicAddress: InetSocketAddress       = new InetSocketAddress(1)
+      def publicAddress: InetSocketAddress       = self.publicAddress
       val (privateKey, publicKey)                = ED25519.generatePriPub()
       def discoveryPrivateKey: ED25519PrivateKey = privateKey
       def discoveryPublicKey: ED25519PublicKey   = publicKey
@@ -54,14 +53,14 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def groups: Int            = 4
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1
-    def brokerId: BrokerId     = BrokerId.unsafe(0)
+    def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
     def isCoordinator: Boolean = true
 
     val peerFixture = new DiscoveryConfigFixture {
       def groups: Int            = 4
       def brokerNum: Int         = 4
       def groupNumPerBroker: Int = 1
-      def brokerId: BrokerId     = BrokerId.unsafe(0)
+      def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>

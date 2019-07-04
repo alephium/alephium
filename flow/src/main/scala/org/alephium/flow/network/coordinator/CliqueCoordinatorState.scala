@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorRef
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.AVector
 
 trait CliqueCoordinatorState {
@@ -14,9 +14,11 @@ trait CliqueCoordinatorState {
   val brokerAddresses  = Array.fill[Option[InetSocketAddress]](brokerNum)(None)
   val brokerConnectors = Array.fill[Option[ActorRef]](brokerNum)(None)
 
-  def addBrokerInfo(info: BrokerConnector.BrokerInfo, sender: ActorRef): Boolean = {
-    val id = info.id.value
-    if (id != config.brokerId.value && brokerAddresses(id).isEmpty) {
+  def addBrokerInfo(info: BrokerInfo, sender: ActorRef): Boolean = {
+    val id = info.id
+    if (id != config.brokerInfo.id &&
+        info.groupNumPerBroker == config.groupNumPerBroker &&
+        brokerAddresses(id).isEmpty) {
       brokerAddresses(id)  = Some(info.address)
       brokerConnectors(id) = Some(sender)
       true
@@ -25,19 +27,19 @@ trait CliqueCoordinatorState {
 
   def isBrokerInfoFull: Boolean = {
     brokerAddresses.zipWithIndex.forall {
-      case (opt, idx) => opt.nonEmpty || idx == config.brokerId.value
+      case (opt, idx) => opt.nonEmpty || idx == config.brokerInfo.id
     }
   }
 
   def broadcast[T](message: T): Unit = {
     brokerConnectors.zipWithIndex.foreach {
-      case (opt, idx) => if (idx != config.brokerId.value) opt.get ! message
+      case (opt, idx) => if (idx != config.brokerInfo.id) opt.get ! message
     }
   }
 
   protected def buildCliqueInfo: CliqueInfo = {
     val addresses = AVector.tabulate(config.brokerNum) { i =>
-      if (i == config.brokerId.value) config.publicAddress else brokerAddresses(i).get
+      if (i == config.brokerInfo.id) config.publicAddress else brokerAddresses(i).get
     }
     CliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
                       addresses,
@@ -46,7 +48,7 @@ trait CliqueCoordinatorState {
 
   val readys: Array[Boolean] = {
     val result = Array.fill(brokerNum)(false)
-    result(config.brokerId.value) = true
+    result(config.brokerInfo.id) = true
     result
   }
   def isAllReady: Boolean     = readys.forall(identity)
@@ -54,7 +56,7 @@ trait CliqueCoordinatorState {
 
   val closeds: Array[Boolean] = {
     val result = Array.fill(brokerNum)(false)
-    result(config.brokerId.value) = true
+    result(config.brokerInfo.id) = true
     result
   }
   def isAllClosed: Boolean = closeds.forall(identity)

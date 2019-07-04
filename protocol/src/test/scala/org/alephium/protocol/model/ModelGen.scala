@@ -72,8 +72,11 @@ object ModelGen {
     Gen.oneOf((1 to config.groups).filter(config.groups % _ == 0))
   }
 
-  def brokerIdGen(implicit config: CliqueConfig): Gen[BrokerId] = {
-    Gen.choose(0, config.brokerNum - 1).map(BrokerId.apply)
+  def brokerInfo(implicit config: CliqueConfig): Gen[BrokerInfo] = {
+    for {
+      id      <- Gen.choose(0, config.brokerNum - 1)
+      address <- socketAddress
+    } yield BrokerInfo.unsafe(id, config.groupNumPerBroker, address)
   }
 
   def cliqueInfo(implicit config: GroupConfig): Gen[CliqueInfo] = {

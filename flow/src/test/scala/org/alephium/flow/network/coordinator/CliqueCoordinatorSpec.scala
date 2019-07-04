@@ -2,7 +2,7 @@ package org.alephium.flow.network.coordinator
 
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.flow.PlatformConfig
-import org.alephium.protocol.model.{BrokerId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.AlephiumActorSpec
 
 class CliqueCoordinatorSpec extends AlephiumActorSpec("CliqueCoordinatorSpec") {
@@ -11,11 +11,11 @@ class CliqueCoordinatorSpec extends AlephiumActorSpec("CliqueCoordinatorSpec") {
     val coordinator = system.actorOf(CliqueCoordinator.props())
 
     val probs = (0 until config.brokerNum)
-      .filter(_ != config.brokerId.value)
+      .filter(_ != config.brokerInfo.id)
       .map { i =>
         val probe   = TestProbe()
         val address = SocketUtil.temporaryServerAddress()
-        coordinator.tell(BrokerConnector.BrokerInfo(BrokerId(i), address), probe.ref)
+        coordinator.tell(BrokerInfo(i, config.groupNumPerBroker, address), probe.ref)
         (i, probe)
       }
       .toMap

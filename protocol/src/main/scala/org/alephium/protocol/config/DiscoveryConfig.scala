@@ -7,7 +7,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import scala.concurrent.duration.FiniteDuration
 
 // TODO: refactor this as two configs
-trait DiscoveryConfig extends BrokerConfig {
+trait DiscoveryConfig extends CliqueConfig {
   def publicAddress: InetSocketAddress
 
   def discoveryPrivateKey: ED25519PrivateKey

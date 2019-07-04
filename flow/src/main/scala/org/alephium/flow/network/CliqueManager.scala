@@ -6,7 +6,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{Block, CliqueInfo}
+import org.alephium.protocol.model.{Block, BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.{AVector, BaseActor}
 
 object CliqueManager {
@@ -26,7 +26,7 @@ object CliqueManager {
   ) extends Command
 
   sealed trait Event
-  case class Connected(cliqueInfo: CliqueInfo, brokerIndex: Int) extends Command
+  case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
 }
 
 class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(

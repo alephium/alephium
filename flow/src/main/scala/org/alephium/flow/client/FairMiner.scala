@@ -80,8 +80,8 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
 
   def handleMining: Receive = {
     case FairMiner.MiningResult(blockOpt, chainIndex, miningCount) =>
-      assert(config.brokerId.contains(chainIndex.from))
-      val fromShift = chainIndex.from.value - config.groupFrom
+      assert(config.brokerInfo.contains(chainIndex.from))
+      val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
       increaseCounts(fromShift, to, miningCount)
       blockOpt match {
@@ -97,7 +97,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     case Miner.UpdateTemplate =>
       updateTasks()
     case Miner.MinedBlockAdded(chainIndex) =>
-      val fromShift = chainIndex.from.value - config.groupFrom
+      val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
       updateTasks()
       setIdle(fromShift, to)
@@ -115,14 +115,14 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
-    val index        = ChainIndex(config.groupFrom + fromShift, to)
+    val index        = ChainIndex(config.brokerInfo.groupFrom + fromShift, to)
     val flowTemplate = node.blockFlow.prepareBlockFlowUnsafe(index)
     BlockTemplate(flowTemplate.deps, flowTemplate.target, fakeTransactions(to))
   }
 
   def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit = {
     val task = Future {
-      val index = ChainIndex.unsafe(fromShift + config.groupFrom, to)
+      val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
       FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
           val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
