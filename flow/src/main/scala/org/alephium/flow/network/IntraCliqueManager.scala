@@ -31,10 +31,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
     case (address, index) =>
       if (index > config.brokerId.value) {
         log.debug(s"Connect to broker $index, $address")
-        val props = builder.createOutboundBrokerHandler(cliqueInfo,
-                                                        BrokerId.unsafe(index),
-                                                        address,
-                                                        allHandlers)
+        val props = builder.createOutboundBrokerHandler(cliqueInfo, index, address, allHandlers)
         context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
       }
   }
@@ -57,7 +54,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
     case CliqueManager.Connected(_cliqueInfo, brokerId) =>
       if (_cliqueInfo.id == cliqueInfo.id) {
         log.debug(s"Broker $brokerId connected")
-        val newBrokers = brokers + (brokerId.value -> sender())
+        val newBrokers = brokers + (brokerId -> sender())
         if (newBrokers.size == cliqueInfo.peers.length - 1) {
           log.debug("All Brokers connected")
           context.parent ! IntraCliqueManager.Ready

@@ -15,7 +15,8 @@ case class Node(builders: BrokerHandler.Builder, name: String)(implicit config: 
 
   val discoveryProps  = DiscoveryServer.props(config.bootstrap)(config)
   val discoveryServer = system.actorOf(discoveryProps, "DiscoveryServer")
-  val cliqueManager   = system.actorOf(CliqueManager.props(builders), "CliqueManager")
+  val cliqueManager =
+    system.actorOf(CliqueManager.props(builders, discoveryServer), "CliqueManager")
 
   val allHandlers = AllHandlers.build(system, cliqueManager, blockFlow)
   cliqueManager ! allHandlers
