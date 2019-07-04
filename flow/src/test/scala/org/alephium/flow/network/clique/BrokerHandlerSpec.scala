@@ -1,7 +1,5 @@
 package org.alephium.flow.network.clique
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
@@ -78,26 +76,19 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
       override def createOutboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
           remoteBroker: BrokerInfo,
-          brokerId: Int,
-          remote: InetSocketAddress,
           blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props = {
-        Props(
-          new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, blockHandlers) {
-            override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+        Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, blockHandlers) {
+          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
-            override def startPingPong(): Unit = pingpongProbe.ref ! "start"
-          })
+          override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+        })
       }
     }
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
     val randomBrokerId   = 0
     val randomBroker     = BrokerInfo.unsafe(0, config.groupNumPerBroker, remote)
     val outboundBrokerHandler = system.actorOf(
-      builder.createOutboundBrokerHandler(localCliqueInfo,
-                                          randomBroker,
-                                          randomBrokerId,
-                                          remote,
-                                          blockHandlers))
+      builder.createOutboundBrokerHandler(localCliqueInfo, randomBroker, blockHandlers))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]

@@ -1,7 +1,5 @@
 package org.alephium.mock
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import com.codahale.metrics.{Histogram, MetricRegistry}
 import org.alephium.flow.PlatformConfig
@@ -21,15 +19,8 @@ object MockBrokerHandler {
     override def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remoteBroker: BrokerInfo,
-        brokerId: Int,
-        remote: InetSocketAddress,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(
-        new MockOutboundBrokerHandler(selfCliqueInfo,
-                                      remoteBroker,
-                                      brokerId,
-                                      remote,
-                                      blockHandlers))
+      Props(new MockOutboundBrokerHandler(selfCliqueInfo, remoteBroker, blockHandlers))
 
   }
 }
@@ -39,7 +30,7 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                allHandlers: AllHandlers)(implicit config: PlatformConfig)
     extends InboundBrokerHandler(selfCliqueInfo, connection, allHandlers) {
   val delays: Histogram =
-    Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
+    Monitoring.metrics.histogram(MetricRegistry.name(remoteBroker.address.toString, "delay"))
 
   override def handlePing(nonce: Int, delay: Long): Unit = {
     super.handlePing(nonce, delay)
@@ -49,12 +40,10 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
 
 class MockOutboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                 remoteBroker: BrokerInfo,
-                                brokerId: Int,
-                                remote: InetSocketAddress,
                                 allHandlers: AllHandlers)(implicit config: PlatformConfig)
-    extends OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, allHandlers) {
+    extends OutboundBrokerHandler(selfCliqueInfo, remoteBroker, allHandlers) {
   val delays: Histogram =
-    Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
+    Monitoring.metrics.histogram(MetricRegistry.name(remoteBroker.address.toString, "delay"))
 
   override def handlePing(nonce: Int, delay: Long): Unit = {
     super.handlePing(nonce, delay)

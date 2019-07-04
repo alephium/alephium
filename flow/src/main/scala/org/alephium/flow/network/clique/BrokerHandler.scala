@@ -1,7 +1,5 @@
 package org.alephium.flow.network.clique
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
@@ -57,11 +55,8 @@ object BrokerHandler {
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remoteBroker: BrokerInfo,
-        brokerId: Int,
-        remote: InetSocketAddress,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(
-        new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, blockHandlers))
+      Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, blockHandlers))
   }
 }
 
@@ -72,8 +67,6 @@ trait BrokerHandler extends BaseActor with Timers {
   def selfCliqueInfo: CliqueInfo
   def cliqueInfo: CliqueInfo
   def remoteBroker: BrokerInfo
-  def remoteIndex: Int
-  def remote: InetSocketAddress
   def connection: ActorRef
   def allHandlers: AllHandlers
 
@@ -128,13 +121,13 @@ trait BrokerHandler extends BaseActor with Timers {
         case Right((messages, rest)) =>
           messages.foreach { message =>
             val cmdName = message.payload.getClass.getSimpleName
-            log.debug(s"Received message of cmd@$cmdName from $remote")
+            log.debug(s"Received message of cmd@$cmdName from ${remoteBroker.address}")
             handle(message.payload)
           }
           context.become(handleWith(rest, next))
         case Left(e) =>
           log.info(
-            s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
+            s"Received corrupted data from ${remoteBroker.address}; error: ${e.toString}; Closing connection")
           stop()
       }
     case BrokerHandler.SendPing => sendPing()
@@ -176,7 +169,7 @@ trait BrokerHandler extends BaseActor with Timers {
         val handler = allHandlers.getBlockHandler(chainIndex)
         handler ! BlockChainHandler.AddBlocks(blocks, Remote(cliqueInfo.id))
       } else {
-        log.warning(s"Received blocks for wrong chain $chainIndex from $remote")
+        log.warning(s"Received blocks for wrong chain $chainIndex from ${remoteBroker.address}")
       }
     case GetBlocks(locators) =>
       log.debug(s"GetBlocks received: #${locators.length}")
@@ -190,7 +183,7 @@ trait BrokerHandler extends BaseActor with Timers {
         val handler = allHandlers.getHeaderHandler(chainIndex)
         handler ! HeaderChainHandler.AddHeaders(headers)
       } else {
-        log.warning(s"Received headers for wrong chain from $remote")
+        log.warning(s"Received headers for wrong chain from ${remoteBroker.address}")
       }
     case GetHeaders(locators) =>
       log.debug(s"GetHeaders received: ${locators.length}")

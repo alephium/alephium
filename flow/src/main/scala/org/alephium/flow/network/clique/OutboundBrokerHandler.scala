@@ -1,6 +1,5 @@
 package org.alephium.flow.network.clique
 
-import java.net.InetSocketAddress
 import java.time.Instant
 
 import akka.actor.{ActorRef, Props}
@@ -12,12 +11,9 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import scala.concurrent.duration._
 
 object OutboundBrokerHandler {
-  def props(selfCliqueInfo: CliqueInfo,
-            remoteBroker: BrokerInfo,
-            brokerId: Int,
-            remote: InetSocketAddress,
-            allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-    Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, allHandlers))
+  def props(selfCliqueInfo: CliqueInfo, remoteBroker: BrokerInfo, allHandlers: AllHandlers)(
+      implicit config: PlatformConfig): Props =
+    Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, allHandlers))
 
   sealed trait Command
   case object Retry extends Command
@@ -27,15 +23,13 @@ object OutboundBrokerHandler {
 
 class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val remoteBroker: BrokerInfo,
-                            val remoteIndex: Int,
-                            val remote: InetSocketAddress,
                             val allHandlers: AllHandlers)(implicit val config: PlatformConfig)
     extends BrokerHandler {
   val until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
 
   var cliqueInfo: CliqueInfo = _
 
-  IO(Tcp)(context.system) ! Tcp.Connect(remote)
+  IO(Tcp)(context.system) ! Tcp.Connect(remoteBroker.address)
 
   var connection: ActorRef = _
 
@@ -43,7 +37,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remote)
+      IO(Tcp)(context.system) ! Tcp.Connect(remoteBroker.address)
 
     case _: Tcp.Connected =>
       connection = sender()
