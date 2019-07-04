@@ -66,9 +66,10 @@ trait PlatformConfigFiles extends StrictLogging {
     val file     = getConfigFile("system")
     val env      = Env.resolve()
     val filename = s"system_${env.name}.conf"
-    if (file.exists) { file.delete }
-    Files.copyFromResource(s"/$filename.tmpl", file.toPath)
-    file.setWritable(false)
+    if (!file.exists) {
+      Files.copyFromResource(s"/$filename.tmpl", file.toPath)
+      file.setWritable(false)
+    }
     file
   }
 
