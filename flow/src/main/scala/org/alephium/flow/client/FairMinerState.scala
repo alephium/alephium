@@ -58,7 +58,7 @@ trait FairMinerState {
   protected def startNewTasks(): Unit = {
     pickTasks().foreach {
       case (fromShift, to, template) =>
-        val index        = ChainIndex.unsafe(fromShift + config.groupFrom, to)
+        val index        = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
         val blockHandler = handlers.getBlockHandler(index)
         startTask(fromShift, to, template, blockHandler)
         setRunning(fromShift, to)

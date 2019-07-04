@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.testkit.{SocketUtil, TestProbe}
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
-import org.alephium.protocol.model.{BrokerId, CliqueInfo, ModelGen}
+import org.alephium.protocol.model.{CliqueInfo, ModelGen}
 import org.alephium.util.AlephiumActorSpec
 import org.scalacheck.Gen
 
@@ -16,7 +16,6 @@ object DiscoveryServerSpec {
     new InetSocketAddress(InetAddress.getLocalHost, port)
 
   def createConfig(groupSize: Int,
-                   groupIndex: Int,
                    port: Int,
                    _peersPerGroup: Int,
                    _scanFrequency: FiniteDuration = 500.millis): DiscoveryConfig = {
@@ -33,8 +32,6 @@ object DiscoveryServerSpec {
       val groups: Int            = groupSize
       val brokerNum: Int         = groupSize
       val groupNumPerBroker: Int = 1
-      val brokerId: BrokerId     = BrokerId.unsafe(groupIndex)
-      val isCoordinator: Boolean = false
     }
   }
 }
@@ -54,11 +51,11 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val groups      = Gen.choose(2, 10).sample.get
     val port0       = SocketUtil.temporaryLocalPort(udp = true)
     val cliqueInfo0 = generateCliqueInfo(createAddr(port0))
-    val config0     = createConfig(groups, 0, port0, 1)
+    val config0     = createConfig(groups, port0, 1)
     val server0     = system.actorOf(DiscoveryServer.props()(config0), "server0")
     val port1       = SocketUtil.temporaryLocalPort(udp = true)
     val cliqueInfo1 = generateCliqueInfo(createAddr(port1))
-    val config1     = createConfig(groups, 1, port1, 1)
+    val config1     = createConfig(groups, port1, 1)
     val server1     = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
 
     server0 ! cliqueInfo0

@@ -4,7 +4,7 @@ import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.protocol.model.CliqueInfo
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
 
@@ -31,7 +31,7 @@ class CliqueCoordinator()(implicit val config: PlatformConfig)
       val name       = BaseActor.envalidActorName(s"Broker-$remote")
       context.actorOf(BrokerConnector.props(connection), name)
       ()
-    case info: BrokerConnector.BrokerInfo =>
+    case info: BrokerInfo =>
       log.debug(s"Received broker info from ${info.address} id: ${info.id}")
       if (addBrokerInfo(info, sender())) {
         context watch sender()

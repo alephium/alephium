@@ -8,7 +8,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.clique.{BrokerHandler, InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.monitoring.Monitoring
-import org.alephium.protocol.model.CliqueInfo
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 
 object MockBrokerHandler {
   trait Builder extends BrokerHandler.Builder {
@@ -20,10 +20,16 @@ object MockBrokerHandler {
 
     override def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
+        remoteBroker: BrokerInfo,
         brokerId: Int,
         remote: InetSocketAddress,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(new MockOutboundBrokerHandler(selfCliqueInfo, brokerId, remote, blockHandlers))
+      Props(
+        new MockOutboundBrokerHandler(selfCliqueInfo,
+                                      remoteBroker,
+                                      brokerId,
+                                      remote,
+                                      blockHandlers))
 
   }
 }
@@ -42,10 +48,11 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
 }
 
 class MockOutboundBrokerHandler(selfCliqueInfo: CliqueInfo,
+                                remoteBroker: BrokerInfo,
                                 brokerId: Int,
                                 remote: InetSocketAddress,
                                 allHandlers: AllHandlers)(implicit config: PlatformConfig)
-    extends OutboundBrokerHandler(selfCliqueInfo, brokerId, remote, allHandlers) {
+    extends OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, allHandlers) {
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
 

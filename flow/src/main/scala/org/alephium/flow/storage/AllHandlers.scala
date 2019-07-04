@@ -13,12 +13,12 @@ case class AllHandlers(flowHandler: ActorRef,
                        headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformConfig) {
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRef = {
-    assert(chainIndex.relateTo(config.brokerId))
+    assert(chainIndex.relateTo(config.brokerInfo))
     blockHandlers(chainIndex)
   }
 
   def getHeaderHandler(chainIndex: ChainIndex): ActorRef = {
-    assert(!chainIndex.relateTo(config.brokerId))
+    assert(!chainIndex.relateTo(config.brokerInfo))
     headerHandlers(chainIndex)
   }
 }
@@ -42,7 +42,7 @@ object AllHandlers {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex(from, to)
-      if chainIndex.relateTo(config.brokerId)
+      if chainIndex.relateTo(config.brokerInfo)
     } yield {
       val handler = system.actorOf(
         BlockChainHandler.props(blockFlow, chainIndex, cliqueManager, flowHandler),
@@ -58,7 +58,7 @@ object AllHandlers {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex(from, to)
-      if !chainIndex.relateTo(config.brokerId)
+      if !chainIndex.relateTo(config.brokerInfo)
     } yield {
       val headerHander = system.actorOf(
         HeaderChainHandler.props(blockFlow, chainIndex, flowHandler),

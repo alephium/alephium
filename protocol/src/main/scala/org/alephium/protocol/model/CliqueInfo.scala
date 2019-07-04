@@ -26,11 +26,10 @@ case class CliqueInfo(id: CliqueId, peers: AVector[InetSocketAddress], groupNumP
 object CliqueInfo {
   implicit val peerSerde: Serde[AVector[InetSocketAddress]] = avectorSerde[InetSocketAddress]
   implicit val serializer: Serializer[CliqueInfo] =
-    Serde.forProduct3(new CliqueInfo(_, _, _), t => (t.id, t.peers, t.groupNumPerBroker))
+    Serializer.forProduct3(t => (t.id, t.peers, t.groupNumPerBroker))
 
-  class Unsafe(val id: CliqueId,
-               val peers: AVector[InetSocketAddress],
-               val groupNumPerBroker: Int) {
+  class Unsafe(val id: CliqueId, val peers: AVector[InetSocketAddress], val groupNumPerBroker: Int)
+      extends UnsafeModel[CliqueInfo] {
     def validate(implicit config: GroupConfig): Either[String, CliqueInfo] = {
       if (peers.isEmpty) Left("Peers vector is empty")
       else if (groupNumPerBroker < 0) Left("Group number per broker is not positive")
