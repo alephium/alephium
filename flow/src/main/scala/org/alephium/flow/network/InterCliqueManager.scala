@@ -46,8 +46,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           val cliqueId     = cliqueInfo.id
           val name         = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$index-$remote")
           val remoteBroker = BrokerInfo(index, config.groupNumPerBroker, remote)
-          val props =
-            OutboundBrokerHandler.props(cliqueInfo, remoteBroker, index, remote, allHandlers)
+          val props        = OutboundBrokerHandler.props(cliqueInfo, remoteBroker, allHandlers)
           context.actorOf(props, name)
         }
       }
