@@ -1,6 +1,5 @@
 package org.alephium.serde
 
-import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteBuffer
 
 import akka.util.ByteString
@@ -140,18 +139,6 @@ object Serde extends ProductSerde {
       }
     }
   }
-
-  implicit val inetAddressSerde: Serde[InetAddress] =
-    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray),
-                       ia => ByteString.fromArrayUnsafe(ia.getAddress))
-
-  implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
-    forProduct2[InetAddress, Int, InetSocketAddress](
-      { (hostname, port) =>
-        new InetSocketAddress(hostname, port)
-      },
-      isa => (isa.getAddress, isa.getPort)
-    )
 
   private object Flags {
     val none: Int  = 0

@@ -1,5 +1,7 @@
 package org.alephium
 
+import java.net.{InetAddress, InetSocketAddress}
+
 import akka.util.ByteString
 import org.alephium.util.AVector
 
@@ -46,4 +48,16 @@ package object serde {
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
+
+  implicit val inetAddressSerde: Serde[InetAddress] =
+    bytesSerde(4).xmap(bs => InetAddress.getByAddress(bs.toArray),
+                       ia => ByteString.fromArrayUnsafe(ia.getAddress))
+
+  implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
+    forProduct2[InetAddress, Int, InetSocketAddress](
+      { (hostname, port) =>
+        new InetSocketAddress(hostname, port)
+      },
+      isa => (isa.getAddress, isa.getPort)
+    )
 }

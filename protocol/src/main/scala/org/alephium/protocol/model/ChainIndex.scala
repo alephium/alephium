@@ -1,11 +1,11 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
 
 class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
-  def relateTo(brokerId: BrokerId)(implicit config: CliqueConfig): Boolean = {
-    brokerId.contains(from) || brokerId.contains(to)
+  def relateTo(brokerInfo: BrokerInfo): Boolean = {
+    brokerInfo.contains(from) || brokerInfo.contains(to)
   }
 
   def toOneDim(implicit config: GroupConfig): Int = from.value * config.groups + to.value

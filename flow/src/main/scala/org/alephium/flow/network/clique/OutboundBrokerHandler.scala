@@ -7,16 +7,17 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.CliqueInfo
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 
 import scala.concurrent.duration._
 
 object OutboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
+            remoteBroker: BrokerInfo,
             brokerId: Int,
             remote: InetSocketAddress,
             allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-    Props(new OutboundBrokerHandler(selfCliqueInfo, brokerId, remote, allHandlers))
+    Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, brokerId, remote, allHandlers))
 
   sealed trait Command
   case object Retry extends Command
@@ -25,6 +26,7 @@ object OutboundBrokerHandler {
 }
 
 class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
+                            val remoteBroker: BrokerInfo,
                             val remoteIndex: Int,
                             val remote: InetSocketAddress,
                             val allHandlers: AllHandlers)(implicit val config: PlatformConfig)
