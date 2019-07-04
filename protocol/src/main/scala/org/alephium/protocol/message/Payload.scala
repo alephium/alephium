@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerId, CliqueInfo}
+import org.alephium.protocol.model.{Block, BlockHeader, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -45,7 +45,7 @@ object Payload {
     }
   }
 
-  def _deserializeHandShake[T <: Payload](build: (Int, Long, CliqueInfo, BrokerId) => T)(
+  def _deserializeHandShake[T <: Payload](build: (Int, Long, CliqueInfo, Int) => T)(
       input: ByteString)(implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
     HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
       case (unsafe, rest) =>
@@ -74,7 +74,7 @@ object HandShake {
                val timestamp: Long,
                val cliqueInfoUnsafe: CliqueInfo.Unsafe,
                val brokerIndex: Int) {
-    def validate[T](build: (Int, Long, CliqueInfo, BrokerId) => T)(
+    def validate[T](build: (Int, Long, CliqueInfo, Int) => T)(
         implicit config: GroupConfig): Either[String, T] = {
       if (version != Protocol.version) {
         Left(s"Invalid protoco version: got $version, expect ${Protocol.version}")
@@ -87,7 +87,7 @@ object HandShake {
             if (brokerIndex < 0 || brokerIndex >= cliqueInfo.brokerNum) {
               Left(
                 s"Invalid brokerIndex: got $brokerIndex, should >= 0 and < ${cliqueInfo.brokerNum}")
-            } else Right(build(version, timestamp, cliqueInfo, BrokerId.unsafe(brokerIndex)))
+            } else Right(build(version, timestamp, cliqueInfo, brokerIndex))
         }
       }
     }
@@ -99,32 +99,26 @@ object HandShake {
   }
 }
 
-class Hello(val version: Int,
-            val timestamp: Long,
-            val cliqueInfo: CliqueInfo,
-            val brokerId: BrokerId)
+class Hello(val version: Int, val timestamp: Long, val cliqueInfo: CliqueInfo, val brokerId: Int)
     extends HandShake
 
 object Hello extends Payload.Code {
   implicit val serializer: Serializer[Hello] =
     Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueInfo, t.brokerId))
 
-  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): Hello = {
+  def apply(cliqueInfo: CliqueInfo, brokerId: Int): Hello = {
     new Hello(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId)
   }
 }
 
-class HelloAck(val version: Int,
-               val timestamp: Long,
-               val cliqueInfo: CliqueInfo,
-               val brokerId: BrokerId)
+class HelloAck(val version: Int, val timestamp: Long, val cliqueInfo: CliqueInfo, val brokerId: Int)
     extends HandShake
 
 object HelloAck extends Payload.Code {
   implicit val serializer: Serializer[HelloAck] =
     Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueInfo, t.brokerId))
 
-  def apply(cliqueInfo: CliqueInfo, brokerId: BrokerId): HelloAck = {
+  def apply(cliqueInfo: CliqueInfo, brokerId: Int): HelloAck = {
     new HelloAck(Protocol.version, System.currentTimeMillis(), cliqueInfo, brokerId)
   }
 }

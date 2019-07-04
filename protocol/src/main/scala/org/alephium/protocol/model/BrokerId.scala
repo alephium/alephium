@@ -12,9 +12,8 @@ class BrokerId private (val value: Int) extends AnyVal {
     (value * config.groupNumPerBroker) <= index && index < (value + 1) * config.groupNumPerBroker
   }
 
-  def intersect(cliqueInfo: CliqueInfo, brokerId: BrokerId)(
-      implicit config: BrokerConfig): Boolean = {
-    val groupFrom  = cliqueInfo.groupNumPerBroker * brokerId.value
+  def intersect(cliqueInfo: CliqueInfo, brokerId: Int)(implicit config: BrokerConfig): Boolean = {
+    val groupFrom  = cliqueInfo.groupNumPerBroker * brokerId
     val groupUntil = groupFrom + cliqueInfo.groupNumPerBroker
     BrokerId.intersect(groupFrom, groupUntil, config.groupFrom, config.groupUntil)
   }
