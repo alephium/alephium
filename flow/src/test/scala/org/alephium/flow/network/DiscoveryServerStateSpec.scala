@@ -51,7 +51,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
         createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
-          val message = DiscoveryMessage.deserialize(send.payload)(peerConfig).right.value
+          val message =
+            DiscoveryMessage.deserialize(CliqueId.generate, send.payload)(peerConfig).right.value
           message.payload is a[T]
       }
     }

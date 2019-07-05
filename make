@@ -62,12 +62,17 @@ elif args.goal == 'run':
         masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
         brokerId = node % brokerNum
 
+        bootstrap = ""
+        if node // brokerNum > 0:
+            bootstrap = "localhost:" + str(9973 + node % brokerNum)
+        print("{}, {}".format(node, bootstrap))
+
         homedir = "{}/alephium/node-{}".format(tempdir, node)
 
         if not os.path.exists(homedir):
             os.makedirs(homedir)
 
-        run('brokerNum={} brokerId={} publicAddress={} masterAddress={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, homedir, homedir))
+        run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
 
 elif args.goal == 'mine':
     rpc_call_all("mining/start", "[]")

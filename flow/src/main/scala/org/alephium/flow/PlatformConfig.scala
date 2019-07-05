@@ -201,8 +201,10 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     Disk.createDirUnsafe(path)
     path
   }
-  val dbStorage =
-    RocksDBStorage.openUnsafe(dbPath.resolve(brokerInfo.id.toString), RocksDBStorage.Compaction.HDD)
+  val dbStorage = {
+    val path = dbPath.resolve(s"${brokerInfo.id}-${publicAddress.getPort}")
+    RocksDBStorage.openUnsafe(path, RocksDBStorage.Compaction.HDD)
+  }
 
   val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
