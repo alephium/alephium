@@ -11,7 +11,7 @@ import scala.reflect.ClassTag
 trait BlockFlowState {
   implicit def config: PlatformConfig
 
-  def brokerInfo: BrokerInfo
+  val brokerInfo: BrokerInfo = config.brokerInfo
 
   val groups = config.groups
 
