@@ -15,8 +15,7 @@ object CliqueManager {
     Props(new CliqueManager(builder, discoveryServer))
 
   sealed trait Command
-  case class Start(cliqueInfo: CliqueInfo)   extends Command
-  case class Connect(cliqueInfo: CliqueInfo) extends Command
+  case class Start(cliqueInfo: CliqueInfo) extends Command
   // TODO: simplify this
   case class BroadCastBlock(
       block: Block,
@@ -76,8 +75,6 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
     case message: CliqueManager.BroadCastBlock =>
       intraCliqueManager ! message
       interCliqueManager ! message
-    case c: Connect =>
-      interCliqueManager ! c
     case c: Tcp.Connected =>
       interCliqueManager.forward(c)
   }

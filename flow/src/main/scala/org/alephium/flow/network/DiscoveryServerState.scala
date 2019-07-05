@@ -135,7 +135,7 @@ trait DiscoveryServerState {
   }
 
   def tryPing(remote: InetSocketAddress): Unit = {
-    log.info(s"Sending Ping to $remote")
+    log.debug(s"Sending Ping to $remote")
     send(remote, Ping(selfCliqueInfo))
   }
 

@@ -5,7 +5,7 @@ import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.BaseActor
 
 import scala.concurrent.duration._
@@ -28,10 +28,10 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   override def receive: Receive = handleMessage orElse handleConnection orElse awaitPeerCliques
 
   def awaitPeerCliques: Receive = {
-    case DiscoveryServer.PeerCliques(peers) =>
-      if (peers.nonEmpty) {
-        log.debug(s"Got ${peers.length} from discovery server")
-        peers.foreach(peer => if (!brokers.contains(peer.id)) self ! CliqueManager.Connect(peer))
+    case DiscoveryServer.PeerCliques(peerCliques) =>
+      if (peerCliques.nonEmpty) {
+        log.debug(s"Got ${peerCliques.length} from discovery server")
+        peerCliques.foreach(clique => if (!brokers.contains(clique.id)) connect(clique))
       } else {
         if (config.bootstrap.nonEmpty && brokers.nonEmpty) {
           scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 2.second)
@@ -45,21 +45,12 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       val props = InboundBrokerHandler.props(selfCliqueInfo, c.remoteAddress, sender(), allHandlers)
       context.actorOf(props, name)
       ()
-    case CliqueManager.Connect(cliqueInfo) =>
-      cliqueInfo.peers.foreachWithIndex { (remote, index) =>
-        if (config.brokerInfo.containsRaw(index)) {
-          val remoteCliqueId = cliqueInfo.id
-          val remoteBroker   = BrokerInfo(index, config.groupNumPerBroker, remote)
-          val name =
-            BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$index-$remote")
-          val props =
-            OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, remoteBroker, allHandlers)
-          context.actorOf(props, name)
-        }
-      }
     case CliqueManager.Connected(cliqueId, brokerInfo) =>
+      log.debug(s"Connected to: $cliqueId, $brokerInfo")
       if (config.brokerInfo.intersect(brokerInfo)) {
         brokers += cliqueId -> sender()
+      } else {
+        context stop sender()
       }
   }
 
@@ -71,5 +62,19 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
             broker ! message.blockMsg
           }
       }
+  }
+
+  def connect(cliqueInfo: CliqueInfo): Unit = {
+    cliqueInfo.brokers.foreach { brokerInfo =>
+      if (config.brokerInfo.intersect(brokerInfo)) {
+        log.debug(s"Try to connect to $brokerInfo")
+        val remoteCliqueId = cliqueInfo.id
+        val name =
+          BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
+        val props =
+          OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, brokerInfo, allHandlers)
+        context.actorOf(props, name)
+      }
+    }
   }
 }
