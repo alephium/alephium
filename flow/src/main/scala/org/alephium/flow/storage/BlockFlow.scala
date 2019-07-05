@@ -221,11 +221,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     BlockDeps(deps2)
   }
 
-  def calBestDepsUnsafe(): Unit = brokerInfo.groupFrom until brokerInfo.groupUntil foreach {
-    mainGroup =>
+  def calBestDepsUnsafe(): Unit =
+    brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
       val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
       updateBestDeps(mainGroup, deps)
-  }
+    }
 
   def calBestDeps(): IOResult[Unit] =
     try {

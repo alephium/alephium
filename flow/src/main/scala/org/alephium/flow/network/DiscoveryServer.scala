@@ -60,30 +60,30 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   import DiscoveryServer._
   import context.system
 
-  IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.publicAddress.getPort))
-
-  def receive: Receive = binding
+  def receive: Receive = awaitCliqueInfo
 
   var selfCliqueInfo: CliqueInfo = _
+
+  def awaitCliqueInfo: Receive = {
+    case cliqueInfo: CliqueInfo =>
+      selfCliqueInfo = cliqueInfo
+
+      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.publicAddress.getPort))
+      context become (binding orElse handleCommand)
+  }
 
   def binding: Receive = {
     case Udp.Bound(address) =>
       log.debug(s"UDP server bound to $address")
       setSocket(sender())
-      context become awaitCliqueInfo
-
-    case Udp.CommandFailed(bind: Udp.Bind) =>
-      log.error(s"Could not bind the UDP socket ($bind)")
-      context stop self
-  }
-
-  def awaitCliqueInfo: Receive = {
-    case cliqueInfo: CliqueInfo =>
-      selfCliqueInfo = cliqueInfo
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
       scheduleOnce(self, Scan, config.scanFastFrequency)
       context.become(ready)
+
+    case Udp.CommandFailed(bind: Udp.Bind) =>
+      log.error(s"Could not bind the UDP socket ($bind)")
+      context stop self
   }
 
   def ready: Receive = handleData orElse handleCommand
