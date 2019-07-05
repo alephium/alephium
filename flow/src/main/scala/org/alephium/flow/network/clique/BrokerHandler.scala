@@ -9,7 +9,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.storage.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -54,9 +54,10 @@ object BrokerHandler {
 
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
+        remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, blockHandlers))
+      Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers))
   }
 }
 
@@ -65,13 +66,13 @@ trait BrokerHandler extends BaseActor with Timers {
   implicit def config: PlatformConfig
 
   def selfCliqueInfo: CliqueInfo
-  def cliqueInfo: CliqueInfo
+  def remoteCliqueId: CliqueId
   def remoteBroker: BrokerInfo
   def connection: ActorRef
   def allHandlers: AllHandlers
 
   def handshakeOut(): Unit = {
-    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo, config.brokerInfo.id))
+    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo.id, config.brokerInfo))
     context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
   }
 
@@ -80,25 +81,25 @@ trait BrokerHandler extends BaseActor with Timers {
   }
 
   def afterHandShake(): Unit = {
-    context.parent ! CliqueManager.Connected(cliqueInfo.id, remoteBroker)
+    context.parent ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
   }
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
-      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo, config.brokerInfo.id))
-      handle(hello.cliqueInfo, hello.brokerId)
+      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo.id, config.brokerInfo))
+      handle(hello.cliqueId, hello.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
   }
 
-  def handle(cliqueInfo: CliqueInfo, brokerIndex: Int): Unit
+  def handle(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      handle(helloAck.cliqueInfo, helloAck.brokerId)
+      handle(helloAck.cliqueId, helloAck.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
@@ -167,7 +168,7 @@ trait BrokerHandler extends BaseActor with Timers {
       val chainIndex = block.chainIndex
       if (chainIndex.relateTo(config.brokerInfo)) {
         val handler = allHandlers.getBlockHandler(chainIndex)
-        handler ! BlockChainHandler.AddBlocks(blocks, Remote(cliqueInfo.id))
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(remoteCliqueId))
       } else {
         log.warning(s"Received blocks for wrong chain $chainIndex from ${remoteBroker.address}")
       }

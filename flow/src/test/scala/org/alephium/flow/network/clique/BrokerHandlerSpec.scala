@@ -7,7 +7,7 @@ import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, ModelGen}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
 import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalatest.EitherValues._
@@ -56,8 +56,8 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
         message.payload match {
           case hello: Hello =>
             hello.version is 0
-            hello.cliqueInfo is localCliqueInfo
-            hello.brokerId is config.brokerInfo.id
+            hello.cliqueId is localCliqueInfo.id
+            hello.brokerInfo is config.brokerInfo
           case _ => assert(false)
         }
       case _ => assert(false)
@@ -65,7 +65,9 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
 
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
     val randomId         = Random.nextInt(randomCliqueInfo.brokerNum)
-    val helloAck         = Message(HelloAck(randomCliqueInfo, randomId))
+    val randomAddress    = randomCliqueInfo.peers(randomId)
+    val randomBroker     = BrokerInfo(randomId, randomCliqueInfo.groupNumPerBroker, randomAddress)
+    val helloAck         = Message(HelloAck(randomCliqueInfo.id, randomBroker))
     inboundBrokerHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
   }
@@ -75,33 +77,37 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
     val builder = new BrokerHandler.Builder {
       override def createOutboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
+          remoteCliqueId: CliqueId,
           remoteBroker: BrokerInfo,
           blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props = {
-        Props(new OutboundBrokerHandler(selfCliqueInfo, remoteBroker, blockHandlers) {
-          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+        Props(
+          new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers) {
+            override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
-          override def startPingPong(): Unit = pingpongProbe.ref ! "start"
-        })
+            override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+          })
       }
     }
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomBrokerId   = 0
     val randomBroker     = BrokerInfo.unsafe(0, config.groupNumPerBroker, remote)
     val outboundBrokerHandler = system.actorOf(
-      builder.createOutboundBrokerHandler(localCliqueInfo, randomBroker, blockHandlers))
+      builder.createOutboundBrokerHandler(localCliqueInfo,
+                                          randomCliqueInfo.id,
+                                          randomBroker,
+                                          blockHandlers))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
 
-    val hello = Message(Hello(randomCliqueInfo, randomBrokerId))
+    val hello = Message(Hello(randomCliqueInfo.id, randomBroker))
     outboundBrokerHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
         val message = Message.deserialize(write.data).right.value
         message.payload match {
           case ack: HelloAck =>
-            ack.cliqueInfo is localCliqueInfo
-            ack.brokerId is config.brokerInfo.id
+            ack.cliqueId is localCliqueInfo.id
+            ack.brokerInfo is config.brokerInfo
           case _ => assert(false)
         }
       case _ => assert(false)
