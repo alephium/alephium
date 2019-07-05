@@ -89,7 +89,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
       }
     }
     val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomBroker     = BrokerInfo.unsafe(0, config.groupNumPerBroker, remote)
+    val randomBroker     = BrokerInfo.unsafe(0, config.groupNumPerBroker, remote) // TODO: improve
     val outboundBrokerHandler = system.actorOf(
       builder.createOutboundBrokerHandler(localCliqueInfo,
                                           randomCliqueInfo.id,

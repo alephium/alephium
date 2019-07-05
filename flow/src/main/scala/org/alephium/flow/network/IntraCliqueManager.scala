@@ -16,8 +16,6 @@ object IntraCliqueManager {
   sealed trait Command
   case object GetPeers extends Command
 
-  case class Broker(brokerInfo: BrokerInfo, brokerHandler: ActorRef)
-
   sealed trait Event
   case object Ready extends Event
 }

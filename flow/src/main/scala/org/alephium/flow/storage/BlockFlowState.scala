@@ -64,9 +64,9 @@ trait BlockFlowState {
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
     assert(brokerInfo.contains(from) || brokerInfo.contains(to))
-    if (brokerInfo.contains(from))
+    if (brokerInfo.contains(from)) {
       outBlockChains(from.value - brokerInfo.groupFrom)(to.value)
-    else {
+    } else {
       val fromIndex =
         if (from.value < brokerInfo.groupFrom) from.value
         else from.value - config.groupNumPerBroker

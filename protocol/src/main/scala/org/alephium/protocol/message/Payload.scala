@@ -89,9 +89,9 @@ object HandShake {
     }
   }
   object Unsafe {
-    implicit val serde: Serde[Unsafe] =
-      Serde.forProduct4(new Unsafe(_, _, _, _),
-                        t => (t.version, t.timestamp, t.cliqueId, t.brokerInfoUnsafe))
+    implicit val serde: Serde[Unsafe] = Serde.forProduct4(
+      new Unsafe(_, _, _, _),
+      t => (t.version, t.timestamp, t.cliqueId, t.brokerInfoUnsafe))
   }
 }
 
@@ -103,7 +103,7 @@ class Hello(val version: Int,
 
 object Hello extends Payload.Code {
   implicit val serializer: Serializer[Hello] =
-    Serializer.forProduct3(t => (t.version, t.timestamp, t.brokerInfo))
+    Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueId, t.brokerInfo))
 
   def apply(cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello = {
     new Hello(Protocol.version, System.currentTimeMillis(), cliqueId, brokerInfo)
