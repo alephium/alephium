@@ -17,6 +17,12 @@ case class CliqueInfo(id: CliqueId, peers: AVector[InetSocketAddress], groupNumP
     val groupNumPerBroker: Int = self.groupNumPerBroker
   }
 
+  def brokers: AVector[BrokerInfo] = {
+    peers.mapWithIndex { (address, index) =>
+      BrokerInfo.unsafe(index, groupNumPerBroker, address)
+    }
+  }
+
   def brokerNum: Int = peers.length
 
   // TODO: add a field for master broker
