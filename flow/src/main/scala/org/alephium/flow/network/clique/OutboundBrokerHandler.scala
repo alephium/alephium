@@ -1,5 +1,6 @@
 package org.alephium.flow.network.clique
 
+import java.net.InetSocketAddress
 import java.time.Instant
 
 import akka.actor.{ActorRef, Props}
@@ -28,6 +29,8 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val remoteBroker: BrokerInfo,
                             val allHandlers: AllHandlers)(implicit val config: PlatformConfig)
     extends BrokerHandler {
+  override def remote: InetSocketAddress = remoteBroker.address
+
   val until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
 
   IO(Tcp)(context.system) ! Tcp.Connect(remoteBroker.address)

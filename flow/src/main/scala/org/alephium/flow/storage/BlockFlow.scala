@@ -14,8 +14,6 @@ class BlockFlow()(implicit val config: PlatformConfig)
     with BlockFlowState
     with FlowUtils {
 
-  override val brokerInfo = config.brokerInfo
-
   def add(block: Block): IOResult[Unit] = {
     val index  = block.chainIndex
     val chain  = getBlockChain(index)
