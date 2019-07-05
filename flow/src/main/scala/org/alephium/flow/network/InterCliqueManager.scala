@@ -30,8 +30,13 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case DiscoveryServer.PeerCliques(peers) =>
       if (peers.nonEmpty) {
         peers.foreach(peer => self ! CliqueManager.Connect(peer))
+        context.become(handleMessage orElse handleConnection)
       } else {
-        scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 1.second)
+        if (config.bootstrap.nonEmpty) {
+          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 1.second)
+        } else {
+          context.become(handleMessage orElse handleConnection)
+        }
       }
   }
 
