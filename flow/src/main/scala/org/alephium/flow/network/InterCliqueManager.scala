@@ -30,6 +30,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   def awaitPeerCliques: Receive = {
     case DiscoveryServer.PeerCliques(peers) =>
       if (peers.nonEmpty) {
+        log.debug(s"Got ${peers.length} from discovery server")
         peers.foreach(peer => if (!brokers.contains(peer.id)) self ! CliqueManager.Connect(peer))
       } else {
         if (config.bootstrap.nonEmpty && brokers.nonEmpty) {

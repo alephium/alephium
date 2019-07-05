@@ -35,6 +35,8 @@ trait DiscoveryServerState {
     AVector.from(table.values.map(_.info))
   }
 
+  def getPeersNum: Int = table.size
+
   def getNeighbors(target: CliqueId): AVector[CliqueInfo] = {
     val candidates = if (target == selfCliqueInfo.id) {
       AVector.from(table.values.map(_.info))
@@ -103,8 +105,8 @@ trait DiscoveryServerState {
       .takeUpto(config.scanMaxPerGroup)
       .foreach(status => fetchNeighbors(status.info))
     val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
-    if (emptySlotNum > 0) emptySlotNum else 0
-    bootstrap.takeUpto(emptySlotNum).foreach(tryPing)
+    val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
+    bootstrap.takeUpto(bootstrapNum).foreach(tryPing)
   }
 
   def shouldScanFast(): Boolean = {
@@ -120,14 +122,14 @@ trait DiscoveryServerState {
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
-    val message = DiscoveryMessage.from(payload)
+    val message = DiscoveryMessage.from(selfCliqueInfo.id, payload)
     socket ! Udp.Send(DiscoveryMessage.serialize(message), remote)
   }
 
   def tryPing(cliqueInfo: CliqueInfo): Unit = {
     if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
       log.info(s"Sending Ping to $cliqueInfo")
-      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo))
+      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo)) // TODO: Improve this
       pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, System.currentTimeMillis()))
     }
   }
@@ -148,7 +150,7 @@ trait DiscoveryServerState {
           tryInsert(cliqueInfo)
         }
       case None =>
-        log.debug(s"Received Pong from $cliqueId without pending request, ignored.")
+        tryPing(cliqueInfo)
     }
   }
 
