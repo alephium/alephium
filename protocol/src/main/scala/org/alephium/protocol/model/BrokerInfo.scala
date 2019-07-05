@@ -18,6 +18,16 @@ class BrokerInfo private (val id: Int, val groupNumPerBroker: Int, val address: 
     BrokerInfo.intersect(groupFrom, groupUntil, another.groupFrom, another.groupUntil)
 
   override def toString: String = s"BrokerInfo($id, $groupNumPerBroker, $address)"
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: BrokerInfo =>
+      id == that.id && groupNumPerBroker == that.groupNumPerBroker && address == that.address
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    id.hashCode() ^ groupNumPerBroker ^ address.hashCode()
+  }
 }
 
 object BrokerInfo { self =>

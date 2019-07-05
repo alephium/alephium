@@ -43,10 +43,12 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case CliqueManager.Connect(cliqueInfo) =>
       cliqueInfo.peers.foreachWithIndex { (remote, index) =>
         if (config.brokerInfo.containsRaw(index)) {
-          val cliqueId     = cliqueInfo.id
-          val name         = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$index-$remote")
-          val remoteBroker = BrokerInfo(index, config.groupNumPerBroker, remote)
-          val props        = OutboundBrokerHandler.props(cliqueInfo, remoteBroker, allHandlers)
+          val remoteCliqueId = cliqueInfo.id
+          val remoteBroker   = BrokerInfo(index, config.groupNumPerBroker, remote)
+          val name =
+            BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$index-$remote")
+          val props =
+            OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, remoteBroker, allHandlers)
           context.actorOf(props, name)
         }
       }
