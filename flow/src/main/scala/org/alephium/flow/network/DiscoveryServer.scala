@@ -90,12 +90,12 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserialize(data) match {
+      DiscoveryMessage.deserialize(selfCliqueInfo.id, data) match {
         case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
-          val sourceId = CliqueId.fromBytesUnsafe(message.header.publicKey.bytes)
+          val sourceId = message.header.cliqueId
           updateStatus(sourceId)
-          handlePayload(sourceId, remote)(message.payload)
+          handlePayload(remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
           log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
@@ -104,7 +104,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
 
   def handleCommand: Receive = {
     case Scan =>
-      log.debug("Scanning the available peers")
+      log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
       scan()
       if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
@@ -116,20 +116,16 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       ()
   }
 
-  def handlePayload(sourceId: CliqueId, remote: InetSocketAddress)(payload: Payload): Unit =
+  def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
       case Ping(cliqueInfo) =>
-        send(cliqueInfo.masterAddress, Pong(selfCliqueInfo))
+        send(remote, Pong(selfCliqueInfo))
         tryPing(cliqueInfo)
       case Pong(cliqueInfo) =>
         handlePong(cliqueInfo)
       case FindNode(targetId) =>
-        val sourceAddress = getPeer(sourceId) match {
-          case Some(source) => source.masterAddress
-          case None         => remote
-        }
         val neighbors = getNeighbors(targetId)
-        send(sourceAddress, Neighbors(neighbors))
+        send(remote, Neighbors(neighbors))
       case Neighbors(peers) =>
         peers.foreach(tryPing)
     }

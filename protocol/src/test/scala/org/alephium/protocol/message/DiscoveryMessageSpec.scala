@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
 import org.scalatest.EitherValues._
 
@@ -65,7 +65,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
-      val value = DiscoveryMessage.deserialize(bytes)(config).right.value
+      val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).right.value
       msg == value
     }
   }

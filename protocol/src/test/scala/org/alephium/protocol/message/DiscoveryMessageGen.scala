@@ -2,7 +2,7 @@ package org.alephium.protocol.message
 
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.scalacheck.Gen
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.{CliqueId, ModelGen}
 import org.alephium.util.AVector
 
 object DiscoveryMessageGen {
@@ -25,6 +25,7 @@ object DiscoveryMessageGen {
 
   def message(implicit config: DiscoveryConfig): Gen[DiscoveryMessage] =
     for {
-      payload <- Gen.oneOf[Payload](findNode, ping, pong, neighbors)
-    } yield DiscoveryMessage.from(payload)
+      cliqueId <- Gen.const(()).map(_ => CliqueId.generate)
+      payload  <- Gen.oneOf[Payload](findNode, ping, pong, neighbors)
+    } yield DiscoveryMessage.from(cliqueId, payload)
 }
