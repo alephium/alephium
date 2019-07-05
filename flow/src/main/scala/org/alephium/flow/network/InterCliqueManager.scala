@@ -20,22 +20,20 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          allHandlers: AllHandlers,
                          discoveryServer: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
+  // TODO: consider cliques with different brokerNum
   val brokers = collection.mutable.HashMap.empty[CliqueId, ActorRef]
 
   discoveryServer ! DiscoveryServer.GetPeerCliques
 
-  override def receive: Receive = handleMessage orElse handleConnection
+  override def receive: Receive = handleMessage orElse handleConnection orElse awaitPeerCliques
 
   def awaitPeerCliques: Receive = {
     case DiscoveryServer.PeerCliques(peers) =>
       if (peers.nonEmpty) {
-        peers.foreach(peer => self ! CliqueManager.Connect(peer))
-        context.become(handleMessage orElse handleConnection)
+        peers.foreach(peer => if (!brokers.contains(peer.id)) self ! CliqueManager.Connect(peer))
       } else {
-        if (config.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 1.second)
-        } else {
-          context.become(handleMessage orElse handleConnection)
+        if (config.bootstrap.nonEmpty && brokers.nonEmpty) {
+          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 2.second)
         }
       }
   }
