@@ -61,7 +61,7 @@ object RPCServer extends StrictLogging {
                                                cfg: ConsensusConfig): Response = {
     import model.BlockFlowRPC._
 
-    req.params.as[FetchRequest] match {
+    req.paramsAs[FetchRequest] match {
       case Right(query) =>
         val now        = Instant.now()
         val lowerBound = now.minus(rpc.blockflowFetchMaxAge).toEpochMilli
@@ -77,9 +77,7 @@ object RPCServer extends StrictLogging {
         val json = Json.obj(("blocks", Json.arr(blocks: _*)))
 
         req.success(json)
-      case Left(decodingFailure) =>
-        logger.debug(s"Unable to decode blokflow/fetch request. (${decodingFailure})")
-        req.failure(Error.InvalidParams)
+      case Left(failure) => failure
     }
   }
 }

@@ -1,10 +1,11 @@
 package org.alephium.rpc.model
 
+import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
 // https://www.jsonrpc.org/specification
 
-object JsonRPC {
+object JsonRPC extends StrictLogging {
   type Handler = PartialFunction[String, Request => Response]
 
   val versionKey = "jsonrpc"
@@ -50,6 +51,14 @@ object JsonRPC {
   }
 
   case class Request(id: Json, method: String, params: Json) {
+    def paramsAs[A: Decoder]: Either[Response, A] = params.as[A] match {
+      case Right(a) => Right(a)
+      case Left(decodingFailure) =>
+        logger.debug(
+          s"Unable to decode JsonRPC request parameters. ($method@$id: ${decodingFailure})")
+        Left(failure(Error.InvalidParams))
+    }
+
     def successful(): Response          = Response.Success(id, Json.True)
     def success(result: Json): Response = Response.Success(id, result)
     def failure(error: Error): Response = Response.Failure(id, error)
