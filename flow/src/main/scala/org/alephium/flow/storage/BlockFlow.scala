@@ -55,7 +55,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
 
   def validate(header: BlockHeader, fromBlock: Boolean): Either[ValidationError, Unit] = {
     val index = header.chainIndex
-    if (fromBlock ^ index.relateTo(config.brokerId)) {
+    if (fromBlock ^ index.relateTo(config.brokerInfo)) {
       // fromBlock = true, relate = false; fromBlock = false, relate = true
       Left(ValidationError.InvalidGroup)
     } else if (!header.validateDiff) {
@@ -219,10 +219,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     BlockDeps(deps2)
   }
 
-  def calBestDepsUnsafe(): Unit = config.groupFrom until config.groupUntil foreach { mainGroup =>
-    val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
-    updateBestDeps(mainGroup, deps)
-  }
+  def calBestDepsUnsafe(): Unit =
+    brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
+      val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
+      updateBestDeps(mainGroup, deps)
+    }
 
   def calBestDeps(): IOResult[Unit] =
     try {

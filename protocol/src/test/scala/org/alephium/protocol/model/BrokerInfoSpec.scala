@@ -4,7 +4,16 @@ import org.alephium.protocol.config.{CliqueConfig, GroupConfig, GroupConfigFixtu
 import org.alephium.util.AlephiumSpec
 import org.scalacheck.Gen
 
-class BrokerIdSpec extends AlephiumSpec {
+class BrokerInfoSpec extends AlephiumSpec {
+  it should "check equality properly" in {
+    forAll { (id: Int, groupNumPerBroker: Int) =>
+      val address = ModelGen.socketAddress.sample.get
+      val info0   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
+      val info1   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
+      info0 is info1
+    }
+  }
+
   it should "check if group included" in {
     forAll(Gen.oneOf(2 to 1 << 4)) { _groups =>
       implicit val groupConfig = new GroupConfig { override def groups: Int = _groups }
@@ -14,8 +23,8 @@ class BrokerIdSpec extends AlephiumSpec {
           override def groupNumPerBroker: Int = _groupNumPerBroker
           override def groups: Int            = _groups
         }
-        forAll(ModelGen.brokerIdGen) { brokerId =>
-          val count = (0 until _groups).count(brokerId.containsRaw)
+        forAll(ModelGen.brokerInfo) { brokerInfo =>
+          val count = (0 until _groups).count(brokerInfo.containsRaw)
           count is cliqueConfig.groupNumPerBroker
         }
       }
@@ -31,21 +40,21 @@ class BrokerIdSpec extends AlephiumSpec {
         override def groups: Int            = self.groups
       }
       0 until cliqueConfig.brokerNum foreach { id =>
-        BrokerId.validate(id)(cliqueConfig) is true
+        BrokerInfo.validate(id, _groupNumPerBroker) is true
       }
       cliqueConfig.brokerNum until (2 * cliqueConfig.brokerNum) foreach { id =>
-        BrokerId.validate(id)(cliqueConfig) is false
+        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig) is false
       }
       -cliqueConfig.brokerNum until 0 foreach { id =>
-        BrokerId.validate(id)(cliqueConfig) is false
+        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig) is false
       }
     }
   }
 
   it should "check intersection" in {
-    BrokerId.intersect(0, 1, 1, 2) is false
-    BrokerId.intersect(0, 1, 0, 2) is true
-    BrokerId.intersect(1, 2, 0, 2) is true
-    BrokerId.intersect(1, 2, 0, 1) is false
+    BrokerInfo.intersect(0, 1, 1, 2) is false
+    BrokerInfo.intersect(0, 1, 0, 2) is true
+    BrokerInfo.intersect(1, 2, 0, 2) is true
+    BrokerInfo.intersect(1, 2, 0, 1) is false
   }
 }

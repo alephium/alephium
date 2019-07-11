@@ -14,7 +14,7 @@ trait FlowUtils extends MultiChain {
   def calBestDepsUnsafe(): Unit
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
-    assert(config.brokerId.contains(chainIndex.from))
+    assert(config.brokerInfo.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
@@ -23,7 +23,7 @@ trait FlowUtils extends MultiChain {
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
-    assert(config.brokerId.contains(chainIndex.from))
+    assert(config.brokerInfo.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     val target      = singleChain.getHashTargetUnsafe(bestDeps.getChainHash(chainIndex.to))
