@@ -4,10 +4,6 @@ import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 
-/*
- * @globalHandlers: actor of BlockHandler
- * @poolHandlers: actors of BlockPoolHandler
- */
 case class AllHandlers(flowHandler: ActorRef,
                        blockHandlers: Map[ChainIndex, ActorRef],
                        headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformConfig) {
