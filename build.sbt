@@ -65,7 +65,6 @@ lazy val flow = subProject("flow")
     libraryDependencies ++= Seq(
       akka,
       `akka-slf4j`,
-      `akka-stream`,
       bcprov,
       `circe-parser`,
       `circe-generic`,
@@ -90,7 +89,8 @@ lazy val protocol = subProject("protocol")
 lazy val rpc = subProject("rpc")
   .settings(
     libraryDependencies ++= Seq(
-      `akka-http`
+      `akka-http`,
+      `akka-stream`
     )
   )
   .dependsOn(flow)
