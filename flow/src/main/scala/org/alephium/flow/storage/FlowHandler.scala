@@ -15,8 +15,8 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case class GetBlocks(hashes: AVector[Keccak256])      extends Command
-  case class GetHeaders(hashes: AVector[Keccak256])     extends Command
+  case class GetBlocks(locators: AVector[Keccak256])    extends Command
+  case class GetHeaders(locators: AVector[Keccak256])   extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
