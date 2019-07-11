@@ -33,8 +33,7 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
       log.debug(s"Connected to master: ${config.masterAddress}")
       val connection = sender()
       connection ! Tcp.Register(self)
-      val info = BrokerConnector.BrokerInfo(config.brokerId, config.publicAddress)
-      connection ! BrokerConnector.envolop(info)
+      connection ! BrokerConnector.envolop(config.brokerInfo)
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -49,10 +48,10 @@ class Broker()(implicit config: PlatformConfig) extends BaseActor {
 
   def awaitCliqueInfo(connection: ActorRef, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
-      BrokerConnector.deserializeCliqueInfo(unaligned ++ data) match {
+      BrokerConnector.deserializeTryWithValidation[CliqueInfo, CliqueInfo.Unsafe](unaligned ++ data) match {
         case Right(Some((cliqueInfo, _))) =>
           log.debug("Received clique info from master")
-          val ack = BrokerConnector.Ack(config.brokerId.value)
+          val ack = BrokerConnector.Ack(config.brokerInfo.id)
           connection ! BrokerConnector.envolop(ack)
           context become awaitReady(connection, cliqueInfo, ByteString.empty)
         case Right(None) =>

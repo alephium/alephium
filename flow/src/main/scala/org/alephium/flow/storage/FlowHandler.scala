@@ -59,7 +59,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    assert(config.brokerId.contains(chainIndex.from))
+    assert(config.brokerInfo.contains(chainIndex.from))
     val template = blockFlow.prepareBlockFlow(chainIndex)
     template match {
       case Left(error) =>

@@ -11,7 +11,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.storage.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -50,16 +50,17 @@ object BrokerHandler {
   trait Builder {
     def createInboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
+        remote: InetSocketAddress,
         connection: ActorRef,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(new InboundBrokerHandler(selfCliqueInfo, connection, blockHandlers))
+      Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers))
 
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
-        brokerId: BrokerId,
-        remote: InetSocketAddress,
+        remoteCliqueId: CliqueId,
+        remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
-      Props(new OutboundBrokerHandler(selfCliqueInfo, brokerId, remote, blockHandlers))
+      Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers))
   }
 }
 
@@ -68,14 +69,14 @@ trait BrokerHandler extends BaseActor with Timers {
   implicit def config: PlatformConfig
 
   def selfCliqueInfo: CliqueInfo
-  def cliqueInfo: CliqueInfo
-  def brokerId: BrokerId
   def remote: InetSocketAddress
+  def remoteCliqueId: CliqueId
+  def remoteBroker: BrokerInfo
   def connection: ActorRef
   def allHandlers: AllHandlers
 
   def handshakeOut(): Unit = {
-    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo, config.brokerId))
+    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo.id, config.brokerInfo))
     context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
   }
 
@@ -84,25 +85,25 @@ trait BrokerHandler extends BaseActor with Timers {
   }
 
   def afterHandShake(): Unit = {
-    context.parent ! CliqueManager.Connected(cliqueInfo, brokerId)
+    context.parent ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
   }
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
-      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo, config.brokerId))
-      handle(hello.cliqueInfo, hello.brokerId)
+      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo.id, config.brokerInfo))
+      handle(hello.cliqueId, hello.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
   }
 
-  def handle(cliqueInfo: CliqueInfo, brokerId: BrokerId): Unit
+  def handle(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      handle(helloAck.cliqueInfo, helloAck.brokerId)
+      handle(helloAck.cliqueId, helloAck.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
@@ -169,9 +170,9 @@ trait BrokerHandler extends BaseActor with Timers {
       // TODO: support many blocks
       val block      = blocks.head
       val chainIndex = block.chainIndex
-      if (chainIndex.relateTo(config.brokerId)) {
+      if (chainIndex.relateTo(config.brokerInfo)) {
         val handler = allHandlers.getBlockHandler(chainIndex)
-        handler ! BlockChainHandler.AddBlocks(blocks, Remote(cliqueInfo.id))
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(remoteCliqueId))
       } else {
         log.warning(s"Received blocks for wrong chain $chainIndex from $remote")
       }
@@ -183,7 +184,7 @@ trait BrokerHandler extends BaseActor with Timers {
       // TODO: support many headers
       val header     = headers.head
       val chainIndex = header.chainIndex
-      if (!chainIndex.relateTo(config.brokerId)) {
+      if (!chainIndex.relateTo(config.brokerInfo)) {
         val handler = allHandlers.getHeaderHandler(chainIndex)
         handler ! HeaderChainHandler.AddHeaders(headers)
       } else {

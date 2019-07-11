@@ -1,45 +1,56 @@
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{BrokerId, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.BaseActor
 
-object InterCliqueManager {
-  def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
-      implicit config: PlatformConfig): Props =
-    Props(new InterCliqueManager(selfCliqueInfo, allHandlers))
+import scala.concurrent.duration._
 
-  sealed trait Command
-  case class Connect(cliqueId: CliqueId, brokerId: BrokerId, remote: InetSocketAddress)
-      extends Command
+object InterCliqueManager {
+  def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
+      implicit config: PlatformConfig): Props =
+    Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 }
 
-class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
-    implicit config: PlatformConfig)
+class InterCliqueManager(selfCliqueInfo: CliqueInfo,
+                         allHandlers: AllHandlers,
+                         discoveryServer: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
+  // TODO: consider cliques with different brokerNum
   val brokers = collection.mutable.HashMap.empty[CliqueId, ActorRef]
 
-  override def receive: Receive = handleMessage orElse handleConnection
+  discoveryServer ! DiscoveryServer.GetPeerCliques
+
+  override def receive: Receive = handleMessage orElse handleConnection orElse awaitPeerCliques
+
+  def awaitPeerCliques: Receive = {
+    case DiscoveryServer.PeerCliques(peerCliques) =>
+      if (peerCliques.nonEmpty) {
+        log.debug(s"Got ${peerCliques.length} from discovery server")
+        peerCliques.foreach(clique => if (!brokers.contains(clique.id)) connect(clique))
+      } else {
+        if (config.bootstrap.nonEmpty && brokers.nonEmpty) {
+          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 2.second)
+        }
+      }
+  }
 
   def handleConnection: Receive = {
     case c: Tcp.Connected =>
-      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
-      context.actorOf(InboundBrokerHandler.props(selfCliqueInfo, sender(), allHandlers), name)
-      ()
-    case CliqueManager.Connect(cliqueId, brokerId, remote) =>
-      val name  = BaseActor.envalidActorName(s"OutboundBrokerHandler-$cliqueId-$brokerId-$remote")
-      val props = OutboundBrokerHandler.props(selfCliqueInfo, brokerId, remote, allHandlers)
+      val name  = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
+      val props = InboundBrokerHandler.props(selfCliqueInfo, c.remoteAddress, sender(), allHandlers)
       context.actorOf(props, name)
       ()
-    case CliqueManager.Connected(cliqueInfo, brokerId) =>
-      if (config.brokerId.intersect(cliqueInfo, brokerId)) {
-        brokers += cliqueInfo.id -> sender()
+    case CliqueManager.Connected(cliqueId, brokerInfo) =>
+      log.debug(s"Connected to: $cliqueId, $brokerInfo")
+      if (config.brokerInfo.intersect(brokerInfo)) {
+        brokers += cliqueId -> sender()
+      } else {
+        context stop sender()
       }
   }
 
@@ -51,5 +62,19 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
             broker ! message.blockMsg
           }
       }
+  }
+
+  def connect(cliqueInfo: CliqueInfo): Unit = {
+    cliqueInfo.brokers.foreach { brokerInfo =>
+      if (config.brokerInfo.intersect(brokerInfo)) {
+        log.debug(s"Try to connect to $brokerInfo")
+        val remoteCliqueId = cliqueInfo.id
+        val name =
+          BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
+        val props =
+          OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, brokerInfo, allHandlers)
+        context.actorOf(props, name)
+      }
+    }
   }
 }

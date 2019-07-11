@@ -14,24 +14,26 @@ case class DiscoveryMessage(header: DiscoveryMessage.Header, payload: DiscoveryM
 object DiscoveryMessage {
   val version: Int = 0
 
-  def from(payload: Payload)(implicit config: DiscoveryConfig): DiscoveryMessage = {
-    val header = Header(version, config.discoveryPublicKey)
+  def from(myCliqueId: CliqueId, payload: Payload)(
+      implicit config: DiscoveryConfig): DiscoveryMessage = {
+    val header = Header(version, config.discoveryPublicKey, myCliqueId)
     DiscoveryMessage(header, payload)
   }
 
-  case class Header(version: Int, publicKey: ED25519PublicKey)
+  case class Header(version: Int, publicKey: ED25519PublicKey, cliqueId: CliqueId)
   object Header {
-    private val serde = Serde.tuple2[Int, ED25519PublicKey]
+    private val serde = Serde.tuple3[Int, ED25519PublicKey, CliqueId]
 
-    def serialize(header: Header): ByteString = serde.serialize((header.version, header.publicKey))
+    def serialize(header: Header): ByteString =
+      serde.serialize((header.version, header.publicKey, header.cliqueId))
 
-    def _deserialize(input: ByteString)(
+    def _deserialize(myCliqueId: CliqueId, input: ByteString)(
         implicit config: DiscoveryConfig): SerdeResult[(Header, ByteString)] = {
       serde._deserialize(input).flatMap {
-        case ((_version, publicKey), rest) =>
+        case ((_version, publicKey, cliqueId), rest) =>
           if (_version == version) {
-            if (publicKey != config.discoveryPublicKey) {
-              Right((Header(_version, publicKey), rest))
+            if (publicKey != config.discoveryPublicKey && cliqueId != myCliqueId) {
+              Right((Header(_version, publicKey, cliqueId), rest))
             } else {
               Left(SerdeError.validation(s"Peer's public key is the same as ours"))
             }
@@ -140,10 +142,10 @@ object DiscoveryMessage {
     headerBytes ++ signature.bytes ++ payloadBytes
   }
 
-  def deserialize(input: ByteString)(
+  def deserialize(myCliqueId: CliqueId, input: ByteString)(
       implicit config: DiscoveryConfig): SerdeResult[DiscoveryMessage] = {
     for {
-      headerPair <- Header._deserialize(input)
+      headerPair <- Header._deserialize(myCliqueId, input)
       header = headerPair._1
       rest1  = headerPair._2
       signaturePair <- Serde[ED25519Signature]._deserialize(rest1)

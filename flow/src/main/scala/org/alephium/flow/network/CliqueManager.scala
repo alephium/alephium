@@ -1,24 +1,21 @@
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{Block, BrokerId, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{Block, BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.{AVector, BaseActor}
 
 object CliqueManager {
-  def props(builder: BrokerHandler.Builder)(implicit config: PlatformConfig): Props =
-    Props(new CliqueManager(builder))
+  def props(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
+      implicit config: PlatformConfig): Props =
+    Props(new CliqueManager(builder, discoveryServer))
 
   sealed trait Command
   case class Start(cliqueInfo: CliqueInfo) extends Command
-  case class Connect(cliqueId: CliqueId, brokerId: BrokerId, remote: InetSocketAddress)
-      extends Command
   // TODO: simplify this
   case class BroadCastBlock(
       block: Block,
@@ -28,10 +25,11 @@ object CliqueManager {
   ) extends Command
 
   sealed trait Event
-  case class Connected(cliqueInfo: CliqueInfo, brokerId: BrokerId) extends Command
+  case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
 }
 
-class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformConfig)
+class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
+    implicit config: PlatformConfig)
     extends BaseActor {
   import CliqueManager._
 
@@ -53,21 +51,21 @@ class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformCon
       val intraCliqueManager =
         context.actorOf(IntraCliqueManager.props(builder, cliqueInfo, allHandlers),
                         "IntraCliqueManager")
-      val interCliqueManager =
-        context.actorOf(InterCliqueManager.props(cliqueInfo, allHandlers), "InterCliqueManager")
       pool.foreach {
         case (connection, message) =>
           intraCliqueManager.tell(message, connection)
       }
-      context become awaitIntraCliqueReady(intraCliqueManager, interCliqueManager)
+      context become awaitIntraCliqueReady(intraCliqueManager, cliqueInfo)
     case c: Tcp.Connected =>
       val pair = (sender(), c)
       context become awaitStart(pool :+ pair)
   }
 
-  def awaitIntraCliqueReady(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
+  def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
     case IntraCliqueManager.Ready =>
       log.debug(s"Intra clique manager is ready")
+      val props              = InterCliqueManager.props(cliqueInfo, allHandlers, discoveryServer)
+      val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       context become handleWith(intraCliqueManager, interCliqueManager)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)
@@ -77,8 +75,6 @@ class CliqueManager(builder: BrokerHandler.Builder)(implicit config: PlatformCon
     case message: CliqueManager.BroadCastBlock =>
       intraCliqueManager ! message
       interCliqueManager ! message
-    case c: Connect =>
-      interCliqueManager ! c
     case c: Tcp.Connected =>
       interCliqueManager.forward(c)
   }

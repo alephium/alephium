@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.crypto.ED25519
 import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
-import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
+import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Env, Files, Network}
 
@@ -66,9 +66,10 @@ trait PlatformConfigFiles extends StrictLogging {
     val file     = getConfigFile("system")
     val env      = Env.resolve()
     val filename = s"system_${env.name}.conf"
-    if (file.exists) { file.delete }
-    Files.copyFromResource(s"/$filename.tmpl", file.toPath)
-    file.setWritable(false)
+    if (!file.exists) {
+      Files.copyFromResource(s"/$filename.tmpl", file.toPath)
+      file.setWritable(false)
+    }
     file
   }
 
@@ -107,14 +108,10 @@ trait PlatformCliqueConfig extends PlatformConfigFiles with CliqueConfig {
   val groupNumPerBroker: Int = groups / brokerNum
 }
 
-trait PlatformBrokerConfig extends PlatformConfigFiles with BrokerConfig {
+trait PlatformBrokerConfig extends PlatformCliqueConfig {
   def brokerConfigRaw: Config = alephium.getConfig("broker").resolve()
 
-  val brokerId: BrokerId = {
-    val myId = brokerConfigRaw.getInt("brokerId")
-    assert(0 <= myId && myId * groupNumPerBroker < groups)
-    BrokerId(myId)(this)
-  }
+  protected val myBrokerId: Int = brokerConfigRaw.getInt("brokerId")
 }
 
 trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
@@ -190,6 +187,10 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     with PlatformCliqueConfig
     with PlatformBrokerConfig
     with PlatformDiscoveryConfig { self =>
+  val brokerInfo: BrokerInfo = {
+    val myId = brokerConfigRaw.getInt("brokerId")
+    BrokerInfo(myId, groupNumPerBroker, publicAddress)(this)
+  }
 
   import RocksDBStorage.{ColumnFamily, Settings}
 
@@ -200,8 +201,10 @@ class PlatformConfig(val env: Env, val rootPath: Path)
     Disk.createDirUnsafe(path)
     path
   }
-  val dbStorage =
-    RocksDBStorage.openUnsafe(dbPath.resolve(brokerId.toString), RocksDBStorage.Compaction.HDD)
+  val dbStorage = {
+    val path = dbPath.resolve(s"${brokerInfo.id}-${publicAddress.getPort}")
+    RocksDBStorage.openUnsafe(path, RocksDBStorage.Compaction.HDD)
+  }
 
   val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 

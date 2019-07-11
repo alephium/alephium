@@ -28,7 +28,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     val socketProbe                   = TestProbe()
 
     implicit val config: DiscoveryConfig =
-      createConfig(groupSize, 0, udpPort, peersPerGroup, scanFrequency)
+      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
 
     val state = new DiscoveryServerState {
       implicit def config: DiscoveryConfig = self.config
@@ -48,10 +48,11 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
 
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
-        createConfig(groupSize, 0, udpPort, peersPerGroup, scanFrequency)
+        createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
-          val message = DiscoveryMessage.deserialize(send.payload)(peerConfig).right.value
+          val message =
+            DiscoveryMessage.deserialize(CliqueId.generate, send.payload)(peerConfig).right.value
           message.payload is a[T]
       }
     }
