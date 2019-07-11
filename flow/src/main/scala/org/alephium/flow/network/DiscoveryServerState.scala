@@ -129,7 +129,7 @@ trait DiscoveryServerState {
   def tryPing(cliqueInfo: CliqueInfo): Unit = {
     if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
       log.info(s"Sending Ping to $cliqueInfo")
-      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo)) // TODO: Improve this
+      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo)) // TODO: don't use masterAddress
       pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, System.currentTimeMillis()))
     }
   }

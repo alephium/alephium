@@ -11,9 +11,9 @@ import org.alephium.util.BaseActor
 import scala.concurrent.duration._
 
 object InterCliqueManager {
-  def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServe: ActorRef)(
+  def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
       implicit config: PlatformConfig): Props =
-    Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServe))
+    Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
