@@ -33,7 +33,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         log.debug(s"Got ${peerCliques.length} from discovery server")
         peerCliques.foreach(clique => if (!brokers.contains(clique.id)) connect(clique))
       } else {
-        if (config.bootstrap.nonEmpty && brokers.nonEmpty) {
+        // TODO: refine the condition, check the number of brokers for example
+        if (config.bootstrap.nonEmpty) {
           scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 2.second)
         }
       }
