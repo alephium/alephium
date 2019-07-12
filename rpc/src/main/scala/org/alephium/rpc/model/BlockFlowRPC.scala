@@ -16,7 +16,7 @@ object BlockFlowRPC {
 
       val index = header.chainIndex
 
-      FetchResponse(
+      FetchEntry(
         hash      = header.shortHex,
         timestamp = header.timestamp,
         chainFrom = index.from.value,
@@ -34,7 +34,13 @@ object BlockFlowRPC {
     implicit val encoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
   }
 
-  case class FetchResponse(
+  case class FetchResponse(blocks: List[FetchEntry])
+  object FetchResponse {
+    implicit val decoder: Decoder[FetchResponse] = deriveDecoder[FetchResponse]
+    implicit val encoder: Encoder[FetchResponse] = deriveEncoder[FetchResponse]
+  }
+
+  case class FetchEntry(
       hash: String,
       timestamp: Long,
       chainFrom: Int,
@@ -43,8 +49,8 @@ object BlockFlowRPC {
       deps: List[String]
   )
 
-  object FetchResponse {
-    implicit val decoder: Decoder[FetchResponse] = deriveDecoder[FetchResponse]
-    implicit val encoder: Encoder[FetchResponse] = deriveEncoder[FetchResponse]
+  object FetchEntry {
+    implicit val decoder: Decoder[FetchEntry] = deriveDecoder[FetchEntry]
+    implicit val encoder: Encoder[FetchEntry] = deriveEncoder[FetchEntry]
   }
 }
