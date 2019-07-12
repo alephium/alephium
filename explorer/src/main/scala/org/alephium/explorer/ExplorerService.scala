@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 import akka.{NotUsed}
@@ -49,6 +49,7 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
   // TODO Move to config
   val connectRetryFrequency: FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)
   val updateFrequency: FiniteDuration       = FiniteDuration(1, TimeUnit.SECONDS)
+  val websocketStreamTimeout                = 250.milliseconds
 
   val rpcId = Json.fromString("explorer")
 
@@ -98,6 +99,13 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
 
     case TextMessage.Strict(text) =>
       handleWSResponse(text)
+    case message @ TextMessage.Streamed(_) =>
+      message.toStrict(websocketStreamTimeout).onComplete {
+        case Success(strict) =>
+          handleWSResponse(strict.text)
+        case Failure(e) =>
+          logger.warn("Can not read WS message.", e)
+      }
 
     case Status.Failure(e: StreamTcpException) =>
       logger.error("Connection failure", e)
