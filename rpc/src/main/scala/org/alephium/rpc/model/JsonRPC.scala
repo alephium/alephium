@@ -78,7 +78,15 @@ object JsonRPC extends StrictLogging {
     import io.circe.generic.auto._
 
     case class Success(id: Json, result: Json) extends Response
+    object Success {
+      import io.circe.generic.semiauto._
+      implicit val decoder: Decoder[Success] = deriveDecoder[Success]
+    }
     case class Failure(id: Json, error: Error) extends Response
+    object Failure {
+      import io.circe.generic.semiauto._
+      implicit val decoder: Decoder[Failure] = deriveDecoder[Failure]
+    }
 
     implicit val encoder: Encoder[Response] = {
       val product: Encoder[Response] = Encoder.instance {
@@ -87,6 +95,10 @@ object JsonRPC extends StrictLogging {
       }
       product.mapJson(versionSet)
     }
+
+    // TODO Rewrite better implementation than type casting/failover
+    implicit val decoder: Decoder[Response] =
+      Success.decoder.or[Response](Failure.decoder.asInstanceOf[Decoder[Response]])
 
   }
 }
