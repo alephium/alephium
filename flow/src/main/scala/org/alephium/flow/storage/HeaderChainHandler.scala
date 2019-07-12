@@ -33,7 +33,7 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
 
   def handleHeader(header: BlockHeader): Unit = {
     if (blockFlow.contains(header)) {
-      log.debug(s"Header already existed")
+      log.debug(s"Header for ${header.chainIndex} already existed")
     } else {
       blockFlow.validate(header, fromBlock = false) match {
         case Left(e) =>

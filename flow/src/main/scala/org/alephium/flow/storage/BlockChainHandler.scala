@@ -37,7 +37,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
 
   def handleBlock(block: Block, origin: DataOrigin): Unit = {
     if (blockFlow.contains(block)) {
-      log.debug(s"Block already exists")
+      log.debug(s"Block for ${block.chainIndex} already exists")
     } else {
       val validationResult = origin match {
         case DataOrigin.LocalMining => Right(())
