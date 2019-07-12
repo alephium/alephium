@@ -27,7 +27,7 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
   var remoteCliqueId: CliqueId = _
   var remoteBroker: BrokerInfo = _
 
-  connection ! Tcp.Register(self)
+  connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
   connection ! BrokerHandler.envelope(Hello(selfCliqueInfo.id, config.brokerInfo))
 
   override def receive: Receive = handleWith(ByteString.empty, awaitHelloAck, handlePayload)
