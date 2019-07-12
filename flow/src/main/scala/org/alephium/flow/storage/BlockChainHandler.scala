@@ -3,9 +3,8 @@ package org.alephium.flow.storage
 import akka.actor.{ActorRef, Props}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.network.CliqueManager
-import org.alephium.protocol.message.{SendBlocks, SendHeaders}
+import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}
 
@@ -56,8 +55,8 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   }
 
   def broadcast(block: Block, origin: DataOrigin): Unit = {
-    val blockMessage  = BrokerHandler.envelope(SendBlocks(AVector(block)))
-    val headerMessage = BrokerHandler.envelope(SendHeaders(AVector(block.header)))
+    val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
+    val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
     cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
   }
 }

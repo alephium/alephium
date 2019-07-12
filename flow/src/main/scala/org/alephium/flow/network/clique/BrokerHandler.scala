@@ -20,6 +20,7 @@ import scala.util.Random
 
 object BrokerHandler {
   object Timer
+  object TcpAck extends Tcp.Event
 
   sealed trait Command
   case object SendPing extends Command
@@ -113,11 +114,11 @@ trait BrokerHandler extends BaseActor with Timers {
   def handleWith(unaligned: ByteString,
                  current: Payload => Unit,
                  next: Payload    => Unit): Receive = {
-    handleEvent(unaligned, current, next) orElse handleOutMessage
+    handleEvent(unaligned, current, next) orElse handleWrite
   }
 
   def handleWith(unaligned: ByteString, handle: Payload => Unit): Receive = {
-    handleEvent(unaligned, handle, handle) orElse handleOutMessage
+    handleEvent(unaligned, handle, handle) orElse handleWrite
   }
 
   def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
@@ -145,12 +146,28 @@ trait BrokerHandler extends BaseActor with Timers {
       context stop self
   }
 
-  // TODO: make this safe by using types
-  def handleOutMessage: Receive = {
-    case message: Message =>
-      connection ! BrokerHandler.envelope(message)
-    case write: Tcp.Write =>
-      connection ! write
+  private var isWaitingAck   = false
+  private val messagesToSent = collection.mutable.Queue.empty[ByteString]
+
+  def send(message: ByteString): Unit = {
+    assert(!isWaitingAck)
+    isWaitingAck = true
+    connection ! Tcp.Write(message, BrokerHandler.TcpAck)
+  }
+
+  def handleWrite: Receive = {
+    case message: ByteString =>
+      if (isWaitingAck) {
+        messagesToSent.enqueue(message)
+      } else {
+        send(message)
+      }
+    case BrokerHandler.TcpAck =>
+      assert(isWaitingAck)
+      isWaitingAck = false
+      if (messagesToSent.nonEmpty) {
+        send(messagesToSent.dequeue())
+      }
   }
 
   def handlePayload(payload: Payload): Unit = payload match {

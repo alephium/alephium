@@ -45,7 +45,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
     case _: Tcp.Connected =>
       connection = sender()
-      connection ! Tcp.Register(self)
+      connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
       handshakeIn()
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
