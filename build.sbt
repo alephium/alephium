@@ -60,6 +60,17 @@ lazy val crypto = subProject("crypto")
     )
   )
 
+lazy val explorer = subProject("explorer")
+  .settings(
+    fork in run := false,
+    mainClass := Some("org.alephium.explorer.ExplorerServer"),
+    libraryDependencies ++= Seq(
+      `akka-http`
+    )
+  )
+  .enablePlugins(JavaAppPackaging)
+  .dependsOn(rpc)
+
 lazy val flow = subProject("flow")
   .settings(
     libraryDependencies ++= Seq(
