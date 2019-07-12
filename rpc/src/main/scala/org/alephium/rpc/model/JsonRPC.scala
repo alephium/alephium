@@ -1,12 +1,14 @@
 package org.alephium.rpc.model
 
+import scala.concurrent.Future
+
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
 // https://www.jsonrpc.org/specification
 
 object JsonRPC extends StrictLogging {
-  type Handler = PartialFunction[String, Request => Response]
+  type Handler = PartialFunction[String, Request => Future[Response]]
 
   val versionKey = "jsonrpc"
   val version    = "2.0"
