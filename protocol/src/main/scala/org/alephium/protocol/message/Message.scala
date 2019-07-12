@@ -17,6 +17,10 @@ object Message {
     Serde[Header].serialize(message.header) ++ Payload.serialize(message.payload)
   }
 
+  def serialize[T <: Payload](payload: T): ByteString = {
+    serialize(apply(payload))
+  }
+
   def _deserialize(input: ByteString)(
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {

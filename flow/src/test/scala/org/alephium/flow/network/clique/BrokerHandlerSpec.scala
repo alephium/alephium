@@ -162,8 +162,9 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
   }
 
   it should "send data out when new message generated" in new Fixture {
-    tcpHandler ! message
-    connection.expectMsg(BrokerHandler.envelope(message))
+    val bytes = Message.serialize(message)
+    tcpHandler ! bytes
+    connection.expectMsg(Tcp.Write(bytes, BrokerHandler.TcpAck))
   }
 
   behavior of "Deserialization"
