@@ -68,7 +68,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, _) =>
       assert(block.chainIndex.relateTo(config.brokerInfo))
-      log.debug(s"Broadcasting block/header ${block.chainIndex}")
+      log.debug(s"Broadcasting block for ${block.chainIndex}")
       brokers.foreach {
         case (_, (info, broker)) =>
           if (block.chainIndex.relateTo(info)) {

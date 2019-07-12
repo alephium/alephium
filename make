@@ -43,7 +43,7 @@ elif args.goal == 'test':
     run('sbt clean scalafmtSbt coverage test coverageReport doc')
 
 elif args.goal == 'package':
-    run('sbt app/universal:packageBin')
+    run('sbt clean app/universal:packageBin')
 
 elif args.goal == 'benchmark':
     run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
