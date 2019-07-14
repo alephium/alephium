@@ -25,7 +25,7 @@ object AllHandlers {
     val flowProps      = FlowHandler.props(blockFlow)
     val flowHandler    = system.actorOf(flowProps, "FlowHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
-    val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
+    val headerHandlers = buildHeaderHandlers(system, cliqueManager, blockFlow, flowHandler)
     AllHandlers(flowHandler, blockHandlers, headerHandlers)
   }
 
@@ -48,8 +48,11 @@ object AllHandlers {
     handlers.toMap
   }
 
-  private def buildHeaderHandlers(system: ActorSystem, blockFlow: BlockFlow, flowHandler: ActorRef)(
-      implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
+  private def buildHeaderHandlers(
+      system: ActorSystem,
+      cliqueManager: ActorRef,
+      blockFlow: BlockFlow,
+      flowHandler: ActorRef)(implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
     val headerHandlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
@@ -57,7 +60,7 @@ object AllHandlers {
       if !chainIndex.relateTo(config.brokerInfo)
     } yield {
       val headerHander = system.actorOf(
-        HeaderChainHandler.props(blockFlow, chainIndex, flowHandler),
+        HeaderChainHandler.props(blockFlow, chainIndex, cliqueManager, flowHandler),
         s"HeaderChainHandler-$from-$to")
       chainIndex -> headerHander
     }

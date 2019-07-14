@@ -189,7 +189,7 @@ trait BrokerHandler extends BaseActor with Timers {
       val chainIndex = block.chainIndex
       if (chainIndex.relateTo(config.brokerInfo)) {
         val handler = allHandlers.getBlockHandler(chainIndex)
-        handler ! BlockChainHandler.AddBlocks(blocks, Remote(remoteCliqueId))
+        handler ! BlockChainHandler.AddBlocks(blocks, Remote(remoteCliqueId, remoteBroker))
       } else {
         log.warning(s"Received blocks for wrong chain $chainIndex from $remote")
       }
@@ -203,7 +203,7 @@ trait BrokerHandler extends BaseActor with Timers {
       val chainIndex = header.chainIndex
       if (!chainIndex.relateTo(config.brokerInfo)) {
         val handler = allHandlers.getHeaderHandler(chainIndex)
-        handler ! HeaderChainHandler.AddHeaders(headers)
+        handler ! HeaderChainHandler.AddHeaders(headers, Remote(remoteCliqueId, remoteBroker))
       } else {
         log.warning(s"Received headers for wrong chain from $remote")
       }
