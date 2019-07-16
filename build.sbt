@@ -1,5 +1,7 @@
 import Dependencies._
 
+Global / cancelable := true // Allow cancelation of forked task without killing SBT
+
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
 def baseProject(id: String): Project = {
@@ -62,7 +64,6 @@ lazy val crypto = subProject("crypto")
 
 lazy val explorer = subProject("explorer")
   .settings(
-    fork in run := false,
     mainClass := Some("org.alephium.explorer.ExplorerServer"),
     libraryDependencies ++= Seq(
       `akka-http`
