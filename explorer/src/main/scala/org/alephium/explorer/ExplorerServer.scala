@@ -8,7 +8,6 @@ import akka.util.Timeout
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.io.StdIn
 
 import io.circe.Json
 import io.circe.syntax._
@@ -21,8 +20,6 @@ import ExplorerService._
 
 // explorer/run 9000 ws://127.0.0.1:8080
 object ExplorerServer extends CORSHandler {
-  val AWS = true
-
   // TODO Move those to config system
   val address = "0.0.0.0"
 
@@ -60,13 +57,14 @@ object ExplorerServer extends CORSHandler {
     val route   = corsHandler(JsonRPCHandler.route(rpcHandler))
     val binding = Http().bindAndHandle(route, address, port)
 
-    // TODO Find better ways, this don't work under `nohup`
-    if (!AWS) {
-      StdIn.readLine() // let it run until user presses return
-
-      binding
-        .flatMap(_.unbind())
-        .onComplete(_ => system.terminate())
-    }
+    Runtime
+      .getRuntime()
+      .addShutdownHook(new Thread() {
+        override def run = {
+          binding
+            .flatMap(_.unbind())
+            .onComplete(_ => system.terminate())
+        }
+      })
   }
 }
