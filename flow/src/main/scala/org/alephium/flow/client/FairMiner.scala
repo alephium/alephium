@@ -108,7 +108,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     val address = addresses(to)
     val data    = ByteString.fromInts(Random.nextInt())
     // scalastyle:off magic.number
-    val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _, data))
+    val transactions = AVector.tabulate(1)(Transaction.coinbase(address, _, data))
     // scalastyle:on magic.number
     transactions
   }
