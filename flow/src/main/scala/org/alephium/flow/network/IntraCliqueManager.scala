@@ -66,17 +66,31 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
   }
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
-    case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, _) =>
+    case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
       assert(block.chainIndex.relateTo(config.brokerInfo))
-      log.debug(s"Broadcasting block/header ${block.chainIndex}")
+      log.debug(s"Broadcasting block for ${block.chainIndex}")
       brokers.foreach {
         case (_, (info, broker)) =>
-          if (block.chainIndex.relateTo(info)) {
-            log.debug(s"Send block to broker $info")
-            broker ! blockMsg
-          } else {
-            log.debug(s"Send header to broker $info")
-            broker ! headerMsg
+          if (!origin.isFrom(cliqueInfo.id, info)) {
+            if (block.chainIndex.relateTo(info)) {
+              log.debug(s"Send block to broker $info")
+              broker ! blockMsg
+            } else {
+              log.debug(s"Send header to broker $info")
+              broker ! headerMsg
+            }
+          }
+      }
+    case CliqueManager.BroadCastHeader(header, headerMsg, origin) =>
+      assert(!header.chainIndex.relateTo(config.brokerInfo))
+      log.debug(s"Broadcasting header for ${header.chainIndex}")
+      brokers.foreach {
+        case (_, (info, broker)) =>
+          if (!origin.isFrom(cliqueInfo.id, info)) {
+            if (!header.chainIndex.relateTo(info)) {
+              log.debug(s"Send header to broker $info")
+              broker ! headerMsg
+            }
           }
       }
   }
