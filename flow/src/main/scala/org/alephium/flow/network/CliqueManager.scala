@@ -2,11 +2,12 @@ package org.alephium.flow.network
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
+import akka.util.ByteString
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage.AllHandlers
-import org.alephium.protocol.model.{Block, BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 object CliqueManager {
@@ -16,11 +17,15 @@ object CliqueManager {
 
   sealed trait Command
   case class Start(cliqueInfo: CliqueInfo) extends Command
-  // TODO: simplify this
   case class BroadCastBlock(
       block: Block,
-      blockMsg: Tcp.Write,
-      headerMsg: Tcp.Write,
+      blockMsg: ByteString,
+      headerMsg: ByteString,
+      origin: DataOrigin
+  ) extends Command
+  case class BroadCastHeader(
+      header: BlockHeader,
+      headerMsg: ByteString,
       origin: DataOrigin
   ) extends Command
 
@@ -73,6 +78,9 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
 
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
     case message: CliqueManager.BroadCastBlock =>
+      intraCliqueManager ! message
+      interCliqueManager ! message
+    case message: CliqueManager.BroadCastHeader =>
       intraCliqueManager ! message
       interCliqueManager ! message
     case c: Tcp.Connected =>
