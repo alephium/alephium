@@ -14,22 +14,16 @@ object BlockFlowRPC {
     final def apply(header: BlockHeader): Json = {
       import io.circe.syntax._
 
-      val index     = header.chainIndex
-      val from      = index.from.value
-      val to        = index.to.value
-      val timestamp = header.timestamp
-      val height    = chain.getHeight(header)
-      val hash      = header.shortHex
-      val deps      = header.blockDeps.toIterable.map(_.shortHex).toList
+      val index = header.chainIndex
 
-      Json.obj(
-        ("timestamp", Json.fromLong(timestamp)),
-        ("chainFrom", Json.fromInt(from)),
-        ("chainTo", Json.fromInt(to)),
-        ("height", Json.fromInt(height)),
-        ("hash", Json.fromString(hash)),
-        ("deps", deps.asJson)
-      )
+      FetchEntry(
+        hash      = header.shortHex,
+        timestamp = header.timestamp,
+        chainFrom = index.from.value,
+        chainTo   = index.to.value,
+        height    = chain.getHeight(header),
+        deps      = header.blockDeps.toIterable.map(_.shortHex).toList
+      ).asJson
     }
   }
 
@@ -38,5 +32,25 @@ object BlockFlowRPC {
   object FetchRequest {
     implicit val decoder: Decoder[FetchRequest] = deriveDecoder[FetchRequest]
     implicit val encoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
+  }
+
+  case class FetchResponse(blocks: List[FetchEntry])
+  object FetchResponse {
+    implicit val decoder: Decoder[FetchResponse] = deriveDecoder[FetchResponse]
+    implicit val encoder: Encoder[FetchResponse] = deriveEncoder[FetchResponse]
+  }
+
+  case class FetchEntry(
+      hash: String,
+      timestamp: Long,
+      chainFrom: Int,
+      chainTo: Int,
+      height: Int,
+      deps: List[String]
+  )
+
+  object FetchEntry {
+    implicit val decoder: Decoder[FetchEntry] = deriveDecoder[FetchEntry]
+    implicit val encoder: Encoder[FetchEntry] = deriveEncoder[FetchEntry]
   }
 }

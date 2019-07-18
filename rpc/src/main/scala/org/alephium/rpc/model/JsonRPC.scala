@@ -1,11 +1,14 @@
 package org.alephium.rpc.model
 
+import scala.concurrent.Future
+
+import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
 // https://www.jsonrpc.org/specification
 
-object JsonRPC {
-  type Handler = PartialFunction[String, Request => Response]
+object JsonRPC extends StrictLogging {
+  type Handler = PartialFunction[String, Request => Future[Response]]
 
   val versionKey = "jsonrpc"
   val version    = "2.0"
@@ -50,6 +53,14 @@ object JsonRPC {
   }
 
   case class Request(id: Json, method: String, params: Json) {
+    def paramsAs[A: Decoder]: Either[Response, A] = params.as[A] match {
+      case Right(a) => Right(a)
+      case Left(decodingFailure) =>
+        logger.debug(
+          s"Unable to decode JsonRPC request parameters. ($method@$id: ${decodingFailure})")
+        Left(failure(Error.InvalidParams))
+    }
+
     def successful(): Response          = Response.Success(id, Json.True)
     def success(result: Json): Response = Response.Success(id, result)
     def failure(error: Error): Response = Response.Failure(id, error)
@@ -67,7 +78,15 @@ object JsonRPC {
     import io.circe.generic.auto._
 
     case class Success(id: Json, result: Json) extends Response
+    object Success {
+      import io.circe.generic.semiauto._
+      implicit val decoder: Decoder[Success] = deriveDecoder[Success]
+    }
     case class Failure(id: Json, error: Error) extends Response
+    object Failure {
+      import io.circe.generic.semiauto._
+      implicit val decoder: Decoder[Failure] = deriveDecoder[Failure]
+    }
 
     implicit val encoder: Encoder[Response] = {
       val product: Encoder[Response] = Encoder.instance {
@@ -76,6 +95,10 @@ object JsonRPC {
       }
       product.mapJson(versionSet)
     }
+
+    // TODO Rewrite better implementation than type casting/failover
+    implicit val decoder: Decoder[Response] =
+      Success.decoder.or[Response](Failure.decoder.asInstanceOf[Decoder[Response]])
 
   }
 }
