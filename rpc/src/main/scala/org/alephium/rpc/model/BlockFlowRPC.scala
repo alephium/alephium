@@ -3,29 +3,7 @@ package org.alephium.rpc.model
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.flow.storage.MultiChain
-import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.BlockHeader
-
 object BlockFlowRPC {
-
-  def blockHeaderEncoder(chain: MultiChain)(
-      implicit config: ConsensusConfig): Encoder[BlockHeader] = new Encoder[BlockHeader] {
-    final def apply(header: BlockHeader): Json = {
-      import io.circe.syntax._
-
-      val index = header.chainIndex
-
-      FetchEntry(
-        hash      = header.shortHex,
-        timestamp = header.timestamp,
-        chainFrom = index.from.value,
-        chainTo   = index.to.value,
-        height    = chain.getHeight(header),
-        deps      = header.blockDeps.toIterable.map(_.shortHex).toList
-      ).asJson
-    }
-  }
 
   case class FetchRequest(from: Option[Long])
 
