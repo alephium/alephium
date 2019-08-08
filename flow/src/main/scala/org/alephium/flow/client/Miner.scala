@@ -94,12 +94,10 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     _mine(template, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
-    case FlowHandler.BlockFlowTemplate(_, deps, target) =>
+    case FlowHandler.BlockFlowTemplate(_, deps, target, transactions) =>
       assert(deps.length == (2 * config.groups - 1))
       // scalastyle:off magic.number
-      val data         = ByteString.fromInts(Random.nextInt())
-      val transactions = AVector.tabulate(1000)(Transaction.coinbase(address, _, data))
-      val chainDep     = deps.takeRight(config.groups)(chainIndex.to.value)
+      val chainDep = deps.takeRight(config.groups)(chainIndex.to.value)
       // scalastyle:on magic.number
       node.blockFlow.getBlockHeader(chainDep) match {
         case Left(e) =>
@@ -107,7 +105,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
         case Right(header) =>
           val lastTs   = header.timestamp
-          val template = BlockTemplate(deps, target, transactions)
+          val data     = ByteString.fromInts(Random.nextInt())
+          val coinbase = Transaction.coinbase(address, 1, data)
+          val template = BlockTemplate(deps, target, coinbase +: transactions)
           context become mine(template, lastTs)
           taskStartingTime = System.currentTimeMillis()
           self ! Miner.Nonce(0, config.nonceStep)
