@@ -176,7 +176,26 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
       }
   }
 
-  def getOpt(key: Keccak256): IOResult[Option[ByteString]] = {
+  def get[K <: Keccak256Hash[_], V: Serde](key: K): IOResult[V] = {
+    getOpt[K, V](key).flatMap {
+      case None        => Left(IOError.RocksDB.keyNotFound)
+      case Some(value) => Right(value)
+    }
+  }
+
+  def getOpt[K <: Keccak256Hash[_], V: Serde](key: K): IOResult[Option[V]] = {
+    val nibbles = MerklePatriciaTrie.hash2Nibbles(key.hash)
+    getOpt(rootHash, nibbles).flatMap {
+      case None => Right(None)
+      case Some(bytes) =>
+        deserialize[V](bytes) match {
+          case Left(error)  => Left(IOError.apply(error))
+          case Right(value) => Right(Some(value))
+        }
+    }
+  }
+
+  def getOptRaw(key: Keccak256): IOResult[Option[ByteString]] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
     getOpt(rootHash, nibbles)
   }
@@ -266,10 +285,10 @@ class MerklePatriciaTrie(var rootHash: Keccak256, storage: KeyValueStorage) {
   }
 
   def put[K <: Keccak256Hash[_], V: Serde](key: K, value: V): IOResult[Unit] = {
-    put(key.hash, serialize[V](value))
+    putRaw(key.hash, serialize[V](value))
   }
 
-  def put(key: Keccak256, value: ByteString): IOResult[Unit] = {
+  def putRaw(key: Keccak256, value: ByteString): IOResult[Unit] = {
     val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
     for {
       result <- put(rootHash, nibbles, value)
