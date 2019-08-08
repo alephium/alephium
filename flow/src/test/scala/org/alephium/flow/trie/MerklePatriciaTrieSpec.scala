@@ -109,7 +109,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "be able to create a trie" in withTrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
-    fixture.trie.getOpt(genesisKey).right.value.nonEmpty is true
+    fixture.trie.getOptRaw(genesisKey).right.value.nonEmpty is true
   }
 
   it should "branch well" in withTrieFixture { fixture =>
@@ -120,7 +120,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie.put(key, value)
+        trie.putRaw(key, value)
         Some(key)
       }
     }
@@ -135,12 +135,12 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      trie.getOpt(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).right.value.nonEmpty is true
     }
 
     keys.foreach { key =>
       trie.remove(key).isRight is true
-      trie.getOpt(key).right.value.isEmpty is true
+      trie.getOptRaw(key).right.value.isEmpty is true
     }
 
     trie.rootHash is genesisNode.hash
@@ -151,17 +151,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(100) { _ =>
       val (key, value) = fixture.generateKV()
-      trie.put(key, value).isRight is true
+      trie.putRaw(key, value).isRight is true
       key
     }
 
     keys.map { key =>
-      trie.getOpt(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).right.value.nonEmpty is true
     }
 
     keys.map { key =>
       trie.remove(key).isRight is true
-      trie.getOpt(key).right.value.isEmpty is true
+      trie.getOptRaw(key).right.value.isEmpty is true
     }
 
     trie.rootHash is genesisNode.hash

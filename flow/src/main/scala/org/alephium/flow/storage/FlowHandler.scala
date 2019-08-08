@@ -6,7 +6,7 @@ import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
@@ -23,7 +23,10 @@ object FlowHandler {
   case class Register(miner: ActorRef)                  extends Command
 
   sealed trait Event
-  case class BlockFlowTemplate(index: ChainIndex, deps: AVector[Keccak256], target: BigInt)
+  case class BlockFlowTemplate(index: ChainIndex,
+                               deps: AVector[Keccak256],
+                               target: BigInt,
+                               transactions: AVector[Transaction])
       extends Event
 }
 

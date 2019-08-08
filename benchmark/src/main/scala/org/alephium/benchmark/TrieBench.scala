@@ -36,7 +36,7 @@ class TrieBench {
     val keys = Array.tabulate(1 << 10) { _ =>
       val key  = Keccak256.random
       val data = Keccak256.random.bytes
-      trie.put(key, data)
+      trie.putRaw(key, data)
       key
     }
     keys.foreach(trie.remove)
