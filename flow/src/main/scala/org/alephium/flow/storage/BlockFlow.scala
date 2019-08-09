@@ -15,7 +15,8 @@ class BlockFlow()(implicit val config: PlatformConfig)
     with FlowUtils {
 
   def add(block: Block): IOResult[Unit] = {
-    val index  = block.chainIndex
+    val index = block.chainIndex
+    assert(index.relateTo(config.brokerInfo))
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to)
     for {
