@@ -105,6 +105,7 @@ lazy val rpc = subProject("rpc")
       `scala-logging`
     )
   )
+  .dependsOn(util % "test->test;compile->compile")
 
 lazy val serde = subProject("serde")
   .settings(
