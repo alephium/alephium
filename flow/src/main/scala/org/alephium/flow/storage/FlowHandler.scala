@@ -107,7 +107,6 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
     val total = blockFlow.numHashes - config.chainNum // exclude genesis blocks
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
-    val utxos = blockFlow.numUTXOs
     val heights = for {
       i <- 0 until config.groups
       j <- 0 until config.groups
@@ -124,7 +123,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends
           s"$span seconds"
       }
     }
-    log.info(s"$index; total: $total; utxos: $utxos; ${chain
+    log.info(s"$index; total: $total; ${chain
       .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
   }
 }

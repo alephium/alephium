@@ -25,8 +25,6 @@ trait BlockFlowState {
     BlockDeps(deps1 ++ deps2)
   }
 
-  private val utxos = ConcurrentHashSet.empty[TxOutputPoint]
-
   private val inBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
       val mainGroup = brokerInfo.groupFrom + toShift
@@ -106,6 +104,4 @@ trait BlockFlowState {
       } yield ()
     }
   }
-
-  def numUTXOs: Int = utxos.size
 }
