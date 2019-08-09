@@ -1,25 +1,62 @@
 package org.alephium
 
-import scala.concurrent.Future
 import java.time.Instant
-
+import akka.actor.ActorRef
+import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
+import scala.concurrent._
+import scala.concurrent.duration.Duration
 import com.typesafe.scalalogging.StrictLogging
-import io.circe.{Encoder, Json}
+import io.circe._
 
+import org.alephium.flow.{Mode, Platform}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.storage.MultiChain
-import org.alephium.flow.{Mode, Platform}
+import org.alephium.flow.network.DiscoveryServer
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
+import org.alephium.rpc.AVectorJson._
 import org.alephium.rpc.model.{JsonRPC, RPC}
 
 trait RPCServer extends Platform with CORSHandler with StrictLogging {
   import RPCServer._
 
   def mode: Mode
+
+  def handler(node: Node, miner: ActorRef)(implicit consus: ConsensusConfig,
+                                           rpc: RPCConfig,
+                                           timeout: Timeout,
+                                           EC: ExecutionContext): JsonRPC.Handler = {
+    case "blockflow/fetch" =>
+      req =>
+        Future {
+          blockflowFetch(node, req)
+        }
+
+    case "clique/info" =>
+      req =>
+        node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
+          val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
+          req.success(encodeAVector[CliqueInfo].apply(cliques.peers))
+        }
+
+    case "mining/start" =>
+      req =>
+        Future {
+          miner ! Miner.Start
+          req.successful()
+        }
+
+    case "mining/stop" =>
+      req =>
+        Future {
+          miner ! Miner.Stop
+          req.successful()
+        }
+  }
 
   def runServer(): Future[Unit] = {
     val node = mode.node
@@ -29,35 +66,14 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
     implicit val executionContext = system.dispatcher
     implicit val config           = mode.config
     implicit val rpcConfig        = RPCConfig.load(config.alephium)
+    implicit val askTimeout       = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
 
     val miner = {
       val props = FairMiner.props(node).withDispatcher("akka.actor.mining-dispatcher")
       system.actorOf(props, s"FairMiner")
     }
 
-    val rpcHandler: JsonRPC.Handler = {
-      case "blockflow/fetch" =>
-        req =>
-          Future {
-            blockflowFetch(node, req)
-          }
-
-      case "mining/start" =>
-        req =>
-          Future {
-            miner ! Miner.Start
-            req.successful()
-          }
-
-      case "mining/stop" =>
-        req =>
-          Future {
-            miner ! Miner.Stop
-            req.successful()
-          }
-    }
-
-    val route = corsHandler(JsonRPCHandler.route(rpcHandler))
+    val route = corsHandler(JsonRPCHandler.route(handler(node, miner)))
 
     Http().bindAndHandle(route, rpcConfig.networkInterface, mode.httpPort).map(_ => ())
   }
@@ -67,6 +83,13 @@ object RPCServer extends StrictLogging {
   import RPC._
   import JsonRPC._
 
+  // TODO How to get this infer automatically? (semiauto generic derivation from Circe is failing)
+  implicit val encodeCliqueInfo: Encoder[CliqueInfo] = new Encoder[CliqueInfo] {
+    final def apply(ci: CliqueInfo): Json = {
+      Json.obj(("id", Json.fromString(ci.id.toString)),
+               ("peers", encodeAVector[String].apply(ci.peers.map(_.toString))))
+    }
+  }
   def blockflowFetch(node: Node, req: Request)(implicit rpc: RPCConfig,
                                                cfg: ConsensusConfig): Response = {
     req.paramsAs[FetchRequest] match {
