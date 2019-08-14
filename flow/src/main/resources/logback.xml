@@ -41,6 +41,8 @@
         </encoder>
     </appender>
 
+    <logger name="akka.stream.impl.streamref" level="INFO"/>
+
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ERRFILE"/>
