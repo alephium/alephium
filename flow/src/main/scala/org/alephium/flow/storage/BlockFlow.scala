@@ -19,6 +19,8 @@ class BlockFlow()(implicit val config: PlatformConfig)
     assert(index.relateTo(config.brokerInfo))
     val chain  = getBlockChain(index)
     val parent = block.uncleHash(index.to) // equal to parentHash
+
+    cacheBlock(block)
     for {
       weight <- calWeight(block)
       _      <- chain.add(block, parent, weight)

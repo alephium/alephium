@@ -19,7 +19,7 @@ class BlockChainSpec extends AlephiumSpec with BlockFlowFixture {
       val chain = BlockChain.fromGenesisUnsafe(genesis)
       chain.numHashes is 1
       val blocksSize1 = chain.numHashes
-      chain.add(block, 0)
+      chain.add(block, 0).isRight is true
       val blocksSize2 = chain.numHashes
       blocksSize1 + 1 is blocksSize2
     }

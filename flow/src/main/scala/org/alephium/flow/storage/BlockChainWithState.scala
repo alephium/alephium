@@ -15,7 +15,7 @@ trait BlockChainWithState extends BlockChain {
     tries(hash)
   }
 
-  def addTrie(hash: Keccak256, trie: MerklePatriciaTrie): Unit = {
+  protected def addTrie(hash: Keccak256, trie: MerklePatriciaTrie): Unit = {
     tries.add(hash, trie)
   }
 
@@ -24,8 +24,8 @@ trait BlockChainWithState extends BlockChain {
   override def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
     val trie = getTrie(block.parentHash)
     for {
-      _       <- super.add(block, parentHash, weight)
       newTrie <- updateState(trie, block)
+      _       <- super.add(block, parentHash, weight)
     } yield {
       addTrie(block.hash, newTrie)
     }
@@ -60,8 +60,8 @@ object BlockChainWithState {
 
       this.persistBlockUnsafe(rootBlock)
       this.addHeaderUnsafe(rootBlock.header)
-      this.addNode(rootNode)
       this.addTrie(rootNode.blockHash, initialTrie)
+      this.addNode(rootNode)
     }
   }
 }
