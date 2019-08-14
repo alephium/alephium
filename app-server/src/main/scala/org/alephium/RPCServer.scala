@@ -1,17 +1,21 @@
 package org.alephium
 
 import java.time.Instant
+import scala.concurrent._
+import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success}
 import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.ws.{TextMessage}
+import akka.http.scaladsl.server.Directives._
+import akka.stream.{ActorMaterializer, SourceRef}
+import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.Timeout
-import scala.concurrent._
-import scala.concurrent.duration.Duration
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
-
-import org.alephium.flow.{Mode, Platform}
+import org.alephium.flow.{Mode, Platform, PlatformEventBus}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.storage.MultiChain
 import org.alephium.flow.network.DiscoveryServer
@@ -73,7 +77,36 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
       system.actorOf(props, s"FairMiner")
     }
 
-    val route = corsHandler(JsonRPCHandler.route(handler(node, miner)))
+    val route = concat(
+      path("rpc") {
+        corsHandler(JsonRPCHandler.route(handler(node, miner)))
+      },
+      path("events") {
+        corsHandler(get {
+          // TODO When does the actor get cleaned?
+          val eventBusClient = system.actorOf(EventBusClient.props(node.eventBus))
+          val source =
+            (eventBusClient ? EventBusClient.Connect).mapTo[SourceRef[PlatformEventBus.Event]]
+          onComplete(source) {
+            case Success(source) =>
+              handleWebSocketMessages(
+                Flow.fromSinkAndSource(
+                  Sink.ignore,
+                  source.map {
+                    // TODO Replace with real impl
+                    case PlatformEventBus.Event.Dummy =>
+                      val ts = System.currentTimeMillis()
+                      TextMessage(s"{ dummy: $ts}")
+                  }
+                ))
+            case Failure(err) =>
+              logger.error("Unable to connect event bus client.", err)
+              complete(
+                HttpResponse(StatusCodes.InternalServerError, entity = HttpEntity(err.getMessage)))
+          }
+        })
+      }
+    )
 
     Http().bindAndHandle(route, rpcConfig.networkInterface, mode.httpPort).map(_ => ())
   }
