@@ -4,14 +4,15 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.storage.BlockFlowState.{BlockCache, InBlockCache, InOutBlockCache, OutBlockCache}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
 import scala.reflect.ClassTag
 
 trait BlockFlowState {
+  import BlockFlowState._
+
   implicit def config: PlatformConfig
 
   val brokerInfo: BrokerInfo = config.brokerInfo
@@ -63,29 +64,39 @@ trait BlockFlowState {
     }
 
   // Cache latest blocks for assisting merkle trie
-  private val inblockCashes    = collection.mutable.HashMap.empty[Keccak256, InBlockCache]
-  private val outblockCashes   = collection.mutable.HashMap.empty[Keccak256, OutBlockCache]
-  private val inoutblockCashes = collection.mutable.HashMap.empty[Keccak256, InOutBlockCache]
+  private val groupCaches = AVector.fill(config.groupNumPerBroker)(GroupCache.empty)
 
-  def getBlockCache(hash: Keccak256): BlockCache = {
-    assert(
-      inblockCashes.contains(hash) || outblockCashes.contains(hash) || inoutblockCashes.contains(
-        hash))
-    if (inblockCashes.contains(hash)) {
-      inblockCashes(hash)
-    } else if (outblockCashes.contains(hash)) {
-      outblockCashes(hash)
-    } else {
-      inoutblockCashes(hash)
+  def getGroupCache(groupIndex: GroupIndex): GroupCache = {
+    assert(brokerInfo.contains(groupIndex))
+    groupCaches(groupIndex.value - brokerInfo.groupFrom)
+  }
+
+  def cacheBlock(block: Block): Unit = {
+    val index = block.chainIndex
+    (brokerInfo.groupFrom until brokerInfo.groupUntil).foreach { group =>
+      val groupIndex = GroupIndex(group)
+      val groupCache = groupCaches(group - brokerInfo.groupFrom)
+      if (index.relateTo(GroupIndex.apply(group))) {
+        convertBlock(block, groupIndex) match {
+          case c: InBlockCache    => groupCache.inblockcaches.add(block.hash, c)
+          case c: OutBlockCache   => groupCache.outblockcaches.add(block.hash, c)
+          case c: InOutBlockCache => groupCache.inoutblockcaches.add(block.hash, c)
+        }
+        groupCache.cachedHashes.enqueue(block.hash)
+        pruneCaches(groupCache)
+      }
     }
   }
 
-  def isUtxoAvailableInCashe(utxo: TxOutputPoint): Boolean = {
-    inblockCashes.values.exists(_.outputs.contains(utxo))
-  }
-
-  def isUtxoSpentInCashe(utxo: TxOutputPoint): Boolean = {
-    outblockCashes.values.exists(_.inputs.contains(utxo))
+  protected def pruneCaches(groupCache: GroupCache): Unit = {
+    import groupCache._
+    if (cachedHashes.length > config.blockCacheSize) {
+      val toRemove = cachedHashes.dequeue
+      inblockcaches.removeIfExist(toRemove)
+      outblockcaches.removeIfExist(toRemove)
+      inoutblockcaches.removeIfExist(toRemove)
+      pruneCaches(groupCache)
+    }
   }
 
   protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T = {
@@ -182,12 +193,14 @@ trait BlockFlowState {
   protected def getBlocksForUpdates(block: Block): IOResult[AVector[BlockCache]] = {
     val chainIndex = block.chainIndex
     assert(chainIndex.isIntraGroup)
+    val groupOffset = chainIndex.from.value - brokerInfo.groupFrom
+    val groupCache  = groupCaches(groupOffset)
     for {
       newTips <- getInOutTips(block.header, chainIndex.from)
       oldTips <- getInOutTips(block.parentHash, chainIndex.from)
     } yield {
       val newHashes = getTipsDiff(newTips, oldTips)
-      newHashes.map(getBlockCache)
+      newHashes.map(groupCache.getBlockCache)
     }
   }
 
@@ -196,40 +209,12 @@ trait BlockFlowState {
     assert(index.isIntraGroup)
     getIntraGroupDepHash(block, index.from).flatMap { intraGroupDepHash =>
       if (index.isIntraGroup) {
-        getBlocksForUpdates(block).flatMap { blocks =>
-          blocks.foldF(trie)(updateState1)
+        getBlocksForUpdates(block).flatMap { blockcaches =>
+          blockcaches.foldF(trie)(BlockFlowState.updateState)
         }
       } else {
         Right(trie)
       }
-    }
-  }
-
-  private def updateState1(trie: MerklePatriciaTrie,
-                           outputs: Map[TxOutputPoint, TxOutput]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(outputs, trie) {
-      case (trie0, (outputPoint, output)) =>
-        trie0.put(outputPoint, output)
-    }
-  }
-
-  private def updateState1(trie: MerklePatriciaTrie,
-                           inputs: Set[TxOutputPoint]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(inputs, trie)(_.remove(_))
-  }
-
-  private def updateState1(trie: MerklePatriciaTrie,
-                           blockCache: BlockCache): IOResult[MerklePatriciaTrie] = {
-    blockCache match {
-      case InBlockCache(outputs) =>
-        updateState1(trie, outputs)
-      case OutBlockCache(inputs) =>
-        updateState1(trie, inputs)
-      case InOutBlockCache(outputs, inputs) =>
-        for {
-          trie0 <- updateState1(trie, outputs)
-          trie1 <- updateState1(trie0, inputs)
-        } yield trie1
     }
   }
 }
@@ -240,4 +225,101 @@ object BlockFlowState {
   case class OutBlockCache(inputs: Set[TxOutputPoint])           extends BlockCache
   case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput], inputs: Set[TxOutputPoint])
       extends BlockCache // For blocks on intra-group chain
+
+  private def convertInputs(block: Block): Set[TxOutputPoint] = {
+    block.transactions.flatMap(_.unsigned.inputs).toIterable.toSet
+  }
+
+  private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
+    val outputs = block.transactions.flatMap { transaction =>
+      transaction.unsigned.outputs.mapWithIndex { (output, i) =>
+        val outputPoint = TxOutputPoint(transaction.hash, i)
+        (outputPoint, output)
+      }
+    }
+    outputs.toIterable.toMap
+  }
+
+  def convertBlock(block: Block, groupIndex: GroupIndex)(
+      implicit config: PlatformConfig): BlockCache = {
+    val index = block.chainIndex
+    assert(index.relateTo(groupIndex))
+    if (index.isIntraGroup) {
+      InOutBlockCache(convertOutputs(block), convertInputs(block))
+    } else if (index.from == groupIndex) {
+      OutBlockCache(convertInputs(block))
+    } else {
+      InBlockCache(convertOutputs(block))
+    }
+  }
+
+  class GroupCache(
+      val inblockcaches: ConcurrentHashMap[Keccak256, InBlockCache],
+      val outblockcaches: ConcurrentHashMap[Keccak256, OutBlockCache],
+      val inoutblockcaches: ConcurrentHashMap[Keccak256, InOutBlockCache],
+      val cachedHashes: ConcurrentQueue[Keccak256]
+  ) {
+    def getBlockCache(hash: Keccak256): BlockCache = {
+      assert(
+        inblockcaches.contains(hash) ||
+          outblockcaches.contains(hash) ||
+          inoutblockcaches.contains(hash))
+
+      if (inblockcaches.contains(hash)) {
+        inblockcaches(hash)
+      } else if (outblockcaches.contains(hash)) {
+        outblockcaches(hash)
+      } else {
+        inoutblockcaches(hash)
+      }
+    }
+
+    def isUtxoAvailableIncache(utxo: TxOutputPoint): Boolean = {
+      inblockcaches.values.exists(_.outputs.contains(utxo)) ||
+      inoutblockcaches.values.exists(_.outputs.contains(utxo))
+    }
+
+    def isUtxoSpentIncache(utxo: TxOutputPoint): Boolean = {
+      outblockcaches.values.exists(_.inputs.contains(utxo)) ||
+      inoutblockcaches.values.exists(_.inputs.contains(utxo))
+    }
+  }
+
+  object GroupCache {
+    def empty: GroupCache = new GroupCache(
+      ConcurrentHashMap.empty,
+      ConcurrentHashMap.empty,
+      ConcurrentHashMap.empty,
+      ConcurrentQueue.empty
+    )
+  }
+
+  def updateStateForOutputs(
+      trie: MerklePatriciaTrie,
+      outputs: Iterable[(TxOutputPoint, TxOutput)]): IOResult[MerklePatriciaTrie] = {
+    EitherF.fold(outputs, trie) {
+      case (trie0, (outputPoint, output)) =>
+        trie0.put(outputPoint, output)
+    }
+  }
+
+  def updateStateForInputs(trie: MerklePatriciaTrie,
+                           inputs: Iterable[TxOutputPoint]): IOResult[MerklePatriciaTrie] = {
+    EitherF.fold(inputs, trie)(_.remove(_))
+  }
+
+  def updateState(trie: MerklePatriciaTrie,
+                  blockCache: BlockCache): IOResult[MerklePatriciaTrie] = {
+    blockCache match {
+      case InBlockCache(outputs) =>
+        updateStateForOutputs(trie, outputs)
+      case OutBlockCache(inputs) =>
+        updateStateForInputs(trie, inputs)
+      case InOutBlockCache(outputs, inputs) =>
+        for {
+          trie0 <- updateStateForOutputs(trie, outputs)
+          trie1 <- updateStateForInputs(trie0, inputs)
+        } yield trie1
+    }
+  }
 }
