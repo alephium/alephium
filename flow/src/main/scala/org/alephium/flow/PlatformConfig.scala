@@ -124,6 +124,8 @@ trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
   val blockConfirmNum: Int      = consensusConfigRaw.getInt("blockConfirmNum")
   val expectedTimeSpan: Long    = blockTargetTime.toMillis
 
+  val blockCacheSize: Int = consensusConfigRaw.getInt("blockCacheSizePerChain") * (2 * groups - 1)
+
   // Digi Shields Difficulty Adjustment
   val medianTimeInterval = 11
   val diffAdjustDownMax  = 16

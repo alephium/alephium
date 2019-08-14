@@ -86,14 +86,17 @@ trait TransactionPool { self: BlockFlowState =>
   def validateIndex(input: TxOutputPoint,
                     trie: MerklePatriciaTrie,
                     from: GroupIndex): Either[Error, Unit] = {
-    val errorRes = Left[Error, Unit](Error.invalidTransaction("Input has different group index"))
+    val errorRes   = Left[Error, Unit](Error.invalidTransaction("Input has different group index"))
+    val groupCache = getGroupCache(from)
     trie.getOpt[TxOutputPoint, TxOutput](input) match {
       case Left(e) => Left(Error.ioError(e))
       case Right(Some(output)) =>
-        if (GroupIndex.from(output.publicKey) == from && (!isUtxoSpentInCashe(input))) Right(())
+        if (GroupIndex.from(output.publicKey) == from &&
+            (!groupCache.isUtxoSpentIncache(input))) Right(())
         else errorRes
       case Right(None) =>
-        if (isUtxoAvailableInCashe(input) && !isUtxoSpentInCashe(input)) Right(())
+        if (groupCache.isUtxoAvailableIncache(input) &&
+            !groupCache.isUtxoSpentIncache(input)) Right(())
         else errorRes
     }
   }
