@@ -208,6 +208,6 @@ class PlatformConfig(val env: Env, val rootPath: Path)
 
   val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
-  val trie: MerklePatriciaTrie =
+  val emptyTrie: MerklePatriciaTrie =
     MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, Settings.readOptions))
 }

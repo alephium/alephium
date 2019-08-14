@@ -18,12 +18,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
     val index = block.chainIndex
     assert(index.relateTo(config.brokerInfo))
     val chain  = getBlockChain(index)
-    val parent = block.uncleHash(index.to)
+    val parent = block.uncleHash(index.to) // equal to parentHash
     for {
       weight <- calWeight(block)
       _      <- chain.add(block, parent, weight)
       _      <- calBestDeps()
-      _      <- updateTxs(block)
     } yield ()
   }
 
@@ -113,6 +112,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
     aggregate(_.getAllTips)(_ ++ _)
   }
 
+  // Rtips means tip representatives for all groups
   private def getRtipsUnsafe(tip: Keccak256, from: GroupIndex): Array[Keccak256] = {
     val rdeps = new Array[Keccak256](groups)
     rdeps(from.value) = tip

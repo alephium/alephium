@@ -5,7 +5,7 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.storage.FlowHandler.BlockFlowTemplate
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 
-trait FlowUtils extends MultiChain with TransactionPool {
+trait FlowUtils extends MultiChain with TransactionPool with BlockFlowState {
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
