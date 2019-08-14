@@ -5,6 +5,12 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.AVector
 
+/** The header of a block with index.from == _group_
+  *
+  * @blockDeps 2 * G - 1 deps in total
+  *            the first G - 1 hashes are from groups different from _group_
+  *            the rest G hashes are from all the chain related to _group_
+  */
 case class BlockHeader(
     blockDeps: AVector[Keccak256],
     txsHash: Keccak256,
@@ -28,6 +34,10 @@ case class BlockHeader(
     assert(toIndex == chainIndex.to)
     blockDeps.takeRight(config.groups)(toIndex.value)
   }
+
+  def inDeps(implicit config: GroupConfig): AVector[Keccak256] = blockDeps.take(config.groups - 1)
+
+  def outDeps(implicit config: GroupConfig): AVector[Keccak256] = blockDeps.takeRight(config.groups)
 
   def validateDiff: Boolean = {
     val current = BigInt(1, hash.bytes.toArray)

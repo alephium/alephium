@@ -2,7 +2,7 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
+import org.alephium.flow.io.{HeaderDB, KeyValueStorage, RocksDBStorage}
 import org.alephium.serde._
 import org.alephium.util.{AVector, AlephiumSpec, Files}
 import org.scalacheck.{Arbitrary, Gen}
@@ -11,6 +11,16 @@ import org.scalatest.EitherValues._
 
 class MerklePatriciaTrieSpec extends AlephiumSpec {
   import MerklePatriciaTrie._
+
+  val genesisKey = Keccak256.zero
+  val genesisNode = {
+    val genesisPath = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
+    LeafNode(genesisPath, ByteString.empty)
+  }
+
+  def create(storage: KeyValueStorage): MerklePatriciaTrie = {
+    MerklePatriciaTrie.create(storage)
+  }
 
   behavior of "nibbles calculation"
 
@@ -88,7 +98,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
     val db   = HeaderDB(storage, ColumnFamily.Trie, Settings.readOptions)
-    val trie = MerklePatriciaTrie.create(db)
+    var trie = MerklePatriciaTrie.create(db)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (Keccak256, ByteString) = {
       val key  = Keccak256.random.bytes
@@ -120,7 +130,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie.putRaw(key, value)
+        trie = trie.putRaw(key, value).right.value
         Some(key)
       }
     }
@@ -139,7 +149,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      trie.remove(key).isRight is true
+      trie = trie.remove(key).right.value
       trie.getOptRaw(key).right.value.isEmpty is true
     }
 
@@ -151,7 +161,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(100) { _ =>
       val (key, value) = fixture.generateKV()
-      trie.putRaw(key, value).isRight is true
+      trie = trie.putRaw(key, value).right.value
       key
     }
 
@@ -160,7 +170,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.map { key =>
-      trie.remove(key).isRight is true
+      trie = trie.remove(key).right.value
       trie.getOptRaw(key).right.value.isEmpty is true
     }
 
