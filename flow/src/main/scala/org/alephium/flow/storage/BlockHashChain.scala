@@ -151,6 +151,32 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     AVector.fromIterator(tips.iterator)
   }
 
+  // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash until newHash
+  // Otherwise, it returns the hash path until newHash
+  // TODO: make this safer
+  def getBlockHashesBetween(newHash: Keccak256, oldHash: Keccak256): AVector[Keccak256] = {
+    blockHashesTable.get(newHash) match {
+      case Some(node) => getBlockHashesBetween(node, oldHash)
+      case None       => AVector.empty
+    }
+  }
+
+  private def getBlockHashesBetween(newNode: BlockHashChain.TreeNode,
+                                    oldHash: Keccak256): AVector[Keccak256] = {
+    @tailrec
+    def iter(acc: AVector[Keccak256], current: BlockHashChain.TreeNode): AVector[Keccak256] = {
+      if (current.blockHash == oldHash) acc
+      else {
+        current match {
+          case n: BlockHashChain.Root => acc :+ n.blockHash
+          case n: BlockHashChain.Node => iter(acc :+ n.blockHash, n.parent)
+        }
+      }
+    }
+
+    iter(AVector.empty, newNode)
+  }
+
   def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
     blockHashesTable.get(hash) match {
       case Some(node) =>
