@@ -29,9 +29,13 @@ class BlockChainSpec extends AlephiumSpec with BlockFlowFixture {
     forAll(chainGen) { blocks =>
       val chain       = BlockChain.fromGenesisUnsafe(genesis)
       val blocksSize1 = chain.numHashes
-      blocks.foreach(block => chain.add(block, 0))
+      blocks.foreach(block => chain.add(block, 0).isRight is true)
       val blocksSize2 = chain.numHashes
       blocksSize1 + blocks.length is blocksSize2
+
+      val midHashes = chain.getBlockHashesBetween(blocks.last.hash, blocks.head.hash)
+      val expected  = blocks.tail.map(_.hash)
+      midHashes is expected
 
       checkConfirmedBlocks(chain, blocks)
     }
