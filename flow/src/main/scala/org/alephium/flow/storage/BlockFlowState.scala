@@ -75,8 +75,8 @@ trait BlockFlowState {
     val index = block.chainIndex
     (brokerInfo.groupFrom until brokerInfo.groupUntil).foreach { group =>
       val groupIndex = GroupIndex(group)
-      val groupCache = groupCaches(group - brokerInfo.groupFrom)
-      if (index.relateTo(GroupIndex.apply(group))) {
+      val groupCache = getGroupCache(groupIndex)
+      if (index.relateTo(groupIndex)) {
         convertBlock(block, groupIndex) match {
           case c: InBlockCache    => groupCache.inblockcaches.add(block.hash, c)
           case c: OutBlockCache   => groupCache.outblockcaches.add(block.hash, c)
@@ -95,7 +95,7 @@ trait BlockFlowState {
       inblockcaches.removeIfExist(toRemove)
       outblockcaches.removeIfExist(toRemove)
       inoutblockcaches.removeIfExist(toRemove)
-      pruneCaches(groupCache)
+      assert(cachedHashes.length <= config.blockCacheSize)
     }
   }
 
@@ -122,7 +122,7 @@ trait BlockFlowState {
 
   protected def getBlockChainWithState(group: GroupIndex): BlockChainWithState = {
     assert(brokerInfo.contains(group))
-    intraGroupChains(group.value)
+    intraGroupChains(group.value - brokerInfo.groupFrom)
   }
 
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool = {
@@ -152,40 +152,74 @@ trait BlockFlowState {
   }
 
   def getBlockHeader(hash: Keccak256): IOResult[BlockHeader]
+//
+//  def getIntraGroupDepHash(block: Block, groupIndex: GroupIndex): IOResult[Keccak256] = {
+//    val index = block.chainIndex
+//    if (index.isIntraGroup) {
+//      Right(block.header.uncleHash(groupIndex))
+//    } else {
+//      val deps = block.header.blockDeps
+//      val depOfTheGroup = if (index.from.value > groupIndex.value) {
+//        deps(groupIndex.value)
+//      } else {
+//        deps(groupIndex.value - 1)
+//      }
+//      getBlockHeader(depOfTheGroup).map(_.uncleHash(groupIndex))
+//    }
+//  }
 
-  def getIntraGroupDepHash(block: Block, groupIndex: GroupIndex): IOResult[Keccak256] = {
-    val index = block.chainIndex
-    if (index.isIntraGroup) {
-      Right(block.header.uncleHash(groupIndex))
+  def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Keccak256] = {
+    val index = header.chainIndex
+    if (header.isGenesis) {
+      config.genesisBlocks(index.from.value).map(_.hash)
     } else {
-      val deps = block.header.blockDeps
-      val depOfTheGroup = if (index.from.value > groupIndex.value) {
-        deps(groupIndex.value)
+      if (inclusive) {
+        header.outDeps.replace(index.to.value, header.hash)
       } else {
-        deps(groupIndex.value - 1)
+        header.outDeps
       }
-      getBlockHeader(depOfTheGroup).map(_.uncleHash(groupIndex))
     }
   }
 
-  def getInOutTips(header: BlockHeader, currentGroup: GroupIndex): IOResult[AVector[Keccak256]] = {
-    val inDeps  = header.inDeps
-    val outDeps = header.outDeps
-    inDeps.traverse(getBlockHeader).map(_.map(_.uncleHash(currentGroup))).map(_ ++ outDeps)
+  def getInTip(dep: Keccak256, currentGroup: GroupIndex): IOResult[Keccak256] = {
+    getBlockHeader(dep).map { header =>
+      val from = header.chainIndex.from
+      if (header.isGenesis) config.genesisBlocks(from.value)(currentGroup.value).hash
+      else header.uncleHash(currentGroup)
+    }
   }
 
-  def getInOutTips(hash: Keccak256, currentGroup: GroupIndex): IOResult[AVector[Keccak256]] = {
-    getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup))
+  // if inclusive is true, the current header would be included
+  def getInOutTips(header: BlockHeader,
+                   currentGroup: GroupIndex,
+                   inclusive: Boolean): IOResult[AVector[Keccak256]] = {
+    if (header.isGenesis) {
+      val inTips = AVector.tabulate(groups - 1) { i =>
+        if (i < currentGroup.value) config.genesisBlocks(i)(currentGroup.value).hash
+        else config.genesisBlocks(i + 1)(currentGroup.value).hash
+      }
+      val outTips = config.genesisBlocks(currentGroup.value).map(_.hash)
+      Right(inTips ++ outTips)
+    } else {
+      val outTips = getOutTips(header, inclusive)
+      header.inDeps.traverse(getInTip(_, currentGroup)).map(_ ++ outTips)
+    }
+  }
+
+  def getInOutTips(hash: Keccak256,
+                   currentGroup: GroupIndex,
+                   inclusive: Boolean): IOResult[AVector[Keccak256]] = {
+    getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup, inclusive))
   }
 
   def getTipsDiff(newTip: Keccak256, oldTip: Keccak256): AVector[Keccak256] = {
-    getBlockChain(newTip).getBlockHashesBetween(newTip, oldTip)
+    getBlockChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
   protected def getTipsDiff(newTips: AVector[Keccak256],
                             oldTips: AVector[Keccak256]): AVector[Keccak256] = {
     assert(newTips.length == oldTips.length)
-    (0 to newTips.length).foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
+    newTips.indices.foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
       acc ++ getTipsDiff(newTips(i), oldTips(i))
     }
   }
@@ -196,25 +230,18 @@ trait BlockFlowState {
     val groupOffset = chainIndex.from.value - brokerInfo.groupFrom
     val groupCache  = groupCaches(groupOffset)
     for {
-      newTips <- getInOutTips(block.header, chainIndex.from)
-      oldTips <- getInOutTips(block.parentHash, chainIndex.from)
+      newTips <- getInOutTips(block.header, chainIndex.from, inclusive     = false)
+      oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
     } yield {
-      val newHashes = getTipsDiff(newTips, oldTips)
+      val newHashes = getTipsDiff(newTips, oldTips) :+ block.hash
       newHashes.map(groupCache.getBlockCache)
     }
   }
 
+  // Note: update state only for intra group blocks
   def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
-    val index = block.chainIndex
-    assert(index.isIntraGroup)
-    getIntraGroupDepHash(block, index.from).flatMap { intraGroupDepHash =>
-      if (index.isIntraGroup) {
-        getBlocksForUpdates(block).flatMap { blockcaches =>
-          blockcaches.foldF(trie)(BlockFlowState.updateState)
-        }
-      } else {
-        Right(trie)
-      }
+    getBlocksForUpdates(block).flatMap { blockcaches =>
+      blockcaches.foldF(trie)(BlockFlowState.updateState)
     }
   }
 }

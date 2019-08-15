@@ -2,7 +2,7 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.{HeaderDB, KeyValueStorage, RocksDBStorage}
+import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.serde._
 import org.alephium.util.{AVector, AlephiumSpec, Files}
 import org.scalacheck.{Arbitrary, Gen}
@@ -11,16 +11,6 @@ import org.scalatest.EitherValues._
 
 class MerklePatriciaTrieSpec extends AlephiumSpec {
   import MerklePatriciaTrie._
-
-  val genesisKey = Keccak256.zero
-  val genesisNode = {
-    val genesisPath = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
-    LeafNode(genesisPath, ByteString.empty)
-  }
-
-  def create(storage: KeyValueStorage): MerklePatriciaTrie = {
-    MerklePatriciaTrie.create(storage)
-  }
 
   behavior of "nibbles calculation"
 
