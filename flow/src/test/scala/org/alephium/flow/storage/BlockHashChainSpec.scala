@@ -19,6 +19,8 @@ class BlockHashChainSpec extends AlephiumSpec with PlatformConfig.Default { Self
     }
   }
 
+  it should "" in new Fixture {}
+
   it should "calculate target correctly" in new Fixture {
     val genesis       = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val gHeader       = genesis.header
