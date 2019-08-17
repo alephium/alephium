@@ -50,6 +50,12 @@ object RandomBytes {
 
     def length: Int
 
+    def from(bytes: ByteString): T = {
+      print(s"${bytes.length} ${length}")
+      require(bytes.length == length)
+      unsafeFrom(bytes)
+    }
+
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
       source.nextBytes(xs)
