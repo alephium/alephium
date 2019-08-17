@@ -2,12 +2,11 @@ package org.alephium.flow.network.coordinator
 
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGen
-import org.alephium.util.AlephiumActorSpec
 
-class BrokerSpec extends AlephiumActorSpec("BrokerSpec") {
-  it should "follow this workflow" in new PlatformConfig.Default {
+class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
+  it should "follow this workflow" in {
     val connection = TestProbe()
     val broker     = system.actorOf(Broker.props())
     watch(broker)

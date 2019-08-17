@@ -1,12 +1,13 @@
 package org.alephium.flow.storage
 
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model.{Block, ModelGen}
-import org.alephium.util.{AVector, AlephiumSpec}
+import org.alephium.util.AVector
 import org.scalatest.EitherValues._
 
-class BlockChainWithStateSpec extends AlephiumSpec with BlockFlowFixture {
+class BlockChainWithStateSpec extends AlephiumFlowSpec {
   trait Fixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
