@@ -1,10 +1,11 @@
 package org.alephium.flow.storage
 
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{Block, ModelGen}
-import org.alephium.util.{AVector, AlephiumSpec}
+import org.alephium.util.AVector
 import org.scalatest.EitherValues._
 
-class BlockChainSpec extends AlephiumSpec with BlockFlowFixture {
+class BlockChainSpec extends AlephiumFlowSpec {
 
   behavior of "BlockChain"
 
