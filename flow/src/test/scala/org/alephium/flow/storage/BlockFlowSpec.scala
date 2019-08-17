@@ -1,14 +1,15 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, AlephiumSpec, Hex}
+import org.alephium.util.{AVector, Hex}
 import org.scalatest.Assertion
 
 import scala.annotation.tailrec
 
 // TODO: test for more groups
-class BlockFlowSpec extends AlephiumSpec with BlockFlowFixture {
+class BlockFlowSpec extends AlephiumFlowSpec {
   behavior of "BlockFlow"
 
   it should "compute correct blockflow height" in {

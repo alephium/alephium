@@ -2,16 +2,16 @@ package org.alephium.flow.client
 
 import akka.actor.ActorRef
 import akka.testkit.TestProbe
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.{AlephiumFlowActorSpec, PlatformConfig}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.storage.{AllHandlers, BlockFlow, BlockFlowFixture, TestUtils}
+import org.alephium.flow.storage.{AllHandlers, BlockFlow, TestUtils}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{AVector, AlephiumActorSpec}
+import org.alephium.util.AVector
 import org.scalacheck.Gen
 
 import scala.util.Random
 
-class FairMinerStateSpec extends AlephiumActorSpec("FairMinerState") with BlockFlowFixture { Spec =>
+class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   val blockFlow: BlockFlow = BlockFlow.createUnsafe()
 
   trait Fixture extends FairMinerState {

@@ -6,21 +6,21 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.{AlephiumFlowActorSpec, PlatformConfig}
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
-import org.alephium.util.{AVector, AlephiumActorSpec}
+import org.alephium.util.AVector
 import org.scalatest.EitherValues._
 
 import scala.util.Random
 
-class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
+class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
 
   behavior of "BrokerHandler"
 
-  trait BaseFixture extends PlatformConfig.Default {
+  trait BaseFixture {
     val remote = SocketUtil.temporaryServerAddress()
     val local  = SocketUtil.temporaryServerAddress()
 
@@ -169,7 +169,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec("BrokerHandlerSpec") {
 
   behavior of "Deserialization"
 
-  trait SerdeFixture extends PlatformConfig.Default {
+  trait SerdeFixture {
     val message1 = Message(Ping(1, System.currentTimeMillis()))
     val message2 = Message(Pong(2))
     val bytes1   = Message.serialize(message1)

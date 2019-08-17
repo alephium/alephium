@@ -18,8 +18,8 @@ import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
-  private val env = Env.resolve()
-  private val rootPath = {
+  val env = Env.resolve()
+  val rootPath = {
     env match {
       case Env.Prod =>
         Files.homeDir.resolve(".alephium")
@@ -30,10 +30,8 @@ object PlatformConfig extends StrictLogging {
     }
   }
 
-  object Default extends PlatformConfig(env, rootPath)
-
   trait Default {
-    implicit def config: PlatformConfig = Default
+    implicit val config: PlatformConfig = new PlatformConfig(env, rootPath)
   }
 
   def mineGenesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
