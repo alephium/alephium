@@ -35,4 +35,10 @@ object Transaction {
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, data, ED25519Signature.zero)
   }
+
+  def genesis(balances: AVector[(ED25519PublicKey, BigInt)]): Transaction = {
+    val outputs  = balances.map { case (key, value) => TxOutput(value, key) }
+    val unsigned = UnsignedTransaction(AVector.empty, outputs)
+    Transaction(unsigned, ByteString.empty, ED25519Signature.zero)
+  }
 }
