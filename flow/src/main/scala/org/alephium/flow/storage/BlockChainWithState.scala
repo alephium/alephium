@@ -58,10 +58,15 @@ object BlockChainWithState {
                                block: Block): IOResult[MerklePatriciaTrie] =
         _updateState(trie, block)
 
-      this.persistBlockUnsafe(rootBlock)
-      this.addHeaderUnsafe(rootBlock.header)
-      this.addTrie(rootNode.blockHash, initialTrie)
-      this.addNode(rootNode)
+      val updateRes = for {
+        _       <- this.persistBlock(rootBlock)
+        _       <- this.addHeader(rootBlock.header)
+        newTrie <- _updateState(initialTrie, rootBlock)
+      } yield {
+        this.addTrie(rootNode.blockHash, newTrie)
+        this.addNode(rootNode)
+      }
+      require(updateRes.isRight)
     }
   }
 }
