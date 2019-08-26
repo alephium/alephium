@@ -51,7 +51,6 @@ object RandomBytes {
     def length: Int
 
     def from(bytes: ByteString): T = {
-      print(s"${bytes.length} ${length}")
       require(bytes.length == length)
       unsafeFrom(bytes)
     }

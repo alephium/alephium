@@ -1,10 +1,13 @@
 package org.alephium.flow.trie
 
 import akka.util.ByteString
-import org.alephium.crypto.{Keccak256, Keccak256Hash}
+import org.alephium.crypto.{ED25519PublicKey, Keccak256, Keccak256Hash}
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.protocol.model.TxOutput
 import org.alephium.serde._
 import org.alephium.util.AVector
+
+import scala.reflect.ClassTag
 
 object MerklePatriciaTrie {
   /* branch [encodedPath, v0, ..., v15]
@@ -152,8 +155,9 @@ object MerklePatriciaTrie {
 
   val genesisKey = Keccak256.zero
   val genesisNode = {
-    val genesisPath = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
-    LeafNode(genesisPath, ByteString.empty)
+    val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
+    val genesisOutput = TxOutput(0, ED25519PublicKey.zero)
+    LeafNode(genesisPath, serialize(genesisOutput))
   }
 
   def create(storage: KeyValueStorage): MerklePatriciaTrie = {
@@ -350,5 +354,25 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
 
     val toAdd = AVector[Node](branchNode, node1, newLeaf)
     Right(TrieUpdateActions(Some(branchNode), AVector(hash), toAdd))
+  }
+
+  def getAllLeafNodes: IOResult[AVector[LeafNode]] =
+    getAllLeafNodes(rootHash)
+
+  def getAllLeafNodes(hash: Keccak256): IOResult[AVector[LeafNode]] = {
+    getNode(hash).flatMap {
+      case n: BranchNode =>
+        n.children.flatMapF {
+          case Some(child) => getAllLeafNodes(child)
+          case None        => Right(AVector.empty[LeafNode])
+        }
+      case n: LeafNode => Right(AVector(n))
+    }
+  }
+
+  def getAll[V: Serde: ClassTag]: IOResult[AVector[V]] = {
+    getAllLeafNodes.flatMap { nodes =>
+      nodes.mapF(node => deserialize[V](node.data).left.map(IOError.apply))
+    }
   }
 }

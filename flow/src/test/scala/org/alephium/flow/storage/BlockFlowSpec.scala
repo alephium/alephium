@@ -1,10 +1,11 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.{AlephiumFlowSpec, PlatformConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 import org.scalatest.Assertion
+import org.scalatest.EitherValues._
 
 import scala.annotation.tailrec
 
@@ -181,10 +182,26 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val deps   = header.blockDeps.map(showHash).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
       }
-      .mkString("\n")
+      .mkString("", "\n", "\n")
   }
 
   def showHash(hash: Keccak256): String = {
     Hex.toHexString(hash.bytes).take(8)
+  }
+
+  def getBalances(blockFlow: BlockFlow, groupIndex: GroupIndex): AVector[TxOutput] = {
+    blockFlow.getBestTrie(groupIndex).getAll[TxOutput].right.value
+  }
+
+  def showBalances(blockFlow: BlockFlow)(implicit config: PlatformConfig): String = {
+    def show(txOutput: TxOutput): String = {
+      txOutput.publicKey.shortHex + ":" + txOutput.value
+    }
+
+    val txOutputs = config.brokerInfo.groupFrom until config.brokerInfo.groupUntil map { group =>
+      val groupIndex = GroupIndex(group)
+      getBalances(blockFlow, groupIndex)
+    }
+    txOutputs.map(_.map(show).mkString(";")) mkString ("", "\n", "\n")
   }
 }
