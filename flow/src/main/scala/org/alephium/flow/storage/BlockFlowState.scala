@@ -141,7 +141,7 @@ trait BlockFlowState {
   def getBestTrie(groupIndex: GroupIndex): MerklePatriciaTrie = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    val hash = deps.deps(groupIndex.value)
+    val hash = deps.deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
   }
 
@@ -240,8 +240,15 @@ trait BlockFlowState {
 
   // Note: update state only for intra group blocks
   def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
-    getBlocksForUpdates(block).flatMap { blockcaches =>
-      blockcaches.foldF(trie)(BlockFlowState.updateState)
+    if (block.header.isGenesis) {
+      val chainIndex = block.chainIndex
+      assert(chainIndex.isIntraGroup)
+      val cache = BlockFlowState.convertBlock(block, chainIndex.from)
+      BlockFlowState.updateState(trie, cache)
+    } else {
+      getBlocksForUpdates(block).flatMap { blockcaches =>
+        blockcaches.foldF(trie)(BlockFlowState.updateState)
+      }
     }
   }
 }

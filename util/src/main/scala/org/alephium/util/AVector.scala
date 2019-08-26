@@ -214,6 +214,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def mapF[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
+    val res = AVector.tabulate(length) { i =>
+      f(apply(i)) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => r
+      }
+    }
+    Right(res)
+  }
+
   def mapWithIndex[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
     AVector.tabulate(length) { i =>
       f(apply(i), i)
@@ -336,6 +346,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def flatMap[B: ClassTag](f: A => AVector[B]): AVector[B] = {
     fold(AVector.empty[B]) { (acc, elem) =>
       acc ++ f(elem)
+    }
+  }
+
+  def flatMapF[L, R: ClassTag](f: A => Either[L, AVector[R]]): Either[L, AVector[R]] = {
+    foldF(AVector.empty[R]) { (acc, elem) =>
+      f(elem).map(acc ++ _)
     }
   }
 
