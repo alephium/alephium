@@ -195,7 +195,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   def showBalances(blockFlow: BlockFlow)(implicit config: PlatformConfig): String = {
     def show(txOutput: TxOutput): String = {
-      txOutput.publicKey.shortHex + ":" + txOutput.value
+      txOutput.mainKey.shortHex + ":" + txOutput.value
     }
 
     val txOutputs = config.brokerInfo.groupFrom until config.brokerInfo.groupUntil map { group =>

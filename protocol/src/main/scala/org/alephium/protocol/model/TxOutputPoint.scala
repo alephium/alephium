@@ -1,13 +1,15 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.{Keccak256, Keccak256Hash}
+import akka.util.ByteString
+import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.serde._
 
-case class TxOutputPoint(txHash: Keccak256, outputIndex: Int) extends Keccak256Hash[TxOutputPoint] {
-  def hash: Keccak256 = _getHash
+case class TxOutputPoint(mainKey: ED25519PublicKey, txHash: Keccak256, outputIndex: Int) {
+  def trieKey: ByteString = serialize(this)
 }
 
 object TxOutputPoint {
+  // Note that the serialization has to put mainKey in the first 32 bytes for the sake of trie indexing
   implicit val serde: Serde[TxOutputPoint] =
-    Serde.forProduct2(apply, ti => (ti.txHash, ti.outputIndex))
+    Serde.forProduct3(apply, ti => (ti.mainKey, ti.txHash, ti.outputIndex))
 }
