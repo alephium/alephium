@@ -12,7 +12,7 @@ import scala.language.reflectiveCalls
 trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   import PlatformConfig.{env, rootPath}
 
-  val newPath = rootPath.resolve(this.getClass.getSimpleName)
+  val newPath = rootPath.resolveSibling(rootPath.getFileName + this.getClass.getSimpleName)
   implicit val config = new PlatformConfig(env, newPath) {
     val balances = AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups) { i =>
       val groupIndex              = GroupIndex(i)(this)

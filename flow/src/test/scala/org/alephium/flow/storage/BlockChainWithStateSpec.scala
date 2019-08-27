@@ -41,7 +41,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
 
   it should "add blocks correctly" in new Fixture {
     forAll(chainGen) { blocks =>
-      val chain       = BlockChain.fromGenesisUnsafe(genesis)
+      val chain       = BlockChainWithState.fromGenesisUnsafe(genesis, myUpdateState)
       val blocksSize1 = chain.numHashes
       blocks.foreach(block => chain.add(block, 0))
       val blocksSize2 = chain.numHashes

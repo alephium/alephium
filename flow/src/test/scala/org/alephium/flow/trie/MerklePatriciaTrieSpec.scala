@@ -50,14 +50,14 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   it should "encode flag correctly" in {
     def test(length: Int, isLeaf: Boolean, flag: Int): Assertion = {
       assert(flag >= 0 && flag < 256)
-      Node.SerdeNode.encodeFlag(length, isLeaf) is flag.toByte
-      Node.SerdeNode.decodeFlag(flag.toByte) is ((length, isLeaf))
+      Node.SerdeNode.encodeFlag(length, isLeaf) is flag
+      Node.SerdeNode.decodeFlag(flag) is ((length, isLeaf))
     }
-    test(0, true, 128)
-    test(0, false, 0)
-    test(64, true, 128 + 64)
-    test(63, true, 128 + 63)
-    test(63, false, 63)
+    test(0, true, 0)
+    test(0, false, 1)
+    test(64, true, 128 + 0)
+    test(63, true, 126 + 0)
+    test(63, false, 126 + 1)
   }
 
   it should "encode nibbles correctly" in new NodeFixture {
@@ -90,10 +90,10 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     val db   = HeaderDB(storage, ColumnFamily.Trie, Settings.readOptions)
     var trie = MerklePatriciaTrie.create(db)
 
-    def generateKV(keyPrefix: ByteString = ByteString.empty): (Keccak256, ByteString) = {
+    def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Keccak256.random.bytes
       val data = ByteString.fromString(Gen.alphaStr.sample.get)
-      (Keccak256.unsafeFrom(keyPrefix ++ key.drop(keyPrefix.length)), data)
+      (keyPrefix ++ key.drop(keyPrefix.length), data)
     }
 
     protected def postTest(): Assertion = {
@@ -139,7 +139,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      trie = trie.remove(key).right.value
+      trie = trie.removeRaw(key).right.value
       trie.getOptRaw(key).right.value.isEmpty is true
     }
 
@@ -160,7 +160,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.map { key =>
-      trie = trie.remove(key).right.value
+      trie = trie.removeRaw(key).right.value
       trie.getOptRaw(key).right.value.isEmpty is true
     }
 

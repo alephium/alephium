@@ -1,7 +1,7 @@
 package org.alephium.flow.trie
 
 import akka.util.ByteString
-import org.alephium.crypto.{ED25519PublicKey, Keccak256, Keccak256Hash}
+import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.model.TxOutput
 import org.alephium.serde._
@@ -42,7 +42,7 @@ object MerklePatriciaTrie {
       LeafNode(prefix ++ path, data)
     }
     def preCut(n: Int): LeafNode = {
-      assert(n < path.length)
+      assert(n <= path.length)
       LeafNode(path.drop(n), data)
     }
   }
@@ -61,10 +61,9 @@ object MerklePatriciaTrie {
     }
 
     implicit object SerdeNode extends Serde[Node] {
-      def encodeFlag(length: Int, isLeaf: Boolean): Byte = {
-        assert(length >= 0 && length + (if (isLeaf) 0 else 1) <= 64)
-        if (isLeaf) (length | (1 << 7)).toByte
-        else length.toByte
+      def encodeFlag(length: Int, isLeaf: Boolean): Int = {
+        assert(length >= 0)
+        (length << 1) + (if (isLeaf) 0 else 1)
       }
 
       def encodeNibbles(path: ByteString): ByteString = {
@@ -79,8 +78,9 @@ object MerklePatriciaTrie {
         ByteString.fromArrayUnsafe(nibbles)
       }
 
-      def decodeFlag(flag: Byte): (Int, Boolean) = {
-        (flag & ((1 << 7) - 1), (flag & (1 << 7)) != 0)
+      def decodeFlag(flag: Int): (Int, Boolean) = {
+        assert(flag >= 0)
+        (flag >> 1, flag % 2 == 0)
       }
 
       def decodeNibbles(nibbles: ByteString, length: Int): ByteString = {
@@ -102,15 +102,15 @@ object MerklePatriciaTrie {
           val flag     = SerdeNode.encodeFlag(n.path.length, isLeaf = false)
           val nibbles  = encodeNibbles(n.path)
           val children = childrenSerde.serialize(n.children)
-          (flag +: nibbles) ++ children
+          (intSerde.serialize(flag) ++ nibbles) ++ children
         case n: LeafNode =>
           val flag    = SerdeNode.encodeFlag(n.path.length, isLeaf = true)
           val nibbles = encodeNibbles(n.path)
-          (flag +: nibbles) ++ bytestringSerde.serialize(n.data)
+          (intSerde.serialize(flag) ++ nibbles) ++ bytestringSerde.serialize(n.data)
       }
 
       override def _deserialize(input: ByteString): SerdeResult[(Node, ByteString)] = {
-        byteSerde._deserialize(input).flatMap {
+        intSerde._deserialize(input).flatMap {
           case (flag, rest) =>
             val (length, isLeaf) = SerdeNode.decodeFlag(flag)
             val (left, right)    = rest.splitAt((length + 1) / 2)
@@ -147,15 +147,19 @@ object MerklePatriciaTrie {
     (byte & 0x0F).toByte
   }
 
-  def hash2Nibbles(hash: Keccak256): ByteString = {
-    hash.bytes.flatMap { byte =>
+  def toNibbles[K: Serde](key: K): ByteString = {
+    bytes2Nibbles(serialize[K](key))
+  }
+
+  def bytes2Nibbles(bytes: ByteString): ByteString = {
+    bytes.flatMap { byte =>
       ByteString(getHighNibble(byte), getLowNibble(byte))
     }
   }
 
-  val genesisKey = Keccak256.zero
+  val genesisKey = Keccak256.zero.bytes
   val genesisNode = {
-    val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey.bytes, genesisKey.bytes.length * 2)
+    val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
     val genesisOutput = TxOutput(0, ED25519PublicKey.zero)
     LeafNode(genesisPath, serialize(genesisOutput))
   }
@@ -183,16 +187,15 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
       }
   }
 
-  def get[K <: Keccak256Hash[_], V: Serde](key: K): IOResult[V] = {
+  def get[K: Serde, V: Serde](key: K): IOResult[V] = {
     getOpt[K, V](key).flatMap {
       case None        => Left(IOError.RocksDB.keyNotFound)
       case Some(value) => Right(value)
     }
   }
 
-  def getOpt[K <: Keccak256Hash[_], V: Serde](key: K): IOResult[Option[V]] = {
-    val nibbles = MerklePatriciaTrie.hash2Nibbles(key.hash)
-    getOpt(rootHash, nibbles).flatMap {
+  def getOpt[K: Serde, V: Serde](key: K): IOResult[Option[V]] = {
+    getOptRaw(serialize[K](key)).flatMap {
       case None => Right(None)
       case Some(bytes) =>
         deserialize[V](bytes) match {
@@ -202,8 +205,8 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     }
   }
 
-  def getOptRaw(key: Keccak256): IOResult[Option[ByteString]] = {
-    val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
+  def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = {
+    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
     getOpt(rootHash, nibbles)
   }
 
@@ -226,12 +229,12 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
 
   def getNode(hash: Keccak256): IOResult[Node] = storage.get[Node](hash.bytes)
 
-  def remove[K <: Keccak256Hash[_]](key: K): IOResult[MerklePatriciaTrie] = {
-    remove(key.hash)
+  def remove[K: Serde](key: K): IOResult[MerklePatriciaTrie] = {
+    removeRaw(serialize[K](key))
   }
 
-  def remove(key: Keccak256): IOResult[MerklePatriciaTrie] = {
-    val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
+  def removeRaw(key: ByteString): IOResult[MerklePatriciaTrie] = {
+    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
     for {
       result <- remove(rootHash, nibbles)
       trie   <- applyActions(result)
@@ -291,12 +294,12 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     }
   }
 
-  def put[K <: Keccak256Hash[_], V: Serde](key: K, value: V): IOResult[MerklePatriciaTrie] = {
-    putRaw(key.hash, serialize[V](value))
+  def put[K: Serde, V: Serde](key: K, value: V): IOResult[MerklePatriciaTrie] = {
+    putRaw(serialize[K](key), serialize[V](value))
   }
 
-  def putRaw(key: Keccak256, value: ByteString): IOResult[MerklePatriciaTrie] = {
-    val nibbles = MerklePatriciaTrie.hash2Nibbles(key)
+  def putRaw(key: ByteString, value: ByteString): IOResult[MerklePatriciaTrie] = {
+    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
     for {
       result <- put(rootHash, nibbles, value)
       trie   <- applyActions(result)
