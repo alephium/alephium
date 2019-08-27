@@ -25,6 +25,16 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     test(0xFF.toByte, 0x0F.toByte, 0x0F.toByte)
   }
 
+  it should "convert" in {
+    forAll(bytesGen) { bytes =>
+      val bs = ByteString.fromArrayUnsafe(bytes.toArray)
+      nibbles2Bytes(bytes2Nibbles(bs)) is bs
+      if (bytes.length == 2) {
+        bytes2Nibbles(nibbles2Bytes(bs)) is bs
+      }
+    }
+  }
+
   behavior of "node serde"
 
   trait NodeFixture {
@@ -138,6 +148,11 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       trie.getOptRaw(key).right.value.nonEmpty is true
     }
 
+    val allStored    = trie.getAllRaw(ByteString.empty).right.value
+    val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
+    val expectedKeys = (keys :+ genesisKey).toArray.sortBy(_.hashCode())
+    allKeys is expectedKeys
+
     keys.foreach { key =>
       trie = trie.removeRaw(key).right.value
       trie.getOptRaw(key).right.value.isEmpty is true
@@ -176,9 +191,9 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))
       trie.getNode(hash).right.value match {
-        case BranchNode(_, children) =>
+        case BranchNode(path, children) =>
           val nChild = children.map(_.fold(0)(_ => 1)).sum
-          print(s"($shortHash, $nChild); ")
+          print(s"($shortHash, ${path.length} $nChild); ")
           children.toArray.toSeq.flatten
         case LeafNode(path, _) =>
           print(s"($shortHash, ${path.length} leaf)")

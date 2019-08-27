@@ -7,8 +7,6 @@ import org.alephium.protocol.model.TxOutput
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-import scala.reflect.ClassTag
-
 object MerklePatriciaTrie {
   /* branch [encodedPath, v0, ..., v15]
    * leaf   [encodedPath, data]
@@ -155,6 +153,16 @@ object MerklePatriciaTrie {
     bytes.flatMap { byte =>
       ByteString(getHighNibble(byte), getLowNibble(byte))
     }
+  }
+
+  def nibbles2Bytes(nibbles: ByteString): ByteString = {
+    assert(nibbles.length % 2 == 0)
+    val bytes = Array.tabulate(nibbles.length / 2) { i =>
+      val high = nibbles(2 * i)
+      val low  = nibbles(2 * i + 1)
+      ((high << 4) | low).toByte
+    }
+    ByteString.fromArrayUnsafe(bytes)
   }
 
   val genesisKey = Keccak256.zero.bytes
@@ -359,23 +367,62 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     Right(TrieUpdateActions(Some(branchNode), AVector(hash), toAdd))
   }
 
-  def getAllLeafNodes: IOResult[AVector[LeafNode]] =
-    getAllLeafNodes(rootHash)
-
-  def getAllLeafNodes(hash: Keccak256): IOResult[AVector[LeafNode]] = {
-    getNode(hash).flatMap {
-      case n: BranchNode =>
-        n.children.flatMapF {
-          case Some(child) => getAllLeafNodes(child)
-          case None        => Right(AVector.empty[LeafNode])
-        }
-      case n: LeafNode => Right(AVector(n))
+  def getAll[K: Serde, V: Serde](prefix: ByteString): IOResult[AVector[(K, V)]] = {
+    val prefixNibbles = MerklePatriciaTrie.bytes2Nibbles(prefix)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty).flatMap { dataVec =>
+      dataVec.mapF {
+        case (nibbles, leaf) =>
+          val deser = for {
+            key   <- deserialize[K](MerklePatriciaTrie.nibbles2Bytes(nibbles))
+            value <- deserialize[V](leaf.data)
+          } yield (key, value)
+          deser.left.map(IOError.apply)
+      }
     }
   }
 
-  def getAll[V: Serde: ClassTag]: IOResult[AVector[V]] = {
-    getAllLeafNodes.flatMap { nodes =>
-      nodes.mapF(node => deserialize[V](node.data).left.map(IOError.apply))
+  def getAllRaw(prefix: ByteString): IOResult[AVector[(ByteString, ByteString)]] = {
+    val prefixNibbles = MerklePatriciaTrie.bytes2Nibbles(prefix)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty).map(_.map {
+      case (nibbles, leaf) => (MerklePatriciaTrie.nibbles2Bytes(nibbles), leaf.data)
+    })
+  }
+
+  protected def getAllRaw(prefix: ByteString,
+                          hash: Keccak256,
+                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+    if (prefix.isEmpty) {
+      getAllRaw(hash, acc)
+    } else {
+      getNode(hash).flatMap {
+        case n: BranchNode =>
+          val nibble = prefix.head & 0xFF
+          assert(nibble < 16)
+          n.children(nibble) match {
+            case Some(child) => getAllRaw(prefix.tail, child, acc ++ n.path :+ nibble.toByte)
+            case None        => Right(AVector.empty)
+          }
+        case n: LeafNode =>
+          if (n.path.take(prefix.length) == prefix) {
+            Right(AVector(acc ++ n.path -> n))
+          } else {
+            Right(AVector.empty)
+          }
+      }
+    }
+  }
+
+  protected def getAllRaw(hash: Keccak256,
+                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+    getNode(hash).flatMap {
+      case n: BranchNode =>
+        n.children.flatMapWithIndexF { (childOpt, index) =>
+          childOpt match {
+            case Some(child) => getAllRaw(child, acc ++ n.path :+ index.toByte)
+            case None        => Right(AVector.empty)
+          }
+        }
+      case n: LeafNode => Right(AVector(acc ++ n.path -> n))
     }
   }
 }
