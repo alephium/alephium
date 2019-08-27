@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
-import org.alephium.crypto.Keccak256
-import org.alephium.flow.{AlephiumFlowSpec, PlatformConfig}
+import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 import org.scalatest.Assertion
@@ -15,9 +15,12 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow.createUnsafe()
+
     config.genesisBlocks.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block.hash) is 0
     }
+
+    checkBalance(blockFlow, config.brokerInfo.groupFrom, genesisBalance)
   }
 
   it should "work for at least 2 user group when adding blocks sequentially" in {
@@ -29,24 +32,28 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       addAndCheck(blockFlow, block1)
       blockFlow.getWeight(block1) is 1
       checkInBestDeps(GroupIndex(0), blockFlow, block1)
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex2 = ChainIndex(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block2.header)
       blockFlow.getWeight(block2.header) is 2
       checkInBestDeps(GroupIndex(0), blockFlow, block2)
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 3
       checkInBestDeps(GroupIndex(0), blockFlow, block3)
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex4 = ChainIndex(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
       addAndCheck(blockFlow, block4)
       blockFlow.getWeight(block4) is 4
       checkInBestDeps(GroupIndex(0), blockFlow, block4)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
     }
   }
 
@@ -69,6 +76,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks1)
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val newBlocks2 = for {
         i <- 0 to 1
@@ -85,6 +93,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks2)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val newBlocks3 = for {
         i <- 0 to 1
@@ -101,6 +110,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks3)
+      checkBalance(blockFlow, 0, genesisBalance - 3)
     }
   }
 
@@ -116,11 +126,13 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       blockFlow.getWeight(block11) is 1
       blockFlow.getWeight(block12) is 1
       checkInBestDeps(GroupIndex(0), blockFlow, IndexedSeq(block11, block12))
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val block13 = mine(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block13)
       blockFlow.getWeight(block13) is 2
       checkInBestDeps(GroupIndex(0), blockFlow, block13)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex2 = ChainIndex(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
@@ -130,21 +142,39 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       blockFlow.getWeight(block21) is 3
       blockFlow.getWeight(block22) is 3
       checkInBestDeps(GroupIndex(0), blockFlow, IndexedSeq(block21, block22))
+      checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex3 = ChainIndex(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 4
       checkInBestDeps(GroupIndex(0), blockFlow, block3)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
     }
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     val deps = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val transactions = {
+      if (chainIndex.isIntraGroup && chainIndex.relateTo(config.brokerInfo)) {
+        val mainGroup                  = chainIndex.from
+        val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
+        val balances = blockFlow
+          .getBestTrie(mainGroup)
+          .getAll[TxOutputPoint, TxOutput](publicKey.bytes)
+          .right
+          .value
+        val total            = balances.sumBy(_._2.value)
+        val (_, toPublicKey) = mainGroup.generateKey()
+        val inputs           = balances.map(_._1)
+        val outputs          = AVector(TxOutput(1, toPublicKey), TxOutput(total - 1, publicKey))
+        AVector(Transaction.from(inputs, outputs, privateKey))
+      } else AVector.empty[Transaction]
+    }
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, AVector.empty[Transaction], config.maxMiningTarget, nonce)
+      val block = Block.from(deps, transactions, config.maxMiningTarget, nonce)
       if (block.preValidate(chainIndex)) block else iter(nonce + 1)
     }
 
@@ -172,6 +202,11 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     blockFlow.add(header).isRight is true
   }
 
+  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {
+    val address = genesisBalances(groupIndex)._2
+    blockFlow.getBalances(address).right.value.sumBy(_._2.value) is expected
+  }
+
   def show(blockFlow: BlockFlow): String = {
     blockFlow.getAllTips
       .map { tip =>
@@ -189,18 +224,22 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     Hex.toHexString(hash.bytes).take(8)
   }
 
-  def getBalances(blockFlow: BlockFlow, groupIndex: GroupIndex): AVector[TxOutput] = {
-    blockFlow.getBestTrie(groupIndex).getAll[TxOutput].right.value
+  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
+    val groupIndex = GroupIndex.from(address)
+    config.brokerInfo.contains(groupIndex) is true
+    val query = blockFlow.getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
+    query.right.value.sumBy(_._2.value)
   }
 
-  def showBalances(blockFlow: BlockFlow)(implicit config: PlatformConfig): String = {
+  def showBalances(blockFlow: BlockFlow, address: ED25519PublicKey): String = {
     def show(txOutput: TxOutput): String = {
       txOutput.mainKey.shortHex + ":" + txOutput.value
     }
 
     val txOutputs = config.brokerInfo.groupFrom until config.brokerInfo.groupUntil map { group =>
       val groupIndex = GroupIndex(group)
-      getBalances(blockFlow, groupIndex)
+      val res        = blockFlow.getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
+      res.right.value.map(_._2)
     }
     txOutputs.map(_.map(show).mkString(";")) mkString ("", "\n", "\n")
   }

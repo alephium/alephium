@@ -1,6 +1,6 @@
 package org.alephium.flow.storage
 
-import org.alephium.crypto.Keccak256
+import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
@@ -152,21 +152,6 @@ trait BlockFlowState {
   }
 
   def getBlockHeader(hash: Keccak256): IOResult[BlockHeader]
-//
-//  def getIntraGroupDepHash(block: Block, groupIndex: GroupIndex): IOResult[Keccak256] = {
-//    val index = block.chainIndex
-//    if (index.isIntraGroup) {
-//      Right(block.header.uncleHash(groupIndex))
-//    } else {
-//      val deps = block.header.blockDeps
-//      val depOfTheGroup = if (index.from.value > groupIndex.value) {
-//        deps(groupIndex.value)
-//      } else {
-//        deps(groupIndex.value - 1)
-//      }
-//      getBlockHeader(depOfTheGroup).map(_.uncleHash(groupIndex))
-//    }
-//  }
 
   def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Keccak256] = {
     val index = header.chainIndex
@@ -250,6 +235,12 @@ trait BlockFlowState {
         blockcaches.foldF(trie)(BlockFlowState.updateState)
       }
     }
+  }
+
+  def getBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+    val groupIndex = GroupIndex.from(address)
+    assert(config.brokerInfo.contains(groupIndex))
+    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
   }
 }
 

@@ -363,6 +363,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     xs
   }
 
+  def flatMapWithIndexF[L, R: ClassTag](
+      f: (A, Int) => Either[L, AVector[R]]): Either[L, AVector[R]] = {
+    foldWithIndexF(AVector.empty[R]) { (acc, elem, index) =>
+      f(elem, index).map(acc ++ _)
+    }
+  }
+
   def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
     val arr = new Array[B](length + 1)
     var acc = zero
