@@ -12,12 +12,14 @@ import scala.language.reflectiveCalls
 trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   import PlatformConfig.{env, rootPath}
 
+  val genesisBalance: BigInt = 100
+
   val newPath = rootPath.resolveSibling(rootPath.getFileName + this.getClass.getSimpleName)
   implicit val config = new PlatformConfig(env, newPath) {
     val balances = AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups) { i =>
       val groupIndex              = GroupIndex(i)(this)
       val (privateKey, publicKey) = groupIndex.generateKey()(this)
-      (privateKey, publicKey, BigInt(100))
+      (privateKey, publicKey, genesisBalance)
     }
 
     override lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow(
