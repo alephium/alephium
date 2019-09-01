@@ -274,6 +274,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "mapF" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      vc.mapF[Unit, Unit](doNothing).isRight is true
+    }
+  }
+
   it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
@@ -294,6 +300,16 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc0 = vc.flatMap(AVector(_))
       checkEq(vc0, arr)
       val vc1 = vc0.flatMap(elem => AVector(elem, elem))
+      checkEq(vc1, arr.flatMap(x => Array(x, x)))
+    }
+  }
+
+  it should "flatMapF" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      val arr = vc.toArray
+      val vc0 = vc.flatMapF(e => Right(AVector(e))).right.value
+      checkEq(vc0, arr)
+      val vc1 = vc0.flatMapF(elem => Right(AVector(elem, elem))).right.value
       checkEq(vc1, arr.flatMap(x => Array(x, x)))
     }
   }
@@ -383,6 +399,19 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
       val sum3 = vc.reduceBy(1 - _)(_ + _)
       sum3 is arr.map(1 - _).sum
+    }
+  }
+
+  it should "foldF" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      vc.foldF(0)((acc, e) => Right(acc + e)).right.value is vc.sum
+    }
+  }
+
+  it should "foldWithIndexF" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      val expected = vc.sum + vc.indices.sum
+      vc.foldWithIndexF(0)((acc, e, idx) => Right(acc + e + idx)).right.value is expected
     }
   }
 

@@ -29,9 +29,6 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     forAll(bytesGen) { bytes =>
       val bs = ByteString.fromArrayUnsafe(bytes.toArray)
       nibbles2Bytes(bytes2Nibbles(bs)) is bs
-      if (bytes.length == 2) {
-        bytes2Nibbles(nibbles2Bytes(bs)) is bs
-      }
     }
   }
 
