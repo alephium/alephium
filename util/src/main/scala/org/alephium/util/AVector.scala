@@ -307,23 +307,29 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     res
   }
 
-  def foldF[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
+  def foldWithIndex[B](zero: B)(f: (B, A, Int) => B): B = {
     var res = zero
-    cfor(start)(_ < end, _ + 1) { i =>
-      f(res, elems(i)) match {
+    foreachWithIndex { (elem, i) =>
+      res = f(res, elem, i)
+    }
+    res
+  }
+
+  def foldF[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
+    val res = fold(zero) {
+      f(_, _) match {
         case Left(l)  => return Left(l)
-        case Right(r) => res = r
+        case Right(r) => r
       }
     }
     Right(res)
   }
 
   def foldWithIndexF[L, R](zero: R)(f: (R, A, Int) => Either[L, R]): Either[L, R] = {
-    var res = zero
-    cfor(start)(_ < end, _ + 1) { i =>
-      f(res, elems(i), i) match {
+    val res = foldWithIndex(zero) {
+      f(_, _, _) match {
         case Left(l)  => return Left(l)
-        case Right(r) => res = r
+        case Right(r) => r
       }
     }
     Right(res)
