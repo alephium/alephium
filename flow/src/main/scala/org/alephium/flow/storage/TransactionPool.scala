@@ -30,59 +30,6 @@ trait TransactionPool { self: BlockFlowState =>
     case (_, _) => ConcurrentHashMap.empty[Keccak256, Transaction]
   }
 
-//  private def getIndexForInput(input: TxOutputPoint): Either[Error, GroupIndex] = {}
-//
-//  private def getIndexForInputs(inputs: AVector[TxOutputPoint]): Either[Error, GroupIndex] = {
-//    if (inputs.isEmpty) {
-//      Left(Error.invalidTransaction("Transaction has 0 input"))
-//    } else {
-//      val indexesEither = inputs
-//        .traverse(config.trie.get[TxOutputPoint, TxOutput])
-//        .map(_.map(output => GroupIndex.from(output.publicKey)))
-//      indexesEither match {
-//        case Left(error) => Left(Error.ioError(error))
-//        case Right(indexes) =>
-//          val index = indexes.head
-//          if (indexes.tail.forall(_ == index)) {
-//            Right(index)
-//          } else {
-//            Left(Error.invalidTransaction("Inputs has different group indexes"))
-//          }
-//      }
-//    }
-//  }
-//
-//  private def getIndexForOutputs(outputs: AVector[TxOutput]): Either[Error, GroupIndex] = {
-//    if (outputs.isEmpty) {
-//      Left(Error.invalidTransaction("Transaction has 0 output"))
-//    } else {
-//      val indexes = outputs.map(output => GroupIndex.from(output.publicKey))
-//      val index   = indexes.head
-//      if (indexes.tail.forall(_ == index)) {
-//        Right(index)
-//      } else {
-//        Left(Error.invalidTransaction("Outputs has different group indexes"))
-//      }
-//    }
-//  }
-//
-//  private def getIndex(unsigned: UnsignedTransaction): Either[Error, ChainIndex] = {
-//    for {
-//      from <- getIndexForInputs(unsigned.inputs)
-//      to   <- getIndexForOutputs(unsigned.outputs)
-//    } yield ChainIndex(from, to)
-//  }
-//
-//  private def withTransaction[T](transaction: Transaction)(f: ChainIndex => T): Either[Error, T] = {
-//    getIndex(transaction.unsigned).flatMap { index =>
-//      if (config.brokerInfo.contains(index.from)) {
-//        Right(f(index))
-//      } else {
-//        Left(Error.invalidIndex(index, config.brokerInfo))
-//      }
-//    }
-//  }
-
   def validateIndex(input: TxOutputPoint,
                     trie: MerklePatriciaTrie,
                     from: GroupIndex): Either[Error, Unit] = {
