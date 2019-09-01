@@ -30,7 +30,8 @@ trait BlockFlowState {
   }
 
   private val intraGroupChains: AVector[BlockChainWithState] = {
-    AVector.tabulate(config.groupNumPerBroker) { group =>
+    AVector.tabulate(config.groupNumPerBroker) { groupShift =>
+      val group = brokerInfo.groupFrom + groupShift
       BlockChainWithState.fromGenesisUnsafe(config.genesisBlocks(group)(group), updateState)
     }
   }
@@ -45,7 +46,7 @@ trait BlockFlowState {
     AVector.tabulate(config.groupNumPerBroker, groups) { (fromShift, to) =>
       val mainGroup = brokerInfo.groupFrom + fromShift
       if (mainGroup == to) {
-        intraGroupChains(mainGroup)
+        intraGroupChains(fromShift)
       } else {
         BlockChain.fromGenesisUnsafe(config.genesisBlocks(mainGroup)(to))
       }
