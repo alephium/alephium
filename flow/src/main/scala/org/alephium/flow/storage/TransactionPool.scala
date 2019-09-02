@@ -64,18 +64,24 @@ trait TransactionPool { self: BlockFlowState =>
     } yield ()
   }
 
+  private def getPool(chainIndex: ChainIndex) = {
+    assert(brokerInfo.contains(chainIndex.from))
+    val fromShift = chainIndex.from.value - brokerInfo.groupFrom
+    pool(fromShift)(chainIndex.to.value)
+  }
+
   def addTxIntoPool(transaction: Transaction, chainIndex: ChainIndex): Either[Error, Unit] = {
     validateIndex(transaction, chainIndex).map { _ =>
-      pool(chainIndex.from.value)(chainIndex.to.value).add(transaction.hash, transaction)
+      getPool(chainIndex).add(transaction.hash, transaction)
     }
   }
 
   def removeTxFromPool(transaction: Transaction, chainIndex: ChainIndex): Unit = {
-    pool(chainIndex.from.value)(chainIndex.to.value).removeIfExist(transaction.hash)
+    getPool(chainIndex).removeIfExist(transaction.hash)
   }
 
   // TODO: consider complete block template view
   def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
-    AVector.unsafe(pool(chainIndex.from.value)(chainIndex.to.value).values.toArray)
+    AVector.unsafe(getPool(chainIndex).values.toArray)
   }
 }
