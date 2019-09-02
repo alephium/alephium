@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse, os, tempfile
 
+port_start = 9973
+
 parser = argparse.ArgumentParser(description='Alephium Make')
 
 parser.add_argument('goal', type=str)
@@ -29,7 +31,7 @@ def rpc_call(host, port, method, params):
 
 def rpc_call_all(method, params):
     for node in range(0, get_env_int('nodes')):
-        port = 8080 + node
+        port = (port_start + 1000) + node
         rpc_call('localhost', port, method, params)
 
 def run(cmd):

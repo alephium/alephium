@@ -108,7 +108,7 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
       }
     )
 
-    Http().bindAndHandle(route, rpcConfig.networkInterface, mode.httpPort).map(_ => ())
+    Http().bindAndHandle(route, rpcConfig.networkInterface, mode.rpcPort).map(_ => ())
   }
 }
 
