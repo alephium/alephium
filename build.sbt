@@ -79,13 +79,7 @@ lazy val flow = subProject("flow")
   .settings(
     libraryDependencies ++= Seq(
       akka,
-      `akka-slf4j`,
-      bcprov,
-      `circe-parser`,
-      `circe-generic`,
-      `scala-logging`,
-      `scala-reflect`(scalaVersion.value),
-      logback
+      `scala-logging`
     )
   )
   .dependsOn(util % "test->test;compile->compile",
