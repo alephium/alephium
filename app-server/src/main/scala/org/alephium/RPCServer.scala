@@ -15,7 +15,7 @@ import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
-import org.alephium.flow.{Mode, Platform, PlatformEventBus}
+import org.alephium.flow.{EventBus, Mode, Platform}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.storage.MultiChain
 import org.alephium.flow.network.DiscoveryServer
@@ -62,6 +62,14 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
         }
   }
 
+  def handleEvent(event: EventBus.Event): TextMessage = {
+    event match {
+      case EventBus.Event.Dummy =>
+        val ts = System.currentTimeMillis()
+        TextMessage(s"{ dummy: $ts}")
+    }
+  }
+
   def runServer(): Future[Unit] = {
     val node = mode.node
 
@@ -83,22 +91,21 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
       },
       path("events") {
         corsHandler(get {
-          // TODO When does the actor get cleaned?
           val eventBusClient = system.actorOf(EventBusClient.props(node.eventBus))
           val source =
-            (eventBusClient ? EventBusClient.Connect).mapTo[SourceRef[PlatformEventBus.Event]]
+            (eventBusClient ? EventBusClient.Connect).mapTo[SourceRef[EventBus.Event]]
           onComplete(source) {
             case Success(source) =>
               handleWebSocketMessages(
-                Flow.fromSinkAndSource(
-                  Sink.ignore,
-                  source.map {
-                    // TODO Replace with real impl
-                    case PlatformEventBus.Event.Dummy =>
-                      val ts = System.currentTimeMillis()
-                      TextMessage(s"{ dummy: $ts}")
-                  }
-                ))
+                Flow
+                  .fromSinkAndSource(Sink.ignore, source.map(handleEvent))
+                  .watchTermination() { (_, termination) =>
+                    termination.onComplete {
+                      case _ =>
+                        system.stop(eventBusClient)
+                    }
+                  })
+
             case Failure(err) =>
               logger.error("Unable to connect event bus client.", err)
               complete(
