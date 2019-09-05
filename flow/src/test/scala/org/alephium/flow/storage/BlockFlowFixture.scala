@@ -17,7 +17,10 @@ trait BlockFlowFixture extends AlephiumSpec with BeforeAndAfter {
         groupIndex.generateKey()(this)
       }
 
-    val balances = addresses.map(key => (key._2, BigInt(100)))
+    val balances = addresses.map {
+      case (_, publicKey) =>
+        (publicKey, BigInt(100))
+    }
 
     override lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow(balances)
   }
