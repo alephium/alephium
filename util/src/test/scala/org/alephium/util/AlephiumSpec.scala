@@ -3,15 +3,16 @@ package org.alephium.util
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary.arbByte
 import org.scalactic.Equality
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
+import org.scalactic.source.Position
 import org.scalatest.words.ResultOfATypeInvocation
 import org.scalatest.{Assertion, FlatSpecLike, Matchers}
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-trait AlephiumSpec extends FlatSpecLike with GeneratorDrivenPropertyChecks with Matchers {
+trait AlephiumSpec extends FlatSpecLike with ScalaCheckDrivenPropertyChecks with Matchers {
 
   lazy val bytesGen: Gen[AVector[Byte]] = Gen.listOf(arbByte.arbitrary).map(AVector.from)
 
-  implicit class IsOps[A: Equality](left: A) {
+  implicit class IsOps[A: Equality](left: A)(implicit pos: Position) {
     // scalastyle:off scalatest-matcher
     def is(right: A): Assertion                             = left shouldEqual right
     def is(right: ResultOfATypeInvocation[_]): Assertion    = left shouldBe right
