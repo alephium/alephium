@@ -132,7 +132,7 @@ lazy val macros = subProject("macros")
 val commonSettings = Seq(
   organization := "org.alephium",
   version := "0.3.0-SNAPSHOT",
-  scalaVersion := "2.12.8",
+  scalaVersion := "2.12.9",
   parallelExecution in Test := false,
   scalacOptions := Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
