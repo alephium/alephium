@@ -11,13 +11,13 @@ object TransactionPool {
   sealed trait Error
   case class InvalidTransaction(msg: String) extends Error
   case class InvalidIndex(msg: String)       extends Error
-  case class IOError(msg: String)            extends Error
+  case class IOError(error: ImportedIOError) extends Error
 
   object Error {
     def invalidTransaction(msg: String): InvalidTransaction = InvalidTransaction(msg)
     def invalidIndex(index: ChainIndex, brokerInfo: BrokerInfo): InvalidIndex =
       InvalidIndex(s"Got $index, but broker is $brokerInfo")
-    def ioError(error: ImportedIOError): IOError = IOError(error.getMessage)
+    def ioError(error: ImportedIOError): IOError = IOError(error)
   }
 }
 
@@ -27,7 +27,8 @@ trait TransactionPool { self: BlockFlowState =>
   implicit def config: PlatformConfig
 
   private val pool = AVector.tabulate(config.brokerInfo.groupNumPerBroker, config.groups) {
-    case (_, _) => ConcurrentHashMap.empty[Keccak256, Transaction]
+    (_, _) =>
+      ConcurrentHashMap.empty[Keccak256, Transaction]
   }
 
   def validateIndex(input: TxOutputPoint,
