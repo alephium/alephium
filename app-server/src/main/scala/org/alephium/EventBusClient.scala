@@ -1,6 +1,6 @@
 package org.alephium
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.stream.{ActorMaterializer}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
@@ -9,11 +9,11 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-import org.alephium.flow.{PlatformEventBus}
+import org.alephium.flow.{EventBus}
 
-class EventBusClient(eventBus: PlatformEventBus) extends Actor with StrictLogging {
+class EventBusClient(eventBus: ActorRef) extends Actor with StrictLogging {
   import EventBusClient._
-  import PlatformEventBus.Event
+  import EventBus.{Event, Subscribe, Unsubscribe}
 
   implicit val materializer         = ActorMaterializer()
   implicit val ec: ExecutionContext = context.dispatcher
@@ -25,7 +25,7 @@ class EventBusClient(eventBus: PlatformEventBus) extends Actor with StrictLoggin
 
   val streamRef = Source.fromPublisher(publisher).runWith(StreamRefs.sourceRef())
 
-  eventBus.subscribe(self, ())
+  eventBus ! Subscribe
 
   override def receive: Receive = {
     case event: Event =>
@@ -37,10 +37,14 @@ class EventBusClient(eventBus: PlatformEventBus) extends Actor with StrictLoggin
           logger.error("Unable to instantiate event bus publisher.", err)
       }
   }
+
+  override def postStop: Unit = {
+    eventBus ! Unsubscribe
+  }
 }
 
 object EventBusClient {
-  def props(eventBus: PlatformEventBus): Props =
+  def props(eventBus: ActorRef): Props =
     Props(new EventBusClient(eventBus))
   case object Connect
 
