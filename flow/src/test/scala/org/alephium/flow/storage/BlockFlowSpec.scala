@@ -241,6 +241,6 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       val res        = blockFlow.getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
       res.right.value.map(_._2)
     }
-    txOutputs.map(_.map(show).mkString(";")) mkString ("", "\n", "\n")
+    txOutputs.map(_.map(show).mkString(";")).mkString("", "\n", "\n")
   }
 }
