@@ -1,6 +1,11 @@
 package org.alephium.mock
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+import scala.util.Random
+
 import akka.actor.Props
+
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.{Miner, Node}
@@ -9,10 +14,6 @@ import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
-import scala.util.Random
 
 object MockMiner {
 

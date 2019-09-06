@@ -1,7 +1,8 @@
 package org.alephium.crypto
 
-import org.alephium.serde.RandomBytes
 import akka.util.ByteString
+
+import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
 trait PrivateKey extends RandomBytes

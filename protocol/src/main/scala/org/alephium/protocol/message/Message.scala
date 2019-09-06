@@ -1,6 +1,7 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
+
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._

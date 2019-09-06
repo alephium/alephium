@@ -2,14 +2,15 @@ package org.alephium.flow.network.coordinator
 
 import java.time.Instant
 
+import scala.concurrent.duration._
+
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
-
-import scala.concurrent.duration._
 
 object Broker {
   def props()(implicit config: PlatformConfig): Props = Props(new Broker())

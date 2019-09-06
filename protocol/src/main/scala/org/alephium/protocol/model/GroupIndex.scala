@@ -1,9 +1,9 @@
 package org.alephium.protocol.model
 
+import scala.annotation.tailrec
+
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.GroupConfig
-
-import scala.annotation.tailrec
 
 class GroupIndex private (val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"

@@ -1,6 +1,7 @@
 package org.alephium.flow.trie
 
 import akka.util.ByteString
+
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.model.TxOutput

@@ -1,9 +1,10 @@
 package org.alephium.flow.client
 
-import akka.actor.{ActorSystem}
+import akka.actor.ActorSystem
+
 import org.alephium.flow.PlatformConfig
-import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage._
 import org.alephium.util.EventBus
 
