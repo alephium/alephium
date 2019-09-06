@@ -1,4 +1,4 @@
-package org.alephium.rpc
+package org.alephium
 
 import scala.concurrent.Future
 import java.time.Instant
@@ -6,12 +6,15 @@ import java.time.Instant
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import io.circe.Json
+import io.circe.{Encoder, Json}
 
 import org.alephium.flow.client.{FairMiner, Miner, Node}
+import org.alephium.flow.storage.MultiChain
 import org.alephium.flow.{Mode, Platform}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.rpc.model.JsonRPC
+import org.alephium.protocol.model.BlockHeader
+import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
+import org.alephium.rpc.model.{JsonRPC, RPC}
 
 trait RPCServer extends Platform with CORSHandler with StrictLogging {
   import RPCServer._
@@ -61,12 +64,11 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
 }
 
 object RPCServer extends StrictLogging {
+  import RPC._
   import JsonRPC._
 
   def blockflowFetch(node: Node, req: Request)(implicit rpc: RPCConfig,
                                                cfg: ConsensusConfig): Response = {
-    import model.BlockFlowRPC._
-
     req.paramsAs[FetchRequest] match {
       case Right(query) =>
         val now        = Instant.now()
@@ -86,4 +88,23 @@ object RPCServer extends StrictLogging {
       case Left(failure) => failure
     }
   }
+
+  def blockHeaderEncoder(chain: MultiChain)(
+      implicit config: ConsensusConfig): Encoder[BlockHeader] = new Encoder[BlockHeader] {
+    final def apply(header: BlockHeader): Json = {
+      import io.circe.syntax._
+
+      val index = header.chainIndex
+
+      FetchEntry(
+        hash      = header.shortHex,
+        timestamp = header.timestamp,
+        chainFrom = index.from.value,
+        chainTo   = index.to.value,
+        height    = chain.getHeight(header),
+        deps      = header.blockDeps.toIterable.map(_.shortHex).toList
+      ).asJson
+    }
+  }
+
 }
