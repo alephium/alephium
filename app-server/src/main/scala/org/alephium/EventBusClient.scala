@@ -1,17 +1,16 @@
 package org.alephium
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ActorRef, Props}
 import akka.stream.{ActorMaterializer}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
 import akka.pattern.pipe
-import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-import org.alephium.flow.{EventBus}
+import org.alephium.util.{BaseActor, EventBus}
 
-class EventBusClient(eventBus: ActorRef) extends Actor with StrictLogging {
+class EventBusClient(eventBus: ActorRef) extends BaseActor {
   import EventBusClient._
   import EventBus.{Event, Subscribe, Unsubscribe}
 
@@ -34,7 +33,7 @@ class EventBusClient(eventBus: ActorRef) extends Actor with StrictLogging {
       streamRef.pipeTo(sender).onComplete {
         case Success(_) => // noop
         case Failure(err) =>
-          logger.error("Unable to instantiate event bus publisher.", err)
+          log.error("Unable to instantiate event bus publisher.", err)
       }
   }
 

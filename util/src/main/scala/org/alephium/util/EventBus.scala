@@ -1,8 +1,7 @@
-package org.alephium.flow
+package org.alephium.util
 
 import scala.collection.mutable
 import akka.actor.{ActorRef, Props}
-import org.alephium.util.{BaseActor}
 
 object EventBus {
   def props(): Props = {
@@ -13,12 +12,7 @@ object EventBus {
   case object Subscribe   extends Command
   case object Unsubscribe extends Command
 
-  sealed trait Event
-  object Event {
-    // TODO Replace with real events
-    case object Dummy extends Event
-  }
-
+  trait Event
 }
 
 class EventBus() extends BaseActor {
