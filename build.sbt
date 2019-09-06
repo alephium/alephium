@@ -43,7 +43,7 @@ lazy val `app-debug` = mainProject("app-debug")
   )
 
 lazy val `app-server` = subProject("app-server")
-  .dependsOn(flow, rpc)
+  .dependsOn(flow, rpc, util % "test->test;compile->compile")
 
 lazy val benchmark = mainProject("benchmark")
   .enablePlugins(JmhPlugin)
