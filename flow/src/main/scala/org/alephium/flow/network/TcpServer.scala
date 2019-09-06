@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
+
 import org.alephium.util.BaseActor
 
 object TcpServer {

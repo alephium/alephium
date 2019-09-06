@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
+
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._

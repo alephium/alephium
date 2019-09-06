@@ -1,22 +1,20 @@
 package org.alephium.explorer
 
+import scala.concurrent._
+import scala.concurrent.duration._
+
+import ExplorerRPC._
+import ExplorerService._
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-
-import scala.concurrent._
-import scala.concurrent.duration._
-
 import io.circe.Json
 import io.circe.syntax._
 
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC
-
-import ExplorerRPC._
-import ExplorerService._
 
 // explorer/run 9000 ws://127.0.0.1:8080
 object ExplorerServer extends CORSHandler {

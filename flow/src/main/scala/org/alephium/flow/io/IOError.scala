@@ -1,7 +1,8 @@
 package org.alephium.flow.io
 
-import org.alephium.serde.SerdeError
 import org.rocksdb.RocksDBException
+
+import org.alephium.serde.SerdeError
 
 sealed abstract class IOError(reason: Throwable) extends Exception(reason)
 

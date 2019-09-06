@@ -3,6 +3,7 @@ package org.alephium.flow.network.coordinator
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
+
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, UnsafeModel}
 import org.alephium.serde._

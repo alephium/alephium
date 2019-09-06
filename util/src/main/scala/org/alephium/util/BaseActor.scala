@@ -1,9 +1,9 @@
 package org.alephium.util
 
+import scala.concurrent.duration.FiniteDuration
+
 import akka.actor._
 import org.slf4j.LoggerFactory
-
-import scala.concurrent.duration.FiniteDuration
 
 trait BaseActor extends Actor with ActorLogging {
 

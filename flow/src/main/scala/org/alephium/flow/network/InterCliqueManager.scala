@@ -1,14 +1,15 @@
 package org.alephium.flow.network
 
+import scala.concurrent.duration._
+
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.BaseActor
-
-import scala.concurrent.duration._
 
 object InterCliqueManager {
   def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(

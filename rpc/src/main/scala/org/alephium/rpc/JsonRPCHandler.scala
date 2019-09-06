@@ -2,6 +2,7 @@ package org.alephium.rpc
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -11,7 +12,6 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
-
 import model.JsonRPC._
 
 object JsonRPCHandler extends StrictLogging {

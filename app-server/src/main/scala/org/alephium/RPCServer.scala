@@ -1,24 +1,27 @@
 package org.alephium
 
 import java.time.Instant
+
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
+
 import akka.actor.ActorRef
-import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
-import akka.http.scaladsl.model.ws.{TextMessage}
+import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives._
+import akka.pattern.ask
 import akka.stream.{ActorMaterializer, SourceRef}
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
+
 import org.alephium.flow.{Mode, Platform}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
-import org.alephium.flow.storage.MultiChain
 import org.alephium.flow.network.DiscoveryServer
+import org.alephium.flow.storage.MultiChain
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}

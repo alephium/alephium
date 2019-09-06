@@ -3,6 +3,7 @@ package org.alephium.flow.network.coordinator
 import java.net.InetSocketAddress
 
 import akka.actor.ActorRef
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.AVector
