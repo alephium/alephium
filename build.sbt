@@ -20,7 +20,7 @@ lazy val root: Project = Project("root", file("."))
     scalastyle := {},
     scalastyle in Test := {},
   )
-  .aggregate(app, `app-debug`, flow, util, serde, crypto, protocol, rpc)
+  .aggregate(app, `app-debug`, `app-server`, flow, util, serde, crypto, protocol, rpc, explorer)
 
 def mainProject(id: String): Project =
   baseProject(id)
@@ -29,7 +29,7 @@ def mainProject(id: String): Project =
       Test / scalastyleConfig := root.base / scalastyleTestCfgFile
     )
     .enablePlugins(JavaAppPackaging)
-    .dependsOn(flow, rpc)
+    .dependsOn(`app-server`)
 
 lazy val app = mainProject("app")
 
@@ -41,6 +41,9 @@ lazy val `app-debug` = mainProject("app-debug")
     ),
     coverageEnabled := false
   )
+
+lazy val `app-server` = subProject("app-server")
+  .dependsOn(flow, rpc)
 
 lazy val benchmark = mainProject("benchmark")
   .enablePlugins(JmhPlugin)
@@ -70,19 +73,13 @@ lazy val explorer = subProject("explorer")
     )
   )
   .enablePlugins(JavaAppPackaging)
-  .dependsOn(rpc)
+  .dependsOn(rpc, util)
 
 lazy val flow = subProject("flow")
   .settings(
     libraryDependencies ++= Seq(
       akka,
-      `akka-slf4j`,
-      bcprov,
-      `circe-parser`,
-      `circe-generic`,
-      `scala-logging`,
-      `scala-reflect`(scalaVersion.value),
-      logback
+      `scala-logging`
     )
   )
   .dependsOn(util % "test->test;compile->compile",
@@ -102,10 +99,12 @@ lazy val rpc = subProject("rpc")
   .settings(
     libraryDependencies ++= Seq(
       `akka-http`,
-      `akka-stream`
+      `akka-stream`,
+      `circe-parser`,
+      `circe-generic`,
+      `scala-logging`
     )
   )
-  .dependsOn(flow)
 
 lazy val serde = subProject("serde")
   .settings(
