@@ -8,6 +8,12 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
     brokerInfo.contains(from) || brokerInfo.contains(to)
   }
 
+  def relateTo(groupIndex: GroupIndex): Boolean = {
+    from == groupIndex || to == groupIndex
+  }
+
+  def isIntraGroup: Boolean = from == to
+
   def toOneDim(implicit config: GroupConfig): Int = from.value * config.groups + to.value
 
   override def equals(obj: Any): Boolean = obj match {

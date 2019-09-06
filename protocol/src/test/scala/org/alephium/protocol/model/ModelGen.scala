@@ -13,8 +13,10 @@ object ModelGen {
 
   val txInputGen: Gen[TxOutputPoint] = for {
     index <- Gen.choose(0, 10)
-  } yield
-    TxOutputPoint(Keccak256.zero, index) // TODO: fixme: Has to use zero here to pass test on ubuntu
+  } yield {
+    val publicKey = ED25519PublicKey.generate
+    TxOutputPoint(publicKey, Keccak256.random, index)
+  }
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose(0, 100)

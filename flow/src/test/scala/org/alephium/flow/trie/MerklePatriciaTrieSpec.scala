@@ -25,6 +25,13 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     test(0xFF.toByte, 0x0F.toByte, 0x0F.toByte)
   }
 
+  it should "convert" in {
+    forAll(bytesGen) { bytes =>
+      val bs = ByteString.fromArrayUnsafe(bytes.toArray)
+      nibbles2Bytes(bytes2Nibbles(bs)) is bs
+    }
+  }
+
   behavior of "node serde"
 
   trait NodeFixture {
@@ -50,14 +57,14 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   it should "encode flag correctly" in {
     def test(length: Int, isLeaf: Boolean, flag: Int): Assertion = {
       assert(flag >= 0 && flag < 256)
-      Node.SerdeNode.encodeFlag(length, isLeaf) is flag.toByte
-      Node.SerdeNode.decodeFlag(flag.toByte) is ((length, isLeaf))
+      Node.SerdeNode.encodeFlag(length, isLeaf) is flag
+      Node.SerdeNode.decodeFlag(flag) is ((length, isLeaf))
     }
-    test(0, true, 128)
-    test(0, false, 0)
-    test(64, true, 128 + 64)
-    test(63, true, 128 + 63)
-    test(63, false, 63)
+    test(0, true, 0)
+    test(0, false, 1)
+    test(64, true, 128 + 0)
+    test(63, true, 126 + 0)
+    test(63, false, 126 + 1)
   }
 
   it should "encode nibbles correctly" in new NodeFixture {
@@ -88,12 +95,12 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
     val db   = HeaderDB(storage, ColumnFamily.Trie, Settings.readOptions)
-    val trie = MerklePatriciaTrie.create(db)
+    var trie = MerklePatriciaTrie.create(db)
 
-    def generateKV(keyPrefix: ByteString = ByteString.empty): (Keccak256, ByteString) = {
+    def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Keccak256.random.bytes
       val data = ByteString.fromString(Gen.alphaStr.sample.get)
-      (Keccak256.unsafeFrom(keyPrefix ++ key.drop(keyPrefix.length)), data)
+      (keyPrefix ++ key.drop(keyPrefix.length), data)
     }
 
     protected def postTest(): Assertion = {
@@ -109,7 +116,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "be able to create a trie" in withTrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
-    fixture.trie.getOpt(genesisKey).right.value.nonEmpty is true
+    fixture.trie.getOptRaw(genesisKey).right.value.nonEmpty is true
   }
 
   it should "branch well" in withTrieFixture { fixture =>
@@ -120,7 +127,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie.put(key, value)
+        trie = trie.putRaw(key, value).right.value
         Some(key)
       }
     }
@@ -135,12 +142,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      trie.getOpt(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).right.value.nonEmpty is true
     }
 
+    val allStored    = trie.getAllRaw(ByteString.empty).right.value
+    val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
+    val expectedKeys = (keys :+ genesisKey).toArray.sortBy(_.hashCode())
+    allKeys is expectedKeys
+
     keys.foreach { key =>
-      trie.remove(key).isRight is true
-      trie.getOpt(key).right.value.isEmpty is true
+      trie = trie.removeRaw(key).right.value
+      trie.getOptRaw(key).right.value.isEmpty is true
     }
 
     trie.rootHash is genesisNode.hash
@@ -151,17 +163,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(100) { _ =>
       val (key, value) = fixture.generateKV()
-      trie.put(key, value).isRight is true
+      trie = trie.putRaw(key, value).right.value
       key
     }
 
     keys.map { key =>
-      trie.getOpt(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).right.value.nonEmpty is true
     }
 
     keys.map { key =>
-      trie.remove(key).isRight is true
-      trie.getOpt(key).right.value.isEmpty is true
+      trie = trie.removeRaw(key).right.value
+      trie.getOptRaw(key).right.value.isEmpty is true
     }
 
     trie.rootHash is genesisNode.hash
@@ -176,9 +188,9 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))
       trie.getNode(hash).right.value match {
-        case BranchNode(_, children) =>
+        case BranchNode(path, children) =>
           val nChild = children.map(_.fold(0)(_ => 1)).sum
-          print(s"($shortHash, $nChild); ")
+          print(s"($shortHash, ${path.length} $nChild); ")
           children.toArray.toSeq.flatten
         case LeafNode(path, _) =>
           print(s"($shortHash, ${path.length} leaf)")

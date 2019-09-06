@@ -5,6 +5,13 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.AVector
 
+/** The header of a block with index.from == _group_
+  *
+  * @param blockDeps If the block is genesis, then it's empty.
+  *                  Otherwise, 2 * G - 1 deps in total:
+  *                  the first G - 1 hashes are from groups different from _group_
+  *                  the rest G hashes are from all the chain related to _group_
+  */
 case class BlockHeader(
     blockDeps: AVector[Keccak256],
     txsHash: Keccak256,
@@ -19,14 +26,25 @@ case class BlockHeader(
     ChainIndex.from(hash)
   }
 
+  def isGenesis: Boolean = blockDeps.isEmpty
+
   def parentHash(implicit config: GroupConfig): Keccak256 = {
     uncleHash(chainIndex.to)
   }
 
-  // when toIndex == chainIndex.to, it returns hash of parent
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Keccak256 = {
-    assert(toIndex == chainIndex.to)
+    assert(!isGenesis)
     blockDeps.takeRight(config.groups)(toIndex.value)
+  }
+
+  def inDeps(implicit config: GroupConfig): AVector[Keccak256] = {
+    assert(!isGenesis)
+    blockDeps.dropRight(config.groups)
+  }
+
+  def outDeps(implicit config: GroupConfig): AVector[Keccak256] = {
+    assert(!isGenesis)
+    blockDeps.takeRight(config.groups)
   }
 
   def validateDiff: Boolean = {

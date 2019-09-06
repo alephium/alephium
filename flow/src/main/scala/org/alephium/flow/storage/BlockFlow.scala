@@ -15,14 +15,16 @@ class BlockFlow()(implicit val config: PlatformConfig)
     with FlowUtils {
 
   def add(block: Block): IOResult[Unit] = {
-    val index  = block.chainIndex
+    val index = block.chainIndex
+    assert(index.relateTo(config.brokerInfo))
     val chain  = getBlockChain(index)
-    val parent = block.uncleHash(index.to)
+    val parent = block.uncleHash(index.to) // equal to parentHash
+
+    cacheBlock(block)
     for {
       weight <- calWeight(block)
       _      <- chain.add(block, parent, weight)
       _      <- calBestDeps()
-      _      <- updateTxs(block)
     } yield ()
   }
 
@@ -86,20 +88,19 @@ class BlockFlow()(implicit val config: PlatformConfig)
     }
 
   private def calWeightUnsafe(header: BlockHeader): Int = {
-    val deps = header.blockDeps
-    if (deps.isEmpty) 0
+    if (header.isGenesis) 0
     else {
-      val weight1 = deps.dropRight(groups).sumBy(calGroupWeightUnsafe)
-      val weight2 = deps.takeRight(groups).sumBy(getHeight)
+      val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
+      val weight2 = header.outDeps.sumBy(getHeight)
       weight1 + weight2 + 1
     }
   }
 
   private def calGroupWeightUnsafe(hash: Keccak256): Int = {
-    val deps = getBlockHeaderUnsafe(hash).blockDeps
-    if (deps.isEmpty) 0
+    val header = getBlockHeaderUnsafe(hash)
+    if (header.isGenesis) 0
     else {
-      deps.takeRight(groups).sumBy(getHeight) + 1
+      header.outDeps.sumBy(getHeight) + 1
     }
   }
 
@@ -112,13 +113,14 @@ class BlockFlow()(implicit val config: PlatformConfig)
     aggregate(_.getAllTips)(_ ++ _)
   }
 
+  // Rtips means tip representatives for all groups
   private def getRtipsUnsafe(tip: Keccak256, from: GroupIndex): Array[Keccak256] = {
     val rdeps = new Array[Keccak256](groups)
     rdeps(from.value) = tip
 
     val header = getBlockHeaderUnsafe(tip)
     val deps   = header.blockDeps
-    if (deps.isEmpty) {
+    if (header.isGenesis) {
       0 until groups foreach { k =>
         if (k != from.value) rdeps(k) = config.genesisBlocks(k).head.hash
       }
@@ -148,7 +150,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
                                  tip: Keccak256,
                                  from: GroupIndex): Boolean = {
     val newRtips = getRtipsUnsafe(tip, from)
-    assert(rtips.size == newRtips.length)
+    assert(rtips.length == newRtips.length)
     rtips.indices forall { k =>
       val t1 = rtips(k)
       val t2 = newRtips(k)
@@ -169,11 +171,11 @@ class BlockFlow()(implicit val config: PlatformConfig)
   }
 
   private def getGroupDepsUnsafe(tip: Keccak256, from: GroupIndex): AVector[Keccak256] = {
-    val deps = getBlockHeaderUnsafe(tip).blockDeps
-    if (deps.isEmpty) {
+    val header = getBlockHeaderUnsafe(tip)
+    if (header.isGenesis) {
       config.genesisBlocks(from.value).map(_.hash)
     } else {
-      deps.takeRight(groups)
+      header.outDeps
     }
   }
 

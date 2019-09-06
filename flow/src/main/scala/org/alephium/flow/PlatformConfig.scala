@@ -7,19 +7,19 @@ import java.nio.file.Path
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-import org.alephium.crypto.ED25519
+import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Env, Files, Network}
+import org.alephium.util._
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object PlatformConfig extends StrictLogging {
-  private val env = Env.resolve()
-  private val rootPath = {
+  val env = Env.resolve()
+  val rootPath = {
     env match {
       case Env.Prod =>
         Files.homeDir.resolve(".alephium")
@@ -30,16 +30,15 @@ object PlatformConfig extends StrictLogging {
     }
   }
 
-  object Default extends PlatformConfig(env, rootPath)
-
   trait Default {
-    implicit def config: PlatformConfig = Default
+    implicit val config: PlatformConfig = new PlatformConfig(env, rootPath)
   }
 
-  def mineGenesis(chainIndex: ChainIndex)(implicit config: ConsensusConfig): Block = {
+  def mineGenesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
+      implicit config: ConsensusConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
+      val block = Block.genesis(transactions, config.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
       if (block.validateIndex(chainIndex)) block else iter(nonce + 1)
     }
@@ -124,6 +123,8 @@ trait PlatformConsensusConfig extends PlatformConfigFiles with ConsensusConfig {
   val blockConfirmNum: Int      = consensusConfigRaw.getInt("blockConfirmNum")
   val expectedTimeSpan: Long    = blockTargetTime.toMillis
 
+  val blockCacheSize: Int = consensusConfigRaw.getInt("blockCacheSizePerChain") * (2 * groups - 1)
+
   // Digi Shields Difficulty Adjustment
   val medianTimeInterval = 11
   val diffAdjustDownMax  = 16
@@ -155,10 +156,29 @@ trait PlatformNetworkConfig extends PlatformConfigFiles {
 }
 
 trait PlatformGenesisConfig extends PlatformConsensusConfig {
+  private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
+    val List(left, right) = raw.split(":").toList
+    val publicKey         = ED25519PublicKey.from(Hex.unsafeFrom(left))
+    val balance           = BigInt(right)
+    (publicKey, balance)
+  }
+
   def loadBlockFlow(): AVector[AVector[Block]] = {
+    import collection.JavaConverters._
+    val entries  = alephium.getStringList("genesis").asScala
+    val balances = entries.map(splitBalance)
+    loadBlockFlow(AVector.from(balances))
+  }
+
+  def loadBlockFlow(balances: AVector[(ED25519PublicKey, BigInt)]): AVector[AVector[Block]] = {
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        PlatformConfig.mineGenesis(ChainIndex(from, to)(this))(this)
+        val transactions = if (from == to) {
+          val balancesOI  = balances.filter(p => GroupIndex.from(p._1)(this).value == from)
+          val transaction = Transaction.genesis(balancesOI)
+          AVector(transaction)
+        } else AVector.empty[Transaction]
+        PlatformConfig.mineGenesis(ChainIndex(from, to)(this), transactions)(this)
     }
   }
 
@@ -208,6 +228,6 @@ class PlatformConfig(val env: Env, val rootPath: Path)
 
   val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
 
-  val trie: MerklePatriciaTrie =
+  val emptyTrie: MerklePatriciaTrie =
     MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, Settings.readOptions))
 }

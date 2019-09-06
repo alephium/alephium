@@ -7,6 +7,17 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
 
   behavior of "ChainIndex"
 
+  it should "check when it's intra group index" in {
+    val index0 = ChainIndex.unsafe(0, 0)
+    val index1 = ChainIndex.unsafe(0, 1)
+    val index2 = ChainIndex.unsafe(1, 0)
+    val index3 = ChainIndex.unsafe(1, 1)
+    index0.isIntraGroup is true
+    index1.isIntraGroup is false
+    index2.isIntraGroup is false
+    index3.isIntraGroup is true
+  }
+
   it should "compute the correct index" in {
     forAll(ModelGen.blockGen) { block =>
       val index = block.chainIndex
