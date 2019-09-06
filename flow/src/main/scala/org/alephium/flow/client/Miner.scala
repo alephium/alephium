@@ -1,7 +1,12 @@
 package org.alephium.flow.client
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+import scala.util.Random
+
 import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
+
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
@@ -9,10 +14,6 @@ import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
-import scala.util.Random
 
 object Miner {
   sealed trait Command

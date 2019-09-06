@@ -1,6 +1,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+
 import org.alephium.serde._
 import org.alephium.util.AVector
 

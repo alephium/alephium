@@ -1,10 +1,10 @@
 package org.alephium.util
 
-import akka.util.ByteString
-import org.bouncycastle.util.encoders.{Hex => BHex}
-
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
+
+import akka.util.ByteString
+import org.bouncycastle.util.encoders.{Hex => BHex}
 
 object Hex {
   def unsafeFrom(s: String): ByteString = {

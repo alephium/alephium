@@ -1,6 +1,7 @@
 package org.alephium.flow
 
 import com.typesafe.scalalogging.StrictLogging
+
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.clique.BrokerHandler
 

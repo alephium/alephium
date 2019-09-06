@@ -1,8 +1,11 @@
 package org.alephium.serde
 
-import scala.reflect.runtime.universe.{typeOf, TypeTag}
-import akka.util.ByteString
 import java.security.SecureRandom
+
+import scala.reflect.runtime.universe.{typeOf, TypeTag}
+
+import akka.util.ByteString
+
 import org.alephium.util.Hex
 
 trait RandomBytes {

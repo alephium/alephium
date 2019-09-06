@@ -1,9 +1,9 @@
 package org.alephium.util
 
-import org.alephium.macros.HPC
-
-import scala.reflect.ClassTag
 import scala.{inline, specialized => sp}
+import scala.reflect.ClassTag
+
+import org.alephium.macros.HPC
 
 // scalastyle:off number.of.methods return
 abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>

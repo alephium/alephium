@@ -2,6 +2,7 @@ package org.alephium.flow.io
 
 import akka.util.ByteString
 import org.rocksdb.ReadOptions
+
 import org.alephium.serde._
 
 object RocksDBColumn {

@@ -1,12 +1,13 @@
 package org.alephium
 
-import akka.actor.{ActorRef, Props}
-import akka.stream.{ActorMaterializer}
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
-import akka.pattern.pipe
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
+
+import akka.actor.{ActorRef, Props}
+import akka.pattern.pipe
+import akka.stream.ActorMaterializer
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
 
 import org.alephium.util.{BaseActor, EventBus}
 

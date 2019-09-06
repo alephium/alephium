@@ -2,11 +2,12 @@ package org.alephium.serde
 
 import java.nio.ByteBuffer
 
-import akka.util.ByteString
-import org.alephium.util.AVector
-
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
+
+import akka.util.ByteString
+
+import org.alephium.util.AVector
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic

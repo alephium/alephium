@@ -1,9 +1,9 @@
 package org.alephium.protocol.config
 
+import scala.annotation.tailrec
+
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.model.GroupIndex
-
-import scala.annotation.tailrec
 
 object GroupConfig {
   def generateKeyForGroup(groupIndex: GroupIndex)(

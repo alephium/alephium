@@ -2,6 +2,7 @@ package org.alephium.flow.network.coordinator
 
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}

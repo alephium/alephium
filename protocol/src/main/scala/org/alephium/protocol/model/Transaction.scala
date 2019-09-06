@@ -1,6 +1,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+
 import org.alephium.crypto._
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util.AVector
