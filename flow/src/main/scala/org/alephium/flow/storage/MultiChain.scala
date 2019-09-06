@@ -112,8 +112,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def add(block: Block): IOResult[Unit]
 
-  def getTransaction(hash: Keccak256): Transaction = ???
-
   def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
     for {
       i    <- 0 until groups

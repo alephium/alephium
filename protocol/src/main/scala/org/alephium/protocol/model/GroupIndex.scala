@@ -1,10 +1,19 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.GroupConfig
+
+import scala.annotation.tailrec
 
 class GroupIndex private (val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"
+
+  @tailrec
+  final def generateKey()(implicit config: GroupConfig): (ED25519PrivateKey, ED25519PublicKey) = {
+    val (privateKey, publicKey) = ED25519.generatePriPub()
+    if (GroupIndex.from(publicKey) == this) (privateKey, publicKey)
+    else generateKey()
+  }
 }
 
 object GroupIndex {

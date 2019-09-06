@@ -214,6 +214,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def mapF[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
+    val res = AVector.tabulate(length) { i =>
+      f(apply(i)) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => r
+      }
+    }
+    Right(res)
+  }
+
   def mapWithIndex[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
     AVector.tabulate(length) { i =>
       f(apply(i), i)
@@ -297,6 +307,34 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     res
   }
 
+  def foldWithIndex[B](zero: B)(f: (B, A, Int) => B): B = {
+    var res = zero
+    foreachWithIndex { (elem, i) =>
+      res = f(res, elem, i)
+    }
+    res
+  }
+
+  def foldF[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
+    val res = fold(zero) {
+      f(_, _) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => r
+      }
+    }
+    Right(res)
+  }
+
+  def foldWithIndexF[L, R](zero: R)(f: (R, A, Int) => Either[L, R]): Either[L, R] = {
+    val res = foldWithIndex(zero) {
+      f(_, _, _) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => r
+      }
+    }
+    Right(res)
+  }
+
   def reduce(op: (A, A) => A): A = {
     reduceBy(identity)(op)
   }
@@ -317,12 +355,25 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def flatMapF[L, R: ClassTag](f: A => Either[L, AVector[R]]): Either[L, AVector[R]] = {
+    foldF(AVector.empty[R]) { (acc, elem) =>
+      f(elem).map(acc ++ _)
+    }
+  }
+
   def flatMapWithIndex[B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
     val (_, xs) = fold((0, AVector.empty[B])) {
       case ((i, acc), elem) =>
         (i + 1, acc ++ f(elem, i))
     }
     xs
+  }
+
+  def flatMapWithIndexF[L, R: ClassTag](
+      f: (A, Int) => Either[L, AVector[R]]): Either[L, AVector[R]] = {
+    foldWithIndexF(AVector.empty[R]) { (acc, elem, index) =>
+      f(elem, index).map(acc ++ _)
+    }
   }
 
   def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
@@ -410,7 +461,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def replace(i: Int, a: A): AVector[A] = {
     assert(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)
-    elems.copyToArray(arr, start, end)
+    System.arraycopy(elems, start, arr, 0, length)
     arr(i) = a
     AVector.unsafe(arr)
   }

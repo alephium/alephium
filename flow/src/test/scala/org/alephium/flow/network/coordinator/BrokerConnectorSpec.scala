@@ -2,14 +2,13 @@ package org.alephium.flow.network.coordinator
 
 import akka.io.Tcp
 import akka.testkit.TestProbe
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.{BrokerInfo, ModelGen}
-import org.alephium.util.AlephiumActorSpec
 
 import scala.util.Random
 
-class BrokerConnectorSpec extends AlephiumActorSpec("BrokerConnector") {
-  it should "follow this workflow" in new PlatformConfig.Default {
+class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") {
+  it should "follow this workflow" in {
     val connection      = TestProbe()
     val brokerConnector = system.actorOf(BrokerConnector.props(connection.ref))
     val randomId        = Random.nextInt(config.brokerNum)

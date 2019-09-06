@@ -1,11 +1,11 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.Block
-import org.alephium.util.{AVector, AlephiumSpec}
+import org.alephium.util.AVector
 
-class BlockHashChainSpec extends AlephiumSpec with PlatformConfig.Default { Self =>
+class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
   trait Fixture extends BlockHashChain {
     val root   = BlockHashChain.Root(Keccak256.zero, 0, 0, 0)
     val config = Self.config

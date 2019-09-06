@@ -3,19 +3,11 @@ package org.alephium.flow.storage
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.{Disk, IOResult}
-import org.alephium.protocol.model.{Block, Transaction}
-
-import scala.collection.mutable.HashMap
+import org.alephium.protocol.model.Block
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def disk: Disk
-
-  protected val transactionsTable: HashMap[Keccak256, Transaction] = HashMap.empty
-
-  def numTransactions: Int = transactionsTable.size
-
-  def getTransaction(hash: Keccak256): Transaction = transactionsTable(hash)
 
   def getBlock(hash: Keccak256): IOResult[Block] = {
     disk.getBlock(hash)

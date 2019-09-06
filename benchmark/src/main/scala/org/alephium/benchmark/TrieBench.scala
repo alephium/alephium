@@ -34,12 +34,12 @@ class TrieBench {
   @Benchmark
   def randomInsert(): Unit = {
     val keys = Array.tabulate(1 << 10) { _ =>
-      val key  = Keccak256.random
+      val key  = Keccak256.random.bytes
       val data = Keccak256.random.bytes
-      trie.put(key, data)
+      trie.putRaw(key, data)
       key
     }
-    keys.foreach(trie.remove)
+    keys.foreach(trie.removeRaw)
     assert(trie.rootHash == MerklePatriciaTrie.genesisNode.hash)
   }
 }

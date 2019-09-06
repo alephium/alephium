@@ -23,6 +23,12 @@ object Transaction {
   implicit val serde: Serde[Transaction] =
     Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.signature))
 
+  def from(inputs: AVector[TxOutputPoint],
+           outputs: AVector[TxOutput],
+           privateKey: ED25519PrivateKey): Transaction = {
+    from(UnsignedTransaction(inputs, outputs), privateKey)
+  }
+
   def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
     val message   = serialize(unsigned)
@@ -34,5 +40,11 @@ object Transaction {
     val txOutput = TxOutput(value, address)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, data, ED25519Signature.zero)
+  }
+
+  def genesis(balances: AVector[(ED25519PublicKey, BigInt)]): Transaction = {
+    val outputs  = balances.map { case (key, value) => TxOutput(value, key) }
+    val unsigned = UnsignedTransaction(AVector.empty, outputs)
+    Transaction(unsigned, ByteString.empty, ED25519Signature.zero)
   }
 }

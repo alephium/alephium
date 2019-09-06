@@ -57,7 +57,8 @@ alephium {
     numZerosAtLeastInHash = 18
     numZerosAtLeastInHash = ${?zeros}
     blockTargetTime = 4 minutes
-    blockConfirmNum = 10
+    blockConfirmNum = 100
+    blockCacheSizePerChain = 25
   }
 
   mining {
@@ -86,5 +87,9 @@ alephium {
 
   bootstrap=""
   bootstrap = ${?bootstrap}
+
+  genesis = [
+    "2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c:100"
+  ]
 }
 

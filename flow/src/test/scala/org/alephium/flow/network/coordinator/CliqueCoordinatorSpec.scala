@@ -1,13 +1,12 @@
 package org.alephium.flow.network.coordinator
 
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
-import org.alephium.util.AlephiumActorSpec
 
-class CliqueCoordinatorSpec extends AlephiumActorSpec("CliqueCoordinatorSpec") {
+class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec") {
 
-  it should "await all the brokers" in new PlatformConfig.Default {
+  it should "await all the brokers" in {
     val coordinator = system.actorOf(CliqueCoordinator.props())
 
     val probs = (0 until config.brokerNum)
