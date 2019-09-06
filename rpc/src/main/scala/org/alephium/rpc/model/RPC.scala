@@ -3,7 +3,7 @@ package org.alephium.rpc.model
 import io.circe._
 import io.circe.generic.semiauto._
 
-object BlockFlowRPC {
+object RPC {
 
   case class FetchRequest(from: Option[Long])
 

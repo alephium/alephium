@@ -14,7 +14,7 @@ import org.alephium.flow.{Mode, Platform}
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
-import org.alephium.rpc.model.{BlockFlowRPC, JsonRPC}
+import org.alephium.rpc.model.{JsonRPC, RPC}
 
 trait RPCServer extends Platform with CORSHandler with StrictLogging {
   import RPCServer._
@@ -64,7 +64,7 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
 }
 
 object RPCServer extends StrictLogging {
-  import BlockFlowRPC._
+  import RPC._
   import JsonRPC._
 
   def blockflowFetch(node: Node, req: Request)(implicit rpc: RPCConfig,
