@@ -18,7 +18,7 @@ import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
 
-import org.alephium.rpc.model.{BlockFlowRPC, JsonRPC}
+import org.alephium.rpc.model.{JsonRPC, RPC}
 import org.alephium.util.{BaseActor}
 
 object ExplorerService {
@@ -32,7 +32,7 @@ object ExplorerService {
   private[ExplorerService] case object Update extends Command
 
   sealed trait Event
-  case class Blocks(blocks: List[BlockFlowRPC.FetchEntry])
+  case class Blocks(blocks: List[RPC.FetchEntry])
 
   // WebSocket Events
   case object StreamClosed extends Command
@@ -61,8 +61,8 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
 
   var outgoingActorRef: ActorRef = _
 
-  var online                                = false
-  var blocks: List[BlockFlowRPC.FetchEntry] = Nil
+  var online                       = false
+  var blocks: List[RPC.FetchEntry] = Nil
 
   def receive: Receive = {
     case Connect =>
@@ -120,7 +120,7 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
       case Right(json) =>
         json.as[Response] match {
           case Right(Response.Success(_, response)) =>
-            response.as[BlockFlowRPC.FetchResponse] match {
+            response.as[RPC.FetchResponse] match {
               case Right(fetchResponse) =>
                 blocks = fetchResponse.blocks.sortBy(-_.timestamp)
               case Left(parsingFailure) =>
