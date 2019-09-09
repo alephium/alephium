@@ -188,7 +188,7 @@ trait BlockFlowState {
       Right(inTips ++ outTips)
     } else {
       val outTips = getOutTips(header, inclusive)
-      header.inDeps.traverse(getInTip(_, currentGroup)).map(_ ++ outTips)
+      header.inDeps.mapE(getInTip(_, currentGroup)).map(_ ++ outTips)
     }
   }
 
@@ -233,7 +233,7 @@ trait BlockFlowState {
       BlockFlowState.updateState(trie, cache)
     } else {
       getBlocksForUpdates(block).flatMap { blockcaches =>
-        blockcaches.foldF(trie)(BlockFlowState.updateState)
+        blockcaches.foldE(trie)(BlockFlowState.updateState)
       }
     }
   }

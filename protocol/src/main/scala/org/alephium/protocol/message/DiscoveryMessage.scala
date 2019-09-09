@@ -112,7 +112,7 @@ object DiscoveryMessage {
     private val deserializer = avectorDeserializer[CliqueInfo.Unsafe]
     def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Neighbors] = {
       deserializer.deserialize(input).flatMap { peers =>
-        peers.traverse(_.validate) match {
+        peers.mapE(_.validate) match {
           case Left(message) => Left(SerdeError.validation(message))
           case Right(infos)  => Right(Neighbors(infos))
         }
