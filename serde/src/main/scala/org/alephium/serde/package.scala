@@ -2,10 +2,11 @@ package org.alephium
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
-import org.alephium.util.AVector
-
 import scala.reflect.ClassTag
+
+import akka.util.ByteString
+
+import org.alephium.util.AVector
 
 package object serde {
   import Serde._

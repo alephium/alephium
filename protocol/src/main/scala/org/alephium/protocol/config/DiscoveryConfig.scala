@@ -2,9 +2,9 @@ package org.alephium.protocol.config
 
 import java.net.InetSocketAddress
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-
 import scala.concurrent.duration.FiniteDuration
+
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 
 // TODO: refactor this as two configs
 trait DiscoveryConfig extends CliqueConfig {

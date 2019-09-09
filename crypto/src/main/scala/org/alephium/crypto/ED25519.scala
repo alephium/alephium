@@ -1,9 +1,10 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
+import org.whispersystems.curve25519.Curve25519
+
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
-import org.whispersystems.curve25519.Curve25519
 
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 

@@ -1,11 +1,12 @@
 package org.alephium.protocol.model
 
+import scala.annotation.tailrec
+
 import akka.util.ByteString
+
 import org.alephium.macros.HPC.cfor
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
-
-import scala.annotation.tailrec
 
 /** 160bits identifier of a Peer **/
 class CliqueId private (val bytes: ByteString) extends RandomBytes {

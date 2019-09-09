@@ -1,21 +1,22 @@
 package org.alephium.flow
 
-import java.time.Duration
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Path
-
-import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.scalalogging.StrictLogging
-import org.alephium.crypto.{ED25519, ED25519PublicKey}
-import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
-import org.alephium.flow.trie.MerklePatriciaTrie
-import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig, DiscoveryConfig => DC}
-import org.alephium.protocol.model._
-import org.alephium.util._
+import java.time.Duration
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
+
+import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.scalalogging.StrictLogging
+
+import org.alephium.crypto.{ED25519, ED25519PublicKey}
+import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
+import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, DiscoveryConfig => DC, GroupConfig}
+import org.alephium.protocol.model._
+import org.alephium.util._
 
 object PlatformConfig extends StrictLogging {
   val env = Env.resolve()

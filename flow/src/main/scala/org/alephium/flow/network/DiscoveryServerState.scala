@@ -2,16 +2,17 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.mutable
+
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter
 import akka.io.Udp
+
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.AVector
-
-import scala.collection.mutable
 
 trait DiscoveryServerState {
   implicit def config: GroupConfig with DiscoveryConfig

@@ -1,8 +1,10 @@
 package org.alephium.rpc
 
 import scala.reflect.ClassTag
-import org.alephium.util.AVector
+
 import io.circe._
+
+import org.alephium.util.AVector
 
 object AVectorJson {
   def decodeAVector[A: ClassTag](implicit A: Decoder[Array[A]]): Decoder[AVector[A]] =

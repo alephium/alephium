@@ -2,9 +2,13 @@ package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
 
+import scala.annotation.tailrec
+import scala.util.Random
+
 import akka.actor.{ActorRef, Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
@@ -14,9 +18,6 @@ import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{AVector, BaseActor}
-
-import scala.annotation.tailrec
-import scala.util.Random
 
 object BrokerHandler {
   object Timer

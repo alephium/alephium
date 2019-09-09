@@ -3,6 +3,7 @@ package org.alephium.crypto
 import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.KeccakDigest
+
 import org.alephium.serde.RandomBytes
 
 class Keccak256(val bytes: ByteString) extends RandomBytes

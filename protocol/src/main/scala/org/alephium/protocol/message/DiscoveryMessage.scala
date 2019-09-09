@@ -1,13 +1,14 @@
 package org.alephium.protocol.message
 
+import scala.language.existentials
+
 import akka.util.ByteString
+
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.serde._
 import org.alephium.protocol.model._
+import org.alephium.serde._
 import org.alephium.util.AVector
-
-import scala.language.existentials
 
 case class DiscoveryMessage(header: DiscoveryMessage.Header, payload: DiscoveryMessage.Payload)
 

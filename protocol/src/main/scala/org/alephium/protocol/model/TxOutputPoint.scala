@@ -1,6 +1,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.serde._
 

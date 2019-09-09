@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import akka.actor.{ActorRef, Props}
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.client.Miner

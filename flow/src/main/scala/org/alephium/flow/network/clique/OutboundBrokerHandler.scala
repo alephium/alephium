@@ -3,13 +3,14 @@ package org.alephium.flow.network.clique
 import java.net.InetSocketAddress
 import java.time.Instant
 
+import scala.concurrent.duration._
+
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
-
-import scala.concurrent.duration._
 
 object OutboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
