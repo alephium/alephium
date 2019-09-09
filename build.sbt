@@ -43,7 +43,7 @@ lazy val `app-debug` = mainProject("app-debug")
   )
 
 lazy val `app-server` = subProject("app-server")
-  .dependsOn(flow, rpc)
+  .dependsOn(flow, rpc, util % "test->test;compile->compile")
 
 lazy val benchmark = mainProject("benchmark")
   .enablePlugins(JmhPlugin)
@@ -105,6 +105,7 @@ lazy val rpc = subProject("rpc")
       `scala-logging`
     )
   )
+  .dependsOn(util % "test->test;compile->compile")
 
 lazy val serde = subProject("serde")
   .settings(
@@ -131,7 +132,7 @@ lazy val macros = subProject("macros")
 val commonSettings = Seq(
   organization := "org.alephium",
   version := "0.3.0-SNAPSHOT",
-  scalaVersion := "2.12.6",
+  scalaVersion := "2.12.8",
   parallelExecution in Test := false,
   scalacOptions := Seq(
 //    "-Xdisable-assertions", // TODO: use this properly

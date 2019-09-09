@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse, os, tempfile
 
+port_start = 9973
+
 parser = argparse.ArgumentParser(description='Alephium Make')
 
 parser.add_argument('goal', type=str)
@@ -24,12 +26,12 @@ def get_env_default_int(key, default):
 
 def rpc_call(host, port, method, params):
     json = """{{"jsonrpc":"2.0","id":"curltext","method":"{}","params": {}}}"""
-    cmd = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}/"""
+    cmd = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}/rpc"""
     run(cmd.format(json.format(method, params), host, port))
 
 def rpc_call_all(method, params):
     for node in range(0, get_env_int('nodes')):
-        port = 8080 + node
+        port = (port_start + 1000) + node
         rpc_call('localhost', port, method, params)
 
 def run(cmd):
