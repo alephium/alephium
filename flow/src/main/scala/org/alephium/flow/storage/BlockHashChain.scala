@@ -1,11 +1,11 @@
 package org.alephium.flow.storage
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
-
-import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
 
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 

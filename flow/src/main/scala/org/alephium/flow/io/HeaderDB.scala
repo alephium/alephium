@@ -1,11 +1,10 @@
 package org.alephium.flow.io
 
+import RocksDBStorage.ColumnFamily
 import org.rocksdb.ReadOptions
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.BlockHeader
-
-import RocksDBStorage.ColumnFamily
 
 object HeaderDB {
   def apply(storage: RocksDBStorage, cf: ColumnFamily, readOptions: ReadOptions): HeaderDB = {

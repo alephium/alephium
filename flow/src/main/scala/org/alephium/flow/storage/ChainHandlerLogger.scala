@@ -1,6 +1,7 @@
 package org.alephium.flow.storage
 
 import akka.event.LoggingAdapter
+
 import org.alephium.protocol.model.BlockHeader
 
 trait ChainHandlerLogger {

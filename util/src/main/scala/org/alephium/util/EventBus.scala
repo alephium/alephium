@@ -1,6 +1,7 @@
 package org.alephium.util
 
 import scala.collection.mutable
+
 import akka.actor.{ActorRef, Props}
 
 object EventBus {

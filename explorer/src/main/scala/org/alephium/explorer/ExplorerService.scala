@@ -2,24 +2,22 @@ package org.alephium.explorer
 
 import java.util.concurrent.TimeUnit
 
-import com.typesafe.scalalogging.StrictLogging
-
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-import akka.{NotUsed}
+import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem, Props, Status}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws._
 import akka.stream.{ActorMaterializer, OverflowStrategy, StreamTcpException}
 import akka.stream.scaladsl._
-
+import com.typesafe.scalalogging.StrictLogging
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
 
 import org.alephium.rpc.model.{JsonRPC, RPC}
-import org.alephium.util.{BaseActor}
+import org.alephium.util.BaseActor
 
 object ExplorerService {
   def props(wsAddress: String): Props =

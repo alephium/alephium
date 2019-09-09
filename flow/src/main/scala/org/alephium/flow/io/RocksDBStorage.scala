@@ -2,10 +2,11 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import org.alephium.util.AVector
 import org.rocksdb.{BlockBasedTableConfig, ColumnFamilyDescriptor, ColumnFamilyHandle, Options}
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, LRUCache, RateLimiter, ReadOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
+
+import org.alephium.util.AVector
 
 object RocksDBStorage {
   {

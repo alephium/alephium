@@ -1,11 +1,13 @@
 package org.alephium.crypto
 
-import scala.reflect.runtime.universe.TypeTag
 import java.nio.charset.Charset
 
+import scala.reflect.runtime.universe.TypeTag
+
 import akka.util.ByteString
-import org.alephium.serde._
 import org.bouncycastle.crypto.Digest
+
+import org.alephium.serde._
 
 abstract class HashCompanion[T: TypeTag](unsafeFrom: ByteString => T, toBytes: T => ByteString)
     extends RandomBytes.Companion[T](unsafeFrom, toBytes) {

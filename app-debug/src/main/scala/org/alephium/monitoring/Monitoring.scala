@@ -1,4 +1,5 @@
 package org.alephium.monitoring
+
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.jmx.JmxReporter
 

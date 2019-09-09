@@ -1,6 +1,7 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
+
 import org.alephium.serde.Serde
 
 trait KeyValueStorage {

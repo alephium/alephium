@@ -1,7 +1,12 @@
 package org.alephium.flow.client
 
+import scala.annotation.tailrec
+import scala.concurrent.Future
+import scala.util.{Failure, Random, Success}
+
 import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
+
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.BlockTemplate
@@ -10,10 +15,6 @@ import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
-
-import scala.annotation.tailrec
-import scala.concurrent.Future
-import scala.util.{Failure, Random, Success}
 
 object FairMiner {
   def props(node: Node)(implicit config: PlatformConfig): Props = {

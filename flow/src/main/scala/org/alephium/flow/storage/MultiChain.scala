@@ -1,12 +1,12 @@
 package org.alephium.flow.storage
 
+import scala.reflect.ClassTag
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.io.IOResult
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
-
-import scala.reflect.ClassTag
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {

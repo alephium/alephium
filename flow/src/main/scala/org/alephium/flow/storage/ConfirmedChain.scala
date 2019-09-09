@@ -1,8 +1,8 @@
 package org.alephium.flow.storage
 
-import org.alephium.protocol.model.Block
-
 import scala.collection.mutable.ArrayBuffer
+
+import org.alephium.protocol.model.Block
 
 class ConfirmedChain() {
   private val blocks: ArrayBuffer[Block] = ArrayBuffer.empty

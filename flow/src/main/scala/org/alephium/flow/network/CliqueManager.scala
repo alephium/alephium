@@ -3,6 +3,7 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
+
 import org.alephium.flow.PlatformConfig
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler

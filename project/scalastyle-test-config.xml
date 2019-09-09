@@ -107,4 +107,13 @@
         </parameters>
         <customMessage><![CDATA[Use is instead of shouldBe|shouldEqual|==]]></customMessage>
     </check>
+    <check level="error" class="org.scalastyle.scalariform.ImportOrderChecker" enabled="true">
+        <parameters>
+            <parameter name="groups">java,scala,3rdParty,alephium</parameter>
+            <parameter name="group.java">javax?\..*</parameter>
+            <parameter name="group.scala">scala\..*</parameter>
+            <parameter name="group.3rdParty">(?!org\.alephium\.).*</parameter>
+            <parameter name="group.alephium">org\.alephium\..*</parameter>
+        </parameters>
+    </check>
 </scalastyle>
