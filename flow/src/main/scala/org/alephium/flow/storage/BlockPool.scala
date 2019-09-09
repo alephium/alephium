@@ -19,7 +19,7 @@ trait BlockPool extends BlockHashPool {
   def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
   def getBlocks(locators: AVector[Keccak256]): IOResult[AVector[Block]] = {
-    locators.filter(contains).traverse(getBlock)
+    locators.filter(contains).mapE(getBlock)
   }
 
   def getHeight(block: Block): Int = getHeight(block.hash)
@@ -28,7 +28,7 @@ trait BlockPool extends BlockHashPool {
 
   // TODO: use ChainSlice instead of AVector[Block]
   def getBlockSlice(hash: Keccak256): IOResult[AVector[Block]] = {
-    getBlockHashSlice(hash).traverse(getBlock)
+    getBlockHashSlice(hash).mapE(getBlock)
   }
   def getBlockSlice(block: Block): IOResult[AVector[Block]] = getBlockSlice(block.hash)
 
