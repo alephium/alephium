@@ -5,12 +5,15 @@ import java.time.Duration
 
 case class RPCConfig(
     networkInterface: String,
-    blockflowFetchMaxAge: Duration
+    blockflowFetchMaxAge: Duration,
+    askTimeout: Duration
 )
 
 object RPCConfig {
   def load(implicit config: Config): RPCConfig = {
     val rpc = config.getConfig("rpc")
-    RPCConfig(rpc.getString("network.interface"), rpc.getDuration("blockflowFetch.maxAge"))
+    RPCConfig(rpc.getString("network.interface"),
+              rpc.getDuration("blockflowFetch.maxAge"),
+              rpc.getDuration("ask.timeout"))
   }
 }
