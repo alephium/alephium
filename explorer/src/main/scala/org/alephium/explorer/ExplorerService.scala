@@ -11,7 +11,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws._
 import akka.stream.{ActorMaterializer, OverflowStrategy, StreamTcpException}
 import akka.stream.scaladsl._
-import com.typesafe.scalalogging.StrictLogging
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
@@ -36,7 +35,7 @@ object ExplorerService {
   case object StreamClosed extends Command
 }
 
-class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
+class ExplorerService(wsAddress: String) extends BaseActor {
   import ExplorerService._
 
   implicit val system: ActorSystem = context.system
@@ -76,7 +75,7 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
 
       upgradeResponse.onComplete {
         case Success(_) =>
-          logger.info(s"Successfully connected to $wsAddress")
+          log.info(s"Successfully connected to $wsAddress")
           online = true
           self ! Update
         case Failure(_) =>
@@ -91,7 +90,7 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
 
         scheduleOnce(self, Update, updateFrequency)
       } else {
-        logger.warn("Can not update blocks, no connection to BlockFlow server.")
+        log.warning("Can not update blocks, no connection to BlockFlow server.")
       }
     }
 
@@ -102,11 +101,11 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
         case Success(strict) =>
           handleWSResponse(strict.text)
         case Failure(e) =>
-          logger.warn("Can not read WS message.", e)
+          log.warning("Can not read WS message.", e)
       }
 
     case Status.Failure(e: StreamTcpException) =>
-      logger.error("Connection failure", e)
+      log.error("Connection failure", e)
       online = false
       scheduleOnce(self, Connect, connectRetryFrequency)
   }
@@ -122,15 +121,15 @@ class ExplorerService(wsAddress: String) extends BaseActor with StrictLogging {
               case Right(fetchResponse) =>
                 blocks = fetchResponse.blocks.sortBy(-_.timestamp)
               case Left(parsingFailure) =>
-                logger.debug(s"Unable to parse FetchResponse. (${parsingFailure})")
+                log.debug(s"Unable to parse FetchResponse. (${parsingFailure})")
             }
           case Right(Response.Failure(_, error)) =>
-            logger.debug(s"Received error for JSON-RPC call. (${error})")
+            log.debug(s"Received error for JSON-RPC call. (${error})")
           case Left(parsingFailure) =>
-            logger.debug(s"Unable to parse JSON-RPC response. (${parsingFailure})")
+            log.debug(s"Unable to parse JSON-RPC response. (${parsingFailure})")
         }
       case Left(parsingFailure) =>
-        logger.debug(s"Unable to parse JSON response. (${parsingFailure})")
+        log.debug(s"Unable to parse JSON response. (${parsingFailure})")
     }
   }
 }
