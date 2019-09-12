@@ -2,10 +2,11 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
-import org.alephium.util.AVector
+import scala.util.Random
+
 import org.openjdk.jmh.annotations._
 
-import scala.util.Random
+import org.alephium.util.AVector
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

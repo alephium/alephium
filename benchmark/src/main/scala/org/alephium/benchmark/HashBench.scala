@@ -2,8 +2,9 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
-import org.alephium.crypto.{Keccak256, Sha256}
 import org.openjdk.jmh.annotations._
+
+import org.alephium.crypto.{Keccak256, Sha256}
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

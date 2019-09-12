@@ -2,13 +2,13 @@ package org.alephium.flow.client
 
 import akka.actor.ActorRef
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.ChainIndex
 
 trait FairMinerState {
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   def handlers: AllHandlers
 

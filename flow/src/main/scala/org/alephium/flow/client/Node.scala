@@ -2,13 +2,13 @@ package org.alephium.flow.client
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.storage._
 import org.alephium.util.EventBus
 
-case class Node(builders: BrokerHandler.Builder, name: String)(implicit config: PlatformConfig) {
+case class Node(builders: BrokerHandler.Builder, name: String)(implicit config: PlatformProfile) {
   val system = ActorSystem(name, config.all)
 
   val blockFlow = BlockFlow.createUnsafe()

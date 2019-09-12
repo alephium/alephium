@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.{IOError => ImportedIOError}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model._
@@ -24,7 +24,7 @@ object TransactionPool {
 trait TransactionPool { self: BlockFlowState =>
   import TransactionPool._
 
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   private val pool = AVector.tabulate(config.brokerInfo.groupNumPerBroker, config.groups) {
     (_, _) =>
