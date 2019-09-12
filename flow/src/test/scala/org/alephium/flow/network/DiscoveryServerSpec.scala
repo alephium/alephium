@@ -2,14 +2,15 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import scala.concurrent.duration._
+
 import akka.testkit.{SocketUtil, TestProbe}
+import org.scalacheck.Gen
+
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{CliqueInfo, ModelGen}
 import org.alephium.util.AlephiumActorSpec
-import org.scalacheck.Gen
-
-import scala.concurrent.duration._
 
 object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =

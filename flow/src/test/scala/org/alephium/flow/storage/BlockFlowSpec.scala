@@ -1,13 +1,14 @@
 package org.alephium.flow.storage
 
+import scala.annotation.tailrec
+
+import org.scalatest.Assertion
+import org.scalatest.EitherValues._
+
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
-import org.scalatest.Assertion
-import org.scalatest.EitherValues._
-
-import scala.annotation.tailrec
 
 // TODO: test for more groups
 class BlockFlowSpec extends AlephiumFlowSpec {
@@ -68,7 +69,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks1.foreach { block =>
         val index = block.chainIndex
-        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
+        if (index.relateTo(GroupIndex(0))) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 1
         } else {
@@ -86,7 +87,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks2.foreach { block =>
         val index = block.chainIndex
-        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
+        if (index.relateTo(GroupIndex(0))) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 4
         } else {
@@ -104,7 +105,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       } yield mine(blockFlow, ChainIndex(i, j))
       newBlocks3.foreach { block =>
         val index = block.chainIndex
-        if (index.from == GroupIndex(0) || index.to == GroupIndex(0)) {
+        if (index.relateTo(GroupIndex(0))) {
           addAndCheck(blockFlow, block)
           blockFlow.getWeight(block) is 8
         } else {

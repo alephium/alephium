@@ -1,10 +1,11 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
+import org.scalatest.EitherValues._
+
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
-import org.scalatest.EitherValues._
 
 class HashSpec extends AlephiumSpec {
 

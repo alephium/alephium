@@ -1,13 +1,14 @@
 package org.alephium.flow.trie
 
 import akka.util.ByteString
-import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
-import org.alephium.serde._
-import org.alephium.util.{AVector, AlephiumSpec, Files}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
+
+import org.alephium.crypto.Keccak256
+import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
+import org.alephium.serde._
+import org.alephium.util.{AlephiumSpec, AVector, Files}
 
 class MerklePatriciaTrieSpec extends AlephiumSpec {
   import MerklePatriciaTrie._
@@ -123,7 +124,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     import fixture.trie
 
     val keys = (0 until 16).flatMap { i =>
-      if (i == genesisNode.path.head.toInt) None
+      if (i equals genesisNode.path.head.toInt) None
       else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
