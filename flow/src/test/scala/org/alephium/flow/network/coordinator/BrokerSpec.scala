@@ -2,6 +2,7 @@ package org.alephium.flow.network.coordinator
 
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
+
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGen
 

@@ -2,19 +2,20 @@ package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
 
+import scala.util.Random
+
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
+import org.scalatest.EitherValues._
+
 import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
 import org.alephium.util.AVector
-import org.scalatest.EitherValues._
-
-import scala.util.Random
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
 

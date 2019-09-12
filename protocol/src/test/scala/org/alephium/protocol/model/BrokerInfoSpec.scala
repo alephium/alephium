@@ -1,8 +1,9 @@
 package org.alephium.protocol.model
 
+import org.scalacheck.Gen
+
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.util.AlephiumSpec
-import org.scalacheck.Gen
 
 class BrokerInfoSpec extends AlephiumSpec {
   it should "check equality properly" in {

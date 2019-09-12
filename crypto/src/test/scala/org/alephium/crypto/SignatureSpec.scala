@@ -1,6 +1,6 @@
 package org.alephium.crypto
 
-import org.alephium.util.{AVector, AlephiumSpec}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class SignatureSpec extends AlephiumSpec {
 

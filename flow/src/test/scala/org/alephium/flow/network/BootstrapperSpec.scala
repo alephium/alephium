@@ -1,6 +1,7 @@
 package org.alephium.flow.network
 
 import akka.testkit.TestProbe
+
 import org.alephium.flow.AlephiumFlowActorSpec
 
 class BootstrapperSpec extends AlephiumFlowActorSpec("BootstrapperSpec") {

@@ -1,6 +1,6 @@
 package org.alephium.rpc
 
-import org.alephium.util.{AVector, AlephiumSpec}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class AVectorJsonSpec extends AlephiumSpec {
   import AVectorJson._
