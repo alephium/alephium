@@ -1,23 +1,24 @@
 package org.alephium.benchmark
 
-import scala.util.Random
 import java.util.concurrent.TimeUnit
 
+import scala.util.Random
+
+import org.openjdk.jmh.annotations._
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{RocksDBColumn, RocksDBStorage}
 import org.alephium.util.Files
-import org.openjdk.jmh.annotations._
-
-import RocksDBStorage.{ColumnFamily, Compaction, Settings}
 
 @BenchmarkMode(Array(Mode.SingleShotTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 // scalastyle:off
 class RocksDBBench {
+  import RocksDBStorage.{ColumnFamily, Compaction, Settings}
+
   {
     RocksDB.loadLibrary()
   }

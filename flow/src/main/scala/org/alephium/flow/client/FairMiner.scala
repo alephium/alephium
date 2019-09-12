@@ -8,7 +8,7 @@ import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
@@ -17,7 +17,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 object FairMiner {
-  def props(node: Node)(implicit config: PlatformConfig): Props = {
+  def props(node: Node)(implicit config: PlatformProfile): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex(i)
       val (_, publicKey) = GroupConfig.generateKeyForGroup(index)
@@ -27,7 +27,7 @@ object FairMiner {
   }
 
   def props(addresses: AVector[ED25519PublicKey], node: Node)(
-      implicit config: PlatformConfig): Props = {
+      implicit config: PlatformProfile): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
       require(GroupIndex.from(address).value == i)
@@ -40,7 +40,7 @@ object FairMiner {
       extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
-      implicit config: PlatformConfig): Option[(Block, BigInt)] = {
+      implicit config: PlatformProfile): Option[(Block, BigInt)] = {
     val nonceStart = BigInt(Random.nextInt(Integer.MAX_VALUE))
     val nonceEnd   = nonceStart + config.nonceStep
 
@@ -58,7 +58,7 @@ object FairMiner {
 }
 
 class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
-    implicit val config: PlatformConfig)
+    implicit val config: PlatformProfile)
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers

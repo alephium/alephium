@@ -1,7 +1,7 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model.Block
@@ -35,7 +35,7 @@ trait BlockChainWithState extends BlockChain {
 object BlockChainWithState {
   def fromGenesisUnsafe(genesis: Block,
                         updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
-      implicit config: PlatformConfig): BlockChainWithState =
+      implicit config: PlatformProfile): BlockChainWithState =
     createUnsafe(genesis, 0, 0, config.emptyTrie, updateState)
 
   private def createUnsafe(
@@ -44,14 +44,14 @@ object BlockChainWithState {
       initialWeight: Int,
       initialTrie: MerklePatriciaTrie,
       _updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
-      implicit _config: PlatformConfig): BlockChainWithState = {
+      implicit _config: PlatformProfile): BlockChainWithState = {
     val timestamp = rootBlock.header.timestamp
     val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
     new BlockChainWithState {
       override val disk                                = _config.disk
       override val headerDB                            = _config.headerDB
-      override implicit val config: PlatformConfig     = _config
+      override implicit val config: PlatformProfile    = _config
       override protected def root: BlockHashChain.Root = rootNode
 
       override def updateState(trie: MerklePatriciaTrie,

@@ -3,7 +3,7 @@ package org.alephium.flow.storage
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
@@ -12,7 +12,7 @@ import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
 
-  def props(blockFlow: BlockFlow)(implicit config: PlatformConfig): Props =
+  def props(blockFlow: BlockFlow)(implicit config: PlatformProfile): Props =
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
@@ -32,7 +32,7 @@ object FlowHandler {
 }
 
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformConfig) extends BaseActor {
+class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extends BaseActor {
   import FlowHandler._
 
   override def receive: Receive = handleWith(None)

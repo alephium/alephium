@@ -4,12 +4,12 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
 
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   protected def root: BlockHashChain.Root
 

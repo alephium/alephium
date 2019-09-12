@@ -2,18 +2,18 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import org.openjdk.jmh.annotations._
+
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.util.Files
-import org.openjdk.jmh.annotations._
-
-import RocksDBStorage.{ColumnFamily, Settings}
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 class TrieBench {
+  import RocksDBStorage.{ColumnFamily, Settings}
 
   private val tmpdir = Files.tmpDir
   private val dbname = "trie"

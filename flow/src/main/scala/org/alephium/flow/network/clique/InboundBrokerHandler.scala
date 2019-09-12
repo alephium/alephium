@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.message.Hello
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
@@ -15,14 +15,14 @@ object InboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
             remote: InetSocketAddress,
             connection: ActorRef,
-            allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+            allHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
     Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers))
 }
 
 class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                            val remote: InetSocketAddress,
                            val connection: ActorRef,
-                           val allHandlers: AllHandlers)(implicit val config: PlatformConfig)
+                           val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BrokerHandler {
 
   var remoteCliqueId: CliqueId = _

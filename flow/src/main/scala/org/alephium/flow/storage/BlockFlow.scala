@@ -3,13 +3,13 @@ package org.alephium.flow.storage
 import java.io.IOException
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.{BlockDeps, ValidationError}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
-class BlockFlow()(implicit val config: PlatformConfig)
+class BlockFlow()(implicit val config: PlatformProfile)
     extends MultiChain
     with BlockFlowState
     with FlowUtils {
@@ -236,7 +236,7 @@ class BlockFlow()(implicit val config: PlatformConfig)
 }
 
 object BlockFlow {
-  def createUnsafe()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
+  def createUnsafe()(implicit config: PlatformProfile): BlockFlow = new BlockFlow()
 
   case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

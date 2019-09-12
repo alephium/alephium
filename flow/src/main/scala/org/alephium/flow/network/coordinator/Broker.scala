@@ -8,18 +8,18 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 object Broker {
-  def props()(implicit config: PlatformConfig): Props = Props(new Broker())
+  def props()(implicit config: PlatformProfile): Props = Props(new Broker())
 
   sealed trait Command
   case object Retry extends Command
 }
 
-class Broker()(implicit config: PlatformConfig) extends BaseActor {
+class Broker()(implicit config: PlatformProfile) extends BaseActor {
   IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
   def until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)

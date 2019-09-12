@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
-import org.alephium.flow.{AlephiumFlowActorSpec, PlatformConfig}
+import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
 import org.alephium.flow.storage.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
@@ -42,7 +42,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
           connection: ActorRef,
-          blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+          blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
           override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
@@ -82,7 +82,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           selfCliqueInfo: CliqueInfo,
           remoteCliqueId: CliqueId,
           remoteBroker: BrokerInfo,
-          blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props = {
+          blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props = {
         Props(
           new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers) {
             override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
@@ -124,7 +124,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
           connection: ActorRef,
-          blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+          blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
           override def receive: Receive = handleWith(ByteString.empty, handlePayload)
 
@@ -210,7 +210,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
           connection: ActorRef,
-          blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+          blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
           override def receive: Receive = handleWith(ByteString.empty, handlePayload)
         })
