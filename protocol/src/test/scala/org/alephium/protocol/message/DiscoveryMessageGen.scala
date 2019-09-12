@@ -1,7 +1,8 @@
 package org.alephium.protocol.message
 
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.scalacheck.Gen
+
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model.{CliqueId, ModelGen}
 import org.alephium.util.AVector
 

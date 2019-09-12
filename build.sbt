@@ -184,12 +184,6 @@ val commonSettings = Seq(
   Test / javaOptions += "-Xss2m",
   Test / envVars += "ALEPHIUM_ENV" -> "test",
   run / javaOptions += "-Xmx4g",
-  scalafmtOnCompile := true,
-  (compile in Compile) := {
-    val result = (compile in Compile).value
-    scalastyle.in(Compile).toTask("").value
-    result
-  },
   libraryDependencies ++= Seq(
     akkatest,
     scalacheck,

@@ -2,12 +2,13 @@ package org.alephium.flow.io
 
 import java.nio.file.Files
 
+import org.scalatest.EitherValues._
+
 import org.alephium.flow.storage.TestUtils
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Files => AFiles}
-import org.scalatest.EitherValues._
 
 class DiskSpec extends AlephiumSpec {
 

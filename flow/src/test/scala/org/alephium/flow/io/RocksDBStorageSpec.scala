@@ -1,10 +1,10 @@
 package org.alephium.flow.io
 
-import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
-
-import RocksDBStorage.ColumnFamily
+import org.alephium.util.{AlephiumSpec, AVector, EnumerationMacros}
 
 class RocksDBStorageSpec extends AlephiumSpec {
+  import RocksDBStorage.ColumnFamily
+
   behavior of "RocksDBStorage"
 
   implicit val ordering: Ordering[ColumnFamily] = Ordering.by(_.name)

@@ -1,13 +1,13 @@
 package org.alephium.util
 
-import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.Assertion
-import org.scalatest.EitherValues._
-
+import scala.{specialized => sp}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Random
-import scala.{specialized => sp}
+
+import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.Assertion
+import org.scalatest.EitherValues._
 
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
@@ -284,12 +284,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.exists(_ == elem) is vc.contains(elem)
+        vc.exists(_ equals elem) is vc.contains(elem)
       }
-      vc.exists(_ == a) is vc.contains(a)
+      vc.exists(_ equals a) is vc.contains(a)
       vc.foreachWithIndex { (elem, index) =>
-        vc.existsWithIndex((e, i) => (e == elem) && (i == index)) is true
-        vc.existsWithIndex((e, i) => (e == elem) && (i == -1)) is false
+        vc.existsWithIndex((e, i) => (e equals elem) && (i equals index)) is true
+        vc.existsWithIndex((e, i) => (e equals elem) && (i equals -1)) is false
       }
     }
   }
@@ -318,7 +318,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.indexWhere(_ == elem) is arr.indexWhere(_ == elem)
+        vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
       }
     }
   }
@@ -328,7 +328,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val index = Random.nextInt(vc.length)
       val vc1   = vc.replace(index, vc.head)
       vc.indices.foreach { i =>
-        if (i == index) vc1(i) is vc.head else vc1(i) is vc(i)
+        if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i)
       }
     }
   }

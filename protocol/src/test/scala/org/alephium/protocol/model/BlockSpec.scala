@@ -1,9 +1,10 @@
 package org.alephium.protocol.model
 
+import org.scalatest.EitherValues._
+
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
-import org.scalatest.EitherValues._
 
 class BlockSpec extends AlephiumSpec with ConsensusConfigFixture {
 
