@@ -6,7 +6,9 @@ import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.clique.BrokerHandler
 
 // scalastyle:off magic.number
-trait Mode extends PlatformConfig.Default {
+trait Mode {
+  implicit def profile: PlatformProfile
+
   def port: Int
 
   def rpcPort: Int = port + 1000
@@ -15,6 +17,7 @@ trait Mode extends PlatformConfig.Default {
 
   def node: Node
 }
+// scalastyle:on magic.number
 
 object Mode {
 
@@ -23,13 +26,17 @@ object Mode {
   def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
 
   class Aws extends Mode with StrictLogging {
-    val port: Int = config.publicAddress.getPort
+    final implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
+
+    val port: Int = profile.publicAddress.getPort
 
     override val node: Node = Node(builders, "Root")
   }
 
   class Local extends Mode {
-    val port: Int = config.publicAddress.getPort
+    final implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
+
+    val port: Int = profile.publicAddress.getPort
 
     override val node: Node = Node(builders, "Root")
   }

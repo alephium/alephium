@@ -4,12 +4,12 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorRef
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.AVector
 
 trait CliqueCoordinatorState {
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   val brokerNum        = config.brokerNum
   val brokerAddresses  = Array.fill[Option[InetSocketAddress]](brokerNum)(None)

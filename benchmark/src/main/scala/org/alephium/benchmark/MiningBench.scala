@@ -2,16 +2,19 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
-import org.alephium.flow.PlatformConfig
+import org.openjdk.jmh.annotations._
+
+import org.alephium.flow.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
-import org.openjdk.jmh.annotations._
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
-class MiningBench extends PlatformConfig.Default {
+class MiningBench {
+
+  implicit val config: PlatformProfile = PlatformProfile.loadDefault()
 
   @Benchmark
   def mineGenesis(): Boolean = {

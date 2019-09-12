@@ -7,7 +7,7 @@ import scala.util.Random
 import akka.actor.Props
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
@@ -21,13 +21,13 @@ object MockMiner {
 
   trait Builder extends Miner.Builder {
     override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-        implicit config: PlatformConfig): Props =
+        implicit config: PlatformProfile): Props =
       Props(new MockMiner(address, node, chainIndex))
   }
 }
 
 class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-    implicit config: PlatformConfig)
+    implicit config: PlatformProfile)
     extends Miner(address, node, chainIndex) {
   import node.allHandlers
 

@@ -2,7 +2,7 @@ package org.alephium.flow.client
 
 import akka.actor.ActorRef
 import akka.testkit.TestProbe
-import org.alephium.flow.{AlephiumFlowActorSpec, PlatformConfig}
+import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.storage.{AllHandlers, BlockFlow, TestUtils}
 import org.alephium.protocol.model.ChainIndex
@@ -15,9 +15,9 @@ class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec 
   val blockFlow: BlockFlow = BlockFlow.createUnsafe()
 
   trait Fixture extends FairMinerState {
-    override implicit def config: PlatformConfig = Spec.config
-    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe
-    val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
+    override implicit def config: PlatformProfile = Spec.config
+    val handlers: AllHandlers                     = TestUtils.createBlockHandlersProbe
+    val probes                                    = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
 
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex(config.brokerInfo.groupFrom + fromShift, to)

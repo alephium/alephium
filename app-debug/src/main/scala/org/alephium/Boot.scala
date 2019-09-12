@@ -1,9 +1,9 @@
 package org.alephium
 
-import org.alephium.flow.Mode
+import org.alephium.flow.{Mode, Platform}
 import org.alephium.mock.{MockBrokerHandler, MockMiner}
 
-object Boot extends RPCServer {
+object Boot extends Platform with RPCServer {
 
   override val mode = new Mode.Local {
     override def builders: Mode.Builder =

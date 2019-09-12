@@ -1,32 +1,32 @@
 package org.alephium.flow
 
+import org.scalatest.BeforeAndAfter
+
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.io.RocksDBStorage
 import org.alephium.flow.storage.TestUtils
-import org.alephium.protocol.model.{Block, GroupIndex}
-import org.alephium.util.{AVector, AlephiumActorSpec, AlephiumSpec}
-import org.scalatest.BeforeAndAfter
-
-import scala.language.reflectiveCalls
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
+import org.alephium.util.{AlephiumActorSpec, AlephiumSpec, AVector, Env}
 
 trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
-  import PlatformConfig.{env, rootPath}
-
   val genesisBalance: BigInt = 100
 
+  val env      = Env.resolve()
+  val rootPath = Platform.getRootPath(env)
+
   val newPath = rootPath.resolveSibling(rootPath.getFileName + this.getClass.getSimpleName)
-  implicit val config = new PlatformConfig(env, newPath) {
-    val balances = AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups) { i =>
-      val groupIndex              = GroupIndex(i)(this)
-      val (privateKey, publicKey) = groupIndex.generateKey()(this)
+  val groups0 = NewConfig.parseConfig(rootPath).getInt("alephium.groups")
+
+  val groupConfig = new GroupConfig { override def groups: Int = groups0 }
+
+  val genesisBalances = AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups0) {
+    i =>
+      val groupIndex              = GroupIndex.apply(i)(groupConfig)
+      val (privateKey, publicKey) = groupIndex.generateKey()(groupConfig)
       (privateKey, publicKey, genesisBalance)
-    }
-
-    override lazy val genesisBlocks: AVector[AVector[Block]] = loadBlockFlow(
-      balances.map(p => (p._2, p._3)))
   }
-
-  val genesisBalances = config.balances
+  implicit val config = PlatformProfile.load(newPath, Some(genesisBalances.map(p => (p._2, p._3))))
 
   after {
     TestUtils.clear(config.disk.blockFolder)
