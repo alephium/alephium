@@ -27,6 +27,7 @@ trait PlatformProfile
     with NewConfig.PlatformNetworkConfig
     with PlatformIO {
   def all: Config
+  def aleph: Config
 }
 
 object PlatformProfile {
@@ -39,9 +40,11 @@ object PlatformProfile {
   def load(rootPath: Path,
            rdbWriteOptions: WriteOptions                                = Settings.writeOptions,
            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]] = None): PlatformProfile = {
-    val alephCfg = parseConfig(rootPath).getConfig("alephium")
+    val allCfg   = parseConfig(rootPath)
+    val alephCfg = allCfg.getConfig("alephium")
     create(
       rootPath,
+      allCfg,
       alephCfg,
       alephCfg.getConfig("clique"),
       alephCfg.getConfig("broker"),
@@ -57,6 +60,7 @@ object PlatformProfile {
   // scalastyle:off method.length parameter.number
   def create(rootPath0: Path,
              allCfg: Config,
+             alephCfg: Config,
              cliqueCfg: Config,
              brokerCfg: Config,
              consensusCfg: Config,
@@ -68,11 +72,12 @@ object PlatformProfile {
     new PlatformProfile {
       /* Common */
       final val all      = allCfg
+      final val aleph    = alephCfg
       final val rootPath = rootPath0
       /* Common */
 
       /* Group */
-      final val groups: Int = allCfg.getInt("groups")
+      final val groups: Int = alephCfg.getInt("groups")
       /* Group */
 
       /* Clique */
@@ -128,12 +133,12 @@ object PlatformProfile {
       final val neighborsPerGroup                         = discoveryCfg.getInt("neighborsPerGroup")
       final val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
       final val bootstrap: AVector[InetSocketAddress] =
-        Network.parseAddresses(allCfg.getString("bootstrap"))
+        Network.parseAddresses(alephCfg.getString("bootstrap"))
       /* Discovery */
 
       /* Genesis */
       final val genesisBlocks = genesisBalances match {
-        case None           => loadBlockFlow(allCfg)(this)
+        case None           => loadBlockFlow(alephCfg)(this)
         case Some(balances) => loadBlockFlow(balances)(this)
       }
       /* Genesis */
