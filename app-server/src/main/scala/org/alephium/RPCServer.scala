@@ -82,7 +82,7 @@ trait RPCServer extends CORSHandler with StrictLogging {
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
     implicit val config           = mode.profile
-    implicit val rpcConfig        = RPCConfig.load(config.all)
+    implicit val rpcConfig        = RPCConfig.load(config.aleph)
     implicit val askTimeout       = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
 
     val miner = {
