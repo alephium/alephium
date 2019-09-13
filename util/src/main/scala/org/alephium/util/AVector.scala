@@ -214,7 +214,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def mapF[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
+  def mapE[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
     val res = AVector.tabulate(length) { i =>
       f(apply(i)) match {
         case Left(l)  => return Left(l)
@@ -238,18 +238,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     filterImpl(p, false)
   }
 
-  def traverse[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
-    var result = AVector.empty[R]
-    foreach { elem =>
-      f(elem) match {
-        case Left(l)  => return Left(l)
-        case Right(r) => result = result :+ r
-      }
-    }
-    Right(result)
-  }
-
-  def foreachF[L](f: A => Either[L, Unit]): Either[L, Unit] = {
+  def foreachE[L](f: A => Either[L, Unit]): Either[L, Unit] = {
     foreach { elem =>
       f(elem) match {
         case Left(l)  => return Left(l)
@@ -259,7 +248,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(())
   }
 
-  def foreachWithIndexF[L](f: (A, Int) => Either[L, Unit]): Either[L, Unit] = {
+  def foreachWithIndexE[L](f: (A, Int) => Either[L, Unit]): Either[L, Unit] = {
     foreachWithIndex { (elem, i) =>
       f(elem, i) match {
         case Left(l)  => return Left(l)
@@ -315,7 +304,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     res
   }
 
-  def foldF[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
+  def foldE[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
     val res = fold(zero) {
       f(_, _) match {
         case Left(l)  => return Left(l)
@@ -325,7 +314,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(res)
   }
 
-  def foldWithIndexF[L, R](zero: R)(f: (R, A, Int) => Either[L, R]): Either[L, R] = {
+  def foldWithIndexE[L, R](zero: R)(f: (R, A, Int) => Either[L, R]): Either[L, R] = {
     val res = foldWithIndex(zero) {
       f(_, _, _) match {
         case Left(l)  => return Left(l)
@@ -355,8 +344,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def flatMapF[L, R: ClassTag](f: A => Either[L, AVector[R]]): Either[L, AVector[R]] = {
-    foldF(AVector.empty[R]) { (acc, elem) =>
+  def flatMapE[L, R: ClassTag](f: A => Either[L, AVector[R]]): Either[L, AVector[R]] = {
+    foldE(AVector.empty[R]) { (acc, elem) =>
       f(elem).map(acc ++ _)
     }
   }
@@ -369,9 +358,9 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     xs
   }
 
-  def flatMapWithIndexF[L, R: ClassTag](
+  def flatMapWithIndexE[L, R: ClassTag](
       f: (A, Int) => Either[L, AVector[R]]): Either[L, AVector[R]] = {
-    foldWithIndexF(AVector.empty[R]) { (acc, elem, index) =>
+    foldWithIndexE(AVector.empty[R]) { (acc, elem, index) =>
       f(elem, index).map(acc ++ _)
     }
   }

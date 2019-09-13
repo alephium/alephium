@@ -185,7 +185,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie] = {
     result.toAdd
-      .foreachF { node =>
+      .foreachE { node =>
         storage.putRaw(node.hash.bytes, node.serialized)
       }
       .map { _ =>
@@ -371,7 +371,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
   def getAll[K: Serde, V: Serde](prefix: ByteString): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = MerklePatriciaTrie.bytes2Nibbles(prefix)
     getAllRaw(prefixNibbles, rootHash, ByteString.empty).flatMap { dataVec =>
-      dataVec.mapF {
+      dataVec.mapE {
         case (nibbles, leaf) =>
           val deser = for {
             key   <- deserialize[K](MerklePatriciaTrie.nibbles2Bytes(nibbles))
@@ -417,7 +417,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
                           acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
     getNode(hash).flatMap {
       case n: BranchNode =>
-        n.children.flatMapWithIndexF { (childOpt, index) =>
+        n.children.flatMapWithIndexE { (childOpt, index) =>
           childOpt match {
             case Some(child) => getAllRaw(child, acc ++ n.path :+ index.toByte)
             case None        => Right(AVector.empty)
