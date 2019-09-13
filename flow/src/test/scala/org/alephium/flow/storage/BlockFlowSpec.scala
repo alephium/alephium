@@ -61,7 +61,6 @@ class BlockFlowSpec extends AlephiumFlowSpec {
   it should "work for at least 2 user group when adding blocks in parallel" in {
     if (config.groups >= 2) {
       val blockFlow = BlockFlow.createUnsafe()
-      showBalances(blockFlow)
 
       val newBlocks1 = for {
         i <- 0 to 1
@@ -78,7 +77,6 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks1)
-      showBalances(blockFlow)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val newBlocks2 = for {
@@ -96,7 +94,6 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks2)
-      showBalances(blockFlow)
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val newBlocks3 = for {
@@ -114,7 +111,6 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         }
       }
       checkInBestDeps(GroupIndex(0), blockFlow, newBlocks3)
-      showBalances(blockFlow)
       checkBalance(blockFlow, 0, genesisBalance - 3)
     }
   }

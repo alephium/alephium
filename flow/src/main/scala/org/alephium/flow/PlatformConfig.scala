@@ -67,7 +67,7 @@ object NewConfig extends StrictLogging {
     if (!directory.exists) directory.mkdir()
 
     val path = rootPath.resolve(s"$name.conf")
-    print(s"Using $name configuration file at $path \n")
+    logger.info(s"Using $name configuration file at $path \n")
 
     path.toFile
   }
