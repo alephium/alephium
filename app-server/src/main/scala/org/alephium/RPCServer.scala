@@ -4,16 +4,14 @@ import java.time.Instant
 
 import scala.concurrent._
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success}
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
-import akka.stream.{ActorMaterializer, SourceRef}
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -90,43 +88,46 @@ trait RPCServer extends CORSHandler with StrictLogging {
       system.actorOf(props, s"FairMiner")
     }
 
-    val route = concat(
+    val routeHttp =
+      corsHandler(JsonRPCHandler.routeHttp(handler(node, miner)))
+
+    val routeWs = concat(
       path("rpc") {
-        corsHandler(JsonRPCHandler.route(handler(node, miner)))
+        corsHandler(JsonRPCHandler.routeWs(handler(node, miner)))
       },
       path("events") {
         corsHandler(get {
-          val eventBusClient = system.actorOf(EventBusClient.props(node.eventBus))
-          val source =
-            (eventBusClient ? EventBusClient.Connect).mapTo[SourceRef[EventBus.Event]]
-          onComplete(source) {
-            case Success(source) =>
-              handleWebSocketMessages(
-                Flow
-                  .fromSinkAndSource(Sink.ignore, source.map(handleEvent))
-                  .watchTermination() { (_, termination) =>
-                    termination.onComplete {
-                      case _ =>
-                        system.stop(eventBusClient)
-                    }
-                  })
-
-            case Failure(err) =>
-              logger.error("Unable to connect event bus client.", err)
+          extractUpgradeToWebSocket {
+            upgrade =>
+              val (actor, source) =
+                Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
+              node.eventBus.tell(EventBus.Subscribe, actor)
               complete(
-                HttpResponse(StatusCodes.InternalServerError, entity = HttpEntity(err.getMessage)))
+                upgrade.handleMessagesWith(
+                  Flow
+                    .fromSinkAndSource(Sink.ignore, source.map(handleEvent))
+                    .watchTermination() { (_, termination) =>
+                      termination.onComplete {
+                        case _ =>
+                          node.eventBus.tell(EventBus.Unsubscribe, actor)
+                      }
+                    }
+                ))
           }
         })
       }
     )
 
-    Http().bindAndHandle(route, rpcConfig.networkInterface, mode.rpcPort).map(_ => ())
+    Http().bindAndHandle(routeHttp, rpcConfig.networkInterface, mode.rpcHttpPort).map(_ => ())
+    Http().bindAndHandle(routeWs, rpcConfig.networkInterface, mode.rpcWsPort).map(_     => ())
   }
 }
 
 object RPCServer extends StrictLogging {
   import RPC._
   import JsonRPC._
+
+  val bufferSize = 64
 
   // TODO How to get this infer automatically? (semiauto generic derivation from Circe is failing)
   implicit val encodeCliqueInfo: Encoder[CliqueInfo] = new Encoder[CliqueInfo] {
