@@ -2,8 +2,7 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import org.rocksdb.{BlockBasedTableConfig, ColumnFamilyDescriptor, ColumnFamilyHandle, Options}
-import org.rocksdb.{ColumnFamilyOptions, DBOptions, LRUCache, RateLimiter, ReadOptions, RocksDB}
+import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
 import org.alephium.util.AVector
@@ -46,6 +45,8 @@ object RocksDBStorage {
   }
 
   object Settings {
+    RocksDB.loadLibrary()
+
     // TODO All options should become part of configuration
     val MaxOpenFiles: Int           = 512
     val BytesPerSync: Long          = 1 * SizeUnit.MB
@@ -54,10 +55,12 @@ object RocksDBStorage {
     val BlockCacheMemoryRatio: Int  = 3
     val CPURatio: Int               = 2
 
-    val readOptions = (new ReadOptions).setVerifyChecksums(false)
+    val readOptions: ReadOptions   = (new ReadOptions).setVerifyChecksums(false)
+    val writeOptions: WriteOptions = new WriteOptions
+    val syncWrite: WriteOptions    = (new WriteOptions).setSync(true)
 
-    val columns            = ColumnFamily.values.length
-    val memoryBudgetPerCol = MemoryBudget / columns
+    val columns: Int             = ColumnFamily.values.length
+    val memoryBudgetPerCol: Long = MemoryBudget / columns
 
     def databaseOptions(compaction: Compaction): DBOptions =
       databaseOptionsForBudget(compaction, memoryBudgetPerCol)

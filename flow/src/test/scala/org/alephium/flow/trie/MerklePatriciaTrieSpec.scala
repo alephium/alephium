@@ -86,7 +86,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   behavior of "Merkle Patricia Trie"
 
   trait TrieFixture {
-    import RocksDBStorage.{ColumnFamily, Settings}
+    import RocksDBStorage.ColumnFamily
 
     private val tmpdir = Files.tmpDir
     private val dbname = "trie"
@@ -95,7 +95,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     private val storage =
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
-    val db   = HeaderDB(storage, ColumnFamily.Trie, Settings.readOptions)
+    val db   = HeaderDB(storage, ColumnFamily.Trie)
     var trie = MerklePatriciaTrie.create(db)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
