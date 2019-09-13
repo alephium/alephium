@@ -5,7 +5,7 @@ import scala.concurrent.duration._
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
@@ -13,13 +13,13 @@ import org.alephium.util.BaseActor
 
 object InterCliqueManager {
   def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
-      implicit config: PlatformConfig): Props =
+      implicit config: PlatformProfile): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          allHandlers: AllHandlers,
-                         discoveryServer: ActorRef)(implicit config: PlatformConfig)
+                         discoveryServer: ActorRef)(implicit config: PlatformProfile)
     extends BaseActor {
   // TODO: consider cliques with different brokerNum
   val brokers = collection.mutable.HashMap.empty[CliqueId, ActorRef]

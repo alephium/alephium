@@ -1,11 +1,11 @@
 package org.alephium.flow.storage
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.util.ConcurrentHashMap
 
 trait ChainDifficultyAdjustment extends BlockHashPool {
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   protected def blockHashesTable: ConcurrentHashMap[Keccak256, BlockHashChain.TreeNode]
 

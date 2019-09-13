@@ -2,10 +2,11 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
+import org.scalacheck.Gen
+
 import org.alephium.crypto._
 import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
 import org.alephium.util.AVector
-import org.scalacheck.Gen
 
 // TODO: rename as GenFixture
 object ModelGen {
@@ -71,7 +72,7 @@ object ModelGen {
     Gen.resultOf[Unit, CliqueId](_ => CliqueId.generate)
 
   def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] = {
-    Gen.oneOf((1 to config.groups).filter(config.groups % _ == 0))
+    Gen.oneOf((1 to config.groups).filter(i => (config.groups % i) equals 0))
   }
 
   def brokerInfo(implicit config: CliqueConfig): Gen[BrokerInfo] = {

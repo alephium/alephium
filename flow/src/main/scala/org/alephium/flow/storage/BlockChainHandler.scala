@@ -2,7 +2,7 @@ package org.alephium.flow.storage
 
 import akka.actor.{ActorRef, Props}
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
@@ -13,7 +13,7 @@ object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
             cliqueManager: ActorRef,
-            flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
+            flowHandler: ActorRef)(implicit config: PlatformProfile): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
@@ -23,7 +23,7 @@ object BlockChainHandler {
 class BlockChainHandler(val blockFlow: BlockFlow,
                         val chainIndex: ChainIndex,
                         cliqueManager: ActorRef,
-                        flowHandler: ActorRef)(implicit val config: PlatformConfig)
+                        flowHandler: ActorRef)(implicit val config: PlatformProfile)
     extends BaseActor
     with ChainHandlerLogger {
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)

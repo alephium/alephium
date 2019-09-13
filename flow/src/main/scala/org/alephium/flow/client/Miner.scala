@@ -8,7 +8,7 @@ import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
@@ -23,7 +23,7 @@ object Miner {
   case class MinedBlockAdded(index: ChainIndex) extends Command
   case class Nonce(from: BigInt, to: BigInt)    extends Command
 
-  def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
+  def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformProfile): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
@@ -35,13 +35,13 @@ object Miner {
 
   trait Builder {
     def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-        implicit config: PlatformConfig): Props =
+        implicit config: PlatformProfile): Props =
       Props(new Miner(address, node, chainIndex))
   }
 }
 
 class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-    implicit config: PlatformConfig)
+    implicit config: PlatformProfile)
     extends BaseActor {
   import node.allHandlers
   var totalMiningCount    = 0 // This counts how many mining tasks got run so far
