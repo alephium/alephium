@@ -13,7 +13,7 @@ import org.alephium.util.Files
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 class TrieBench {
-  import RocksDBStorage.{ColumnFamily, Settings}
+  import RocksDBStorage.ColumnFamily
 
   private val tmpdir = Files.tmpDir
   private val dbname = "trie"
@@ -27,7 +27,7 @@ class TrieBench {
 
     RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
   }
-  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
+  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
   val trie = MerklePatriciaTrie.create(db)
 

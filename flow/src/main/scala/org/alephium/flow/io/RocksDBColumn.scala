@@ -1,20 +1,24 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.ReadOptions
+import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.serde._
 
 object RocksDBColumn {
+  import RocksDBStorage.Settings
+
   def apply(storage: RocksDBStorage,
             cf: RocksDBStorage.ColumnFamily,
-            readOptions: ReadOptions): RocksDBColumn =
-    new RocksDBColumn(storage, cf, readOptions)
+            writeOptions: WriteOptions = Settings.writeOptions,
+            readOptions: ReadOptions   = Settings.readOptions): RocksDBColumn =
+    new RocksDBColumn(storage, cf, writeOptions, readOptions)
 }
 
 class RocksDBColumn(
     storage: RocksDBStorage,
     cf: RocksDBStorage.ColumnFamily,
+    writeOptions: WriteOptions,
     readOptions: ReadOptions
 ) extends KeyValueStorage {
 
@@ -83,7 +87,7 @@ class RocksDBColumn(
   }
 
   def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
-    storage.db.put(handle, key.toArray, value.toArray)
+    storage.db.put(handle, writeOptions, key.toArray, value.toArray)
   }
 
   def put[V: Serde](key: ByteString, value: V): IOResult[Unit] = {
