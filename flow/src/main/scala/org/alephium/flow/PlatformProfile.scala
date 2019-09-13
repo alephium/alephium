@@ -11,6 +11,7 @@ import com.typesafe.config.Config
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
+import org.alephium.flow.io.RocksDBStorage.{ColumnFamily, Settings}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
@@ -136,7 +137,6 @@ object PlatformProfile {
       /* Genesis */
 
       /* IO */
-      import org.alephium.flow.io.RocksDBStorage.{ColumnFamily, Settings}
       final val disk: Disk = Disk.createUnsafe(rootPath)
       final val dbStorage = {
         val dbPath = {
@@ -150,9 +150,9 @@ object PlatformProfile {
       final val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
       final val emptyTrie: MerklePatriciaTrie =
         MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, Settings.readOptions))
+      /* IO */
     }
   // scalastyle:off method.length parameter.number
-  /* IO */
 
   private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
     val List(left, right) = raw.split(":").toList
