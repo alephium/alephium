@@ -8,11 +8,10 @@ import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 import com.typesafe.config.Config
+import org.rocksdb.WriteOptions
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
-import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
-import org.alephium.flow.io.RocksDBStorage.{ColumnFamily, Settings}
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Env, Hex, Network}
@@ -38,6 +37,7 @@ object PlatformProfile {
   }
 
   def load(rootPath: Path,
+           rdbWriteOptions: WriteOptions                                = Settings.writeOptions,
            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]] = None): PlatformProfile = {
     val alephCfg = parseConfig(rootPath).getConfig("alephium")
     create(
@@ -49,6 +49,7 @@ object PlatformProfile {
       alephCfg.getConfig("mining"),
       alephCfg.getConfig("network"),
       alephCfg.getConfig("discovery"),
+      rdbWriteOptions,
       genesisBalances
     )
   }
@@ -62,7 +63,8 @@ object PlatformProfile {
              miningCfg: Config,
              networkCfg: Config,
              discoveryCfg: Config,
-             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]] = None): PlatformProfile =
+             rdbWriteOptions: WriteOptions,
+             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
     new PlatformProfile {
       /* Common */
       final val all      = allCfg
@@ -137,19 +139,11 @@ object PlatformProfile {
       /* Genesis */
 
       /* IO */
-      final val disk: Disk = Disk.createUnsafe(rootPath)
-      final val dbStorage = {
-        val dbPath = {
-          val path = rootPath.resolve("db")
-          Disk.createDirUnsafe(path)
-          path
-        }
-        val path = dbPath.resolve(s"${brokerInfo.id}-${publicAddress.getPort}")
-        RocksDBStorage.openUnsafe(path, RocksDBStorage.Compaction.HDD)
+      final val (disk, headerDB, emptyTrie) = {
+        val dbFolder = "db"
+        val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"
+        PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)
       }
-      final val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
-      final val emptyTrie: MerklePatriciaTrie =
-        MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, Settings.readOptions))
       /* IO */
     }
   // scalastyle:off method.length parameter.number

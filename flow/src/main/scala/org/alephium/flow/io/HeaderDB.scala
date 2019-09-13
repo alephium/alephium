@@ -1,19 +1,27 @@
 package org.alephium.flow.io
 
 import RocksDBStorage.ColumnFamily
-import org.rocksdb.ReadOptions
+import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.BlockHeader
 
 object HeaderDB {
-  def apply(storage: RocksDBStorage, cf: ColumnFamily, readOptions: ReadOptions): HeaderDB = {
-    new HeaderDB(storage, cf, readOptions)
+  import RocksDBStorage.Settings
+
+  def apply(storage: RocksDBStorage,
+            cf: ColumnFamily,
+            writeOptions: WriteOptions = Settings.writeOptions,
+            readOptions: ReadOptions   = Settings.readOptions): HeaderDB = {
+    new HeaderDB(storage, cf, writeOptions, readOptions)
   }
 }
 
-class HeaderDB(val storage: RocksDBStorage, cf: ColumnFamily, readOptions: ReadOptions)
-    extends RocksDBColumn(storage, cf, readOptions) {
+class HeaderDB(val storage: RocksDBStorage,
+               cf: ColumnFamily,
+               writeOptions: WriteOptions,
+               readOptions: ReadOptions)
+    extends RocksDBColumn(storage, cf, writeOptions, readOptions) {
   def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
     getOpt(hash.bytes)
 
