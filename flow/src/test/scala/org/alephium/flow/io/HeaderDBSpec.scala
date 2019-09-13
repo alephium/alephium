@@ -10,7 +10,7 @@ import org.alephium.protocol.model.ModelGen
 import org.alephium.util.{AlephiumSpec, Files}
 
 class HeaderDBSpec extends AlephiumSpec {
-  import RocksDBStorage.{ColumnFamily, Settings}
+  import RocksDBStorage.ColumnFamily
 
   trait Fixture {
     val tmpdir = Files.tmpDir
@@ -18,7 +18,7 @@ class HeaderDBSpec extends AlephiumSpec {
     val dbPath = tmpdir.resolve(dbname)
 
     val dbStorage    = RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
-    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, Settings.readOptions)
+    val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
     def generate(): (ByteString, ByteString) = {
       val generator = Arbitrary.arbString.arbitrary

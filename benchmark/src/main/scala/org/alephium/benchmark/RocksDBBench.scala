@@ -71,7 +71,7 @@ class RocksDBBench {
     val storage: RocksDBStorage =
       RocksDBStorage.openUnsafeWithOptions(path, databaseOptions, columnOptions)
 
-    RocksDBColumn(storage, ColumnFamily.All, Settings.readOptions)
+    RocksDBColumn(storage, ColumnFamily.All)
   }
 
   def createDBForBudget(name: String,
