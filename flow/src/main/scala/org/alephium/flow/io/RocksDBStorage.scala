@@ -2,8 +2,7 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import org.rocksdb.{BlockBasedTableConfig, ColumnFamilyDescriptor, ColumnFamilyHandle, Options}
-import org.rocksdb.{ColumnFamilyOptions, DBOptions, LRUCache, RateLimiter, ReadOptions, RocksDB}
+import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
 import org.alephium.util.AVector
@@ -54,7 +53,9 @@ object RocksDBStorage {
     val BlockCacheMemoryRatio: Int  = 3
     val CPURatio: Int               = 2
 
-    val readOptions = (new ReadOptions).setVerifyChecksums(false)
+    val readOptions  = (new ReadOptions).setVerifyChecksums(false)
+    val writeOptions = new WriteOptions
+    val syncWrite    = (new WriteOptions).setSync(true)
 
     val columns            = ColumnFamily.values.length
     val memoryBudgetPerCol = MemoryBudget / columns
