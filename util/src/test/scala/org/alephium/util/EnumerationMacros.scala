@@ -1,9 +1,8 @@
 package org.alephium.util
 
-import scala.language.experimental.macros
-
-import scala.reflect.macros.blackbox.Context
 import scala.collection.immutable.TreeSet
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context
 
 object EnumerationMacros {
   def sealedInstancesOf[A]: TreeSet[A] = macro sealedInstancesOf_impl[A]

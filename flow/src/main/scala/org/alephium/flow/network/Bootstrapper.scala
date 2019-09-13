@@ -3,14 +3,14 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.coordinator.{Broker, CliqueCoordinator}
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 object Bootstrapper {
   def props(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
-      implicit config: PlatformConfig): Props =
+      implicit config: PlatformProfile): Props =
     Props(new Bootstrapper(server, discoveryServer, cliqueManager))
 
   sealed trait Command
@@ -19,7 +19,7 @@ object Bootstrapper {
 
 // TODO: close this properly
 class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: ActorRef)(
-    implicit config: PlatformConfig)
+    implicit config: PlatformProfile)
     extends BaseActor {
   import Bootstrapper._
 

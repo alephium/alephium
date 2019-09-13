@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import com.codahale.metrics.{Histogram, MetricRegistry}
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.clique.{BrokerHandler, InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.monitoring.Monitoring
@@ -17,14 +17,14 @@ object MockBrokerHandler {
         selfCliqueInfo: CliqueInfo,
         remote: InetSocketAddress,
         connection: ActorRef,
-        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
       Props(new MockInboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers))
 
     override def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
-        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
       Props(
         new MockOutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers))
 
@@ -34,7 +34,7 @@ object MockBrokerHandler {
 class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                remote: InetSocketAddress,
                                connection: ActorRef,
-                               allHandlers: AllHandlers)(implicit config: PlatformConfig)
+                               allHandlers: AllHandlers)(implicit config: PlatformProfile)
     extends InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers) {
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
@@ -48,7 +48,7 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
 class MockOutboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                 remoteCliqueId: CliqueId,
                                 remoteBroker: BrokerInfo,
-                                allHandlers: AllHandlers)(implicit config: PlatformConfig)
+                                allHandlers: AllHandlers)(implicit config: PlatformProfile)
     extends OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, allHandlers) {
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remoteBroker.address.toString, "delay"))

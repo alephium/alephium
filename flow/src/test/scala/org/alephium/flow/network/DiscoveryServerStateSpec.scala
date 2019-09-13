@@ -2,19 +2,20 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.concurrent.duration._
+import scala.reflect.ClassTag
+
 import akka.event.LoggingAdapter
 import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
-import org.alephium.protocol.config.DiscoveryConfig
-import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
-import org.alephium.util.{AVector, AlephiumActorSpec}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import scala.concurrent.duration._
-import scala.reflect.ClassTag
+import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.message.DiscoveryMessage
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
+import org.alephium.util.{AlephiumActorSpec, AVector}
 
 class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   import DiscoveryServerSpec._

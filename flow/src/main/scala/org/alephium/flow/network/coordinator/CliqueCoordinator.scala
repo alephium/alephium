@@ -3,14 +3,14 @@ package org.alephium.flow.network.coordinator
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
 
 object CliqueCoordinator {
-  def props()(implicit config: PlatformConfig): Props = Props(new CliqueCoordinator())
+  def props()(implicit config: PlatformProfile): Props = Props(new CliqueCoordinator())
 
   sealed trait Event
   case object Ready extends Event {
@@ -20,7 +20,7 @@ object CliqueCoordinator {
   }
 }
 
-class CliqueCoordinator()(implicit val config: PlatformConfig)
+class CliqueCoordinator()(implicit val config: PlatformProfile)
     extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers

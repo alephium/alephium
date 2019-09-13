@@ -18,7 +18,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
-import org.alephium.flow.{Mode, Platform}
+import org.alephium.flow.Mode
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.storage.MultiChain
@@ -29,7 +29,7 @@ import org.alephium.rpc.AVectorJson._
 import org.alephium.rpc.model.{JsonRPC, RPC}
 import org.alephium.util.EventBus
 
-trait RPCServer extends Platform with CORSHandler with StrictLogging {
+trait RPCServer extends CORSHandler with StrictLogging {
   import RPCServer._
 
   def mode: Mode
@@ -81,8 +81,8 @@ trait RPCServer extends Platform with CORSHandler with StrictLogging {
     implicit val system           = node.system
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
-    implicit val config           = mode.config
-    implicit val rpcConfig        = RPCConfig.load(config.alephium)
+    implicit val config           = mode.profile
+    implicit val rpcConfig        = RPCConfig.load(config.all)
     implicit val askTimeout       = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
 
     val miner = {

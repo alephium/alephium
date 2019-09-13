@@ -1,10 +1,12 @@
 package org.alephium
 
 import scala.concurrent.duration._
-import akka.testkit.TestProbe
+
 import akka.stream.{ActorMaterializer, SourceRef}
 import akka.stream.scaladsl.{Keep, Sink}
+import akka.testkit.TestProbe
 import org.scalatest.concurrent.ScalaFutures
+
 import org.alephium.util.{AlephiumActorSpec, EventBus}
 
 class EventBusClientSpec extends AlephiumActorSpec("EventBusClient") with ScalaFutures {

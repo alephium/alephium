@@ -5,13 +5,14 @@ import java.util.Comparator
 
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
-import org.alephium.flow.PlatformConfig
-import org.alephium.util.{Files => AFiles}
+
+import org.alephium.flow.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.util.{Files => AFiles}
 
 object TestUtils {
 
-  def createBlockHandlersProbe(implicit config: PlatformConfig,
+  def createBlockHandlersProbe(implicit config: PlatformProfile,
                                system: ActorSystem): AllHandlers = {
     val flowHandler = TestProbe().ref
     val blockHandlers = (for {

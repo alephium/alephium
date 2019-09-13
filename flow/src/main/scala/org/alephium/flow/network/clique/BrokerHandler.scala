@@ -9,7 +9,7 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.storage.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
@@ -54,21 +54,21 @@ object BrokerHandler {
         selfCliqueInfo: CliqueInfo,
         remote: InetSocketAddress,
         connection: ActorRef,
-        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
       Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers))
 
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
-        blockHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
       Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers))
   }
 }
 
 trait BrokerHandler extends BaseActor with Timers {
 
-  implicit def config: PlatformConfig
+  implicit def config: PlatformProfile
 
   def selfCliqueInfo: CliqueInfo
   def remote: InetSocketAddress

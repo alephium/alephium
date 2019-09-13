@@ -1,9 +1,10 @@
 package org.alephium.flow.storage
 
+import org.scalatest.EitherValues._
+
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.AVector
-import org.scalatest.EitherValues._
 
 class BlockChainSpec extends AlephiumFlowSpec {
 

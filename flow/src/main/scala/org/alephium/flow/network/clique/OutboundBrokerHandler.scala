@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
-import org.alephium.flow.PlatformConfig
+import org.alephium.flow.PlatformProfile
 import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
@@ -16,7 +16,7 @@ object OutboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
             remoteCliqueId: CliqueId,
             remoteBroker: BrokerInfo,
-            allHandlers: AllHandlers)(implicit config: PlatformConfig): Props =
+            allHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
     Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, allHandlers))
 
   sealed trait Command
@@ -28,7 +28,7 @@ object OutboundBrokerHandler {
 class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val remoteCliqueId: CliqueId,
                             val remoteBroker: BrokerInfo,
-                            val allHandlers: AllHandlers)(implicit val config: PlatformConfig)
+                            val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BrokerHandler {
   override def remote: InetSocketAddress = remoteBroker.address
 

@@ -2,13 +2,14 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
+import scala.concurrent.duration._
+
+import org.scalatest.EitherValues._
+
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
-import org.alephium.util.{AVector, AlephiumSpec, EnumerationMacros}
-import org.scalatest.EitherValues._
-
-import scala.concurrent.duration._
+import org.alephium.util.{AlephiumSpec, AVector, EnumerationMacros}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code
@@ -66,7 +67,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
       val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).right.value
-      msg == value
+      msg is value
     }
   }
 }

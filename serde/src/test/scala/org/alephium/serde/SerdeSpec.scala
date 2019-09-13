@@ -1,10 +1,11 @@
 package org.alephium.serde
 
 import akka.util.ByteString
-import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
-import org.alephium.util.{AVector, AlephiumSpec}
 import org.scalacheck.Gen
 import org.scalatest.EitherValues._
+
+import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class SerdeSpec extends AlephiumSpec {
 

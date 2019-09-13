@@ -1,16 +1,16 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.alephium.protocol.config.ConsensusConfigFixture
-import org.alephium.protocol.model.ModelGen
-import org.alephium.util.{AlephiumSpec, Files}
 import org.scalacheck.Arbitrary
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import RocksDBStorage.{ColumnFamily, Settings}
+import org.alephium.protocol.config.ConsensusConfigFixture
+import org.alephium.protocol.model.ModelGen
+import org.alephium.util.{AlephiumSpec, Files}
 
 class HeaderDBSpec extends AlephiumSpec {
+  import RocksDBStorage.{ColumnFamily, Settings}
 
   trait Fixture {
     val tmpdir = Files.tmpDir
