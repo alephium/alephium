@@ -60,8 +60,8 @@ trait TransactionPool { self: BlockFlowState =>
   def validateIndex(transaction: Transaction, chainIndex: ChainIndex): Either[Error, Unit] = {
     val trie = getBestTrie(chainIndex.from)
     for {
-      _ <- transaction.unsigned.inputs.traverse(validateIndex(_, trie, chainIndex.from))
-      _ <- transaction.unsigned.outputs.traverse(validateIndex(_, chainIndex.to))
+      _ <- transaction.unsigned.inputs.mapE(validateIndex(_, trie, chainIndex.from))
+      _ <- transaction.unsigned.outputs.mapE(validateIndex(_, chainIndex.to))
     } yield ()
   }
 

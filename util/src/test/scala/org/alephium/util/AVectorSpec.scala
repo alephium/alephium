@@ -263,20 +263,14 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "traverse" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.traverse(alwaysRight).right.value is vc
-      vc.traverse(alwaysLeft).isLeft is true
+      vc.mapE(alwaysRight).right.value is vc
+      vc.mapE(alwaysLeft).isLeft is true
     }
   }
 
-  it should "foreachF" in new FixtureF {
+  it should "foreachE" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.foreachF[Unit](doNothing).isRight is true
-    }
-  }
-
-  it should "mapF" in new FixtureF {
-    forAll(vectorGen) { vc =>
-      vc.mapF[Unit, Unit](doNothing).isRight is true
+      vc.foreachE[Unit](doNothing).isRight is true
     }
   }
 
@@ -304,12 +298,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
-  it should "flatMapF" in new FixtureF {
+  it should "flatMapE" in new FixtureF {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
-      val vc0 = vc.flatMapF(e => Right(AVector(e))).right.value
+      val vc0 = vc.flatMapE(e => Right(AVector(e))).right.value
       checkEq(vc0, arr)
-      val vc1 = vc0.flatMapF(elem => Right(AVector(elem, elem))).right.value
+      val vc1 = vc0.flatMapE(elem => Right(AVector(elem, elem))).right.value
       checkEq(vc1, arr.flatMap(x => Array(x, x)))
     }
   }
@@ -402,16 +396,16 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     }
   }
 
-  it should "foldF" in new FixtureF {
+  it should "foldE" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.foldF(0)((acc, e) => Right(acc + e)).right.value is vc.sum
+      vc.foldE(0)((acc, e) => Right(acc + e)).right.value is vc.sum
     }
   }
 
-  it should "foldWithIndexF" in new FixtureF {
+  it should "foldWithIndexE" in new FixtureF {
     forAll(vectorGen) { vc =>
       val expected = vc.sum + vc.indices.sum
-      vc.foldWithIndexF(0)((acc, e, idx) => Right(acc + e + idx)).right.value is expected
+      vc.foldWithIndexE(0)((acc, e, idx) => Right(acc + e + idx)).right.value is expected
     }
   }
 
