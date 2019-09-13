@@ -4,6 +4,7 @@ import org.scalatest.BeforeAndAfter
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.io.RocksDBStorage
+import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.flow.storage.TestUtils
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
@@ -26,7 +27,8 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
       val (privateKey, publicKey) = groupIndex.generateKey()(groupConfig)
       (privateKey, publicKey, genesisBalance)
   }
-  implicit val config = PlatformProfile.load(newPath, Some(genesisBalances.map(p => (p._2, p._3))))
+  implicit val config =
+    PlatformProfile.load(newPath, Settings.syncWrite, Some(genesisBalances.map(p => (p._2, p._3))))
 
   after {
     TestUtils.clear(config.disk.blockFolder)

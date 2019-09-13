@@ -63,8 +63,8 @@ object PlatformProfile {
              miningCfg: Config,
              networkCfg: Config,
              discoveryCfg: Config,
-             rdbWriteOptions: WriteOptions                                = Settings.writeOptions,
-             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]] = None): PlatformProfile =
+             rdbWriteOptions: WriteOptions,
+             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
     new PlatformProfile {
       /* Common */
       final val all      = allCfg
