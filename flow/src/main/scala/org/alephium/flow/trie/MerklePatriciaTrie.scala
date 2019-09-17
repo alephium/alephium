@@ -4,7 +4,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
-import org.alephium.protocol.model.TxOutput
+import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -166,16 +166,32 @@ object MerklePatriciaTrie {
     ByteString.fromArrayUnsafe(bytes)
   }
 
-  val genesisKey = Keccak256.zero.bytes
-  val genesisNode = {
-    val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
-    val genesisOutput = TxOutput(0, ED25519PublicKey.zero)
-    LeafNode(genesisPath, serialize(genesisOutput))
-  }
-
-  def create(storage: KeyValueStorage): MerklePatriciaTrie = {
+  def create(storage: KeyValueStorage, genesisNode: LeafNode): MerklePatriciaTrie = {
     storage.put[Node](genesisNode.hash.bytes, genesisNode)
     new MerklePatriciaTrie(genesisNode.hash, storage)
+  }
+
+  def createEmptyTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
+    val genesisKey = Keccak256.zero.bytes
+    val genesisNode = {
+      val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
+      val genesisOutput = TxOutput(0, ED25519PublicKey.zero)
+      LeafNode(genesisPath, serialize(genesisOutput))
+    }
+
+    create(storage, genesisNode)
+  }
+
+  def createStateTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
+    val genesisOutputPoint = TxOutputPoint(ED25519PublicKey.zero, Keccak256.zero, 0)
+    val genesisOutput      = TxOutput(0, ED25519PublicKey.zero)
+    val genesisKey         = serialize(genesisOutputPoint)
+    val genesisNode = {
+      val genesisPath = bytes2Nibbles(genesisKey)
+      LeafNode(genesisPath, serialize(genesisOutput))
+    }
+
+    create(storage, genesisNode)
   }
 }
 
@@ -397,11 +413,18 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     } else {
       getNode(hash).flatMap {
         case n: BranchNode =>
-          val nibble = prefix.head & 0xFF
-          assert(nibble < 16)
-          n.children(nibble) match {
-            case Some(child) => getAllRaw(prefix.tail, child, acc ++ n.path :+ nibble.toByte)
-            case None        => Right(AVector.empty)
+          if (n.path.length >= prefix.length) {
+            if (n.path.startsWith(prefix)) getAllRaw(n, acc) else Right(AVector.empty)
+          } else {
+            if (prefix.startsWith(n.path)) {
+              val prefixRest = prefix.drop(n.path.length)
+              val nibble     = prefixRest.head
+              assert(nibble >= 0 && nibble < 16)
+              n.children(nibble.toInt) match {
+                case Some(child) => getAllRaw(prefixRest.tail, child, acc ++ n.path :+ nibble)
+                case None        => Right(AVector.empty)
+              }
+            } else Right(AVector.empty)
           }
         case n: LeafNode =>
           if (n.path.take(prefix.length) == prefix) {
@@ -417,13 +440,18 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
                           acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
     getNode(hash).flatMap {
       case n: BranchNode =>
-        n.children.flatMapWithIndexE { (childOpt, index) =>
-          childOpt match {
-            case Some(child) => getAllRaw(child, acc ++ n.path :+ index.toByte)
-            case None        => Right(AVector.empty)
-          }
-        }
+        getAllRaw(n, acc)
       case n: LeafNode => Right(AVector(acc ++ n.path -> n))
+    }
+  }
+
+  protected def getAllRaw(node: BranchNode,
+                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+    node.children.flatMapWithIndexE { (childOpt, index) =>
+      childOpt match {
+        case Some(child) => getAllRaw(child, acc ++ node.path :+ index.toByte)
+        case None        => Right(AVector.empty)
+      }
     }
   }
 }

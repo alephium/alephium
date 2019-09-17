@@ -85,6 +85,12 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   behavior of "Merkle Patricia Trie"
 
+  val genesisKey = Keccak256.zero.bytes
+  val genesisNode = {
+    val genesisPath = bytes2Nibbles(genesisKey)
+    LeafNode(genesisPath, ByteString.empty)
+  }
+
   trait TrieFixture {
     import RocksDBStorage.ColumnFamily
 
@@ -96,7 +102,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
     val db   = HeaderDB(storage, ColumnFamily.Trie)
-    var trie = MerklePatriciaTrie.create(db)
+    var trie = MerklePatriciaTrie.create(db, genesisNode)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Keccak256.random.bytes

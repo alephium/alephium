@@ -29,7 +29,8 @@ class TrieBench {
   }
   val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
-  val trie = MerklePatriciaTrie.create(db)
+  val trie        = MerklePatriciaTrie.createEmptyTrie(db)
+  val genesisHash = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {
@@ -40,6 +41,6 @@ class TrieBench {
       key
     }
     keys.foreach(trie.removeRaw)
-    assert(trie.rootHash == MerklePatriciaTrie.genesisNode.hash)
+    assert(trie.rootHash == genesisHash)
   }
 }
