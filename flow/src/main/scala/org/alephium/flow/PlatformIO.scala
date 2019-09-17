@@ -33,7 +33,7 @@ object PlatformIO {
     }
     val headerDB: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All, writeOptions)
     val emptyTrie: MerklePatriciaTrie =
-      MerklePatriciaTrie.create(RocksDBColumn(dbStorage, ColumnFamily.Trie, writeOptions))
+      MerklePatriciaTrie.createStateTrie(RocksDBColumn(dbStorage, ColumnFamily.Trie, writeOptions))
 
     (disk, headerDB, emptyTrie)
   }
