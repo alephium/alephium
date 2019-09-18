@@ -5,7 +5,7 @@ import akka.actor.ActorSystem
 import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.storage._
+import org.alephium.flow.core._
 import org.alephium.util.EventBus
 
 case class Node(builders: BrokerHandler.Builder, name: String)(implicit config: PlatformProfile) {

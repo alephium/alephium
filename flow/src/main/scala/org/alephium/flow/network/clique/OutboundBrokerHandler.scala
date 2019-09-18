@@ -9,7 +9,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
 import org.alephium.flow.PlatformProfile
-import org.alephium.flow.storage.AllHandlers
+import org.alephium.flow.core.AllHandlers
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
 object OutboundBrokerHandler {

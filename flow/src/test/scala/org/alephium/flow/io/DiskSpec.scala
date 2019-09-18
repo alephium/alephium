@@ -4,7 +4,7 @@ import java.nio.file.Files
 
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.storage.TestUtils
+import org.alephium.flow.core.TestUtils
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
 import org.alephium.serde._
