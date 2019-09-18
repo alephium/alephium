@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
 import org.alephium.flow.PlatformProfile
-import org.alephium.flow.network.coordinator.{Broker, CliqueCoordinator}
+import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator}
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 

@@ -6,7 +6,7 @@ import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.storage.BlockFlow
+import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.model.GroupIndex
 
 @BenchmarkMode(Array(Mode.AverageTime))

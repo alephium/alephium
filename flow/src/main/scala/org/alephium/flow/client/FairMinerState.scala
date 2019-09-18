@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 
 import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.storage.AllHandlers
+import org.alephium.flow.core.AllHandlers
 import org.alephium.protocol.model.ChainIndex
 
 trait FairMinerState {

@@ -1,4 +1,4 @@
-package org.alephium.flow.network.coordinator
+package org.alephium.flow.network.bootstrap
 
 import scala.util.Random
 

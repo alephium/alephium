@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.core
 
 import org.scalatest.EitherValues._
 
