@@ -3,9 +3,9 @@ package org.alephium.flow
 import org.scalatest.BeforeAndAfter
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.flow.core.TestUtils
 import org.alephium.flow.io.RocksDBStorage
 import org.alephium.flow.io.RocksDBStorage.Settings
-import org.alephium.flow.core.TestUtils
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.{AlephiumActorSpec, AlephiumSpec, AVector, Env}

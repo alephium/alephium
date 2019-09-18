@@ -1,8 +1,8 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 
 trait FlowUtils extends MultiChain with TransactionPool with BlockFlowState {
