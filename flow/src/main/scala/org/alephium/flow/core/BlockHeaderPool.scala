@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.IOResult

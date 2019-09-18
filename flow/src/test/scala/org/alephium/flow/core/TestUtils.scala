@@ -1,4 +1,4 @@
-package org.alephium.flow.storage
+package org.alephium.flow.core
 
 import java.nio.file.{Files, Path}
 import java.util.Comparator

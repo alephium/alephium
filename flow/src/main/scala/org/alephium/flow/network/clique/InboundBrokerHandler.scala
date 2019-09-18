@@ -7,7 +7,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.PlatformProfile
-import org.alephium.flow.storage.AllHandlers
+import org.alephium.flow.core.AllHandlers
 import org.alephium.protocol.message.Hello
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
