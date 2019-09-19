@@ -6,9 +6,10 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
-import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
+import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, BlockFlow, TestUtils}
 import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 

@@ -6,7 +6,7 @@ import java.util.Comparator
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 
-import org.alephium.flow.PlatformProfile
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{Files => AFiles}
 

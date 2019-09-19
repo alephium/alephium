@@ -8,7 +8,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformProfile
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 

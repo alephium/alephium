@@ -10,8 +10,9 @@ import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
+import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, TestUtils}
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
