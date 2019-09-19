@@ -9,10 +9,10 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}

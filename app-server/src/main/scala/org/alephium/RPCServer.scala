@@ -18,10 +18,10 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
-import org.alephium.flow.Mode
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.core.MultiChain
 import org.alephium.flow.network.DiscoveryServer
+import org.alephium.flow.platform.Mode
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}

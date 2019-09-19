@@ -2,9 +2,9 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, BaseActor}

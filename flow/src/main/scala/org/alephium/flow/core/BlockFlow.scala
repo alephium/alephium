@@ -3,9 +3,9 @@ package org.alephium.flow.core
 import java.io.IOException
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.{BlockDeps, ValidationError}
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 

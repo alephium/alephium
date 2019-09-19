@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, ActorSystem}
 
-import org.alephium.flow.PlatformProfile
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
 
 case class AllHandlers(

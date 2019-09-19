@@ -1,8 +1,8 @@
 package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.{Disk, IOResult}
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.Block
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {

@@ -1,4 +1,4 @@
-package org.alephium.flow
+package org.alephium.flow.platform
 
 import java.io.File
 import java.net.InetSocketAddress
