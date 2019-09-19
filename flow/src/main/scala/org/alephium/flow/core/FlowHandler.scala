@@ -3,9 +3,9 @@ package org.alephium.flow.core
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}

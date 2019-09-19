@@ -3,9 +3,9 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.BrokerHandler
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.BaseActor
 
