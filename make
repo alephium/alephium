@@ -77,7 +77,7 @@ elif args.goal == 'run':
         run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
 
 elif args.goal == 'mine':
-    rpc_call_all("mining/start", "[]")
+    rpc_call_all("mining_start", "[]")
 
 elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
