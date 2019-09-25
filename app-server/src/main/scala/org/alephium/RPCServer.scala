@@ -24,7 +24,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
 import org.alephium.rpc.AVectorJson._
-import org.alephium.rpc.model.{JsonRPC, RPC}
+import org.alephium.rpc.model.{JsonRPC, Module, RPC}
 import org.alephium.util.EventBus
 
 trait RPCServer extends CORSHandler with StrictLogging {
@@ -32,36 +32,48 @@ trait RPCServer extends CORSHandler with StrictLogging {
 
   def mode: Mode
 
+  def parseMethod(str: String): Option[(Module, String)] = {
+    val tokens = str.split('_')
+    if (tokens.size < 2) { None }
+    else {
+      Module.fromString(tokens(0)).map((_, tokens(1)))
+    }
+  }
+
   def handler(node: Node, miner: ActorRef)(implicit consus: ConsensusConfig,
                                            rpc: RPCConfig,
                                            timeout: Timeout,
                                            EC: ExecutionContext): JsonRPC.Handler = {
-    case "blockflow/fetch" =>
-      req =>
+   import Module._
+
+   parseMethod(_).flatMap {
+     case (BlockFlow, "fetch") =>
+      Some(req =>
         Future {
           blockflowFetch(node, req)
-        }
-
-    case "clique/info" =>
-      req =>
+        })
+    case (Clique, "info") =>
+      Some(req =>
         node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
           val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
           req.success(encodeAVector[CliqueInfo].apply(cliques.peers))
-        }
+        })
 
-    case "mining/start" =>
-      req =>
+    case (Mining, "start") =>
+      Some(req =>
         Future {
           miner ! Miner.Start
           req.successful()
-        }
+        })
 
-    case "mining/stop" =>
-      req =>
+    case (Mining, "stop") =>
+      Some(req =>
         Future {
           miner ! Miner.Stop
           req.successful()
-        }
+        })
+     case _ => None
+   }
   }
 
   def handleEvent(event: EventBus.Event): TextMessage = {
