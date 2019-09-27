@@ -11,7 +11,10 @@ trait Mode {
 
   def port: Int
 
-  def rpcPort: Int = port + 1000
+  def rpcHttpPort: Int = port + 1000
+  // TODO Comment for review:
+  // I would prefer to do `rpcHttpPort + 1` like parity, but that would not work locally.
+  def rpcWsPort: Int = port + 2000
 
   def builders: Mode.Builder = Mode.defaultBuilders
 
