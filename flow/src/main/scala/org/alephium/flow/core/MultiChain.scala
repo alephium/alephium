@@ -3,8 +3,8 @@ package org.alephium.flow.core
 import scala.reflect.ClassTag
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.IOResult
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 

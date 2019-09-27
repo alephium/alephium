@@ -5,9 +5,9 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import com.codahale.metrics.{Histogram, MetricRegistry}
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{BrokerHandler, InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.monitoring.Monitoring
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 

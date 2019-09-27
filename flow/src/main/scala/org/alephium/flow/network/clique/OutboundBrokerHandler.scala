@@ -8,8 +8,8 @@ import scala.concurrent.duration._
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
 object OutboundBrokerHandler {

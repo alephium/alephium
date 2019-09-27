@@ -1,7 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.util.ConcurrentHashMap
 
 trait ChainDifficultyAdjustment extends BlockHashPool {

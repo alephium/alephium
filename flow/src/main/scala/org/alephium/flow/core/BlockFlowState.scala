@@ -3,9 +3,9 @@ package org.alephium.flow.core
 import scala.reflect.ClassTag
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}

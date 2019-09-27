@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorRef
 
-import org.alephium.flow.PlatformProfile
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.AVector
 

@@ -1,8 +1,8 @@
 package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.io.IOResult
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model.Block
 import org.alephium.util.ConcurrentHashMap
