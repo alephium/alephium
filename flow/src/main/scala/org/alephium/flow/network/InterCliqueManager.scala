@@ -6,8 +6,8 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
 import org.alephium.flow.PlatformProfile
+import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
-import org.alephium.flow.storage.AllHandlers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.BaseActor
 
