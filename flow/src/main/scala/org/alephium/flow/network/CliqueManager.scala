@@ -4,10 +4,10 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 

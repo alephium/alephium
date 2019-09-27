@@ -3,8 +3,8 @@ package org.alephium.flow.network.bootstrap
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 
-import org.alephium.flow.PlatformProfile
 import org.alephium.flow.network.Bootstrapper
+import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
