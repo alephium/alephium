@@ -9,9 +9,9 @@ import akka.actor.Props
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.PlatformProfile
 import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
-import org.alephium.flow.storage.{BlockChainHandler, FlowHandler}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 

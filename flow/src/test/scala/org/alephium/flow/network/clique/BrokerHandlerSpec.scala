@@ -11,7 +11,7 @@ import akka.util.ByteString
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowActorSpec, PlatformProfile}
-import org.alephium.flow.storage.{AllHandlers, TestUtils}
+import org.alephium.flow.core.{AllHandlers, TestUtils}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
