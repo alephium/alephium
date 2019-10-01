@@ -3,6 +3,7 @@ package org.alephium.flow.platform
 import java.nio.file.Path
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -12,7 +13,14 @@ trait Platform extends App with StrictLogging {
   def mode: Mode
 
   def init(): Future[Unit] = {
-    runServer()
+    val future = runServer()
+
+    future.onComplete {
+      case Success(_) => ()
+      case Failure(e) => logger.error("Fatal error during initialization.", e)
+    } (scala.concurrent.ExecutionContext.global)
+
+    future
   }
 
   def runServer(): Future[Unit]
