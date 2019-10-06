@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.appserver
 
 import io.circe._
 import io.circe.generic.semiauto._
