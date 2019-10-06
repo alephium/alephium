@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.appserver
 
 import java.time.Instant
 
@@ -17,7 +17,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
-import org.alephium.RPCModel.{FetchEntry, FetchRequest}
+import org.alephium.appserver.RPCModel.{FetchEntry, FetchRequest}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.core.MultiChain
 import org.alephium.flow.network.DiscoveryServer
