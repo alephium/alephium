@@ -5,6 +5,7 @@ import java.time.Instant
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 
+import akka.NotUsed
 import akka.actor.ActorRef
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.TextMessage
@@ -24,7 +25,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
 import org.alephium.rpc.AVectorJson._
-import org.alephium.rpc.model.{JsonRPC, Module, RPC}
+import org.alephium.rpc.model.{JsonRPC, RPC}
 import org.alephium.util.EventBus
 
 trait RPCServer extends CORSHandler with StrictLogging {
@@ -32,49 +33,32 @@ trait RPCServer extends CORSHandler with StrictLogging {
 
   def mode: Mode
 
-  def parseMethod(str: String): Option[(Module, String)] = {
-    val tokens = str.split('_')
-    if (tokens.size < 2) { None }
-    else {
-      Module.fromString(tokens(0)).map((_, tokens(1)))
-    }
-  }
-
   def handler(node: Node, miner: ActorRef)(implicit consus: ConsensusConfig,
                                            rpc: RPCConfig,
                                            timeout: Timeout,
-                                           EC: ExecutionContext): JsonRPC.Handler = {
-   import Module._
-
-   parseMethod(_).flatMap {
-     case (BlockFlow, "fetch") =>
-      Some(req =>
-        Future {
-          blockflowFetch(node, req)
-        })
-    case (Clique, "info") =>
-      Some(req =>
-        node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
-          val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
-          req.success(encodeAVector[CliqueInfo].apply(cliques.peers))
-        })
-
-    case (Mining, "start") =>
-      Some(req =>
-        Future {
-          miner ! Miner.Start
-          req.successful()
-        })
-
-    case (Mining, "stop") =>
-      Some(req =>
-        Future {
-          miner ! Miner.Stop
-          req.successful()
-        })
-     case _ => None
-   }
-  }
+                                           EC: ExecutionContext): JsonRPC.Handler = Map.apply(
+    "blockflow_fetch" -> { req =>
+      Future { blockflowFetch(node, req) }
+    },
+    "clique_info" -> { req =>
+      node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
+        val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
+        req.success(encodeAVector[CliqueInfo].apply(cliques.peers))
+      }
+    },
+    "mining_start" -> { req =>
+      Future {
+        miner ! Miner.Start
+        req.successful()
+      }
+    },
+    "mining_stop" -> { req =>
+      Future {
+        miner ! Miner.Stop
+        req.successful()
+      }
+    }
+  )
 
   def handleEvent(event: EventBus.Event): TextMessage = {
     // TODO Replace with concrete implementation.
@@ -103,32 +87,26 @@ trait RPCServer extends CORSHandler with StrictLogging {
     val routeHttp =
       corsHandler(JsonRPCHandler.routeHttp(handler(node, miner)))
 
-    val routeWs = concat(
-      path("rpc") {
-        corsHandler(JsonRPCHandler.routeWs(handler(node, miner)))
-      },
+    def wsFlow(actor: ActorRef, source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
+      Flow
+        .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
+        .watchTermination() { (_, termination) =>
+          termination.onComplete(_ => node.eventBus.tell(EventBus.Unsubscribe, actor))
+        }
+    }
+
+    val routeWs =
       path("events") {
         corsHandler(get {
-          extractUpgradeToWebSocket {
-            upgrade =>
-              val (actor, source) =
-                Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
-              node.eventBus.tell(EventBus.Subscribe, actor)
-              complete(
-                upgrade.handleMessagesWith(
-                  Flow
-                    .fromSinkAndSource(Sink.ignore, source.map(handleEvent))
-                    .watchTermination() { (_, termination) =>
-                      termination.onComplete {
-                        case _ =>
-                          node.eventBus.tell(EventBus.Unsubscribe, actor)
-                      }
-                    }
-                ))
+          extractUpgradeToWebSocket { upgrade =>
+            val (actor, source) =
+              Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
+            node.eventBus.tell(EventBus.Subscribe, actor)
+            val response = upgrade.handleMessages(wsFlow(actor, source))
+            complete(response)
           }
         })
       }
-    )
 
     Http().bindAndHandle(routeHttp, rpcConfig.networkInterface, mode.rpcHttpPort).map(_ => ())
     Http().bindAndHandle(routeWs, rpcConfig.networkInterface, mode.rpcWsPort).map(_     => ())
@@ -141,13 +119,13 @@ object RPCServer extends StrictLogging {
 
   val bufferSize = 64
 
-  // TODO How to get this infer automatically? (semiauto generic derivation from Circe is failing)
   implicit val encodeCliqueInfo: Encoder[CliqueInfo] = new Encoder[CliqueInfo] {
     final def apply(ci: CliqueInfo): Json = {
       Json.obj(("id", Json.fromString(ci.id.toString)),
                ("peers", encodeAVector[String].apply(ci.peers.map(_.toString))))
     }
   }
+
   def blockflowFetch(node: Node, req: Request)(implicit rpc: RPCConfig,
                                                cfg: ConsensusConfig): Response = {
     req.paramsAs[FetchRequest] match {
