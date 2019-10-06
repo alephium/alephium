@@ -17,15 +17,17 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 
+import org.alephium.RPCModel.{FetchEntry, FetchRequest}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
 import org.alephium.flow.core.MultiChain
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.Mode
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
-import org.alephium.rpc.{CORSHandler, JsonRPCHandler, RPCConfig}
-import org.alephium.rpc.AVectorJson._
-import org.alephium.rpc.model.{JsonRPC, RPC}
+import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
+import org.alephium.rpc.model.JsonRPC
+import org.alephium.rpc.model.JsonRPC.Response
+import org.alephium.rpc.util.AVectorJson._
 import org.alephium.util.EventBus
 
 trait RPCServer extends CORSHandler with StrictLogging {
@@ -33,6 +35,7 @@ trait RPCServer extends CORSHandler with StrictLogging {
 
   def mode: Mode
 
+  private val cliquesEncoder = encodeAVector[CliqueInfo]
   def handler(node: Node, miner: ActorRef)(implicit consus: ConsensusConfig,
                                            rpc: RPCConfig,
                                            timeout: Timeout,
@@ -43,19 +46,20 @@ trait RPCServer extends CORSHandler with StrictLogging {
     "clique_info" -> { req =>
       node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
         val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
-        req.success(encodeAVector[CliqueInfo].apply(cliques.peers))
+        val json    = cliquesEncoder.apply(cliques.peers)
+        Response.successful(req, json)
       }
     },
     "mining_start" -> { req =>
       Future {
         miner ! Miner.Start
-        req.successful()
+        Response.successful(req)
       }
     },
     "mining_stop" -> { req =>
       Future {
         miner ! Miner.Stop
-        req.successful()
+        Response.successful(req)
       }
     }
   )
@@ -114,7 +118,6 @@ trait RPCServer extends CORSHandler with StrictLogging {
 }
 
 object RPCServer extends StrictLogging {
-  import RPC._
   import JsonRPC._
 
   val bufferSize = 64
@@ -143,7 +146,7 @@ object RPCServer extends StrictLogging {
 
         val json = Json.obj(("blocks", Json.arr(blocks: _*)))
 
-        req.success(json)
+        Response.successful(req, json)
       case Left(failure) => failure
     }
   }
@@ -165,5 +168,4 @@ object RPCServer extends StrictLogging {
       ).asJson
     }
   }
-
 }
