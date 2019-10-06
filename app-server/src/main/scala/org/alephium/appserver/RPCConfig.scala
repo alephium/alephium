@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.appserver
 
 import java.time.Duration
 
