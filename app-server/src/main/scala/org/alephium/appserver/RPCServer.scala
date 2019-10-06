@@ -16,6 +16,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
+import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel.{FetchEntry, FetchRequest}
 import org.alephium.flow.client.{FairMiner, Miner, Node}
@@ -26,7 +27,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.Response
+import org.alephium.rpc.model.JsonRPC.{Notification, Response}
 import org.alephium.rpc.util.AVectorJson._
 import org.alephium.util.EventBus
 
@@ -69,7 +70,8 @@ trait RPCServer extends CORSHandler with StrictLogging {
     event match {
       case _ =>
         val ts = System.currentTimeMillis()
-        TextMessage(s"{ dummy: $ts}")
+        val result = Notification("events_fake", ts.asJson)
+        TextMessage(result.asJson.noSpaces)
     }
   }
 
