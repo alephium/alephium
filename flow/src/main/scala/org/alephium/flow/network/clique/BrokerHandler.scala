@@ -66,7 +66,7 @@ object BrokerHandler {
   }
 }
 
-trait BrokerHandler extends BaseActor with Timers {
+trait BrokerHandler extends ConnectionReader with ConnectionWriter with PingPong with Timers {
 
   implicit def config: PlatformProfile
 
@@ -77,66 +77,47 @@ trait BrokerHandler extends BaseActor with Timers {
   def connection: ActorRef
   def allHandlers: AllHandlers
 
+  def cliqueManager: ActorRef = context.parent
+
+  def handle: Receive = handleSocketData orElse handleWrite orElse handleEvent
+
   def handshakeOut(): Unit = {
-    connection ! BrokerHandler.envelope(Hello(selfCliqueInfo.id, config.brokerInfo))
-    context become handleWith(ByteString.empty, awaitHelloAck, handlePayload)
+    sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
+    setPayloadHandler(awaitHelloAck)
   }
 
   def handshakeIn(): Unit = {
-    context become handleWith(ByteString.empty, awaitHello, handlePayload)
-  }
-
-  def afterHandShake(): Unit = {
-    context.parent ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
-    startPingPong()
+    setPayloadHandler(awaitHello)
   }
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
       connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo.id, config.brokerInfo))
-      handle(hello.cliqueId, hello.brokerInfo)
+      handleBrokerInfo(hello.cliqueId, hello.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
   }
 
-  def handle(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
-
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      handle(helloAck.cliqueId, helloAck.brokerInfo)
+      handleBrokerInfo(helloAck.cliqueId, helloAck.brokerInfo)
       afterHandShake()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
   }
 
-  def handleWith(unaligned: ByteString,
-                 current: Payload => Unit,
-                 next: Payload    => Unit): Receive = {
-    handleEvent(unaligned, current, next) orElse handleWrite
+  def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
+
+  def afterHandShake(): Unit = {
+    cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
+    startPingPong()
+    setPayloadHandler(handlePayload)
   }
 
-  def handleWith(unaligned: ByteString, handle: Payload => Unit): Receive = {
-    handleEvent(unaligned, handle, handle) orElse handleWrite
-  }
-
-  def handleEvent(unaligned: ByteString, handle: Payload => Unit, next: Payload => Unit): Receive = {
-    case Tcp.Received(data) =>
-      BrokerHandler.deserialize(unaligned ++ data) match {
-        case Right((messages, rest)) =>
-          messages.foreach { message =>
-            val cmdName = message.payload.getClass.getSimpleName
-            log.debug(s"Received message of cmd@$cmdName from $remote")
-            handle(message.payload)
-          }
-          context.become(handleWith(rest, next))
-        case Left(e) =>
-          log.info(
-            s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
-          stop()
-      }
+  def handleEvent: Receive = {
     case BrokerHandler.SendPing => sendPing()
     case event: Tcp.ConnectionClosed =>
       if (event.isErrorClosed) {
@@ -147,42 +128,12 @@ trait BrokerHandler extends BaseActor with Timers {
       context stop self
   }
 
-  private var isWaitingAck   = false
-  private val messagesToSent = collection.mutable.Queue.empty[ByteString]
-
-  def send(message: ByteString): Unit = {
-    assert(!isWaitingAck)
-    isWaitingAck = true
-    connection ! Tcp.Write(message, BrokerHandler.TcpAck)
-  }
-
-  def handleWrite: Receive = {
-    case message: ByteString =>
-      if (isWaitingAck) {
-        messagesToSent.enqueue(message)
-      } else {
-        send(message)
-      }
-    case BrokerHandler.TcpAck =>
-      assert(isWaitingAck)
-      isWaitingAck = false
-      if (messagesToSent.nonEmpty) {
-        send(messagesToSent.dequeue())
-      }
-  }
-
   def handlePayload(payload: Payload): Unit = payload match {
     case Ping(nonce, timestamp) =>
       val delay = System.currentTimeMillis() - timestamp
       handlePing(nonce, delay)
     case Pong(nonce) =>
-      if (nonce == pingNonce) {
-        log.debug("Pong received")
-        pingNonce = 0
-      } else {
-        log.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
-        stop()
-      }
+      uponNewNonce(nonce)
     case SendBlocks(blocks) =>
       log.debug(s"Received #${blocks.length} blocks")
       // TODO: support many blocks
@@ -214,8 +165,91 @@ trait BrokerHandler extends BaseActor with Timers {
     case _ =>
       log.warning(s"Got unexpected payload type")
   }
+}
+
+trait ConnectionWriter extends BaseActor {
+  def connection: ActorRef
+
+  private var isWaitingAck   = false
+  private val messagesToSent = collection.mutable.Queue.empty[ByteString]
+
+  private def send(message: ByteString): Unit = {
+    assert(!isWaitingAck)
+    isWaitingAck = true
+    connection ! Tcp.Write(message, BrokerHandler.TcpAck)
+  }
+
+  private def trySend(message: ByteString): Unit = {
+    if (isWaitingAck) {
+      messagesToSent.enqueue(message)
+    } else {
+      send(message)
+    }
+  }
+
+  def sendPayload(payload: Payload): Unit = {
+    val message = Message.serialize(payload)
+    trySend(message)
+  }
+
+  def handleWrite: Receive = {
+    case message: ByteString => // We use ByteString here for efficiency reasons
+      trySend(message)
+    case BrokerHandler.TcpAck =>
+      assert(isWaitingAck)
+      isWaitingAck = false
+      if (messagesToSent.nonEmpty) {
+        send(messagesToSent.dequeue())
+      }
+  }
+}
+
+trait ConnectionReader extends BaseActor with ConnectionUtil {
+  implicit def config: GroupConfig
+
+  def remote: InetSocketAddress
+
+  private var unaligned: ByteString = ByteString.empty
+  private var payloadHandler: Payload => Unit = (_ => ())
+
+  def getPayloadHandler(): Payload => Unit = payloadHandler
+
+  def setPayloadHandler(handler: Payload => Unit): Unit = payloadHandler = handler
+
+  def handleSocketData: Receive = {
+    case Tcp.Received(data) =>
+      BrokerHandler.deserialize(unaligned ++ data) match {
+        case Right((messages, rest)) =>
+          messages.foreach { message =>
+            val cmdName = message.payload.getClass.getSimpleName
+            log.debug(s"Received message of cmd@$cmdName from $remote")
+            getPayloadHandler()(message.payload)
+          }
+          unaligned = rest
+        case Left(e) =>
+          log.info(
+            s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
+          stop()
+      }
+  }
+}
+
+trait PingPong extends ConnectionWriter with ConnectionUtil with Timers {
+  def config: PlatformProfile
+
+  def connection: ActorRef
 
   private var pingNonce: Int = 0
+
+  def uponNewNonce(nonce: Int): Unit = {
+    if (nonce == pingNonce) {
+      log.debug("Pong received")
+      pingNonce = 0
+    } else {
+      log.debug(s"Pong received with wrong nonce: expect $pingNonce, got $nonce")
+      stop()
+    }
+  }
 
   def handlePing(nonce: Int, delay: Long): Unit = {
     // TODO: refuse ping if it's too frequent
@@ -230,13 +264,17 @@ trait BrokerHandler extends BaseActor with Timers {
     } else {
       pingNonce = Random.nextInt()
       val timestamp = System.currentTimeMillis()
-      connection ! BrokerHandler.envelope(Ping(pingNonce, timestamp))
+      sendPayload(Ping(pingNonce, timestamp))
     }
   }
 
   def startPingPong(): Unit = {
     timers.startPeriodicTimer(BrokerHandler.Timer, BrokerHandler.SendPing, config.pingFrequency)
   }
+}
+
+trait ConnectionUtil extends BaseActor {
+  def connection: ActorRef
 
   def stop(): Unit = {
     if (connection != null) {

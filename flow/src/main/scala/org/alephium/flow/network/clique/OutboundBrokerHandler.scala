@@ -48,6 +48,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
       connection = sender()
       connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
       handshakeIn()
+      context.become(handle)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       val current = Instant.now()
@@ -59,7 +60,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
       }
   }
 
-  def handle(_remoteCliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
+  def handleBrokerInfo(_remoteCliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
     if (_remoteCliqueId != remoteCliqueId ||
         remoteBroker.id != brokerInfo.id ||
         remoteBroker.groupNumPerBroker != brokerInfo.groupNumPerBroker) {
