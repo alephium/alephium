@@ -1,7 +1,5 @@
 package org.alephium.flow.platform
 
-import com.typesafe.scalalogging.StrictLogging
-
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.network.clique.BrokerHandler
 
@@ -28,7 +26,7 @@ object Mode {
 
   def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
 
-  class Aws extends Mode with StrictLogging {
+  class Aws extends Mode {
     final implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
 
     val port: Int = profile.publicAddress.getPort
