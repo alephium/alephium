@@ -2,7 +2,7 @@ package org.alephium.flow.platform
 
 import java.nio.file.Path
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import com.typesafe.scalalogging.StrictLogging
@@ -10,6 +10,8 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.util.{Env, Files}
 
 trait Platform extends App with StrictLogging {
+  implicit def executionContext: ExecutionContext
+
   def mode: Mode
 
   def init(): Future[Unit] = {
@@ -18,7 +20,7 @@ trait Platform extends App with StrictLogging {
     future.onComplete {
       case Success(_) => ()
       case Failure(e) => logger.error("Fatal error during initialization.", e)
-    } (scala.concurrent.ExecutionContext.global)
+    }
 
     future
   }
