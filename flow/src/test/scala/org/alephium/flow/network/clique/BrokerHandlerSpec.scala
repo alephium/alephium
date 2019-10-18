@@ -128,9 +128,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           connection: ActorRef,
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
-          override def receive: Receive = handleWith(ByteString.empty, handlePayload)
+          setPayloadHandler(payloadHandler.ref ! _)
 
-          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+          self ! BrokerHandler.TcpAck // confirm that hello is sent out
         })
     }
     val tcpHandler = system.actorOf(
@@ -214,7 +214,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           connection: ActorRef,
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
-          override def receive: Receive = handleWith(ByteString.empty, handlePayload)
+          setPayloadHandler(handlePayload)
+
+          self ! BrokerHandler.TcpAck
         })
     }
     val tcpHandler = system.actorOf(
