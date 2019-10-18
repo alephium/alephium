@@ -25,6 +25,7 @@ object RPCModel {
   )
 
   object FetchEntry {
+    implicit val decoder: Decoder[FetchEntry] = deriveDecoder[FetchEntry]
     implicit val encoder: Encoder[FetchEntry] = deriveEncoder[FetchEntry]
   }
 }

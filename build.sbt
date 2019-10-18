@@ -47,11 +47,13 @@ lazy val `app-debug` = mainProject("app-debug")
   )
 
 lazy val `app-server` = project("app-server")
-  .dependsOn(flow)
+  .dependsOn(flow, flow % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       `alephium-rpc`,
-      `alephium-util` % "test" classifier "tests"
+      `alephium-util` % "test" classifier "tests",
+      akkahttptest,
+      akkastreamtest
     )
   )
 
