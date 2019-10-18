@@ -32,7 +32,7 @@ import org.alephium.rpc.model.JsonRPC.{Notification, Response}
 import org.alephium.rpc.util.AVectorJson._
 import org.alephium.util.{AVector, EventBus}
 
-trait RPCServer extends RPCServerAbstract {
+class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
 
   implicit val system: ActorSystem = mode.node.system
@@ -41,8 +41,6 @@ trait RPCServer extends RPCServerAbstract {
   implicit val config: PlatformProfile = mode.profile
   implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
-
-  def mode: Mode
 
   def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
     blockflowFetch(mode.node.blockFlow, req)
