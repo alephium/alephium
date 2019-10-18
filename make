@@ -25,7 +25,7 @@ def get_env_default_int(key, default):
     return int(get_env_default(key, default))
 
 def rpc_call(host, port, method, params):
-    json = """{{"jsonrpc":"2.0","id":"curltext","method":"{}","params": {}}}"""
+    json = """{{"jsonrpc":"2.0","id": 0,"method":"{}","params": {}}}"""
     cmd = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
     run(cmd.format(json.format(method, params), host, port))
 
