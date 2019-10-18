@@ -66,7 +66,7 @@ object BrokerHandler {
   }
 }
 
-trait BrokerHandler extends ConnectionReader with ConnectionWriter with PingPong with Timers {
+trait BrokerHandler extends ConnectionReader with ConnectionWriter with HandShake with PingPong {
 
   implicit def config: PlatformProfile
 
@@ -80,36 +80,6 @@ trait BrokerHandler extends ConnectionReader with ConnectionWriter with PingPong
   def cliqueManager: ActorRef = context.parent
 
   def handle: Receive = handleSocketData orElse handleWrite orElse handleEvent
-
-  def handshakeOut(): Unit = {
-    sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
-    setPayloadHandler(awaitHelloAck)
-  }
-
-  def handshakeIn(): Unit = {
-    setPayloadHandler(awaitHello)
-  }
-
-  def awaitHello(payload: Payload): Unit = payload match {
-    case hello: Hello =>
-      connection ! BrokerHandler.envelope(HelloAck(selfCliqueInfo.id, config.brokerInfo))
-      handleBrokerInfo(hello.cliqueId, hello.brokerInfo)
-      afterHandShake()
-    case err =>
-      log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
-      stop()
-  }
-
-  def awaitHelloAck(payload: Payload): Unit = payload match {
-    case helloAck: HelloAck =>
-      handleBrokerInfo(helloAck.cliqueId, helloAck.brokerInfo)
-      afterHandShake()
-    case err =>
-      log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
-      stop()
-  }
-
-  def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   def afterHandShake(): Unit = {
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
@@ -232,6 +202,43 @@ trait ConnectionReader extends BaseActor with ConnectionUtil {
           stop()
       }
   }
+}
+
+trait HandShake extends ConnectionReader with ConnectionWriter {
+  def config: PlatformProfile
+  def selfCliqueInfo: CliqueInfo
+
+  def handshakeOut(): Unit = {
+    sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
+    setPayloadHandler(awaitHelloAck)
+  }
+
+  def handshakeIn(): Unit = {
+    setPayloadHandler(awaitHello)
+  }
+
+  def awaitHello(payload: Payload): Unit = payload match {
+    case hello: Hello =>
+      sendPayload(HelloAck(selfCliqueInfo.id, config.brokerInfo))
+      handleBrokerInfo(hello.cliqueId, hello.brokerInfo)
+      afterHandShake()
+    case err =>
+      log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
+      stop()
+  }
+
+  def awaitHelloAck(payload: Payload): Unit = payload match {
+    case helloAck: HelloAck =>
+      handleBrokerInfo(helloAck.cliqueId, helloAck.brokerInfo)
+      afterHandShake()
+    case err =>
+      log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
+      stop()
+  }
+
+  def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
+
+  def afterHandShake(): Unit
 }
 
 trait PingPong extends ConnectionWriter with ConnectionUtil with Timers {
