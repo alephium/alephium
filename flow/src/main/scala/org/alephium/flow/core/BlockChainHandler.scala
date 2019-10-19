@@ -17,7 +17,7 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
+  case class AddBlock(block: Block, origin: DataOrigin) extends Command
 }
 
 class BlockChainHandler(val blockFlow: BlockFlow,
@@ -29,11 +29,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
-    case BlockChainHandler.AddBlocks(blocks, origin) =>
-      // TODO: support more blocks later
-      assert(blocks.length == 1)
-      val block = blocks.head
-      handleBlock(block, origin)
+    case BlockChainHandler.AddBlock(block, origin) => handleBlock(block, origin)
   }
 
   def handleBlock(block: Block, origin: DataOrigin): Unit = {
