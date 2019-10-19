@@ -39,8 +39,9 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
 
-  override def handlePing(nonce: Int, delay: Long): Unit = {
-    super.handlePing(nonce, delay)
+  override def handlePing(nonce: Int, timestamp: Long): Unit = {
+    super.handlePing(nonce, timestamp)
+    val delay = System.currentTimeMillis() - timestamp
     delays.update(delay)
   }
 }
