@@ -68,8 +68,7 @@ object BrokerHandler {
   }
 }
 
-trait BrokerHandler extends P2PStage with HandShake {
-
+trait BrokerHandler extends HandShake with Relay {
   implicit def config: PlatformProfile
 
   def selfCliqueInfo: CliqueInfo
@@ -81,29 +80,12 @@ trait BrokerHandler extends P2PStage with HandShake {
 
   def cliqueManager: ActorRef = context.parent
 
-  def handle: Receive = handleSocketData orElse handleWrite orElse handleEvent
+  def handle: Receive = handleSocketData orElse handleWrite orElse handleRelayEvent
 
-  def afterHandShake(): Unit = {
+  def uponHandshaked(): Unit = {
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
-    setPayloadHandler(handlePayload)
-  }
-
-  def handleEvent: Receive = {
-    case BrokerHandler.SendPing      => sendPing()
-    case event: Tcp.ConnectionClosed => stopDueto(event)
-  }
-
-  def handlePayload(payload: Payload): Unit = payload match {
-    case SendBlocks(blocks)     => handleSendBlocks(blocks)
-    case GetBlocks(locators)    => handleGetBlocks(locators)
-    case SendHeaders(headers)   => handleSendHeaders(headers)
-    case GetHeaders(locators)   => handleGetHeaders(locators)
-    case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
-    case Pong(nonce)            => handlePong(nonce)
-    case x                      =>
-      // TODO: take care of misbehavior
-      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+    setPayloadHandler(handleRelayPayload)
   }
 }
 
@@ -191,7 +173,7 @@ trait HandShake extends ConnectionReader with ConnectionWriter {
     case hello: Hello =>
       sendPayload(HelloAck(selfCliqueInfo.id, config.brokerInfo))
       handleBrokerInfo(hello.cliqueId, hello.brokerInfo)
-      afterHandShake()
+      uponHandshaked()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
@@ -200,7 +182,7 @@ trait HandShake extends ConnectionReader with ConnectionWriter {
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
       handleBrokerInfo(helloAck.cliqueId, helloAck.brokerInfo)
-      afterHandShake()
+      uponHandshaked()
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
@@ -208,7 +190,7 @@ trait HandShake extends ConnectionReader with ConnectionWriter {
 
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
-  def afterHandShake(): Unit
+  def uponHandshaked(): Unit
 }
 
 trait PingPong extends ConnectionWriter with ConnectionUtil with Timers {
@@ -345,6 +327,25 @@ trait Sync extends P2PStage {
 
   def handleSyncPayload(payload: Payload): Unit = payload match {
     case SendBlocks(blocks)     => handleSendBlocks(blocks); checkSelfSynced(blocks.length)
+    case GetBlocks(locators)    => handleGetBlocks(locators)
+    case SendHeaders(headers)   => handleSendHeaders(headers)
+    case GetHeaders(locators)   => handleGetHeaders(locators)
+    case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
+    case Pong(nonce)            => handlePong(nonce)
+    case x                      =>
+      // TODO: take care of misbehavior
+      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+  }
+}
+
+trait Relay extends P2PStage {
+  def handleRelayEvent: Receive = {
+    case BrokerHandler.SendPing      => sendPing()
+    case event: Tcp.ConnectionClosed => stopDueto(event)
+  }
+
+  def handleRelayPayload(payload: Payload): Unit = payload match {
+    case SendBlocks(blocks)     => handleSendBlocks(blocks)
     case GetBlocks(locators)    => handleGetBlocks(locators)
     case SendHeaders(headers)   => handleSendHeaders(headers)
     case GetHeaders(locators)   => handleGetHeaders(locators)
