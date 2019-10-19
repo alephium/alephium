@@ -46,7 +46,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           connection: ActorRef,
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
-          override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+          override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
           override def startPingPong(): Unit = pingpongProbe.ref ! "start"
         })
@@ -87,7 +87,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props = {
         Props(
           new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers) {
-            override def handlePayload(payload: Payload): Unit = payloadHandler.ref ! payload
+            override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
             override def startPingPong(): Unit = pingpongProbe.ref ! "start"
           })
@@ -214,7 +214,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           connection: ActorRef,
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
-          setPayloadHandler(handlePayload)
+          setPayloadHandler(handleRelayPayload)
 
           self ! BrokerHandler.TcpAck
         })
