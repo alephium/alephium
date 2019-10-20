@@ -17,7 +17,7 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddHeaders(headers: AVector[BlockHeader], origin: DataOrigin)
+  case class AddHeader(header: BlockHeader, origin: DataOrigin)
 }
 
 class HeaderChainHandler(val blockFlow: BlockFlow,
@@ -31,10 +31,7 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
   val chain: BlockHeaderPool = blockFlow.getHeaderChain(chainIndex)
 
   override def receive: Receive = {
-    case AddHeaders(headers, origin) =>
-      // TODO: support more heads later
-      assert(headers.length == 1)
-      val header = headers.head
+    case AddHeader(header, origin) =>
       handleHeader(header, origin)
   }
 
