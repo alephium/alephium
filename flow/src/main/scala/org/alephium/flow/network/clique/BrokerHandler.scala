@@ -77,7 +77,7 @@ trait BrokerHandler extends HandShake with Relay {
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
-    startRelay(handleReadWrite orElse handleRelayEvent)
+    startRelay()
   }
 }
 
@@ -157,15 +157,15 @@ trait HandShake extends ConnectionReaderWriter {
   def config: PlatformProfile
   def selfCliqueInfo: CliqueInfo
 
-  def handshakeOut(receive: Receive): Unit = {
+  def handshakeOut(): Unit = {
     sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
     setPayloadHandler(awaitHelloAck)
-    context become receive
+    context become handleReadWrite
   }
 
-  def handshakeIn(receive: Receive): Unit = {
+  def handshakeIn(): Unit = {
     setPayloadHandler(awaitHello)
-    context become receive
+    context become handleReadWrite
   }
 
   def awaitHello(payload: Payload): Unit = payload match {
@@ -285,11 +285,11 @@ trait Sync extends P2PStage {
   private var remoteSynced     = false
   private val numOfBlocksLimit = 128 // Each message can include upto this number of blocks
 
-  def startSync(receive: Receive): Unit = {
+  def startSync(): Unit = {
     assert(!selfSynced)
     flowHandler ! FlowHandler.GetTips
     setPayloadHandler(handleSyncPayload)
-    context become receive
+    context become (handleReadWrite orElse handleSyncEvents)
   }
 
   def uponSynced(): Unit
@@ -334,9 +334,9 @@ trait Sync extends P2PStage {
 }
 
 trait Relay extends P2PStage {
-  def startRelay(receive: Receive): Unit = {
+  def startRelay(): Unit = {
     setPayloadHandler(handleRelayPayload)
-    context become receive
+    context become (handleReadWrite orElse handleRelayEvent)
   }
 
   def handleRelayEvent: Receive = {
