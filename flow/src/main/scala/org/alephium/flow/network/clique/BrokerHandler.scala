@@ -68,15 +68,21 @@ object BrokerHandler {
   }
 }
 
-trait BrokerHandler extends HandShake with Relay {
+trait BrokerHandler extends HandShake with Relay with Sync {
   def cliqueManager: ActorRef = context.parent
 
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   override def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
+    log.debug(s"Handshaked with remote $remote - $remoteCliqueId")
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
+    startRelay()
+  }
+
+  override def uponSynced(): Unit = {
+    log.debug(s"Synced with remote $remote - $remoteCliqueId")
     startRelay()
   }
 }
@@ -124,9 +130,10 @@ trait ConnectionReader extends BaseActor with ConnectionUtil {
   def setUnaligned(bs: ByteString): Unit            = unaligned = bs
   def useUnaligned(newData: ByteString): ByteString = unaligned ++ newData
 
-  private var payloadHandler: Payload => Unit = (_ => ())
-  def getPayloadHandler(): Payload    => Unit = payloadHandler
-  def setPayloadHandler(handler: Payload => Unit): Unit = payloadHandler = handler
+  type PayloadHandler = Payload => Unit
+  private var payloadHandler: PayloadHandler           = _
+  def getPayloadHandler(): PayloadHandler              = payloadHandler
+  def setPayloadHandler(handler: PayloadHandler): Unit = payloadHandler = handler
 }
 
 trait ConnectionReaderWriter extends ConnectionReader with ConnectionWriter {
@@ -257,12 +264,14 @@ trait MessageHandler extends BaseActor {
 
   def handleSendHeaders(headers: AVector[BlockHeader]): Unit = {
     log.debug(s"Received #${headers.length} block headers")
-    // TODO: support many headers
-    val header     = headers.head
+    headers.foreach(handleNewHeader)
+  }
+
+  private def handleNewHeader(header: BlockHeader): Unit = {
     val chainIndex = header.chainIndex
     if (!chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
-      handler ! HeaderChainHandler.AddHeaders(headers, Remote(remoteCliqueId, remoteBroker))
+      handler ! HeaderChainHandler.AddHeader(header, Remote(remoteCliqueId, remoteBroker))
     } else {
       log.warning(s"Received headers for wrong chain from $remote")
     }
@@ -277,9 +286,7 @@ trait MessageHandler extends BaseActor {
 trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler
 
 trait Sync extends P2PStage {
-  def remoteCliqueId: CliqueId
-  def remoteBroker: BrokerInfo
-  def flowHandler: ActorRef
+  def flowHandler: ActorRef = allHandlers.flowHandler
 
   private var selfSynced       = false
   private var remoteSynced     = false
