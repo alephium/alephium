@@ -214,7 +214,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           connection: ActorRef,
           blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers) {
-          setPayloadHandler(handleRelayPayload)
+          startRelay(handleReadWrite orElse handleRelayEvent)
 
           self ! BrokerHandler.TcpAck
         })

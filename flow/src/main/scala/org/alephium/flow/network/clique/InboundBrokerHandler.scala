@@ -27,9 +27,9 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
   var remoteBroker: BrokerInfo = _
 
   connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
-  handshakeOut()
+  handshakeOut(handleReadWrite)
 
-  override def receive: Receive = handle
+  override def receive: Receive = handleReadWrite
 
   def handleBrokerInfo(_remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
     remoteCliqueId = _remoteCliqueId

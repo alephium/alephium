@@ -69,23 +69,15 @@ object BrokerHandler {
 }
 
 trait BrokerHandler extends HandShake with Relay {
-  implicit def config: PlatformProfile
-
-  def selfCliqueInfo: CliqueInfo
-  def remote: InetSocketAddress
-  def remoteCliqueId: CliqueId
-  def remoteBroker: BrokerInfo
-  def connection: ActorRef
-  def allHandlers: AllHandlers
-
   def cliqueManager: ActorRef = context.parent
 
-  def handle: Receive = handleSocketData orElse handleWrite orElse handleRelayEvent
+  def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
-  def uponHandshaked(): Unit = {
+  override def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
+    handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
     startPingPong()
-    setPayloadHandler(handleRelayPayload)
+    startRelay(handleReadWrite orElse handleRelayEvent)
   }
 }
 
@@ -101,7 +93,7 @@ trait ConnectionWriter extends BaseActor {
     connection ! Tcp.Write(message, BrokerHandler.TcpAck)
   }
 
-  private def trySend(message: ByteString): Unit = {
+  def trySend(message: ByteString): Unit = {
     if (isWaitingAck) {
       messagesToSent.enqueue(message)
     } else {
@@ -109,20 +101,17 @@ trait ConnectionWriter extends BaseActor {
     }
   }
 
+  def trySendBuffered(): Unit = {
+    assert(isWaitingAck)
+    isWaitingAck = false
+    if (messagesToSent.nonEmpty) {
+      send(messagesToSent.dequeue())
+    }
+  }
+
   def sendPayload(payload: Payload): Unit = {
     val message = Message.serialize(payload)
     trySend(message)
-  }
-
-  def handleWrite: Receive = {
-    case message: ByteString => // We use ByteString here for efficiency reasons
-      trySend(message)
-    case BrokerHandler.TcpAck =>
-      assert(isWaitingAck)
-      isWaitingAck = false
-      if (messagesToSent.nonEmpty) {
-        send(messagesToSent.dequeue())
-      }
   }
 }
 
@@ -131,49 +120,58 @@ trait ConnectionReader extends BaseActor with ConnectionUtil {
 
   def remote: InetSocketAddress
 
-  private var unaligned: ByteString = ByteString.empty
+  private var unaligned: ByteString                 = ByteString.empty
+  def setUnaligned(bs: ByteString): Unit            = unaligned = bs
+  def useUnaligned(newData: ByteString): ByteString = unaligned ++ newData
+
   private var payloadHandler: Payload => Unit = (_ => ())
-
-  def getPayloadHandler(): Payload => Unit = payloadHandler
-
+  def getPayloadHandler(): Payload    => Unit = payloadHandler
   def setPayloadHandler(handler: Payload => Unit): Unit = payloadHandler = handler
+}
 
-  def handleSocketData: Receive = {
+trait ConnectionReaderWriter extends ConnectionReader with ConnectionWriter {
+  def handleReadWrite: Receive = {
     case Tcp.Received(data) =>
-      BrokerHandler.deserialize(unaligned ++ data) match {
+      BrokerHandler.deserialize(useUnaligned(data)) match {
         case Right((messages, rest)) =>
           messages.foreach { message =>
             val cmdName = message.payload.getClass.getSimpleName
             log.debug(s"Received message of cmd@$cmdName from $remote")
             getPayloadHandler()(message.payload)
           }
-          unaligned = rest
+          setUnaligned(rest)
         case Left(e) =>
           log.info(
             s"Received corrupted data from $remote; error: ${e.toString}; Closing connection")
           stop()
       }
+
+    // We use ByteString here to avoid duplicated serialization
+    case message: ByteString         => trySend(message)
+    case BrokerHandler.TcpAck        => trySendBuffered()
+    case event: Tcp.ConnectionClosed => stopDueto(event)
   }
 }
 
-trait HandShake extends ConnectionReader with ConnectionWriter {
+trait HandShake extends ConnectionReaderWriter {
   def config: PlatformProfile
   def selfCliqueInfo: CliqueInfo
 
-  def handshakeOut(): Unit = {
+  def handshakeOut(receive: Receive): Unit = {
     sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
     setPayloadHandler(awaitHelloAck)
+    context become receive
   }
 
-  def handshakeIn(): Unit = {
+  def handshakeIn(receive: Receive): Unit = {
     setPayloadHandler(awaitHello)
+    context become receive
   }
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
       sendPayload(HelloAck(selfCliqueInfo.id, config.brokerInfo))
-      handleBrokerInfo(hello.cliqueId, hello.brokerInfo)
-      uponHandshaked()
+      uponHandshaked(hello.cliqueId, hello.brokerInfo)
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
       stop()
@@ -181,19 +179,16 @@ trait HandShake extends ConnectionReader with ConnectionWriter {
 
   def awaitHelloAck(payload: Payload): Unit = payload match {
     case helloAck: HelloAck =>
-      handleBrokerInfo(helloAck.cliqueId, helloAck.brokerInfo)
-      uponHandshaked()
+      uponHandshaked(helloAck.cliqueId, helloAck.brokerInfo)
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect HelloAck")
       stop()
   }
 
-  def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
-
-  def uponHandshaked(): Unit
+  def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 }
 
-trait PingPong extends ConnectionWriter with ConnectionUtil with Timers {
+trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
   def config: PlatformProfile
 
   def connection: ActorRef
@@ -279,7 +274,7 @@ trait MessageHandler extends BaseActor {
   }
 }
 
-trait P2PStage extends ConnectionReader with ConnectionWriter with PingPong with MessageHandler
+trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler
 
 trait Sync extends P2PStage {
   def remoteCliqueId: CliqueId
@@ -290,10 +285,11 @@ trait Sync extends P2PStage {
   private var remoteSynced     = false
   private val numOfBlocksLimit = 128 // Each message can include upto this number of blocks
 
-  def startSync(): Unit = {
+  def startSync(receive: Receive): Unit = {
     assert(!selfSynced)
     flowHandler ! FlowHandler.GetTips
     setPayloadHandler(handleSyncPayload)
+    context become receive
   }
 
   def uponSynced(): Unit
@@ -321,8 +317,7 @@ trait Sync extends P2PStage {
     case FlowHandler.BlocksLocated(blocks) =>
       sendPayload(SendBlocks(blocks))
       checkRemoteSynced(blocks.length)
-    case BrokerHandler.SendPing      => sendPing()
-    case event: Tcp.ConnectionClosed => stopDueto(event)
+    case BrokerHandler.SendPing => sendPing()
   }
 
   def handleSyncPayload(payload: Payload): Unit = payload match {
@@ -339,9 +334,13 @@ trait Sync extends P2PStage {
 }
 
 trait Relay extends P2PStage {
+  def startRelay(receive: Receive): Unit = {
+    setPayloadHandler(handleRelayPayload)
+    context become receive
+  }
+
   def handleRelayEvent: Receive = {
-    case BrokerHandler.SendPing      => sendPing()
-    case event: Tcp.ConnectionClosed => stopDueto(event)
+    case BrokerHandler.SendPing => sendPing()
   }
 
   def handleRelayPayload(payload: Payload): Unit = payload match {
