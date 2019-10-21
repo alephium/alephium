@@ -23,16 +23,16 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                            val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BrokerHandler {
 
-  var remoteCliqueId: CliqueId = _
-  var remoteBroker: BrokerInfo = _
+  var remoteCliqueId: CliqueId     = _
+  var remoteBrokerInfo: BrokerInfo = _
 
   connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
   handshakeOut()
 
   override def receive: Receive = handleReadWrite
 
-  def handleBrokerInfo(_remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
-    remoteCliqueId = _remoteCliqueId
-    remoteBroker   = remoteBrokerInfo
+  def handleBrokerInfo(_remoteCliqueId: CliqueId, _remoteBrokerInfo: BrokerInfo): Unit = {
+    remoteCliqueId   = _remoteCliqueId
+    remoteBrokerInfo = _remoteBrokerInfo
   }
 }
