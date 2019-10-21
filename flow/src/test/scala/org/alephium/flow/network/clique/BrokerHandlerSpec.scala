@@ -6,7 +6,7 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import akka.testkit.{SocketUtil, TestProbe}
+import akka.testkit.TestProbe
 import akka.util.ByteString
 import org.scalatest.EitherValues._
 
@@ -18,22 +18,27 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
 import org.alephium.serde.SerdeError
 import org.alephium.util.AVector
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
+class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spec =>
 
   behavior of "BrokerHandler"
 
-  trait BaseFixture {
-    val remote = SocketUtil.temporaryServerAddress()
-    val local  = SocketUtil.temporaryServerAddress()
+  def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
+    val cliqueInfo = ModelGen.cliqueInfo.sample.get
+    val id         = Random.nextInt(cliqueInfo.brokerNum)
+    val address    = cliqueInfo.peers(id)
+    val brokerInfo = BrokerInfo(id, cliqueInfo.groupNumPerBroker, address)
+    (address, cliqueInfo, brokerInfo)
+  }
 
-    val localCliqueInfo = ModelGen.cliqueInfo.sample.get
+  trait BaseFixture {
+    val (remote, remoteCliqueInfo, remoteBrokerInfo) = genBroker()
+    val (local, selfCliqueInfo, selfBrokerInfo)      = genBroker()
 
     val message = Message(SendBlocks(AVector.empty))
     val data    = Message.serialize(message)
 
-    val connection    = TestProbe("connection")
-    val blockHandlers = TestUtils.createBlockHandlersProbe
-
+    val connection     = TestProbe("connection")
+    val blockHandlers  = TestUtils.createBlockHandlersProbe
     val payloadHandler = TestProbe("payload-probe")
   }
 
@@ -53,7 +58,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     }
     val inboundBrokerHandler =
       system.actorOf(
-        builder.createInboundBrokerHandler(localCliqueInfo, remote, connection.ref, blockHandlers))
+        builder.createInboundBrokerHandler(selfCliqueInfo, remote, connection.ref, blockHandlers))
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
@@ -61,18 +66,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
         message.payload match {
           case hello: Hello =>
             hello.version is 0
-            hello.cliqueId is localCliqueInfo.id
+            hello.cliqueId is selfCliqueInfo.id
             hello.brokerInfo is config.brokerInfo
           case _ => assert(false)
         }
       case _ => assert(false)
     }
 
-    val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomId         = Random.nextInt(randomCliqueInfo.brokerNum)
-    val randomAddress    = randomCliqueInfo.peers(randomId)
-    val randomBroker     = BrokerInfo(randomId, randomCliqueInfo.groupNumPerBroker, randomAddress)
-    val helloAck         = Message(HelloAck(randomCliqueInfo.id, randomBroker))
+    val helloAck = Message(HelloAck(remoteCliqueInfo.id, remoteBrokerInfo))
     inboundBrokerHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
   }
@@ -93,25 +94,23 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
           })
       }
     }
-    val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
-    val randomBroker     = BrokerInfo.unsafe(0, config.groupNumPerBroker, remote) // TODO: improve
     val outboundBrokerHandler = system.actorOf(
-      builder.createOutboundBrokerHandler(localCliqueInfo,
-                                          randomCliqueInfo.id,
-                                          randomBroker,
+      builder.createOutboundBrokerHandler(selfCliqueInfo,
+                                          remoteCliqueInfo.id,
+                                          remoteBrokerInfo,
                                           blockHandlers))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
 
-    val hello = Message(Hello(randomCliqueInfo.id, randomBroker))
+    val hello = Message(Hello(remoteCliqueInfo.id, remoteBrokerInfo))
     outboundBrokerHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
         val message = Message.deserialize(write.data).right.value
         message.payload match {
           case ack: HelloAck =>
-            ack.cliqueId is localCliqueInfo.id
+            ack.cliqueId is selfCliqueInfo.id
             ack.brokerInfo is config.brokerInfo
           case _ => assert(false)
         }
@@ -134,7 +133,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
         })
     }
     val tcpHandler = system.actorOf(
-      builder.createInboundBrokerHandler(localCliqueInfo, remote, connection.ref, blockHandlers))
+      builder.createInboundBrokerHandler(selfCliqueInfo, remote, connection.ref, blockHandlers))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -153,7 +152,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
 
   it should "handle message boundary correctly" in new Fixture {
     tcpHandler ! Tcp.Received(data.take(1))
+    tcpHandler ! Tcp.Received(data.tail ++ data.take(1))
     tcpHandler ! Tcp.Received(data.tail)
+    payloadHandler.expectMsg(message.payload)
     payloadHandler.expectMsg(message.payload)
   }
 
@@ -220,7 +221,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
         })
     }
     val tcpHandler = system.actorOf(
-      builder.createInboundBrokerHandler(localCliqueInfo, remote, connection.ref, blockHandlers))
+      builder.createInboundBrokerHandler(selfCliqueInfo, remote, connection.ref, blockHandlers))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -251,4 +252,31 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     tcpHandler ! Tcp.Received(data1)
     expectTerminated(tcpHandler)
   }
+
+  behavior of "Sync protocol"
+
+  trait SyncFixture extends BaseFixture { Base =>
+    val props = Props(new BrokerHandler {
+      override def config: PlatformProfile    = Spec.config
+      override def remote: InetSocketAddress  = Base.remote
+      var remoteCliqueId: CliqueId            = _
+      var remoteBrokerInfo: BrokerInfo        = _
+      override def selfCliqueInfo: CliqueInfo = Base.selfCliqueInfo
+      override def connection: ActorRef       = Base.connection.ref
+      override def allHandlers: AllHandlers =
+        TestUtils.createBlockHandlersProbe(Spec.config, Spec.system)
+
+      override def receive: Receive = handleReadWrite
+
+      override def handleBrokerInfo(_remoteCliqueId: CliqueId,
+                                    _remoteBrokerInfo: BrokerInfo): Unit = {
+        remoteCliqueId   = _remoteCliqueId
+        remoteBrokerInfo = _remoteBrokerInfo
+      }
+
+      uponHandshaked(Base.remoteCliqueInfo.id, Base.remoteBrokerInfo)
+    })
+  }
+
+//  it should "start syncing after handshaking" in
 }

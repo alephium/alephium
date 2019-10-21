@@ -76,9 +76,9 @@ trait BrokerHandler extends HandShake with Relay with Sync {
   override def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
     log.debug(s"Handshaked with remote $remote - $remoteCliqueId")
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
-    cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBroker)
+    cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
-    startRelay()
+    startSync()
   }
 
   override def uponSynced(): Unit = {
@@ -240,7 +240,7 @@ trait MessageHandler extends BaseActor {
   def allHandlers: AllHandlers
   def remote: InetSocketAddress
   def remoteCliqueId: CliqueId
-  def remoteBroker: BrokerInfo
+  def remoteBrokerInfo: BrokerInfo
 
   def handleSendBlocks(blocks: AVector[Block]): Unit = {
     log.debug(s"Received #${blocks.length} blocks")
@@ -251,7 +251,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = block.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlock(block, Remote(remoteCliqueId, remoteBroker))
+      handler ! BlockChainHandler.AddBlock(block, Remote(remoteCliqueId, remoteBrokerInfo))
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }
@@ -271,7 +271,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = header.chainIndex
     if (!chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
-      handler ! HeaderChainHandler.AddHeader(header, Remote(remoteCliqueId, remoteBroker))
+      handler ! HeaderChainHandler.AddHeader(header, Remote(remoteCliqueId, remoteBrokerInfo))
     } else {
       log.warning(s"Received headers for wrong chain from $remote")
     }
