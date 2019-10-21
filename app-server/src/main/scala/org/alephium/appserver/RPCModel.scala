@@ -12,6 +12,7 @@ object RPCModel {
 
   case class FetchResponse(blocks: List[FetchEntry])
   object FetchResponse {
+    implicit val decoder: Decoder[FetchResponse] = deriveDecoder[FetchResponse]
     implicit val encoder: Encoder[FetchResponse] = deriveEncoder[FetchResponse]
   }
 
