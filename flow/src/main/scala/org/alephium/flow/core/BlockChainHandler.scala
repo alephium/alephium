@@ -37,13 +37,15 @@ class BlockChainHandler(val blockFlow: BlockFlow,
       log.debug(s"Block for ${block.chainIndex} already exists")
     } else {
       val validationResult = origin match {
-        case DataOrigin.LocalMining => Right(())
-        case _: DataOrigin.Remote   => blockFlow.validate(block)
+        case DataOrigin.LocalMining    => Right(ValidBlock)
+        case origin: DataOrigin.Remote => blockFlow.validate(block, origin.isSyncing)
       }
       validationResult match {
         case Left(e) =>
-          log.debug(s"Failed in block validation: ${e.toString}")
-        case Right(_) =>
+          log.debug(s"IO failed in block validation: ${e.toString}")
+        case Right(x: InvalidBlockStatus) =>
+          log.debug(s"Failed in block validation: $x")
+        case Right(_: ValidBlock.type) =>
           logInfo(block.header)
           broadcast(block, origin)
           flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())

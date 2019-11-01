@@ -33,6 +33,7 @@ object FlowHandler {
   case class BlocksLocated(blocks: AVector[Block]) extends Event
 }
 
+// TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
 class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extends BaseActor {
   import FlowHandler._

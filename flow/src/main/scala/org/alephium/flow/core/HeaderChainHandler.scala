@@ -17,7 +17,7 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddHeader(header: BlockHeader, origin: DataOrigin)
+  case class AddHeader(header: BlockHeader, origin: DataOrigin.Remote)
 }
 
 class HeaderChainHandler(val blockFlow: BlockFlow,
@@ -35,14 +35,16 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
       handleHeader(header, origin)
   }
 
-  def handleHeader(header: BlockHeader, origin: DataOrigin): Unit = {
+  def handleHeader(header: BlockHeader, origin: DataOrigin.Remote): Unit = {
     if (blockFlow.contains(header)) {
       log.debug(s"Header for ${header.chainIndex} already existed")
     } else {
-      blockFlow.validate(header, fromBlock = false) match {
+      blockFlow.validate(header, origin.isSyncing) match {
         case Left(e) =>
-          log.debug(s"Failed in header validation: ${e.toString}")
-        case Right(_) =>
+          log.debug(s"IO failed in header validation: ${e.toString}")
+        case Right(x: InvalidHeaderStatus) =>
+          log.debug(s"IO failed in header validation: $x")
+        case Right(_: ValidHeader.type) =>
           logInfo(header)
           broadcast(header, origin)
           flowHandler.tell(FlowHandler.AddHeader(header), sender())
