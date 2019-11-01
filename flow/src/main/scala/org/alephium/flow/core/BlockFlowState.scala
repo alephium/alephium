@@ -51,7 +51,7 @@ trait BlockFlowState {
         BlockChain.fromGenesisUnsafe(config.genesisBlocks(mainGroup)(to))
       }
     }
-  private val blockHeaderChains: AVector[AVector[BlockHeaderPool with BlockHashChain]] =
+  private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
         if (brokerInfo.containsRaw(from)) {
@@ -126,12 +126,23 @@ trait BlockFlowState {
     intraGroupChains(group.value - brokerInfo.groupFrom)
   }
 
-  protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool = {
+  protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain = {
     blockHeaderChains(from.value)(to.value)
   }
 
   protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain = {
     blockHeaderChains(from.value)(to.value)
+  }
+
+  private def getTrie(deps: AVector[Keccak256], groupIndex: GroupIndex): MerklePatriciaTrie = {
+    assert(deps.length == 2 * config.groups - 1)
+    val hash = deps(config.groups - 1 + groupIndex.value)
+    getBlockChainWithState(groupIndex).getTrie(hash)
+  }
+
+  def getTrie(block: Block): MerklePatriciaTrie = {
+    val header = block.header
+    getTrie(header.blockDeps, header.chainIndex.from)
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
@@ -142,8 +153,7 @@ trait BlockFlowState {
   def getBestTrie(groupIndex: GroupIndex): MerklePatriciaTrie = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    val hash = deps.deps(config.groups - 1 + groupIndex.value)
-    getBlockChainWithState(groupIndex).getTrie(hash)
+    getTrie(deps.deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {

@@ -242,6 +242,13 @@ trait MessageHandler extends BaseActor {
   def remoteCliqueId: CliqueId
   def remoteBrokerInfo: BrokerInfo
 
+  def origin: Remote = Remote(remoteCliqueId, remoteBrokerInfo, isSyncing)
+
+  private var _isSyncing: Boolean = false
+  def isSyncing: Boolean          = _isSyncing
+  def setSyncOn(): Unit           = _isSyncing = true
+  def setSyncOff(): Unit          = _isSyncing = false
+
   def handleSendBlocks(blocks: AVector[Block]): Unit = {
     log.debug(s"Received #${blocks.length} blocks")
     blocks.foreach(handleNewBlock)
@@ -251,7 +258,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = block.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlock(block, Remote(remoteCliqueId, remoteBrokerInfo))
+      handler ! BlockChainHandler.AddBlock(block, origin)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }
@@ -271,7 +278,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = header.chainIndex
     if (!chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
-      handler ! HeaderChainHandler.AddHeader(header, Remote(remoteCliqueId, remoteBrokerInfo))
+      handler ! HeaderChainHandler.AddHeader(header, origin)
     } else {
       log.warning(s"Received headers for wrong chain from $remote")
     }
@@ -297,6 +304,7 @@ trait Sync extends P2PStage {
     flowHandler ! FlowHandler.GetTips
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents)
+    setSyncOn()
   }
 
   def uponSynced(): Unit
@@ -344,6 +352,7 @@ trait Relay extends P2PStage {
   def startRelay(): Unit = {
     setPayloadHandler(handleRelayPayload)
     context become (handleReadWrite orElse handleRelayEvent)
+    setSyncOff()
   }
 
   def handleRelayEvent: Receive = {
