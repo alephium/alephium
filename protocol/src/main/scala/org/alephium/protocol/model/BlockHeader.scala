@@ -47,20 +47,9 @@ case class BlockHeader(
     blockDeps.takeRight(config.groups)
   }
 
-  def validateDiff: Boolean = {
-    val current = BigInt(1, hash.bytes.toArray)
-    assert(current >= 0)
-    current <= target
-  }
-
   def validateIndex(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
     val actual = chainIndex
     target.from == actual.from && target.to == actual.to
-  }
-
-  // Note: the target is not validated here
-  def preValidate(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
-    validateIndex(target) && validateDiff
   }
 }
 

@@ -176,7 +176,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.from(deps, transactions, config.maxMiningTarget, nonce)
-      if (block.preValidate(chainIndex)) block else iter(nonce + 1)
+      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)

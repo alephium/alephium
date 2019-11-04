@@ -8,7 +8,7 @@ import akka.actor.Props
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.core.{BlockChainHandler, FlowHandler, Validation}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
@@ -63,7 +63,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val header = template.buildHeader(current)
-        if (header.preValidate(chainIndex))
+        if (Validation.validateMined(header, chainIndex))
           Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None
