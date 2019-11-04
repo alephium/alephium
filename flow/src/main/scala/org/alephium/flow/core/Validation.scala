@@ -4,7 +4,7 @@ import org.alephium.crypto.{ED25519Signature, Keccak256}
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHeader, TxOutput, TxOutputPoint}
+import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
 object Validation {
@@ -29,7 +29,7 @@ object Validation {
   }
 
   def validate(block: Block, flow: BlockFlow, isSyncing: Boolean)(
-    implicit config: PlatformProfile): IOResult[BlockStatus] = {
+      implicit config: PlatformProfile): IOResult[BlockStatus] = {
     convert(validateBlock(block, flow, isSyncing), ValidBlock)
   }
 
@@ -71,7 +71,6 @@ object Validation {
     if (ok1 && ok2) valid0 else invalid0(InvalidTimeStamp)
   }
 
-  // Fix now: remove validateDiff from BlockHeader
   def validateWorkAmount(header: BlockHeader): HeaderValidationResult = {
     val current = BigInt(1, header.hash.bytes.toArray)
     assert(current >= 0)
@@ -132,5 +131,17 @@ object Validation {
       }
     }
     valid1
+  }
+
+  /*
+   * The following functions are helper functions which will not contain any core logic
+   */
+  def validateMined(block: Block, index: ChainIndex)(implicit config: GroupConfig): Boolean = {
+    validateMined(block.header, index)
+  }
+
+  def validateMined(header: BlockHeader, index: ChainIndex)(
+      implicit config: GroupConfig): Boolean = {
+    header.chainIndex == index && validateWorkAmount(header).isRight
   }
 }
