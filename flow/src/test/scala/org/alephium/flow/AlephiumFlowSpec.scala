@@ -17,7 +17,7 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   val env      = Env.resolve()
   val rootPath = Platform.getRootPath(env)
 
-  val newPath = rootPath.resolveSibling(rootPath.getFileName + this.getClass.getSimpleName)
+  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + this.getClass.getSimpleName)
   val groups0 = NewConfig.parseConfig(rootPath).getInt("alephium.groups")
 
   val groupConfig = new GroupConfig { override def groups: Int = groups0 }

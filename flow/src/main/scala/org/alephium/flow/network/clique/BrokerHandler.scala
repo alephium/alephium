@@ -297,9 +297,10 @@ trait Sync extends P2PStage {
 
   private var selfSynced       = false
   private var remoteSynced     = false
-  private val numOfBlocksLimit = 128 // Each message can include upto this number of blocks
+  private val numOfBlocksLimit = config.numOfSyncBlocksLimit // Each message can include upto this number of blocks
 
   def startSync(): Unit = {
+    log.info(s"Start syncing with ${remoteBrokerInfo.address}")
     assert(!selfSynced)
     flowHandler ! FlowHandler.GetTips
     setPayloadHandler(handleSyncPayload)
@@ -335,6 +336,7 @@ trait Sync extends P2PStage {
     case BrokerHandler.SendPing => sendPing()
   }
 
+  // TODO: move checkSelfSynced to handleSyncEvents so that all the blocks sent are validated
   def handleSyncPayload(payload: Payload): Unit = payload match {
     case SendBlocks(blocks)     => handleSendBlocks(blocks); checkSelfSynced(blocks.length)
     case GetBlocks(locators)    => handleGetBlocks(locators)
