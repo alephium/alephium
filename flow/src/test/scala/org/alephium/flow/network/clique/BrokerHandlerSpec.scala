@@ -6,15 +6,15 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import akka.testkit.TestProbe
+import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, TestUtils}
+import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils, Validation}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, ModelGen}
+import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
 import org.alephium.util.AVector
 
@@ -34,7 +34,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val (remote, remoteCliqueInfo, remoteBrokerInfo) = genBroker()
     val (local, selfCliqueInfo, selfBrokerInfo)      = genBroker()
 
-    val message = Message(SendBlocks(AVector.empty))
+    val message = SendBlocks(AVector.empty)
     val data    = Message.serialize(message)
 
     val connection     = TestProbe("connection")
@@ -54,6 +54,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
           override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+
+          isSyncing is false
         })
     }
     val inboundBrokerHandler =
@@ -73,7 +75,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       case _ => assert(false)
     }
 
-    val helloAck = Message(HelloAck(remoteCliqueInfo.id, remoteBrokerInfo))
+    val helloAck = HelloAck(remoteCliqueInfo.id, remoteBrokerInfo)
     inboundBrokerHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
   }
@@ -91,6 +93,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
             override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
             override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+
+            isSyncing is false
           })
       }
     }
@@ -103,7 +107,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
 
-    val hello = Message(Hello(remoteCliqueInfo.id, remoteBrokerInfo))
+    val hello = Hello(remoteCliqueInfo.id, remoteBrokerInfo)
     outboundBrokerHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
@@ -141,7 +145,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
 
   it should "forward data to message handler" in new Fixture {
     tcpHandler ! Tcp.Received(data)
-    payloadHandler.expectMsg(message.payload)
+    payloadHandler.expectMsg(message)
   }
 
   it should "stop when received corrupted data" in new Fixture {
@@ -154,8 +158,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     tcpHandler ! Tcp.Received(data.take(1))
     tcpHandler ! Tcp.Received(data.tail ++ data.take(1))
     tcpHandler ! Tcp.Received(data.tail)
-    payloadHandler.expectMsg(message.payload)
-    payloadHandler.expectMsg(message.payload)
+    payloadHandler.expectMsg(message)
+    payloadHandler.expectMsg(message)
   }
 
   it should "stop when tcp connection closed" in new Fixture {
@@ -238,7 +242,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
 
   it should "reply pong to ping" in new PingPongFixture {
     val nonce    = Random.nextInt()
-    val message1 = Message(Ping(nonce, System.currentTimeMillis()))
+    val message1 = Ping(nonce, System.currentTimeMillis())
     val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
     connection.expectMsg(BrokerHandler.envelope(Message(Pong(nonce))))
@@ -247,7 +251,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
   it should "fail if receive a wrong ping" in new PingPongFixture {
     watch(tcpHandler)
     val nonce    = Random.nextInt()
-    val message1 = Message(Pong(nonce))
+    val message1 = Pong(nonce)
     val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
     expectTerminated(tcpHandler)
@@ -256,7 +260,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
   behavior of "Sync protocol"
 
   trait SyncFixture extends BaseFixture { Base =>
-    val props = Props(new BrokerHandler {
+    val syncHandlerRef = TestActorRef(new BrokerHandler {
       override def config: PlatformProfile    = Spec.config
       override def remote: InetSocketAddress  = Base.remote
       var remoteCliqueId: CliqueId            = _
@@ -266,17 +270,34 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       override def allHandlers: AllHandlers =
         TestUtils.createBlockHandlersProbe(Spec.config, Spec.system)
 
-      override def receive: Receive = handleReadWrite
+      override def receive: Receive = { case _ => () }
 
       override def handleBrokerInfo(_remoteCliqueId: CliqueId,
                                     _remoteBrokerInfo: BrokerInfo): Unit = {
         remoteCliqueId   = _remoteCliqueId
         remoteBrokerInfo = _remoteBrokerInfo
       }
-
-      uponHandshaked(Base.remoteCliqueInfo.id, Base.remoteBrokerInfo)
     })
+    val syncHandler = syncHandlerRef.underlyingActor
   }
 
-//  it should "start syncing after handshaking" in
+  def genBlock()(implicit config: PlatformProfile): Block = {
+    val block = ModelGen.blockGen.sample.get
+    if (Validation.validateGroup(block).isRight) block else genBlock
+  }
+
+  it should "start syncing after handshaking" in new SyncFixture {
+    syncHandler.isSyncing is false
+    syncHandler.uponHandshaked(this.remoteCliqueInfo.id, this.remoteBrokerInfo)
+    syncHandler.isSyncing is true
+
+    val block      = genBlock()
+    val blocksMsg0 = Message.serialize(SendBlocks(AVector.fill(config.numOfSyncBlocksLimit)(block)))
+    syncHandlerRef ! Tcp.Received(blocksMsg0)
+    syncHandler.isSyncing is true
+    val blocksMsg1 = Message.serialize(SendBlocks(AVector.fill(1)(block)))
+    syncHandlerRef ! Tcp.Received(blocksMsg1)
+    syncHandlerRef ! FlowHandler.BlocksLocated(AVector.fill(1)(block))
+    syncHandler.isSyncing is false
+  }
 }

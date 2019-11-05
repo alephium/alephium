@@ -9,7 +9,7 @@ import scala.concurrent.duration._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, DiscoveryConfig => DC, GroupConfig}
+import org.alephium.protocol.config.{DiscoveryConfig => DC, _}
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -46,6 +46,7 @@ object NewConfig extends StrictLogging {
     def retryTimeout: FiniteDuration
     def publicAddress: InetSocketAddress
     def masterAddress: InetSocketAddress
+    def numOfSyncBlocksLimit: Int
     def isCoordinator: Boolean
 
     def bootstrap: AVector[InetSocketAddress]
