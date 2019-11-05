@@ -115,7 +115,8 @@ object PlatformProfile {
         networkCfg.getString("publicAddress"))
       final val masterAddress: InetSocketAddress = parseAddress(
         networkCfg.getString("masterAddress"))
-      final val isCoordinator: Boolean = publicAddress == masterAddress
+      final val numOfSyncBlocksLimit: Int = networkCfg.getInt("numOfSyncBlocksLimit")
+      final val isCoordinator: Boolean    = publicAddress == masterAddress
       /* Network */
 
       /* Broker */
