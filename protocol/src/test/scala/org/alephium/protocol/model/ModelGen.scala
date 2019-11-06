@@ -13,14 +13,14 @@ object ModelGen {
   private val (sk, pk) = ED25519.generatePriPub()
 
   val txInputGen: Gen[TxOutputPoint] = for {
-    index <- Gen.choose(0, 10)
+    index <- Gen.choose(0, 5)
   } yield {
     val publicKey = ED25519PublicKey.generate
     TxOutputPoint(publicKey, Keccak256.random, index)
   }
 
   val txOutputGen: Gen[TxOutput] = for {
-    value <- Gen.choose(0, 100)
+    value <- Gen.choose(0, 5)
   } yield TxOutput(value, pk)
 
   val transactionGen: Gen[Transaction] = for {
@@ -32,13 +32,20 @@ object ModelGen {
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
-      txNum <- Gen.choose(0, 100)
+      txNum <- Gen.choose(0, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
+  def blockGenFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] =
+    blockGen.retryUntil(_.chainIndex.relateTo(broker))
+
+  def blockGenNotFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] = {
+    blockGen.retryUntil(!_.chainIndex.relateTo(broker))
+  }
+
   def blockGenWith(deps: AVector[Keccak256])(implicit config: ConsensusConfig): Gen[Block] =
     for {
-      txNum <- Gen.choose(0, 100)
+      txNum <- Gen.choose(0, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(deps, AVector.from(txs), config.maxMiningTarget, 0)
 
