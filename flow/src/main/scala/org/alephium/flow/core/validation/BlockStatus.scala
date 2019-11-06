@@ -19,6 +19,7 @@ final case object EmptyTransactionList extends InvalidBlockStatus
 final case object InvalidCoinbase      extends InvalidBlockStatus
 final case object InvalidMerkleRoot    extends InvalidBlockStatus
 
-sealed trait InvalidTransactions extends InvalidBlockStatus
-final case object DoubleSpent    extends InvalidTransactions
-final case object InvalidCoins   extends InvalidTransactions
+sealed trait InvalidTransactions     extends InvalidBlockStatus
+final case object InvalidTxSignature extends InvalidTransactions
+final case object InvalidCoin        extends InvalidTransactions
+final case object DoubleSpent        extends InvalidTransactions

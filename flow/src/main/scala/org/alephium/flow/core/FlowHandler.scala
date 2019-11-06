@@ -49,9 +49,9 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
           sender() ! Message(SendHeaders(headers))
       }
     case GetBlocks(locators: AVector[Keccak256]) =>
-      blockFlow.getBlocks(locators) match {
+      locators.flatMapE(blockFlow.getBlocksAfter) match {
         case Left(error) =>
-          log.warning(s"Failure while getting blocks: $error")
+          log.warning(s"IO Failure while getting blocks: $error")
         case Right(blocks) =>
           sender() ! BlocksLocated(blocks)
       }

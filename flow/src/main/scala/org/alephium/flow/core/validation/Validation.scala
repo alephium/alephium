@@ -4,6 +4,7 @@ import org.alephium.crypto.{ED25519Signature, Keccak256}
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
@@ -55,7 +56,8 @@ object Validation {
       _ <- validateNonEmptyTransactions(block)
       _ <- validateCoinbase(block)
       _ <- validateMerkleRoot(block)
-      _ <- validateTransactions(block, flow)
+//      _ <- validateTxsSignature(block, flow) // TODO: design & implement this
+      _ <- validateSpending(block, flow)
     } yield ()
   }
 
@@ -79,9 +81,9 @@ object Validation {
     if (current <= header.target) valid0 else invalid0(InvalidWorkAmount)
   }
 
-  def validateWorkTarget(header: BlockHeader,
-                         headerChain: BlockHeaderChain): HeaderValidationResult = {
-    headerChain.getHashTarget(header.hash) match {
+  def validateWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(
+      implicit config: GroupConfig): HeaderValidationResult = {
+    headerChain.getHashTarget(header.parentHash) match {
       case Left(error)   => Left(Left(error))
       case Right(target) => if (target == header.target) valid0 else invalid0(InvalidWorkTarget)
     }
@@ -114,9 +116,23 @@ object Validation {
     else invalid1(InvalidMerkleRoot)
   }
 
-  // TODO: refine this and test this
-  def validateTransactions(block: Block, flow: BlockFlow): BlockValidationResult = {
-    val trie     = flow.getTrie(block)
+  // TODO: refine transaction validation and test properly
+  def validateSpending(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): BlockValidationResult = {
+    val index      = block.chainIndex
+    val brokerInfo = config.brokerInfo
+    assert(index.relateTo(brokerInfo))
+
+    val boolFrom = brokerInfo.contains(index.from)
+    if (boolFrom) {
+      val trie = flow.getTrie(block)
+      validateSpending(block, trie)
+    } else {
+      valid1
+    }
+  }
+
+  private def validateSpending(block: Block, trie: MerklePatriciaTrie): BlockValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
     block.transactions.foreach { tx =>
       tx.unsigned.inputs.foreach { txOutputPoint =>
@@ -126,7 +142,7 @@ object Validation {
           utxoUsed += txOutputPoint
           trie.getOpt[TxOutputPoint, TxOutput](txOutputPoint) match {
             case Left(error)        => return Left(Left(error))
-            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) return invalid1(InvalidCoins)
+            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) return invalid1(InvalidCoin)
           }
         }
         // scalastyle:on return
@@ -138,6 +154,7 @@ object Validation {
   /*
    * The following functions are helper functions which will not contain any core logic
    */
+
   def validateMined(block: Block, index: ChainIndex)(implicit config: GroupConfig): Boolean = {
     validateMined(block.header, index)
   }
