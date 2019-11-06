@@ -1,6 +1,7 @@
-package org.alephium.flow.core
+package org.alephium.flow.core.validation
 
 import org.alephium.crypto.{ED25519Signature, Keccak256}
+import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.config.GroupConfig
@@ -8,8 +9,9 @@ import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
 object Validation {
-  private type HeaderValidationResult = Either[Either[IOError, InvalidHeaderStatus], Unit]
-  private type BlockValidationResult  = Either[Either[IOError, InvalidBlockStatus], Unit]
+  private[validation] type HeaderValidationResult =
+    Either[Either[IOError, InvalidHeaderStatus], Unit]
+  private[validation] type BlockValidationResult = Either[Either[IOError, InvalidBlockStatus], Unit]
 
   private def invalid0(status: InvalidHeaderStatus): HeaderValidationResult = Left(Right(status))
   private def invalid1(status: InvalidBlockStatus): BlockValidationResult   = Left(Right(status))
@@ -66,8 +68,8 @@ object Validation {
     val now      = TimeStamp.now()
     val headerTs = TimeStamp.fromMillis(header.timestamp)
 
-    val ok1 = now <= now.plusHours(1)
-    val ok2 = isSyncing || (headerTs >= now.plusHours(-1))
+    val ok1 = headerTs < now.plusHours(1)
+    val ok2 = isSyncing || (headerTs > now.plusHours(-1))
     if (ok1 && ok2) valid0 else invalid0(InvalidTimeStamp)
   }
 
@@ -99,7 +101,7 @@ object Validation {
   }
 
   def validateCoinbase(block: Block): BlockValidationResult = {
-    val coinbase = block.transactions.head
+    val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.signature == ED25519Signature.zero)
       valid1

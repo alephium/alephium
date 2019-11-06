@@ -7,6 +7,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519PublicKey, Keccak256}
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.validation.Validation
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 
@@ -169,7 +170,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val (_, toPublicKey) = mainGroup.generateKey()
         val inputs           = balances.map(_._1)
         val outputs          = AVector(TxOutput(1, toPublicKey), TxOutput(total - 1, publicKey))
-        AVector(Transaction.from(inputs, outputs, privateKey))
+        AVector(Transaction.from0(inputs, outputs, privateKey))
       } else AVector.empty[Transaction]
     }
 

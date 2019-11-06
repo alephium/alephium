@@ -1,4 +1,4 @@
-package org.alephium.flow.core
+package org.alephium.flow.core.validation
 
 sealed trait BlockStatus
 sealed trait InvalidBlockStatus extends BlockStatus
