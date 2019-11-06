@@ -24,10 +24,16 @@ object Transaction {
   implicit val serde: Serde[Transaction] =
     Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.signature))
 
-  def from(inputs: AVector[TxOutputPoint],
-           outputs: AVector[TxOutput],
-           privateKey: ED25519PrivateKey): Transaction = {
+  def from0(inputs: AVector[TxOutputPoint],
+            outputs: AVector[TxOutput],
+            privateKey: ED25519PrivateKey): Transaction = {
     from(UnsignedTransaction(inputs, outputs), privateKey)
+  }
+
+  def from1(inputs: AVector[TxOutputPoint],
+            outputs: AVector[TxOutput],
+            signature: ED25519Signature): Transaction = {
+    Transaction(UnsignedTransaction(inputs, outputs), ByteString.empty, signature)
   }
 
   def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {

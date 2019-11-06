@@ -8,7 +8,8 @@ import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.core.{BlockChainHandler, FlowHandler, Validation}
+import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile

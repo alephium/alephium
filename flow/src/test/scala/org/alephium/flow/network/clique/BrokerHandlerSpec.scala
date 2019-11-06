@@ -11,7 +11,7 @@ import akka.util.ByteString
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils, Validation}
+import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
@@ -281,17 +281,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val syncHandler = syncHandlerRef.underlyingActor
   }
 
-  def genBlock()(implicit config: PlatformProfile): Block = {
-    val block = ModelGen.blockGen.sample.get
-    if (Validation.validateGroup(block).isRight) block else genBlock
-  }
-
   it should "start syncing after handshaking" in new SyncFixture {
     syncHandler.isSyncing is false
     syncHandler.uponHandshaked(this.remoteCliqueInfo.id, this.remoteBrokerInfo)
     syncHandler.isSyncing is true
 
-    val block      = genBlock()
+    val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
     val blocksMsg0 = Message.serialize(SendBlocks(AVector.fill(config.numOfSyncBlocksLimit)(block)))
     syncHandlerRef ! Tcp.Received(blocksMsg0)
     syncHandler.isSyncing is true

@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.flow.core.validation.{InvalidHeaderStatus, ValidHeader}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
