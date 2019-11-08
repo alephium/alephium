@@ -35,12 +35,12 @@ import org.alephium.util.{AVector, EventBus}
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
 
-  implicit val system: ActorSystem = mode.node.system
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val system: ActorSystem                = mode.node.system
+  implicit val materializer: ActorMaterializer    = ActorMaterializer()
   implicit val executionContext: ExecutionContext = system.dispatcher
-  implicit val config: PlatformProfile = mode.profile
-  implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
-  implicit val askTimeout: Timeout = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
+  implicit val config: PlatformProfile            = mode.profile
+  implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
+  implicit val askTimeout: Timeout                = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
 
   def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
     blockflowFetch(mode.node.blockFlow, req)
@@ -58,8 +58,14 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
       system.actorOf(props, s"FairMiner")
     }
 
-    Http().bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, mode.rpcHttpPort).map(_ => ())
-    Http().bindAndHandle(routeWs(mode.node.eventBus), rpcConfig.networkInterface.getHostAddress, mode.rpcWsPort).map(_     => ())
+    Http()
+      .bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, mode.rpcHttpPort)
+      .map(_ => ())
+    Http()
+      .bindAndHandle(routeWs(mode.node.eventBus),
+                     rpcConfig.networkInterface.getHostAddress,
+                     mode.rpcWsPort)
+      .map(_ => ())
   }
 }
 
@@ -83,15 +89,19 @@ trait RPCServerAbstract extends StrictLogging {
     // TODO Replace with concrete implementation.
     event match {
       case _ =>
-        val ts = System.currentTimeMillis()
+        val ts     = System.currentTimeMillis()
         val result = Notification("events_fake", Some(ts.asJson))
         TextMessage(result.asJson.noSpaces)
     }
   }
 
   def handlerRPC(miner: ActorRef): JsonRPC.Handler = Map.apply(
-    "blockflow_fetch" -> { req => Future { doBlockflowFetch(req) }},
-    "clique_info" -> { req => doCliqueInfo(req) },
+    "blockflow_fetch" -> { req =>
+      Future { doBlockflowFetch(req) }
+    },
+    "clique_info" -> { req =>
+      doCliqueInfo(req)
+    },
     "mining_start" -> { req =>
       Future {
         miner ! Miner.Start
@@ -105,7 +115,6 @@ trait RPCServerAbstract extends StrictLogging {
       }
     }
   )
-
 
   def routeHttp(miner: ActorRef): Route =
     CORSHandler(JsonRPCHandler.routeHttp(handlerRPC(miner)))
@@ -124,7 +133,9 @@ trait RPCServerAbstract extends StrictLogging {
     }
   }
 
-  def wsFlow(eventBus: ActorRef, actor: ActorRef, source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
+  def wsFlow(eventBus: ActorRef,
+             actor: ActorRef,
+             source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
     Flow
       .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
       .watchTermination() { (_, termination) =>
@@ -148,7 +159,7 @@ object RPCServer extends StrictLogging {
   implicit val cliquesEncoder: Encoder[AVector[CliqueInfo]] = encodeAVector[CliqueInfo]
 
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(implicit rpc: RPCConfig,
-                                               cfg: ConsensusConfig): Response = {
+                                                         cfg: ConsensusConfig): Response = {
     req.paramsAs[FetchRequest] match {
       case Right(query) =>
         val now        = Instant.now()
