@@ -26,11 +26,11 @@ object RPCServerSpec {
   case object Dummy extends EventBus.Event
 
   class RPCServerDummy(implicit val config: PlatformProfile) extends RPCServerAbstract {
-    implicit val system: ActorSystem = ActorSystem()
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
+    implicit val system: ActorSystem                = ActorSystem()
+    implicit val materializer: ActorMaterializer    = ActorMaterializer()
     implicit val executionContext: ExecutionContext = system.dispatcher
-    implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
-    implicit val askTimeout: Timeout = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
+    implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
+    implicit val askTimeout: Timeout                = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
 
     def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
       JsonRPC.Response.failed(JsonRPC.Error.InternalError)
@@ -53,13 +53,13 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   trait RouteHTTP {
     implicit lazy val askTimeout = Timeout(Duration.fromNanos(server.rpcConfig.askTimeout.toNanos))
 
-    lazy val server: RPCServerDummy = new RPCServerDummy { }
-    lazy val route: Route = server.routeHttp(TestProbe().ref)
+    lazy val server: RPCServerDummy = new RPCServerDummy {}
+    lazy val route: Route           = server.routeHttp(TestProbe().ref)
 
     def checkCall[T](method: String)(f: JsonRPC.Response.Success => T): T = {
       rpcRequest(method, Json.obj(), 0) ~> route ~> check {
         status.intValue is 200
-        val json = parse(responseAs[String]).right.value
+        val json    = parse(responseAs[String]).right.value
         val success = json.as[JsonRPC.Response.Success].right.value
         f(success)
       }
@@ -68,30 +68,30 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     def checkCallResult[T](method: String)(f: Json => T): T =
       checkCall(method)(json => f(json.result))
 
-
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
       val jsonRequest = JsonRPC.Request(method, Some(params), id).asJson.noSpaces
-      HttpRequest(HttpMethods.POST, "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
+      HttpRequest(HttpMethods.POST,
+                  "/",
+                  entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
     }
   }
 
   trait MiningMock extends RouteHTTP {
-    val miner = TestProbe()
+    val miner                      = TestProbe()
     override lazy val route: Route = server.routeHttp(miner.ref)
   }
 
-
   trait RouteWS {
-    val client = WSProbe()
-    val server = new RPCServerDummy { }
+    val client   = WSProbe()
+    val server   = new RPCServerDummy {}
     val eventBus = system.actorOf(EventBus.props())
-    val route = server.routeWs(eventBus)
+    val route    = server.routeWs(eventBus)
 
     def sendEventAndCheck: Assertion = {
       eventBus ! Dummy
       val TextMessage.Strict(message) = client.expectMessage()
 
-      val json = parse(message).right.value
+      val json         = parse(message).right.value
       val notification = json.as[JsonRPC.NotificationUnsafe].right.value.asNotification.right.value
 
       notification.method is "events_fake"
@@ -150,8 +150,10 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   it should "http - reject wrong content type" in new RouteHTTP {
-    val request = HttpRequest(HttpMethods.POST, "/",
-      entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, Json.Null.noSpaces))
+    val request = HttpRequest(HttpMethods.POST,
+                              "/",
+                              entity =
+                                HttpEntity(ContentTypes.`text/plain(UTF-8)`, Json.Null.noSpaces))
 
     request ~> route ~> check {
       val List(rejection: UnsupportedRequestContentTypeRejection) = rejections
