@@ -2,7 +2,6 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
 import akka.event.LoggingAdapter
@@ -15,18 +14,18 @@ import org.scalatest.EitherValues._
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
-import org.alephium.util.{AlephiumActorSpec, AVector}
+import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
 
 class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   import DiscoveryServerSpec._
   import DiscoveryMessage._
 
   trait Fixture { self =>
-    def groupSize: Int                = 3
-    val udpPort: Int                  = SocketUtil.temporaryLocalPort(udp = true)
-    def peersPerGroup: Int            = 1
-    def scanFrequency: FiniteDuration = 500.millis
-    val socketProbe                   = TestProbe()
+    def groupSize: Int          = 3
+    val udpPort: Int            = SocketUtil.temporaryLocalPort(udp = true)
+    def peersPerGroup: Int      = 1
+    def scanFrequency: Duration = Duration.ofMillis(500)
+    val socketProbe             = TestProbe()
 
     implicit val config: DiscoveryConfig =
       createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
@@ -92,7 +91,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   }
 
   it should "clean up everything if timeout is negative" in new Fixture {
-    override def scanFrequency: FiniteDuration = (-1).millis
+    override def scanFrequency: Duration = Duration.ofMillis(-1)
 
     addToTable(peerClique)
     val peer0 = ModelGen.cliqueInfo.sample.get

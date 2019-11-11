@@ -120,8 +120,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
       chain.getBlockHeader(parentHash) match {
         case Left(_) => "??? seconds"
         case Right(parentHeader) =>
-          val span = (header.timestamp - parentHeader.timestamp).toDouble / 1000
-          s"$span seconds"
+          val span = header.timestamp.diff(parentHeader.timestamp)
+          s"${span.toSeconds} seconds"
       }
     }
     log.info(s"$index; total: $total; ${chain
