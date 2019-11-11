@@ -70,17 +70,17 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   /* BlockHeader apis */
 
-  protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderPool
+  protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain
 
-  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderPool = {
+  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain = {
     getHeaderChain(chainIndex.from, chainIndex.to)
   }
 
-  def getHeaderChain(header: BlockHeader): BlockHeaderPool = {
+  def getHeaderChain(header: BlockHeader): BlockHeaderChain = {
     getHeaderChain(header.chainIndex)
   }
 
-  def getHeaderChain(hash: Keccak256): BlockHeaderPool = {
+  def getHeaderChain(hash: Keccak256): BlockHeaderChain = {
     getHeaderChain(ChainIndex.from(hash))
   }
 

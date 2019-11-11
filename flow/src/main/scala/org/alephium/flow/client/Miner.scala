@@ -9,6 +9,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
@@ -27,7 +28,7 @@ object Miner {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
-      if (block.preValidate(chainIndex)) block else iter(nonce + 1)
+      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)
@@ -72,7 +73,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           val elapsed = System.currentTimeMillis() - lastTs
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
-          blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
+          blockHandler ! BlockChainHandler.AddBlock(block, LocalMining)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
             allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
@@ -122,7 +123,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     def iter(current: BigInt): Option[Block] = {
       if (current < to) {
         val header = template.buildHeader(current)
-        if (header.preValidate(chainIndex))
+        if (Validation.validateMined(header, chainIndex))
           Some(Block(header, template.transactions))
         else iter(current + 1)
       } else None

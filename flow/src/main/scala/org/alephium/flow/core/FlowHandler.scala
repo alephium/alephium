@@ -6,18 +6,18 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
+import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 object FlowHandler {
-
   def props(blockFlow: BlockFlow)(implicit config: PlatformProfile): Props =
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
   case class GetBlocks(locators: AVector[Keccak256])    extends Command
   case class GetHeaders(locators: AVector[Keccak256])   extends Command
+  case object GetTips                                   extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
@@ -29,8 +29,11 @@ object FlowHandler {
                                target: BigInt,
                                transactions: AVector[Transaction])
       extends Event
+  case class CurrentTips(tips: AVector[Keccak256]) extends Event
+  case class BlocksLocated(blocks: AVector[Block]) extends Event
 }
 
+// TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
 class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extends BaseActor {
   import FlowHandler._
@@ -46,20 +49,17 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
           sender() ! Message(SendHeaders(headers))
       }
     case GetBlocks(locators: AVector[Keccak256]) =>
-      blockFlow.getBlocks(locators) match {
+      locators.flatMapE(blockFlow.getBlocksAfter) match {
         case Left(error) =>
-          log.warning(s"Failure while getting blocks: $error")
+          log.warning(s"IO Failure while getting blocks: $error")
         case Right(blocks) =>
-          sender() ! Message(SendBlocks(blocks))
+          sender() ! BlocksLocated(blocks)
       }
-    case PrepareBlockFlow(chainIndex) =>
-      prepareBlockFlow(chainIndex)
-    case AddHeader(header: BlockHeader) =>
-      handleHeader(minerOpt, header)
-    case AddBlock(block, origin) =>
-      handleBlock(minerOpt, block, origin)
-    case Register(miner) =>
-      context become handleWith(Some(miner))
+    case PrepareBlockFlow(chainIndex)   => prepareBlockFlow(chainIndex)
+    case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
+    case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
+    case GetTips                        => sender() ! CurrentTips(blockFlow.getAllTips)
+    case Register(miner)                => context become handleWith(Some(miner))
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {

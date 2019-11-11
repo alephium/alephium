@@ -14,7 +14,8 @@ object DataOrigin {
 
     override def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean = false
   }
-  case class Remote(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends DataOrigin {
+  case class Remote(cliqueId: CliqueId, brokerInfo: BrokerInfo, isSyncing: Boolean)
+      extends DataOrigin {
     override def isFrom(another: CliqueId): Boolean = cliqueId == another
 
     override def isFrom(_cliqueId: CliqueId, _brokerInfo: BrokerInfo): Boolean =

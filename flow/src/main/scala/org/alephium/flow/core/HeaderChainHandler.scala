@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.flow.core.validation.{InvalidHeaderStatus, ValidHeader}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
@@ -17,7 +18,7 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddHeaders(headers: AVector[BlockHeader], origin: DataOrigin)
+  case class AddHeader(header: BlockHeader, origin: DataOrigin.Remote)
 }
 
 class HeaderChainHandler(val blockFlow: BlockFlow,
@@ -31,21 +32,20 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
   val chain: BlockHeaderPool = blockFlow.getHeaderChain(chainIndex)
 
   override def receive: Receive = {
-    case AddHeaders(headers, origin) =>
-      // TODO: support more heads later
-      assert(headers.length == 1)
-      val header = headers.head
+    case AddHeader(header, origin) =>
       handleHeader(header, origin)
   }
 
-  def handleHeader(header: BlockHeader, origin: DataOrigin): Unit = {
+  def handleHeader(header: BlockHeader, origin: DataOrigin.Remote): Unit = {
     if (blockFlow.contains(header)) {
       log.debug(s"Header for ${header.chainIndex} already existed")
     } else {
-      blockFlow.validate(header, fromBlock = false) match {
+      blockFlow.validate(header, origin.isSyncing) match {
         case Left(e) =>
-          log.debug(s"Failed in header validation: ${e.toString}")
-        case Right(_) =>
+          log.debug(s"IO failed in header validation: ${e.toString}")
+        case Right(x: InvalidHeaderStatus) =>
+          log.debug(s"IO failed in header validation: $x")
+        case Right(_: ValidHeader.type) =>
           logInfo(header)
           broadcast(header, origin)
           flowHandler.tell(FlowHandler.AddHeader(header), sender())

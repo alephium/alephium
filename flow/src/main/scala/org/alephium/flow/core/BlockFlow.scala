@@ -3,8 +3,9 @@ package org.alephium.flow.core
 import java.io.IOException
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.core.validation.{BlockStatus, HeaderStatus, Validation}
 import org.alephium.flow.io.{IOError, IOResult}
-import org.alephium.flow.model.{BlockDeps, ValidationError}
+import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
@@ -13,6 +14,14 @@ class BlockFlow()(implicit val config: PlatformProfile)
     extends MultiChain
     with BlockFlowState
     with FlowUtils {
+
+  def validate(header: BlockHeader, isSyncing: Boolean): IOResult[HeaderStatus] = {
+    Validation.validate(header, this, isSyncing)
+  }
+
+  def validate(block: Block, isSyncing: Boolean): IOResult[BlockStatus] = {
+    Validation.validate(block, this, isSyncing)
+  }
 
   def add(block: Block): IOResult[Unit] = {
     val index = block.chainIndex
@@ -26,10 +35,6 @@ class BlockFlow()(implicit val config: PlatformProfile)
       _      <- chain.add(block, parent, weight)
       _      <- calBestDeps()
     } yield ()
-  }
-
-  def validate(block: Block): Either[ValidationError, Unit] = {
-    validate(block.header, fromBlock = true)
   }
 
   def add(block: Block, weight: Int): IOResult[Unit] = {
@@ -49,25 +54,6 @@ class BlockFlow()(implicit val config: PlatformProfile)
       _      <- chain.add(header, parent, weight)
       _      <- calBestDeps()
     } yield ()
-  }
-
-  def validate(header: BlockHeader): Either[ValidationError, Unit] = {
-    validate(header, fromBlock = false)
-  }
-
-  def validate(header: BlockHeader, fromBlock: Boolean): Either[ValidationError, Unit] = {
-    val index = header.chainIndex
-    if (fromBlock ^ index.relateTo(config.brokerInfo)) {
-      // fromBlock = true, relate = false; fromBlock = false, relate = true
-      Left(ValidationError.InvalidGroup)
-    } else if (!header.validateDiff) {
-      Left(ValidationError.InvalidDifficulty)
-    } else {
-      val deps        = header.blockDeps
-      val missingDeps = deps.filterNot(contains)
-      if (missingDeps.isEmpty) Right(())
-      else Left(ValidationError.MissingDeps(missingDeps))
-    }
   }
 
   def add(header: BlockHeader, weight: Int): IOResult[Unit] = {

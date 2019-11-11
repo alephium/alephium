@@ -127,7 +127,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   def getHashesAfter(locator: Keccak256): AVector[Keccak256] = {
     blockHashesTable.get(locator) match {
-      case Some(node) => getHashesAfter(node)
+      case Some(node) => getHashesAfter(node).tail
       case None       => AVector.empty
     }
   }

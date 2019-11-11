@@ -27,14 +27,14 @@ object OutboundBrokerHandler {
 
 class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val remoteCliqueId: CliqueId,
-                            val remoteBroker: BrokerInfo,
+                            val remoteBrokerInfo: BrokerInfo,
                             val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BrokerHandler {
-  override def remote: InetSocketAddress = remoteBroker.address
+  override def remote: InetSocketAddress = remoteBrokerInfo.address
 
   val until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
 
-  IO(Tcp)(context.system) ! Tcp.Connect(remoteBroker.address)
+  IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
 
   var connection: ActorRef = _
 
@@ -42,7 +42,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remoteBroker.address)
+      IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
 
     case _: Tcp.Connected =>
       connection = sender()
@@ -59,10 +59,10 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
       }
   }
 
-  def handle(_remoteCliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
+  def handleBrokerInfo(_remoteCliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
     if (_remoteCliqueId != remoteCliqueId ||
-        remoteBroker.id != brokerInfo.id ||
-        remoteBroker.groupNumPerBroker != brokerInfo.groupNumPerBroker) {
+        remoteBrokerInfo.id != brokerInfo.id ||
+        remoteBrokerInfo.groupNumPerBroker != brokerInfo.groupNumPerBroker) {
       context stop self
     }
   }
