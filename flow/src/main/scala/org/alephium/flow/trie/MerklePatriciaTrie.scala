@@ -92,8 +92,7 @@ object MerklePatriciaTrie {
       }
 
       val childrenSerde: Serde[AVector[Option[Keccak256]]] = {
-        val bsOptSerde: Serde[Option[Keccak256]] = optionSerde
-        Serde.fixedSizeSerde(16, bsOptSerde)
+        fixedSizeSerde(16)
       }
 
       override def serialize(node: Node): ByteString = node match {

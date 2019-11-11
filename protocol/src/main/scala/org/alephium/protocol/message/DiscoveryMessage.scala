@@ -54,7 +54,7 @@ object DiscoveryMessage {
         case x: FindNode  => (FindNode, FindNode.serialize(x))
         case x: Neighbors => (Neighbors, Neighbors.serialize(x))
       }
-      Serde[Int].serialize(Code.toInt(code)) ++ data
+      intSerde.serialize(Code.toInt(code)) ++ data
     }
 
     def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Payload] = {
@@ -134,7 +134,7 @@ object DiscoveryMessage {
   }
 
   val deserializerCode: Deserializer[Code[_]] =
-    Serde[Int].validateGet(Code.fromInt, c => s"Invalid message code '$c'")
+    intSerde.validateGet(Code.fromInt, c => s"Invalid message code '$c'")
 
   def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
     val headerBytes  = Header.serialize(message.header)
@@ -149,7 +149,7 @@ object DiscoveryMessage {
       headerPair <- Header._deserialize(myCliqueId, input)
       header = headerPair._1
       rest1  = headerPair._2
-      signaturePair <- Serde[ED25519Signature]._deserialize(rest1)
+      signaturePair <- serdeImpl[ED25519Signature]._deserialize(rest1)
       signature = signaturePair._1
       rest2     = signaturePair._2
       payload <- Payload.deserialize(rest2).flatMap { payload =>
