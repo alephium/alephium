@@ -2,15 +2,13 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import scala.concurrent.duration._
-
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{CliqueInfo, ModelGen}
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{AlephiumActorSpec, Duration}
 
 object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =
@@ -19,16 +17,16 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
-                   _scanFrequency: FiniteDuration = 500.millis): DiscoveryConfig = {
+                   _scanFrequency: Duration = Duration.ofMillis(500)): DiscoveryConfig = {
     new DiscoveryConfig {
       val publicAddress: InetSocketAddress          = new InetSocketAddress("localhost", port)
       val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
 
-      val peersPerGroup: Int                = _peersPerGroup
-      val scanMaxPerGroup: Int              = 1
-      val scanFrequency: FiniteDuration     = _scanFrequency
-      val scanFastFrequency: FiniteDuration = _scanFrequency
-      val neighborsPerGroup: Int            = _peersPerGroup
+      val peersPerGroup: Int          = _peersPerGroup
+      val scanMaxPerGroup: Int        = 1
+      val scanFrequency: Duration     = _scanFrequency
+      val scanFastFrequency: Duration = _scanFrequency
+      val neighborsPerGroup: Int      = _peersPerGroup
 
       val groups: Int            = groupSize
       val brokerNum: Int         = groupSize
@@ -68,12 +66,14 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     server0.tell(DiscoveryServer.GetPeerCliques, probo0.ref)
     val probo1 = TestProbe()
     server1.tell(DiscoveryServer.GetPeerCliques, probo1.ref)
-    probo0.expectMsgPF(40.seconds) {
+
+    val waitTime = Duration.ofSeconds(40).asScala
+    probo0.expectMsgPF(waitTime) {
       case DiscoveryServer.PeerCliques(peers) =>
         peers.length is 1
         peers.head is cliqueInfo1
     }
-    probo1.expectMsgPF(40.seconds) {
+    probo1.expectMsgPF(waitTime) {
       case DiscoveryServer.PeerCliques(peers) =>
         peers.length is 1
         peers.head is cliqueInfo0

@@ -1,6 +1,6 @@
 package org.alephium.protocol.config
 
-import java.time.Duration
+import org.alephium.util.Duration
 
 trait ConsensusConfig extends GroupConfig {
 

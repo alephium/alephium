@@ -9,7 +9,7 @@ import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
   def props(bootstrap: AVector[InetSocketAddress])(implicit config: DiscoveryConfig): Props =
@@ -19,17 +19,16 @@ object DiscoveryServer {
     props(AVector.from(peers))
   }
 
-  case class PeerStatus(info: CliqueInfo, updateAt: Long)
+  case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
   object PeerStatus {
     def fromInfo(info: CliqueInfo): PeerStatus = {
-      val now = System.currentTimeMillis
-      PeerStatus(info, now)
+      PeerStatus(info, TimeStamp.now())
     }
   }
 
   object Timer
 
-  case class AwaitPong(remote: InetSocketAddress, pingAt: Long)
+  case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
   case object GetPeerCliques             extends Command

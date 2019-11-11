@@ -5,12 +5,12 @@ import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.EitherValues
 
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   def entryDummy(i: Int): RPCModel.FetchEntry =
-    RPCModel.FetchEntry(i.toString, i.toLong, i, i, i, List(i.toString))
+    RPCModel.FetchEntry(i.toString, TimeStamp.fromMillis(i.toLong), i, i, i, List(i.toString))
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
@@ -34,6 +34,6 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   it should "parse request" in {
     val request = parseAs[RPCModel.FetchRequest]("""{"from": "42"}""")
-    request.from is Some(42L)
+    request.from.get.millis is 42L
   }
 }

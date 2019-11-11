@@ -1,9 +1,6 @@
 package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
-import java.time.Instant
-
-import scala.concurrent.duration._
 
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
@@ -11,6 +8,7 @@ import akka.io.{IO, Tcp}
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.util.{Duration, TimeStamp}
 
 object OutboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
@@ -32,7 +30,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
     extends BrokerHandler {
   override def remote: InetSocketAddress = remoteBrokerInfo.address
 
-  val until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
+  val until: TimeStamp = TimeStamp.now() + config.retryTimeout
 
   IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
 
@@ -50,9 +48,9 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
       handshakeIn()
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
-      val current = Instant.now()
+      val current = TimeStamp.now()
       if (current isBefore until) {
-        scheduleOnce(self, OutboundBrokerHandler.Retry, 1.second)
+        scheduleOnce(self, OutboundBrokerHandler.Retry, Duration.ofSeconds(1))
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}")
         stop()

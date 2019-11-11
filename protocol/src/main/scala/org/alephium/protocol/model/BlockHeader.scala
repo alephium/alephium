@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import org.alephium.crypto._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 /** The header of a block with index.from == _group_
   *
@@ -15,7 +15,7 @@ import org.alephium.util.AVector
 case class BlockHeader(
     blockDeps: AVector[Keccak256],
     txsHash: Keccak256,
-    timestamp: Long,
+    timestamp: TimeStamp,
     target: BigInt,
     nonce: BigInt
 ) extends Keccak256Hash[BlockHeader] {
@@ -54,6 +54,10 @@ case class BlockHeader(
 }
 
 object BlockHeader {
+  private implicit val serdeTS: Serde[TimeStamp] =
+    longSerde
+      .validate(_ >= 0, n => s"Expect positive timestamp, got $n")
+      .xmap(TimeStamp.fromMillis, _.millis)
 
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
