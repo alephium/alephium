@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.flow.core.validation.{InvalidBlockStatus, ValidBlock}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
@@ -17,7 +18,7 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
+  case class AddBlock(block: Block, origin: DataOrigin) extends Command
 }
 
 class BlockChainHandler(val blockFlow: BlockFlow,
@@ -29,11 +30,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
-    case BlockChainHandler.AddBlocks(blocks, origin) =>
-      // TODO: support more blocks later
-      assert(blocks.length == 1)
-      val block = blocks.head
-      handleBlock(block, origin)
+    case BlockChainHandler.AddBlock(block, origin) => handleBlock(block, origin)
   }
 
   def handleBlock(block: Block, origin: DataOrigin): Unit = {
@@ -41,13 +38,15 @@ class BlockChainHandler(val blockFlow: BlockFlow,
       log.debug(s"Block for ${block.chainIndex} already exists")
     } else {
       val validationResult = origin match {
-        case DataOrigin.LocalMining => Right(())
-        case _: DataOrigin.Remote   => blockFlow.validate(block)
+        case DataOrigin.LocalMining    => Right(ValidBlock)
+        case origin: DataOrigin.Remote => blockFlow.validate(block, origin.isSyncing)
       }
       validationResult match {
         case Left(e) =>
-          log.debug(s"Failed in block validation: ${e.toString}")
-        case Right(_) =>
+          log.debug(s"IO failed in block validation: ${e.toString}")
+        case Right(x: InvalidBlockStatus) =>
+          log.debug(s"Failed in block validation: $x")
+        case Right(_: ValidBlock.type) =>
           logInfo(block.header)
           broadcast(block, origin)
           flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())

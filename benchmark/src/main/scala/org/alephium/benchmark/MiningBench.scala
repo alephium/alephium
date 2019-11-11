@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.serde.RandomBytes
@@ -22,6 +23,6 @@ class MiningBench {
     val block = Block.genesis(AVector.empty, config.maxMiningTarget, BigInt(nonce))
     val i     = RandomBytes.source.nextInt(config.groups)
     val j     = RandomBytes.source.nextInt(config.groups)
-    block.preValidate(ChainIndex(i, j))
+    Validation.validateMined(block, ChainIndex(i, j))
   }
 }

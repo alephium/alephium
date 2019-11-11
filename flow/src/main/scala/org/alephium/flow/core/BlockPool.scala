@@ -18,8 +18,12 @@ trait BlockPool extends BlockHashPool {
   // Assuming the block is verified
   def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit]
 
-  def getBlocks(locators: AVector[Keccak256]): IOResult[AVector[Block]] = {
-    locators.filter(contains).mapE(getBlock)
+  def getBlocks(hashes: AVector[Keccak256]): IOResult[AVector[Block]] = {
+    hashes.filter(contains).mapE(getBlock)
+  }
+
+  def getBlocksAfter(locator: Keccak256): IOResult[AVector[Block]] = {
+    getHashesAfter(locator).mapE(getBlock)
   }
 
   def getHeight(block: Block): Int = getHeight(block.hash)

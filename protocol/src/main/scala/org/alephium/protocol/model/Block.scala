@@ -21,17 +21,8 @@ case class Block(header: BlockHeader, transactions: AVector[Transaction])
     header.uncleHash(toIndex)
   }
 
-  def validateDiff: Boolean = {
-    header.validateDiff
-  }
-
   def validateIndex(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
     header.validateIndex(target)
-  }
-
-  // Note: the target is not validated here
-  def preValidate(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
-    validateIndex(target) && validateDiff
   }
 }
 

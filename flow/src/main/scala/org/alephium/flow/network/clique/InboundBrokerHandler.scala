@@ -4,11 +4,9 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
-import akka.util.ByteString
 
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.message.Hello
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
 object InboundBrokerHandler {
@@ -25,16 +23,16 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                            val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BrokerHandler {
 
-  var remoteCliqueId: CliqueId = _
-  var remoteBroker: BrokerInfo = _
+  var remoteCliqueId: CliqueId     = _
+  var remoteBrokerInfo: BrokerInfo = _
 
   connection ! Tcp.Register(self, keepOpenOnPeerClosed = true)
-  connection ! BrokerHandler.envelope(Hello(selfCliqueInfo.id, config.brokerInfo))
+  handshakeOut()
 
-  override def receive: Receive = handleWith(ByteString.empty, awaitHelloAck, handlePayload)
+  override def receive: Receive = handleReadWrite
 
-  def handle(_remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
-    remoteCliqueId = _remoteCliqueId
-    remoteBroker   = remoteBrokerInfo
+  def handleBrokerInfo(_remoteCliqueId: CliqueId, _remoteBrokerInfo: BrokerInfo): Unit = {
+    remoteCliqueId   = _remoteCliqueId
+    remoteBrokerInfo = _remoteBrokerInfo
   }
 }

@@ -9,6 +9,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
@@ -48,7 +49,7 @@ object FairMiner {
     def iter(current: BigInt): Option[(Block, BigInt)] = {
       if (current < nonceEnd) {
         val header = template.buildHeader(current)
-        if (header.preValidate(index))
+        if (Validation.validateMined(header, index))
           Some((Block(header, template.transactions), current - nonceStart + 1))
         else iter(current + 1)
       } else None
@@ -126,7 +127,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
       val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
       FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
-          val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
+          val handlerMessage = BlockChainHandler.AddBlock(block, LocalMining)
           blockHandler ! handlerMessage
           self ! FairMiner.MiningResult(Some(block), index, miningCount)
         case None =>
