@@ -4,8 +4,6 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Path
 
-import scala.concurrent.duration._
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -27,7 +25,7 @@ object NewConfig extends StrictLogging {
   trait PlatformGroupConfig  extends GroupConfig
   trait PlatformCliqueConfig extends CliqueConfig
   trait PlatformConsensusConfig extends ConsensusConfig {
-    def expectedTimeSpan: Long
+    def expectedTimeSpan: Duration
 
     def blockCacheSize: Int
 
@@ -35,15 +33,15 @@ object NewConfig extends StrictLogging {
     def medianTimeInterval: Int
     def diffAdjustDownMax: Int
     def diffAdjustUpMax: Int
-    def timeSpanMin: Long
-    def timeSpanMax: Long
+    def timeSpanMin: Duration
+    def timeSpanMax: Duration
   }
   trait PlatformDiscoveryConfig extends DC
   trait PlatformBrokerConfig { def brokerInfo: BrokerInfo }
   trait PlatformMiningConfig { def nonceStep: BigInt }
   trait PlatformNetworkConfig {
-    def pingFrequency: FiniteDuration
-    def retryTimeout: FiniteDuration
+    def pingFrequency: Duration
+    def retryTimeout: Duration
     def publicAddress: InetSocketAddress
     def masterAddress: InetSocketAddress
     def numOfSyncBlocksLimit: Int
@@ -58,9 +56,9 @@ object NewConfig extends StrictLogging {
     new InetSocketAddress(left, right.toInt)
   }
 
-  def getDuration(config: Config, path: String): FiniteDuration = {
+  def getDuration(config: Config, path: String): Duration = {
     val duration = config.getDuration(path)
-    FiniteDuration(duration.toNanos, NANOSECONDS)
+    Duration.from(duration)
   }
 
   def getConfigFile(rootPath: Path, name: String): File = {

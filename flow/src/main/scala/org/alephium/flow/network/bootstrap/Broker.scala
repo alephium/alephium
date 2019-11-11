@@ -1,16 +1,12 @@
 package org.alephium.flow.network.bootstrap
 
-import java.time.Instant
-
-import scala.concurrent.duration._
-
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.CliqueInfo
-import org.alephium.util.BaseActor
+import org.alephium.util.{BaseActor, Duration, TimeStamp}
 
 object Broker {
   def props()(implicit config: PlatformProfile): Props = Props(new Broker())
@@ -22,11 +18,11 @@ object Broker {
 class Broker()(implicit config: PlatformProfile) extends BaseActor {
   IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
-  def until: Instant = Instant.now().plusMillis(config.retryTimeout.toMillis)
+  def until: TimeStamp = TimeStamp.now() + config.retryTimeout
 
   override def receive: Receive = awaitMaster(until)
 
-  def awaitMaster(until: Instant): Receive = {
+  def awaitMaster(until: TimeStamp): Receive = {
     case Broker.Retry =>
       IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
 
@@ -38,9 +34,9 @@ class Broker()(implicit config: PlatformProfile) extends BaseActor {
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
-      val current = Instant.now()
+      val current = TimeStamp.now()
       if (current isBefore until) {
-        scheduleOnce(self, Broker.Retry, 1.second)
+        scheduleOnce(self, Broker.Retry, Duration.ofSeconds(1))
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}")
         context stop self

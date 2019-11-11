@@ -2,10 +2,8 @@ package org.alephium.flow.platform
 
 import java.net.InetSocketAddress
 import java.nio.file.Path
-import java.time.Duration
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
 
 import com.typesafe.config.Config
 import org.rocksdb.WriteOptions
@@ -14,7 +12,7 @@ import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Env, Hex, Network}
+import org.alephium.util._
 
 trait PlatformProfile
     extends NewConfig.PlatformGroupConfig
@@ -90,18 +88,19 @@ object PlatformProfile {
       final val numZerosAtLeastInHash: Int = consensusCfg.getInt("numZerosAtLeastInHash")
       final val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-      final val blockTargetTime: Duration = consensusCfg.getDuration("blockTargetTime")
-      final val blockConfirmNum: Int      = consensusCfg.getInt("blockConfirmNum")
-      final val expectedTimeSpan: Long    = blockTargetTime.toMillis
+      final val blockTargetTime: Duration =
+        Duration.from(consensusCfg.getDuration("blockTargetTime"))
+      final val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
+      final val expectedTimeSpan: Duration = blockTargetTime
 
       final val blockCacheSize
         : Int = consensusCfg.getInt("blockCacheSizePerChain") * (2 * groups - 1)
 
-      final val medianTimeInterval = 11
-      final val diffAdjustDownMax  = 16
-      final val diffAdjustUpMax    = 8
-      final val timeSpanMin: Long  = expectedTimeSpan * (100 - diffAdjustDownMax) / 100
-      final val timeSpanMax: Long  = expectedTimeSpan * (100 + diffAdjustUpMax) / 100
+      final val medianTimeInterval    = 11
+      final val diffAdjustDownMax     = 16
+      final val diffAdjustUpMax       = 8
+      final val timeSpanMin: Duration = expectedTimeSpan * (100l - diffAdjustDownMax) / 100l
+      final val timeSpanMax: Duration = expectedTimeSpan * (100l + diffAdjustUpMax) / 100l
       /* Consensus */
 
       /* mining */
@@ -109,8 +108,8 @@ object PlatformProfile {
       /* mining */
 
       /* Network */
-      final val pingFrequency: FiniteDuration = getDuration(networkCfg, "pingFrequency")
-      final val retryTimeout: FiniteDuration  = getDuration(networkCfg, "retryTimeout")
+      final val pingFrequency: Duration = getDuration(networkCfg, "pingFrequency")
+      final val retryTimeout: Duration  = getDuration(networkCfg, "retryTimeout")
       final val publicAddress: InetSocketAddress = parseAddress(
         networkCfg.getString("publicAddress"))
       final val masterAddress: InetSocketAddress = parseAddress(

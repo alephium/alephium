@@ -231,7 +231,9 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
   }
 
   def startPingPong(): Unit = {
-    timers.startPeriodicTimer(BrokerHandler.Timer, BrokerHandler.SendPing, config.pingFrequency)
+    timers.startPeriodicTimer(BrokerHandler.Timer,
+                              BrokerHandler.SendPing,
+                              config.pingFrequency.asScala)
   }
 }
 

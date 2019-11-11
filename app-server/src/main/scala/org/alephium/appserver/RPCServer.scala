@@ -1,9 +1,6 @@
 package org.alephium.appserver
 
-import java.time.Instant
-
 import scala.concurrent._
-import scala.concurrent.duration.Duration
 
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
@@ -30,7 +27,7 @@ import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Notification, Response}
 import org.alephium.rpc.util.AVectorJson._
-import org.alephium.util.{AVector, EventBus}
+import org.alephium.util.{AVector, EventBus, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
@@ -40,7 +37,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val executionContext: ExecutionContext = system.dispatcher
   implicit val config: PlatformProfile            = mode.profile
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
-  implicit val askTimeout: Timeout                = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
+  implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
   def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
     blockflowFetch(mode.node.blockFlow, req)
@@ -162,11 +159,11 @@ object RPCServer extends StrictLogging {
                                                          cfg: ConsensusConfig): Response = {
     req.paramsAs[FetchRequest] match {
       case Right(query) =>
-        val now        = Instant.now()
-        val lowerBound = now.minus(rpc.blockflowFetchMaxAge).toEpochMilli
+        val now        = TimeStamp.now()
+        val lowerBound = now - rpc.blockflowFetchMaxAge
 
         val from = query.from match {
-          case Some(ts) => Math.max(ts, lowerBound)
+          case Some(ts) => if (ts > lowerBound) ts else lowerBound
           case None     => lowerBound
         }
 
