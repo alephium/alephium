@@ -23,11 +23,11 @@ object Payload {
       case x: SendHeaders => (SendHeaders, Serializer[SendHeaders].serialize(x))
       case x: GetHeaders  => (GetHeaders, Serializer[GetHeaders].serialize(x))
     }
-    Serde[Int].serialize(Code.toInt(code)) ++ data
+    intSerde.serialize(Code.toInt(code)) ++ data
   }
 
   val deserializerCode: Deserializer[Code] =
-    Serde[Int].validateGet(Code.fromInt, c => s"Invalid code $c")
+    intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
   def _deserialize(input: ByteString)(
       implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
@@ -36,12 +36,12 @@ object Payload {
         code match {
           case Hello       => _deserializeHandShake(new Hello(_, _, _, _))(rest)
           case HelloAck    => _deserializeHandShake(new HelloAck(_, _, _, _))(rest)
-          case Ping        => Serde[Ping]._deserialize(rest)
-          case Pong        => Serde[Pong]._deserialize(rest)
-          case SendBlocks  => Serde[SendBlocks]._deserialize(rest)
-          case GetBlocks   => Serde[GetBlocks]._deserialize(rest)
-          case SendHeaders => Serde[SendHeaders]._deserialize(rest)
-          case GetHeaders  => Serde[GetHeaders]._deserialize(rest)
+          case Ping        => serdeImpl[Ping]._deserialize(rest)
+          case Pong        => serdeImpl[Pong]._deserialize(rest)
+          case SendBlocks  => serdeImpl[SendBlocks]._deserialize(rest)
+          case GetBlocks   => serdeImpl[GetBlocks]._deserialize(rest)
+          case SendHeaders => serdeImpl[SendHeaders]._deserialize(rest)
+          case GetHeaders  => serdeImpl[GetHeaders]._deserialize(rest)
         }
     }
   }
