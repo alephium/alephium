@@ -15,7 +15,7 @@ object Message {
   }
 
   def serialize(message: Message): ByteString = {
-    Serde[Header].serialize(message.header) ++ Payload.serialize(message.payload)
+    serdeImpl[Header].serialize(message.header) ++ Payload.serialize(message.payload)
   }
 
   def serialize[T <: Payload](payload: T): ByteString = {
@@ -25,7 +25,7 @@ object Message {
   def _deserialize(input: ByteString)(
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {
-      headerPair <- Serde[Header]._deserialize(input)
+      headerPair <- serdeImpl[Header]._deserialize(input)
       header = headerPair._1
       rest0  = headerPair._2
       payloadPair <- Payload._deserialize(rest0)
