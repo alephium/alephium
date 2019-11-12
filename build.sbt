@@ -12,7 +12,7 @@ def baseProject(id: String): Project = {
 val scalastyleCfgFile     = "project/scalastyle-config.xml"
 val scalastyleTestCfgFile = "project/scalastyle-test-config.xml"
 
-lazy val root: Project = Project("root", file("."))
+lazy val root: Project = Project("alephium-scala-blockflow", file("."))
   .settings(commonSettings: _*)
   .settings(
     // This is just a project to aggregate modules, nothing to compile or to check scalastyle for.
