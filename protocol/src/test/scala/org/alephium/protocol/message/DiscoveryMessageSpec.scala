@@ -2,14 +2,12 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration._
-
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
-import org.alephium.util.{AlephiumSpec, AVector, EnumerationMacros}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, EnumerationMacros}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code
@@ -42,11 +40,11 @@ class DiscoveryMessageSpec extends AlephiumSpec {
       def discoveryPrivateKey: ED25519PrivateKey = privateKey
       def discoveryPublicKey: ED25519PublicKey   = publicKey
 
-      val peersPerGroup: Int                = 1
-      val scanMaxPerGroup: Int              = 1
-      val scanFrequency: FiniteDuration     = 1.second
-      val scanFastFrequency: FiniteDuration = 1.second
-      val neighborsPerGroup: Int            = 1
+      val peersPerGroup: Int          = 1
+      val scanMaxPerGroup: Int        = 1
+      val scanFrequency: Duration     = Duration.ofSeconds(1)
+      val scanFastFrequency: Duration = Duration.ofSeconds(1)
+      val neighborsPerGroup: Int      = 1
     }
   }
 

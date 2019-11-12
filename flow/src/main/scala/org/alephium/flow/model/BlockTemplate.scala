@@ -2,7 +2,7 @@ package org.alephium.flow.model
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, BlockHeader, Transaction}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 case class BlockTemplate(deps: AVector[Keccak256],
                          target: BigInt,
@@ -10,7 +10,7 @@ case class BlockTemplate(deps: AVector[Keccak256],
                          transactions: AVector[Transaction]) {
 
   def buildHeader(nonce: BigInt): BlockHeader =
-    BlockHeader(deps, txHash, System.currentTimeMillis(), target, nonce)
+    BlockHeader(deps, txHash, TimeStamp.now(), target, nonce)
 
   def buildBlock(nonce: BigInt): Block = {
     val header = buildHeader(nonce)

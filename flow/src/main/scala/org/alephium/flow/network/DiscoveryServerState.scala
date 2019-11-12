@@ -12,7 +12,7 @@ import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait DiscoveryServerState {
   implicit def config: GroupConfig with DiscoveryConfig
@@ -70,7 +70,7 @@ trait DiscoveryServerState {
   def updateStatus(cliqueId: CliqueId): Unit = {
     table.get(cliqueId) match {
       case Some(status) =>
-        table(cliqueId) = status.copy(updateAt = System.currentTimeMillis())
+        table(cliqueId) = status.copy(updateAt = TimeStamp.now())
       case None => ()
     }
   }
@@ -80,15 +80,15 @@ trait DiscoveryServerState {
   }
 
   def cleanup(): Unit = {
-    val now = System.currentTimeMillis()
+    val now = TimeStamp.now()
     val toRemove = table.values
-      .filter(status => now - status.updateAt > config.peersTimeout.toMillis)
+      .filter(status => now.diff(status.updateAt) > config.peersTimeout)
       .map(_.info.id)
       .toSet
     table --= toRemove
 
     val deadPendings = pendings.collect {
-      case (cliqueId, status) if now - status.pingAt > config.peersTimeout.toMillis => cliqueId
+      case (cliqueId, status) if now.diff(status.pingAt) > config.peersTimeout => cliqueId
     }
     pendings --= deadPendings
   }
@@ -131,7 +131,7 @@ trait DiscoveryServerState {
     if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
       log.info(s"Sending Ping to $cliqueInfo")
       send(cliqueInfo.masterAddress, Ping(selfCliqueInfo)) // TODO: don't use masterAddress
-      pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, System.currentTimeMillis()))
+      pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, TimeStamp.now()))
     }
   }
 

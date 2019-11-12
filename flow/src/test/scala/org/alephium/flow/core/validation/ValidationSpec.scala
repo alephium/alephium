@@ -1,14 +1,12 @@
 package org.alephium.flow.core.validation
 
-import scala.concurrent.duration.Duration
-
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{ModelGen, Transaction}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ValidationSpec extends AlephiumFlowSpec {
   import Validation._
@@ -32,9 +30,9 @@ class ValidationSpec extends AlephiumFlowSpec {
 
   it should "validate timestamp for block" in {
     val header  = ModelGen.blockGen.sample.get.header
-    val now     = System.currentTimeMillis()
-    val before  = now - Duration("1.1h").toMillis
-    val after   = now + Duration("1.1h").toMillis
+    val now     = TimeStamp.now()
+    val before  = now + Duration.ofMinutes(-61)
+    val after   = now + Duration.ofMinutes(61)
     val header0 = header.copy(timestamp = now)
     val header1 = header.copy(timestamp = before)
     val header2 = header.copy(timestamp = after)

@@ -2,9 +2,8 @@ package org.alephium.protocol.config
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration.FiniteDuration
-
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.util.Duration
 
 // TODO: refactor this as two configs
 trait DiscoveryConfig extends CliqueConfig {
@@ -21,13 +20,13 @@ trait DiscoveryConfig extends CliqueConfig {
   def scanMaxPerGroup: Int
 
   /* Wait time between two scan. */
-  def scanFrequency: FiniteDuration
+  def scanFrequency: Duration
 
-  def scanFastFrequency: FiniteDuration
+  def scanFastFrequency: Duration
 
   /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
   def neighborsPerGroup: Int
 
   /** Duration we wait before considering a peer dead. **/
-  def peersTimeout: FiniteDuration = scanFrequency * 3
+  def peersTimeout: Duration = scanFrequency * 3
 }
