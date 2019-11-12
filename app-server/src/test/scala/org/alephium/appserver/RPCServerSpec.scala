@@ -1,7 +1,6 @@
 package org.alephium.appserver
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.Duration
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
@@ -30,7 +29,7 @@ object RPCServerSpec {
     implicit val materializer: ActorMaterializer    = ActorMaterializer()
     implicit val executionContext: ExecutionContext = system.dispatcher
     implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
-    implicit val askTimeout: Timeout                = Timeout(Duration.fromNanos(rpcConfig.askTimeout.toNanos))
+    implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
     def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
       JsonRPC.Response.failed(JsonRPC.Error.InternalError)
@@ -51,7 +50,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   val rpcSuccess = JsonRPC.Response.Success(Json.fromInt(42), 1)
 
   trait RouteHTTP {
-    implicit lazy val askTimeout = Timeout(Duration.fromNanos(server.rpcConfig.askTimeout.toNanos))
+    implicit lazy val askTimeout = Timeout(server.rpcConfig.askTimeout.asScala)
 
     lazy val server: RPCServerDummy = new RPCServerDummy {}
     lazy val route: Route           = server.routeHttp(TestProbe().ref)

@@ -1,7 +1,5 @@
 package org.alephium.flow.network
 
-import scala.concurrent.duration._
-
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
@@ -9,7 +7,7 @@ import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.BaseActor
+import org.alephium.util.{BaseActor, Duration}
 
 object InterCliqueManager {
   def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
@@ -36,7 +34,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       } else {
         // TODO: refine the condition, check the number of brokers for example
         if (config.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, 2.second)
+          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, Duration.ofSeconds(2))
         }
       }
   }

@@ -5,7 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet}
+import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet, TimeStamp}
 
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
@@ -43,7 +43,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   protected def addHash(hash: Keccak256,
                         parent: BlockHashChain.TreeNode,
                         weight: Int,
-                        timestamp: Long): Unit = {
+                        timestamp: TimeStamp): Unit = {
     val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight, timestamp)
     parent.successors += newNode
     addNode(newNode)
@@ -261,7 +261,7 @@ object BlockHashChain {
     val successors: ArrayBuffer[Node]
     val height: Int
     val weight: Int
-    val timestamp: Long
+    val timestamp: TimeStamp
 
     def isRoot: Boolean
     def isLeaf: Boolean = successors.isEmpty
@@ -274,7 +274,7 @@ object BlockHashChain {
       successors: ArrayBuffer[Node],
       height: Int,
       weight: Int,
-      timestamp: Long
+      timestamp: TimeStamp
   ) extends TreeNode {
     override def isRoot: Boolean = true
 
@@ -282,7 +282,7 @@ object BlockHashChain {
   }
 
   object Root {
-    def apply(blockHash: Keccak256, height: Int, weight: Int, timestamp: Long): Root =
+    def apply(blockHash: Keccak256, height: Int, weight: Int, timestamp: TimeStamp): Root =
       Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
   }
 
@@ -292,7 +292,7 @@ object BlockHashChain {
       successors: ArrayBuffer[Node],
       height: Int,
       weight: Int,
-      timestamp: Long
+      timestamp: TimeStamp
   ) extends TreeNode {
     override def isRoot: Boolean = false
 
@@ -304,7 +304,7 @@ object BlockHashChain {
               parent: TreeNode,
               height: Int,
               weight: Int,
-              timestamp: Long): Node = {
+              timestamp: TimeStamp): Node = {
       new Node(blockHash, parent, ArrayBuffer.empty, height, weight, timestamp)
     }
   }

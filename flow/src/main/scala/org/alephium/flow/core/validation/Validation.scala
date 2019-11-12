@@ -82,7 +82,7 @@ object Validation {
 
   def checkTimeStamp(header: BlockHeader, isSyncing: Boolean): HeaderValidationResult = {
     val now      = TimeStamp.now()
-    val headerTs = TimeStamp.fromMillis(header.timestamp)
+    val headerTs = header.timestamp
 
     val ok1 = headerTs < now.plusHours(1)
     val ok2 = isSyncing || (headerTs > now.plusHours(-1))

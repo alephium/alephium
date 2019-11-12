@@ -14,7 +14,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{AVector, BaseActor, TimeStamp}
 
 object Miner {
   sealed trait Command
@@ -65,14 +65,14 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       context become awaitStart
   }
 
-  protected def _mine(template: BlockTemplate, lastTs: Long): Receive = {
+  protected def _mine(template: BlockTemplate, lastTs: TimeStamp): Receive = {
     case Miner.Nonce(from, to) =>
       totalMiningCount += 1
       tryMine(template, from, to) match {
         case Some(block) =>
-          val elapsed = System.currentTimeMillis() - lastTs
+          val elapsed = TimeStamp.now().diff(lastTs)
           log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed ms, miningCount: $totalMiningCount, target: ${template.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed, miningCount: $totalMiningCount, target: ${template.target}")
           blockHandler ! BlockChainHandler.AddBlock(block, LocalMining)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
@@ -92,7 +92,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       context become collect
   }
 
-  def mine(template: BlockTemplate, lastTs: Long): Receive =
+  def mine(template: BlockTemplate, lastTs: TimeStamp): Receive =
     _mine(template, lastTs) orElse awaitStop
 
   protected def _collect: Receive = {
