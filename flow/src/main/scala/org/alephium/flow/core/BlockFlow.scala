@@ -3,7 +3,6 @@ package org.alephium.flow.core
 import java.io.IOException
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.core.validation.{BlockStatus, HeaderStatus, Validation}
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
@@ -14,15 +13,6 @@ class BlockFlow()(implicit val config: PlatformProfile)
     extends MultiChain
     with BlockFlowState
     with FlowUtils {
-
-  def validate(header: BlockHeader, isSyncing: Boolean): IOResult[HeaderStatus] = {
-    Validation.validate(header, this, isSyncing)
-  }
-
-  def validate(block: Block, isSyncing: Boolean): IOResult[BlockStatus] = {
-    Validation.validate(block, this, isSyncing)
-  }
-
   def add(block: Block): IOResult[Unit] = {
     val index = block.chainIndex
     assert(index.relateTo(config.brokerInfo))

@@ -37,6 +37,11 @@ object Validation {
     convert(validateBlock(block, flow, isSyncing), ValidBlock)
   }
 
+  def validatePostHeader(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[BlockStatus] = {
+    convert(validateBlockPostHeader(block, flow), ValidBlock)
+  }
+
   private def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
       implicit config: PlatformProfile): HeaderValidationResult = {
     val headerChain = flow.getHeaderChain(header)
@@ -52,12 +57,19 @@ object Validation {
   private def validateBlock(block: Block, flow: BlockFlow, isSyncing: Boolean)(
       implicit config: PlatformProfile): BlockValidationResult = {
     for {
-      _ <- checkGroup(block)
       _ <- validateHeader(block.header, flow, isSyncing)
+      _ <- validateBlockPostHeader(block, flow)
+    } yield ()
+  }
+
+  private def validateBlockPostHeader(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): BlockValidationResult = {
+    for {
+      _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
       _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
-//      _ <- checkTxsSignature(block, flow) // TODO: design & implement this
+      //      _ <- checkTxsSignature(block, flow) // TODO: design & implement this
       _ <- checkSpending(block, flow)
     } yield ()
   }
@@ -110,7 +122,8 @@ object Validation {
   }
 
   def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult = {
-    if (header.blockDeps.forall(flow.contains)) validHeader else invalidHeader(MissingDeps)
+    val missings = header.blockDeps.filterNot(flow.contains)
+    if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
   }
 
   def checkNonEmptyTransactions(block: Block): BlockValidationResult = {

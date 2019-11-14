@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
-import org.alephium.flow.core.validation.{InvalidHeaderStatus, ValidHeader}
+import org.alephium.flow.core.validation.{InvalidHeaderStatus, Validation, ValidHeader}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
@@ -40,7 +40,7 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
     if (blockFlow.contains(header)) {
       log.debug(s"Header for ${header.chainIndex} already existed")
     } else {
-      blockFlow.validate(header, origin.isSyncing) match {
+      Validation.validate(header, blockFlow, origin.isSyncing) match {
         case Left(e) =>
           log.debug(s"IO failed in header validation: ${e.toString}")
         case Right(x: InvalidHeaderStatus) =>
