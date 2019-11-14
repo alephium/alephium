@@ -70,6 +70,8 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   def broadcast(block: Block, origin: DataOrigin): Unit = {
     val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
     val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
-    cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
+    if (config.brokerInfo.contains(block.chainIndex.from)) {
+      cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
+    }
   }
 }

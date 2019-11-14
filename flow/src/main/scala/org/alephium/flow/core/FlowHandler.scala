@@ -132,7 +132,9 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
   }
 
   def updateUponNewData(hash: Keccak256): Unit = {
-    updateStatus(hash).foreach {
+    val readies = updateStatus(hash)
+    log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
+    readies.foreach {
       case PendingBlock(block, _, origin, broker, chainHandler) =>
         chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
       case PendingHeader(header, _, _, _, _) =>
