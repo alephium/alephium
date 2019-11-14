@@ -62,13 +62,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
             broker ! message.blockMsg
           }
       }
-    case message: CliqueManager.BroadCastHeader =>
-      brokers.foreach {
-        case (cliqueId, broker) =>
-          if (!message.origin.isFrom(cliqueId)) {
-            broker ! message.headerMsg
-          }
-      }
   }
 
   def connect(cliqueInfo: CliqueInfo): Unit = {

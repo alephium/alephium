@@ -82,17 +82,5 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
             }
           }
       }
-    case CliqueManager.BroadCastHeader(header, headerMsg, origin) =>
-      assert(!header.chainIndex.relateTo(config.brokerInfo))
-      log.debug(s"Broadcasting header for ${header.chainIndex}")
-      brokers.foreach {
-        case (_, (info, broker)) =>
-          if (!origin.isFrom(cliqueInfo.id, info)) {
-            if (!header.chainIndex.relateTo(info)) {
-              log.debug(s"Send header to broker $info")
-              broker ! headerMsg
-            }
-          }
-      }
   }
 }
