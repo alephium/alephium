@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import scala.collection.mutable
+
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
@@ -8,7 +10,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util._
 
 object FlowHandler {
   def props(blockFlow: BlockFlow)(implicit config: PlatformProfile): Props =
@@ -23,6 +25,24 @@ object FlowHandler {
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
   case class Register(miner: ActorRef)                  extends Command
 
+  sealed trait PendingData {
+    def missingDeps: mutable.HashSet[Keccak256]
+  }
+  case class PendingBlock(block: Block,
+                          missingDeps: mutable.HashSet[Keccak256],
+                          origin: DataOrigin,
+                          broker: ActorRef,
+                          chainHandler: ActorRef)
+      extends PendingData
+      with Command
+  case class PendingHeader(header: BlockHeader,
+                           missingDeps: mutable.HashSet[Keccak256],
+                           origin: DataOrigin,
+                           broker: ActorRef,
+                           chainHandler: ActorRef)
+      extends PendingData
+      with Command
+
   sealed trait Event
   case class BlockFlowTemplate(index: ChainIndex,
                                deps: AVector[Keccak256],
@@ -35,8 +55,12 @@ object FlowHandler {
 
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extends BaseActor {
+class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
+    extends BaseActor
+    with FlowHandlerState {
   import FlowHandler._
+
+  override def statusSizeLimit: Int = config.brokerNum * 8
 
   override def receive: Receive = handleWith(None)
 
@@ -58,6 +82,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
     case PrepareBlockFlow(chainIndex)   => prepareBlockFlow(chainIndex)
     case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
     case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
+    case pending: PendingData           => addStatus(pending)
     case GetTips                        => sender() ! CurrentTips(blockFlow.getAllTips)
     case Register(miner)                => context become handleWith(Some(miner))
   }
@@ -80,6 +105,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
           // TODO: handle IOError
           log.error(s"Failed in adding new header: ${e.toString}")
         case Right(_) =>
+          updateUponNewData(header.hash)
           minerOpt.foreach(_ ! Miner.UpdateTemplate)
           logInfo(header)
       }
@@ -93,6 +119,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
           // TODO: handle IOError
           log.error(s"Failed in adding new block: ${e.toString}")
         case Right(_) =>
+          updateUponNewData(block.hash)
           origin match {
             case DataOrigin.LocalMining =>
               minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
@@ -101,6 +128,15 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
           }
           logInfo(block.header)
       }
+    }
+  }
+
+  def updateUponNewData(hash: Keccak256): Unit = {
+    updateStatus(hash).foreach {
+      case PendingBlock(block, _, origin, broker, chainHandler) =>
+        chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
+      case PendingHeader(header, _, _, _, _) =>
+        self ! AddHeader(header)
     }
   }
 
@@ -126,5 +162,38 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile) extend
     }
     log.info(s"$index; total: $total; ${chain
       .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
+  }
+}
+
+trait FlowHandlerState {
+  import FlowHandler._
+
+  def statusSizeLimit: Int
+
+  val pendingStatus = scala.collection.mutable.SortedMap.empty[Long, PendingData]
+
+  def addStatus(pending: PendingData): Unit = {
+    val missingDeps = scala.collection.mutable.HashSet.empty[Keccak256]
+    pending.missingDeps.foreach(missingDeps.add)
+    pendingStatus.put(System.currentTimeMillis(), pending)
+    checkSizeLimit()
+  }
+
+  def updateStatus(hash: Keccak256): Iterable[PendingData] = {
+    val toRemove = pendingStatus.collect {
+      case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
+        ts
+    }
+    val blocks = toRemove.map(pendingStatus(_))
+    toRemove.foreach(pendingStatus.remove)
+    blocks
+  }
+
+  def checkSizeLimit(): Unit = {
+    if (pendingStatus.size > statusSizeLimit) {
+      val toRemove = pendingStatus.head._1
+      pendingStatus.remove(toRemove)
+      ()
+    }
   }
 }
