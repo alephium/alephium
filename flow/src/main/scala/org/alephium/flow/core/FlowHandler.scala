@@ -133,7 +133,9 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
 
   def updateUponNewData(hash: Keccak256): Unit = {
     val readies = updateStatus(hash)
-    log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
+    if (readies.nonEmpty) {
+      log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
+    }
     readies.foreach {
       case PendingBlock(block, _, origin, broker, chainHandler) =>
         chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
@@ -181,11 +183,11 @@ trait FlowHandlerState {
     checkSizeLimit()
   }
 
-  def updateStatus(hash: Keccak256): Iterable[PendingData] = {
-    val toRemove = pendingStatus.collect {
+  def updateStatus(hash: Keccak256): IndexedSeq[PendingData] = {
+    val toRemove: IndexedSeq[Long] = pendingStatus.collect {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts
-    }
+    }(scala.collection.breakOut)
     val blocks = toRemove.map(pendingStatus(_))
     toRemove.foreach(pendingStatus.remove)
     blocks

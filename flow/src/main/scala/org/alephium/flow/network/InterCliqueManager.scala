@@ -56,9 +56,12 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
   def handleMessage: Receive = {
     case message: CliqueManager.BroadCastBlock =>
+      val block = message.block
+      log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       brokers.foreach {
         case (cliqueId, broker) =>
           if (!message.origin.isFrom(cliqueId)) {
+            log.debug(s"Send block to broker $cliqueId")
             broker ! message.blockMsg
           }
       }
