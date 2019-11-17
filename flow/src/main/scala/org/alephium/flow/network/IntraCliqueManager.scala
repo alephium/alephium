@@ -69,7 +69,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
       assert(block.chainIndex.relateTo(config.brokerInfo))
-      log.debug(s"Broadcasting block for ${block.chainIndex}")
+      log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       brokers.foreach {
         case (_, (info, broker)) =>
           if (!origin.isFrom(cliqueInfo.id, info)) {
