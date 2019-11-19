@@ -40,18 +40,21 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
     state.pendingStatus.size is 1
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending0
+    state.counter is 1
 
     val pending1 = genPending(mutable.HashSet.empty[Keccak256])
     state.addStatus(pending1)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending1
+    state.counter is 2
 
     val pending2 = genPending(mutable.HashSet.empty[Keccak256])
     state.addStatus(pending2)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending1
     state.pendingStatus.last._2 is pending2
+    state.counter is 3
   }
 
   it should "update status" in {
@@ -64,15 +67,18 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
     state.addStatus(pending0)
     state.pendingStatus.size is 1
     state.pendingStatus.head._2.missingDeps.size is 2
+    state.counter is 1
 
     val readies1 = state.updateStatus(block1.hash)
     readies1.size is 0
     state.pendingStatus.size is 1
     state.pendingStatus.head._2.missingDeps.size is 1
+    state.counter is 1
 
     val readies2 = state.updateStatus(block2.hash).toList
     readies2.size is 1
     readies2.head is pending0
     state.pendingStatus.size is 0
+    state.counter is 1
   }
 }

@@ -174,17 +174,23 @@ trait FlowHandlerState {
 
   def statusSizeLimit: Int
 
-  val pendingStatus = scala.collection.mutable.SortedMap.empty[Long, PendingData]
+  var counter: Int  = 0
+  val pendingStatus = scala.collection.mutable.SortedMap.empty[Int, PendingData]
+
+  def increaseAndCounter(): Int = {
+    counter += 1
+    counter
+  }
 
   def addStatus(pending: PendingData): Unit = {
     val missingDeps = scala.collection.mutable.HashSet.empty[Keccak256]
     pending.missingDeps.foreach(missingDeps.add)
-    pendingStatus.put(System.currentTimeMillis(), pending)
+    pendingStatus.put(increaseAndCounter(), pending)
     checkSizeLimit()
   }
 
   def updateStatus(hash: Keccak256): IndexedSeq[PendingData] = {
-    val toRemove: IndexedSeq[Long] = pendingStatus.collect {
+    val toRemove: IndexedSeq[Int] = pendingStatus.collect {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts
     }(scala.collection.breakOut)
