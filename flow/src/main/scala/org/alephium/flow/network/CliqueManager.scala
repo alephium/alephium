@@ -24,11 +24,6 @@ object CliqueManager {
       headerMsg: ByteString,
       origin: DataOrigin
   ) extends Command
-  case class BroadCastHeader(
-      header: BlockHeader,
-      headerMsg: ByteString,
-      origin: DataOrigin
-  ) extends Command
 
   sealed trait Event
   case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
@@ -79,9 +74,6 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
 
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
     case message: CliqueManager.BroadCastBlock =>
-      intraCliqueManager ! message
-      interCliqueManager ! message
-    case message: CliqueManager.BroadCastHeader =>
       intraCliqueManager ! message
       interCliqueManager ! message
     case c: Tcp.Connected =>
