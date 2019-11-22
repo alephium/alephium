@@ -30,7 +30,9 @@ def rpc_call(host, port, method, params):
     run(cmd.format(json.format(method, params), host, port))
 
 def rpc_call_all(method, params):
-    for node in range(0, get_env_int('nodes')):
+    nodes = get_env_int('nodes')
+    batch = get_env_default_int('batch', 0)
+    for node in range(batch * nodes, (batch + 1) * nodes):
         port = (port_start + 1000) + node
         rpc_call('localhost', port, method, params)
 
@@ -58,7 +60,8 @@ elif args.goal == 'run':
     nodes = get_env_int('nodes')
     assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
-    for node in range(0, nodes):
+    batch = get_env_default_int('batch', 0)
+    for node in range(batch * nodes, (batch + 1) * nodes):
         port = 9973 + node
         publicAddress = "localhost:" + str(port)
         masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
@@ -76,8 +79,11 @@ elif args.goal == 'run':
 
         run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
 
-elif args.goal == 'mine':
+elif args.goal == 'mining_start':
     rpc_call_all("mining_start", "[]")
+
+elif args.goal == 'mining_stop':
+    rpc_call_all("mining_stop", "[]")
 
 elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
