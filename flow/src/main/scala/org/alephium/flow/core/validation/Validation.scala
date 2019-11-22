@@ -48,9 +48,9 @@ object Validation {
     for {
       _ <- checkTimeStamp(header, isSyncing)
       _ <- checkWorkAmount(header)
-      _ <- checkWorkTarget(header, headerChain)
       _ <- checkParent(header, headerChain)
       _ <- checkDependencies(header, flow)
+      _ <- checkWorkTarget(header, headerChain)
     } yield ()
   }
 

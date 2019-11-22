@@ -308,7 +308,7 @@ trait Sync extends P2PStage {
   def startSync(): Unit = {
     log.info(s"Start syncing with ${remoteBrokerInfo.address}")
     assert(!selfSynced)
-    flowHandler ! FlowHandler.GetTips
+    flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents)
     setSyncOn()

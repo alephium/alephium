@@ -9,7 +9,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendHeaders}
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
@@ -19,7 +19,7 @@ object FlowHandler {
   sealed trait Command
   case class GetBlocks(locators: AVector[Keccak256])    extends Command
   case class GetHeaders(locators: AVector[Keccak256])   extends Command
-  case object GetTips                                   extends Command
+  case class GetTips(broker: BrokerInfo)                extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
@@ -84,7 +84,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
     case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
     case pending: PendingData           => addStatus(pending)
-    case GetTips                        => sender() ! CurrentTips(blockFlow.getAllTips)
+    case GetTips(brokerInfo)            => sender() ! CurrentTips(blockFlow.getAllBlockTips(brokerInfo))
     case Register(miner)                => context become handleWith(Some(miner))
     case UnRegister                     => context become handleWith(None)
   }
