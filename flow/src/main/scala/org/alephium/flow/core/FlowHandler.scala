@@ -24,6 +24,7 @@ object FlowHandler {
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
   case class Register(miner: ActorRef)                  extends Command
+  case object UnRegister                                extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Keccak256]
@@ -85,6 +86,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     case pending: PendingData           => addStatus(pending)
     case GetTips                        => sender() ! CurrentTips(blockFlow.getAllTips)
     case Register(miner)                => context become handleWith(Some(miner))
+    case UnRegister                     => context become handleWith(None)
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
