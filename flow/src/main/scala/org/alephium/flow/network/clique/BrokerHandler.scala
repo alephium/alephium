@@ -78,7 +78,11 @@ trait BrokerHandler extends HandShake with Relay with Sync {
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
-    startSync()
+    if (remoteBrokerInfo.intersect(config.brokerInfo)) {
+      startSync()
+    } else {
+      startRelay()
+    }
   }
 
   override def uponSynced(): Unit = {
@@ -354,6 +358,7 @@ trait Sync extends P2PStage {
 
 trait Relay extends P2PStage {
   def startRelay(): Unit = {
+    log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
     setPayloadHandler(handleRelayPayload)
     context become (handleReadWrite orElse handleRelayEvent)
     setSyncOff()

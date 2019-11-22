@@ -63,13 +63,14 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
     extends BaseActor
     with FairMinerState {
   val handlers = node.allHandlers
-  handlers.flowHandler ! FlowHandler.Register(self)
 
   def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
+      handlers.flowHandler ! FlowHandler.Register(self)
+      updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
   }
@@ -77,6 +78,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   def awaitStop: Receive = {
     case Miner.Stop =>
       log.info("Stop mining")
+      handlers.flowHandler ! FlowHandler.UnRegister
       context become awaitStart
   }
 
