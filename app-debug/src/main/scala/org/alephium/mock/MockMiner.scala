@@ -48,7 +48,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs.millis, Long.MaxValue).get
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
-      blockHandler ! BlockChainHandler.AddBlock(block, LocalMining)
+      blockHandler ! BlockChainHandler.AddBlock(block, LocalMining, isSyncing = false)
 
     case Miner.UpdateTemplate =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
