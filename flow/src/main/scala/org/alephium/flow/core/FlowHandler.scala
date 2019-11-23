@@ -185,8 +185,6 @@ trait FlowHandlerState {
   }
 
   def addStatus(pending: PendingData): Unit = {
-    val missingDeps = scala.collection.mutable.HashSet.empty[Keccak256]
-    pending.missingDeps.foreach(missingDeps.add)
     pendingStatus.put(increaseAndCounter(), pending)
     checkSizeLimit()
   }
@@ -194,6 +192,43 @@ trait FlowHandlerState {
   def updateStatus(hash: Keccak256): IndexedSeq[PendingData] = {
     val toRemove: IndexedSeq[Int] = pendingStatus.collect {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
+        ts
+    }(scala.collection.breakOut)
+    val blocks = toRemove.map(pendingStatus(_))
+    toRemove.foreach(pendingStatus.remove)
+    blocks
+  }
+
+  def checkSizeLimit(): Unit = {
+    if (pendingStatus.size > statusSizeLimit) {
+      val toRemove = pendingStatus.head._1
+      pendingStatus.remove(toRemove)
+      ()
+    }
+  }
+}
+
+trait Pending[P] {
+  def statusSizeLimit: Int
+
+  def isReady(hash: Keccak256, pending: P): Boolean
+
+  var counter: Int  = 0
+  val pendingStatus = scala.collection.mutable.SortedMap.empty[Int, P]
+
+  def increaseAndCounter(): Int = {
+    counter += 1
+    counter
+  }
+
+  def addStatus(pending: P): Unit = {
+    pendingStatus.put(increaseAndCounter(), pending)
+    checkSizeLimit()
+  }
+
+  def updateStatus(hash: Keccak256): IndexedSeq[P] = {
+    val toRemove: IndexedSeq[Int] = pendingStatus.collect {
+      case (ts, status) if isReady(hash, status) =>
         ts
     }(scala.collection.breakOut)
     val blocks = toRemove.map(pendingStatus(_))

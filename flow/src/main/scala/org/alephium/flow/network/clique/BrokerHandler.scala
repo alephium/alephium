@@ -79,14 +79,16 @@ trait BrokerHandler extends HandShake with Relay with Sync {
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
     if (remoteBrokerInfo.intersect(config.brokerInfo)) {
+      log.info(s"Start syncing with ${remoteBrokerInfo.address}")
       startSync()
     } else {
+      log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
       startRelay()
     }
   }
 
   override def uponSynced(): Unit = {
-    log.debug(s"Synced with remote $remote - $remoteCliqueId")
+    log.debug(s"Synced with remote $remote - $remoteCliqueId, start relaying")
     startRelay()
   }
 }
@@ -264,7 +266,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = block.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlock(block, origin)
+      handler ! BlockChainHandler.AddBlock(block, origin, isSyncing)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }
@@ -306,7 +308,6 @@ trait Sync extends P2PStage {
   private val numOfBlocksLimit = config.numOfSyncBlocksLimit // Each message can include upto this number of blocks
 
   def startSync(): Unit = {
-    log.info(s"Start syncing with ${remoteBrokerInfo.address}")
     assert(!selfSynced)
     flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
     setPayloadHandler(handleSyncPayload)
@@ -358,7 +359,6 @@ trait Sync extends P2PStage {
 
 trait Relay extends P2PStage {
   def startRelay(): Unit = {
-    log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
     setPayloadHandler(handleRelayPayload)
     context become (handleReadWrite orElse handleRelayEvent)
     setSyncOff()

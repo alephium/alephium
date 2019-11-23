@@ -283,7 +283,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
 
   it should "start syncing after handshaking" in new SyncFixture {
     syncHandler.isSyncing is false
-    syncHandler.uponHandshaked(this.remoteCliqueInfo.id, this.remoteBrokerInfo)
+    syncHandler.uponHandshaked(this.remoteCliqueInfo.id, config.brokerInfo)
     syncHandler.isSyncing is true
 
     val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
