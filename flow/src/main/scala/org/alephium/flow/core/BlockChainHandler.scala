@@ -2,6 +2,8 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.crypto.Keccak256
+import org.alephium.flow.Utils
 import org.alephium.flow.core.validation._
 import org.alephium.flow.io.IOError
 import org.alephium.flow.model.DataOrigin
@@ -34,7 +36,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
-    case AddBlocks(blocks, origin)      => handleNewBlocks(blocks, origin)
+    case AddBlocks(blocks, origin)      => handleBlocks(blocks, origin)
     case AddPendingBlock(block, origin) => handlePendingBlock(block, origin)
   }
 
@@ -42,7 +44,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
     assert(!blockFlow.contains(block))
     val validationResult = origin match {
       case DataOrigin.LocalMining => Right(ValidBlock)
-      case _: DataOrigin.Remote   => Validation.validatePostHeader(block, blockFlow)
+      case _: DataOrigin.Remote   => Validation.validateAfterDependencies(block, blockFlow)
     }
     validationResult match {
       case Left(e)                      => handleIoError(e)
@@ -51,26 +53,23 @@ class BlockChainHandler(val blockFlow: BlockFlow,
     }
   }
 
-  def handleNewBlocks(blocks: AVector[Block], origin: DataOrigin): Unit = {
+  def handleBlocks(blocks: AVector[Block], origin: DataOrigin): Unit = {
     assert(Validation.checkSubtreeOfDAG(blocks))
     if (Validation.checkHasParent(blocks.head, blockFlow)) {
-      blocks.foreach(handleNewBlock(_, origin))
+      blocks.foreach(handleBlock(_, origin))
     } else {
       log.warning(s"parent block is not included yet, might be DoS")
     }
   }
 
-  def handleNewBlock(block: Block, origin: DataOrigin): Unit = {
+  def handleBlock(block: Block, origin: DataOrigin): Unit = {
     if (blockFlow.contains(block)) {
+      // TODO: anti-DoS
       log.debug(s"Block for ${block.chainIndex} already exists")
     } else {
-      val validationResult = Validation.validate(block, blockFlow, origin.isSyncing)
-      validationResult match {
-        case Left(e) => handleIoError(e)
-        case Right(MissingDeps(hashes)) =>
-          log.debug(s"""Missing depes: ${hashes.map(_.shortHex).mkString(",")}""")
-          val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
-          flowHandler ! FlowHandler.PendingBlock(block, missings, origin, sender(), self)
+      Validation.validate(block, blockFlow, origin.isSyncing) match {
+        case Left(e)                      => handleIoError(e)
+        case Right(MissingDeps(hashes))   => handleMissingDeps(block, hashes, origin)
         case Right(x: InvalidBlockStatus) => handleInvalidBlock(x)
         case Right(_: ValidBlock.type)    => handleValidBlock(block, origin)
       }
@@ -79,12 +78,20 @@ class BlockChainHandler(val blockFlow: BlockFlow,
 
   def handleValidBlock(block: Block, origin: DataOrigin): Unit = {
     logInfo(block.header)
-    broadcast(block, origin)
+    if (!origin.isSyncing) {
+      broadcast(block, origin)
+    }
     flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())
   }
 
   def handleIoError(e: IOError): Unit = {
     log.debug(s"IO failed in block validation: ${e.toString}")
+  }
+
+  def handleMissingDeps(block: Block, hashes: AVector[Keccak256], origin: DataOrigin): Unit = {
+    log.debug(s"""Missing depes: ${Utils.show(hashes)}""")
+    val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
+    flowHandler ! FlowHandler.PendingBlock(block, missings, origin, sender(), self)
   }
 
   def handleInvalidBlock(status: InvalidBlockStatus): Unit = {
