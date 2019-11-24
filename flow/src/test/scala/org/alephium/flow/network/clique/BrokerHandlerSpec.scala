@@ -286,13 +286,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     syncHandler.uponHandshaked(this.remoteCliqueInfo.id, config.brokerInfo)
     syncHandler.isSyncing is true
 
-    val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
-    val blocksMsg0 = Message.serialize(SendBlocks(AVector.fill(config.numOfSyncBlocksLimit)(block)))
+    val blocks0    = ModelGen.chainGen(config.numOfSyncBlocksLimit).sample.get
+    val blocksMsg0 = Message.serialize(SendBlocks(blocks0))
     syncHandlerRef ! Tcp.Received(blocksMsg0)
     syncHandler.isSyncing is true
-    val blocksMsg1 = Message.serialize(SendBlocks(AVector.fill(1)(block)))
+    val blocks1    = ModelGen.chainGen(1).sample.get
+    val blocksMsg1 = Message.serialize(SendBlocks(blocks1))
     syncHandlerRef ! Tcp.Received(blocksMsg1)
-    syncHandlerRef ! FlowHandler.BlocksLocated(AVector.fill(1)(block))
+    syncHandlerRef ! FlowHandler.BlocksLocated(blocks1)
     syncHandler.isSyncing is false
   }
 }
