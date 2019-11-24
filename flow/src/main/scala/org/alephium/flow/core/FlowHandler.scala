@@ -38,7 +38,7 @@ object FlowHandler {
       with Command
   case class PendingHeader(header: BlockHeader,
                            missingDeps: mutable.HashSet[Keccak256],
-                           origin: DataOrigin,
+                           origin: DataOrigin.Remote,
                            broker: ActorRef,
                            chainHandler: ActorRef)
       extends PendingData
@@ -141,8 +141,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     readies.foreach {
       case PendingBlock(block, _, origin, broker, chainHandler) =>
         chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
-      case PendingHeader(header, _, _, _, _) =>
-        self ! AddHeader(header)
+      case PendingHeader(header, _, origin, broker, chainHandler) =>
+        chainHandler.tell(HeaderChainHandler.AddPendingHeader(header, origin), broker)
     }
   }
 

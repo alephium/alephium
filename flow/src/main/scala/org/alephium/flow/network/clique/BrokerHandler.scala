@@ -10,8 +10,9 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.Utils
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
@@ -259,7 +260,7 @@ trait MessageHandler extends BaseActor {
   def setSyncOff(): Unit          = _isSyncing = false
 
   def handleSendBlocks(blocks: AVector[Block]): Unit = {
-    log.debug(s"Received #${blocks.length} blocks")
+    log.debug(s"Received #${blocks.length} blocks ${Utils.showHashable(blocks)}")
     val splits = blocks.splitBy(_.chainIndex)
     if (splits.forall(Validation.checkSubtreeOfDAG)) {
       splits.foreach(handleNewBlocks)
@@ -280,12 +281,12 @@ trait MessageHandler extends BaseActor {
   }
 
   def handleGetBlocks(locators: AVector[Keccak256]): Unit = {
-    log.debug(s"GetBlocks received: #${locators.length}")
+    log.debug(s"GetBlocks received: #${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetBlocks(locators)
   }
 
   def handleSendHeaders(headers: AVector[BlockHeader]): Unit = {
-    log.debug(s"Received #${headers.length} block headers")
+    log.debug(s"Received #${headers.length} block headers ${Utils.showHashable(headers)}")
     headers.foreach(handleNewHeader)
   }
 
@@ -300,7 +301,7 @@ trait MessageHandler extends BaseActor {
   }
 
   def handleGetHeaders(locators: AVector[Keccak256]): Unit = {
-    log.debug(s"GetHeaders received: ${locators.length}")
+    log.debug(s"GetHeaders received: ${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
   }
 }
