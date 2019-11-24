@@ -9,6 +9,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
+// scalastyle:off number.of.methods
 object Validation {
   private[validation] type HeaderValidationResult =
     Either[Either[IOError, InvalidHeaderStatus], Unit]
@@ -37,19 +38,70 @@ object Validation {
     convert(validateBlock(block, flow, isSyncing), ValidBlock)
   }
 
-  def validatePostHeader(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): IOResult[BlockStatus] = {
-    convert(validateBlockPostHeader(block, flow), ValidBlock)
+  def validateUntilDependencies(header: BlockHeader,
+                                flow: BlockFlow,
+                                isSyncing: Boolean): IOResult[HeaderStatus] = {
+    convert(validateHeaderUntilDependencies(header, flow, isSyncing), ValidHeader)
   }
 
-  private def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformProfile): HeaderValidationResult = {
-    val headerChain = flow.getHeaderChain(header)
+  def validateAfterDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[HeaderStatus] = {
+    convert(validateHeaderAfterDependencies(header, flow), ValidHeader)
+  }
+
+  def validateUntilDependencies(block: Block,
+                                flow: BlockFlow,
+                                isSyncing: Boolean): IOResult[BlockStatus] = {
+    convert(validateBlockUntilDependencies(block, flow, isSyncing), ValidBlock)
+  }
+
+  def validateAfterDependencies(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[BlockStatus] = {
+    convert(validateBlockAfterDependencies(block, flow), ValidBlock)
+  }
+
+  def validateAfterHeader(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[BlockStatus] = {
+    convert(validateBlockAfterHeader(block, flow), ValidBlock)
+  }
+
+  private def validateHeaderUntilDependencies(header: BlockHeader,
+                                              flow: BlockFlow,
+                                              isSyncing: Boolean): HeaderValidationResult = {
     for {
       _ <- checkTimeStamp(header, isSyncing)
       _ <- checkWorkAmount(header)
       _ <- checkDependencies(header, flow)
+    } yield ()
+  }
+
+  private def validateHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: PlatformProfile): HeaderValidationResult = {
+    val headerChain = flow.getHeaderChain(header)
+    for {
       _ <- checkWorkTarget(header, headerChain)
+    } yield ()
+  }
+
+  private def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
+      implicit config: PlatformProfile): HeaderValidationResult = {
+    for {
+      _ <- validateHeaderUntilDependencies(header, flow, isSyncing)
+      _ <- validateHeaderAfterDependencies(header, flow)
+    } yield ()
+  }
+
+  private def validateBlockUntilDependencies(block: Block,
+                                             flow: BlockFlow,
+                                             isSyncing: Boolean): BlockValidationResult = {
+    validateHeaderUntilDependencies(block.header, flow, isSyncing)
+  }
+
+  private def validateBlockAfterDependencies(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): BlockValidationResult = {
+    for {
+      _ <- validateHeaderAfterDependencies(block.header, flow)
+      _ <- validateBlockAfterHeader(block, flow)
     } yield ()
   }
 
@@ -57,11 +109,11 @@ object Validation {
       implicit config: PlatformProfile): BlockValidationResult = {
     for {
       _ <- validateHeader(block.header, flow, isSyncing)
-      _ <- validateBlockPostHeader(block, flow)
+      _ <- validateBlockAfterHeader(block, flow)
     } yield ()
   }
 
-  private def validateBlockPostHeader(block: Block, flow: BlockFlow)(
+  private def validateBlockAfterHeader(block: Block, flow: BlockFlow)(
       implicit config: PlatformProfile): BlockValidationResult = {
     for {
       _ <- checkGroup(block)
@@ -199,3 +251,4 @@ object Validation {
     flow.contains(header.parentHash)
   }
 }
+// scalastyle:on number.of.methods
