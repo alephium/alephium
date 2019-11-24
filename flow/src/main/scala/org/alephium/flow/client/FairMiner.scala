@@ -129,7 +129,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
       val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
       FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
-          val handlerMessage = BlockChainHandler.AddBlock(block, LocalMining, isSyncing = false)
+          val handlerMessage = BlockChainHandler.AddBlocks(AVector(block), LocalMining)
           blockHandler ! handlerMessage
           self ! FairMiner.MiningResult(Some(block), index, miningCount)
         case None =>
