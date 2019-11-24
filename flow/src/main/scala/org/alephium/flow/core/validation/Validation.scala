@@ -7,7 +7,7 @@ import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.TimeStamp
+import org.alephium.util.{AVector, TimeStamp}
 
 object Validation {
   private[validation] type HeaderValidationResult =
@@ -48,7 +48,6 @@ object Validation {
     for {
       _ <- checkTimeStamp(header, isSyncing)
       _ <- checkWorkAmount(header)
-      _ <- checkParent(header, headerChain)
       _ <- checkDependencies(header, flow)
       _ <- checkWorkTarget(header, headerChain)
     } yield ()
@@ -116,11 +115,6 @@ object Validation {
     }
   }
 
-  def checkParent(header: BlockHeader, headerChain: BlockHeaderChain)(
-      implicit config: GroupConfig): HeaderValidationResult = {
-    if (headerChain.contains(header.parentHash)) validHeader else invalidHeader(MissingParent)
-  }
-
   def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult = {
     val missings = header.blockDeps.filterNot(flow.contains)
     if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
@@ -177,5 +171,31 @@ object Validation {
       }
     }
     validBlock
+  }
+
+  /*
+   * The following functions are for other type of checks
+   */
+
+  // Check that a sequence of blocks is a subtree of DAG
+  def checkSubtreeOfDAG(blocks: AVector[Block])(implicit config: GroupConfig): Boolean = {
+    val buffer = scala.collection.mutable.HashSet(blocks.head.hash)
+    // scalastyle:off return
+    blocks.tail.foreach { block =>
+      if (!buffer.contains(block.parentHash)) return false
+      else buffer += block.hash
+    }
+    true
+    // scalastyle:on
+  }
+
+  // Check that if parent block is persisted
+  def checkHasParent(block: Block, flow: BlockFlow)(implicit config: GroupConfig): Boolean = {
+    checkHasParent(block.header, flow)
+  }
+
+  def checkHasParent(header: BlockHeader, flow: BlockFlow)(
+      implicit config: GroupConfig): Boolean = {
+    flow.contains(header.parentHash)
   }
 }

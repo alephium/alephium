@@ -10,6 +10,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
@@ -259,14 +260,20 @@ trait MessageHandler extends BaseActor {
 
   def handleSendBlocks(blocks: AVector[Block]): Unit = {
     log.debug(s"Received #${blocks.length} blocks")
-    blocks.foreach(handleNewBlock)
+    val splits = blocks.splitBy(_.chainIndex)
+    if (splits.forall(Validation.checkSubtreeOfDAG)) {
+      splits.foreach(handleNewBlocks)
+    } else {
+      log.warning(s"Received blocks that are not from subtrees of DAG")
+    }
   }
 
-  private def handleNewBlock(block: Block): Unit = {
-    val chainIndex = block.chainIndex
+  private def handleNewBlocks(blocks: AVector[Block]): Unit = {
+    assert(blocks.nonEmpty)
+    val chainIndex = blocks.head.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlock(block, origin, isSyncing)
+      handler ! BlockChainHandler.AddBlocks(blocks, origin)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }

@@ -19,8 +19,8 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddBlock(block: Block, origin: DataOrigin, isSyncing: Boolean) extends Command
-  case class AddPendingBlock(block: Block, origin: DataOrigin)              extends Command
+  case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
+  case class AddPendingBlock(block: Block, origin: DataOrigin)     extends Command
 }
 
 class BlockChainHandler(val blockFlow: BlockFlow,
@@ -34,8 +34,8 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   val chain: BlockPool = blockFlow.getBlockChain(chainIndex)
 
   override def receive: Receive = {
-    case AddBlock(block, origin, isSyncing) => handleNewBlock(block, origin, isSyncing)
-    case AddPendingBlock(block, origin)     => handlePendingBlock(block, origin)
+    case AddBlocks(blocks, origin)      => handleNewBlocks(blocks, origin)
+    case AddPendingBlock(block, origin) => handlePendingBlock(block, origin)
   }
 
   def handlePendingBlock(block: Block, origin: DataOrigin): Unit = {
@@ -51,24 +51,26 @@ class BlockChainHandler(val blockFlow: BlockFlow,
     }
   }
 
-  def handleNewBlock(block: Block, origin: DataOrigin, isSyncing: Boolean): Unit = {
+  def handleNewBlocks(blocks: AVector[Block], origin: DataOrigin): Unit = {
+    assert(Validation.checkSubtreeOfDAG(blocks))
+    if (Validation.checkHasParent(blocks.head, blockFlow)) {
+      blocks.foreach(handleNewBlock(_, origin))
+    } else {
+      log.warning(s"parent block is not included yet, might be DoS")
+    }
+  }
+
+  def handleNewBlock(block: Block, origin: DataOrigin): Unit = {
     if (blockFlow.contains(block)) {
       log.debug(s"Block for ${block.chainIndex} already exists")
     } else {
-      val validationResult = origin match {
-        case DataOrigin.LocalMining    => Right(ValidBlock)
-        case origin: DataOrigin.Remote => Validation.validate(block, blockFlow, origin.isSyncing)
-      }
+      val validationResult = Validation.validate(block, blockFlow, origin.isSyncing)
       validationResult match {
         case Left(e) => handleIoError(e)
         case Right(MissingDeps(hashes)) =>
           log.debug(s"""Missing depes: ${hashes.map(_.shortHex).mkString(",")}""")
           val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
           flowHandler ! FlowHandler.PendingBlock(block, missings, origin, sender(), self)
-        case Right(MissingParent) =>
-          if (isSyncing) {
-            ???
-          } else handleInvalidBlock(MissingParent)
         case Right(x: InvalidBlockStatus) => handleInvalidBlock(x)
         case Right(_: ValidBlock.type)    => handleValidBlock(block, origin)
       }
