@@ -41,13 +41,13 @@ def run(cmd):
     os.system(cmd)
 
 if args.goal == 'build':
-    run('sbt clean app/stage')
+    run('sbt app/stage')
 
 elif args.goal == 'test':
-    run('sbt clean scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
+    run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
 
 elif args.goal == 'package':
-    run('sbt clean app/universal:packageBin')
+    run('sbt app/universal:packageBin')
 
 elif args.goal == 'benchmark':
     run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
@@ -87,3 +87,6 @@ elif args.goal == 'mining_stop':
 
 elif args.goal == 'kill':
     run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
+
+elif args.goal == 'clean':
+    run('sbt clean')

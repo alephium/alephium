@@ -75,7 +75,9 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
     case message: CliqueManager.BroadCastBlock =>
       intraCliqueManager ! message
-      interCliqueManager ! message
+      if (!message.origin.isSyncing) {
+        interCliqueManager ! message
+      }
     case c: Tcp.Connected =>
       interCliqueManager.forward(c)
   }
