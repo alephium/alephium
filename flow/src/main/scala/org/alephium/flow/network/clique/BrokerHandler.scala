@@ -311,9 +311,8 @@ trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler
 trait Sync extends P2PStage {
   def flowHandler: ActorRef = allHandlers.flowHandler
 
-  private var selfSynced       = false
-  private var remoteSynced     = false
-  private val numOfBlocksLimit = config.numOfSyncBlocksLimit // Each message can include upto this number of blocks
+  private var selfSynced   = false
+  private var remoteSynced = false
 
   def startSync(): Unit = {
     assert(!selfSynced)
@@ -326,7 +325,7 @@ trait Sync extends P2PStage {
   def uponSynced(): Unit
 
   private def checkRemoteSynced(numNewBlocks: Int): Unit = {
-    if (numNewBlocks < numOfBlocksLimit) {
+    if (numNewBlocks == 0) {
       remoteSynced = true
     }
     if (selfSynced) {
@@ -335,7 +334,7 @@ trait Sync extends P2PStage {
   }
 
   private def checkSelfSynced(numNewBlocks: Int): Unit = {
-    if (numNewBlocks < numOfBlocksLimit) {
+    if (numNewBlocks == 0) {
       selfSynced = true
     }
     if (remoteSynced) {
@@ -344,14 +343,23 @@ trait Sync extends P2PStage {
   }
 
   def handleSyncEvents: Receive = {
-    case FlowHandler.CurrentTips(tips) => sendPayload(GetBlocks(tips))
+    case FlowHandler.CurrentTips(tips) =>
+      sendPayload(GetBlocks(tips))
     case FlowHandler.BlocksLocated(blocks) =>
       sendPayload(SendBlocks(blocks))
       checkRemoteSynced(blocks.length)
-    case BrokerHandler.SendPing => sendPing()
+    case BlockChainHandler.BlocksAdded =>
+      flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
+    case BlockChainHandler.BlocksAddingFailed =>
+      log.debug(s"stop broker handler due to failures")
+      stop()
+    case BlockChainHandler.InvalidBlocks =>
+      log.debug(s"stop broker handler due to invalid blocks")
+      stop()
+    case BrokerHandler.SendPing =>
+      sendPing()
   }
 
-  // TODO: move checkSelfSynced to handleSyncEvents so that all the blocks sent are validated
   def handleSyncPayload(payload: Payload): Unit = payload match {
     case SendBlocks(blocks)     => handleSendBlocks(blocks); checkSelfSynced(blocks.length)
     case GetBlocks(locators)    => handleGetBlocks(locators)
