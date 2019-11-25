@@ -27,9 +27,9 @@ object BlockChainHandler {
   case class AddPendingBlock(block: Block, origin: DataOrigin)     extends Command
 
   sealed trait Event
-  case object BlocksAdded        extends Event
-  case object BlocksAddingFailed extends Event
-  case object InvalidBlocks      extends Event
+  case class BlocksAdded(chainIndex: ChainIndex) extends Event
+  case object BlocksAddingFailed                 extends Event
+  case object InvalidBlocks                      extends Event
 }
 
 class BlockChainHandler(val blockFlow: BlockFlow,
@@ -88,13 +88,13 @@ class BlockChainHandler(val blockFlow: BlockFlow,
 
   def handleValidBlock(block: Block, origin: DataOrigin): Unit = {
     logInfo(block.header)
-    if (!origin.isSyncing) {
-      broadcast(block, origin)
-    }
+    broadcast(block, origin)
     flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())
     tasks(sender()) -= block.hash
     if (tasks(sender()).isEmpty) {
-      sender() ! BlocksAdded
+      if (origin.isInstanceOf[DataOrigin.Remote]) {
+        sender() ! BlocksAdded(chainIndex)
+      }
     }
   }
 

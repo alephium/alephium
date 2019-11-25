@@ -95,11 +95,6 @@ class BlockFlow()(implicit val config: PlatformProfile)
 
     var tips = AVector.empty[Keccak256]
     for {
-      from <- 0 until groups
-      if from < low || from >= high
-      to <- low until high
-    } tips = tips ++ getHashChain(GroupIndex(from), GroupIndex(to)).getAllTips
-    for {
       from <- low until high
       to   <- 0 until groups
     } tips = tips ++ getHashChain(GroupIndex(from), GroupIndex(to)).getAllTips
