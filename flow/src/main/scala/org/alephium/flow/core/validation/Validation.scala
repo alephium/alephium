@@ -241,12 +241,12 @@ object Validation {
     // scalastyle:on
   }
 
-  // Check that if parent block is persisted
-  def checkHasParent(block: Block, flow: BlockFlow)(implicit config: GroupConfig): Boolean = {
-    checkHasParent(block.header, flow)
+  // Check if parent block is added into the blockflow
+  def checkParentAdded(block: Block, flow: BlockFlow)(implicit config: GroupConfig): Boolean = {
+    checkParentAdded(block.header, flow)
   }
 
-  def checkHasParent(header: BlockHeader, flow: BlockFlow)(
+  def checkParentAdded(header: BlockHeader, flow: BlockFlow)(
       implicit config: GroupConfig): Boolean = {
     flow.contains(header.parentHash)
   }
