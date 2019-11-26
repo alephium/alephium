@@ -132,8 +132,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     }
   }
 
-  // BFS search instead of DFS
+  // Note: this is BFS search instead of DFS search
   private def getHashesSince(nodes: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
+    @tailrec
     def iter(acc: AVector[Keccak256],
              currents: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
       if (currents.nonEmpty) {

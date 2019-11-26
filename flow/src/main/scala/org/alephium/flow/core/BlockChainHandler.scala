@@ -48,26 +48,23 @@ class BlockChainHandler(val blockFlow: BlockFlow,
     case AddPendingBlock(block, origin) => handlePendingBlock(block, origin)
   }
 
-  def handlePendingBlock(block: Block, origin: DataOrigin): Unit = {
-    assert(!blockFlow.contains(block))
-    val validationResult = origin match {
-      case DataOrigin.LocalMining => Right(ValidBlock)
-      case _: DataOrigin.Remote   => Validation.validateAfterDependencies(block, blockFlow)
-    }
-    validationResult match {
-      case Left(e)                      => handleIOError(e)
-      case Right(x: InvalidBlockStatus) => handleInvalidBlock(x)
-      case Right(_: ValidBlock.type)    => handleValidBlock(block, origin)
-    }
-  }
-
   def handleBlocks(blocks: AVector[Block], origin: DataOrigin): Unit = {
     assert(Validation.checkSubtreeOfDAG(blocks))
-    if (Validation.checkHasParent(blocks.head, blockFlow)) {
+    if (Validation.checkParentAdded(blocks.head, blockFlow)) {
       tasks += sender() -> (mutable.HashSet.empty ++ blocks.map(_.hash).toIterable)
       blocks.foreach(handleBlock(_, origin))
     } else {
       log.warning(s"parent block is not included yet, might be DoS")
+    }
+  }
+
+  def handlePendingBlock(block: Block, origin: DataOrigin): Unit = {
+    assert(!blockFlow.contains(block))
+    val validationResult = Validation.validateAfterDependencies(block, blockFlow)
+    validationResult match {
+      case Left(e)                      => handleIOError(e)
+      case Right(x: InvalidBlockStatus) => handleInvalidBlock(x)
+      case Right(_: ValidBlock.type)    => handleValidBlock(block, origin)
     }
   }
 
@@ -92,16 +89,16 @@ class BlockChainHandler(val blockFlow: BlockFlow,
     flowHandler.tell(FlowHandler.AddBlock(block, origin), sender())
     tasks(sender()) -= block.hash
     if (tasks(sender()).isEmpty) {
-      if (origin.isInstanceOf[DataOrigin.Remote]) {
-        sender() ! BlocksAdded(chainIndex)
+      origin match {
+        case _: DataOrigin.Remote => sender() ! BlocksAdded(chainIndex)
+        case _                    => ()
       }
     }
   }
 
   def handleIOError(e: IOError): Unit = {
     log.debug(s"IO failed in block validation: ${e.toString}")
-    tasks -= sender()
-    sender() ! BlocksAddingFailed
+    feedback(BlocksAddingFailed)
   }
 
   def handleMissingDeps(block: Block, hashes: AVector[Keccak256], origin: DataOrigin): Unit = {
@@ -112,8 +109,12 @@ class BlockChainHandler(val blockFlow: BlockFlow,
 
   def handleInvalidBlock(status: InvalidBlockStatus): Unit = {
     log.debug(s"Failed in block validation: $status")
+    feedback(InvalidBlocks)
+  }
+
+  def feedback(event: Event): Unit = {
     tasks -= sender()
-    sender() ! InvalidBlocks
+    sender() ! event
   }
 
   def broadcast(block: Block, origin: DataOrigin): Unit = {

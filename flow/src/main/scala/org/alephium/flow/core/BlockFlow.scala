@@ -89,7 +89,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     aggregate(_.getAllTips)(_ ++ _)
   }
 
-  def getAllBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256] = {
+  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256] = {
     val (low, high) = brokerInfo.calIntersection(config.brokerInfo)
     assert(low < high)
 
