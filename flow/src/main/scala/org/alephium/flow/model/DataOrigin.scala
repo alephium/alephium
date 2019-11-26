@@ -6,6 +6,8 @@ sealed trait DataOrigin {
   def isFrom(another: CliqueId): Boolean
 
   def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean
+
+  def isSyncing: Boolean
 }
 
 object DataOrigin {
@@ -13,6 +15,8 @@ object DataOrigin {
     override def isFrom(another: CliqueId): Boolean = false
 
     override def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean = false
+
+    override def isSyncing: Boolean = false
   }
   case class Remote(cliqueId: CliqueId, brokerInfo: BrokerInfo, isSyncing: Boolean)
       extends DataOrigin {

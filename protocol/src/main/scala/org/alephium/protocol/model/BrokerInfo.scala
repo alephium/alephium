@@ -17,6 +17,10 @@ class BrokerInfo private (val id: Int, val groupNumPerBroker: Int, val address: 
   def intersect(another: BrokerInfo): Boolean =
     BrokerInfo.intersect(groupFrom, groupUntil, another.groupFrom, another.groupUntil)
 
+  def calIntersection(another: BrokerInfo): (Int, Int) = {
+    (math.max(groupFrom, another.groupFrom), math.min(groupUntil, another.groupUntil))
+  }
+
   override def toString: String = s"BrokerInfo($id, $groupNumPerBroker, $address)"
 
   override def equals(obj: Any): Boolean = obj match {

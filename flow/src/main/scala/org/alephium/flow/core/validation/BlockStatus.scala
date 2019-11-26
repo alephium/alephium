@@ -16,7 +16,6 @@ final case object InvalidGroup                           extends InvalidBlockSta
 final case object InvalidTimeStamp                       extends InvalidHeaderStatus
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus
 final case object InvalidWorkTarget                      extends InvalidHeaderStatus
-final case object MissingParent                          extends InvalidHeaderStatus
 final case class MissingDeps(hashes: AVector[Keccak256]) extends InvalidHeaderStatus
 final case object EmptyTransactionList                   extends InvalidBlockStatus
 final case object InvalidCoinbase                        extends InvalidBlockStatus

@@ -6,7 +6,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, GroupIndex}
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 class BlockFlow()(implicit val config: PlatformProfile)
@@ -87,6 +87,18 @@ class BlockFlow()(implicit val config: PlatformProfile)
 
   override def getAllTips: AVector[Keccak256] = {
     aggregate(_.getAllTips)(_ ++ _)
+  }
+
+  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256] = {
+    val (low, high) = brokerInfo.calIntersection(config.brokerInfo)
+    assert(low < high)
+
+    var tips = AVector.empty[Keccak256]
+    for {
+      from <- low until high
+      to   <- 0 until groups
+    } tips = tips ++ getHashChain(GroupIndex(from), GroupIndex(to)).getAllTips
+    tips
   }
 
   // Rtips means tip representatives for all groups

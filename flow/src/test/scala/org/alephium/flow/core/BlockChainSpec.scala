@@ -117,9 +117,12 @@ class BlockChainSpec extends AlephiumFlowSpec {
         blocks2.foreach(block => chain.contains(block) is true)
         chain.maxHeight is 4
         chain.maxWeight is 8
-        chain.getHashesAfter(blocks1.head.hash).length is 5
+        chain.getHashesAfter(blocks1.head.hash) is {
+          val branch1 = blocks1.tail
+          AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
+        }
         chain.getHashesAfter(blocks2.head.hash).length is 0
-        chain.getHashesAfter(blocks1.tail.head.hash).length is 3
+        chain.getHashesAfter(blocks1.tail.head.hash) is blocks1.tail.tail.map(_.hash)
       }
     }
   }

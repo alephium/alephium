@@ -7,8 +7,9 @@ import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.TimeStamp
+import org.alephium.util.{AVector, TimeStamp}
 
+// scalastyle:off number.of.methods
 object Validation {
   private[validation] type HeaderValidationResult =
     Either[Either[IOError, InvalidHeaderStatus], Unit]
@@ -37,20 +38,70 @@ object Validation {
     convert(validateBlock(block, flow, isSyncing), ValidBlock)
   }
 
-  def validatePostHeader(block: Block, flow: BlockFlow)(
+  def validateUntilDependencies(header: BlockHeader,
+                                flow: BlockFlow,
+                                isSyncing: Boolean): IOResult[HeaderStatus] = {
+    convert(validateHeaderUntilDependencies(header, flow, isSyncing), ValidHeader)
+  }
+
+  def validateAfterDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[HeaderStatus] = {
+    convert(validateHeaderAfterDependencies(header, flow), ValidHeader)
+  }
+
+  def validateUntilDependencies(block: Block,
+                                flow: BlockFlow,
+                                isSyncing: Boolean): IOResult[BlockStatus] = {
+    convert(validateBlockUntilDependencies(block, flow, isSyncing), ValidBlock)
+  }
+
+  def validateAfterDependencies(block: Block, flow: BlockFlow)(
       implicit config: PlatformProfile): IOResult[BlockStatus] = {
-    convert(validateBlockPostHeader(block, flow), ValidBlock)
+    convert(validateBlockAfterDependencies(block, flow), ValidBlock)
+  }
+
+  def validateAfterHeader(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): IOResult[BlockStatus] = {
+    convert(validateBlockAfterHeader(block, flow), ValidBlock)
+  }
+
+  private def validateHeaderUntilDependencies(header: BlockHeader,
+                                              flow: BlockFlow,
+                                              isSyncing: Boolean): HeaderValidationResult = {
+    for {
+      _ <- checkTimeStamp(header, isSyncing)
+      _ <- checkWorkAmount(header)
+      _ <- checkDependencies(header, flow)
+    } yield ()
+  }
+
+  private def validateHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: PlatformProfile): HeaderValidationResult = {
+    val headerChain = flow.getHeaderChain(header)
+    for {
+      _ <- checkWorkTarget(header, headerChain)
+    } yield ()
   }
 
   private def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
       implicit config: PlatformProfile): HeaderValidationResult = {
-    val headerChain = flow.getHeaderChain(header)
     for {
-      _ <- checkTimeStamp(header, isSyncing)
-      _ <- checkWorkAmount(header)
-      _ <- checkWorkTarget(header, headerChain)
-      _ <- checkParent(header, headerChain)
-      _ <- checkDependencies(header, flow)
+      _ <- validateHeaderUntilDependencies(header, flow, isSyncing)
+      _ <- validateHeaderAfterDependencies(header, flow)
+    } yield ()
+  }
+
+  private def validateBlockUntilDependencies(block: Block,
+                                             flow: BlockFlow,
+                                             isSyncing: Boolean): BlockValidationResult = {
+    validateHeaderUntilDependencies(block.header, flow, isSyncing)
+  }
+
+  private def validateBlockAfterDependencies(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): BlockValidationResult = {
+    for {
+      _ <- validateHeaderAfterDependencies(block.header, flow)
+      _ <- validateBlockAfterHeader(block, flow)
     } yield ()
   }
 
@@ -58,11 +109,11 @@ object Validation {
       implicit config: PlatformProfile): BlockValidationResult = {
     for {
       _ <- validateHeader(block.header, flow, isSyncing)
-      _ <- validateBlockPostHeader(block, flow)
+      _ <- validateBlockAfterHeader(block, flow)
     } yield ()
   }
 
-  private def validateBlockPostHeader(block: Block, flow: BlockFlow)(
+  private def validateBlockAfterHeader(block: Block, flow: BlockFlow)(
       implicit config: PlatformProfile): BlockValidationResult = {
     for {
       _ <- checkGroup(block)
@@ -114,11 +165,6 @@ object Validation {
       case Right(target) =>
         if (target == header.target) validHeader else invalidHeader(InvalidWorkTarget)
     }
-  }
-
-  def checkParent(header: BlockHeader, headerChain: BlockHeaderChain)(
-      implicit config: GroupConfig): HeaderValidationResult = {
-    if (headerChain.contains(header.parentHash)) validHeader else invalidHeader(MissingParent)
   }
 
   def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult = {
@@ -178,4 +224,31 @@ object Validation {
     }
     validBlock
   }
+
+  /*
+   * The following functions are for other type of checks
+   */
+
+  // Check that a sequence of blocks is a subtree of DAG
+  def checkSubtreeOfDAG(blocks: AVector[Block])(implicit config: GroupConfig): Boolean = {
+    val buffer = scala.collection.mutable.HashSet(blocks.head.hash)
+    // scalastyle:off return
+    blocks.tail.foreach { block =>
+      if (!buffer.contains(block.parentHash)) return false
+      else buffer += block.hash
+    }
+    true
+    // scalastyle:on
+  }
+
+  // Check if parent block is added into the blockflow
+  def checkParentAdded(block: Block, flow: BlockFlow)(implicit config: GroupConfig): Boolean = {
+    checkParentAdded(block.header, flow)
+  }
+
+  def checkParentAdded(header: BlockHeader, flow: BlockFlow)(
+      implicit config: GroupConfig): Boolean = {
+    flow.contains(header.parentHash)
+  }
 }
+// scalastyle:on number.of.methods

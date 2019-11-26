@@ -13,7 +13,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{Duration, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 object MockMiner {
 
@@ -48,7 +48,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs.millis, Long.MaxValue).get
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
-      blockHandler ! BlockChainHandler.AddBlock(block, LocalMining)
+      blockHandler ! BlockChainHandler.AddBlocks(AVector(block), LocalMining)
 
     case Miner.UpdateTemplate =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

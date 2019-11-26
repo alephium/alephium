@@ -3,6 +3,7 @@ package org.alephium.flow.network.clique
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.util.Random
 
 import akka.actor.{ActorRef, Props, Timers}
@@ -10,7 +11,9 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.Utils
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
+import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin.Remote
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
@@ -78,11 +81,23 @@ trait BrokerHandler extends HandShake with Relay with Sync {
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
-    startSync()
+
+    val isSameClique  = remoteCliqueId == selfCliqueInfo.id
+    val isIntersected = remoteBrokerInfo.intersect(config.brokerInfo)
+    if (!isSameClique && isIntersected) {
+      log.info(s"Start syncing with ${remoteBrokerInfo.address}")
+      startSync()
+    } else if (isSameClique && !isIntersected) {
+      log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
+      startRelay()
+    } else {
+      log.warning(s"Invalid connection from $remoteCliqueId - $remoteBrokerInfo")
+      stop()
+    }
   }
 
   override def uponSynced(): Unit = {
-    log.debug(s"Synced with remote $remote - $remoteCliqueId")
+    log.debug(s"Synced with remote $remote - $remoteCliqueId, start relaying")
     startRelay()
   }
 }
@@ -251,28 +266,36 @@ trait MessageHandler extends BaseActor {
   def setSyncOn(): Unit           = _isSyncing = true
   def setSyncOff(): Unit          = _isSyncing = false
 
-  def handleSendBlocks(blocks: AVector[Block]): Unit = {
-    log.debug(s"Received #${blocks.length} blocks")
-    blocks.foreach(handleNewBlock)
+  def handleSendBlocks(blocks: AVector[Block],
+                       notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = {
+    log.debug(s"Received #${blocks.length} blocks ${Utils.showHashable(blocks)}")
+    val splits = blocks.splitBy(_.chainIndex)
+    if (splits.forall(Validation.checkSubtreeOfDAG)) {
+      notifyListOpt.foreach(_ ++= splits.map(_.head.chainIndex).toIterable)
+      splits.foreach(handleNewBlocks)
+    } else {
+      log.warning(s"Received blocks that are not from subtrees of DAG")
+    }
   }
 
-  private def handleNewBlock(block: Block): Unit = {
-    val chainIndex = block.chainIndex
+  private def handleNewBlocks(blocks: AVector[Block]): Unit = {
+    assert(blocks.nonEmpty)
+    val chainIndex = blocks.head.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlock(block, origin)
+      handler ! BlockChainHandler.AddBlocks(blocks, origin)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }
   }
 
   def handleGetBlocks(locators: AVector[Keccak256]): Unit = {
-    log.debug(s"GetBlocks received: #${locators.length}")
+    log.debug(s"GetBlocks received: #${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetBlocks(locators)
   }
 
   def handleSendHeaders(headers: AVector[BlockHeader]): Unit = {
-    log.debug(s"Received #${headers.length} block headers")
+    log.debug(s"Received #${headers.length} block headers ${Utils.showHashable(headers)}")
     headers.foreach(handleNewHeader)
   }
 
@@ -287,60 +310,85 @@ trait MessageHandler extends BaseActor {
   }
 
   def handleGetHeaders(locators: AVector[Keccak256]): Unit = {
-    log.debug(s"GetHeaders received: ${locators.length}")
+    log.debug(s"GetHeaders received: ${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
   }
 }
 
-trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler
+trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler {
+  def handleCommonEvents: Receive = {
+    case BlockChainHandler.BlocksAddingFailed =>
+      log.debug(s"stop broker handler due to failures")
+      stop()
+    case BlockChainHandler.InvalidBlocks =>
+      log.debug(s"stop broker handler due to invalid blocks")
+      stop()
+    case BrokerHandler.SendPing =>
+      sendPing()
+  }
+}
 
 trait Sync extends P2PStage {
   def flowHandler: ActorRef = allHandlers.flowHandler
 
-  private var selfSynced       = false
-  private var remoteSynced     = false
-  private val numOfBlocksLimit = config.numOfSyncBlocksLimit // Each message can include upto this number of blocks
+  private var selfSynced   = false
+  private var remoteSynced = false
+
+  private val notifyList = scala.collection.mutable.HashSet.empty[ChainIndex]
 
   def startSync(): Unit = {
-    log.info(s"Start syncing with ${remoteBrokerInfo.address}")
     assert(!selfSynced)
-    flowHandler ! FlowHandler.GetTips
+    flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
     setPayloadHandler(handleSyncPayload)
-    context become (handleReadWrite orElse handleSyncEvents)
+    context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
     setSyncOn()
   }
 
   def uponSynced(): Unit
 
   private def checkRemoteSynced(numNewBlocks: Int): Unit = {
-    if (numNewBlocks < numOfBlocksLimit) {
+    assert(!remoteSynced)
+    if (numNewBlocks == 0) {
       remoteSynced = true
     }
-    if (selfSynced) {
+    if (selfSynced && remoteSynced) {
       uponSynced()
     }
   }
 
   private def checkSelfSynced(numNewBlocks: Int): Unit = {
-    if (numNewBlocks < numOfBlocksLimit) {
+    assert(!selfSynced)
+    if (numNewBlocks == 0) {
       selfSynced = true
     }
-    if (remoteSynced) {
+    if (selfSynced && remoteSynced) {
       uponSynced()
     }
   }
 
   def handleSyncEvents: Receive = {
-    case FlowHandler.CurrentTips(tips) => sendPayload(GetBlocks(tips))
+    case FlowHandler.CurrentTips(tips) =>
+      log.debug(s"ask blocks from these tips ${Utils.show(tips)}")
+      sendPayload(GetBlocks(tips))
     case FlowHandler.BlocksLocated(blocks) =>
+      log.debug(s"send blocks after remote's tips ${Utils.showHashable(blocks)}")
       sendPayload(SendBlocks(blocks))
       checkRemoteSynced(blocks.length)
-    case BrokerHandler.SendPing => sendPing()
+    case BlockChainHandler.BlocksAdded(chainIndex) =>
+      assert(notifyList.contains(chainIndex))
+      log.debug(s"all the blocks sent for $chainIndex are added")
+      notifyList -= chainIndex
+      if (notifyList.isEmpty) {
+        allHandlers.flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
+      }
   }
 
-  // TODO: move checkSelfSynced to handleSyncEvents so that all the blocks sent are validated
   def handleSyncPayload(payload: Payload): Unit = payload match {
-    case SendBlocks(blocks)     => handleSendBlocks(blocks); checkSelfSynced(blocks.length)
+    case SendBlocks(blocks) =>
+      if (blocks.nonEmpty) {
+        handleSendBlocks(blocks, Some(notifyList))
+      }
+      checkSelfSynced(blocks.length)
     case GetBlocks(locators)    => handleGetBlocks(locators)
     case SendHeaders(headers)   => handleSendHeaders(headers)
     case GetHeaders(locators)   => handleGetHeaders(locators)
@@ -355,16 +403,17 @@ trait Sync extends P2PStage {
 trait Relay extends P2PStage {
   def startRelay(): Unit = {
     setPayloadHandler(handleRelayPayload)
-    context become (handleReadWrite orElse handleRelayEvent)
+    context become (handleReadWrite orElse handleRelayEvent orElse handleCommonEvents)
     setSyncOff()
   }
 
   def handleRelayEvent: Receive = {
-    case BrokerHandler.SendPing => sendPing()
+    case BlockChainHandler.BlocksAdded(chainIndex) =>
+      log.debug(s"all the blocks sent for $chainIndex are added")
   }
 
   def handleRelayPayload(payload: Payload): Unit = payload match {
-    case SendBlocks(blocks)     => handleSendBlocks(blocks)
+    case SendBlocks(blocks)     => handleSendBlocks(blocks, notifyListOpt = None)
     case GetBlocks(locators)    => handleGetBlocks(locators)
     case SendHeaders(headers)   => handleSendHeaders(headers)
     case GetHeaders(locators)   => handleGetHeaders(locators)
