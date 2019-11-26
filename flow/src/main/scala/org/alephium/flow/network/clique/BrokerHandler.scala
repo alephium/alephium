@@ -81,11 +81,17 @@ trait BrokerHandler extends HandShake with Relay with Sync {
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
     cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
-    if (remoteBrokerInfo.intersect(config.brokerInfo)) {
+
+    val isSameClique  = remoteCliqueId == selfCliqueInfo.id
+    val isIntersected = remoteBrokerInfo.intersect(config.brokerInfo)
+    if (!isSameClique && isIntersected) {
       log.info(s"Start syncing with ${remoteBrokerInfo.address}")
       startSync()
+    } else if (isSameClique && !isIntersected) {
+      log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
+      startRelay()
     } else {
-      log.warning(s"no common groups with $remoteCliqueId - ${remoteBrokerInfo.address}")
+      log.warning(s"Invalid connection from $remoteCliqueId - $remoteBrokerInfo")
       stop()
     }
   }
