@@ -40,7 +40,7 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
       // TODO: anti-DoS
       log.debug(s"Header for ${header.chainIndex} already existed")
     } else {
-      if (Validation.checkHasParent(header, blockFlow)) {
+      if (Validation.checkParentAdded(header, blockFlow)) {
         handleNewHeader(header, origin)
       } else {
         log.warning(s"parent header is not included yet, might be DoS")

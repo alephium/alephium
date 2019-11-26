@@ -85,8 +85,8 @@ trait BrokerHandler extends HandShake with Relay with Sync {
       log.info(s"Start syncing with ${remoteBrokerInfo.address}")
       startSync()
     } else {
-      log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
-      startRelay()
+      log.warning(s"no common groups with $remoteCliqueId - ${remoteBrokerInfo.address}")
+      stop()
     }
   }
 
