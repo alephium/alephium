@@ -9,7 +9,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendHeaders}
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
@@ -19,11 +19,12 @@ object FlowHandler {
   sealed trait Command
   case class GetBlocks(locators: AVector[Keccak256])    extends Command
   case class GetHeaders(locators: AVector[Keccak256])   extends Command
-  case object GetTips                                   extends Command
+  case class GetTips(broker: BrokerInfo)                extends Command
   case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
   case class AddHeader(header: BlockHeader)             extends Command
   case class AddBlock(block: Block, origin: DataOrigin) extends Command
   case class Register(miner: ActorRef)                  extends Command
+  case object UnRegister                                extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Keccak256]
@@ -37,7 +38,7 @@ object FlowHandler {
       with Command
   case class PendingHeader(header: BlockHeader,
                            missingDeps: mutable.HashSet[Keccak256],
-                           origin: DataOrigin,
+                           origin: DataOrigin.Remote,
                            broker: ActorRef,
                            chainHandler: ActorRef)
       extends PendingData
@@ -83,8 +84,9 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
     case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
     case pending: PendingData           => addStatus(pending)
-    case GetTips                        => sender() ! CurrentTips(blockFlow.getAllTips)
+    case GetTips(brokerInfo)            => sender() ! CurrentTips(blockFlow.getOutBlockTips(brokerInfo))
     case Register(miner)                => context become handleWith(Some(miner))
+    case UnRegister                     => context become handleWith(None)
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
@@ -139,8 +141,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     readies.foreach {
       case PendingBlock(block, _, origin, broker, chainHandler) =>
         chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
-      case PendingHeader(header, _, _, _, _) =>
-        self ! AddHeader(header)
+      case PendingHeader(header, _, origin, broker, chainHandler) =>
+        chainHandler.tell(HeaderChainHandler.AddPendingHeader(header, origin), broker)
     }
   }
 
@@ -183,8 +185,6 @@ trait FlowHandlerState {
   }
 
   def addStatus(pending: PendingData): Unit = {
-    val missingDeps = scala.collection.mutable.HashSet.empty[Keccak256]
-    pending.missingDeps.foreach(missingDeps.add)
     pendingStatus.put(increaseAndCounter(), pending)
     checkSizeLimit()
   }

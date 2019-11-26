@@ -127,20 +127,23 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   def getHashesAfter(locator: Keccak256): AVector[Keccak256] = {
     blockHashesTable.get(locator) match {
-      case Some(node) => getHashesAfter(node).tail
+      case Some(node) => getHashesSince(AVector.from(node.successors))
       case None       => AVector.empty
     }
   }
 
-  private def getHashesAfter(node: BlockHashChain.TreeNode): AVector[Keccak256] = {
-    if (node.isLeaf) AVector(node.blockHash)
-    else {
-      val buffer = node.successors.foldLeft(ArrayBuffer[Keccak256](node.blockHash)) {
-        case (blocks, successor) =>
-          blocks ++ getHashesAfter(successor).toIterable
-      }
-      AVector.from(buffer)
+  // Note: this is BFS search instead of DFS search
+  private def getHashesSince(nodes: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
+    @tailrec
+    def iter(acc: AVector[Keccak256],
+             currents: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
+      if (currents.nonEmpty) {
+        val nexts = currents.flatMap(node => AVector.from(node.successors))
+        iter(acc ++ currents.map(_.blockHash), nexts)
+      } else acc
     }
+
+    iter(AVector.empty, nodes)
   }
 
   def getBestTip: Keccak256 = {
