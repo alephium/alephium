@@ -102,7 +102,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   }
 
   def handleMissingDeps(block: Block, hashes: AVector[Keccak256], origin: DataOrigin): Unit = {
-    log.debug(s"""Missing depes: ${Utils.show(hashes)}""")
+    log.debug(s"Missing depes: ${Utils.show(hashes)}")
     val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
     flowHandler ! FlowHandler.PendingBlock(block, missings, origin, sender(), self)
   }
