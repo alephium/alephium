@@ -73,7 +73,7 @@ class HeaderChainHandler(val blockFlow: BlockFlow,
   def handleMissingDeps(header: BlockHeader,
                         hashes: AVector[Keccak256],
                         origin: DataOrigin.Remote): Unit = {
-    log.debug(s"""Missing depes: ${Utils.show(hashes)}""")
+    log.debug(s"${header.shortHex} missing depes: ${Utils.show(hashes)}")
     val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
     flowHandler ! FlowHandler.PendingHeader(header, missings, origin, sender(), self)
   }

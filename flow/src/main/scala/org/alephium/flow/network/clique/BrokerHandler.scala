@@ -428,7 +428,10 @@ trait Relay extends P2PStage {
 trait ConnectionUtil extends BaseActor {
   def connection: ActorRef
 
+  def remote: InetSocketAddress
+
   def stop(): Unit = {
+    log.debug(s"stopping connection with $remote")
     if (connection != null) {
       connection ! Tcp.Close
     }
