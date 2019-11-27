@@ -303,7 +303,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = header.chainIndex
     if (!chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
-      handler ! HeaderChainHandler.AddHeader(header, origin)
+      handler ! HeaderChainHandler.AddHeaders(AVector(header), origin)
     } else {
       log.warning(s"Received headers for wrong chain from $remote")
     }
@@ -318,11 +318,15 @@ trait MessageHandler extends BaseActor {
 trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler {
   def handleCommonEvents: Receive = {
     case BlockChainHandler.BlocksAddingFailed =>
-      log.debug(s"stop broker handler due to failures")
+      log.debug(s"stop broker handler due to failures in adding blocks")
       stop()
     case BlockChainHandler.InvalidBlocks =>
       log.debug(s"stop broker handler due to invalid blocks")
       stop()
+    case HeaderChainHandler.HeadersAddingFailed =>
+      log.debug(s"stop broker handler due to failures in adding headers")
+    case HeaderChainHandler.InvalidHeaders =>
+      log.debug(s"stop broker handler due to invalid headers")
     case BrokerHandler.SendPing =>
       sendPing()
   }
@@ -334,7 +338,7 @@ trait Sync extends P2PStage {
   private var selfSynced   = false
   private var remoteSynced = false
 
-  private val notifyList = scala.collection.mutable.HashSet.empty[ChainIndex]
+  private val blockNotifyList = scala.collection.mutable.HashSet.empty[ChainIndex]
 
   def startSync(): Unit = {
     assert(!selfSynced)
@@ -375,18 +379,20 @@ trait Sync extends P2PStage {
       sendPayload(SendBlocks(blocks))
       checkRemoteSynced(blocks.length)
     case BlockChainHandler.BlocksAdded(chainIndex) =>
-      assert(notifyList.contains(chainIndex))
+      assert(blockNotifyList.contains(chainIndex))
       log.debug(s"all the blocks sent for $chainIndex are added")
-      notifyList -= chainIndex
-      if (notifyList.isEmpty) {
+      blockNotifyList -= chainIndex
+      if (blockNotifyList.isEmpty) {
         allHandlers.flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
       }
+    case HeaderChainHandler.HeadersAdded(chainIndex) =>
+      log.debug(s"all the blocks sent for $chainIndex are added")
   }
 
   def handleSyncPayload(payload: Payload): Unit = payload match {
     case SendBlocks(blocks) =>
       if (blocks.nonEmpty) {
-        handleSendBlocks(blocks, Some(notifyList))
+        handleSendBlocks(blocks, Some(blockNotifyList))
       }
       checkSelfSynced(blocks.length)
     case GetBlocks(locators)    => handleGetBlocks(locators)
