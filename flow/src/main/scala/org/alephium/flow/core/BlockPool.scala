@@ -2,12 +2,15 @@ package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.IOResult
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, FlowData}
 import org.alephium.util.AVector
 
 trait BlockPool extends BlockHashPool {
 
   def contains(block: Block): Boolean = contains(block.hash)
+
+  // TODO: refactor and merge contains and includes
+  def includes[T <: FlowData](data: T): Boolean = contains(data.hash)
 
   // Assuming the hash is in the pool
   def getBlock(hash: Keccak256): IOResult[Block]

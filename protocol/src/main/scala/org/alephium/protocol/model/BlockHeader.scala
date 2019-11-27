@@ -18,8 +18,8 @@ case class BlockHeader(
     timestamp: TimeStamp,
     target: BigInt,
     nonce: BigInt
-) extends Keccak256Hash[BlockHeader] {
-
+) extends Keccak256Hash[BlockHeader]
+    with FlowData {
   override lazy val hash: Keccak256 = _getHash
 
   def chainIndex(implicit config: GroupConfig): ChainIndex = {
@@ -45,11 +45,6 @@ case class BlockHeader(
   def outDeps(implicit config: GroupConfig): AVector[Keccak256] = {
     assert(!isGenesis)
     blockDeps.takeRight(config.groups)
-  }
-
-  def validateIndex(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
-    val actual = chainIndex
-    target.from == actual.from && target.to == actual.to
   }
 }
 
