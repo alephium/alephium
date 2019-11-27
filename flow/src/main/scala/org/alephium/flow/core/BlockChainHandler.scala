@@ -50,6 +50,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
 
   def handleBlocks(blocks: AVector[Block], origin: DataOrigin): Unit = {
     assert(Validation.checkSubtreeOfDAG(blocks))
+    log.debug(s"try to add ${Utils.showHashable(blocks)}")
     if (Validation.checkParentAdded(blocks.head, blockFlow)) {
       tasks += sender() -> (mutable.HashSet.empty ++ blocks.map(_.hash).toIterable)
       blocks.foreach(handleBlock(_, origin))
@@ -102,7 +103,7 @@ class BlockChainHandler(val blockFlow: BlockFlow,
   }
 
   def handleMissingDeps(block: Block, hashes: AVector[Keccak256], origin: DataOrigin): Unit = {
-    log.debug(s"Missing depes: ${Utils.show(hashes)}")
+    log.debug(s"${block.shortHex} missing depes: ${Utils.show(hashes)}")
     val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
     flowHandler ! FlowHandler.PendingBlock(block, missings, origin, sender(), self)
   }
