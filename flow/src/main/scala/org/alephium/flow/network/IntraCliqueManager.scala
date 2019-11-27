@@ -74,10 +74,10 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
         case (_, (info, broker)) =>
           if (!origin.isFrom(cliqueInfo.id, info)) {
             if (block.chainIndex.relateTo(info)) {
-              log.debug(s"Send block to broker $info")
+              log.debug(s"Send block ${block.shortHex} to broker $info")
               broker ! blockMsg
             } else {
-              log.debug(s"Send header to broker $info")
+              log.debug(s"Send header ${block.shortHex} to broker $info")
               broker ! headerMsg
             }
           }

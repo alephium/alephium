@@ -83,7 +83,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     case PrepareBlockFlow(chainIndex)   => prepareBlockFlow(chainIndex)
     case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
     case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
-    case pending: PendingData           => addStatus(pending)
+    case pending: PendingData           => handlePending(pending)
     case GetTips(brokerInfo)            => sender() ! CurrentTips(blockFlow.getOutBlockTips(brokerInfo))
     case Register(miner)                => context become handleWith(Some(miner))
     case UnRegister                     => context become handleWith(None)
@@ -133,17 +133,29 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     }
   }
 
+  def handlePending(pending: PendingData): Unit = {
+    val missings = pending.missingDeps
+    missings.retain(!blockFlow.contains(_)) // necessary to remove the new added dependencies
+    if (missings.isEmpty) {
+      feedback(pending)
+    } else {
+      addStatus(pending)
+    }
+  }
+
   def updateUponNewData(hash: Keccak256): Unit = {
     val readies = updateStatus(hash)
     if (readies.nonEmpty) {
       log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
     }
-    readies.foreach {
-      case PendingBlock(block, _, origin, broker, chainHandler) =>
-        chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
-      case PendingHeader(header, _, origin, broker, chainHandler) =>
-        chainHandler.tell(HeaderChainHandler.AddPendingHeader(header, origin), broker)
-    }
+    readies.foreach(feedback)
+  }
+
+  def feedback(pending: PendingData): Unit = pending match {
+    case PendingBlock(block, _, origin, broker, chainHandler) =>
+      chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
+    case PendingHeader(header, _, origin, broker, chainHandler) =>
+      chainHandler.tell(HeaderChainHandler.AddPendingHeader(header, origin), broker)
   }
 
   def logInfo(header: BlockHeader): Unit = {
