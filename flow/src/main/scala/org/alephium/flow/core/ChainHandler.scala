@@ -29,12 +29,18 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
   def handleDatas(datas: AVector[T], origin: DataOrigin): Unit = {
     assert(Validation.checkSubtreeOfDAG(datas))
     log.debug(s"try to add ${Utils.showHashable(datas)}")
-    if (Validation.checkParentAdded(datas.head, blockFlow)) {
+    if (checkContinuity(datas)) {
       tasks += sender() -> (mutable.HashSet.empty ++ datas.map(_.hash).toIterable)
       datas.foreach(handleData(_, origin))
     } else {
       log.warning(s"parent block/header is not included yet, might be DoS")
     }
+  }
+
+  // either the first block's parent is added into blockflow, or the parent is in processing
+  def checkContinuity(datas: AVector[T]): Boolean = {
+    val head = datas.head
+    Validation.checkParentAdded(head, blockFlow) || tasks(sender()).contains(head.parentHash)
   }
 
   def handleData(data: T, origin: DataOrigin): Unit = {
