@@ -60,15 +60,14 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
   }
 
   def handlePending(data: T, origin: DataOrigin): Unit = {
-    logInfo(data)
-    broadcast(data, origin)
-    addToFlowHandler(data, origin, sender())
-    tasks(sender()) -= data.hash
-    if (tasks(sender()).isEmpty) {
-      origin match {
-        case _: DataOrigin.Remote => sender() ! dataAddedEvent()
-        case _                    => ()
-      }
+    assert(!blockFlow.includes(data))
+    val validationResult = validator.validateAfterDependencies(data, blockFlow)
+    validationResult match {
+      case Left(e)                      => handleIOError(e)
+      case Right(x: InvalidBlockStatus) => handleInvalidData(x)
+      case Right(s) =>
+        assert(s.isInstanceOf[ValidStatus]) // avoid and double check exhaustive matching issues
+        handleValidData(data, origin)
     }
   }
 
