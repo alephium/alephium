@@ -6,12 +6,19 @@ import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
 case class Block(header: BlockHeader, transactions: AVector[Transaction])
-    extends Keccak256Hash[Block] {
+    extends Keccak256Hash[Block]
+    with FlowData {
   override def hash: Keccak256 = header.hash
+
+  override def timestamp: TimeStamp = header.timestamp
+
+  override def target: BigInt = header.target
 
   def chainIndex(implicit config: GroupConfig): ChainIndex = {
     header.chainIndex
   }
+
+  def isGenesis: Boolean = header.isGenesis
 
   def parentHash(implicit config: GroupConfig): Keccak256 = {
     header.parentHash
@@ -19,10 +26,6 @@ case class Block(header: BlockHeader, transactions: AVector[Transaction])
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Keccak256 = {
     header.uncleHash(toIndex)
-  }
-
-  def validateIndex(target: ChainIndex)(implicit config: GroupConfig): Boolean = {
-    header.validateIndex(target)
   }
 }
 
