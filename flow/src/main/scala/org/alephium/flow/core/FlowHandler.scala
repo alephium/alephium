@@ -38,7 +38,7 @@ object FlowHandler {
       with Command
   case class PendingHeader(header: BlockHeader,
                            missingDeps: mutable.HashSet[Keccak256],
-                           origin: DataOrigin.Remote,
+                           origin: DataOrigin,
                            broker: ActorRef,
                            chainHandler: ActorRef)
       extends PendingData

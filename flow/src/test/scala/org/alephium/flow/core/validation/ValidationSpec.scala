@@ -10,6 +10,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ValidationSpec extends AlephiumFlowSpec {
   import Validation._
+  import ValidationStatus._
 
   def check(res: BlockValidationResult): Assertion = {
     res.isRight is true

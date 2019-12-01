@@ -186,7 +186,7 @@ object PlatformProfile {
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(transactions, config.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
-      if (block.validateIndex(chainIndex)) block else iter(nonce + 1)
+      if (block.chainIndex == chainIndex) block else iter(nonce + 1)
     }
 
     iter(0)

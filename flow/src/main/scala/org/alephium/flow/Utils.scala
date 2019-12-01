@@ -1,6 +1,6 @@
 package org.alephium.flow
 
-import org.alephium.crypto.Keccak256Hash
+import org.alephium.protocol.model.FlowData
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
@@ -9,7 +9,7 @@ object Utils {
     elems.map(_.shortHex).mkString("-")
   }
 
-  def showHashable[T <: Keccak256Hash[_]](elems: AVector[T]): String = {
+  def showHashable[T <: FlowData](elems: AVector[T]): String = {
     elems.map(_.shortHex).mkString("-")
   }
 }

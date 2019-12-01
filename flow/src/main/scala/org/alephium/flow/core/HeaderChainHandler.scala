@@ -1,15 +1,15 @@
 package org.alephium.flow.core
 
+import scala.collection.mutable
+
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.Utils
-import org.alephium.flow.core.validation.{InvalidHeaderStatus, MissingDeps, Validation, ValidHeader}
-import org.alephium.flow.io.IOError
+import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.AVector
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
@@ -17,75 +17,42 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   sealed trait Command
-  case class AddHeader(header: BlockHeader, origin: DataOrigin.Remote)
-  case class AddPendingHeader(header: BlockHeader, origin: DataOrigin.Remote)
+  case class AddHeaders(header: AVector[BlockHeader], origin: DataOrigin)
+  case class AddPendingHeader(header: BlockHeader, origin: DataOrigin)
+
+  sealed trait Event                              extends ChainHandler.Event
+  case class HeadersAdded(chainIndex: ChainIndex) extends Event
+  case object HeadersAddingFailed                 extends Event
+  case object InvalidHeaders                      extends Event
 }
 
-class HeaderChainHandler(val blockFlow: BlockFlow,
-                         val chainIndex: ChainIndex,
-                         flowHandler: ActorRef)(implicit val config: PlatformProfile)
-    extends BaseActor
-    with ChainHandlerLogger {
+class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
+    implicit val config: PlatformProfile)
+    extends ChainHandler[BlockHeader, HeaderStatus](blockFlow, chainIndex, HeaderValidation) {
   import HeaderChainHandler._
 
-  val chain: BlockHeaderPool = blockFlow.getHeaderChain(chainIndex)
-
   override def receive: Receive = {
-    case AddHeader(header, origin)        => handleHeader(header, origin)
+    case AddHeaders(headers, origin)      => handleDatas(headers, origin)
     case AddPendingHeader(header, origin) => handlePending(header, origin)
   }
 
-  def handleHeader(header: BlockHeader, origin: DataOrigin.Remote): Unit = {
-    if (blockFlow.contains(header)) {
-      // TODO: anti-DoS
-      log.debug(s"Header for ${header.chainIndex} already existed")
-    } else {
-      if (Validation.checkParentAdded(header, blockFlow)) {
-        handleNewHeader(header, origin)
-      } else {
-        log.warning(s"parent header is not included yet, might be DoS")
-      }
-    }
+  override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
+
+  override def addToFlowHandler(header: BlockHeader, origin: DataOrigin, sender: ActorRef): Unit = {
+    flowHandler.tell(FlowHandler.AddHeader(header), sender)
   }
 
-  def handlePending(header: BlockHeader, origin: DataOrigin.Remote): Unit = {
-    assert(!blockFlow.contains(header))
-    Validation.validateAfterDependencies(header, blockFlow) match {
-      case Left(e)                       => handleIOError(header, e)
-      case Right(x: InvalidHeaderStatus) => handleInvalidHeader(header, x, origin)
-      case Right(_: ValidHeader.type)    => handleValidHeader(header)
-    }
+  override def pendingToFlowHandler(header: BlockHeader,
+                                    missings: mutable.HashSet[Keccak256],
+                                    origin: DataOrigin,
+                                    sender: ActorRef,
+                                    self: ActorRef): Unit = {
+    flowHandler ! FlowHandler.PendingHeader(header, missings, origin, sender, self)
   }
 
-  def handleNewHeader(header: BlockHeader, origin: DataOrigin.Remote): Unit = {
-    Validation.validate(header, blockFlow, origin.isSyncing) match {
-      case Left(e)                       => handleIOError(header, e)
-      case Right(MissingDeps(hashes))    => handleMissingDeps(header, hashes, origin)
-      case Right(s: InvalidHeaderStatus) => handleInvalidHeader(header, s, origin)
-      case Right(_: ValidHeader.type)    => handleValidHeader(header)
-    }
-  }
+  override def dataAddedEvent(): Event = HeadersAdded(chainIndex)
 
-  def handleIOError(header: BlockHeader, error: IOError): Unit = {
-    log.debug(s"IO failed in header validation for ${header.shortHex}: ${error.toString}")
-  }
+  override def dataAddingFailed(): Event = HeadersAddingFailed
 
-  def handleMissingDeps(header: BlockHeader,
-                        hashes: AVector[Keccak256],
-                        origin: DataOrigin.Remote): Unit = {
-    log.debug(s"${header.shortHex} missing depes: ${Utils.show(hashes)}")
-    val missings = scala.collection.mutable.HashSet(hashes.toArray: _*)
-    flowHandler ! FlowHandler.PendingHeader(header, missings, origin, sender(), self)
-  }
-
-  def handleInvalidHeader(header: BlockHeader,
-                          status: InvalidHeaderStatus,
-                          origin: DataOrigin.Remote): Unit = {
-    log.debug(s"Failed in header validation for ${header.shortHex} from $origin: $status")
-  }
-
-  def handleValidHeader(header: BlockHeader): Unit = {
-    logInfo(header)
-    flowHandler.tell(FlowHandler.AddHeader(header), sender())
-  }
+  override def dataInvalid(): Event = InvalidHeaders
 }
