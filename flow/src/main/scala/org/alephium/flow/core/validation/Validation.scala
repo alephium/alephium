@@ -7,7 +7,7 @@ import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Forest, TimeStamp}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
@@ -82,11 +82,6 @@ object Validation {
       //      _ <- checkTxsSignature(block, flow) // TODO: design & implement this
       _ <- checkSpending(block, flow)
     } yield ()
-  }
-
-  def validateMined[T <: FlowData](data: T, index: ChainIndex)(
-      implicit config: GroupConfig): Boolean = {
-    data.chainIndex == index && checkWorkAmount(data).isRight
   }
 
   /*
@@ -185,24 +180,18 @@ object Validation {
   }
 
   /*
-   * The following functions are for other type of checks
+   * The following functions are for other type of validation
    */
 
-  // Check that a sequence of blocks is a subtree of DAG
-  def checkSubtreeOfDAG[T <: FlowData](datas: AVector[T])(implicit config: GroupConfig): Boolean = {
-    val buffer = scala.collection.mutable.HashSet(datas.head.hash)
-    // scalastyle:off return
-    datas.tail.foreach { data =>
-      if (!buffer.contains(data.parentHash)) return false
-      else buffer += data.hash
-    }
-    true
-    // scalastyle:on
+  def validateFlowDAG[T <: FlowData](datas: AVector[T])(
+      implicit config: GroupConfig): Option[AVector[Forest[Keccak256, T]]] = {
+    val splits = datas.splitBy(_.chainIndex)
+    val builds = splits.map(ds => Forest.build[Keccak256, T](ds, _.hash, _.parentHash))
+    if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
   }
 
-  // Check if parent block is added into the blockflow
-  def checkParentAdded[T <: FlowData](data: T, flow: BlockFlow)(
+  def validateMined[T <: FlowData](data: T, index: ChainIndex)(
       implicit config: GroupConfig): Boolean = {
-    flow.contains(data.parentHash)
+    data.chainIndex == index && checkWorkAmount(data).isRight
   }
 }
