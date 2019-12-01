@@ -142,7 +142,7 @@ trait ChainHandlerState[T <: FlowData] {
 
   def removeTask(sender: ActorRef, hash: Keccak256, origin: DataOrigin): Unit = {
     tasks(sender).removeRootNode(hash)
-    if (tasks(sender()).isEmpty) {
+    if (tasks(sender).isEmpty) {
       origin match {
         case _: DataOrigin.Remote => feedback(dataAddedEvent())
         case _                    => ()

@@ -16,6 +16,11 @@ object HeaderChainHandler {
       implicit config: PlatformProfile): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
+  def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
+    val forest = Forest.build[Keccak256, BlockHeader](header, _.hash)
+    AddHeaders(forest, origin)
+  }
+
   sealed trait Command
   case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin) extends Command
   case class AddPendingHeader(header: BlockHeader, origin: DataOrigin)              extends Command

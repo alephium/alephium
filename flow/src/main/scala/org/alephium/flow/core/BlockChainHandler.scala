@@ -20,6 +20,11 @@ object BlockChainHandler {
             flowHandler: ActorRef)(implicit config: PlatformProfile): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
+  def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
+    val forets = Forest.build[Keccak256, Block](block, _.hash)
+    AddBlocks(forets, origin)
+  }
+
   sealed trait Command
   case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
   case class AddPendingBlock(block: Block, origin: DataOrigin)               extends Command
