@@ -304,7 +304,7 @@ trait MessageHandler extends BaseActor {
     val chainIndex = header.chainIndex
     if (!chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
-      handler ! HeaderChainHandler.AddHeaders(AVector(header), origin)
+      handler ! HeaderChainHandler.addOneHeader(header, origin)
     } else {
       log.warning(s"Received headers for wrong chain from $remote")
     }
