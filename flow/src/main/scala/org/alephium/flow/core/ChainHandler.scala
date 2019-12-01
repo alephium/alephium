@@ -11,7 +11,7 @@ import org.alephium.flow.io.IOError
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{ChainIndex, FlowData}
-import org.alephium.util.{AVector, BaseActor, TimeStamp}
+import org.alephium.util.{AVector, BaseActor, Forest, TimeStamp}
 
 object ChainHandler {
   trait Event
@@ -21,31 +21,37 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
     validator: Validation[T, S])(implicit config: PlatformProfile)
-    extends BaseActor {
+    extends BaseActor
+    with ChainHandlerState[T] {
   import ChainHandler.Event
 
-  val tasks = mutable.HashMap.empty[ActorRef, mutable.HashSet[Keccak256]]
+  val headerChain = blockFlow.getHashChain(chainIndex)
 
-  def handleDatas(datas: AVector[T], origin: DataOrigin): Unit = {
-    assert(Validation.checkSubtreeOfDAG(datas))
-    log.debug(s"try to add ${Utils.showHashable(datas)}")
-    if (checkContinuity(datas)) {
-      tasks += sender() -> (mutable.HashSet.empty ++ datas.map(_.hash).toIterable)
-      datas.foreach(handleData(_, origin))
+  def handleDatas(datas: Forest[Keccak256, T], origin: DataOrigin): Unit = {
+    if (!isProcessing(sender())) {
+      if (checkContinuity(datas)) {
+        addTasks(sender(), datas)
+        datas.roots.foreach(node => handleData(node.value, origin))
+      } else {
+        // TODO: take care of DoS attack
+        val tips = headerChain.getAllTips
+        sender() ! FlowHandler.CurrentTips(tips)
+      }
     } else {
-      log.warning(s"parent block/header is not included yet, might be DoS")
+      // TODO: take care of DoS attack
+      log.debug(s"It's processing messages from the peer, ignore for the moment")
     }
   }
 
-  // either the first block's parent is added into blockflow, or the parent is in processing
-  def checkContinuity(datas: AVector[T]): Boolean = {
-    val head = datas.head
-    Validation.checkParentAdded(head, blockFlow) || tasks(sender()).contains(head.parentHash)
+  // either all the earliest blocks's parents are added into blockflow
+  def checkContinuity(datas: Forest[Keccak256, T]): Boolean = {
+    datas.roots.forall(node => blockFlow.contains(node.value.parentHash))
   }
 
   def handleData(data: T, origin: DataOrigin): Unit = {
+    log.debug(s"try to add ${data.shortHex}")
     if (blockFlow.includes(data)) {
-      tasks(sender()) -= data.hash
+      removeTask(sender(), data.hash, origin)
       log.debug(s"Data for ${data.chainIndex} already exists") // TODO: anti-DoS
     } else {
       validator.validate(data, blockFlow, origin.isSyncing) match {
@@ -91,13 +97,7 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
     logInfo(data)
     broadcast(data, origin)
     addToFlowHandler(data, origin, sender())
-    tasks(sender()) -= data.hash
-    if (tasks(sender()).isEmpty) {
-      origin match {
-        case _: DataOrigin.Remote => sender() ! dataAddedEvent()
-        case _                    => ()
-      }
-    }
+    removeTask(sender(), data.hash, origin)
   }
 
   def feedback(event: Event): Unit = {
@@ -125,4 +125,32 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
   def dataAddingFailed(): Event
 
   def dataInvalid(): Event
+}
+
+trait ChainHandlerState[T <: FlowData] {
+  import ChainHandler.Event
+
+  val tasks = mutable.HashMap.empty[ActorRef, Forest[Keccak256, T]]
+
+  def addTasks(sender: ActorRef, forest: Forest[Keccak256, T]): Unit = {
+    tasks += sender -> forest
+  }
+
+  def isProcessing(sender: ActorRef): Boolean = {
+    tasks.contains(sender)
+  }
+
+  def removeTask(sender: ActorRef, hash: Keccak256, origin: DataOrigin): Unit = {
+    tasks(sender).removeRootNode(hash)
+    if (tasks(sender()).isEmpty) {
+      origin match {
+        case _: DataOrigin.Remote => feedback(dataAddedEvent())
+        case _                    => ()
+      }
+    }
+  }
+
+  def feedback(event: Event): Unit
+
+  def dataAddedEvent(): Event
 }

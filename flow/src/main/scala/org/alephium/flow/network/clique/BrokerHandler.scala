@@ -21,7 +21,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.{SerdeError, SerdeResult}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{AVector, BaseActor, Forest}
 
 object BrokerHandler {
   sealed trait Command
@@ -268,22 +268,23 @@ trait MessageHandler extends BaseActor {
 
   def handleSendBlocks(blocks: AVector[Block],
                        notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = {
+    assert(blocks.nonEmpty)
     log.debug(s"Received #${blocks.length} blocks ${Utils.showHashable(blocks)}")
-    val splits = blocks.splitBy(_.chainIndex)
-    if (splits.forall(Validation.checkSubtreeOfDAG)) {
-      notifyListOpt.foreach(_ ++= splits.map(_.head.chainIndex).toIterable)
-      splits.foreach(handleNewBlocks)
-    } else {
-      log.warning(s"Received blocks that are not from subtrees of DAG")
+    Validation.validateFlowDAG(blocks) match {
+      case Some(forests) =>
+        notifyListOpt.foreach(_ ++= forests.map(_.roots.head.value.chainIndex).toIterable)
+        forests.foreach(handleNewBlocks)
+      case None =>
+        log.warning(s"Received blocks that are not from subtrees of DAG")
     }
   }
 
-  private def handleNewBlocks(blocks: AVector[Block]): Unit = {
-    assert(blocks.nonEmpty)
-    val chainIndex = blocks.head.chainIndex
+  private def handleNewBlocks(forest: Forest[Keccak256, Block]): Unit = {
+    assert(forest.nonEmpty)
+    val chainIndex = forest.roots.head.value.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
-      handler ! BlockChainHandler.AddBlocks(blocks, origin)
+      handler ! BlockChainHandler.AddBlocks(forest, origin)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
     }
