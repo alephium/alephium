@@ -186,7 +186,7 @@ object Validation {
   def validateFlowDAG[T <: FlowData](datas: AVector[T])(
       implicit config: GroupConfig): Option[AVector[Forest[Keccak256, T]]] = {
     val splits = datas.splitBy(_.chainIndex)
-    val builds = splits.map(ds => Forest.build[Keccak256, T](ds, _.hash, _.parentHash))
+    val builds = splits.map(ds => Forest.tryBuild[Keccak256, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
   }
 
