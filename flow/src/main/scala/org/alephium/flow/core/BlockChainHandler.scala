@@ -11,7 +11,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Forest}
 
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
@@ -21,8 +21,8 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   sealed trait Command
-  case class AddBlocks(blocks: AVector[Block], origin: DataOrigin) extends Command
-  case class AddPendingBlock(block: Block, origin: DataOrigin)     extends Command
+  case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
+  case class AddPendingBlock(block: Block, origin: DataOrigin)               extends Command
 
   sealed trait Event                             extends ChainHandler.Event
   case class BlocksAdded(chainIndex: ChainIndex) extends Event

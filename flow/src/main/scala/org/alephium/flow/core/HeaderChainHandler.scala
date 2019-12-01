@@ -9,7 +9,7 @@ import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.AVector
+import org.alephium.util.Forest
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
@@ -17,8 +17,8 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   sealed trait Command
-  case class AddHeaders(header: AVector[BlockHeader], origin: DataOrigin)
-  case class AddPendingHeader(header: BlockHeader, origin: DataOrigin)
+  case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin) extends Command
+  case class AddPendingHeader(header: BlockHeader, origin: DataOrigin)              extends Command
 
   sealed trait Event                              extends ChainHandler.Event
   case class HeadersAdded(chainIndex: ChainIndex) extends Event
