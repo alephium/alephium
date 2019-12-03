@@ -125,7 +125,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
           origin match {
             case DataOrigin.LocalMining =>
               minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
-            case _: DataOrigin.Remote =>
+            case _: DataOrigin.FromClique =>
               minerOpt.foreach(_ ! Miner.UpdateTemplate)
           }
           logInfo(block.header)

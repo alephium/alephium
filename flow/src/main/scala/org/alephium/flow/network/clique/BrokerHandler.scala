@@ -12,10 +12,10 @@ import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.Utils
-import org.alephium.flow.core.{AllHandlers, BlockChainHandler, FlowHandler, HeaderChainHandler}
+import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
-import org.alephium.flow.model.DataOrigin.Remote
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.model.DataOrigin._
+import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
@@ -258,8 +258,15 @@ trait MessageHandler extends BaseActor {
   def remote: InetSocketAddress
   def remoteCliqueId: CliqueId
   def remoteBrokerInfo: BrokerInfo
+  def selfCliqueInfo: CliqueInfo
 
-  def origin: Remote = Remote(remoteCliqueId, remoteBrokerInfo, isSyncing)
+  def origin: FromClique = {
+    if (remoteCliqueId == selfCliqueInfo.id) {
+      IntraClique(remoteCliqueId, remoteBrokerInfo)
+    } else {
+      InterClique(remoteCliqueId, remoteBrokerInfo, isSyncing)
+    }
+  }
 
   private var _isSyncing: Boolean = false
   def isSyncing: Boolean          = _isSyncing
@@ -269,7 +276,7 @@ trait MessageHandler extends BaseActor {
   def handleSendBlocks(blocks: AVector[Block],
                        notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = {
     assert(blocks.nonEmpty)
-    log.debug(s"Received #${blocks.length} blocks ${Utils.showHashable(blocks)}")
+    log.debug(s"Received #${blocks.length} blocks ${Utils.showHashableV(blocks)}")
     Validation.validateFlowDAG(blocks) match {
       case Some(forests) =>
         notifyListOpt.foreach(_ ++= forests.map(_.roots.head.value.chainIndex).toIterable)
@@ -296,7 +303,7 @@ trait MessageHandler extends BaseActor {
   }
 
   def handleSendHeaders(headers: AVector[BlockHeader]): Unit = {
-    log.debug(s"Received #${headers.length} block headers ${Utils.showHashable(headers)}")
+    log.debug(s"Received #${headers.length} block headers ${Utils.showHashableV(headers)}")
     headers.foreach(handleNewHeader)
   }
 
@@ -334,6 +341,7 @@ trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler 
 }
 
 trait Sync extends P2PStage {
+  def cliqueManager: ActorRef
   def flowHandler: ActorRef = allHandlers.flowHandler
 
   private var selfSynced   = false
@@ -347,6 +355,7 @@ trait Sync extends P2PStage {
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
     setSyncOn()
+    cliqueManager ! InterCliqueManager.Syncing
   }
 
   def uponSynced(): Unit
@@ -356,9 +365,7 @@ trait Sync extends P2PStage {
     if (numNewBlocks == 0) {
       remoteSynced = true
     }
-    if (selfSynced && remoteSynced) {
-      uponSynced()
-    }
+    checkSynced()
   }
 
   private def checkSelfSynced(numNewBlocks: Int): Unit = {
@@ -366,7 +373,12 @@ trait Sync extends P2PStage {
     if (numNewBlocks == 0) {
       selfSynced = true
     }
+    checkSynced()
+  }
+
+  private def checkSynced(): Unit = {
     if (selfSynced && remoteSynced) {
+      cliqueManager ! InterCliqueManager.Synced
       uponSynced()
     }
   }
@@ -376,7 +388,7 @@ trait Sync extends P2PStage {
       log.debug(s"ask blocks from these tips ${Utils.show(tips)}")
       sendPayload(GetBlocks(tips))
     case FlowHandler.BlocksLocated(blocks) =>
-      log.debug(s"send blocks after remote's tips ${Utils.showHashable(blocks)}")
+      log.debug(s"send blocks after remote's tips ${Utils.showHashableV(blocks)}")
       sendPayload(SendBlocks(blocks))
       checkRemoteSynced(blocks.length)
     case BlockChainHandler.BlocksAdded(chainIndex) =>
@@ -419,6 +431,8 @@ trait Relay extends P2PStage {
       log.debug(s"all the blocks sent for $chainIndex are added")
     case HeaderChainHandler.HeadersAdded(chainIndex) =>
       log.debug(s"all the headers sent for $chainIndex are added")
+    case BlockChainHandler.FetchSince(tips) =>
+      sendPayload(GetBlocks(tips))
   }
 
   def handleRelayPayload(payload: Payload): Unit = payload match {

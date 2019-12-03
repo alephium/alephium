@@ -1,6 +1,7 @@
 package org.alephium.flow.core
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import akka.actor.ActorRef
 
@@ -17,35 +18,30 @@ object ChainHandler {
   trait Event
 }
 
-abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
+abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
     validator: Validation[T, S])(implicit config: PlatformProfile)
-    extends BaseActor
-    with ChainHandlerState[T] {
+    extends ChainHandlerState[T]
+    with BaseActor {
   import ChainHandler.Event
 
   val headerChain = blockFlow.getHashChain(chainIndex)
 
   def handleDatas(datas: Forest[Keccak256, T], origin: DataOrigin): Unit = {
-    if (!isProcessing(sender())) {
-      if (checkContinuity(datas)) {
-        addTasks(sender(), datas)
-        datas.roots.foreach(node => handleData(node.value, origin))
-      } else {
-        // TODO: take care of DoS attack
-        val tips = headerChain.getAllTips
-        sender() ! FlowHandler.CurrentTips(tips)
-      }
+    if (checkContinuity(datas)) {
+      addTasks(sender(), datas)
+      val readies = extractReady(sender(), t => blockFlow.contains(t.parentHash))
+      readies.foreach(handleData(_, origin))
     } else {
-      // TODO: take care of DoS attack
-      log.debug(s"It's processing messages from the peer, ignore for the moment")
+      handleMissingParent(datas, origin)
     }
   }
 
-  // either all the earliest blocks's parents are added into blockflow
   def checkContinuity(datas: Forest[Keccak256, T]): Boolean = {
-    datas.roots.forall(node => blockFlow.contains(node.value.parentHash))
+    datas.roots.forall { node =>
+      blockFlow.contains(node.value.parentHash) || isProcessing(sender(), node.value.parentHash)
+    }
   }
 
   def handleData(data: T, origin: DataOrigin): Unit = {
@@ -65,6 +61,8 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
     }
   }
 
+  def handleMissingParent(datas: Forest[Keccak256, T], origin: DataOrigin): Unit
+
   def handlePending(data: T, origin: DataOrigin): Unit = {
     assert(!blockFlow.includes(data))
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
@@ -79,7 +77,7 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
 
   def handleIOError(error: IOError): Unit = {
     log.debug(s"IO failed in block/header validation: ${error.toString}")
-    feedback(dataAddingFailed())
+    feedbackAndClear(dataAddingFailed())
   }
 
   def handleMissingDeps(data: T, hashes: AVector[Keccak256], origin: DataOrigin): Unit = {
@@ -90,7 +88,7 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
 
   def handleInvalidData(status: InvalidStatus): Unit = {
     log.debug(s"Failed in validation: $status")
-    feedback(dataInvalid())
+    feedbackAndClear(dataInvalid())
   }
 
   def handleValidData(data: T, origin: DataOrigin): Unit = {
@@ -100,8 +98,8 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
     removeTask(sender(), data.hash, origin)
   }
 
-  def feedback(event: Event): Unit = {
-    tasks -= sender()
+  def feedbackAndClear(event: Event): Unit = {
+    remove(sender())
     sender() ! event
   }
 
@@ -127,30 +125,51 @@ abstract class ChainHandler[T <: FlowData, S <: ValidationStatus](
   def dataInvalid(): Event
 }
 
-trait ChainHandlerState[T <: FlowData] {
+abstract class ChainHandlerState[T <: FlowData: ClassTag] {
   import ChainHandler.Event
 
-  val tasks = mutable.HashMap.empty[ActorRef, Forest[Keccak256, T]]
+  private val tasks = mutable.HashMap.empty[ActorRef, Forest[Keccak256, T]]
 
   def addTasks(sender: ActorRef, forest: Forest[Keccak256, T]): Unit = {
-    tasks += sender -> forest
+    tasks.get(sender) match {
+      case Some(existing) => existing.simpleMerge(forest)
+      case None           => tasks(sender) = forest
+    }
   }
 
-  def isProcessing(sender: ActorRef): Boolean = {
-    tasks.contains(sender)
+  def extractReady(sender: ActorRef, predict: T => Boolean): AVector[T] = {
+    tasks.get(sender) match {
+      case Some(forest) =>
+        val readies = forest.roots.view.map(_.value).filter(predict).toList
+        readies.foreach(t => forest.removeRootNode(t.hash)) // might avoid t.hash later
+        AVector.from(readies)
+      case None => AVector.empty
+    }
+  }
+
+  def isProcessing(sender: ActorRef, task: Keccak256): Boolean = {
+    tasks.get(sender).map(_.contains(task)) match {
+      case Some(bool) => bool
+      case None       => false
+    }
   }
 
   def removeTask(sender: ActorRef, hash: Keccak256, origin: DataOrigin): Unit = {
     tasks(sender).removeRootNode(hash)
     if (tasks(sender).isEmpty) {
       origin match {
-        case _: DataOrigin.Remote => feedback(dataAddedEvent())
-        case _                    => ()
+        case _: DataOrigin.FromClique => feedbackAndClear(dataAddedEvent())
+        case _                        => ()
       }
     }
   }
 
-  def feedback(event: Event): Unit
+  def remove(sender: ActorRef): Unit = {
+    tasks.remove(sender)
+    ()
+  }
+
+  def feedbackAndClear(event: Event): Unit
 
   def dataAddedEvent(): Event
 }
