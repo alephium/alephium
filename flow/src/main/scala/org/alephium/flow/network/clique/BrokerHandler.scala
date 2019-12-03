@@ -355,7 +355,7 @@ trait Sync extends P2PStage {
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
     setSyncOn()
-    cliqueManager ! InterCliqueManager.Syncing
+    cliqueManager ! InterCliqueManager.Syncing(remoteCliqueId)
   }
 
   def uponSynced(): Unit
@@ -378,7 +378,7 @@ trait Sync extends P2PStage {
 
   private def checkSynced(): Unit = {
     if (selfSynced && remoteSynced) {
-      cliqueManager ! InterCliqueManager.Synced
+      cliqueManager ! InterCliqueManager.Synced(remoteCliqueId)
       uponSynced()
     }
   }
