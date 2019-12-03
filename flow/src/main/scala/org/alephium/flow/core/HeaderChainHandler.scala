@@ -41,6 +41,13 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandl
     case AddPendingHeader(header, origin) => handlePending(header, origin)
   }
 
+  override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
+                                   origin: DataOrigin): Unit = {
+    assert(origin.isInstanceOf[DataOrigin.IntraClique])
+    log.warning(s"missing parent headers, might be bug or compromised node in the clique")
+    feedbackAndClear(dataInvalid())
+  }
+
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
   override def addToFlowHandler(header: BlockHeader, origin: DataOrigin, sender: ActorRef): Unit = {

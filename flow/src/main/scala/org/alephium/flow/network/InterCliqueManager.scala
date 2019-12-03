@@ -13,15 +13,23 @@ object InterCliqueManager {
   def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
       implicit config: PlatformProfile): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
+
+  sealed trait Command
+  case class Syncing(cliqueId: CliqueId) extends Command
+  case class Synced(cliqueId: CliqueId)  extends Command
+
+  case class BrokerState(actor: ActorRef, isSynced: Boolean) {
+    def setSyncing(): BrokerState = BrokerState(actor, isSynced = false)
+
+    def setSynced(): BrokerState = BrokerState(actor, isSynced = true)
+  }
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          allHandlers: AllHandlers,
                          discoveryServer: ActorRef)(implicit config: PlatformProfile)
-    extends BaseActor {
-  // TODO: consider cliques with different brokerNum
-  val brokers = collection.mutable.HashMap.empty[CliqueId, ActorRef]
-
+    extends BaseActor
+    with InterCliqueManagerState {
   discoveryServer ! DiscoveryServer.GetPeerCliques
 
   override def receive: Receive = handleMessage orElse handleConnection orElse awaitPeerCliques
@@ -30,7 +38,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case DiscoveryServer.PeerCliques(peerCliques) =>
       if (peerCliques.nonEmpty) {
         log.debug(s"Got ${peerCliques.length} from discovery server")
-        peerCliques.foreach(clique => if (!brokers.contains(clique.id)) connect(clique))
+        peerCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
       } else {
         // TODO: refine the condition, check the number of brokers for example
         if (config.bootstrap.nonEmpty) {
@@ -48,7 +56,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case CliqueManager.Connected(cliqueId, brokerInfo) =>
       log.debug(s"Connected to: $cliqueId, $brokerInfo")
       if (config.brokerInfo.intersect(brokerInfo)) {
-        brokers += cliqueId -> sender()
+        addBroker(cliqueId, sender())
       } else {
         context stop sender()
       }
@@ -58,13 +66,19 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case message: CliqueManager.BroadCastBlock =>
       val block = message.block
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
-      brokers.foreach {
-        case (cliqueId, broker) =>
-          if (!message.origin.isFrom(cliqueId)) {
+      iterBrokers {
+        case (cliqueId, brokerState) =>
+          if (!message.origin.isFrom(cliqueId) && brokerState.isSynced) {
             log.debug(s"Send block to broker $cliqueId")
-            broker ! message.blockMsg
+            brokerState.actor ! message.blockMsg
           }
       }
+    case InterCliqueManager.Syncing(cliqueId) =>
+      log.debug(s"$cliqueId starts syncing")
+      setSyncing(cliqueId)
+    case InterCliqueManager.Synced(cliqueId) =>
+      log.debug(s"$cliqueId has synced")
+      setSynced(cliqueId)
   }
 
   def connect(cliqueInfo: CliqueInfo): Unit = {
@@ -79,5 +93,37 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         context.actorOf(props, name)
       }
     }
+  }
+}
+
+trait InterCliqueManagerState {
+  import InterCliqueManager._
+
+  // TODO: consider cliques with different brokerNum
+  private val brokers = collection.mutable.HashMap.empty[CliqueId, BrokerState]
+
+  def addBroker(cliqueId: CliqueId, broker: ActorRef): Unit = {
+    assert(!brokers.contains(cliqueId))
+    brokers += cliqueId -> BrokerState(broker, isSynced = false)
+  }
+
+  def containsBroker(clique: CliqueInfo): Boolean = {
+    brokers.contains(clique.id)
+  }
+
+  def iterBrokers(f: ((CliqueId, BrokerState)) => Unit): Unit = {
+    brokers.foreach(f)
+  }
+
+  def setSyncing(cliqueId: CliqueId): Unit = {
+    assert(brokers.contains(cliqueId))
+    val current = brokers(cliqueId)
+    brokers(cliqueId) = current.setSyncing()
+  }
+
+  def setSynced(cliqueId: CliqueId): Unit = {
+    assert(brokers.contains(cliqueId))
+    val current = brokers(cliqueId)
+    brokers(cliqueId) = current.setSynced()
   }
 }

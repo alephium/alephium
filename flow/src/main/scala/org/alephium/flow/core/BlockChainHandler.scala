@@ -5,6 +5,7 @@ import scala.collection.mutable
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.Utils
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
@@ -29,10 +30,11 @@ object BlockChainHandler {
   case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
   case class AddPendingBlock(block: Block, origin: DataOrigin)               extends Command
 
-  sealed trait Event                             extends ChainHandler.Event
-  case class BlocksAdded(chainIndex: ChainIndex) extends Event
-  case object BlocksAddingFailed                 extends Event
-  case object InvalidBlocks                      extends Event
+  sealed trait Event                              extends ChainHandler.Event
+  case class BlocksAdded(chainIndex: ChainIndex)  extends Event
+  case object BlocksAddingFailed                  extends Event
+  case object InvalidBlocks                       extends Event
+  case class FetchSince(tips: AVector[Keccak256]) extends Event
 }
 
 class BlockChainHandler(blockFlow: BlockFlow,
@@ -45,6 +47,19 @@ class BlockChainHandler(blockFlow: BlockFlow,
   override def receive: Receive = {
     case AddBlocks(blocks, origin)      => handleDatas(blocks, origin)
     case AddPendingBlock(block, origin) => handlePending(block, origin)
+  }
+
+  override def handleMissingParent(blocks: Forest[Keccak256, Block], origin: DataOrigin): Unit = {
+    if (origin.isSyncing) {
+      log.warning(s"missing parent blocks in syncing, might be DoS attack")
+      feedbackAndClear(dataInvalid())
+    } else {
+      // TODO: DoS prevention
+      log.debug(
+        s"missing parent blocks, root hashes: ${Utils.showHashableI(blocks.roots.view.map(_.value))}")
+      val tips = headerChain.getAllTips
+      sender() ! FetchSince(tips)
+    }
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
