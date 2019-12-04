@@ -158,10 +158,7 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
   }
 
   def isProcessing(broker: ActorRef, task: Keccak256): Boolean = {
-    tasks.get(broker).map(_.contains(task)) match {
-      case Some(bool) => bool
-      case None       => false
-    }
+    tasks.get(broker).exists(_.contains(task))
   }
 
   def removeTask(broker: ActorRef, hash: Keccak256, origin: DataOrigin): Unit = {
