@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, tempfile
+import argparse, os, tempfile, sys
 
 port_start = 9973
 
@@ -40,53 +40,80 @@ def run(cmd):
     print(cmd)
     os.system(cmd)
 
-if args.goal == 'build':
-    run('sbt app/stage')
+class AlephiumMake(object):
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            usage='''make <command> [<args>]
 
-elif args.goal == 'test':
-    run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
+   clean        Clean the project workspace
+   build        Build the project
+   test         Run the test suite
+   benchmark    Run the benchmark suite
+   package      Produce the project deliverable
 
-elif args.goal == 'package':
-    run('sbt app/universal:packageBin')
 
-elif args.goal == 'benchmark':
-    run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
+   run          Run a local testnet
+   mining_start Start mining on local testnet
+   mining_stop  Stop mining on local testnet
+   kill         kill a local running testnet
+''')
+        parser.add_argument('command', help='Subcommand to run')
+        args = parser.parse_args(sys.argv[1:2])
+        if not hasattr(self, args.command):
+            print('Unrecognized command')
+            parser.print_help()
+            exit(1)
+        getattr(self, args.command)()
 
-elif args.goal == 'run':
+    def build(self):
+        run('sbt app/stage')
 
-    tempdir = tempfile.gettempdir()
-    groups = get_env_int('groups')
-    brokerNum = get_env_default_int('brokerNum', groups)
-    nodes = get_env_int('nodes')
-    assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
+    def test(self):
+        run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
 
-    batch = get_env_default_int('batch', 0)
-    for node in range(batch * nodes, (batch + 1) * nodes):
-        port = 9973 + node
-        publicAddress = "localhost:" + str(port)
-        masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
-        brokerId = node % brokerNum
+    def package(self):
+        run('sbt app/universal:packageBin')
 
-        bootstrap = ""
-        if node // brokerNum > 0:
-            bootstrap = "localhost:" + str(9973 + node % brokerNum)
-        print("{}, {}".format(node, bootstrap))
+    def benchmark(self):
+        run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
 
-        homedir = "{}/alephium/node-{}".format(tempdir, node)
+    def run(self):
+        tempdir = tempfile.gettempdir()
+        groups = get_env_int('groups')
+        brokerNum = get_env_default_int('brokerNum', groups)
+        nodes = get_env_int('nodes')
+        assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
-        if not os.path.exists(homedir):
-            os.makedirs(homedir)
+        batch = get_env_default_int('batch', 0)
+        for node in range(batch * nodes, (batch + 1) * nodes):
+            port = 9973 + node
+            publicAddress = "localhost:" + str(port)
+            masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
+            brokerId = node % brokerNum
 
-        run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
+            bootstrap = ""
+            if node // brokerNum > 0:
+                bootstrap = "localhost:" + str(9973 + node % brokerNum)
+            print("{}, {}".format(node, bootstrap))
 
-elif args.goal == 'mining_start':
-    rpc_call_all("mining_start", "[]")
+            homedir = "{}/alephium/node-{}".format(tempdir, node)
 
-elif args.goal == 'mining_stop':
-    rpc_call_all("mining_stop", "[]")
+            if not os.path.exists(homedir):
+                os.makedirs(homedir)
 
-elif args.goal == 'kill':
-    run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
+            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
 
-elif args.goal == 'clean':
-    run('sbt clean')
+    def mining_start(self):
+        rpc_call_all("mining_start", "[]")
+
+    def mining_stop(self):
+        rpc_call_all("mining_stop", "[]")
+
+    def kill(self):
+        run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
+
+    def clean(self):
+        run('sbt clean')
+
+if __name__ == '__main__':
+    AlephiumMake()
