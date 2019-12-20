@@ -261,11 +261,7 @@ trait MessageHandler extends BaseActor {
   def selfCliqueInfo: CliqueInfo
 
   def origin: FromClique = {
-    if (remoteCliqueId == selfCliqueInfo.id) {
-      IntraClique(remoteCliqueId, remoteBrokerInfo)
-    } else {
-      InterClique(remoteCliqueId, remoteBrokerInfo, isSyncing)
-    }
+    InterClique(remoteCliqueId, remoteBrokerInfo, isSyncing)
   }
 
   private var _isSyncing: Boolean = false
