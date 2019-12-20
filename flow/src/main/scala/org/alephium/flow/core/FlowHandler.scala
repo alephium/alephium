@@ -17,14 +17,14 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case class GetBlocks(locators: AVector[Keccak256])    extends Command
-  case class GetHeaders(locators: AVector[Keccak256])   extends Command
-  case class GetTips(broker: BrokerInfo)                extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex)   extends Command
-  case class AddHeader(header: BlockHeader)             extends Command
-  case class AddBlock(block: Block, origin: DataOrigin) extends Command
-  case class Register(miner: ActorRef)                  extends Command
-  case object UnRegister                                extends Command
+  case class AddHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin) extends Command
+  case class AddBlock(block: Block, broker: ActorRef, origin: DataOrigin)         extends Command
+  case class GetBlocks(locators: AVector[Keccak256])                              extends Command
+  case class GetHeaders(locators: AVector[Keccak256])                             extends Command
+  case class GetTips(broker: BrokerInfo)                                          extends Command
+  case class PrepareBlockFlow(chainIndex: ChainIndex)                             extends Command
+  case class Register(miner: ActorRef)                                            extends Command
+  case object UnRegister                                                          extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Keccak256]
@@ -50,8 +50,10 @@ object FlowHandler {
                                target: BigInt,
                                transactions: AVector[Transaction])
       extends Event
-  case class CurrentTips(tips: AVector[Keccak256]) extends Event
-  case class BlocksLocated(blocks: AVector[Block]) extends Event
+  case class CurrentTips(tips: AVector[Keccak256])                                  extends Event
+  case class BlocksLocated(blocks: AVector[Block])                                  extends Event
+  case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin)         extends Event
+  case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin) extends Event
 }
 
 // TODO: set AddHeader and AddBlock with highest priority
@@ -80,13 +82,15 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
         case Right(blocks) =>
           sender() ! BlocksLocated(blocks)
       }
-    case PrepareBlockFlow(chainIndex)   => prepareBlockFlow(chainIndex)
-    case AddHeader(header: BlockHeader) => handleHeader(minerOpt, header)
-    case AddBlock(block, origin)        => handleBlock(minerOpt, block, origin)
-    case pending: PendingData           => handlePending(pending)
-    case GetTips(brokerInfo)            => sender() ! CurrentTips(blockFlow.getOutBlockTips(brokerInfo))
-    case Register(miner)                => context become handleWith(Some(miner))
-    case UnRegister                     => context become handleWith(None)
+    case PrepareBlockFlow(chainIndex) => prepareBlockFlow(chainIndex)
+    case AddHeader(header, broker, origin: DataOrigin) =>
+      handleHeader(minerOpt, header, broker, origin)
+    case AddBlock(block, broker, origin) =>
+      handleBlock(minerOpt, block, broker, origin)
+    case pending: PendingData => handlePending(pending)
+    case GetTips(brokerInfo)  => sender() ! CurrentTips(blockFlow.getOutBlockTips(brokerInfo))
+    case Register(miner)      => context become handleWith(Some(miner))
+    case UnRegister           => context become handleWith(None)
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
@@ -100,13 +104,17 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     }
   }
 
-  def handleHeader(minerOpt: Option[ActorRef], header: BlockHeader): Unit = {
+  def handleHeader(minerOpt: Option[ActorRef],
+                   header: BlockHeader,
+                   broker: ActorRef,
+                   origin: DataOrigin): Unit = {
     if (!blockFlow.contains(header)) {
       blockFlow.add(header) match {
         case Left(e) =>
           // TODO: handle IOError
           log.error(s"Failed in adding new header: ${e.toString}")
         case Right(_) =>
+          sender() ! FlowHandler.HeaderAdded(header, broker, origin)
           updateUponNewData(header.hash)
           minerOpt.foreach(_ ! Miner.UpdateTemplate)
           logInfo(header)
@@ -114,18 +122,22 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     }
   }
 
-  def handleBlock(minerOpt: Option[ActorRef], block: Block, origin: DataOrigin): Unit = {
+  def handleBlock(minerOpt: Option[ActorRef],
+                  block: Block,
+                  broker: ActorRef,
+                  origin: DataOrigin): Unit = {
     if (!blockFlow.contains(block)) {
       blockFlow.add(block) match {
         case Left(e) =>
           // TODO: handle IOError
           log.error(s"Failed in adding new block: ${e.toString}")
         case Right(_) =>
+          sender() ! FlowHandler.BlockAdded(block, broker, origin)
           updateUponNewData(block.hash)
           origin match {
             case DataOrigin.LocalMining =>
               minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
-            case _: DataOrigin.Remote =>
+            case _: DataOrigin.FromClique =>
               minerOpt.foreach(_ ! Miner.UpdateTemplate)
           }
           logInfo(block.header)
@@ -153,9 +165,9 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
 
   def feedback(pending: PendingData): Unit = pending match {
     case PendingBlock(block, _, origin, broker, chainHandler) =>
-      chainHandler.tell(BlockChainHandler.AddPendingBlock(block, origin), broker)
+      chainHandler ! BlockChainHandler.AddPendingBlock(block, broker, origin)
     case PendingHeader(header, _, origin, broker, chainHandler) =>
-      chainHandler.tell(HeaderChainHandler.AddPendingHeader(header, origin), broker)
+      chainHandler ! HeaderChainHandler.AddPendingHeader(header, broker, origin)
   }
 
   def logInfo(header: BlockHeader): Unit = {

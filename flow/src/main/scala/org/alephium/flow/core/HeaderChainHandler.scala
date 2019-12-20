@@ -5,20 +5,27 @@ import scala.collection.mutable
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.core.FlowHandler.HeaderAdded
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.AVector
+import org.alephium.util.Forest
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
       implicit config: PlatformProfile): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
+  def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
+    val forest = Forest.build[Keccak256, BlockHeader](header, _.hash)
+    AddHeaders(forest, origin)
+  }
+
   sealed trait Command
-  case class AddHeaders(header: AVector[BlockHeader], origin: DataOrigin)
-  case class AddPendingHeader(header: BlockHeader, origin: DataOrigin)
+  case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin) extends Command
+  case class AddPendingHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+      extends Command
 
   sealed trait Event                              extends ChainHandler.Event
   case class HeadersAdded(chainIndex: ChainIndex) extends Event
@@ -32,22 +39,31 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandl
   import HeaderChainHandler._
 
   override def receive: Receive = {
-    case AddHeaders(headers, origin)      => handleDatas(headers, origin)
-    case AddPendingHeader(header, origin) => handlePending(header, origin)
+    case AddHeaders(headers, origin)              => handleDatas(headers, sender(), origin)
+    case AddPendingHeader(header, broker, origin) => handlePending(header, broker, origin)
+    case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
+  }
+
+  override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
+                                   broker: ActorRef,
+                                   origin: DataOrigin): Unit = {
+    assert(origin.isInstanceOf[DataOrigin.IntraClique])
+    log.warning(s"missing parent headers, might be bug or compromised node in the clique")
+    feedbackAndClear(broker, dataInvalid())
   }
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
-  override def addToFlowHandler(header: BlockHeader, origin: DataOrigin, sender: ActorRef): Unit = {
-    flowHandler.tell(FlowHandler.AddHeader(header), sender)
+  override def addToFlowHandler(header: BlockHeader, broker: ActorRef, origin: DataOrigin): Unit = {
+    flowHandler ! FlowHandler.AddHeader(header, broker, origin)
   }
 
   override def pendingToFlowHandler(header: BlockHeader,
                                     missings: mutable.HashSet[Keccak256],
+                                    broker: ActorRef,
                                     origin: DataOrigin,
-                                    sender: ActorRef,
                                     self: ActorRef): Unit = {
-    flowHandler ! FlowHandler.PendingHeader(header, missings, origin, sender, self)
+    flowHandler ! FlowHandler.PendingHeader(header, missings, origin, broker, self)
   }
 
   override def dataAddedEvent(): Event = HeadersAdded(chainIndex)
