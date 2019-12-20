@@ -18,11 +18,19 @@ object DataOrigin {
 
     override def isSyncing: Boolean = false
   }
-  case class Remote(cliqueId: CliqueId, brokerInfo: BrokerInfo, isSyncing: Boolean)
-      extends DataOrigin {
+
+  trait FromClique extends DataOrigin {
+    def cliqueId: CliqueId
+    def brokerInfo: BrokerInfo
+
     override def isFrom(another: CliqueId): Boolean = cliqueId == another
 
     override def isFrom(_cliqueId: CliqueId, _brokerInfo: BrokerInfo): Boolean =
       cliqueId == _cliqueId && _brokerInfo == brokerInfo
+  }
+  case class InterClique(cliqueId: CliqueId, brokerInfo: BrokerInfo, isSyncing: Boolean)
+      extends FromClique
+  case class IntraClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique {
+    override def isSyncing: Boolean = false
   }
 }
