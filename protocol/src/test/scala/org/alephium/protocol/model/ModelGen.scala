@@ -28,7 +28,7 @@ object ModelGen {
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(0, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
-  } yield Transaction.from(UnsignedTransaction(AVector.from(inputs), AVector.from(outputs)), sk)
+  } yield Transaction.from(RawTransaction(AVector.from(inputs), AVector.from(outputs)), sk)
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
