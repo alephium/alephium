@@ -16,12 +16,14 @@ class ScriptSpec extends AlephiumSpec {
 
       val pubScript =
         AVector[Instruction](OP_KECCAK256, OP_PUSH(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG)
-      val witness = AVector[Instruction](OP_PUSH(signature.bytes), OP_PUSH(pk.bytes))
+      val priScript  = AVector[Instruction](OP_PUSH(pk.bytes))
+      val signatures = AVector(signature.bytes)
 
-      Script.run(data, pubScript, witness) is ExeSuccessful
-      Script.run(data0, pubScript, witness) is VerificationFailed
-      Script.run(data, pubScript, witness.init) is VerificationFailed
-      Script.run(data, pubScript, OP_PUSH(pk.bytes) +: witness) is InvalidFinalStack
+      Script.run(data, pubScript, Witness(priScript, signatures)) is ExeSuccessful
+      Script.run(data0, pubScript, Witness(priScript, signatures)) is VerificationFailed
+      Script.run(data, pubScript, Witness(priScript, AVector.empty)) is a[NonCategorized]
+      Script.run(data, pubScript, Witness(priScript.init, signatures)) is a[NonCategorized]
+      Script.run(data, pubScript, Witness(OP_PUSH(pk.bytes) +: priScript, signatures)) is InvalidFinalState
     }
   }
 }

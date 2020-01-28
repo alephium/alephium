@@ -269,7 +269,7 @@ object BlockFlowState {
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
       transaction.unsigned.outputs.mapWithIndex { (output, i) =>
-        val outputPoint = TxOutputPoint(output.mainKey, transaction.hash, i)
+        val outputPoint = TxOutputPoint(output.shortKey, transaction.hash, i)
         (outputPoint, output)
       }
     }

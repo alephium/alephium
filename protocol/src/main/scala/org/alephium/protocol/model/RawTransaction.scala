@@ -2,10 +2,14 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.{Keccak256, Keccak256Hash}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
 case class RawTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
+    extends Keccak256Hash[RawTransaction] {
+  override val hash: Keccak256 = _getHash
+}
 
 object RawTransaction {
   implicit val serde: Serde[RawTransaction] = new Serde[RawTransaction] {
