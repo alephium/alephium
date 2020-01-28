@@ -132,7 +132,7 @@ object Validation {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.signature == ED25519Signature.zero)
+    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witness == ED25519Signature.zero)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }

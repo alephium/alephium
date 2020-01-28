@@ -4,67 +4,102 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
+import org.alephium.crypto._
+import org.alephium.protocol.model.RawTransaction
+import org.alephium.serde.Serde
 import org.alephium.util.AVector
+
+case class Witness(privateScript: AVector[Instruction], signatures: AVector[ByteString])
+object Witness {
+  implicit val serde: Serde[Witness] =
+    Serde.forProduct2(Witness(_, _), t => (t.privateScript, t.signatures))
+}
 
 object Script {
   type Stack     = ArrayBuffer[ByteString]
   type PubScript = AVector[Instruction]
-  type Witness   = AVector[Instruction]
-  type Context   = ByteString
 
-  private type ExeResult0 = Either[ExeFailed, Stack]
+  // It's mutable for efficiency
+  class Context(val stack: ArrayBuffer[ByteString],
+                val signatures: ArrayBuffer[ByteString],
+                val data: ByteString) {
+    def isEmpty: Boolean = stack.isEmpty && signatures.isEmpty
+  }
 
-  def run(context: Context, pubScript: PubScript, witness: Witness): ExeResult = {
-    run(context, ArrayBuffer.empty, pubScript, witness) match {
-      case Left(failure) => failure
-      case Right(stack) =>
-        if (stack.isEmpty) ExeSuccessful else InvalidFinalStack
+  object Context {
+    def apply(signatures: AVector[ByteString], data: ByteString): Context = {
+      val sigBuffer = signatures.toArray.to[ArrayBuffer]
+      new Context(ArrayBuffer.empty, sigBuffer, data)
     }
   }
 
-  private[script] def run(context: Context,
-                          stack: Stack,
-                          pubScript: PubScript,
-                          witness: Witness): ExeResult0 = {
-    run(context, stack, List(witness, pubScript))
+  private type ExeResult0 = Either[ExeFailed, Unit]
+
+  def p2pkhPub(publicKey: ED25519PublicKey): PubScript = {
+    val pkHash = Keccak256.hash(publicKey.bytes)
+    AVector[Instruction](OP_KECCAK256, OP_PUSH(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG)
+  }
+
+  def p2pkhWitness(rawTransaction: RawTransaction,
+                   publicKey: ED25519PublicKey,
+                   privateKey: ED25519PrivateKey): Witness = {
+    val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
+    Witness(AVector[Instruction](OP_PUSH(publicKey.bytes)), AVector(signature.bytes))
+  }
+
+  def run(data: ByteString, pubScript: PubScript, witness: Witness): ExeResult = {
+    val context = Context(witness.signatures, data)
+    run(context, pubScript, witness) match {
+      case Left(failure) => failure
+      case Right(())     => if (context.isEmpty) ExeSuccessful else InvalidFinalState
+    }
+  }
+
+  private[script] def run(context: Context, pubScript: PubScript, witness: Witness): ExeResult0 = {
+    run(context, List(witness.privateScript, pubScript))
   }
 
   private[script] def run(context: Context,
-                          stack: Stack,
                           instructionLists: List[AVector[Instruction]]): ExeResult0 = {
     instructionLists match {
-      case Nil => Right(stack)
+      case Nil => Right(())
       case instructions :: rest =>
-        val allRest = if (instructions.length == 1) rest else instructions.tail :: rest
-        run(context, stack, instructions.head).flatMap(run(context, _, allRest))
+        if (instructions.isEmpty) {
+          run(context, rest)
+        } else {
+          val allRest = if (instructions.length == 1) rest else instructions.tail :: rest
+          run(context, instructions.head).flatMap(_ => run(context, allRest))
+        }
     }
   }
 
-  private[script] def run(context: Context, stack: Stack, instruction: Instruction): ExeResult0 =
+  private[script] def run(context: Context, instruction: Instruction): ExeResult0 = {
+    import context._
     instruction match {
       case OP_PUSH(bytes) =>
         stack.append(bytes)
-        Right(stack)
+        Done
       case OP_EQUALVERIFY =>
         if (stack.size < 2) insufficientItems(instruction, stack)
         else {
           val item1 = pop(stack)
           val item2 = pop(stack)
-          if (item1 == item2) Right(stack) else Left(VerificationFailed)
+          if (item1 == item2) Done else Left(VerificationFailed)
         }
       case OP_KECCAK256 =>
         if (stack.isEmpty) emptyStack(instruction)
         else {
           val hash = Keccak256.hash(stack.last)
           stack.append(hash.bytes)
-          Right(stack)
+          Done
         }
       case OP_CHECKSIG =>
-        if (stack.size < 2) insufficientItems(instruction, stack)
+        if (stack.isEmpty) emptyStack(instruction)
+        if (signatures.size < 1) error(instruction, "no signature available")
         else {
           val rawPublicKey = pop(stack)
-          val rawSignature = pop(stack)
+          val rawSignature = pop(signatures)
+          // Fix this in this PR: better key initialization
           if (rawPublicKey.length != ED25519PublicKey.length) {
             error(instruction, s"public key of size ${rawPublicKey.length}")
           } else if (rawSignature.length != ED25519Signature.length) {
@@ -72,11 +107,12 @@ object Script {
           } else {
             val publicKey = ED25519PublicKey.unsafeFrom(rawPublicKey)
             val signature = ED25519Signature.unsafeFrom(rawSignature)
-            val ok        = ED25519.verify(context, signature, publicKey)
-            if (ok) Right(stack) else Left(VerificationFailed)
+            val ok        = ED25519.verify(data, signature, publicKey)
+            if (ok) Done else Left(VerificationFailed)
           }
         }
     }
+  }
 
   def error(instruction: Instruction, message: String): ExeResult0 = {
     Left(NonCategorized(s"${instruction.toString} failed, due to $message"))
@@ -96,6 +132,7 @@ object Script {
     stack.remove(stack.size - 1)
   }
 
+  private[script] val Done           = Right(())
   private[script] val OneOfTrueValue = ByteString(1)
   private[script] val False          = ByteString(0)
   private[script] def convert(ok: Boolean): ByteString = {

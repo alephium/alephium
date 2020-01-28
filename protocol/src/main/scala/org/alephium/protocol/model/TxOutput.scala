@@ -1,10 +1,12 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.script.Script.PubScript
 import org.alephium.serde.Serde
 
-case class TxOutput(value: BigInt, mainKey: ED25519PublicKey)
+case class TxOutput(value: BigInt, pubScript: PubScript) {
+  def shortKey: Long = ???
+}
 
 object TxOutput {
-  implicit val serde: Serde[TxOutput] = Serde.forProduct2(apply, to => (to.value, to.mainKey))
+  implicit val serde: Serde[TxOutput] = Serde.forProduct2(apply, to => (to.value, to.pubScript))
 }
