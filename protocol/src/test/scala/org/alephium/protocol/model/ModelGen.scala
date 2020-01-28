@@ -10,25 +10,23 @@ import org.alephium.util.AVector
 
 // TODO: rename as GenFixture
 object ModelGen {
-  private val (sk, pk) = ED25519.generatePriPub()
-
   val txInputGen: Gen[TxOutputPoint] = for {
-    index <- Gen.choose(0, 5)
+    shortKey <- Gen.choose(0l, 5l)
+    index    <- Gen.choose(0, 5)
   } yield {
-    val publicKey = ED25519PublicKey.generate
-    TxOutputPoint(publicKey, Keccak256.random, index)
+    TxOutputPoint(shortKey, Keccak256.random, index)
   }
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose(0, 5)
-  } yield TxOutput(value, pk)
+  } yield TxOutput(value, AVector.empty)
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(0, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(0, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
-  } yield Transaction.from(RawTransaction(AVector.from(inputs), AVector.from(outputs)), sk)
+  } yield Transaction.from1(AVector.from(inputs), AVector.from(outputs), AVector.empty)
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
