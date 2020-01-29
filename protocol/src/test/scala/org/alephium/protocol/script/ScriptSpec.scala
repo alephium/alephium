@@ -14,8 +14,8 @@ class ScriptSpec extends AlephiumSpec {
       val pkHash    = Keccak256.hash(pk.bytes)
       val signature = ED25519.sign(data, sk)
 
-      val pubScript =
-        AVector[Instruction](OP_KECCAK256, OP_PUSH(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG)
+      val pubScript = PubScript(
+        AVector[Instruction](OP_KECCAK256, OP_PUSH(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG))
       val priScript  = AVector[Instruction](OP_PUSH(pk.bytes))
       val signatures = AVector(signature.bytes)
 

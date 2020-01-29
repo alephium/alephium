@@ -1,6 +1,6 @@
 package org.alephium.flow.core.validation
 
-import org.alephium.crypto.{ED25519Signature, Keccak256}
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.core._
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformProfile
@@ -132,7 +132,7 @@ object Validation {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witness == ED25519Signature.zero)
+    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witness.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }

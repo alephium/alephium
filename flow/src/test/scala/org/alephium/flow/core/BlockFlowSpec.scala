@@ -161,16 +161,12 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       if (chainIndex.isIntraGroup && chainIndex.relateTo(config.brokerInfo)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val balances = blockFlow
-          .getBestTrie(mainGroup)
-          .getAll[TxOutputPoint, TxOutput](publicKey.bytes)
-          .right
-          .value
-        val total            = balances.sumBy(_._2.value)
-        val (_, toPublicKey) = mainGroup.generateKey()
-        val inputs           = balances.map(_._1)
-        val outputs          = AVector(TxOutput(1, toPublicKey), TxOutput(total - 1, publicKey))
-        AVector(Transaction.from0(inputs, outputs, privateKey))
+        val balances                   = blockFlow.getP2pkhBalances(publicKey).right.value
+        val total                      = balances.sumBy(_._2.value)
+        val (_, toPublicKey)           = mainGroup.generateP2pkhKey()
+        val inputs                     = balances.map(_._1)
+        val outputs                    = AVector(TxOutput.p2pkh(1, toPublicKey), TxOutput.p2pkh(total - 1, publicKey))
+        AVector(Transaction.from(inputs, outputs, publicKey, privateKey))
       } else AVector.empty[Transaction]
     }
 
@@ -206,7 +202,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {
     val address = genesisBalances(groupIndex)._2
-    blockFlow.getBalances(address).right.value.sumBy(_._2.value) is expected
+    blockFlow.getP2pkhBalances(address).right.value.sumBy(_._2.value) is expected
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -227,23 +223,19 @@ class BlockFlowSpec extends AlephiumFlowSpec {
   }
 
   def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
-    val groupIndex = GroupIndex.from(address)
+    val groupIndex = GroupIndex.fromP2PKH(address)
     config.brokerInfo.contains(groupIndex) is true
-    val query = blockFlow.getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
+    val query = blockFlow.getP2pkhBalances(address)
     query.right.value.sumBy(_._2.value)
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
     def show(txOutput: TxOutput): String = {
-      txOutput.mainKey.shortHex + ":" + txOutput.value
+      txOutput.shortKey + ":" + txOutput.value
     }
 
-    val address = genesisBalances(config.brokerInfo.id)._2
-    val txOutputs = config.brokerInfo.groupFrom until config.brokerInfo.groupUntil map { group =>
-      val groupIndex = GroupIndex(group)
-      val res        = blockFlow.getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
-      res.right.value.map(_._2)
-    }
-    print(txOutputs.map(_.map(show).mkString(";")).mkString("", "\n", "\n"))
+    val address   = genesisBalances(config.brokerInfo.id)._2
+    val txOutputs = blockFlow.getP2pkhBalances(address).right.value.map(_._2)
+    print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 }
