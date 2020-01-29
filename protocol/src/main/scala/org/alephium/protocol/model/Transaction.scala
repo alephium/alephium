@@ -14,7 +14,7 @@ import org.alephium.util.AVector
  *
  */
 case class Transaction(
-    unsigned: RawTransaction,
+    raw: RawTransaction,
     data: ByteString,
     witness: AVector[Witness] // TODO: support n2n transactions
 ) extends Keccak256Hash[Transaction] {
@@ -23,7 +23,7 @@ case class Transaction(
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.witness))
+    Serde.forProduct3(Transaction.apply, t => (t.raw, t.data, t.witness))
 
   def from(inputs: AVector[TxOutputPoint],
            outputs: AVector[TxOutput],
@@ -38,19 +38,19 @@ object Transaction {
     Transaction(RawTransaction(inputs, outputs), ByteString.empty, witnesses)
   }
 
-  def from(unsigned: RawTransaction,
+  def from(raw: RawTransaction,
            publicKey: ED25519PublicKey,
            privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
-    val witness = Witness.p2pkh(unsigned, publicKey, privateKey)
-    Transaction(unsigned, ByteString.empty, AVector(witness))
+    val witness = Witness.p2pkh(raw, publicKey, privateKey)
+    Transaction(raw, ByteString.empty, AVector(witness))
   }
 
   def coinbase(publicKey: ED25519PublicKey, value: BigInt, data: ByteString): Transaction = {
     val pkScript = PubScript.p2pkh(publicKey)
     val txOutput = TxOutput(value, pkScript)
-    val unsigned = RawTransaction(AVector.empty, AVector(txOutput))
-    Transaction(unsigned, data, AVector.empty)
+    val raw      = RawTransaction(AVector.empty, AVector(txOutput))
+    Transaction(raw, data, AVector.empty)
   }
 
   def genesis(balances: AVector[(ED25519PublicKey, BigInt)]): Transaction = {
@@ -59,7 +59,7 @@ object Transaction {
         val pkScript = PubScript.p2pkh(publicKey)
         TxOutput(value, pkScript)
     }
-    val unsigned = RawTransaction(AVector.empty, outputs)
-    Transaction(unsigned, ByteString.empty, AVector.empty)
+    val raw = RawTransaction(AVector.empty, outputs)
+    Transaction(raw, ByteString.empty, AVector.empty)
   }
 }

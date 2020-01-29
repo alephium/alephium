@@ -131,8 +131,8 @@ object Validation {
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
-    val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witness.isEmpty)
+    val raw      = coinbase.raw
+    if (raw.inputs.length == 0 && raw.outputs.length == 1 && coinbase.witness.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -163,7 +163,7 @@ object Validation {
                                         trie: MerklePatriciaTrie): BlockValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
     block.transactions.foreach { tx =>
-      tx.unsigned.inputs.foreach { txOutputPoint =>
+      tx.raw.inputs.foreach { txOutputPoint =>
         // scalastyle:off return
         if (utxoUsed.contains(txOutputPoint)) return invalidBlock(DoubleSpent)
         else {

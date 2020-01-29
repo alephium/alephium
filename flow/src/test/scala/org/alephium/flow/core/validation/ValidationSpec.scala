@@ -58,8 +58,8 @@ class ValidationSpec extends AlephiumFlowSpec {
       .retryUntil { block =>
         val txs = block.transactions
         txs.nonEmpty && {
-          val unsigned = txs.head.unsigned
-          unsigned.inputs.nonEmpty && unsigned.outputs.length > 1
+          val raw = txs.head.raw
+          raw.inputs.nonEmpty && raw.outputs.length > 1
         }
       }
       .sample
@@ -67,14 +67,14 @@ class ValidationSpec extends AlephiumFlowSpec {
     val (privateKey, publicKey) = ED25519.generatePriPub()
 
     val coinbase0 = block0.transactions.head
-    val input0    = coinbase0.unsigned.inputs
-    val output0   = coinbase0.unsigned.outputs
+    val input0    = coinbase0.raw.inputs
+    val output0   = coinbase0.raw.outputs
     check(checkCoinbase(block0), InvalidCoinbase)
 
     val emptyInputs    = AVector.empty[TxOutputPoint]
     val emptyOutputs   = AVector.empty[TxOutput]
     val emptyWitnesses = AVector.empty[Witness]
-    val testWitness    = AVector(Witness.p2pkh(coinbase0.unsigned, publicKey, privateKey))
+    val testWitness    = AVector(Witness.p2pkh(coinbase0.raw, publicKey, privateKey))
 
     val coinbase1 = Transaction.from(emptyInputs, AVector(output0.head), emptyWitnesses)
     val block1    = block0.copy(transactions = AVector(coinbase1))
