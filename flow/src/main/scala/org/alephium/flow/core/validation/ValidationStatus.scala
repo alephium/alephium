@@ -2,6 +2,7 @@ package org.alephium.flow.core.validation
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult}
+import org.alephium.protocol.script.RunFailed
 import org.alephium.util.AVector
 
 sealed trait ValidationStatus
@@ -26,22 +27,29 @@ final case object EmptyTransactionList                   extends InvalidBlockSta
 final case object InvalidCoinbase                        extends InvalidBlockStatus
 final case object InvalidMerkleRoot                      extends InvalidBlockStatus
 
-sealed trait InvalidTransactions     extends InvalidBlockStatus
-final case object InvalidTxSignature extends InvalidTransactions
-final case object InvalidCoin        extends InvalidTransactions
-final case object DoubleSpent        extends InvalidTransactions
+sealed trait InvalidTransaction                   extends InvalidBlockStatus
+final case object InvalidWitnessLength            extends InvalidTransaction
+final case class InvalidWitness(error: RunFailed) extends InvalidTransaction
+final case object InvalidCoin                     extends InvalidTransaction
+final case object DoubleSpent                     extends InvalidTransaction
 
 object ValidationStatus {
   private[validation] type HeaderValidationResult =
     Either[Either[IOError, InvalidHeaderStatus], Unit]
-  private[validation] type BlockValidationResult = Either[Either[IOError, InvalidBlockStatus], Unit]
+  private[validation] type BlockValidationError  = Either[IOError, InvalidBlockStatus]
+  private[validation] type BlockValidationResult = Either[BlockValidationError, Unit]
+  private[validation] type TxValidationError     = Either[IOError, InvalidTransaction]
+  private[validation] type TxValidationResult    = Either[TxValidationError, Unit]
 
   private[validation] def invalidHeader(status: InvalidHeaderStatus): HeaderValidationResult =
     Left(Right(status))
   private[validation] def invalidBlock(status: InvalidBlockStatus): BlockValidationResult =
     Left(Right(status))
+  private[validation] def invalidTx(status: InvalidTransaction): TxValidationResult =
+    Left(Right(status))
   private[validation] val validHeader: HeaderValidationResult = Right(())
   private[validation] val validBlock: BlockValidationResult   = Right(())
+  private[validation] val validTx: TxValidationResult         = Right(())
 
   private[validation] def convert[T](x: Either[Either[IOError, T], Unit], default: T): IOResult[T] =
     x match {

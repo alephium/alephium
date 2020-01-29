@@ -24,18 +24,17 @@ object Script {
     }
   }
 
-  private type ExeResult0 = Either[ExeFailed, Unit]
+  private type RunResult = Either[RunFailed, Unit]
 
-  def run(data: ByteString, pubScript: PubScript, witness: Witness): ExeResult = {
+  def run(data: ByteString, pubScript: PubScript, witness: Witness): RunResult = {
     val context = Context(witness.signatures, data)
-    run(context, List(witness.privateScript, pubScript.instructions)) match {
-      case Left(failure) => failure
-      case Right(())     => if (context.isEmpty) ExeSuccessful else InvalidFinalState
+    run(context, List(witness.privateScript, pubScript.instructions)).flatMap { _ =>
+      if (context.isEmpty) Right(()) else Left(InvalidFinalState)
     }
   }
 
   private[script] def run(context: Context,
-                          instructionLists: List[AVector[Instruction]]): ExeResult0 = {
+                          instructionLists: List[AVector[Instruction]]): RunResult = {
     instructionLists match {
       case Nil => Right(())
       case instructions :: rest =>
@@ -48,7 +47,7 @@ object Script {
     }
   }
 
-  private[script] def run(context: Context, instruction: Instruction): ExeResult0 = {
+  private[script] def run(context: Context, instruction: Instruction): RunResult = {
     import context._
     instruction match {
       case OP_PUSH(bytes) =>
@@ -89,15 +88,15 @@ object Script {
     }
   }
 
-  def error(instruction: Instruction, message: String): ExeResult0 = {
+  def error(instruction: Instruction, message: String): RunResult = {
     Left(NonCategorized(s"${instruction.toString} failed, due to $message"))
   }
 
-  def emptyStack(instruction: Instruction): ExeResult0 = {
+  def emptyStack(instruction: Instruction): RunResult = {
     error(instruction, "empty stack")
   }
 
-  def insufficientItems(instruction: Instruction, stack: Stack): ExeResult0 = {
+  def insufficientItems(instruction: Instruction, stack: Stack): RunResult = {
     error(instruction, s"stack of only ${stack.size}")
   }
 

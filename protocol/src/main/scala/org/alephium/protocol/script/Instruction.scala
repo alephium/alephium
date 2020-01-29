@@ -37,8 +37,6 @@ object Instruction {
   //scalastyle:on magic.number
 }
 
-// TODO: Control Instructions
-
 // Stack Instructions
 case class OP_PUSH(bytes: ByteString) extends Instruction
 

@@ -16,14 +16,14 @@ import org.alephium.util.AVector
 case class Transaction(
     raw: RawTransaction,
     data: ByteString,
-    witness: AVector[Witness] // TODO: support n2n transactions
+    witnesses: AVector[Witness] // TODO: support n2n transactions
 ) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = _getHash
 }
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct3(Transaction.apply, t => (t.raw, t.data, t.witness))
+    Serde.forProduct3(Transaction.apply, t => (t.raw, t.data, t.witnesses))
 
   def from(inputs: AVector[TxOutputPoint],
            outputs: AVector[TxOutput],
