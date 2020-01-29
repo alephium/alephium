@@ -8,6 +8,8 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PubScript
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
 trait BlockFlowState {
@@ -248,10 +250,14 @@ trait BlockFlowState {
     }
   }
 
-  def getBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
-    val groupIndex = GroupIndex.from(address)
+  def getP2pkhBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+    val pubScript  = PubScript.p2pkh(address)
+    val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
-    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
+    val prefix = serialize(pubScript.shortKey)
+    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](prefix).map { data =>
+      data.filter(_._2.pubScript == pubScript)
+    }
   }
 }
 
