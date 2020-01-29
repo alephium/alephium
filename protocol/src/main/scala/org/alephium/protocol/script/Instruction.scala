@@ -7,6 +7,7 @@ import org.alephium.serde._
 sealed trait Instruction extends Product with Serializable
 
 object Instruction {
+  //scalastyle:off magic.number
   implicit val serde: Serde[Instruction] = new Serde[Instruction] {
     override def serialize(input: Instruction): ByteString = input match {
       case x: OP_PUSH     => ByteString.apply(0x01) ++ bytestringSerde.serialize(x.bytes)
@@ -33,13 +34,10 @@ object Instruction {
       }
     }
   }
+  //scalastyle:on magic.number
 }
 
-// Control Instructions
-//case object OP_IF     extends Instruction
-//case object OP_ELSE   extends Instruction
-//case object OP_ENDIF  extends Instruction
-//case object OP_OUTPUT extends Instruction
+// TODO: Control Instructions
 
 // Stack Instructions
 case class OP_PUSH(bytes: ByteString) extends Instruction

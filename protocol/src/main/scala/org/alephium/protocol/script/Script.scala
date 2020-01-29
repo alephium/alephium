@@ -5,19 +5,10 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.model.RawTransaction
-import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-case class Witness(privateScript: AVector[Instruction], signatures: AVector[ByteString])
-object Witness {
-  implicit val serde: Serde[Witness] =
-    Serde.forProduct2(Witness(_, _), t => (t.privateScript, t.signatures))
-}
-
 object Script {
-  type Stack     = ArrayBuffer[ByteString]
-  type PubScript = AVector[Instruction]
+  type Stack = ArrayBuffer[ByteString]
 
   // It's mutable for efficiency
   class Context(val stack: ArrayBuffer[ByteString],
@@ -35,28 +26,12 @@ object Script {
 
   private type ExeResult0 = Either[ExeFailed, Unit]
 
-  def p2pkhPub(publicKey: ED25519PublicKey): PubScript = {
-    val pkHash = Keccak256.hash(publicKey.bytes)
-    AVector[Instruction](OP_KECCAK256, OP_PUSH(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG)
-  }
-
-  def p2pkhWitness(rawTransaction: RawTransaction,
-                   publicKey: ED25519PublicKey,
-                   privateKey: ED25519PrivateKey): Witness = {
-    val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
-    Witness(AVector[Instruction](OP_PUSH(publicKey.bytes)), AVector(signature.bytes))
-  }
-
   def run(data: ByteString, pubScript: PubScript, witness: Witness): ExeResult = {
     val context = Context(witness.signatures, data)
-    run(context, pubScript, witness) match {
+    run(context, List(witness.privateScript, pubScript.instructions)) match {
       case Left(failure) => failure
       case Right(())     => if (context.isEmpty) ExeSuccessful else InvalidFinalState
     }
-  }
-
-  private[script] def run(context: Context, pubScript: PubScript, witness: Witness): ExeResult0 = {
-    run(context, List(witness.privateScript, pubScript))
   }
 
   private[script] def run(context: Context,

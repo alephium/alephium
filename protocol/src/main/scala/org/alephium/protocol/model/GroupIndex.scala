@@ -2,17 +2,20 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto._
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.script.PubScript
 
 class GroupIndex private (val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"
 
   @tailrec
-  final def generateKey()(implicit config: GroupConfig): (ED25519PrivateKey, ED25519PublicKey) = {
+  final def generateP2pkhKey()(
+      implicit config: GroupConfig): (ED25519PrivateKey, ED25519PublicKey) = {
     val (privateKey, publicKey) = ED25519.generatePriPub()
-    if (GroupIndex.from(publicKey) == this) (privateKey, publicKey)
-    else generateKey()
+    val pubScript               = PubScript.p2pkh(publicKey)
+    if (GroupIndex.from(pubScript) == this) (privateKey, publicKey)
+    else generateP2pkhKey()
   }
 }
 
@@ -22,8 +25,14 @@ object GroupIndex {
     new GroupIndex(value)
   }
 
-  def from(publicKey: ED25519PublicKey)(implicit config: GroupConfig): GroupIndex = {
-    GroupIndex((publicKey.bytes.last & 0xFF) % config.groups)
+  def fromP2PKH(publicKey: ED25519PublicKey)(implicit config: GroupConfig): GroupIndex = {
+    val pubScript = PubScript.p2pkh(publicKey)
+    from(pubScript)
+  }
+
+  def from(pubScript: PubScript)(implicit config: GroupConfig): GroupIndex = {
+    val bytes = pubScript.hash.bytes
+    GroupIndex((bytes.last & 0xFF) % config.groups)
   }
 
   def unsafe(value: Int): GroupIndex = new GroupIndex(value)
