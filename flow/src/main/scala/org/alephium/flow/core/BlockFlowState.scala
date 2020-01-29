@@ -269,12 +269,12 @@ object BlockFlowState {
       extends BlockCache // For blocks on intra-group chain
 
   private def convertInputs(block: Block): Set[TxOutputPoint] = {
-    block.transactions.flatMap(_.unsigned.inputs).toIterable.toSet
+    block.transactions.flatMap(_.raw.inputs).toIterable.toSet
   }
 
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
-      transaction.unsigned.outputs.mapWithIndex { (output, i) =>
+      transaction.raw.outputs.mapWithIndex { (output, i) =>
         val outputPoint = TxOutputPoint(output.shortKey, transaction.hash, i)
         (outputPoint, output)
       }
