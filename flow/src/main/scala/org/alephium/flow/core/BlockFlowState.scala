@@ -339,7 +339,7 @@ object BlockFlowState {
   def updateStateForOutputs(
       trie: MerklePatriciaTrie,
       outputs: Iterable[(TxOutputPoint, TxOutput)]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(outputs, trie) {
+    EitherF.foldTry(outputs, trie) {
       case (trie0, (outputPoint, output)) =>
         trie0.put(outputPoint, output)
     }
@@ -347,7 +347,7 @@ object BlockFlowState {
 
   def updateStateForInputs(trie: MerklePatriciaTrie,
                            inputs: Iterable[TxOutputPoint]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(inputs, trie)(_.remove(_))
+    EitherF.foldTry(inputs, trie)(_.remove(_))
   }
 
   def updateState(trie: MerklePatriciaTrie,
