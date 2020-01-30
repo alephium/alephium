@@ -16,7 +16,7 @@ import org.alephium.util.AVector
 case class Transaction(
     raw: RawTransaction,
     data: ByteString,
-    witnesses: AVector[Witness] // TODO: support n2n transactions
+    witnesses: AVector[Witness]
 ) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = _getHash
 }

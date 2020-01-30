@@ -25,7 +25,7 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   val genesisBalances = AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups0) {
     i =>
       val groupIndex              = GroupIndex.apply(i)(groupConfig)
-      val (privateKey, publicKey) = groupIndex.generateP2pkhKey()(groupConfig)
+      val (privateKey, publicKey) = groupIndex.generateP2pkhKey(groupConfig)
       (privateKey, publicKey, genesisBalance)
   }
   implicit val config =

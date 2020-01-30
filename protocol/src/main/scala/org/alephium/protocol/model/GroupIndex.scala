@@ -10,12 +10,12 @@ class GroupIndex private (val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"
 
   @tailrec
-  final def generateP2pkhKey()(
+  final def generateP2pkhKey(
       implicit config: GroupConfig): (ED25519PrivateKey, ED25519PublicKey) = {
     val (privateKey, publicKey) = ED25519.generatePriPub()
     val pubScript               = PubScript.p2pkh(publicKey)
     if (GroupIndex.from(pubScript) == this) (privateKey, publicKey)
-    else generateP2pkhKey()
+    else generateP2pkhKey
   }
 }
 
