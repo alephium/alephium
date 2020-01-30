@@ -164,28 +164,24 @@ object Validation {
   private[validation] def checkSpending(block: Block,
                                         trie: MerklePatriciaTrie): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    block.transactions.foreach { tx =>
-      tx.raw.inputs.foreach { txOutputPoint =>
-        // scalastyle:off return
-        if (utxoUsed.contains(txOutputPoint)) return invalidTx(DoubleSpent)
+    EitherF.foreach(block.transactions.tail.toIterable) { tx =>
+      EitherF.foreach(tx.raw.inputs.toIterable) { input =>
+        if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {
-          utxoUsed += txOutputPoint
-          trie.getOpt[TxOutputPoint, TxOutput](txOutputPoint) match {
-            case Left(error)        => return Left(Left(error))
-            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) return invalidTx(InvalidCoin)
+          utxoUsed += input
+          trie.getOpt[TxOutputPoint, TxOutput](input) match {
+            case Left(error)        => Left(Left(error))
+            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) invalidTx(InvalidCoin) else validTx
           }
         }
-        // scalastyle:on return
       }
     }
-    validTx
   }
 
   private[validation] def checkAllScripts(block: Block,
                                           trie: MerklePatriciaTrie): TxValidationResult = {
     val transactions = block.transactions
-    EitherF.foreach[Int, TxValidationError](transactions.indices.tail,
-                                            idx => checkTxScripts(transactions(idx), trie))
+    EitherF.foreach(transactions.indices.tail)(idx => checkTxScripts(transactions(idx), trie))
   }
 
   private[validation] def checkTxScripts(tx: Transaction,
@@ -196,17 +192,14 @@ object Validation {
       invalidTx(InvalidWitnessLength)
     } else {
       val rawHash = Keccak256.hash(serialize(tx.raw))
-      EitherF.foreach[Int, TxValidationError](
-        inputs.indices,
-        idx => {
-          val input   = inputs(idx)
-          val witness = witnesses(idx)
-          trie.get[TxOutputPoint, TxOutput](input) match {
-            case Left(error)      => Left(Left(error))
-            case Right(preOutput) => checkWitness(rawHash, preOutput.pubScript, witness)
-          }
+      EitherF.foreach(inputs.indices) { idx =>
+        val input   = inputs(idx)
+        val witness = witnesses(idx)
+        trie.get[TxOutputPoint, TxOutput](input) match {
+          case Left(error)      => Left(Left(error))
+          case Right(preOutput) => checkWitness(rawHash, preOutput.pubScript, witness)
         }
-      )
+      }
     }
   }
 
