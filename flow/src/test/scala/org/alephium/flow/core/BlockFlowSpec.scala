@@ -163,7 +163,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
         val balances                   = blockFlow.getP2pkhBalances(publicKey).right.value
         val total                      = balances.sumBy(_._2.value)
-        val (_, toPublicKey)           = mainGroup.generateP2pkhKey()
+        val (_, toPublicKey)           = mainGroup.generateP2pkhKey
         val inputs                     = balances.map(_._1)
         val outputs                    = AVector(TxOutput.p2pkh(1, toPublicKey), TxOutput.p2pkh(total - 1, publicKey))
         AVector(Transaction.from(inputs, outputs, publicKey, privateKey))
