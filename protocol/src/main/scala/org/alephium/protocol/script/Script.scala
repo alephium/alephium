@@ -73,7 +73,6 @@ object Script {
         else {
           val rawPublicKey = pop(stack)
           val rawSignature = pop(signatures)
-          // Fix this in this PR: better key initialization
           if (rawPublicKey.length != ED25519PublicKey.length) {
             error(instruction, s"public key of size ${rawPublicKey.length}")
           } else if (rawSignature.length != ED25519Signature.length) {
