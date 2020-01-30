@@ -164,8 +164,8 @@ object Validation {
   private[validation] def checkSpending(block: Block,
                                         trie: MerklePatriciaTrie): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    EitherF.foreach(block.transactions.tail.toIterable) { tx =>
-      EitherF.foreach(tx.raw.inputs.toIterable) { input =>
+    EitherF.foreachTry(block.transactions.tail.toIterable) { tx =>
+      EitherF.foreachTry(tx.raw.inputs.toIterable) { input =>
         if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {
           utxoUsed += input
@@ -181,7 +181,7 @@ object Validation {
   private[validation] def checkAllScripts(block: Block,
                                           trie: MerklePatriciaTrie): TxValidationResult = {
     val transactions = block.transactions
-    EitherF.foreach(transactions.indices.tail)(idx => checkTxScripts(transactions(idx), trie))
+    EitherF.foreachTry(transactions.indices.tail)(idx => checkTxScripts(transactions(idx), trie))
   }
 
   private[validation] def checkTxScripts(tx: Transaction,
@@ -192,7 +192,7 @@ object Validation {
       invalidTx(InvalidWitnessLength)
     } else {
       val rawHash = Keccak256.hash(serialize(tx.raw))
-      EitherF.foreach(inputs.indices) { idx =>
+      EitherF.foreachTry(inputs.indices) { idx =>
         val input   = inputs(idx)
         val witness = witnesses(idx)
         trie.get[TxOutputPoint, TxOutput](input) match {
