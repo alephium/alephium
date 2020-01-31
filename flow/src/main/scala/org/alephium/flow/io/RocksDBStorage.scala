@@ -8,7 +8,7 @@ import org.rocksdb.util.SizeUnit
 import org.alephium.util.AVector
 
 object RocksDBStorage {
-  import IOError.execute
+  import IOUtils.execute
 
   {
     RocksDB.loadLibrary()
@@ -149,7 +149,7 @@ object RocksDBStorage {
 
 class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
   import RocksDBStorage._
-  import IOError.execute
+  import IOUtils.execute
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))

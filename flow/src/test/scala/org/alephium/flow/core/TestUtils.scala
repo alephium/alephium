@@ -5,7 +5,7 @@ import java.nio.file.Path
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 
-import org.alephium.flow.io.Disk
+import org.alephium.flow.io.IOUtils
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{Files => AFiles}
@@ -37,7 +37,7 @@ object TestUtils {
   // remove all the content under the path; the path itself would be kept
   def clear(path: Path): Unit = {
     if (path.startsWith(AFiles.tmpDir)) {
-      Disk.clearUnsafe(path)
+      IOUtils.clearUnsafe(path)
     } else throw new RuntimeException("Only files under tmp dir could be cleared")
   }
 }
