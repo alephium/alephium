@@ -223,7 +223,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
       case None => Right(None)
       case Some(bytes) =>
         deserialize[V](bytes) match {
-          case Left(error)  => Left(IOError.apply(error))
+          case Left(error)  => Left(IOError.Serde(error))
           case Right(value) => Right(Some(value))
         }
     }
@@ -392,7 +392,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
             key   <- deserialize[K](MerklePatriciaTrie.nibbles2Bytes(nibbles))
             value <- deserialize[V](leaf.data)
           } yield (key, value)
-          deser.left.map(IOError.apply)
+          deser.left.map(IOError.Serde)
       }
     }
   }

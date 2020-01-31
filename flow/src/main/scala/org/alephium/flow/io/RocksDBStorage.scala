@@ -8,6 +8,8 @@ import org.rocksdb.util.SizeUnit
 import org.alephium.util.AVector
 
 object RocksDBStorage {
+  import IOError.execute
+
   {
     RocksDB.loadLibrary()
   }
@@ -74,7 +76,7 @@ object RocksDBStorage {
         .setKeepLogFileNum(1)
         .setBytesPerSync(BytesPerSync)
         .setDbWriteBufferSize(memoryBudgetPerCol / WriteBufferMemoryRatio)
-        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime().availableProcessors() / CPURatio))
+        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime.availableProcessors() / CPURatio))
 
       compaction.writeRateLimit match {
         case Some(rateLimit) => options.setRateLimiter(new RateLimiter(rateLimit))
@@ -143,18 +145,11 @@ object RocksDBStorage {
   def dESTROYUnsafe(db: RocksDBStorage): Unit = {
     RocksDB.destroyDB(db.path.toString, new Options())
   }
-
-  @inline
-  def execute[T](f: => T): IOResult[T] = {
-    try Right(f)
-    catch {
-      case e: Throwable => Left(IOError(e))
-    }
-  }
 }
 
 class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
   import RocksDBStorage._
+  import IOError.execute
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))
