@@ -71,6 +71,9 @@ class AlephiumMake(object):
     def package(self):
         run('sbt app/universal:packageBin')
 
+    def publish(self):
+        run('sbt publishLocal')
+
     def benchmark(self):
         run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
 
