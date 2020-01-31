@@ -21,8 +21,7 @@ class RocksDBColumn(
     writeOptions: WriteOptions,
     readOptions: ReadOptions
 ) extends KeyValueStorage {
-
-  import RocksDBStorage.execute
+  import IOError.execute
 
   val handle = storage.handle(cf)
 
