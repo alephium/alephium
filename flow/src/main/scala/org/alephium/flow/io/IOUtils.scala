@@ -35,13 +35,13 @@ object IOUtils {
   }
 
   @inline
-  def execute[T](f: => T): IOResult[T] = {
+  def tryExecute[T](f: => T): IOResult[T] = {
     try Right(f)
     catch error
   }
 
   @inline
-  def executeF[T](f: => IOResult[T]): IOResult[T] = {
+  def tryExecuteF[T](f: => IOResult[T]): IOResult[T] = {
     try f
     catch error
   }
