@@ -19,7 +19,8 @@ import io.circe.syntax._
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{FairMiner, Miner}
-import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
+import org.alephium.flow.core.{BlockFlow, FlowHandler, MultiChain, TxHandler}
+import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
@@ -28,6 +29,7 @@ import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC._
+import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util.{EventBus, Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
@@ -49,6 +51,9 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
       val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
       Right(PeersResult(peers))
     }
+
+  def doBlockNotify(blockNotify: BlockNotify): Json =
+    blockNotifyEncoder(mode.node.blockFlow).apply(blockNotify)
 
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
@@ -85,6 +90,7 @@ trait RPCServerAbstract extends StrictLogging {
   implicit def rpcConfig: RPCConfig
   implicit def askTimeout: Timeout
 
+  def doBlockNotify(blockNotify: BlockNotify): Json
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
   def doGetPeers(req: Request): FutureTry[PeersResult]
   def doGetBalance(req: Request): FutureTry[Balance]
@@ -97,12 +103,11 @@ trait RPCServerAbstract extends StrictLogging {
   def runServer(): Future[Unit]
 
   def handleEvent(event: EventBus.Event): TextMessage = {
-    // TODO Replace with concrete implementation.
     event match {
-      case _ =>
-        val ts     = System.currentTimeMillis()
-        val result = Notification("events_fake", Some(ts.asJson))
-        TextMessage(result.asJson.noSpaces)
+      case bn @ FlowHandler.BlockNotify(_, _) =>
+        val params = doBlockNotify(bn)
+        val notif  = Notification("block_notify", params)
+        TextMessage(notif.asJson.noSpaces)
     }
   }
 
@@ -306,4 +311,26 @@ object RPCServer extends StrictLogging {
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
+  def blockHeaderEncode(header: BlockHeader, height: Int)(implicit config: ConsensusConfig): Json =
+    FetchEntry(
+      hash      = header.shortHex,
+      timestamp = header.timestamp,
+      chainFrom = header.chainIndex.from.value,
+      chainTo   = header.chainIndex.to.value,
+      height    = height,
+      deps      = header.blockDeps.toIterable.map(_.shortHex).toList
+    ).asJson
+
+  def blockNotifyEncode(bn: BlockNotify, height: Int)(implicit config: ConsensusConfig): Json =
+    Json.obj(("header", blockHeaderEncode(bn.header, height)), ("height", Json.fromInt(height)))
+
+  def blockHeaderEncoder(chain: MultiChain)(
+      implicit config: ConsensusConfig): Encoder[BlockHeader] = new Encoder[BlockHeader] {
+    final def apply(header: BlockHeader): Json = blockHeaderEncode(header, chain.getHeight(header))
+  }
+
+  def blockNotifyEncoder(chain: MultiChain)(implicit cfg: ConsensusConfig): Encoder[BlockNotify] =
+    new Encoder[BlockNotify] {
+      final def apply(bn: BlockNotify): Json = blockNotifyEncode(bn, chain.getHeight(bn.header))
+    }
 }
