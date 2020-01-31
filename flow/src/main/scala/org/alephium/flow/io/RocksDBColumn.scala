@@ -21,11 +21,11 @@ class RocksDBColumn(
     writeOptions: WriteOptions,
     readOptions: ReadOptions
 ) extends KeyValueStorage {
-  import IOUtils.execute
+  import IOUtils.tryExecute
 
   val handle = storage.handle(cf)
 
-  def getRaw(key: ByteString): IOResult[ByteString] = execute {
+  def getRaw(key: ByteString): IOResult[ByteString] = tryExecute {
     getRawUnsafe(key)
   }
 
@@ -35,7 +35,7 @@ class RocksDBColumn(
     else ByteString.fromArrayUnsafe(result)
   }
 
-  def get[V: Serde](key: ByteString): IOResult[V] = execute {
+  def get[V: Serde](key: ByteString): IOResult[V] = tryExecute {
     getUnsafe[V](key)
   }
 
@@ -47,7 +47,7 @@ class RocksDBColumn(
     }
   }
 
-  def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = execute {
+  def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = tryExecute {
     getOptRawUnsafe(key)
   }
 
@@ -59,7 +59,7 @@ class RocksDBColumn(
     }
   }
 
-  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = execute {
+  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = tryExecute {
     getOptUnsafe[V](key)
   }
 
@@ -72,7 +72,7 @@ class RocksDBColumn(
     }
   }
 
-  def exists(key: ByteString): IOResult[Boolean] = execute {
+  def exists(key: ByteString): IOResult[Boolean] = tryExecute {
     existsUnsafe(key)
   }
 
@@ -81,7 +81,7 @@ class RocksDBColumn(
     result != null
   }
 
-  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = execute {
+  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = tryExecute {
     putRawUnsafe(key, value)
   }
 
@@ -98,7 +98,7 @@ class RocksDBColumn(
   }
 
   // TODO: should we check the existence of the key?
-  def delete(key: ByteString): IOResult[Unit] = execute {
+  def delete(key: ByteString): IOResult[Unit] = tryExecute {
     deleteUnsafe(key)
   }
 
