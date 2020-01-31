@@ -1,7 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.io.{IOError, IOResult}
+import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model._
@@ -57,7 +57,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
   }
 
   private def calWeight(header: BlockHeader): IOResult[Int] = {
-    IOError.execute(calWeightUnsafe(header))
+    IOUtils.execute(calWeightUnsafe(header))
   }
 
   private def calWeightUnsafe(header: BlockHeader): Int = {
@@ -213,7 +213,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     }
 
   def calBestDeps(): IOResult[Unit] = {
-    IOError.execute(calBestDepsUnsafe())
+    IOUtils.execute(calBestDepsUnsafe())
   }
 }
 

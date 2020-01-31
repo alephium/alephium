@@ -9,7 +9,9 @@ import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
 object Disk {
-  def create(root: Path): IOResult[Disk] = IOError.execute {
+  import IOUtils._
+
+  def create(root: Path): IOResult[Disk] = execute {
     createUnsafe(root)
   }
 
@@ -19,34 +21,10 @@ object Disk {
     createDirUnsafe(disk.blockFolder)
     disk
   }
-
-  def createDirUnsafe(path: Path): Unit = {
-    if (!Files.exists(path)) {
-      Files.createDirectory(path)
-    }
-    ()
-  }
-
-  def clearUnsafe(path: Path): Unit = {
-    if (Files.exists(path)) {
-      if (Files.isDirectory(path)) {
-        Files.list(path).forEach(removeUnsafe)
-      }
-    }
-  }
-
-  def removeUnsafe(path: Path): Unit = {
-    if (Files.exists(path)) {
-      if (Files.isDirectory(path)) {
-        Files.list(path).forEach(removeUnsafe)
-      }
-      Files.delete(path)
-    }
-  }
 }
 
 class Disk private (root: Path) {
-  import IOError.{execute, executeF}
+  import IOUtils.{execute, executeF}
 
   val blockFolder: Path = root.resolve("blocks")
 
@@ -69,7 +47,7 @@ class Disk private (root: Path) {
     try {
       val length = out.write(data.toByteBuffer)
       Right(length)
-    } catch { IOError.error } finally {
+    } catch { IOUtils.error } finally {
       out.close()
     }
   }
@@ -106,6 +84,6 @@ class Disk private (root: Path) {
   }
 
   def clear(): IOResult[Unit] = execute {
-    Disk.clearUnsafe(root)
+    IOUtils.clearUnsafe(root)
   }
 }
