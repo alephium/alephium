@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import org.rocksdb.WriteOptions
 
-import org.alephium.flow.io.{Disk, HeaderDB, RocksDBColumn, RocksDBStorage}
+import org.alephium.flow.io.{Disk, HeaderDB, IOUtils, RocksDBColumn, RocksDBStorage}
 import org.alephium.flow.io.RocksDBStorage.ColumnFamily
 import org.alephium.flow.trie.MerklePatriciaTrie
 
@@ -25,7 +25,7 @@ object PlatformIO {
     val dbStorage = {
       val dbPath = {
         val path = rootPath.resolve(dbFolder)
-        Disk.createDirUnsafe(path)
+        IOUtils.createDirUnsafe(path)
         path
       }
       val path = dbPath.resolve(dbName)
