@@ -1,7 +1,5 @@
 package org.alephium.flow.core
 
-import java.io.IOException
-
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
@@ -58,10 +56,9 @@ class BlockFlow()(implicit val config: PlatformProfile)
     calWeight(block.header)
   }
 
-  private def calWeight(header: BlockHeader): IOResult[Int] =
-    try { Right(calWeightUnsafe(header)) } catch {
-      case e: IOException => Left(IOError(e))
-    }
+  private def calWeight(header: BlockHeader): IOResult[Int] = {
+    IOError.execute(calWeightUnsafe(header))
+  }
 
   private def calWeightUnsafe(header: BlockHeader): Int = {
     if (header.isGenesis) 0
@@ -215,12 +212,9 @@ class BlockFlow()(implicit val config: PlatformProfile)
       updateBestDeps(mainGroup, deps)
     }
 
-  def calBestDeps(): IOResult[Unit] =
-    try {
-      Right(calBestDepsUnsafe())
-    } catch {
-      case e: Exception => Left(IOError(e))
-    }
+  def calBestDeps(): IOResult[Unit] = {
+    IOError.execute(calBestDepsUnsafe())
+  }
 }
 
 object BlockFlow {
