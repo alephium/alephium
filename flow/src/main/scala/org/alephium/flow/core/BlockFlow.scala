@@ -57,7 +57,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
   }
 
   private def calWeight(header: BlockHeader): IOResult[Int] = {
-    IOUtils.execute(calWeightUnsafe(header))
+    IOUtils.tryExecute(calWeightUnsafe(header))
   }
 
   private def calWeightUnsafe(header: BlockHeader): Int = {
@@ -213,7 +213,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     }
 
   def calBestDeps(): IOResult[Unit] = {
-    IOUtils.execute(calBestDepsUnsafe())
+    IOUtils.tryExecute(calBestDepsUnsafe())
   }
 }
 

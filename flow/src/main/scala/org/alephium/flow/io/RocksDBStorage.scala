@@ -8,7 +8,7 @@ import org.rocksdb.util.SizeUnit
 import org.alephium.util.AVector
 
 object RocksDBStorage {
-  import IOUtils.execute
+  import IOUtils.tryExecute
 
   {
     RocksDB.loadLibrary()
@@ -106,7 +106,7 @@ object RocksDBStorage {
     }
   }
 
-  def open(path: Path, compaction: Compaction): IOResult[RocksDBStorage] = execute {
+  def open(path: Path, compaction: Compaction): IOResult[RocksDBStorage] = tryExecute {
     openUnsafe(path, compaction)
   }
 
@@ -134,11 +134,11 @@ object RocksDBStorage {
     new RocksDBStorage(path, db, AVector.fromIterator(handles.toIterator))
   }
 
-  def dESTROY(path: Path): IOResult[Unit] = execute {
+  def dESTROY(path: Path): IOResult[Unit] = tryExecute {
     RocksDB.destroyDB(path.toString, new Options())
   }
 
-  def dESTROY(db: RocksDBStorage): IOResult[Unit] = execute {
+  def dESTROY(db: RocksDBStorage): IOResult[Unit] = tryExecute {
     dESTROYUnsafe(db)
   }
 
@@ -149,12 +149,12 @@ object RocksDBStorage {
 
 class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
   import RocksDBStorage._
-  import IOUtils.execute
+  import IOUtils.tryExecute
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))
 
-  def close(): IOResult[Unit] = execute {
+  def close(): IOResult[Unit] = tryExecute {
     db.close()
   }
 
