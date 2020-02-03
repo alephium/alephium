@@ -31,7 +31,7 @@ object FairMiner {
       implicit config: PlatformProfile): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
-      require(GroupIndex.from(address).value == i)
+      require(GroupIndex.fromP2PKH(address).value == i)
     }
     Props(new FairMiner(addresses, node))
   }

@@ -39,7 +39,7 @@ trait TransactionPool { self: BlockFlowState =>
     trie.getOpt[TxOutputPoint, TxOutput](input) match {
       case Left(e) => Left(Error.ioError(e))
       case Right(Some(output)) =>
-        if (GroupIndex.from(output.mainKey) == from &&
+        if (GroupIndex.from(output.pubScript) == from &&
             (!groupCache.isUtxoSpentIncache(input))) Right(())
         else errorRes
       case Right(None) =>
@@ -50,7 +50,7 @@ trait TransactionPool { self: BlockFlowState =>
   }
 
   def validateIndex(output: TxOutput, to: GroupIndex): Either[Error, Unit] = {
-    if (GroupIndex.from(output.mainKey) == to) {
+    if (GroupIndex.from(output.pubScript) == to) {
       Right(())
     } else {
       Left(Error.invalidTransaction("Output has differnet group index"))
@@ -60,8 +60,8 @@ trait TransactionPool { self: BlockFlowState =>
   def validateIndex(transaction: Transaction, chainIndex: ChainIndex): Either[Error, Unit] = {
     val trie = getBestTrie(chainIndex.from)
     for {
-      _ <- transaction.unsigned.inputs.mapE(validateIndex(_, trie, chainIndex.from))
-      _ <- transaction.unsigned.outputs.mapE(validateIndex(_, chainIndex.to))
+      _ <- transaction.raw.inputs.mapE(validateIndex(_, trie, chainIndex.from))
+      _ <- transaction.raw.outputs.mapE(validateIndex(_, chainIndex.to))
     } yield ()
   }
 

@@ -2,6 +2,7 @@ package org.alephium.flow.io
 
 import java.nio.file.Files
 
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.core.TestUtils
@@ -11,20 +12,21 @@ import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Files => AFiles}
 
 class DiskSpec extends AlephiumSpec {
-
   trait Fixture {
     val root = AFiles.tmpDir.resolve(".alephium-test-diskspec")
     val disk = Disk.create(root).right.value
+
+    def postTest(): Assertion = {
+      disk.clear()
+      Files.exists(root) is true
+      Files.exists(disk.blockFolder) is false
+    }
   }
 
   it should "create related folders" in new Fixture {
     Files.exists(root) is true
     Files.exists(disk.blockFolder) is true
     Disk.create(root).isRight is true
-
-    TestUtils.clear(root)
-    Files.exists(root) is true
-    Files.exists(disk.blockFolder) is false
   }
 
   it should "save and read blocks" in new Fixture with ConsensusConfigFixture {

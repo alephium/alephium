@@ -2,7 +2,7 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
 import org.alephium.serde._
@@ -174,7 +174,7 @@ object MerklePatriciaTrie {
     val genesisKey = Keccak256.zero.bytes
     val genesisNode = {
       val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
-      val genesisOutput = TxOutput(0, ED25519PublicKey.zero)
+      val genesisOutput = TxOutput.burn(0)
       LeafNode(genesisPath, serialize(genesisOutput))
     }
 
@@ -182,8 +182,8 @@ object MerklePatriciaTrie {
   }
 
   def createStateTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
-    val genesisOutputPoint = TxOutputPoint(ED25519PublicKey.zero, Keccak256.zero, 0)
-    val genesisOutput      = TxOutput(0, ED25519PublicKey.zero)
+    val genesisOutputPoint = TxOutputPoint(0, Keccak256.zero, 0)
+    val genesisOutput      = TxOutput.burn(0)
     val genesisKey         = serialize(genesisOutputPoint)
     val genesisNode = {
       val genesisPath = bytes2Nibbles(genesisKey)
@@ -223,7 +223,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
       case None => Right(None)
       case Some(bytes) =>
         deserialize[V](bytes) match {
-          case Left(error)  => Left(IOError.apply(error))
+          case Left(error)  => Left(IOError.Serde(error))
           case Right(value) => Right(Some(value))
         }
     }
@@ -392,7 +392,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
             key   <- deserialize[K](MerklePatriciaTrie.nibbles2Bytes(nibbles))
             value <- deserialize[V](leaf.data)
           } yield (key, value)
-          deser.left.map(IOError.apply)
+          deser.left.map(IOError.Serde)
       }
     }
   }

@@ -1,13 +1,15 @@
 package org.alephium.flow.core.validation
 
-import org.alephium.crypto.{ED25519Signature, Keccak256}
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.core._
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Forest, TimeStamp}
+import org.alephium.protocol.script.{PubScript, Script, Witness}
+import org.alephium.serde.serialize
+import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
@@ -79,8 +81,7 @@ object Validation {
       _ <- checkNonEmptyTransactions(block)
       _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
-      //      _ <- checkTxsSignature(block, flow) // TODO: design & implement this
-      _ <- checkSpending(block, flow)
+      _ <- checkTransactions(block, flow)
     } yield ()
   }
 
@@ -131,8 +132,8 @@ object Validation {
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
-    val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.signature == ED25519Signature.zero)
+    val raw      = coinbase.raw
+    if (raw.inputs.length == 0 && raw.outputs.length == 1 && coinbase.witnesses.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -143,40 +144,72 @@ object Validation {
     else invalidBlock(InvalidMerkleRoot)
   }
 
-  // TODO: refine transaction validation and test properly
-  private[validation] def checkSpending(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): BlockValidationResult = {
+  private[validation] def checkTransactions(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): TxValidationResult = {
     val index      = block.chainIndex
     val brokerInfo = config.brokerInfo
     assert(index.relateTo(brokerInfo))
 
-    val boolFrom = brokerInfo.contains(index.from)
-    if (boolFrom) {
+    if (brokerInfo.contains(index.from)) {
       val trie = flow.getTrie(block)
-      checkSpending(block, trie)
+      for {
+        _ <- checkSpending(block, trie)
+        _ <- checkAllScripts(block, trie)
+      } yield ()
     } else {
-      validBlock
+      validTx
     }
   }
 
   private[validation] def checkSpending(block: Block,
-                                        trie: MerklePatriciaTrie): BlockValidationResult = {
+                                        trie: MerklePatriciaTrie): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    block.transactions.foreach { tx =>
-      tx.unsigned.inputs.foreach { txOutputPoint =>
-        // scalastyle:off return
-        if (utxoUsed.contains(txOutputPoint)) return invalidBlock(DoubleSpent)
+    EitherF.foreachTry(block.transactions.tail.toIterable) { tx =>
+      EitherF.foreachTry(tx.raw.inputs.toIterable) { input =>
+        if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {
-          utxoUsed += txOutputPoint
-          trie.getOpt[TxOutputPoint, TxOutput](txOutputPoint) match {
-            case Left(error)        => return Left(Left(error))
-            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) return invalidBlock(InvalidCoin)
+          utxoUsed += input
+          trie.getOpt[TxOutputPoint, TxOutput](input) match {
+            case Left(error)        => Left(Left(error))
+            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) invalidTx(InvalidCoin) else validTx
           }
         }
-        // scalastyle:on return
       }
     }
-    validBlock
+  }
+
+  private[validation] def checkAllScripts(block: Block,
+                                          trie: MerklePatriciaTrie): TxValidationResult = {
+    val transactions = block.transactions
+    EitherF.foreachTry(transactions.indices.tail)(idx => checkTxScripts(transactions(idx), trie))
+  }
+
+  private[validation] def checkTxScripts(tx: Transaction,
+                                         trie: MerklePatriciaTrie): TxValidationResult = {
+    val inputs    = tx.raw.inputs
+    val witnesses = tx.witnesses
+    if (inputs.length != witnesses.length) {
+      invalidTx(InvalidWitnessLength)
+    } else {
+      val rawHash = Keccak256.hash(serialize(tx.raw))
+      EitherF.foreachTry(inputs.indices) { idx =>
+        val input   = inputs(idx)
+        val witness = witnesses(idx)
+        trie.get[TxOutputPoint, TxOutput](input) match {
+          case Left(error)      => Left(Left(error))
+          case Right(preOutput) => checkWitness(rawHash, preOutput.pubScript, witness)
+        }
+      }
+    }
+  }
+
+  private[validation] def checkWitness(hash: Keccak256,
+                                       pubScript: PubScript,
+                                       witness: Witness): TxValidationResult = {
+    Script.run(hash.bytes, pubScript, witness) match {
+      case Left(error) => invalidTx(InvalidWitness(error))
+      case Right(_)    => validTx
+    }
   }
 
   /*

@@ -172,7 +172,7 @@ object PlatformProfile {
     AVector.tabulate(config.groups, config.groups) {
       case (from, to) =>
         val transactions = if (from == to) {
-          val balancesOI  = balances.filter(p => GroupIndex.from(p._1).value == from)
+          val balancesOI  = balances.filter(p => GroupIndex.fromP2PKH(p._1).value == from)
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]

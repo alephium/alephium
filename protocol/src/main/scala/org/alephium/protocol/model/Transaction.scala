@@ -3,7 +3,8 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.serde.{serialize, Serde}
+import org.alephium.protocol.script.{PubScript, Witness}
+import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 /*
@@ -13,45 +14,52 @@ import org.alephium.util.AVector
  *
  */
 case class Transaction(
-    unsigned: UnsignedTransaction,
+    raw: RawTransaction,
     data: ByteString,
-    signature: ED25519Signature // TODO: support n2n transactions
+    witnesses: AVector[Witness]
 ) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = _getHash
 }
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.signature))
+    Serde.forProduct3(Transaction.apply, t => (t.raw, t.data, t.witnesses))
 
-  def from0(inputs: AVector[TxOutputPoint],
-            outputs: AVector[TxOutput],
-            privateKey: ED25519PrivateKey): Transaction = {
-    from(UnsignedTransaction(inputs, outputs), privateKey)
+  def from(inputs: AVector[TxOutputPoint],
+           outputs: AVector[TxOutput],
+           publicKey: ED25519PublicKey,
+           privateKey: ED25519PrivateKey): Transaction = {
+    from(RawTransaction(inputs, outputs), publicKey, privateKey)
   }
 
-  def from1(inputs: AVector[TxOutputPoint],
-            outputs: AVector[TxOutput],
-            signature: ED25519Signature): Transaction = {
-    Transaction(UnsignedTransaction(inputs, outputs), ByteString.empty, signature)
+  def from(inputs: AVector[TxOutputPoint],
+           outputs: AVector[TxOutput],
+           witnesses: AVector[Witness]): Transaction = {
+    Transaction(RawTransaction(inputs, outputs), ByteString.empty, witnesses)
   }
 
-  def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
+  def from(raw: RawTransaction,
+           publicKey: ED25519PublicKey,
+           privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
-    val message   = serialize(unsigned)
-    val signature = ED25519.sign(message, privateKey)
-    Transaction(unsigned, ByteString.empty, signature)
+    val witness = Witness.p2pkh(raw, publicKey, privateKey)
+    Transaction(raw, ByteString.empty, AVector(witness))
   }
 
-  def coinbase(address: ED25519PublicKey, value: BigInt, data: ByteString): Transaction = {
-    val txOutput = TxOutput(value, address)
-    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
-    Transaction(unsigned, data, ED25519Signature.zero)
+  def coinbase(publicKey: ED25519PublicKey, value: BigInt, data: ByteString): Transaction = {
+    val pkScript = PubScript.p2pkh(publicKey)
+    val txOutput = TxOutput(value, pkScript)
+    val raw      = RawTransaction(AVector.empty, AVector(txOutput))
+    Transaction(raw, data, AVector.empty)
   }
 
   def genesis(balances: AVector[(ED25519PublicKey, BigInt)]): Transaction = {
-    val outputs  = balances.map { case (key, value) => TxOutput(value, key) }
-    val unsigned = UnsignedTransaction(AVector.empty, outputs)
-    Transaction(unsigned, ByteString.empty, ED25519Signature.zero)
+    val outputs = balances.map {
+      case (publicKey, value) =>
+        val pkScript = PubScript.p2pkh(publicKey)
+        TxOutput(value, pkScript)
+    }
+    val raw = RawTransaction(AVector.empty, outputs)
+    Transaction(raw, ByteString.empty, AVector.empty)
   }
 }

@@ -9,6 +9,8 @@ import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
 object Disk {
+  import IOUtils._
+
   def create(root: Path): IOResult[Disk] = execute {
     createUnsafe(root)
   }
@@ -19,29 +21,10 @@ object Disk {
     createDirUnsafe(disk.blockFolder)
     disk
   }
-
-  def createDirUnsafe(path: Path): Unit = {
-    if (!Files.exists(path)) {
-      Files.createDirectory(path)
-    }
-    ()
-  }
-
-  @inline
-  def execute[T](f: => T): IOResult[T] = {
-    try Right(f)
-    catch { case e: Exception => Left(IOError(e)) }
-  }
-
-  @inline
-  def executeF[T](f: => IOResult[T]): IOResult[T] = {
-    try f
-    catch { case e: Exception => Left(IOError(e)) }
-  }
 }
 
 class Disk private (root: Path) {
-  import Disk.{execute, executeF}
+  import IOUtils.{execute, executeF}
 
   val blockFolder: Path = root.resolve("blocks")
 
@@ -64,7 +47,7 @@ class Disk private (root: Path) {
     try {
       val length = out.write(data.toByteBuffer)
       Right(length)
-    } catch { case e: Exception => Left(IOError(e)) } finally {
+    } catch { IOUtils.error } finally {
       out.close()
     }
   }
@@ -88,7 +71,7 @@ class Disk private (root: Path) {
       ByteString.fromArrayUnsafe(bytes)
     }
     dataIOResult.flatMap { data =>
-      deserialize[Block](data).left.map(IOError(_))
+      deserialize[Block](data).left.map(IOError.Serde)
     }
   }
 
@@ -98,5 +81,9 @@ class Disk private (root: Path) {
       Files.isRegularFile(inPath)
     }
     result.fold(_ => false, identity)
+  }
+
+  def clear(): IOResult[Unit] = execute {
+    IOUtils.clearUnsafe(root)
   }
 }
