@@ -1,5 +1,6 @@
 package org.alephium.protocol.script
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
@@ -11,9 +12,9 @@ object Script {
   type Stack = ArrayBuffer[ByteString]
 
   // It's mutable for efficiency
-  class Context(val stack: ArrayBuffer[ByteString],
-                val signatures: ArrayBuffer[ByteString],
-                val data: ByteString) {
+  private[script] class Context(val stack: ArrayBuffer[ByteString],
+                                val signatures: ArrayBuffer[ByteString],
+                                val data: ByteString) {
     def isEmpty: Boolean = stack.isEmpty && signatures.isEmpty
   }
 
@@ -33,6 +34,7 @@ object Script {
     }
   }
 
+  @tailrec
   private[script] def run(context: Context,
                           instructionLists: List[AVector[Instruction]]): RunResult = {
     instructionLists match {
@@ -42,7 +44,10 @@ object Script {
           run(context, rest)
         } else {
           val allRest = if (instructions.length == 1) rest else instructions.tail :: rest
-          run(context, instructions.head).flatMap(_ => run(context, allRest))
+          run(context, instructions.head) match {
+            case Left(e)  => Left(e)
+            case Right(_) => run(context, allRest)
+          }
         }
     }
   }
