@@ -8,6 +8,8 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PubScript
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
 trait BlockFlowState {
@@ -248,10 +250,14 @@ trait BlockFlowState {
     }
   }
 
-  def getBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
-    val groupIndex = GroupIndex.from(address)
+  def getP2pkhBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+    val pubScript  = PubScript.p2pkh(address)
+    val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
-    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](address.bytes)
+    val prefix = serialize(pubScript.shortKey)
+    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](prefix).map { data =>
+      data.filter(_._2.pubScript == pubScript)
+    }
   }
 }
 
@@ -263,13 +269,13 @@ object BlockFlowState {
       extends BlockCache // For blocks on intra-group chain
 
   private def convertInputs(block: Block): Set[TxOutputPoint] = {
-    block.transactions.flatMap(_.unsigned.inputs).toIterable.toSet
+    block.transactions.flatMap(_.raw.inputs).toIterable.toSet
   }
 
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
-      transaction.unsigned.outputs.mapWithIndex { (output, i) =>
-        val outputPoint = TxOutputPoint(output.mainKey, transaction.hash, i)
+      transaction.raw.outputs.mapWithIndex { (output, i) =>
+        val outputPoint = TxOutputPoint(output.shortKey, transaction.hash, i)
         (outputPoint, output)
       }
     }
@@ -333,7 +339,7 @@ object BlockFlowState {
   def updateStateForOutputs(
       trie: MerklePatriciaTrie,
       outputs: Iterable[(TxOutputPoint, TxOutput)]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(outputs, trie) {
+    EitherF.foldTry(outputs, trie) {
       case (trie0, (outputPoint, output)) =>
         trie0.put(outputPoint, output)
     }
@@ -341,7 +347,7 @@ object BlockFlowState {
 
   def updateStateForInputs(trie: MerklePatriciaTrie,
                            inputs: Iterable[TxOutputPoint]): IOResult[MerklePatriciaTrie] = {
-    EitherF.fold(inputs, trie)(_.remove(_))
+    EitherF.foldTry(inputs, trie)(_.remove(_))
   }
 
   def updateState(trie: MerklePatriciaTrie,
