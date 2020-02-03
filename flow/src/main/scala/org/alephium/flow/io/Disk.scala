@@ -11,7 +11,7 @@ import org.alephium.serde._
 object Disk {
   import IOUtils._
 
-  def create(root: Path): IOResult[Disk] = execute {
+  def create(root: Path): IOResult[Disk] = tryExecute {
     createUnsafe(root)
   }
 
@@ -24,7 +24,7 @@ object Disk {
 }
 
 class Disk private (root: Path) {
-  import IOUtils.{execute, executeF}
+  import IOUtils.{tryExecute, tryExecuteF}
 
   val blockFolder: Path = root.resolve("blocks")
 
@@ -40,7 +40,7 @@ class Disk private (root: Path) {
     blockFolder.resolve(blockHash.shortHex + ".dat")
   }
 
-  def putBlock(block: Block): IOResult[Int] = executeF {
+  def putBlock(block: Block): IOResult[Int] = tryExecuteF {
     val data    = serialize(block)
     val outPath = getBlockPath(block)
     val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
@@ -65,7 +65,7 @@ class Disk private (root: Path) {
   }
 
   def getBlock(blockHash: Keccak256): IOResult[Block] = {
-    val dataIOResult = execute {
+    val dataIOResult = tryExecute {
       val inPath = getBlockPath(blockHash)
       val bytes  = Files.readAllBytes(inPath)
       ByteString.fromArrayUnsafe(bytes)
@@ -76,14 +76,14 @@ class Disk private (root: Path) {
   }
 
   def checkBlockFile(blockHash: Keccak256): Boolean = {
-    val result = execute {
+    val result = tryExecute {
       val inPath = getBlockPath(blockHash)
       Files.isRegularFile(inPath)
     }
     result.fold(_ => false, identity)
   }
 
-  def clear(): IOResult[Unit] = execute {
+  def clear(): IOResult[Unit] = tryExecute {
     IOUtils.clearUnsafe(root)
   }
 }
