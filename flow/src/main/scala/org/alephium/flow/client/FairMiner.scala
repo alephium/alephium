@@ -13,7 +13,6 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.LocalMining
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
@@ -21,7 +20,7 @@ object FairMiner {
   def props(node: Node)(implicit config: PlatformProfile): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex(i)
-      val (_, publicKey) = GroupConfig.generateKeyForGroup(index)
+      val (_, publicKey) = index.generateP2pkhKey
       publicKey
     }
     props(addresses, node)
