@@ -150,6 +150,10 @@ object PlatformProfile {
         PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)
       }
       /* IO */
+
+      /* Platform */
+      val txPoolCapacity = 1000
+      /* Platform */
     }
   // scalastyle:off method.length parameter.number
 
