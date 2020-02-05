@@ -35,11 +35,18 @@ object ModelGen {
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
+  def blockGenNonEmpty(implicit config: ConsensusConfig): Gen[Block] =
+    blockGen.retryUntil(_.transactions.nonEmpty)
+
   def blockGenFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] =
-    blockGen.retryUntil(_.chainIndex.relateTo(broker))
+    blockGenNonEmpty.retryUntil(_.chainIndex.relateTo(broker))
 
   def blockGenNotFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] = {
-    blockGen.retryUntil(!_.chainIndex.relateTo(broker))
+    blockGenNonEmpty.retryUntil(!_.chainIndex.relateTo(broker))
+  }
+
+  def blockGenFrom(group: GroupIndex)(implicit config: ConsensusConfig): Gen[Block] = {
+    blockGenNonEmpty.retryUntil(_.chainIndex.from equals group)
   }
 
   def blockGenWith(deps: AVector[Keccak256])(implicit config: ConsensusConfig): Gen[Block] =
