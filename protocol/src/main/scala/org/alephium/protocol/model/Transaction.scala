@@ -18,7 +18,7 @@ case class Transaction(
     data: ByteString,
     witnesses: AVector[Witness]
 ) extends Keccak256Hash[Transaction] {
-  override val hash: Keccak256 = _getHash
+  override val hash: Keccak256 = raw.hash
 }
 
 object Transaction {
