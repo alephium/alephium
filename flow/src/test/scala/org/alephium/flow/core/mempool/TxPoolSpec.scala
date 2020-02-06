@@ -13,7 +13,8 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
   it should "contain/add/remove for new transactions" in {
     val pool = TxPool.empty(3)
     forAll(ModelGen.blockGenNonEmpty) { block =>
-      val numberAdded = pool.add(block.transactions)
+      val weightedTxs = block.transactions.map((_, 1.0))
+      val numberAdded = pool.add(weightedTxs)
       pool.size is numberAdded
       if (block.transactions.length > pool.capacity) {
         pool.isFull is true
@@ -30,10 +31,11 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
   }
 
   trait Fixture extends WithLock {
-    val pool  = TxPool.empty(3)
-    val block = ModelGen.blockGenNonEmpty.sample.get
-    val txNum = block.transactions.length
-    val rwl   = pool._getLock
+    val pool        = TxPool.empty(3)
+    val block       = ModelGen.blockGenNonEmpty.sample.get
+    val weightedTxs = block.transactions.map((_, 1.0))
+    val txNum       = block.transactions.length
+    val rwl         = pool._getLock
 
     val sizeAfterAdd = if (txNum >= 3) 3 else txNum
   }
@@ -43,11 +45,11 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
   }
 
   it should "use write lock for adding" in new Fixture {
-    checkWriteLock(rwl)(0, pool.add(block.transactions), sizeAfterAdd)
+    checkWriteLock(rwl)(0, pool.add(weightedTxs), sizeAfterAdd)
   }
 
   it should "use write lock for removing" in new Fixture {
-    pool.add(block.transactions)
+    pool.add(weightedTxs)
     checkWriteLock(rwl)(0, pool.remove(block.transactions), sizeAfterAdd)
   }
 }

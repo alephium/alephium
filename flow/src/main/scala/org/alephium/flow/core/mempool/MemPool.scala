@@ -23,7 +23,11 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
     getPool(index).contains(transaction)
   }
 
-  def add(index: ChainIndex, transactions: AVector[Transaction]): Int = readOnly {
+  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[Transaction] = readOnly {
+    getPool(index).collectForBlock(maxNum)
+  }
+
+  def add(index: ChainIndex, transactions: AVector[(Transaction, Double)]): Int = readOnly {
     getPool(index).add(transactions)
   }
 
@@ -33,7 +37,7 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
 
   // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(toRemove: AVector[AVector[Transaction]],
-            toAdd: AVector[AVector[Transaction]]): (Int, Int) = writeOnly {
+            toAdd: AVector[AVector[(Transaction, Double)]]): (Int, Int) = writeOnly {
     assume(toRemove.length == config.groups && toAdd.length == config.groups)
 
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).remove(txs))
