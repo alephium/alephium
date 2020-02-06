@@ -19,7 +19,8 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
       val index = block.chainIndex
       if (index.from.equals(group)) {
         block.transactions.foreach(pool.contains(index, _) is false)
-        pool.add(index, block.transactions) is block.transactions.length
+        val weightedTxs = block.transactions.map((_, 1.0))
+        pool.add(index, weightedTxs) is block.transactions.length
         pool.size is block.transactions.length
         block.transactions.foreach(pool.contains(index, _) is true)
         pool.remove(index, block.transactions) is block.transactions.length
@@ -31,11 +32,12 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   }
 
   trait Fixture extends WithLock {
-    val group = GroupIndex(0)
-    val pool  = MemPool.empty(group)
-    val block = ModelGen.blockGenFrom(group).retryUntil(_.transactions.nonEmpty).sample.get
-    val txNum = block.transactions.length
-    val rwl   = pool._getLock
+    val group       = GroupIndex(0)
+    val pool        = MemPool.empty(group)
+    val block       = ModelGen.blockGenFrom(group).retryUntil(_.transactions.nonEmpty).sample.get
+    val weightedTxs = block.transactions.map((_, 1.0))
+    val txNum       = block.transactions.length
+    val rwl         = pool._getLock
 
     val chainIndex   = block.chainIndex
     val sizeAfterAdd = if (txNum >= 3) 3 else txNum
@@ -46,9 +48,9 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   }
 
   it should "use read lock for add" in new Fixture {
-    checkLockUsed(rwl)(0, pool.add(chainIndex, block.transactions), txNum)
+    checkLockUsed(rwl)(0, pool.add(chainIndex, weightedTxs), txNum)
     pool.clear()
-    checkNoWriteLock(rwl)(0, pool.add(chainIndex, block.transactions), txNum)
+    checkNoWriteLock(rwl)(0, pool.add(chainIndex, weightedTxs), txNum)
   }
 
   it should "use read lock for remove" in new Fixture {
@@ -57,6 +59,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
 
   it should "use write lock for reorg" in new Fixture {
     val foo = AVector.fill(config.groups)(AVector.empty[Transaction])
-    checkWriteLock(rwl)((1, 1), pool.reorg(foo, foo), (0, 0))
+    val bar = AVector.fill(config.groups)(AVector.empty[(Transaction, Double)])
+    checkWriteLock(rwl)((1, 1), pool.reorg(foo, bar), (0, 0))
   }
 }

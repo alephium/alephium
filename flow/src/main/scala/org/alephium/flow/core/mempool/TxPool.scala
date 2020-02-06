@@ -4,13 +4,16 @@ import scala.collection.mutable
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.RWLock
+import org.alephium.flow.core.mempool.TxPool.WeightedId
 import org.alephium.protocol.model.Transaction
 import org.alephium.util.AVector
 
 /*
  * Transaction pool implementation
  */
-class TxPool private (pool: mutable.HashMap[Keccak256, Transaction], _capacity: Int)
+class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
+                      weights: mutable.HashMap[Keccak256, Double],
+                      _capacity: Int)
     extends RWLock {
   def isFull: Boolean = pool.size == _capacity
 
@@ -19,37 +22,39 @@ class TxPool private (pool: mutable.HashMap[Keccak256, Transaction], _capacity: 
   def capacity: Int = _capacity
 
   def contains(transaction: Transaction): Boolean = readOnly {
-    pool.contains(transaction.hash)
+    weights.contains(transaction.hash)
   }
 
-  def add(transactions: AVector[Transaction]): Int = {
-    update(transactions) { tx =>
-      if (isFull) false
-      else {
-        pool += tx.hash -> tx
-        true
-      }
-    }
+  def collectForBlock(maxNum: Int): AVector[Transaction] = readOnly {
+    AVector.from(pool.values.take(maxNum))
   }
 
-  def remove(transactions: AVector[Transaction]): Int = {
-    val count = update(transactions) { tx =>
-      if (pool.contains(tx.hash)) {
-        pool -= tx.hash
-        true
-      } else false
-    }
-    -count
-  }
-
-  def update(transactions: AVector[Transaction])(f: Transaction => Boolean): Int = writeOnly {
+  def add(transactions: AVector[(Transaction, Double)]): Int = writeOnly {
     val sizeBefore = size
-    transactions.foreachE { tx =>
-      val result = f(tx)
-      if (!result) Left(()) else Right(())
+    transactions.foreachE {
+      case (tx, weight) =>
+        if (isFull) Left(())
+        else {
+          weights += tx.hash                  -> weight
+          pool += WeightedId(weight, tx.hash) -> tx
+          Right(())
+        }
     }
     val sizeAfter = size
     sizeAfter - sizeBefore
+  }
+
+  def remove(transactions: AVector[Transaction]): Int = writeOnly {
+    val sizeBefore = size
+    transactions.foreach { tx =>
+      if (contains(tx)) {
+        val weight = weights(tx.hash)
+        weights -= tx.hash
+        pool -= WeightedId(weight, tx.hash)
+      }
+    }
+    val sizeAfter = size
+    sizeBefore - sizeAfter
   }
 
   def clear(): Unit = writeOnly {
@@ -58,5 +63,21 @@ class TxPool private (pool: mutable.HashMap[Keccak256, Transaction], _capacity: 
 }
 
 object TxPool {
-  def empty(capacity: Int): TxPool = new TxPool(mutable.HashMap.empty, capacity)
+  def empty(capacity: Int): TxPool =
+    new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+
+  case class WeightedId(weight: Double, id: Keccak256) {
+    override def equals(obj: Any): Boolean = obj match {
+      case that: WeightedId => this.id == that.id
+      case _                => false
+    }
+
+    override def hashCode(): Int = id.hashCode()
+  }
+
+  implicit val ord: Ordering[WeightedId] = {
+    implicit val keccak256Ord = Ordering.Iterable[Byte].on[Keccak256](_.bytes)
+    implicit val pairOrd      = Ordering.Tuple2[Double, Keccak256]
+    Ordering.by(p => (-p.weight, p.id))
+  }
 }
