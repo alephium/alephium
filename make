@@ -108,7 +108,7 @@ class AlephiumMake(object):
         rpc_call_all(method, args)
 
     def kill(self):
-        run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")
+        run("ps aux | grep -i org.alephium.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
 
     def clean(self):
         run('sbt clean')
