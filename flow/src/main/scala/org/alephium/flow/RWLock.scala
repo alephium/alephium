@@ -3,9 +3,9 @@ package org.alephium.flow
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 trait RWLock {
-  val lock      = new ReentrantReadWriteLock()
-  val readLock  = lock.readLock()
-  val writeLock = lock.writeLock()
+  private val lock      = new ReentrantReadWriteLock()
+  private val readLock  = lock.readLock()
+  private val writeLock = lock.writeLock()
 
   // Note: functions started with _ are for testing
   def _getLock: ReentrantReadWriteLock = lock
