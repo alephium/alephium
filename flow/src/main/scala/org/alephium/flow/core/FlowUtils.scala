@@ -1,17 +1,32 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
+import org.alephium.flow.core.mempool.MemPool
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
+import org.alephium.util.AVector
 
-trait FlowUtils extends MultiChain with TransactionPool with BlockFlowState {
+trait FlowUtils extends MultiChain with BlockFlowState {
+
+  val mempools = AVector.tabulate(config.groupNumPerBroker) { idx =>
+    val group = GroupIndex(brokerInfo.groupFrom + idx)
+    MemPool.empty(group)
+  }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
   def calBestDeps(): IOResult[Unit]
 
   def calBestDepsUnsafe(): Unit
+
+  private def getPool(chainIndex: ChainIndex): MemPool = {
+    mempools(chainIndex.from.value - brokerInfo.groupFrom)
+  }
+
+  private def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
+    getPool(chainIndex).collectForBlock(chainIndex, config.txMaxNumberPerBlock)
+  }
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
     assert(config.brokerInfo.contains(chainIndex.from))
