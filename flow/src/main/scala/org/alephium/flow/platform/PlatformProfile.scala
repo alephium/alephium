@@ -26,6 +26,9 @@ trait PlatformProfile
     with PlatformIO {
   def all: Config
   def aleph: Config
+
+  def txPoolCapacity: Int
+  def txMaxNumberPerBlock: Int
 }
 
 object PlatformProfile {
@@ -152,7 +155,8 @@ object PlatformProfile {
       /* IO */
 
       /* Platform */
-      val txPoolCapacity = 1000
+      val txPoolCapacity      = 1000
+      val txMaxNumberPerBlock = 1000
       /* Platform */
     }
   // scalastyle:off method.length parameter.number
