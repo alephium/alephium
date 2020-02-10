@@ -137,7 +137,7 @@ trait BlockFlowState {
   }
 
   private def getTrie(deps: AVector[Keccak256], groupIndex: GroupIndex): MerklePatriciaTrie = {
-    assert(deps.length == 2 * config.groups - 1)
+    assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
   }

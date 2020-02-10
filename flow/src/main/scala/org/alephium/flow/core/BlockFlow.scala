@@ -21,7 +21,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     for {
       weight <- calWeight(block)
       _      <- chain.add(block, parent, weight)
-      _      <- calBestDeps()
+      _      <- updateBestDeps()
     } yield ()
   }
 
@@ -40,7 +40,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     for {
       weight <- calWeight(header)
       _      <- chain.add(header, parent, weight)
-      _      <- calBestDeps()
+      _      <- updateBestDeps()
     } yield ()
   }
 
@@ -209,10 +209,11 @@ class BlockFlow()(implicit val config: PlatformProfile)
   def calBestDepsUnsafe(): Unit =
     brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
       val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
+      updateMemPoolUnsafe(mainGroup, deps)
       updateBestDeps(mainGroup, deps)
     }
 
-  def calBestDeps(): IOResult[Unit] = {
+  def updateBestDeps(): IOResult[Unit] = {
     IOUtils.tryExecute(calBestDepsUnsafe())
   }
 }

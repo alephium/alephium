@@ -97,7 +97,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(_, deps, target, transactions) =>
-      assert(deps.length == (2 * config.groups - 1))
+      assert(deps.length == config.depsNum)
       // scalastyle:off magic.number
       val chainDep = deps.takeRight(config.groups)(chainIndex.to.value)
       // scalastyle:on magic.number
