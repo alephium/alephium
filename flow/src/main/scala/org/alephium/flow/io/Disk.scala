@@ -75,6 +75,16 @@ class Disk private (root: Path) {
     }
   }
 
+  def getBlockUnsafe(blockHash: Keccak256): Block = {
+    val inPath = getBlockPath(blockHash)
+    val bytes  = Files.readAllBytes(inPath)
+    val data   = ByteString.fromArrayUnsafe(bytes)
+    deserialize[Block](data) match {
+      case Left(error)  => throw error
+      case Right(block) => block
+    }
+  }
+
   def checkBlockFile(blockHash: Keccak256): Boolean = {
     val result = tryExecute {
       val inPath = getBlockPath(blockHash)

@@ -4,11 +4,12 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
+import org.alephium.flow.core.BlockHashChain.{ChainDiff, TreeNode}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet, TimeStamp}
 
+// scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
-
   implicit def config: PlatformProfile
 
   protected def root: BlockHashChain.Root
@@ -249,6 +250,57 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     } else false
   }
 
+  def calHashDiff(newHash: Keccak256, oldHash: Keccak256): ChainDiff = {
+    val toRemove = ArrayBuffer.empty[Keccak256]
+    val toAdd    = ArrayBuffer.empty[Keccak256]
+    calDiff(toRemove, toAdd, newHash, oldHash)
+    ChainDiff(AVector.from(toRemove), AVector.from(toAdd))
+  }
+
+  private def calDiff(toRemove: ArrayBuffer[Keccak256],
+                      toAdd: ArrayBuffer[Keccak256],
+                      newHash: Keccak256,
+                      oldHash: Keccak256): Unit = {
+    val newNode = getNode(newHash)
+    val oldNode = getNode(oldHash)
+    if (newNode.height > oldNode.height) {
+      val newNode1 = accDiff(toAdd, newNode, newNode.height, oldNode.height)
+      calDiff(toRemove, toAdd, newNode1, oldNode)
+    } else if (oldNode.height > newNode.height) {
+      val oldNode1 = accDiff(toRemove, oldNode, oldNode.height, newNode.height)
+      calDiff(toRemove, toAdd, newNode, oldNode1)
+    } else {
+      calDiff(toRemove, toAdd, newNode, oldNode)
+    }
+  }
+
+  @tailrec
+  private def accDiff(todos: ArrayBuffer[Keccak256],
+                      node: TreeNode,
+                      currentHeight: Int,
+                      targetHeight: Int): TreeNode = {
+    if (currentHeight > targetHeight) {
+      todos.append(node.blockHash)
+      assume(node.parentOpt.nonEmpty) // This should always be true
+      accDiff(todos, node.parentOpt.get, currentHeight - 1, targetHeight)
+    } else {
+      node
+    }
+  }
+
+  @tailrec
+  private def calDiff(toRemove: ArrayBuffer[Keccak256],
+                      toAdd: ArrayBuffer[Keccak256],
+                      newNode: TreeNode,
+                      oldNode: TreeNode): Unit = {
+    if (newNode.blockHash != oldNode.blockHash) {
+      toRemove.append(oldNode.blockHash)
+      toAdd.append(newNode.blockHash)
+      assume(newNode.parentOpt.nonEmpty && oldNode.parentOpt.nonEmpty) // This should always be true
+      calDiff(toRemove, toAdd, newNode.parentOpt.get, oldNode.parentOpt.get)
+    }
+  }
+
   def getConfirmedHash(height: Int): Option[Keccak256] = {
     assert(height >= 0)
     if (height < confirmedHashes.size) {
@@ -256,6 +308,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     } else None
   }
 }
+// scalastyle:on number.of.methods
 
 object BlockHashChain {
 
@@ -311,4 +364,6 @@ object BlockHashChain {
       new Node(blockHash, parent, ArrayBuffer.empty, height, weight, timestamp)
     }
   }
+
+  case class ChainDiff(toRemove: AVector[Keccak256], toAdd: AVector[Keccak256])
 }
