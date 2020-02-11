@@ -40,8 +40,9 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
             toAdd: AVector[AVector[(Transaction, Double)]]): (Int, Int) = writeOnly {
     assume(toRemove.length == config.groups && toAdd.length == config.groups)
 
-    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).remove(txs))
+    // First, add transactions from short chains, then remove transactions from canonical chains
     val added   = toAdd.foldWithIndex(0)((sum, txs, toGroup)    => sum + pools(toGroup).add(txs))
+    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).remove(txs))
     (removed, added)
   }
 

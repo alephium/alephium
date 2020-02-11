@@ -7,9 +7,6 @@ import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.AVector
 
 class BlockChainSpec extends AlephiumFlowSpec {
-
-  behavior of "BlockChain"
-
   trait Fixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
@@ -24,6 +21,10 @@ class BlockChainSpec extends AlephiumFlowSpec {
       chain.add(block, 0).isRight is true
       val blocksSize2 = chain.numHashes
       blocksSize1 + 1 is blocksSize2
+
+      val diff = chain.calHashDiff(block.hash, genesis.hash)
+      diff.toAdd is AVector(block.hash)
+      diff.toRemove.isEmpty is true
     }
   }
 
@@ -61,6 +62,10 @@ class BlockChainSpec extends AlephiumFlowSpec {
       chain0.maxHeight is blocks.length
       chain0.getAllTips is AVector(lastBlock.hash)
       checkConfirmedBlocks(chain0, blocks)
+
+      val diff = chain0.calHashDiff(blocks.last.hash, genesis.hash)
+      diff.toRemove.isEmpty is true
+      diff.toAdd is blocks.map(_.hash)
     }
   }
 
@@ -91,6 +96,24 @@ class BlockChainSpec extends AlephiumFlowSpec {
         chain0.getBestTip is longChain.last.hash
         chain0.maxHeight is longChain.length
         chain0.getAllTips.toIterable.toSet is Set(longChain.last.hash)
+      }
+    }
+  }
+
+  it should "test chain diffs with two chains of blocks" in new Fixture {
+    forAll(ModelGen.chainGen(4, genesis)) { longChain =>
+      forAll(ModelGen.chainGen(3, genesis)) { shortChain =>
+        val chain = BlockChain.fromGenesisUnsafe(genesis)
+        shortChain.foreach(block => chain.add(block, 0))
+        longChain.foreach(block  => chain.add(block, 0))
+
+        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash)
+        diff0.toRemove is shortChain.map(_.hash).reverse
+        diff0.toAdd is longChain.map(_.hash)
+
+        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash)
+        diff1.toRemove is longChain.map(_.hash).reverse
+        diff1.toAdd is shortChain.map(_.hash)
       }
     }
   }

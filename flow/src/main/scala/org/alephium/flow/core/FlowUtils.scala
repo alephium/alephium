@@ -16,11 +16,11 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     MemPool.empty(group)
   }
 
-  private def getPool(mainGroup: Int): MemPool = {
+  def getPool(mainGroup: Int): MemPool = {
     mempools(mainGroup - brokerInfo.groupFrom)
   }
 
-  private def getPool(chainIndex: ChainIndex): MemPool = {
+  def getPool(chainIndex: ChainIndex): MemPool = {
     mempools(chainIndex.from.value - brokerInfo.groupFrom)
   }
 
@@ -35,9 +35,9 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
       val index  = ChainIndex.unsafe(mainGroup, i)
       getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
     }
-    val toRemove = diffs.map(_.toRemove.flatMap(_.transactions))
-    val toAdd    = diffs.map(_.toAdd.flatMap(_.transactions.map((_, 1.0)))) // Fixme in this PR
-    if (toAdd.isEmpty) Normal(toRemove) else Reorg(toRemove, toAdd)
+    val toRemove = diffs.map(_.toAdd.flatMap(_.transactions))
+    val toAdd    = diffs.map(_.toRemove.flatMap(_.transactions.map((_, 1.0)))) // Fixme in this PR
+    if (toRemove.isEmpty) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
   def updateMemPoolUnsafe(mainGroup: Int, newDeps: BlockDeps): Unit = {
