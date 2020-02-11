@@ -254,7 +254,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     val toRemove = ArrayBuffer.empty[Keccak256]
     val toAdd    = ArrayBuffer.empty[Keccak256]
     calDiff(toRemove, toAdd, newHash, oldHash)
-    ChainDiff(AVector.from(toRemove), AVector.from(toAdd))
+    ChainDiff(AVector.from(toRemove), AVector.fromIterator(toAdd.reverseIterator))
   }
 
   private def calDiff(toRemove: ArrayBuffer[Keccak256],
