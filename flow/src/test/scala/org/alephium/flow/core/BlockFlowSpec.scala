@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
@@ -13,8 +14,6 @@ import org.alephium.util.{AVector, Hex}
 
 // TODO: test for more groups
 class BlockFlowSpec extends AlephiumFlowSpec {
-  behavior of "BlockFlow"
-
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow.createUnsafe()
 
@@ -116,7 +115,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     }
   }
 
-  it should "work for 2 user group when there is forks" in {
+  it should "work for 2 user group when there is a fork" in {
     if (config.groups >= 2) {
       val blockFlow = BlockFlow.createUnsafe()
 
@@ -152,6 +151,31 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       blockFlow.getWeight(block3) is 4
       checkInBestDeps(GroupIndex(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - 2)
+    }
+  }
+
+  it should "update mempool correctly" in {
+    if (config.groups >= 2) {
+      val broker = config.brokerInfo
+      forAll(Gen.choose(broker.groupFrom, broker.groupUntil - 1)) { mainGroup =>
+        val blockFlow = BlockFlow.createUnsafe()
+
+        val chainIndex = ChainIndex.unsafe(mainGroup, 0)
+        val block11    = mine(blockFlow, chainIndex)
+        val block12    = mine(blockFlow, chainIndex)
+        blockFlow.mempools.foreach(_.size is 0)
+        addAndCheck(blockFlow, block11)
+        blockFlow.mempools.foreach(_.size is 0)
+        addAndCheck(blockFlow, block12)
+
+        val blockAdded = blockFlow.getBestDeps(chainIndex.from).getChainHash(chainIndex.to)
+        if (blockAdded equals block12.hash) {
+          blockAdded is block12.hash
+          blockFlow.getPool(chainIndex).size is block11.transactions.length
+          val template = blockFlow.prepareBlockFlow(chainIndex).right.value
+          template.transactions.length is block11.transactions.length
+        }
+      }
     }
   }
 
