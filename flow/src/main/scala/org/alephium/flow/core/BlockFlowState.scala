@@ -250,7 +250,7 @@ trait BlockFlowState {
     }
   }
 
-  def getP2pkhBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+  def getP2pkhUtxos(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val pubScript  = PubScript.p2pkh(address)
     val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
@@ -258,6 +258,10 @@ trait BlockFlowState {
     getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](prefix).map { data =>
       data.filter(_._2.pubScript == pubScript)
     }
+  }
+
+  def getP2pkhBalance(address: ED25519PublicKey): IOResult[BigInt] = {
+    getP2pkhUtxos(address).map(_.sumBy(_._2.value))
   }
 }
 
