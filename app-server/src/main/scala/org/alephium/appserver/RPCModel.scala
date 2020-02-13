@@ -48,4 +48,14 @@ object RPCModel {
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
   }
+
+  case class Transfer(fromAddress: String,
+                      fromType: String,
+                      toAddress: String,
+                      toType: String,
+                      value: BigInt,
+                      fromPrivateKey: String)
+  object Transfer {
+    implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
+  }
 }

@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
@@ -262,6 +262,18 @@ trait BlockFlowState {
 
   def getP2pkhBalance(address: ED25519PublicKey): IOResult[BigInt] = {
     getP2pkhUtxos(address).map(_.sumBy(_._2.value))
+  }
+
+  def prepareP2pkhTx(from: ED25519PublicKey,
+                     to: ED25519PublicKey,
+                     value: BigInt,
+                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+    getP2pkhUtxos(from).map { utxos =>
+      val balance = utxos.sumBy(_._2.value)
+      if (balance >= value) {
+        Some(Transaction.simpleTransfer(utxos.map(_._1), balance, from, to, value, fromPrivateKey))
+      } else None
+    }
   }
 }
 

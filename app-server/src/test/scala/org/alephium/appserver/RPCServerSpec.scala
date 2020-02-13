@@ -31,12 +31,12 @@ object RPCServerSpec {
     implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
     implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
-    def doBlockflowFetch(req: Request): Future[Response] =
+    def dummyResponse: Future[Response.Failure] =
       Future.successful(Response.failed(Error.server("test")))
-    def doCliqueInfo(req: Request): Future[Response] =
-      Future.successful(Response.failed(Error.server("test")))
-    def doGetBalance(req: Request): Future[Response] =
-      Future.successful(Response.failed(Error.server("test")))
+    def doBlockflowFetch(req: Request): Future[Response] = dummyResponse
+    def doCliqueInfo(req: Request): Future[Response]     = dummyResponse
+    def doGetBalance(req: Request): Future[Response]     = dummyResponse
+    def doTransfer(req: Request): Future[Response]       = dummyResponse
 
     def runServer(): Future[Unit] = Future.successful(())
   }
