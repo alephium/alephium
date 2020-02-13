@@ -62,4 +62,21 @@ object Transaction {
     val raw = RawTransaction(AVector.empty, outputs)
     Transaction(raw, ByteString.empty, AVector.empty)
   }
+
+  def simpleTransfer(inputs: AVector[TxOutputPoint],
+                     inputSum: BigInt,
+                     from: ED25519PublicKey,
+                     to: ED25519PublicKey,
+                     value: BigInt,
+                     privateKey: ED25519PrivateKey): Transaction = {
+    assume(inputSum >= value)
+    val fromPubScript = PubScript.p2pkh(from)
+    val toPubScript   = PubScript.p2pkh(to)
+    val toOutput      = TxOutput(value, toPubScript)
+    val fromOutput    = TxOutput(inputSum - value, fromPubScript)
+    val outputs       = if (inputSum - value > 0) AVector(toOutput, fromOutput) else AVector(toOutput)
+    val raw           = RawTransaction(inputs, outputs)
+    val witness       = Witness.p2pkh(raw, from, privateKey)
+    Transaction(raw, ByteString.empty, AVector.fill(inputs.length)(witness))
+  }
 }
