@@ -163,7 +163,7 @@ object PlatformProfile {
 
   private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
     val List(left, right) = raw.split(":").toList
-    val publicKeyOpt      = ED25519PublicKey.from(Hex.unsafeFrom(left))
+    val publicKeyOpt      = Hex.from(left).flatMap(ED25519PublicKey.from)
     require(publicKeyOpt.nonEmpty, "Invalid public key")
 
     val publicKey = publicKeyOpt.get
