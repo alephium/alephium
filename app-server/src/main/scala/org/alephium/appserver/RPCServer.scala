@@ -23,12 +23,11 @@ import org.alephium.flow.core.{BlockFlow, MultiChain}
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.rpc.util.AVectorJson._
-import org.alephium.util.{AVector, EventBus, Hex, TimeStamp}
+import org.alephium.util.{EventBus, Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
@@ -40,19 +39,19 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
-  def doBlockflowFetch(req: Request): Future[Response] =
+  def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
-  def doCliqueInfo(req: Request): Future[Response] =
+  def doGetPeers(req: Request): FutureTry[PeersResult] =
     mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
-      val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
-      Response.successful(req, cliques.peers)
+      val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
+      Right(PeersResult(peers))
     }
 
-  def doGetBalance(req: Request): Future[Response] =
+  def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
 
-  def doTransfer(req: Request): Future[Response] =
+  def doTransfer(req: Request): FutureTry[TransferResult] =
     Future.successful(transfer(mode.node.blockFlow, req))
 
   def runServer(): Future[Unit] = {
@@ -82,14 +81,14 @@ trait RPCServerAbstract extends StrictLogging {
   implicit def rpcConfig: RPCConfig
   implicit def askTimeout: Timeout
 
-  def doBlockflowFetch(req: Request): Future[Response]
-  def doCliqueInfo(req: Request): Future[Response]
-  def doGetBalance(req: Request): Future[Response]
-  def doTransfer(req: Request): Future[Response]
-  def doStartMining(miner: ActorRef, req: Request): Future[Response] =
-    execute(miner ! Miner.Start, req)
-  def doStopMining(miner: ActorRef, req: Request): Future[Response] =
-    execute(miner ! Miner.Stop, req)
+  def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
+  def doGetPeers(req: Request): FutureTry[PeersResult]
+  def doGetBalance(req: Request): FutureTry[Balance]
+  def doTransfer(req: Request): FutureTry[TransferResult]
+  def doStartMining(miner: ActorRef): FutureTry[Boolean] =
+    execute(miner ! Miner.Start)
+  def doStopMining(miner: ActorRef): FutureTry[Boolean] =
+    execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
 
@@ -104,12 +103,12 @@ trait RPCServerAbstract extends StrictLogging {
   }
 
   def handlerRPC(miner: ActorRef): Handler = Map.apply(
-    "blockflow_fetch" -> (req => doBlockflowFetch(req)),
-    "clique_info"     -> (req => doCliqueInfo(req)),
-    "get_balance"     -> (req => doGetBalance(req)),
-    "transfer"        -> (req => doTransfer(req)),
-    "mining_start"    -> (req => doStartMining(miner, req)),
-    "mining_stop"     -> (req => doStopMining(miner, req))
+    "blockflow_fetch" -> (req => wrap(req, doBlockflowFetch(req))),
+    "clique_info"     -> (req => wrap(req, doGetPeers(req))),
+    "get_balance"     -> (req => wrap(req, doGetBalance(req))),
+    "transfer"        -> (req => wrap(req, doTransfer(req))),
+    "mining_start"    -> (req => wrap(req, doStartMining(miner))),
+    "mining_stop"     -> (req => wrap(req, doStopMining(miner)))
   )
 
   def routeHttp(miner: ActorRef): Route =
@@ -142,29 +141,29 @@ trait RPCServerAbstract extends StrictLogging {
 
 object RPCServer extends StrictLogging {
   import Response.Failure
-  type Try[T] = Either[Failure, T]
+  type Try[T]       = Either[Failure, T]
+  type FutureTry[T] = Future[Try[T]]
 
   val bufferSize = 64
 
-  implicit val encodeCliqueInfo: Encoder[CliqueInfo] = new Encoder[CliqueInfo] {
-    final def apply(ci: CliqueInfo): Json = {
-      Json.obj(("id", Json.fromString(ci.id.toString)),
-               ("peers", encodeAVector[String].apply(ci.peers.map(_.toString))))
+  def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
+    req.paramsAs[T] match {
+      case Right(query)  => Right(f(query))
+      case Left(failure) => Left(failure)
     }
   }
 
-  implicit val cliquesEncoder: Encoder[AVector[CliqueInfo]] = encodeAVector[CliqueInfo]
-
-  def withReq[T: Decoder](req: Request)(f: T => Response): Response = {
+  def withReqF[T: Decoder, R](req: Request)(f: T => Try[R]): Try[R] = {
     req.paramsAs[T] match {
       case Right(query)  => f(query)
-      case Left(failure) => failure
+      case Left(failure) => Left(failure)
     }
   }
 
-  def blockflowFetch(blockFlow: BlockFlow, req: Request)(implicit rpc: RPCConfig,
-                                                         cfg: ConsensusConfig): Response = {
-    withReq[FetchRequest](req) { query =>
+  def blockflowFetch(blockFlow: BlockFlow, req: Request)(
+      implicit rpc: RPCConfig,
+      cfg: ConsensusConfig): Try[FetchResponse] = {
+    withReq[FetchRequest, FetchResponse](req) { query =>
       val now        = TimeStamp.now()
       val lowerBound = now - rpc.blockflowFetchMaxAge
       val from = query.from match {
@@ -172,14 +171,13 @@ object RPCServer extends StrictLogging {
         case None     => lowerBound
       }
 
-      val headers  = blockFlow.getHeadersUnsafe(header => header.timestamp > from)
-      val response = FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
-      Response.successful(req, response)
+      val headers = blockFlow.getHeadersUnsafe(header => header.timestamp > from)
+      FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, req: Request): Response = {
-    withReq[GetBalance](req) { query =>
+  def getBalance(blockFlow: BlockFlow, req: Request): Try[Balance] = {
+    withReqF[GetBalance, Balance](req) { query =>
       if (query.`type` == GetBalance.pkh) {
         val result = for {
           address <- decodeAddress(query.address)
@@ -187,11 +185,11 @@ object RPCServer extends StrictLogging {
           balance <- getP2pkhBalance(blockFlow, address)
         } yield balance
         result match {
-          case Right(balance) => Response.successful(req, balance)
-          case Left(error)    => error
+          case Right(balance) => Right(balance)
+          case Left(error)    => Left(error)
         }
       } else {
-        Response.failed(s"Invalid address type ${query.`type`}")
+        Left(Response.failed(s"Invalid address type ${query.`type`}"))
       }
     }
   }
@@ -233,8 +231,8 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def transfer(blockFlow: BlockFlow, req: Request): Response = {
-    withReq[Transfer](req) { query =>
+  def transfer(blockFlow: BlockFlow, req: Request): Try[TransferResult] = {
+    withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh && query.toType == GetBalance.pkh) {
         val result = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
@@ -248,14 +246,14 @@ object RPCServer extends StrictLogging {
                                             fromPrivateKey)
         } yield {
           // publish transaction
-          Response.successful(req, transaction.shortHex)
+          TransferResult(Hex.toHexString(transaction.hash.bytes))
         }
         result match {
-          case Right(response) => response
-          case Left(error)     => error
+          case Right(result) => Right(result)
+          case Left(error)   => Left(error)
         }
       } else {
-        Response.failed(s"Invalid address types: ${query.fromType} or ${query.toType}")
+        Left(Response.failed(s"Invalid address types: ${query.fromType} or ${query.toType}"))
       }
     }
   }
@@ -293,9 +291,16 @@ object RPCServer extends StrictLogging {
     )
   }
 
-  def execute(f: => Unit, req: Request)(implicit ec: ExecutionContext): Future[Response] = Future {
-    f
-    Response.successful(req)
+  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
+    Future {
+      f
+      Right(true)
+    }
+
+  def wrap[T: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))

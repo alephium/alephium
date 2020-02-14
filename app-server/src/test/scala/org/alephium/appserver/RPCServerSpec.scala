@@ -11,17 +11,20 @@ import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe.Json
+import io.circe.{Decoder, Json}
 import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 
+import org.alephium.appserver.RPCModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AlephiumSpec, EventBus}
+import org.alephium.util.{AlephiumSpec, AVector, EventBus}
 
 object RPCServerSpec {
+  import RPCServer._
+
   case object Dummy extends EventBus.Event
 
   class RPCServerDummy(implicit val config: PlatformProfile) extends RPCServerAbstract {
@@ -31,12 +34,17 @@ object RPCServerSpec {
     implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
     implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
-    def dummyResponse: Future[Response.Failure] =
-      Future.successful(Response.failed(Error.server("test")))
-    def doBlockflowFetch(req: Request): Future[Response] = dummyResponse
-    def doCliqueInfo(req: Request): Future[Response]     = dummyResponse
-    def doGetBalance(req: Request): Future[Response]     = dummyResponse
-    def doTransfer(req: Request): Future[Response]       = dummyResponse
+    def successful[T](t: T): FutureTry[T] = Future.successful(Right(t))
+
+    val dummyFetchResponse  = FetchResponse(Seq.empty)
+    val dummyPeers          = PeersResult(AVector.empty)
+    val dummyBalance        = Balance(1, 1)
+    val dummyTransferResult = TransferResult("foobar")
+
+    def doBlockflowFetch(req: Request): FutureTry[FetchResponse] = successful(dummyFetchResponse)
+    def doGetPeers(req: Request): FutureTry[PeersResult]         = successful(dummyPeers)
+    def doGetBalance(req: Request): FutureTry[Balance]           = successful(dummyBalance)
+    def doTransfer(req: Request): FutureTry[TransferResult]      = successful(dummyTransferResult)
 
     def runServer(): Future[Unit] = Future.successful(())
   }
@@ -64,8 +72,8 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       }
     }
 
-    def checkCallResult[T](method: String)(f: Json => T): T =
-      checkCall(method)(json => f(json.result))
+    def checkCallResult[T: Decoder](method: String)(expected: T): Assertion =
+      checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
       val jsonRequest = Request(method, Some(params), id).asJson.noSpaces
@@ -106,51 +114,25 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   behavior of "http"
 
   it should "call mining_start" in new MiningMock {
-    checkCallResult("mining_start") { result =>
-      miner.expectMsg(Miner.Start)
-      result.as[Boolean].right.value is true
-    }
+    checkCallResult("mining_start")(true)
+    miner.expectMsg(Miner.Start)
   }
 
   it should "call mining_stop" in new MiningMock {
-    checkCallResult("mining_stop") { result =>
-      miner.expectMsg(Miner.Stop)
-      result.as[Boolean].right.value is true
-    }
+    checkCallResult("mining_stop")(true)
+    miner.expectMsg(Miner.Stop)
   }
 
   it should "call blockflow_fetch" in new RouteHTTP {
-    override lazy val server = new RPCServerDummy {
-      override def doBlockflowFetch(req: Request): Future[Response] =
-        Future.successful(rpcSuccess)
-    }
-
-    checkCall("blockflow_fetch") { response =>
-      response is rpcSuccess
-    }
+    checkCallResult("blockflow_fetch")(server.dummyFetchResponse)
   }
 
   it should "call clique_info" in new RouteHTTP {
-    override lazy val server = new RPCServerDummy {
-      override def doCliqueInfo(req: Request): Future[Response] =
-        Future.successful(rpcSuccess)
-    }
-
-    checkCall("clique_info") { response =>
-      response is rpcSuccess
-    }
+    checkCallResult("clique_info")(server.dummyPeers)
   }
 
   it should "call get_balance" in new RouteHTTP {
-    override lazy val server = new RPCServerDummy {
-      override def doGetBalance(req: Request): Future[Response] = {
-        Future.successful(rpcSuccess)
-      }
-    }
-
-    checkCall("get_balance") { response =>
-      response is rpcSuccess
-    }
+    checkCallResult("get_balance")(server.dummyBalance)
   }
 
   it should "reject GET" in new RouteHTTP {
