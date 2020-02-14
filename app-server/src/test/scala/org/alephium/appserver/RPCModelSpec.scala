@@ -16,7 +16,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   def entryDummy(i: Int): FetchEntry =
-    FetchEntry(i.toString, TimeStamp.fromMillis(i.toLong), i, i, i, List(i.toString))
+    FetchEntry(i.toString, TimeStamp.ofMillisUnsafe(i.toLong), i, i, i, List(i.toString))
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
@@ -35,14 +35,16 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode request" in {
-    val request = FetchRequest(Some(TimeStamp.fromMillis(42L)))
+    val request = FetchRequest(Some(TimeStamp.ofMillisUnsafe(42L)))
     val jsonRaw = """{"from":42}"""
     checkData(request, jsonRaw)
   }
 
   it should "encode/decode empty FetchResponse" in {
-    val response = FetchResponse(Seq.empty)
-    val jsonRaw  = """{"blocks":[]}"""
+    val entry    = FetchEntry("hash", TimeStamp.ofMillisUnsafe(0), 0, 1, 1, List.empty)
+    val response = FetchResponse(Seq(entry))
+    val jsonRaw =
+      """{"blocks":[{"hash":"hash","timestamp":0,"chainFrom":0,"chainTo":1,"height":1,"deps":[]}]}"""
     checkData(response, jsonRaw)
   }
 

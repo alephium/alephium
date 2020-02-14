@@ -24,7 +24,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     def groupSize: Int          = 3
     val udpPort: Int            = SocketUtil.temporaryLocalPort(udp = true)
     def peersPerGroup: Int      = 1
-    def scanFrequency: Duration = Duration.ofMillis(500)
+    def scanFrequency: Duration = Duration.unsafeFrom(500)
     val socketProbe             = TestProbe()
 
     implicit val config: DiscoveryConfig =
@@ -90,8 +90,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     state.isInTable(peerClique.id) is true
   }
 
-  it should "clean up everything if timeout is negative" in new Fixture {
-    override def scanFrequency: Duration = Duration.ofMillis(-1)
+  it should "clean up everything if timeout is zero" in new Fixture {
+    override def scanFrequency: Duration = Duration.unsafeFrom(0)
 
     addToTable(peerClique)
     val peer0 = ModelGen.cliqueInfo.sample.get

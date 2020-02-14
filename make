@@ -27,6 +27,7 @@ def get_env_default_int(key, default):
 def rpc_call(host, port, method, params):
     json = """{{"jsonrpc":"2.0","id": 0,"method":"{}","params": {}}}"""
     cmd = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
+    print(json.format(method, params))
     run(cmd.format(json.format(method, params), host, port))
 
 def rpc_call_all(method, params):
@@ -108,6 +109,9 @@ class AlephiumMake(object):
 
     def mining_stop(self):
         rpc_call_all("mining_stop", "[]")
+
+    def get_balance(self):
+        rpc_call_all("get_balance", '{"address":         "2db399c90fee96ec2310b62e3f62b5bd87972a96e5fa64675f0adc683546cd1c","type":"pkh"}')
 
     def kill(self):
         run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")

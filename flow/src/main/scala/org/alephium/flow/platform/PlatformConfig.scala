@@ -58,7 +58,7 @@ object NewConfig extends StrictLogging {
 
   def getDuration(config: Config, path: String): Duration = {
     val duration = config.getDuration(path)
-    Duration.from(duration)
+    Duration.from(duration).get
   }
 
   def getConfigFile(rootPath: Path, name: String): File = {

@@ -42,7 +42,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       } else {
         // TODO: refine the condition, check the number of brokers for example
         if (config.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, Duration.ofSeconds(2))
+          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, Duration.ofSecondsUnsafe(2))
         }
       }
   }
