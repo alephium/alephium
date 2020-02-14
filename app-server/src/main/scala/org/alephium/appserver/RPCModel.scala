@@ -3,7 +3,9 @@ package org.alephium.appserver
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.util.TimeStamp
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.rpc.CirceUtils._
+import org.alephium.util.{AVector, Hex, TimeStamp}
 
 object RPCModel {
   object TimeStampCodec {
@@ -36,6 +38,21 @@ object RPCModel {
     implicit val codec: Codec[FetchEntry] = deriveCodec[FetchEntry]
   }
 
+  case class PeersResult(cliques: AVector[CliqueInfo])
+  object PeersResult {
+    def createId(s: String): Either[String, CliqueId] = {
+      Hex.from(s).flatMap(CliqueId.from) match {
+        case Some(id) => Right(id)
+        case None     => Left("invalid clique id")
+      }
+    }
+
+    implicit val idEncoder: Encoder[CliqueId]       = Encoder.encodeString.contramap(_.toHexString)
+    implicit val idDecoder: Decoder[CliqueId]       = Decoder.decodeString.emap(createId)
+    implicit val cliqueInfoCodec: Codec[CliqueInfo] = deriveCodec[CliqueInfo]
+    implicit val codec: Codec[PeersResult]          = deriveCodec[PeersResult]
+  }
+
   case class GetBalance(address: String, `type`: String)
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
@@ -57,5 +74,10 @@ object RPCModel {
                       fromPrivateKey: String)
   object Transfer {
     implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
+  }
+
+  case class TransferResult(txId: String)
+  object TransferResult {
+    implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
   }
 }
