@@ -92,18 +92,18 @@ object PlatformProfile {
       final val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
       final val blockTargetTime: Duration =
-        Duration.from(consensusCfg.getDuration("blockTargetTime"))
+        Duration.from(consensusCfg.getDuration("blockTargetTime")).get
       final val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
       final val expectedTimeSpan: Duration = blockTargetTime
 
       final val blockCacheSize
         : Int = consensusCfg.getInt("blockCacheSizePerChain") * (2 * groups - 1)
 
-      final val medianTimeInterval    = 11
-      final val diffAdjustDownMax     = 16
-      final val diffAdjustUpMax       = 8
-      final val timeSpanMin: Duration = expectedTimeSpan * (100l - diffAdjustDownMax) / 100l
-      final val timeSpanMax: Duration = expectedTimeSpan * (100l + diffAdjustUpMax) / 100l
+      final val medianTimeInterval = 11
+      final val diffAdjustDownMax  = 16
+      final val diffAdjustUpMax    = 8
+      final val timeSpanMin        = (expectedTimeSpan * (100l - diffAdjustDownMax)).get divUnsafe 100l
+      final val timeSpanMax        = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
       /* Consensus */
 
       /* mining */

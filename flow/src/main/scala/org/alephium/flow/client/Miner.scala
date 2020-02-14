@@ -70,9 +70,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       totalMiningCount += 1
       tryMine(template, from, to) match {
         case Some(block) =>
-          val elapsed = TimeStamp.now().diff(lastTs)
+          val elapsed = TimeStamp.now().millis - lastTs.millis
           log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed, miningCount: $totalMiningCount, target: ${template.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed ${elapsed}ms, miningCount: $totalMiningCount, target: ${template.target}")
           blockHandler ! BlockChainHandler.addOneBlock(block, LocalMining)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {

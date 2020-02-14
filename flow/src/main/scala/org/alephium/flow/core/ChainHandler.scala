@@ -115,8 +115,8 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
   }
 
   def logInfo(data: T): Unit = {
-    val elapsedTime = TimeStamp.now().diff(data.timestamp)
-    log.info(s"Potentially new block/header: ${data.shortHex}; elapsed: $elapsedTime")
+    val elapsedTime = TimeStamp.now().millis - data.timestamp.millis
+    log.info(s"Potentially new block/header: ${data.shortHex}; elapsed: ${elapsedTime}ms")
   }
 
   def broadcast(data: T, origin: DataOrigin): Unit

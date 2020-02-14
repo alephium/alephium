@@ -17,8 +17,8 @@ object RPCConfig {
     val rpc = config.getConfig("rpc")
     RPCConfig(
       InetAddress.getByName(rpc.getString("network.interface")),
-      Duration.from(rpc.getDuration("blockflowFetch.maxAge")),
-      Duration.from(rpc.getDuration("ask.timeout"))
+      Duration.from(rpc.getDuration("blockflowFetch.maxAge")).get,
+      Duration.from(rpc.getDuration("ask.timeout")).get
     )
   }
 }

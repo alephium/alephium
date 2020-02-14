@@ -28,5 +28,5 @@ trait DiscoveryConfig extends CliqueConfig {
   def neighborsPerGroup: Int
 
   /** Duration we wait before considering a peer dead. **/
-  def peersTimeout: Duration = scanFrequency * 3
+  def peersTimeout: Duration = scanFrequency.timesUnsafe(3)
 }

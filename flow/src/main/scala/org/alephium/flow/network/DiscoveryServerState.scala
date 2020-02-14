@@ -82,13 +82,13 @@ trait DiscoveryServerState {
   def cleanup(): Unit = {
     val now = TimeStamp.now()
     val toRemove = table.values
-      .filter(status => now.diff(status.updateAt) > config.peersTimeout)
+      .filter(status => (now -- status.updateAt).exists(_ >= config.peersTimeout))
       .map(_.info.id)
       .toSet
     table --= toRemove
 
     val deadPendings = pendings.collect {
-      case (cliqueId, status) if now.diff(status.pingAt) > config.peersTimeout => cliqueId
+      case (cliqueId, status) if (now -- status.pingAt).exists(_ >= config.peersTimeout) => cliqueId
     }
     pendings --= deadPendings
   }
