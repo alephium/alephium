@@ -33,16 +33,16 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   override def _mine(template: BlockTemplate, lastTs: TimeStamp): Receive = {
     case Miner.Nonce(_, _) =>
-      val delta     = Duration.ofMillis(1000l * 30l + Random.nextInt(1000 * 60).toLong)
+      val delta     = Duration.ofMillisUnsafe(1000l * 30l + Random.nextInt(1000 * 60).toLong)
       val currentTs = TimeStamp.now()
       val nextTs =
         if (lastTs == TimeStamp.zero) currentTs + delta
         else {
-          val num = currentTs.diff(lastTs).millis / delta.millis + 1
+          val num = (currentTs.millis - lastTs.millis) / delta.millis + 1
           if (num > 1) log.info(s"---- step: $num")
-          lastTs + delta * num
+          lastTs + delta.timesUnsafe(num)
         }
-      val sleepTs = nextTs.diff(currentTs)
+      val sleepTs = (nextTs -- currentTs).get
       scheduleOnce(self, MockMiner.MockMining(nextTs), sleepTs)
 
     case MockMiner.MockMining(nextTs) =>

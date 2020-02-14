@@ -33,8 +33,8 @@ class ValidationSpec extends AlephiumFlowSpec {
   it should "validate timestamp for block" in {
     val header  = ModelGen.blockGen.sample.get.header
     val now     = TimeStamp.now()
-    val before  = now + Duration.ofMinutes(-61)
-    val after   = now + Duration.ofMinutes(61)
+    val before  = (now - Duration.ofMinutesUnsafe(61)).get
+    val after   = now + Duration.ofMinutesUnsafe(61)
     val header0 = header.copy(timestamp = now)
     val header1 = header.copy(timestamp = before)
     val header2 = header.copy(timestamp = after)

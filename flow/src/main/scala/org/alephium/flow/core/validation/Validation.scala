@@ -95,13 +95,14 @@ object Validation {
     else invalidBlock(InvalidGroup)
   }
 
+  // TODO: make sure header.timestamp is alwayer larger than its parant header
   private[validation] def checkTimeStamp(header: BlockHeader,
                                          isSyncing: Boolean): HeaderValidationResult = {
     val now      = TimeStamp.now()
     val headerTs = header.timestamp
 
-    val ok1 = headerTs < now.plusHours(1)
-    val ok2 = isSyncing || (headerTs > now.plusHours(-1))
+    val ok1 = headerTs < now.plusHoursUnsafe(1)
+    val ok2 = isSyncing || (headerTs > now.plusHours(-1).get) // Note: now -1hour is always positive
     if (ok1 && ok2) validHeader else invalidHeader(InvalidTimeStamp)
   }
 

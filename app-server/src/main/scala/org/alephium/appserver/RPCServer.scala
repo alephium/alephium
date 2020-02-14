@@ -165,7 +165,7 @@ object RPCServer extends StrictLogging {
       cfg: ConsensusConfig): Try[FetchResponse] = {
     withReq[FetchRequest, FetchResponse](req) { query =>
       val now        = TimeStamp.now()
-      val lowerBound = now - rpc.blockflowFetchMaxAge
+      val lowerBound = (now - rpc.blockflowFetchMaxAge).get // Note: get should be safe
       val from = query.from match {
         case Some(ts) => if (ts > lowerBound) ts else lowerBound
         case None     => lowerBound
