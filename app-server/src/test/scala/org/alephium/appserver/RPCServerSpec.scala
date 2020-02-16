@@ -135,6 +135,10 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     checkCallResult("get_balance")(server.dummyBalance)
   }
 
+  it should "call transfer" in new RouteHTTP {
+    checkCallResult("transfer")(server.dummyTransferResult)
+  }
+
   it should "reject GET" in new RouteHTTP {
     Get() ~> route ~> check {
       rejections is List(
