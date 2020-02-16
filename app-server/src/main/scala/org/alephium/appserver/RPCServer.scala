@@ -233,7 +233,7 @@ object RPCServer extends StrictLogging {
 
   def transfer(blockFlow: BlockFlow, req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
-      if (query.fromType == GetBalance.pkh && query.toType == GetBalance.pkh) {
+      if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
         val result = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
           _              <- checkGroup(blockFlow, fromAddress)
