@@ -22,7 +22,7 @@ class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec 
     val probes                                    = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
 
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
-      val index        = ChainIndex(config.brokerInfo.groupFrom + fromShift, to)
+      val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
       BlockTemplate(flowTemplate.deps, flowTemplate.target, AVector.empty)
     }

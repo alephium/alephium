@@ -24,6 +24,11 @@ object CliqueManager {
       headerMsg: ByteString,
       origin: DataOrigin
   ) extends Command
+  case class BroadCastTx(tx: Transaction,
+                         txMsg: ByteString,
+                         chainIndex: ChainIndex,
+                         origin: DataOrigin)
+      extends Command
 
   sealed trait Event
   case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
@@ -78,6 +83,8 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
       if (!message.origin.isSyncing) {
         interCliqueManager ! message
       }
+    case message: CliqueManager.BroadCastTx =>
+      interCliqueManager ! message
     case c: Tcp.Connected =>
       interCliqueManager.forward(c)
   }

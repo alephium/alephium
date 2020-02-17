@@ -6,7 +6,7 @@ import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.Block
 
 object BlockValidation extends Validation[Block, BlockStatus]() {
-  import ValidationStatus._
+  import ValidationStatus.convert
 
   def validate(block: Block, flow: BlockFlow, isSyncing: Boolean)(
       implicit config: PlatformProfile): IOResult[BlockStatus] = {

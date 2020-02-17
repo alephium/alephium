@@ -6,7 +6,7 @@ import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.BlockHeader
 
 object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
-  import ValidationStatus._
+  import ValidationStatus.convert
 
   def validate(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
       implicit config: PlatformProfile
