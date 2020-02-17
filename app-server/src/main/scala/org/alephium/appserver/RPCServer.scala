@@ -19,7 +19,8 @@ import io.circe.syntax._
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{FairMiner, Miner}
-import org.alephium.flow.core.{BlockFlow, MultiChain}
+import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
+import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
@@ -51,8 +52,10 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
 
-  def doTransfer(req: Request): FutureTry[TransferResult] =
-    Future.successful(transfer(mode.node.blockFlow, req))
+  def doTransfer(req: Request): FutureTry[TransferResult] = {
+    val txHandler = mode.node.allHandlers.txHandler
+    Future.successful(transfer(mode.node.blockFlow, txHandler, req))
+  }
 
   def runServer(): Future[Unit] = {
     val miner = {
@@ -231,7 +234,7 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def transfer(blockFlow: BlockFlow, req: Request): Try[TransferResult] = {
+  def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
         val result = for {
@@ -239,14 +242,11 @@ object RPCServer extends StrictLogging {
           _              <- checkGroup(blockFlow, fromAddress)
           toAddress      <- decodePublicKey(query.toAddress)
           fromPrivateKey <- decodePrivateKey(query.fromPrivateKey)
-          transaction <- prepareTransaction(blockFlow,
-                                            fromAddress,
-                                            toAddress,
-                                            query.value,
-                                            fromPrivateKey)
+          tx             <- prepareTransaction(blockFlow, fromAddress, toAddress, query.value, fromPrivateKey)
         } yield {
           // publish transaction
-          TransferResult(Hex.toHexString(transaction.hash.bytes))
+          txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
+          TransferResult(Hex.toHexString(tx.hash.bytes))
         }
         result match {
           case Right(result) => Right(result)

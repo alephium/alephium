@@ -11,7 +11,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.LocalMining
+import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
@@ -19,7 +19,7 @@ import org.alephium.util.{AVector, BaseActor}
 object FairMiner {
   def props(node: Node)(implicit config: PlatformProfile): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
-      val index          = GroupIndex(i)
+      val index          = GroupIndex.unsafe(i)
       val (_, publicKey) = index.generateP2pkhKey
       publicKey
     }
@@ -117,8 +117,8 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
-    assert(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
-    val index        = ChainIndex(config.brokerInfo.groupFrom + fromShift, to)
+    assume(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
+    val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
     val flowTemplate = node.blockFlow.prepareBlockFlowUnsafe(index)
     BlockTemplate(flowTemplate.deps, flowTemplate.target, fakeTransactions(to))
   }
@@ -128,7 +128,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
       val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
       FairMiner.mine(index, template) match {
         case Some((block, miningCount)) =>
-          val handlerMessage = BlockChainHandler.addOneBlock(block, LocalMining)
+          val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
           blockHandler ! handlerMessage
           self ! FairMiner.MiningResult(Some(block), index, miningCount)
         case None =>

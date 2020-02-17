@@ -77,7 +77,7 @@ trait BlockFlowState {
   def cacheBlock(block: Block): Unit = {
     val index = block.chainIndex
     (brokerInfo.groupFrom until brokerInfo.groupUntil).foreach { group =>
-      val groupIndex = GroupIndex(group)
+      val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {
         convertBlock(block, groupIndex) match {
@@ -150,6 +150,10 @@ trait BlockFlowState {
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
     val groupShift = groupIndex.value - brokerInfo.groupFrom
     bestDeps(groupShift)
+  }
+
+  def getBestTrie(chainIndex: ChainIndex): MerklePatriciaTrie = {
+    getBestTrie(chainIndex.from)
   }
 
   def getBestTrie(groupIndex: GroupIndex): MerklePatriciaTrie = {
@@ -250,6 +254,13 @@ trait BlockFlowState {
     }
   }
 
+  def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
+    val trie = getBestTrie(chainIndex)
+    tx.raw.inputs.mapE { input =>
+      trie.get[TxOutputPoint, TxOutput](input)
+    }
+  }
+
   def getP2pkhUtxos(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val pubScript  = PubScript.p2pkh(address)
     val groupIndex = GroupIndex.from(pubScript)
@@ -291,7 +302,7 @@ object BlockFlowState {
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
       transaction.raw.outputs.mapWithIndex { (output, i) =>
-        val outputPoint = TxOutputPoint(output.shortKey, transaction.hash, i)
+        val outputPoint = TxOutputPoint.unsafe(transaction, i)
         (outputPoint, output)
       }
     }

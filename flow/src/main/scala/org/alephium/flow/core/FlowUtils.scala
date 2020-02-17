@@ -12,7 +12,7 @@ import org.alephium.util.AVector
 trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
 
   val mempools = AVector.tabulate(config.groupNumPerBroker) { idx =>
-    val group = GroupIndex(brokerInfo.groupFrom + idx)
+    val group = GroupIndex.unsafe(brokerInfo.groupFrom + idx)
     MemPool.empty(group)
   }
 
@@ -41,11 +41,11 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
   }
 
   def updateMemPoolUnsafe(mainGroup: Int, newDeps: BlockDeps): Unit = {
-    val oldDeps = getBestDeps(GroupIndex(mainGroup))
+    val oldDeps = getBestDeps(GroupIndex.unsafe(mainGroup))
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
       case Normal(toRemove) =>
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
-          val index = ChainIndex(mainGroup, toGroup)
+          val index = ChainIndex.unsafe(mainGroup, toGroup)
           sum + getPool(index).remove(index, txs)
         }
         logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")

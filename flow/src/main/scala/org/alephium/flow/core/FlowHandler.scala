@@ -135,7 +135,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
           sender() ! FlowHandler.BlockAdded(block, broker, origin)
           updateUponNewData(block.hash)
           origin match {
-            case DataOrigin.LocalMining =>
+            case DataOrigin.Local =>
               minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
             case _: DataOrigin.FromClique =>
               minerOpt.foreach(_ ! Miner.UpdateTemplate)
@@ -177,7 +177,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
     val heights = for {
       i <- 0 until config.groups
       j <- 0 until config.groups
-      height = blockFlow.getHashChain(ChainIndex(i, j)).maxHeight
+      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
     val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat

@@ -15,10 +15,11 @@ object TestUtils {
   def createBlockHandlersProbe(implicit config: PlatformProfile,
                                system: ActorSystem): AllHandlers = {
     val flowHandler = TestProbe().ref
+    val txHandler   = TestProbe().ref
     val blockHandlers = (for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      chainIndex = ChainIndex(from, to)
+      chainIndex = ChainIndex.unsafe(from, to)
       if chainIndex.relateTo(config.brokerInfo)
     } yield {
       chainIndex -> TestProbe().ref
@@ -26,12 +27,12 @@ object TestUtils {
     val headerHandlers = (for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      chainIndex = ChainIndex(from, to)
+      chainIndex = ChainIndex.unsafe(from, to)
       if !chainIndex.relateTo(config.brokerInfo)
     } yield {
       chainIndex -> TestProbe().ref
     }).toMap
-    AllHandlers(flowHandler, blockHandlers, headerHandlers)
+    AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
   }
 
   // remove all the content under the path; the path itself would be kept

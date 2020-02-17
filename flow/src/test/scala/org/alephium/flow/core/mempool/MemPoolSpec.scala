@@ -8,13 +8,14 @@ import org.alephium.util.AVector
 
 class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   it should "initialize an empty pool" in {
-    val pool = MemPool.empty(GroupIndex(0))
+    val pool = MemPool.empty(GroupIndex.unsafe(0))
     pool.size is 0
   }
 
   it should "contain/add/remove for transactions" in {
     forAll(ModelGen.blockGenNonEmpty) { block =>
-      val group = GroupIndex(config.brokerInfo.groupFrom + Random.nextInt(config.groupNumPerBroker))
+      val group =
+        GroupIndex.unsafe(config.brokerInfo.groupFrom + Random.nextInt(config.groupNumPerBroker))
       val pool  = MemPool.empty(group)
       val index = block.chainIndex
       if (index.from.equals(group)) {
@@ -32,7 +33,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   }
 
   trait Fixture extends WithLock {
-    val group       = GroupIndex(0)
+    val group       = GroupIndex.unsafe(0)
     val pool        = MemPool.empty(group)
     val block       = ModelGen.blockGenFrom(group).retryUntil(_.transactions.nonEmpty).sample.get
     val weightedTxs = block.transactions.map((_, 1.0))

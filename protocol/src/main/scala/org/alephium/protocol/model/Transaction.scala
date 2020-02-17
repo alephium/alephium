@@ -3,6 +3,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.crypto._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.{PubScript, Witness}
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
@@ -19,6 +20,10 @@ case class Transaction(
     witnesses: AVector[Witness]
 ) extends Keccak256Hash[Transaction] {
   override val hash: Keccak256 = raw.hash
+
+  def fromGroup(implicit config: GroupConfig): GroupIndex  = raw.inputs.head.fromGroup
+  def toGroup(implicit config: GroupConfig): GroupIndex    = raw.outputs.head.toGroup
+  def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 }
 
 object Transaction {

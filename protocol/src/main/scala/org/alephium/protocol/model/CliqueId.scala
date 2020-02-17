@@ -1,19 +1,12 @@
 package org.alephium.protocol.model
 
-import scala.annotation.tailrec
-
 import akka.util.ByteString
 
 import org.alephium.macros.HPC.cfor
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
 
 /** 160bits identifier of a Peer **/
 class CliqueId private (val bytes: ByteString) extends RandomBytes {
-  def groupIndex(implicit config: GroupConfig): GroupIndex = {
-    GroupIndex((bytes.last & 0xFF) % config.groups)
-  }
-
   def hammingDist(another: CliqueId): Int = {
     CliqueId.hammingDist(this, another)
   }
@@ -51,18 +44,5 @@ object CliqueId extends RandomBytes.Companion[CliqueId](new CliqueId(_), _.bytes
   def hammingDist(byte0: Byte, byte1: Byte): Int = {
     val xor = byte0 ^ byte1
     countLookUp(xor & 0x0F) + countLookUp((xor >> 4) & 0x0F)
-  }
-
-  def generateFor(mainGroup: GroupIndex)(implicit config: GroupConfig): CliqueId = {
-    assert(mainGroup.value < config.groups)
-
-    @tailrec
-    def iter(): CliqueId = {
-      val id = CliqueId.generate
-      if (id.groupIndex == mainGroup) {
-        id
-      } else iter()
-    }
-    iter()
   }
 }
