@@ -70,6 +70,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
       assert(block.chainIndex.relateTo(config.brokerInfo))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
+      // TODO: optimize this without using iteration
       brokers.foreach {
         case (_, (info, broker)) =>
           if (!origin.isFrom(cliqueInfo.id, info)) {

@@ -187,7 +187,7 @@ object PlatformProfile {
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]
-        mineGenesis(ChainIndex(from, to)(config), transactions)
+        mineGenesis(ChainIndex.from(from, to).get, transactions)
     }
   }
 

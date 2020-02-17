@@ -73,6 +73,15 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
             brokerState.actor ! message.blockMsg
           }
       }
+    case message: CliqueManager.BroadCastTx =>
+      log.debug(s"Broadcasting tx ${message.tx.shortHex} for ${message.chainIndex}")
+      iterBrokers {
+        case (cliqueId, brokerState) =>
+          if (!message.origin.isFrom(cliqueId) && brokerState.isSynced) {
+            log.debug(s"Send tx to broker $cliqueId")
+            brokerState.actor ! message.txMsg
+          }
+      }
     case InterCliqueManager.Syncing(cliqueId) =>
       log.debug(s"$cliqueId starts syncing")
       setSyncing(cliqueId)

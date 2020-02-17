@@ -5,7 +5,7 @@ import akka.util.ByteString
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, CliqueId}
+import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -22,6 +22,7 @@ object Payload {
       case x: GetBlocks   => (GetBlocks, Serializer[GetBlocks].serialize(x))
       case x: SendHeaders => (SendHeaders, Serializer[SendHeaders].serialize(x))
       case x: GetHeaders  => (GetHeaders, Serializer[GetHeaders].serialize(x))
+      case x: SendTxs     => (SendTxs, Serializer[SendTxs].serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -42,6 +43,7 @@ object Payload {
           case GetBlocks   => serdeImpl[GetBlocks]._deserialize(rest)
           case SendHeaders => serdeImpl[SendHeaders]._deserialize(rest)
           case GetHeaders  => serdeImpl[GetHeaders]._deserialize(rest)
+          case SendTxs     => serdeImpl[SendTxs]._deserialize(rest)
         }
     }
   }
@@ -59,8 +61,8 @@ object Payload {
 
   sealed trait Code
   object Code {
-    private val values: AVector[Code] =
-      AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders)
+    private[message] val values: AVector[Code] =
+      AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders, SendTxs)
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
     def fromInt(code: Int): Option[Code] =
@@ -160,4 +162,10 @@ case class GetHeaders(locators: AVector[Keccak256]) extends Payload
 
 object GetHeaders extends Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
+}
+
+case class SendTxs(txs: AVector[Transaction]) extends Payload
+
+object SendTxs extends Payload.Code {
+  implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }

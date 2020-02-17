@@ -11,7 +11,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.LocalMining
+import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor, TimeStamp}
@@ -73,7 +73,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
           val elapsed = TimeStamp.now().millis - lastTs.millis
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, elapsed ${elapsed}ms, miningCount: $totalMiningCount, target: ${template.target}")
-          blockHandler ! BlockChainHandler.addOneBlock(block, LocalMining)
+          blockHandler ! BlockChainHandler.addOneBlock(block, Local)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
             allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

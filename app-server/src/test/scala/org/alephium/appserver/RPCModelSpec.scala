@@ -75,4 +75,10 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
       """{"fromAddress":"from","fromType":"p2pkh","toAddress":"to","toType":"p2pkh","value":1,"fromPrivateKey":"key"}"""
     checkData(transfer, jsonRaw)
   }
+
+  it should "encode/decode TransferResult" in {
+    val result  = TransferResult("txId")
+    val jsonRaw = """{"txId":"txId"}"""
+    checkData(result, jsonRaw)
+  }
 }

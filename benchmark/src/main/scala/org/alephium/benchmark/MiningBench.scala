@@ -23,6 +23,6 @@ class MiningBench {
     val block = Block.genesis(AVector.empty, config.maxMiningTarget, BigInt(nonce))
     val i     = RandomBytes.source.nextInt(config.groups)
     val j     = RandomBytes.source.nextInt(config.groups)
-    Validation.validateMined(block, ChainIndex(i, j))
+    Validation.validateMined(block, ChainIndex.unsafe(i, j))
   }
 }
