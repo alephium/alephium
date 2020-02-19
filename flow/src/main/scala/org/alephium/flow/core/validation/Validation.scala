@@ -140,7 +140,7 @@ object Validation {
   }
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
-    val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
+    val coinbase = block.transactions.last // Note: validateNonEmptyTransactions first pls!
     val raw      = coinbase.raw
     if (raw.inputs.length == 0 && raw.outputs.length == 1 && coinbase.witnesses.isEmpty)
       validBlock
@@ -163,7 +163,7 @@ object Validation {
       val trie = flow.getTrie(block)
       val result = for {
         _ <- checkBlockDoubleSpending(block)
-        _ <- block.transactions.tail.foreachE(checkBlockNonCoinbase(index, _, trie))
+        _ <- block.transactions.init.foreachE(checkBlockNonCoinbase(index, _, trie))
       } yield ()
       convert(result)
     } else {
@@ -228,7 +228,7 @@ object Validation {
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    block.transactions.tail.foreachE { tx =>
+    block.transactions.init.foreachE { tx =>
       tx.raw.inputs.foreachE { input =>
         if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {

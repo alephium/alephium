@@ -12,7 +12,6 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 
-// TODO: test for more groups
 class BlockFlowSpec extends AlephiumFlowSpec {
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow.createUnsafe()
@@ -47,14 +46,14 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 3
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
       addAndCheck(blockFlow, block4)
       blockFlow.getWeight(block4) is 4
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - 3)
     }
   }
 
@@ -65,7 +64,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       val newBlocks1 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j))
+      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks1.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
@@ -82,7 +81,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       val newBlocks2 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j))
+      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks2.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
@@ -99,7 +98,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       val newBlocks3 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j))
+      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks3.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
@@ -150,7 +149,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       addAndCheck(blockFlow, block3)
       blockFlow.getWeight(block3) is 4
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - 3)
     }
   }
 
@@ -179,15 +178,15 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     }
   }
 
-  def mine(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
+  def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val transactions = {
-      if (chainIndex.isIntraGroup && chainIndex.relateTo(config.brokerInfo)) {
+      if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
         val balances                   = blockFlow.getP2pkhUtxos(publicKey).right.value
         val total                      = balances.sumBy(_._2.value)
-        val (_, toPublicKey)           = mainGroup.generateP2pkhKey
+        val (_, toPublicKey)           = chainIndex.to.generateP2pkhKey
         val inputs                     = balances.map(_._1)
         val outputs                    = AVector(TxOutput.p2pkh(1, toPublicKey), TxOutput.p2pkh(total - 1, publicKey))
         AVector(Transaction.from(inputs, outputs, publicKey, privateKey))
