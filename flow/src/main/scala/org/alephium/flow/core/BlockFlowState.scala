@@ -7,11 +7,13 @@ import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PubScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
+// scalastyle:off number.of.methods
 trait BlockFlowState {
   import BlockFlowState._
 
@@ -261,13 +263,58 @@ trait BlockFlowState {
     }
   }
 
+  def getNonPersistedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[OutBlockCache]] = {
+    val bestDeps = getBestDeps(groupIndex)
+    val outDeps  = bestDeps.outDeps
+    val intraDep = outDeps(groupIndex.value)
+    val diffE = getBlockHeader(intraDep).map { header =>
+      if (header.isGenesis) {
+        AVector.empty
+      } else {
+        val persistedOutDeps = header.outDeps.replace(groupIndex.value, intraDep)
+        outDeps.indices.foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
+          acc ++ getTipsDiff(outDeps(i), persistedOutDeps(i))
+        }
+      }
+    }
+    val cache = getGroupCache(groupIndex)
+    diffE.map(_.map(cache.outblockcaches.apply))
+  }
+
+  def isInputNotSpentInNewOutBlocks(groupIndex: GroupIndex,
+                                    input: TxOutputPoint): IOResult[Boolean] = {
+    getNonPersistedOutBlocks(groupIndex).map(_.forall(!_.inputs.contains(input)))
+  }
+
   def getP2pkhUtxos(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val pubScript  = PubScript.p2pkh(address)
     val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
+
     val prefix = serialize(pubScript.shortKey)
-    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](prefix).map { data =>
-      data.filter(_._2.pubScript == pubScript)
+    for {
+      persistedUtxos <- getBestTrie(groupIndex)
+        .getAll[TxOutputPoint, TxOutput](prefix)
+        .map(_.filter(_._2.pubScript == pubScript))
+      pair <- getP2pkhUtxosInCache(pubScript, groupIndex, persistedUtxos)
+    } yield {
+      val (usedUtxos, newUtxos) = pair
+      persistedUtxos.filter(p => !usedUtxos.contains(p._1)) ++ newUtxos
+    }
+  }
+
+  def getP2pkhUtxosInCache(pubScript: PubScript,
+                           groupIndex: GroupIndex,
+                           persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
+    : IOResult[(AVector[TxOutputPoint], AVector[(TxOutputPoint, TxOutput)])] = {
+    getNonPersistedOutBlocks(groupIndex).map { blockCaches =>
+      val result0 = blockCaches
+        .map(cache => cache.inputs.filter(i => persistedUtxos.exists(_._1 == i)))
+        .flatMap(AVector.from)
+      val result1 = blockCaches
+        .map(cache => AVector.from(cache.relatedOutputs.filter(_._2.pubScript == pubScript)))
+        .flatMap(identity)
+      (result0, result1)
     }
   }
 
@@ -287,11 +334,13 @@ trait BlockFlowState {
     }
   }
 }
+// scalastyle:on number.of.methods
 
 object BlockFlowState {
   sealed trait BlockCache
   case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache
-  case class OutBlockCache(inputs: Set[TxOutputPoint])           extends BlockCache
+  case class OutBlockCache(inputs: Set[TxOutputPoint], relatedOutputs: Map[TxOutputPoint, TxOutput])
+      extends BlockCache
   case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput], inputs: Set[TxOutputPoint])
       extends BlockCache // For blocks on intra-group chain
 
@@ -309,6 +358,11 @@ object BlockFlowState {
     outputs.toIterable.toMap
   }
 
+  private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
+      implicit config: GroupConfig): Map[TxOutputPoint, TxOutput] = {
+    convertOutputs(block).filter(_._1.fromGroup == groupIndex)
+  }
+
   def convertBlock(block: Block, groupIndex: GroupIndex)(
       implicit config: PlatformProfile): BlockCache = {
     val index = block.chainIndex
@@ -316,7 +370,7 @@ object BlockFlowState {
     if (index.isIntraGroup) {
       InOutBlockCache(convertOutputs(block), convertInputs(block))
     } else if (index.from == groupIndex) {
-      OutBlockCache(convertInputs(block))
+      OutBlockCache(convertInputs(block), convertRelatedOutputs(block, groupIndex))
     } else {
       InBlockCache(convertOutputs(block))
     }
@@ -382,8 +436,11 @@ object BlockFlowState {
     blockCache match {
       case InBlockCache(outputs) =>
         updateStateForOutputs(trie, outputs)
-      case OutBlockCache(inputs) =>
-        updateStateForInputs(trie, inputs)
+      case OutBlockCache(inputs, relatedOutputs) =>
+        for {
+          trie0 <- updateStateForInputs(trie, inputs)
+          trie1 <- updateStateForOutputs(trie0, relatedOutputs)
+        } yield trie1
       case InOutBlockCache(outputs, inputs) =>
         for {
           trie0 <- updateStateForOutputs(trie, outputs)

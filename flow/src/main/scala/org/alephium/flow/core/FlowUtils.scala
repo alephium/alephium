@@ -37,7 +37,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     }
     val toRemove = diffs.map(_.toAdd.flatMap(_.transactions))
     val toAdd    = diffs.map(_.toRemove.flatMap(_.transactions.map((_, 1.0))))
-    if (toRemove.isEmpty) Normal(toRemove) else Reorg(toRemove, toAdd)
+    if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
   def updateMemPoolUnsafe(mainGroup: Int, newDeps: BlockDeps): Unit = {
@@ -52,6 +52,15 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
       case Reorg(toRemove, toAdd) =>
         val (removed, added) = getPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
+    }
+    {
+      val info = config.brokerInfo
+      val indexes = for {
+        i <- info.groupFrom until info.groupUntil
+        j <- 0 until config.groups
+      } yield ChainIndex.unsafe(i, j)
+      val counts = indexes.map(idx => getPool(idx).getPool(idx).size)
+      logger.debug(s"""Pool sizes: ${indexes.zip(counts).mkString(",")}""")
     }
   }
 

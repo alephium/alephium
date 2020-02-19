@@ -13,6 +13,7 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
@@ -107,20 +108,15 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
       startNewTasks()
   }
 
-  private val fakeTransactions = AVector.tabulate(config.groups) { to =>
-    val address = addresses(to)
-    val data    = ByteString.fromInts(Random.nextInt())
-    // scalastyle:off magic.number
-    val transactions = AVector.tabulate(1)(Transaction.coinbase(address, _, data))
-    // scalastyle:on magic.number
-    transactions
+  private def coinbase(to: Int): Transaction = {
+    Transaction.coinbase(addresses(to), ALF.CoinBaseValue, ByteString.fromInts(Random.nextInt()))
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assume(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
     val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
     val flowTemplate = node.blockFlow.prepareBlockFlowUnsafe(index)
-    BlockTemplate(flowTemplate.deps, flowTemplate.target, fakeTransactions(to))
+    BlockTemplate(flowTemplate.deps, flowTemplate.target, flowTemplate.transactions :+ coinbase(to))
   }
 
   def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit = {
