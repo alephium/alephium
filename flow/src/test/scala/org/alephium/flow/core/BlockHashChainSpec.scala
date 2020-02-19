@@ -14,7 +14,7 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
 
     var currentNode: BlockHashChain.TreeNode = root
     def addNewHash(n: Int): Unit = {
-      val timestamp = TimeStamp.ofMillisUnsafe(n.toLong)
+      val timestamp = TimeStamp.unsafe(n.toLong)
       val newHash   = Keccak256.random
       addHash(newHash, currentNode, 0, timestamp)
       currentNode = getNode(newHash)
@@ -32,7 +32,7 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
 
   it should "compute the correct median value" in new Fixture {
     def checkCalMedian(tss: Array[Long], expected: Long): Assertion = {
-      calMedian(tss.map(TimeStamp.ofMillisUnsafe)) is TimeStamp.ofMillisUnsafe(expected)
+      calMedian(tss.map(TimeStamp.unsafe)) is TimeStamp.unsafe(expected)
     }
 
     checkCalMedian(Array(0, 1, 2, 3, 4, 5, 6), 3)
@@ -50,11 +50,11 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
     calMedianBlockTime(currentNode) is None
 
     addNewHash(config.medianTimeInterval)
-    calMedianBlockTime(currentNode).get is TimeStamp.ofMillisUnsafe(
+    calMedianBlockTime(currentNode).get is TimeStamp.unsafe(
       ((config.medianTimeInterval + 1) / 2).toLong)
 
     addNewHash(config.medianTimeInterval + 1)
-    calMedianBlockTime(currentNode).get is TimeStamp.ofMillisUnsafe(
+    calMedianBlockTime(currentNode).get is TimeStamp.unsafe(
       ((config.medianTimeInterval + 3) / 2).toLong)
   }
 

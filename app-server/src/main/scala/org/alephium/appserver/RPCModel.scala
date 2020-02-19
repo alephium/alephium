@@ -10,7 +10,7 @@ import org.alephium.util.{AVector, Hex, TimeStamp}
 object RPCModel {
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
-      Decoder.decodeLong.ensure(_ >= 0, s"expect positive timestamp").map(TimeStamp.ofMillisUnsafe)
+      Decoder.decodeLong.ensure(_ >= 0, s"expect positive timestamp").map(TimeStamp.unsafe)
     implicit val encoderTS: Encoder[TimeStamp] = Encoder.encodeLong.contramap(_.millis)
   }
 
