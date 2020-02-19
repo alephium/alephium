@@ -13,7 +13,6 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
@@ -109,7 +108,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   }
 
   private def coinbase(to: Int): Transaction = {
-    Transaction.coinbase(addresses(to), ALF.CoinBaseValue, ByteString.fromInts(Random.nextInt()))
+    Transaction.coinbase(addresses(to), ByteString.fromInts(Random.nextInt()))
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {

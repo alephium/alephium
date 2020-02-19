@@ -30,7 +30,6 @@ class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
 }
 
 object ChainIndex {
-
   def from(from: Int, to: Int)(implicit config: GroupConfig): Option[ChainIndex] = {
     if (validate(from, to)) {
       Some(new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to)))

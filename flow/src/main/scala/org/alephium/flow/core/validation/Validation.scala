@@ -103,7 +103,6 @@ object Validation {
     else invalidBlock(InvalidGroup)
   }
 
-  // TODO: make sure header.timestamp is alwayer larger than its parant header
   private[validation] def checkTimeStamp(header: BlockHeader,
                                          isSyncing: Boolean): HeaderValidationResult = {
     val now      = TimeStamp.now()
