@@ -12,7 +12,7 @@ import org.alephium.util.AVector
  */
 class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit config: PlatformProfile)
     extends RWLock {
-  private def getPool(index: ChainIndex): TxPool = {
+  def getPool(index: ChainIndex): TxPool = {
     assume(group == index.from)
     pools(index.to.value)
   }

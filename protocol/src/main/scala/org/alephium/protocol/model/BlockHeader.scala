@@ -46,6 +46,11 @@ case class BlockHeader(
     assert(!isGenesis)
     blockDeps.takeRight(config.groups)
   }
+
+  def outTips(implicit config: GroupConfig): AVector[Keccak256] = {
+    assert(!isGenesis)
+    blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
+  }
 }
 
 object BlockHeader {

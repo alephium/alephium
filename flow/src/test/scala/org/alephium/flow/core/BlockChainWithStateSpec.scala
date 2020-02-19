@@ -20,7 +20,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
       cache match {
         case InBlockCache(outputs) =>
           updateStateForOutputs(trie, outputs)
-        case OutBlockCache(_) =>
+        case OutBlockCache(_, _) =>
           Right(trie)
         case InOutBlockCache(outputs, _) =>
           updateStateForOutputs(trie, outputs)
