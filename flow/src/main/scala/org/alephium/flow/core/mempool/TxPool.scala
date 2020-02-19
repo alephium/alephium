@@ -3,10 +3,9 @@ package org.alephium.flow.core.mempool
 import scala.collection.mutable
 
 import org.alephium.crypto.Keccak256
-import org.alephium.flow.RWLock
 import org.alephium.flow.core.mempool.TxPool.WeightedId
 import org.alephium.protocol.model.Transaction
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, RWLock}
 
 /*
  * Transaction pool implementation
