@@ -2,6 +2,7 @@ package org.alephium.flow.core.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.ModelGen
+import org.alephium.util.LockFixture
 
 class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
   it should "initialize an empty tx pool" in {

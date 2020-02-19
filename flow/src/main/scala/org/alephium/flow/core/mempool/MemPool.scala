@@ -1,9 +1,8 @@
 package org.alephium.flow.core.mempool
 
-import org.alephium.flow.RWLock
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, RWLock}
 
 /*
  * MemPool is the class to store all the pending transactions
