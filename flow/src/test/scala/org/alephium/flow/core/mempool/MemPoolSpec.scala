@@ -4,7 +4,7 @@ import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{GroupIndex, ModelGen, Transaction}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, LockFixture}
 
 class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   it should "initialize an empty pool" in {
