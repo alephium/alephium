@@ -17,7 +17,7 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
-                   _scanFrequency: Duration = Duration.unsafeFrom(500)): DiscoveryConfig = {
+                   _scanFrequency: Duration = Duration.unsafe(500)): DiscoveryConfig = {
     new DiscoveryConfig {
       val publicAddress: InetSocketAddress          = new InetSocketAddress("localhost", port)
       val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()

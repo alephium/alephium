@@ -12,7 +12,6 @@ import org.alephium.util.AVector
 /*
  * For the moment, if a transaction does not have any input, then it's a coinbase transaction
  * In this way, we could pad many coinbase transactions into one block without hacking any code
- * TODO: we will evolve it to use only one coinbase transaction
  *
  */
 case class Transaction(

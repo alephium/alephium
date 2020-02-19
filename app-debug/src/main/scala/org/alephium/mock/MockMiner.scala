@@ -33,7 +33,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   override def _mine(template: BlockTemplate, lastTs: TimeStamp): Receive = {
     case Miner.Nonce(_, _) =>
-      val delta     = Duration.ofMillisUnsafe(1000l * 30l + Random.nextInt(1000 * 60).toLong)
+      val delta     = Duration.unsafe(1000l * 30l + Random.nextInt(1000 * 60).toLong)
       val currentTs = TimeStamp.now()
       val nextTs =
         if (lastTs == TimeStamp.zero) currentTs + delta
