@@ -3,6 +3,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.crypto._
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.{PubScript, Witness}
 import org.alephium.serde.Serde
@@ -51,9 +52,9 @@ object Transaction {
     Transaction(raw, ByteString.empty, AVector(witness))
   }
 
-  def coinbase(publicKey: ED25519PublicKey, value: BigInt, data: ByteString): Transaction = {
+  def coinbase(publicKey: ED25519PublicKey, data: ByteString): Transaction = {
     val pkScript = PubScript.p2pkh(publicKey)
-    val txOutput = TxOutput(value, pkScript)
+    val txOutput = TxOutput(ALF.CoinBaseValue, pkScript)
     val raw      = RawTransaction(AVector.empty, AVector(txOutput))
     Transaction(raw, data, AVector.empty)
   }

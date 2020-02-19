@@ -108,7 +108,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
         case Right(header) =>
           val lastTs   = header.timestamp
           val data     = ByteString.fromInts(Random.nextInt())
-          val coinbase = Transaction.coinbase(address, 1, data)
+          val coinbase = Transaction.coinbase(address, data)
           val template = BlockTemplate(deps, target, transactions :+ coinbase)
           context become mine(template, lastTs)
           taskStartingTime = System.currentTimeMillis()

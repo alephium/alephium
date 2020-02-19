@@ -41,10 +41,9 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode empty FetchResponse" in {
-    val entry    = FetchEntry("hash", TimeStamp.ofMillisUnsafe(0), 0, 1, 1, List.empty)
-    val response = FetchResponse(Seq(entry))
+    val response = FetchResponse(Seq.empty)
     val jsonRaw =
-      """{"blocks":[{"hash":"hash","timestamp":0,"chainFrom":0,"chainTo":1,"height":1,"deps":[]}]}"""
+      """{"blocks":[]}"""
     checkData(response, jsonRaw)
   }
 
@@ -70,9 +69,9 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode Transfer" in {
-    val transfer = Transfer("from", "p2pkh", "to", "p2pkh", 1, "key")
+    val transfer = Transfer("from", "pkh", "to", "pkh", 1, "key")
     val jsonRaw =
-      """{"fromAddress":"from","fromType":"p2pkh","toAddress":"to","toType":"p2pkh","value":1,"fromPrivateKey":"key"}"""
+      """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1,"fromPrivateKey":"key"}"""
     checkData(transfer, jsonRaw)
   }
 
