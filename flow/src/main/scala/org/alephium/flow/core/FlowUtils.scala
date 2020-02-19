@@ -53,15 +53,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
         val (removed, added) = getPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
     }
-    {
-      val info = config.brokerInfo
-      val indexes = for {
-        i <- info.groupFrom until info.groupUntil
-        j <- 0 until config.groups
-      } yield ChainIndex.unsafe(i, j)
-      val counts = indexes.map(idx => getPool(idx).getPool(idx).size)
-      logger.debug(s"""Pool sizes: ${indexes.zip(counts).mkString(",")}""")
-    }
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
