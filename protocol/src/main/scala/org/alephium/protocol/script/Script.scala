@@ -74,19 +74,18 @@ object Script {
         }
       case OP_CHECKSIG =>
         if (stack.isEmpty) emptyStack(instruction)
-        if (signatures.size < 1) error(instruction, "no signature available")
+        if (signatures.isEmpty) error(instruction, "no signature available")
         else {
           val rawPublicKey = pop(stack)
           val rawSignature = pop(signatures)
-          if (rawPublicKey.length != ED25519PublicKey.length) {
-            error(instruction, s"public key of size ${rawPublicKey.length}")
-          } else if (rawSignature.length != ED25519Signature.length) {
-            error(instruction, s"signature of size ${rawSignature.length}")
-          } else {
-            val publicKey = ED25519PublicKey.unsafeFrom(rawPublicKey)
-            val signature = ED25519Signature.unsafeFrom(rawSignature)
-            val ok        = ED25519.verify(data, signature, publicKey)
-            if (ok) Done else Left(VerificationFailed)
+          val okOpt = for {
+            publicKey <- ED25519PublicKey.from(rawPublicKey)
+            signature <- ED25519Signature.from(rawSignature)
+          } yield ED25519.verify(data, signature, publicKey)
+          okOpt match {
+            case Some(true)  => Done
+            case Some(false) => Left(VerificationFailed)
+            case None        => error(instruction, s"invalid format for public key or signature")
           }
         }
     }

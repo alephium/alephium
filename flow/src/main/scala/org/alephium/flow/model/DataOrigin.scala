@@ -11,7 +11,7 @@ sealed trait DataOrigin {
 }
 
 object DataOrigin {
-  case object LocalMining extends DataOrigin {
+  case object Local extends DataOrigin {
     override def isFrom(another: CliqueId): Boolean = false
 
     override def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean = false

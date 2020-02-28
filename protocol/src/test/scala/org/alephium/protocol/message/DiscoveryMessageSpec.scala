@@ -42,8 +42,8 @@ class DiscoveryMessageSpec extends AlephiumSpec {
 
       val peersPerGroup: Int          = 1
       val scanMaxPerGroup: Int        = 1
-      val scanFrequency: Duration     = Duration.ofSeconds(1)
-      val scanFastFrequency: Duration = Duration.ofSeconds(1)
+      val scanFrequency: Duration     = Duration.ofSecondsUnsafe(1)
+      val scanFastFrequency: Duration = Duration.ofSecondsUnsafe(1)
       val neighborsPerGroup: Int      = 1
     }
   }

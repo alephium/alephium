@@ -7,6 +7,7 @@ import org.alephium.protocol.model.ChainIndex
 
 case class AllHandlers(
     flowHandler: ActorRef,
+    txHandler: ActorRef,
     blockHandlers: Map[ChainIndex, ActorRef],
     headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformProfile) {
 
@@ -26,9 +27,11 @@ object AllHandlers {
       implicit config: PlatformProfile): AllHandlers = {
     val flowProps      = FlowHandler.props(blockFlow)
     val flowHandler    = system.actorOf(flowProps, "FlowHandler")
+    val txProps        = TxHandler.props(blockFlow, cliqueManager)
+    val txHandler      = system.actorOf(txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
-    AllHandlers(flowHandler, blockHandlers, headerHandlers)
+    AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
   }
 
   private def buildBlockHandlers(
@@ -39,7 +42,7 @@ object AllHandlers {
     val handlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      chainIndex = ChainIndex(from, to)
+      chainIndex = ChainIndex.unsafe(from, to)
       if chainIndex.relateTo(config.brokerInfo)
     } yield {
       val handler = system.actorOf(
@@ -55,7 +58,7 @@ object AllHandlers {
     val headerHandlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
-      chainIndex = ChainIndex(from, to)
+      chainIndex = ChainIndex.unsafe(from, to)
       if !chainIndex.relateTo(config.brokerInfo)
     } yield {
       val headerHander = system.actorOf(

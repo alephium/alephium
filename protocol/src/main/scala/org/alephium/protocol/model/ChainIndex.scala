@@ -2,8 +2,9 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
+import org.alephium.util.Bits
 
-class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
+class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
   def relateTo(brokerInfo: BrokerInfo): Boolean = {
     brokerInfo.contains(from) || brokerInfo.contains(to)
   }
@@ -29,29 +30,36 @@ class ChainIndex private (val from: GroupIndex, val to: GroupIndex) {
 }
 
 object ChainIndex {
+  def from(from: Int, to: Int)(implicit config: GroupConfig): Option[ChainIndex] = {
+    if (validate(from, to)) {
+      Some(new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to)))
+    } else None
+  }
 
-  def apply(from: Int, to: Int)(implicit config: GroupConfig): ChainIndex = {
-    assert(0 <= from && from < config.groups && 0 <= to && to < config.groups)
-    new ChainIndex(GroupIndex(from), GroupIndex(to))
+  def unsafe(from: Int, to: Int)(implicit config: GroupConfig): ChainIndex = {
+    assume(validate(from, to))
+    new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
   }
 
   def apply(from: GroupIndex, to: GroupIndex): ChainIndex = {
     new ChainIndex(from, to)
   }
 
-  def unsafe(from: Int, to: Int): ChainIndex =
-    new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
+  @inline
+  private def validate(from: Int, to: Int)(implicit config: GroupConfig): Boolean = {
+    0 <= from && from < config.groups && 0 <= to && to < config.groups
+  }
 
   def from(randomBytes: RandomBytes)(implicit config: GroupConfig): ChainIndex = {
     val bytes = randomBytes.bytes
     assert(bytes.length >= 2)
 
-    val beforeLast = bytes(bytes.length - 2)
-    val last       = bytes.last
-    val bigIndex   = (beforeLast & 0xFF) << 8 | (last & 0xFF)
+    val beforeLast = Bits.toPosInt(bytes(bytes.length - 2))
+    val last       = Bits.toPosInt(bytes.last)
+    val bigIndex   = beforeLast << 8 | last
     assert(bigIndex >= 0)
 
     val index = bigIndex % config.chainNum
-    ChainIndex(index / config.groups, index % config.groups)
+    ChainIndex.unsafe(index / config.groups, index % config.groups)
   }
 }

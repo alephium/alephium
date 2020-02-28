@@ -21,7 +21,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     for {
       weight <- calWeight(block)
       _      <- chain.add(block, parent, weight)
-      _      <- calBestDeps()
+      _      <- updateBestDeps()
     } yield ()
   }
 
@@ -40,7 +40,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     for {
       weight <- calWeight(header)
       _      <- chain.add(header, parent, weight)
-      _      <- calBestDeps()
+      _      <- updateBestDeps()
     } yield ()
   }
 
@@ -94,7 +94,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     for {
       from <- low until high
       to   <- 0 until groups
-    } tips = tips ++ getHashChain(GroupIndex(from), GroupIndex(to)).getAllTips
+    } tips = tips ++ getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to)).getAllTips
     tips
   }
 
@@ -172,11 +172,11 @@ class BlockFlow()(implicit val config: PlatformProfile)
       .filter(_ != group.value)
       .foldLeft(AVector.empty[Keccak256]) {
         case (deps, _k) =>
-          val k = GroupIndex(_k)
+          val k = GroupIndex.unsafe(_k)
           if (k == bestIndex.from) deps :+ bestTip
           else {
             val toTries = (0 until groups).foldLeft(AVector.empty[Keccak256]) { (acc, _l) =>
-              val l = GroupIndex(_l)
+              val l = GroupIndex.unsafe(_l)
               acc ++ getHashChain(k, l).getAllTips
             }
             val validTries = toTries.filter(tip => isCompatibleUnsafe(rtips, tip, k))
@@ -193,7 +193,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
     val deps2 = (0 until groups)
       .foldLeft(deps1) {
         case (deps, _l) =>
-          val l          = GroupIndex(_l)
+          val l          = GroupIndex.unsafe(_l)
           val chain      = getHashChain(group, l)
           val toTries    = chain.getAllTips
           val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l.value), tip))
@@ -208,11 +208,12 @@ class BlockFlow()(implicit val config: PlatformProfile)
 
   def calBestDepsUnsafe(): Unit =
     brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
-      val deps = calBestDepsUnsafe(GroupIndex(mainGroup))
+      val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
+      updateMemPoolUnsafe(mainGroup, deps)
       updateBestDeps(mainGroup, deps)
     }
 
-  def calBestDeps(): IOResult[Unit] = {
+  def updateBestDeps(): IOResult[Unit] = {
     IOUtils.tryExecute(calBestDepsUnsafe())
   }
 }

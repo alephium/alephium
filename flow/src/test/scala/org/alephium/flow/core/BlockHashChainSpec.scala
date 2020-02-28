@@ -14,7 +14,7 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
 
     var currentNode: BlockHashChain.TreeNode = root
     def addNewHash(n: Int): Unit = {
-      val timestamp = TimeStamp.fromMillis(n.toLong)
+      val timestamp = TimeStamp.unsafe(n.toLong)
       val newHash   = Keccak256.random
       addHash(newHash, currentNode, 0, timestamp)
       currentNode = getNode(newHash)
@@ -25,14 +25,14 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
     val genesis       = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val gHeader       = genesis.header
     val currentTarget = genesis.header.target
-    reTarget(currentTarget, config.expectedTimeSpan) is gHeader.target
-    reTarget(currentTarget, config.expectedTimeSpan * 2) is (gHeader.target * 2)
-    reTarget(currentTarget, config.expectedTimeSpan / 2) is (gHeader.target / 2)
+    reTarget(currentTarget, config.expectedTimeSpan.millis) is gHeader.target
+    reTarget(currentTarget, (config.expectedTimeSpan timesUnsafe 2).millis) is (gHeader.target * 2)
+    reTarget(currentTarget, (config.expectedTimeSpan divUnsafe 2).millis) is (gHeader.target / 2)
   }
 
   it should "compute the correct median value" in new Fixture {
     def checkCalMedian(tss: Array[Long], expected: Long): Assertion = {
-      calMedian(tss.map(TimeStamp.fromMillis)) is TimeStamp.fromMillis(expected)
+      calMedian(tss.map(TimeStamp.unsafe)) is TimeStamp.unsafe(expected)
     }
 
     checkCalMedian(Array(0, 1, 2, 3, 4, 5, 6), 3)
@@ -50,11 +50,11 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
     calMedianBlockTime(currentNode) is None
 
     addNewHash(config.medianTimeInterval)
-    calMedianBlockTime(currentNode).get is TimeStamp.fromMillis(
+    calMedianBlockTime(currentNode).get is TimeStamp.unsafe(
       ((config.medianTimeInterval + 1) / 2).toLong)
 
     addNewHash(config.medianTimeInterval + 1)
-    calMedianBlockTime(currentNode).get is TimeStamp.fromMillis(
+    calMedianBlockTime(currentNode).get is TimeStamp.unsafe(
       ((config.medianTimeInterval + 3) / 2).toLong)
   }
 

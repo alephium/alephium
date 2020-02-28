@@ -33,14 +33,4 @@ class CliqueIdSpec extends AlephiumSpec {
       CliqueId.hammingDist(byte0, byte1) is distance
     }
   }
-
-//  it should "be able to generate from ED25519 public key" in new GroupConfigFixture {
-//    override def groups: Int = 9
-//    (0 until 9).foreach { i =>
-//      val groupIndex     = GroupIndex(i)
-//      val (_, publicKey) = GroupConfig.generateKeyForGroup(groupIndex)
-//      val peerId         = CliqueId.fromPublicKey(publicKey)
-//      peerId.groupIndex is groupIndex
-//    }
-//  }
 }

@@ -35,6 +35,7 @@ class DiskSpec extends AlephiumSpec {
       val data = serialize(block)
       disk.putBlock(block).right.value is data.length
       disk.checkBlockFile(block.hash) is true
+      disk.getBlockUnsafe(block.hash) is block
       disk.getBlock(block.hash).right.value is block
     }
     TestUtils.clear(root)

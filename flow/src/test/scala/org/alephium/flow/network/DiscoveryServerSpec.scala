@@ -17,7 +17,7 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
-                   _scanFrequency: Duration = Duration.ofMillis(500)): DiscoveryConfig = {
+                   _scanFrequency: Duration = Duration.unsafe(500)): DiscoveryConfig = {
     new DiscoveryConfig {
       val publicAddress: InetSocketAddress          = new InetSocketAddress("localhost", port)
       val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
@@ -67,7 +67,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val probo1 = TestProbe()
     server1.tell(DiscoveryServer.GetPeerCliques, probo1.ref)
 
-    val waitTime = Duration.ofSeconds(40).asScala
+    val waitTime = Duration.ofSecondsUnsafe(40).asScala
     probo0.expectMsgPF(waitTime) {
       case DiscoveryServer.PeerCliques(peers) =>
         peers.length is 1
