@@ -11,23 +11,24 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 import io.circe.syntax._
 
-import org.alephium.appserver.RPCModel.{FetchEntry, FetchRequest}
+import org.alephium.appserver.RPCModel._
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{FairMiner, Miner}
-import org.alephium.flow.core.{BlockFlow, MultiChain}
+import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
+import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, CliqueInfo}
+import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
+import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
-import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.{Notification, Response}
-import org.alephium.rpc.util.AVectorJson._
-import org.alephium.util.{AVector, EventBus, TimeStamp}
+import org.alephium.rpc.model.JsonRPC._
+import org.alephium.util.{EventBus, Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
@@ -39,15 +40,22 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
-  def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response =
-    blockflowFetch(mode.node.blockFlow, req)
+  def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
+    Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
-  def doCliqueInfo(req: JsonRPC.Request): Future[JsonRPC.Response] =
+  def doGetPeers(req: Request): FutureTry[PeersResult] =
     mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
-      val cliques = result.asInstanceOf[DiscoveryServer.PeerCliques]
-      val json    = cliques.peers.asJson
-      Response.successful(req, json)
+      val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
+      Right(PeersResult(peers))
     }
+
+  def doGetBalance(req: Request): FutureTry[Balance] =
+    Future.successful(getBalance(mode.node.blockFlow, req))
+
+  def doTransfer(req: Request): FutureTry[TransferResult] = {
+    val txHandler = mode.node.allHandlers.txHandler
+    Future.successful(transfer(mode.node.blockFlow, txHandler, req))
+  }
 
   def runServer(): Future[Unit] = {
     val miner = {
@@ -76,9 +84,14 @@ trait RPCServerAbstract extends StrictLogging {
   implicit def rpcConfig: RPCConfig
   implicit def askTimeout: Timeout
 
-  def doBlockflowFetch(req: JsonRPC.Request): JsonRPC.Response
-
-  def doCliqueInfo(req: JsonRPC.Request): Future[JsonRPC.Response]
+  def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
+  def doGetPeers(req: Request): FutureTry[PeersResult]
+  def doGetBalance(req: Request): FutureTry[Balance]
+  def doTransfer(req: Request): FutureTry[TransferResult]
+  def doStartMining(miner: ActorRef): FutureTry[Boolean] =
+    execute(miner ! Miner.Start)
+  def doStopMining(miner: ActorRef): FutureTry[Boolean] =
+    execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
 
@@ -92,25 +105,13 @@ trait RPCServerAbstract extends StrictLogging {
     }
   }
 
-  def handlerRPC(miner: ActorRef): JsonRPC.Handler = Map.apply(
-    "blockflow_fetch" -> { req =>
-      Future { doBlockflowFetch(req) }
-    },
-    "clique_info" -> { req =>
-      doCliqueInfo(req)
-    },
-    "mining_start" -> { req =>
-      Future {
-        miner ! Miner.Start
-        Response.successful(req)
-      }
-    },
-    "mining_stop" -> { req =>
-      Future {
-        miner ! Miner.Stop
-        Response.successful(req)
-      }
-    }
+  def handlerRPC(miner: ActorRef): Handler = Map.apply(
+    "blockflow_fetch" -> (req => wrap(req, doBlockflowFetch(req))),
+    "clique_info"     -> (req => wrap(req, doGetPeers(req))),
+    "get_balance"     -> (req => wrap(req, doGetBalance(req))),
+    "transfer"        -> (req => wrap(req, doTransfer(req))),
+    "mining_start"    -> (req => wrap(req, doStartMining(miner))),
+    "mining_stop"     -> (req => wrap(req, doStopMining(miner)))
   )
 
   def routeHttp(miner: ActorRef): Route =
@@ -142,56 +143,165 @@ trait RPCServerAbstract extends StrictLogging {
 }
 
 object RPCServer extends StrictLogging {
-  import JsonRPC._
+  import Response.Failure
+  type Try[T]       = Either[Failure, T]
+  type FutureTry[T] = Future[Try[T]]
 
   val bufferSize = 64
 
-  implicit val encodeCliqueInfo: Encoder[CliqueInfo] = new Encoder[CliqueInfo] {
-    final def apply(ci: CliqueInfo): Json = {
-      Json.obj(("id", Json.fromString(ci.id.toString)),
-               ("peers", encodeAVector[String].apply(ci.peers.map(_.toString))))
+  def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
+    req.paramsAs[T] match {
+      case Right(query)  => Right(f(query))
+      case Left(failure) => Left(failure)
     }
   }
 
-  implicit val cliquesEncoder: Encoder[AVector[CliqueInfo]] = encodeAVector[CliqueInfo]
+  def withReqF[T: Decoder, R](req: Request)(f: T => Try[R]): Try[R] = {
+    req.paramsAs[T] match {
+      case Right(query)  => f(query)
+      case Left(failure) => Left(failure)
+    }
+  }
 
-  def blockflowFetch(blockFlow: BlockFlow, req: Request)(implicit rpc: RPCConfig,
-                                                         cfg: ConsensusConfig): Response = {
-    req.paramsAs[FetchRequest] match {
-      case Right(query) =>
-        val now        = TimeStamp.now()
-        val lowerBound = now - rpc.blockflowFetchMaxAge
+  def blockflowFetch(blockFlow: BlockFlow, req: Request)(
+      implicit rpc: RPCConfig,
+      cfg: ConsensusConfig): Try[FetchResponse] = {
+    withReq[FetchRequest, FetchResponse](req) { query =>
+      val now        = TimeStamp.now()
+      val lowerBound = (now - rpc.blockflowFetchMaxAge).get // Note: get should be safe
+      val from = query.from match {
+        case Some(ts) => if (ts > lowerBound) ts else lowerBound
+        case None     => lowerBound
+      }
 
-        val from = query.from match {
-          case Some(ts) => if (ts > lowerBound) ts else lowerBound
-          case None     => lowerBound
+      val headers = blockFlow.getHeadersUnsafe(header => header.timestamp > from)
+      FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
+    }
+  }
+
+  def getBalance(blockFlow: BlockFlow, req: Request): Try[Balance] = {
+    withReqF[GetBalance, Balance](req) { query =>
+      if (query.`type` == GetBalance.pkh) {
+        val result = for {
+          address <- decodeAddress(query.address)
+          _       <- checkGroup(blockFlow, address)
+          balance <- getP2pkhBalance(blockFlow, address)
+        } yield balance
+        result match {
+          case Right(balance) => Right(balance)
+          case Left(error)    => Left(error)
         }
-
-        val headers = blockFlow.getHeadersUnsafe(header => header.timestamp > from)
-        val blocks  = headers.map(blockHeaderEncoder(blockFlow).apply)
-
-        val json = Json.obj(("blocks", Json.arr(blocks: _*)))
-
-        Response.successful(req, json)
-      case Left(failure) => failure
+      } else {
+        Left(Response.failed(s"Invalid address type ${query.`type`}"))
+      }
     }
   }
 
-  def blockHeaderEncoder(chain: MultiChain)(
-      implicit config: ConsensusConfig): Encoder[BlockHeader] = new Encoder[BlockHeader] {
-    final def apply(header: BlockHeader): Json = {
-      import io.circe.syntax._
+  def decodeAddress(raw: String): Try[ED25519PublicKey] = {
+    val addressOpt = for {
+      bytes   <- Hex.from(raw)
+      address <- ED25519PublicKey.from(bytes)
+    } yield address
 
-      val index = header.chainIndex
-
-      FetchEntry(
-        hash      = header.shortHex,
-        timestamp = header.timestamp,
-        chainFrom = index.from.value,
-        chainTo   = index.to.value,
-        height    = chain.getHeight(header),
-        deps      = header.blockDeps.toIterable.map(_.shortHex).toList
-      ).asJson
+    addressOpt match {
+      case Some(address) => Right(address)
+      case None          => Left(Response.failed("Failed in decoding address"))
     }
   }
+
+  def decodePublicKey(raw: String): Try[ED25519PublicKey] =
+    decodeRandomBytes(raw, ED25519PublicKey.from, "public key")
+
+  def decodePrivateKey(raw: String): Try[ED25519PrivateKey] =
+    decodeRandomBytes(raw, ED25519PrivateKey.from, "private key")
+
+  def decodeRandomBytes[T](raw: String, from: ByteString => Option[T], name: String): Try[T] = {
+    val addressOpt = for {
+      bytes   <- Hex.from(raw)
+      address <- from(bytes)
+    } yield address
+
+    addressOpt match {
+      case Some(address) => Right(address)
+      case None          => Left(Response.failed(s"Failed in decoding $name"))
+    }
+  }
+
+  def getP2pkhBalance(blockFlow: BlockFlow, address: ED25519PublicKey): Try[Balance] = {
+    blockFlow.getP2pkhUtxos(address) match {
+      case Right(utxos) => Right(Balance(utxos.sumBy(_._2.value), utxos.length))
+      case Left(_)      => failedInIO
+    }
+  }
+
+  def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
+    withReqF[Transfer, TransferResult](req) { query =>
+      if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
+        val result = for {
+          fromAddress    <- decodePublicKey(query.fromAddress)
+          _              <- checkGroup(blockFlow, fromAddress)
+          toAddress      <- decodePublicKey(query.toAddress)
+          fromPrivateKey <- decodePrivateKey(query.fromPrivateKey)
+          tx             <- prepareTransaction(blockFlow, fromAddress, toAddress, query.value, fromPrivateKey)
+        } yield {
+          // publish transaction
+          txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
+          TransferResult(Hex.toHexString(tx.hash.bytes))
+        }
+        result match {
+          case Right(result) => Right(result)
+          case Left(error)   => Left(error)
+        }
+      } else {
+        Left(Response.failed(s"Invalid address types: ${query.fromType} or ${query.toType}"))
+      }
+    }
+  }
+
+  def prepareTransaction(blockFlow: BlockFlow,
+                         fromAddress: ED25519PublicKey,
+                         toAddress: ED25519PublicKey,
+                         value: BigInt,
+                         fromPrivateKey: ED25519PrivateKey): Try[Transaction] = {
+    blockFlow.prepareP2pkhTx(fromAddress, toAddress, value, fromPrivateKey) match {
+      case Right(Some(transaction)) => Right(transaction)
+      case Right(None)              => Left(Response.failed("Not enough balance"))
+      case Left(_)                  => failedInIO
+    }
+  }
+
+  def checkGroup(blockFlow: BlockFlow, address: ED25519PublicKey): Try[Unit] = {
+    val pubScript  = PubScript.p2pkh(address)
+    val groupIndex = GroupIndex.from(pubScript)(blockFlow.config)
+    if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
+    else Left(Response.failed(s"Address ${address.shortHex} belongs to other groups"))
+  }
+
+  def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
+      implicit config: ConsensusConfig): FetchEntry = {
+    val index = header.chainIndex
+
+    FetchEntry(
+      hash      = header.shortHex,
+      timestamp = header.timestamp,
+      chainFrom = index.from.value,
+      chainTo   = index.to.value,
+      height    = chain.getHeight(header),
+      deps      = header.blockDeps.toIterable.map(_.shortHex).toList
+    )
+  }
+
+  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
+    Future {
+      f
+      Right(true)
+    }
+
+  def wrap[T: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
+  }
+
+  def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 }

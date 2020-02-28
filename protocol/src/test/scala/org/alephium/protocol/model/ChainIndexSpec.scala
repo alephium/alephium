@@ -36,8 +36,8 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
       index1 is index2
     }
 
-    val index1 = ChainIndex.unsafe(999999, 999999)
-    val index2 = ChainIndex.unsafe(999999, 999999)
+    val index1 = new ChainIndex(new GroupIndex(999999), new GroupIndex(999999))
+    val index2 = new ChainIndex(new GroupIndex(999999), new GroupIndex(999999))
     index1 is index2
   }
 }

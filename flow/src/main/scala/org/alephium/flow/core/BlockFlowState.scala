@@ -2,16 +2,18 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PubScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
+// scalastyle:off number.of.methods
 trait BlockFlowState {
   import BlockFlowState._
 
@@ -77,7 +79,7 @@ trait BlockFlowState {
   def cacheBlock(block: Block): Unit = {
     val index = block.chainIndex
     (brokerInfo.groupFrom until brokerInfo.groupUntil).foreach { group =>
-      val groupIndex = GroupIndex(group)
+      val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {
         convertBlock(block, groupIndex) match {
@@ -137,7 +139,7 @@ trait BlockFlowState {
   }
 
   private def getTrie(deps: AVector[Keccak256], groupIndex: GroupIndex): MerklePatriciaTrie = {
-    assert(deps.length == 2 * config.groups - 1)
+    assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
   }
@@ -150,6 +152,10 @@ trait BlockFlowState {
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
     val groupShift = groupIndex.value - brokerInfo.groupFrom
     bestDeps(groupShift)
+  }
+
+  def getBestTrie(chainIndex: ChainIndex): MerklePatriciaTrie = {
+    getBestTrie(chainIndex.from)
   }
 
   def getBestTrie(groupIndex: GroupIndex): MerklePatriciaTrie = {
@@ -250,21 +256,91 @@ trait BlockFlowState {
     }
   }
 
-  def getP2pkhBalances(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+  def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
+    val trie = getBestTrie(chainIndex)
+    tx.raw.inputs.mapE { input =>
+      trie.get[TxOutputPoint, TxOutput](input)
+    }
+  }
+
+  def getNonPersistedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[OutBlockCache]] = {
+    val bestDeps = getBestDeps(groupIndex)
+    val outDeps  = bestDeps.outDeps
+    val intraDep = outDeps(groupIndex.value)
+    val diffE = getBlockHeader(intraDep).map { header =>
+      if (header.isGenesis) {
+        AVector.empty
+      } else {
+        val persistedOutDeps = header.outDeps.replace(groupIndex.value, intraDep)
+        outDeps.indices.foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
+          acc ++ getTipsDiff(outDeps(i), persistedOutDeps(i))
+        }
+      }
+    }
+    val cache = getGroupCache(groupIndex)
+    diffE.map(_.map(cache.outblockcaches.apply))
+  }
+
+  def isInputNotSpentInNewOutBlocks(groupIndex: GroupIndex,
+                                    input: TxOutputPoint): IOResult[Boolean] = {
+    getNonPersistedOutBlocks(groupIndex).map(_.forall(!_.inputs.contains(input)))
+  }
+
+  def getP2pkhUtxos(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val pubScript  = PubScript.p2pkh(address)
     val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
+
     val prefix = serialize(pubScript.shortKey)
-    getBestTrie(groupIndex).getAll[TxOutputPoint, TxOutput](prefix).map { data =>
-      data.filter(_._2.pubScript == pubScript)
+    for {
+      persistedUtxos <- getBestTrie(groupIndex)
+        .getAll[TxOutputPoint, TxOutput](prefix)
+        .map(_.filter(_._2.pubScript == pubScript))
+      pair <- getP2pkhUtxosInCache(pubScript, groupIndex, persistedUtxos)
+    } yield {
+      val (usedUtxos, newUtxos) = pair
+      persistedUtxos.filter(p => !usedUtxos.contains(p._1)) ++ newUtxos
+    }
+  }
+
+  def getP2pkhUtxosInCache(pubScript: PubScript,
+                           groupIndex: GroupIndex,
+                           persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
+    : IOResult[(AVector[TxOutputPoint], AVector[(TxOutputPoint, TxOutput)])] = {
+    getNonPersistedOutBlocks(groupIndex).map { blockCaches =>
+      val result0 = blockCaches
+        .map(cache => cache.inputs.filter(i => persistedUtxos.exists(_._1 == i)))
+        .flatMap(AVector.from)
+      val result1 = blockCaches
+        .map(cache => AVector.from(cache.relatedOutputs.filter(_._2.pubScript == pubScript)))
+        .flatMap(identity)
+      (result0, result1)
+    }
+  }
+
+  def getP2pkhBalance(address: ED25519PublicKey): IOResult[BigInt] = {
+    getP2pkhUtxos(address).map(_.sumBy(_._2.value))
+  }
+
+  def prepareP2pkhTx(from: ED25519PublicKey,
+                     to: ED25519PublicKey,
+                     value: BigInt,
+                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+    getP2pkhUtxos(from).map { utxos =>
+      val balance = utxos.sumBy(_._2.value)
+      if (balance >= value) {
+        Some(Transaction.simpleTransfer(utxos.map(_._1), balance, from, to, value, fromPrivateKey))
+      } else None
     }
   }
 }
+// scalastyle:on number.of.methods
 
 object BlockFlowState {
   sealed trait BlockCache
   case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache
-  case class OutBlockCache(inputs: Set[TxOutputPoint])           extends BlockCache
+  case class OutBlockCache(inputs: Set[TxOutputPoint], relatedOutputs: Map[TxOutputPoint, TxOutput])
+      extends BlockCache
   case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput], inputs: Set[TxOutputPoint])
       extends BlockCache // For blocks on intra-group chain
 
@@ -275,11 +351,16 @@ object BlockFlowState {
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
       transaction.raw.outputs.mapWithIndex { (output, i) =>
-        val outputPoint = TxOutputPoint(output.shortKey, transaction.hash, i)
+        val outputPoint = TxOutputPoint.unsafe(transaction, i)
         (outputPoint, output)
       }
     }
     outputs.toIterable.toMap
+  }
+
+  private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
+      implicit config: GroupConfig): Map[TxOutputPoint, TxOutput] = {
+    convertOutputs(block).filter(_._1.fromGroup == groupIndex)
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
@@ -289,7 +370,7 @@ object BlockFlowState {
     if (index.isIntraGroup) {
       InOutBlockCache(convertOutputs(block), convertInputs(block))
     } else if (index.from == groupIndex) {
-      OutBlockCache(convertInputs(block))
+      OutBlockCache(convertInputs(block), convertRelatedOutputs(block, groupIndex))
     } else {
       InBlockCache(convertOutputs(block))
     }
@@ -355,8 +436,11 @@ object BlockFlowState {
     blockCache match {
       case InBlockCache(outputs) =>
         updateStateForOutputs(trie, outputs)
-      case OutBlockCache(inputs) =>
-        updateStateForInputs(trie, inputs)
+      case OutBlockCache(inputs, relatedOutputs) =>
+        for {
+          trie0 <- updateStateForInputs(trie, inputs)
+          trie1 <- updateStateForOutputs(trie0, relatedOutputs)
+        } yield trie1
       case InOutBlockCache(outputs, inputs) =>
         for {
           trie0 <- updateStateForOutputs(trie, outputs)

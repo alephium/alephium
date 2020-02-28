@@ -5,8 +5,9 @@ import scala.annotation.tailrec
 import org.alephium.crypto._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.PubScript
+import org.alephium.util.Bits
 
-class GroupIndex private (val value: Int) extends AnyVal {
+class GroupIndex(val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"
 
   @tailrec
@@ -20,10 +21,22 @@ class GroupIndex private (val value: Int) extends AnyVal {
 }
 
 object GroupIndex {
-  def apply(value: Int)(implicit config: GroupConfig): GroupIndex = {
-    require(validate(value))
-    new GroupIndex(value)
+  def unsafe(group: Int)(implicit config: GroupConfig): GroupIndex = {
+    assume(validate(group))
+    new GroupIndex(group)
   }
+
+  def from(group: Int)(implicit config: GroupConfig): Option[GroupIndex] = {
+    if (validate(group)) {
+      Some(new GroupIndex(group))
+    } else {
+      None
+    }
+  }
+
+  @inline
+  private def validate(group: Int)(implicit config: GroupConfig): Boolean =
+    0 <= group && group < config.groups
 
   def fromP2PKH(publicKey: ED25519PublicKey)(implicit config: GroupConfig): GroupIndex = {
     val pubScript = PubScript.p2pkh(publicKey)
@@ -31,11 +44,11 @@ object GroupIndex {
   }
 
   def from(pubScript: PubScript)(implicit config: GroupConfig): GroupIndex = {
-    val bytes = pubScript.hash.bytes
-    GroupIndex((bytes.last & 0xFF) % config.groups)
+    fromShortKey(pubScript.shortKey)
   }
 
-  def unsafe(value: Int): GroupIndex = new GroupIndex(value)
-  def validate(group: Int)(implicit config: GroupConfig): Boolean =
-    0 <= group && group < config.groups
+  def fromShortKey(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
+    val hash = Bits.toPosInt(Bits.xorByte(shortKey))
+    GroupIndex.unsafe(hash % config.groups)
+  }
 }

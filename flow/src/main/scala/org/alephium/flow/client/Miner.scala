@@ -11,7 +11,7 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.LocalMining
+import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor, TimeStamp}
@@ -70,10 +70,10 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
       totalMiningCount += 1
       tryMine(template, from, to) match {
         case Some(block) =>
-          val elapsed = TimeStamp.now().diff(lastTs)
+          val elapsed = TimeStamp.now().millis - lastTs.millis
           log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed $elapsed, miningCount: $totalMiningCount, target: ${template.target}")
-          blockHandler ! BlockChainHandler.addOneBlock(block, LocalMining)
+            s"A new block ${block.shortHex} got mined for $chainIndex, elapsed ${elapsed}ms, miningCount: $totalMiningCount, target: ${template.target}")
+          blockHandler ! BlockChainHandler.addOneBlock(block, Local)
         case None =>
           if (System.currentTimeMillis() - taskStartingTime >= taskRefreshDuration) {
             allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)
@@ -97,7 +97,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   protected def _collect: Receive = {
     case FlowHandler.BlockFlowTemplate(_, deps, target, transactions) =>
-      assert(deps.length == (2 * config.groups - 1))
+      assert(deps.length == config.depsNum)
       // scalastyle:off magic.number
       val chainDep = deps.takeRight(config.groups)(chainIndex.to.value)
       // scalastyle:on magic.number
@@ -108,8 +108,8 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
         case Right(header) =>
           val lastTs   = header.timestamp
           val data     = ByteString.fromInts(Random.nextInt())
-          val coinbase = Transaction.coinbase(address, 1, data)
-          val template = BlockTemplate(deps, target, coinbase +: transactions)
+          val coinbase = Transaction.coinbase(address, data)
+          val template = BlockTemplate(deps, target, transactions :+ coinbase)
           context become mine(template, lastTs)
           taskStartingTime = System.currentTimeMillis()
           self ! Miner.Nonce(0, config.nonceStep)

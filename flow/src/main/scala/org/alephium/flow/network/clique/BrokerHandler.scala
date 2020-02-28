@@ -309,13 +309,18 @@ trait MessageHandler extends BaseActor {
       val handler = allHandlers.getHeaderHandler(chainIndex)
       handler ! HeaderChainHandler.addOneHeader(header, origin)
     } else {
-      log.warning(s"Received headers for wrong chain from $remote")
+      log.warning(s"Received header ${header.shortHex} for wrong chain from $remote")
     }
   }
 
   def handleGetHeaders(locators: AVector[Keccak256]): Unit = {
     log.debug(s"GetHeaders received: ${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
+  }
+
+  def handleSendTxs(txs: AVector[Transaction]): Unit = {
+    log.debug(s"SendTxs received: ${Utils.show(txs.map(_.hash))}")
+    txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddTx(tx, origin))
   }
 }
 
@@ -436,6 +441,7 @@ trait Relay extends P2PStage {
     case GetBlocks(locators)    => handleGetBlocks(locators)
     case SendHeaders(headers)   => handleSendHeaders(headers)
     case GetHeaders(locators)   => handleGetHeaders(locators)
+    case SendTxs(txs)           => handleSendTxs(txs)
     case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
     case Pong(nonce)            => handlePong(nonce)
     case x                      =>

@@ -21,6 +21,6 @@ class BlockFlowBench {
 
   @Benchmark
   def findBestDeps(): BlockDeps = {
-    blockFlow.calBestDepsUnsafe(GroupIndex(0))
+    blockFlow.calBestDepsUnsafe(GroupIndex.unsafe(0))
   }
 }

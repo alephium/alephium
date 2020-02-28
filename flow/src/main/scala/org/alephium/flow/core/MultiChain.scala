@@ -116,7 +116,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     for {
       i    <- 0 until groups
       j    <- 0 until groups
-      hash <- getHashChain(GroupIndex(i), GroupIndex(j)).getAllBlockHashes
+      hash <- getHashChain(GroupIndex.unsafe(i), GroupIndex.unsafe(j)).getAllBlockHashes
       header = getBlockHeaderUnsafe(hash)
       if predicate(header)
     } yield {

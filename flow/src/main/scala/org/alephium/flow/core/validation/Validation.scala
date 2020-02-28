@@ -2,13 +2,13 @@ package org.alephium.flow.core.validation
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.core._
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.{PubScript, Script, Witness}
-import org.alephium.serde.serialize
 import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
@@ -21,6 +21,7 @@ abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
       implicit config: PlatformProfile): IOResult[S]
 }
 
+// scalastyle:off number.of.methods
 object Validation {
   import ValidationStatus._
 
@@ -81,8 +82,15 @@ object Validation {
       _ <- checkNonEmptyTransactions(block)
       _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
-      _ <- checkTransactions(block, flow)
+      _ <- checkNonCoinbases(block, flow)
     } yield ()
+  }
+
+  private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
+      implicit config: PlatformProfile): TxValidationResult = {
+    val index = ChainIndex(tx.fromGroup, tx.toGroup)
+    val trie  = flow.getBestTrie(index)
+    checkNonCoinbaseTx(index, tx, trie)
   }
 
   /*
@@ -100,8 +108,8 @@ object Validation {
     val now      = TimeStamp.now()
     val headerTs = header.timestamp
 
-    val ok1 = headerTs < now.plusHours(1)
-    val ok2 = isSyncing || (headerTs > now.plusHours(-1))
+    val ok1 = headerTs < now.plusHoursUnsafe(1)
+    val ok2 = isSyncing || (headerTs > now.plusHours(-1).get) // Note: now -1hour is always positive
     if (ok1 && ok2) validHeader else invalidHeader(InvalidTimeStamp)
   }
 
@@ -131,7 +139,7 @@ object Validation {
   }
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
-    val coinbase = block.transactions.head // Note: validateNonEmptyTransactions first pls!
+    val coinbase = block.transactions.last // Note: validateNonEmptyTransactions first pls!
     val raw      = coinbase.raw
     if (raw.inputs.length == 0 && raw.outputs.length == 1 && coinbase.witnesses.isEmpty)
       validBlock
@@ -144,62 +152,137 @@ object Validation {
     else invalidBlock(InvalidMerkleRoot)
   }
 
-  private[validation] def checkTransactions(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): TxValidationResult = {
+  private[validation] def checkNonCoinbases(block: Block, flow: BlockFlow)(
+      implicit config: PlatformProfile): TxsValidationResult = {
     val index      = block.chainIndex
     val brokerInfo = config.brokerInfo
     assert(index.relateTo(brokerInfo))
 
     if (brokerInfo.contains(index.from)) {
       val trie = flow.getTrie(block)
-      for {
-        _ <- checkSpending(block, trie)
-        _ <- checkAllScripts(block, trie)
+      val result = for {
+        _ <- checkBlockDoubleSpending(block)
+        _ <- block.transactions.init.foreachE(checkBlockNonCoinbase(index, _, trie))
       } yield ()
+      convert(result)
+    } else {
+      validTxs
+    }
+  }
+
+  private[validation] def checkBlockNonCoinbase(
+      index: ChainIndex,
+      tx: Transaction,
+      trie: MerklePatriciaTrie)(implicit config: GroupConfig): TxValidationResult = {
+    for {
+      _ <- checkNonEmpty(tx)
+      _ <- checkOutputValue(tx)
+      _ <- checkChainIndex(index, tx)
+      _ <- checkSpending(tx, trie)
+    } yield ()
+  }
+
+  private[validation] def checkNonCoinbaseTx(
+      index: ChainIndex,
+      tx: Transaction,
+      trie: MerklePatriciaTrie)(implicit config: GroupConfig): TxValidationResult = {
+    for {
+      _ <- checkNonEmpty(tx)
+      _ <- checkOutputValue(tx)
+      _ <- checkChainIndex(index, tx)
+      _ <- checkTxDoubleSpending(tx)
+      _ <- checkSpending(tx, trie)
+    } yield ()
+  }
+
+  private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult = {
+    if (tx.raw.inputs.isEmpty) {
+      invalidTx(EmptyInputs)
+    } else if (tx.raw.outputs.isEmpty) {
+      invalidTx(EmptyOutputs)
     } else {
       validTx
     }
   }
 
-  private[validation] def checkSpending(block: Block,
-                                        trie: MerklePatriciaTrie): TxValidationResult = {
+  private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
+    if (!tx.raw.outputs.forall(_.value >= 0)) {
+      invalidTx(NegativeOutputValue)
+    } else if (!(tx.raw.outputs.sumBy(_.value) < ALF.MaxALFValue)) {
+      invalidTx(OutputValueOverFlow)
+    } else {
+      validTx
+    }
+  }
+
+  private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
+      implicit config: GroupConfig): TxValidationResult = {
+    val fromOk = tx.raw.inputs.forall(_.fromGroup == index.from)
+    val toOk = tx.raw.outputs.forall { output =>
+      output.toGroup == index.from || output.toGroup == index.to
+    }
+    val existed = tx.raw.outputs.exists(_.toGroup == index.to)
+    if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
+  }
+
+  private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    EitherF.foreachTry(block.transactions.tail.toIterable) { tx =>
-      EitherF.foreachTry(tx.raw.inputs.toIterable) { input =>
+    block.transactions.init.foreachE { tx =>
+      tx.raw.inputs.foreachE { input =>
         if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {
           utxoUsed += input
-          trie.getOpt[TxOutputPoint, TxOutput](input) match {
-            case Left(error)        => Left(Left(error))
-            case Right(txOutputOpt) => if (txOutputOpt.isEmpty) invalidTx(InvalidCoin) else validTx
-          }
+          validTx
         }
       }
     }
   }
 
-  private[validation] def checkAllScripts(block: Block,
-                                          trie: MerklePatriciaTrie): TxValidationResult = {
-    val transactions = block.transactions
-    EitherF.foreachTry(transactions.indices.tail)(idx => checkTxScripts(transactions(idx), trie))
+  private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult = {
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
+    tx.raw.inputs.foreachE { input =>
+      if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
+      else {
+        utxoUsed += input
+        validTx
+      }
+    }
   }
 
-  private[validation] def checkTxScripts(tx: Transaction,
-                                         trie: MerklePatriciaTrie): TxValidationResult = {
-    val inputs    = tx.raw.inputs
-    val witnesses = tx.witnesses
-    if (inputs.length != witnesses.length) {
-      invalidTx(InvalidWitnessLength)
-    } else {
-      val rawHash = Keccak256.hash(serialize(tx.raw))
-      EitherF.foreachTry(inputs.indices) { idx =>
-        val input   = inputs(idx)
-        val witness = witnesses(idx)
-        trie.get[TxOutputPoint, TxOutput](input) match {
-          case Left(error)      => Left(Left(error))
-          case Right(preOutput) => checkWitness(rawHash, preOutput.pubScript, witness)
-        }
-      }
+  private[validation] def checkSpending(tx: Transaction,
+                                        trie: MerklePatriciaTrie): TxValidationResult = {
+    val query = tx.raw.inputs.mapE { input =>
+      trie.get[TxOutputPoint, TxOutput](input)
+    }
+    query match {
+      case Right(preOutputs)                 => checkSpending(tx, preOutputs)
+      case Left(IOError.RocksDB.keyNotFound) => invalidTx(NonExistInput)
+      case Left(error)                       => Left(Left(error))
+    }
+  }
+
+  private[validation] def checkSpending(tx: Transaction,
+                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
+    for {
+      _ <- checkBalance(tx, preOutputs)
+      _ <- checkWitnesses(tx, preOutputs)
+    } yield ()
+  }
+
+  private[validation] def checkBalance(tx: Transaction,
+                                       preOutputs: AVector[TxOutput]): TxValidationResult = {
+    val inputSum  = preOutputs.sumBy(_.value)
+    val outputSum = tx.raw.outputs.sumBy(_.value)
+    if (outputSum <= inputSum) validTx else invalidTx(InvalidBalance)
+  }
+
+  private[validation] def checkWitnesses(tx: Transaction,
+                                         preOutputs: AVector[TxOutput]): TxValidationResult = {
+    assume(tx.raw.inputs.length == preOutputs.length)
+    EitherF.foreachTry(preOutputs.indices) { idx =>
+      val witness = tx.witnesses(idx)
+      val output  = preOutputs(idx)
+      checkWitness(tx.hash, output.pubScript, witness)
     }
   }
 
@@ -228,3 +311,4 @@ object Validation {
     data.chainIndex == index && checkWorkAmount(data).isRight
   }
 }
+// scalastyle:on number.of.methods

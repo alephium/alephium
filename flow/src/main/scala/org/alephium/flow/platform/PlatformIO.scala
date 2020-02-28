@@ -14,6 +14,8 @@ trait PlatformIO {
   def headerDB: HeaderDB
 
   def emptyTrie: MerklePatriciaTrie
+
+  def txPoolCapacity: Int
 }
 
 object PlatformIO {

@@ -44,8 +44,9 @@ object Block {
   }
 
   def genesis(transactions: AVector[Transaction], target: BigInt, nonce: BigInt): Block = {
-    val txsHash     = Keccak256.hash(transactions)
-    val blockHeader = BlockHeader(AVector.empty, txsHash, TimeStamp.fromMillis(0), target, nonce)
+    val txsHash = Keccak256.hash(transactions)
+    val blockHeader =
+      BlockHeader(AVector.empty, txsHash, TimeStamp.unsafe(0), target, nonce)
     Block(blockHeader, transactions)
   }
 }

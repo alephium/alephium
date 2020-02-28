@@ -26,6 +26,9 @@ trait PlatformProfile
     with PlatformIO {
   def all: Config
   def aleph: Config
+
+  def txPoolCapacity: Int
+  def txMaxNumberPerBlock: Int
 }
 
 object PlatformProfile {
@@ -89,18 +92,18 @@ object PlatformProfile {
       final val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
       final val blockTargetTime: Duration =
-        Duration.from(consensusCfg.getDuration("blockTargetTime"))
+        Duration.from(consensusCfg.getDuration("blockTargetTime")).get
       final val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
       final val expectedTimeSpan: Duration = blockTargetTime
 
       final val blockCacheSize
         : Int = consensusCfg.getInt("blockCacheSizePerChain") * (2 * groups - 1)
 
-      final val medianTimeInterval    = 11
-      final val diffAdjustDownMax     = 16
-      final val diffAdjustUpMax       = 8
-      final val timeSpanMin: Duration = expectedTimeSpan * (100l - diffAdjustDownMax) / 100l
-      final val timeSpanMax: Duration = expectedTimeSpan * (100l + diffAdjustUpMax) / 100l
+      final val medianTimeInterval = 11
+      final val diffAdjustDownMax  = 16
+      final val diffAdjustUpMax    = 8
+      final val timeSpanMin        = (expectedTimeSpan * (100l - diffAdjustDownMax)).get divUnsafe 100l
+      final val timeSpanMax        = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
       /* Consensus */
 
       /* mining */
@@ -150,13 +153,21 @@ object PlatformProfile {
         PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)
       }
       /* IO */
+
+      /* Platform */
+      val txPoolCapacity      = 1000
+      val txMaxNumberPerBlock = 1000
+      /* Platform */
     }
   // scalastyle:off method.length parameter.number
 
   private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
     val List(left, right) = raw.split(":").toList
-    val publicKey         = ED25519PublicKey.from(Hex.unsafeFrom(left))
-    val balance           = BigInt(right)
+    val publicKeyOpt      = Hex.from(left).flatMap(ED25519PublicKey.from)
+    require(publicKeyOpt.nonEmpty, "Invalid public key")
+
+    val publicKey = publicKeyOpt.get
+    val balance   = BigInt(right)
     (publicKey, balance)
   }
 
@@ -176,7 +187,7 @@ object PlatformProfile {
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]
-        mineGenesis(ChainIndex(from, to)(config), transactions)
+        mineGenesis(ChainIndex.from(from, to).get, transactions)
     }
   }
 

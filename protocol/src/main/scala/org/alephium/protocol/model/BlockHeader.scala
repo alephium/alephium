@@ -46,14 +46,14 @@ case class BlockHeader(
     assert(!isGenesis)
     blockDeps.takeRight(config.groups)
   }
+
+  def outTips(implicit config: GroupConfig): AVector[Keccak256] = {
+    assert(!isGenesis)
+    blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
+  }
 }
 
 object BlockHeader {
-  private implicit val serdeTS: Serde[TimeStamp] =
-    longSerde
-      .validate(_ >= 0, n => s"Expect positive timestamp, got $n")
-      .xmap(TimeStamp.fromMillis, _.millis)
-
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 }

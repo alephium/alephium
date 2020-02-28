@@ -10,7 +10,7 @@ import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.model.DataOrigin.LocalMining
+import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{Duration, TimeStamp}
@@ -33,22 +33,22 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
 
   override def _mine(template: BlockTemplate, lastTs: TimeStamp): Receive = {
     case Miner.Nonce(_, _) =>
-      val delta     = Duration.ofMillis(1000l * 30l + Random.nextInt(1000 * 60).toLong)
+      val delta     = Duration.unsafe(1000l * 30l + Random.nextInt(1000 * 60).toLong)
       val currentTs = TimeStamp.now()
       val nextTs =
         if (lastTs == TimeStamp.zero) currentTs + delta
         else {
-          val num = currentTs.diff(lastTs).millis / delta.millis + 1
+          val num = (currentTs.millis - lastTs.millis) / delta.millis + 1
           if (num > 1) log.info(s"---- step: $num")
-          lastTs + delta * num
+          lastTs + delta.timesUnsafe(num)
         }
-      val sleepTs = nextTs.diff(currentTs)
+      val sleepTs = (nextTs -- currentTs).get
       scheduleOnce(self, MockMiner.MockMining(nextTs), sleepTs)
 
     case MockMiner.MockMining(nextTs) =>
       val block = tryMine(template, nextTs.millis, Long.MaxValue).get
       log.info(s"A new block ${block.shortHex} got mined at ${block.header.timestamp}")
-      blockHandler ! BlockChainHandler.addOneBlock(block, LocalMining)
+      blockHandler ! BlockChainHandler.addOneBlock(block, Local)
 
     case Miner.UpdateTemplate =>
       allHandlers.flowHandler ! FlowHandler.PrepareBlockFlow(chainIndex)

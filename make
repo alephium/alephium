@@ -3,12 +3,6 @@ import argparse, os, tempfile, sys
 
 port_start = 9973
 
-parser = argparse.ArgumentParser(description='Alephium Make')
-
-parser.add_argument('goal', type=str)
-
-args = parser.parse_args()
-
 def get_env(key):
     return os.environ[key]
 
@@ -26,8 +20,10 @@ def get_env_default_int(key, default):
 
 def rpc_call(host, port, method, params):
     json = """{{"jsonrpc":"2.0","id": 0,"method":"{}","params": {}}}"""
-    cmd = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
-    run(cmd.format(json.format(method, params), host, port))
+    cmd_tmp = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
+    cmd = cmd_tmp.format(json.format(method, params), host, port)
+    print("[RPC]-[{}@{}]: {}".format(host, port, cmd))
+    run(cmd)
 
 def rpc_call_all(method, params):
     nodes = get_env_int('nodes')
@@ -37,7 +33,6 @@ def rpc_call_all(method, params):
         rpc_call('localhost', port, method, params)
 
 def run(cmd):
-    print(cmd)
     os.system(cmd)
 
 class AlephiumMake(object):
@@ -45,25 +40,27 @@ class AlephiumMake(object):
         parser = argparse.ArgumentParser(
             usage='''make <command> [<args>]
 
-   clean        Clean the project workspace
-   build        Build the project
-   test         Run the test suite
-   benchmark    Run the benchmark suite
-   package      Produce the project deliverable
+            clean        Clean the project workspace
+            build        Build the project
+            test         Run the test suite
+            benchmark    Run the benchmark suite
+            package      Produce the project deliverable
 
+            run          Run a local testnet
+            kill         kill a local running testnet
+            rpc method params    rpc call to local testnet
+        ''')
 
-   run          Run a local testnet
-   mining_start Start mining on local testnet
-   mining_stop  Stop mining on local testnet
-   kill         kill a local running testnet
-''')
-        parser.add_argument('command', help='Subcommand to run')
-        args = parser.parse_args(sys.argv[1:2])
-        if not hasattr(self, args.command):
+        parser.add_argument('command', nargs='*', help='Subcommand to run')
+        args = parser.parse_args()
+        if not hasattr(self, args.command[0]):
             print('Unrecognized command')
             parser.print_help()
             exit(1)
-        getattr(self, args.command)()
+        if len(args.command) == 1:
+            getattr(self, args.command[0])()
+        else:
+            getattr(self, args.command[0])(args.command[1:])
 
     def build(self):
         run('sbt app/stage')
@@ -94,7 +91,6 @@ class AlephiumMake(object):
             bootstrap = ""
             if node // brokerNum > 0:
                 bootstrap = "localhost:" + str(9973 + node % brokerNum)
-            print("{}, {}".format(node, bootstrap))
 
             homedir = "{}/alephium/node-{}".format(tempdir, node)
 
@@ -103,11 +99,10 @@ class AlephiumMake(object):
 
             run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
 
-    def mining_start(self):
-        rpc_call_all("mining_start", "[]")
-
-    def mining_stop(self):
-        rpc_call_all("mining_stop", "[]")
+    def rpc(self, params):
+        method = params[0]
+        args = params[1] if len(params) > 1 else "{}"
+        rpc_call_all(method, args)
 
     def kill(self):
         run("ps aux | grep -i org.alephium | awk '{print $2}' | xargs kill 2> /dev/null")

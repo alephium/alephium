@@ -6,7 +6,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Bits}
 
 object MerklePatriciaTrie {
   /* branch [encodedPath, v0, ..., v15]
@@ -145,6 +145,11 @@ object MerklePatriciaTrie {
     (byte & 0x0F).toByte
   }
 
+  def getNibble(nibbles: ByteString, index: Int): Int = {
+    assume(index >= 0 && index < nibbles.length)
+    Bits.toPosInt(nibbles(index))
+  }
+
   def toNibbles[K: Serde](key: K): ByteString = {
     bytes2Nibbles(serialize[K](key))
   }
@@ -196,7 +201,7 @@ object MerklePatriciaTrie {
 
 // TODO: batch mode
 class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
-  import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions}
+  import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie] = {
     result.toAdd
@@ -239,7 +244,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
       case BranchNode(path, children) =>
         assert(nibbles.length > path.length)
         if (path == nibbles.take(path.length)) {
-          children(nibbles(path.length) & 0xFF) match {
+          children(getNibble(nibbles, path.length)) match {
             case Some(childHash) =>
               getOpt(childHash, nibbles.drop(path.length + 1))
             case None =>
@@ -269,7 +274,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     getNode(hash) flatMap {
       case node @ BranchNode(path, children) =>
         assert(nibbles.length > path.length)
-        val nibble   = nibbles(path.length) & 0xFF
+        val nibble   = getNibble(nibbles, path.length)
         val childOpt = children(nibble)
         if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
           val restNibbles = nibbles.drop(path.length + 1)
@@ -341,7 +346,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
       if (branchIndex == -1) {
         node match {
           case branchNode @ BranchNode(_, children) =>
-            val nibble       = nibbles(path.length) & 0xFF
+            val nibble       = getNibble(nibbles, path.length)
             val nibblesRight = nibbles.drop(path.length + 1)
             children(nibble) match {
               case Some(childHash) =>
@@ -372,10 +377,10 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
                      value: ByteString): IOResult[TrieUpdateActions] = {
     val path         = node.path
     val prefix       = path.take(branchIndex)
-    val nibble1      = path(branchIndex) & 0xFF
+    val nibble1      = getNibble(path, branchIndex)
     val node1        = node.preCut(branchIndex + 1)
     val nibblesRight = nibbles.drop(branchIndex + 1)
-    val nibble2      = nibbles(branchIndex) & 0xFF
+    val nibble2      = getNibble(nibbles, branchIndex)
     val newLeaf      = LeafNode(nibblesRight, value)
     val branchNode   = Node.branch(prefix, nibble1, node1, nibble2, newLeaf)
 
