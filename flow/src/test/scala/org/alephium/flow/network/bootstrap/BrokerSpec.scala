@@ -18,11 +18,11 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
     connection.expectMsgType[Tcp.Write]
 
     val randomInfo = ModelGen.cliqueInfo.sample.get
-    val infoData   = BrokerConnector.envolop(randomInfo).data
+    val infoData   = BrokerConnector.envelop(randomInfo).data
     broker.tell(Tcp.Received(infoData), connection.ref)
     connection.expectMsgType[Tcp.Write]
 
-    val ready = BrokerConnector.envolop(CliqueCoordinator.Ready).data
+    val ready = BrokerConnector.envelop(CliqueCoordinator.Ready).data
     broker.tell(Tcp.Received(ready), connection.ref)
     connection.expectMsg(Tcp.ConfirmedClose)
 

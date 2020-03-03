@@ -40,7 +40,7 @@ object BrokerConnector {
     }
   }
 
-  def envolop[T](input: T)(implicit serializer: Serializer[T]): Tcp.Write = {
+  def envelop[T](input: T)(implicit serializer: Serializer[T]): Tcp.Write = {
     Tcp.Write(serializer.serialize(input))
   }
 }
@@ -57,13 +57,13 @@ class BrokerConnector(connection: ActorRef)(implicit config: GroupConfig) extend
 
   def forwardCliqueInfo: Receive = {
     case cliqueInfo: CliqueInfo =>
-      connection ! envolop(cliqueInfo)
+      connection ! envelop(cliqueInfo)
       context become await[Ack](ByteString.empty, context become forwardReady, deserializeTry(_))
   }
 
   def forwardReady: Receive = {
     case ready: CliqueCoordinator.Ready.type =>
-      connection ! envolop(ready)
+      connection ! envelop(ready)
     case Tcp.PeerClosed =>
       context stop self
   }
