@@ -30,7 +30,10 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
     context.actorOf(CliqueCoordinator.props(), "CliqueCoordinator")
   } else {
     log.debug("Start as Broker")
-    context.actorOf(Broker.props(), "Broker")
+    context.actorOf(
+      Broker.props(config.masterAddress, config.brokerInfo, config.retryTimeout),
+      "Broker"
+    )
   }
 
   override def receive: Receive =
