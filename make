@@ -99,11 +99,17 @@ class AlephiumMake(object):
         assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
         batch = get_env_default_int('batch', 0)
+
+        print("logs dir: " + tempdir + "/alephium")
+
         for node in range(batch * nodes, (batch + 1) * nodes):
             port = 9973 + node
             publicAddress = "localhost:" + str(port)
             masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
+
+            print("Starting a new node")
+            print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
 
             bootstrap = ""
             if node // brokerNum > 0:
