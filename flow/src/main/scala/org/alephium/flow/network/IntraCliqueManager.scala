@@ -40,6 +40,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
   override def receive: Receive = awaitBrokers(Map.empty)
 
   // TODO: replace Map with Array for performance
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connection from $remote")

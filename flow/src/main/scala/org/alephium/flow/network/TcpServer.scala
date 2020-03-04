@@ -11,7 +11,7 @@ object TcpServer {
   def props(port: Int): Props = Props(new TcpServer(port))
 
   sealed trait Command
-  case class Start(bootstrapper: ActorRef) extends Command
+  final case class Start(bootstrapper: ActorRef) extends Command
 
   sealed trait Event
   case object Bound extends Event
@@ -37,6 +37,7 @@ class TcpServer(port: Int) extends BaseActor {
       context stop self
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def workFor(actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
       actor.forward(c)

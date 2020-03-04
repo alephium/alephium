@@ -8,7 +8,9 @@ import org.alephium.util.AVector
 
 // All the groups [0, ..., G-1] are divided into G/gFactor continuous groups
 // Assume the peers are ordered according to the groups they correspond to
-case class CliqueInfo(id: CliqueId, peers: AVector[InetSocketAddress], groupNumPerBroker: Int) {
+final case class CliqueInfo(id: CliqueId,
+                            peers: AVector[InetSocketAddress],
+                            groupNumPerBroker: Int) {
   self =>
 
   def cliqueConfig: CliqueConfig = new CliqueConfig {

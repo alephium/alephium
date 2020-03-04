@@ -5,7 +5,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.ChainIndex
 
-case class AllHandlers(
+final case class AllHandlers(
     flowHandler: ActorRef,
     txHandler: ActorRef,
     blockHandlers: Map[ChainIndex, ActorRef],

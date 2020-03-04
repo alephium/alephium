@@ -17,7 +17,7 @@ object TxHandler {
     Props(new TxHandler(blockFlow, cliqueManager))
 
   sealed trait Command
-  case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
+  final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
 }
 
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: PlatformProfile)

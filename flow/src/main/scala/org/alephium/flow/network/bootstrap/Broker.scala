@@ -43,6 +43,7 @@ class Broker()(implicit config: PlatformProfile) extends BaseActor {
       }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitCliqueInfo(connection: ActorRef, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeTryWithValidation[CliqueInfo, CliqueInfo.Unsafe](unaligned ++ data) match {
@@ -59,6 +60,7 @@ class Broker()(implicit config: PlatformProfile) extends BaseActor {
       }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitReady(connection: ActorRef, cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeTry[CliqueCoordinator.Ready.type](unaligned ++ data) match {

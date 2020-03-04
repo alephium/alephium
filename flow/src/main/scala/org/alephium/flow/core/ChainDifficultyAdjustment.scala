@@ -9,13 +9,14 @@ trait ChainDifficultyAdjustment extends BlockHashPool {
 
   protected def blockHashesTable: ConcurrentHashMap[Keccak256, BlockHashChain.TreeNode]
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   protected def calMedianBlockTime(node: BlockHashChain.TreeNode): Option[TimeStamp] = {
     if (node.height < config.medianTimeInterval) None
     else {
       var cur = node
       val timestamps = Array.fill(config.medianTimeInterval) {
         val timestamp = cur.timestamp
-        cur = cur.parentOpt.get
+        cur = cur.parentOpt.get // cur.parentOpt is always nonEmpty
         timestamp
       }
       Some(calMedian(timestamps))

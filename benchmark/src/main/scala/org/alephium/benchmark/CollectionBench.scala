@@ -13,10 +13,10 @@ import org.alephium.util.AVector
 @State(Scope.Thread)
 // scalastyle:off magic.number
 class CollectionBench {
-  val N = 1000000
+  val N: Int = 1000000
 
-  val vector  = Vector.tabulate(N)(identity)
-  val avector = AVector.tabulate(N)(identity)
+  val vector: Vector[Int]   = Vector.tabulate(N)(identity)
+  val avector: AVector[Int] = AVector.tabulate(N)(identity)
 
   @Benchmark
   def accessVector(): Int = {
@@ -61,6 +61,7 @@ class CollectionBench {
   }
 
   @Benchmark
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def filterVector(): Int = {
     val vc: Vector[Int] = vector.filter(_ % 2 == 0)
     vc.last
