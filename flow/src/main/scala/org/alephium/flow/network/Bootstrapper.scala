@@ -31,7 +31,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
   } else {
     log.debug("Start as Broker")
     context.actorOf(
-      Broker.props(config.masterAddress, config.brokerInfo, config.retryTimeout),
+      Broker.props(config.masterAddress, config.brokerInfo, config.retryTimeout, self),
       "Broker"
     )
   }
