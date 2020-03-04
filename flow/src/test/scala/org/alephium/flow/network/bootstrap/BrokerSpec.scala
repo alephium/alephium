@@ -8,8 +8,15 @@ import org.alephium.protocol.model.ModelGen
 
 class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
   it should "follow this workflow" in {
-    val connection = TestProbe()
-    val broker     = system.actorOf(Broker.props())
+    val connection    = TestProbe()
+    val bootstrapper  = TestProbe()
+    val masterAddress = SocketUtil.temporaryServerAddress()
+
+    IO(Tcp) ! Tcp.Bind(connection.ref, masterAddress)
+    expectMsgType[Tcp.Bound]
+
+    val broker = system.actorOf(
+      Broker.props(masterAddress, config.brokerInfo, config.retryTimeout, bootstrapper.ref))
     watch(broker)
 
     broker.tell(Tcp.Connected(SocketUtil.temporaryServerAddress(), config.publicAddress),
@@ -27,6 +34,7 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
     connection.expectMsg(Tcp.ConfirmedClose)
 
     broker ! Tcp.ConfirmedClosed
+    bootstrapper.expectMsg(randomInfo)
     expectTerminated(broker)
   }
 }

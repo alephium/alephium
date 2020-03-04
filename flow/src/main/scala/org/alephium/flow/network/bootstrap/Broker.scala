@@ -11,17 +11,22 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{BaseActor, Duration, TimeStamp}
 
 object Broker {
-  def props(masterAddress: InetSocketAddress, brokerInfo: BrokerInfo, retryTimeout: Duration)(
+  def props(masterAddress: InetSocketAddress,
+            brokerInfo: BrokerInfo,
+            retryTimeout: Duration,
+            bootstrapper: ActorRef)(
       implicit groupConfig: GroupConfig
   ): Props =
-    Props(new Broker(masterAddress, brokerInfo, retryTimeout))
+    Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
 
   sealed trait Command
   case object Retry extends Command
 }
 
-class Broker(masterAddress: InetSocketAddress, brokerInfo: BrokerInfo, retryTimeout: Duration)(
-    implicit groupConfig: GroupConfig)
+class Broker(masterAddress: InetSocketAddress,
+             brokerInfo: BrokerInfo,
+             retryTimeout: Duration,
+             bootstrapper: ActorRef)(implicit groupConfig: GroupConfig)
     extends BaseActor {
 
   def until: TimeStamp = TimeStamp.now() + retryTimeout
@@ -87,7 +92,7 @@ class Broker(masterAddress: InetSocketAddress, brokerInfo: BrokerInfo, retryTime
   def awaitClose(cliqueInfo: CliqueInfo): Receive = {
     case Tcp.ConfirmedClosed =>
       log.debug("Close connection to master")
-      context.parent ! cliqueInfo
+      bootstrapper ! cliqueInfo
       context.stop(self)
   }
 }
