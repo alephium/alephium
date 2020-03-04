@@ -68,5 +68,5 @@ object BlockChain {
     }
   }
 
-  case class ChainDiff(toRemove: AVector[Block], toAdd: AVector[Block])
+  final case class ChainDiff(toRemove: AVector[Block], toAdd: AVector[Block])
 }

@@ -9,10 +9,16 @@ import org.alephium.protocol.model.BlockHeader
 object HeaderDB {
   import RocksDBStorage.Settings
 
+  def apply(storage: RocksDBStorage, cf: ColumnFamily): HeaderDB =
+    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+
+  def apply(storage: RocksDBStorage, cf: ColumnFamily, writeOptions: WriteOptions): HeaderDB =
+    apply(storage, cf, writeOptions, Settings.readOptions)
+
   def apply(storage: RocksDBStorage,
             cf: ColumnFamily,
-            writeOptions: WriteOptions = Settings.writeOptions,
-            readOptions: ReadOptions   = Settings.readOptions): HeaderDB = {
+            writeOptions: WriteOptions,
+            readOptions: ReadOptions): HeaderDB = {
     new HeaderDB(storage, cf, writeOptions, readOptions)
   }
 }

@@ -6,7 +6,7 @@ import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
-case class Message(header: Header, payload: Payload)
+final case class Message(header: Header, payload: Payload)
 
 object Message {
   def apply[T <: Payload](payload: T): Message = {

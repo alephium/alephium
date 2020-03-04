@@ -7,6 +7,7 @@ import org.rocksdb.util.SizeUnit
 
 import org.alephium.util.AVector
 
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object RocksDBStorage {
   import IOUtils.tryExecute
 
@@ -24,7 +25,7 @@ object RocksDBStorage {
     val values: AVector[ColumnFamily] = AVector(All, Trie)
   }
 
-  case class Compaction(
+  final case class Compaction(
       initialFileSize: Long,
       blockSize: Long,
       writeRateLimit: Option[Long]
@@ -33,13 +34,13 @@ object RocksDBStorage {
   object Compaction {
     import SizeUnit._
 
-    val SSD = Compaction(
+    val SSD: Compaction = Compaction(
       initialFileSize = 64 * MB,
       blockSize       = 16 * KB,
       writeRateLimit  = None
     )
 
-    val HDD = Compaction(
+    val HDD: Compaction = Compaction(
       initialFileSize = 256 * MB,
       blockSize       = 64 * KB,
       writeRateLimit  = Some(16 * MB)

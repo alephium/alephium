@@ -18,11 +18,11 @@ import org.alephium.util.{AVector, BaseActor, TimeStamp}
 
 object Miner {
   sealed trait Command
-  case object Start                             extends Command
-  case object Stop                              extends Command
-  case object UpdateTemplate                    extends Command
-  case class MinedBlockAdded(index: ChainIndex) extends Command
-  case class Nonce(from: BigInt, to: BigInt)    extends Command
+  case object Start                                   extends Command
+  case object Stop                                    extends Command
+  case object UpdateTemplate                          extends Command
+  final case class MinedBlockAdded(index: ChainIndex) extends Command
+  final case class Nonce(from: BigInt, to: BigInt)    extends Command
 
   def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformProfile): Block = {
     @tailrec
@@ -45,9 +45,9 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     implicit config: PlatformProfile)
     extends BaseActor {
   import node.allHandlers
-  var totalMiningCount    = 0 // This counts how many mining tasks got run so far
-  var taskStartingTime    = 0l // This is the starting time for current task
-  val taskRefreshDuration = 5.seconds.toMillis
+  var totalMiningCount: Int     = 0 // This counts how many mining tasks got run so far
+  var taskStartingTime: Long    = 0l // This is the starting time for current task
+  val taskRefreshDuration: Long = 5.seconds.toMillis
 
   val blockHandler: ActorRef = allHandlers.getBlockHandler(chainIndex)
 

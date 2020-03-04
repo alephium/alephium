@@ -7,13 +7,13 @@ import org.alephium.serde.SerdeError
 sealed abstract class IOError(reason: Throwable) extends Exception(reason)
 
 object IOError {
-  case class JavaIO(e: java.io.IOException)     extends IOError(e)
-  case class JavaSecurity(e: SecurityException) extends IOError(e)
-  case class RocksDB(e: RocksDBException)       extends IOError(e)
-  case class Serde(e: SerdeError)               extends IOError(e)
-  case class Other(e: Throwable)                extends IOError(e)
+  final case class JavaIO(e: java.io.IOException)     extends IOError(e)
+  final case class JavaSecurity(e: SecurityException) extends IOError(e)
+  final case class RocksDB(e: RocksDBException)       extends IOError(e)
+  final case class Serde(e: SerdeError)               extends IOError(e)
+  final case class Other(e: Throwable)                extends IOError(e)
 
   object RocksDB {
-    val keyNotFound = RocksDB(new RocksDBException("key not found"))
+    val keyNotFound: IOError.RocksDB = RocksDB(new RocksDBException("key not found"))
   }
 }

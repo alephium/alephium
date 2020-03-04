@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.dispatch.{Envelope, MailboxType, MessageQueue, ProducesMessageQueue}
-import com.codahale.metrics.MetricRegistry
+import com.codahale.metrics.{Counter, MetricRegistry}
 import com.typesafe.config.Config
 
 object MonitoringMailbox {
@@ -15,8 +15,10 @@ object MonitoringMailbox {
       with akka.dispatch.UnboundedMessageQueueSemantics
       with MonitoringMailboxSemantics {
 
-    val queue     = new ConcurrentLinkedQueue[Envelope]()
-    val queueSize = Monitoring.metrics.counter(MetricRegistry.name(owner.path.toString, "queue"))
+    val queue: ConcurrentLinkedQueue[Envelope] = new ConcurrentLinkedQueue[Envelope]()
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+    val queueSize: Counter =
+      Monitoring.metrics.counter(MetricRegistry.name(owner.path.toString, "queue"))
 
     def enqueue(receiver: ActorRef, handle: Envelope): Unit = {
       val _ = queue.offer(handle)
@@ -33,6 +35,7 @@ object MonitoringMailbox {
     def numberOfMessages: Int = queue.size
     def hasMessages: Boolean  = !queue.isEmpty
 
+    @SuppressWarnings(Array("org.wartremover.warts.While"))
     def cleanUp(owner: ActorRef, deadLetters: MessageQueue) {
       while (hasMessages) {
         deadLetters.enqueue(owner, dequeue())
@@ -51,6 +54,7 @@ class MonitoringMailbox
     this()
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   final override def create(
       owner: Option[ActorRef],
       system: Option[ActorSystem]

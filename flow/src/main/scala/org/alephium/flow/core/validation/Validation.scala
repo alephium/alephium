@@ -103,6 +103,7 @@ object Validation {
     else invalidBlock(InvalidGroup)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private[validation] def checkTimeStamp(header: BlockHeader,
                                          isSyncing: Boolean): HeaderValidationResult = {
     val now      = TimeStamp.now()
@@ -299,6 +300,7 @@ object Validation {
    * The following functions are for other type of validation
    */
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def validateFlowDAG[T <: FlowData](datas: AVector[T])(
       implicit config: GroupConfig): Option[AVector[Forest[Keccak256, T]]] = {
     val splits = datas.splitBy(_.chainIndex)

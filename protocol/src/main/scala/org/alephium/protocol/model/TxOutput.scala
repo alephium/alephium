@@ -5,7 +5,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.PubScript
 import org.alephium.serde._
 
-case class TxOutput(value: BigInt, pubScript: PubScript) {
+final case class TxOutput(value: BigInt, pubScript: PubScript) {
   def shortKey: Int = pubScript.shortKey
 
   def toGroup(implicit config: GroupConfig): GroupIndex = GroupIndex.from(pubScript)

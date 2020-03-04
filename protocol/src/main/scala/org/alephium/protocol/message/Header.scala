@@ -3,7 +3,7 @@ package org.alephium.protocol.message
 import org.alephium.protocol.Protocol
 import org.alephium.serde.{Serde, SerdeError}
 
-case class Header(version: Int)
+final case class Header(version: Int)
 
 object Header {
   implicit val serde: Serde[Header] =

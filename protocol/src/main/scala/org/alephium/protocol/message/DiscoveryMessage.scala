@@ -10,7 +10,8 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-case class DiscoveryMessage(header: DiscoveryMessage.Header, payload: DiscoveryMessage.Payload)
+final case class DiscoveryMessage(header: DiscoveryMessage.Header,
+                                  payload: DiscoveryMessage.Payload)
 
 object DiscoveryMessage {
   val version: Int = 0
@@ -21,7 +22,7 @@ object DiscoveryMessage {
     DiscoveryMessage(header, payload)
   }
 
-  case class Header(version: Int, publicKey: ED25519PublicKey, cliqueId: CliqueId)
+  final case class Header(version: Int, publicKey: ED25519PublicKey, cliqueId: CliqueId)
   object Header {
     private val serde = Serde.tuple3[Int, ED25519PublicKey, CliqueId]
 
@@ -47,6 +48,7 @@ object DiscoveryMessage {
 
   trait Payload
   object Payload {
+    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
     def serialize(payload: Payload): ByteString = {
       val (code: Code[_], data) = payload match {
         case x: Ping      => (Ping, Ping.serialize(x))
@@ -70,7 +72,7 @@ object DiscoveryMessage {
     }
   }
 
-  case class Ping(cliqueInfo: CliqueInfo) extends Payload
+  final case class Ping(cliqueInfo: CliqueInfo) extends Payload
   object Ping extends Code[Ping] {
     def serialize(ping: Ping): ByteString =
       implicitly[Serializer[CliqueInfo]].serialize(ping.cliqueInfo)
@@ -81,7 +83,7 @@ object DiscoveryMessage {
     }
   }
 
-  case class Pong(cliqueInfo: CliqueInfo) extends Payload
+  final case class Pong(cliqueInfo: CliqueInfo) extends Payload
   object Pong extends Code[Pong] {
     def serialize(pong: Pong): ByteString =
       implicitly[Serializer[CliqueInfo]].serialize(pong.cliqueInfo)
@@ -92,7 +94,7 @@ object DiscoveryMessage {
     }
   }
 
-  case class FindNode(targetId: CliqueId) extends Payload
+  final case class FindNode(targetId: CliqueId) extends Payload
   object FindNode extends Code[FindNode] {
     private val serde = Serde.tuple1[CliqueId]
 
@@ -103,7 +105,7 @@ object DiscoveryMessage {
       serde.deserialize(input).map(FindNode(_))
   }
 
-  case class Neighbors(peers: AVector[CliqueInfo]) extends Payload
+  final case class Neighbors(peers: AVector[CliqueInfo]) extends Payload
   object Neighbors extends Code[Neighbors] {
     private val serializer = avectorSerializer[CliqueInfo]
 

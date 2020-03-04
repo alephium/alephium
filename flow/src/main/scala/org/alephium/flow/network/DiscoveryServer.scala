@@ -19,7 +19,7 @@ object DiscoveryServer {
     props(AVector.from(peers))
   }
 
-  case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
+  final case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
   object PeerStatus {
     def fromInfo(info: CliqueInfo): PeerStatus = {
       PeerStatus(info, TimeStamp.now())
@@ -28,15 +28,15 @@ object DiscoveryServer {
 
   object Timer
 
-  case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
+  final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetPeerCliques             extends Command
-  case class Disable(cliqueId: CliqueId) extends Command
-  case object Scan                       extends Command
+  case object GetPeerCliques                   extends Command
+  final case class Disable(cliqueId: CliqueId) extends Command
+  case object Scan                             extends Command
 
   sealed trait Event
-  case class PeerCliques(peers: AVector[CliqueInfo]) extends Event
+  final case class PeerCliques(peers: AVector[CliqueInfo]) extends Event
 }
 
 /*

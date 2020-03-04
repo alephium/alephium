@@ -17,43 +17,45 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case class AddHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin) extends Command
-  case class AddBlock(block: Block, broker: ActorRef, origin: DataOrigin)         extends Command
-  case class GetBlocks(locators: AVector[Keccak256])                              extends Command
-  case class GetHeaders(locators: AVector[Keccak256])                             extends Command
-  case class GetTips(broker: BrokerInfo)                                          extends Command
-  case class PrepareBlockFlow(chainIndex: ChainIndex)                             extends Command
-  case class Register(miner: ActorRef)                                            extends Command
-  case object UnRegister                                                          extends Command
+  final case class AddHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+      extends Command
+  final case class AddBlock(block: Block, broker: ActorRef, origin: DataOrigin) extends Command
+  final case class GetBlocks(locators: AVector[Keccak256])                      extends Command
+  final case class GetHeaders(locators: AVector[Keccak256])                     extends Command
+  final case class GetTips(broker: BrokerInfo)                                  extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)                     extends Command
+  final case class Register(miner: ActorRef)                                    extends Command
+  case object UnRegister                                                        extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Keccak256]
   }
-  case class PendingBlock(block: Block,
-                          missingDeps: mutable.HashSet[Keccak256],
-                          origin: DataOrigin,
-                          broker: ActorRef,
-                          chainHandler: ActorRef)
+  final case class PendingBlock(block: Block,
+                                missingDeps: mutable.HashSet[Keccak256],
+                                origin: DataOrigin,
+                                broker: ActorRef,
+                                chainHandler: ActorRef)
       extends PendingData
       with Command
-  case class PendingHeader(header: BlockHeader,
-                           missingDeps: mutable.HashSet[Keccak256],
-                           origin: DataOrigin,
-                           broker: ActorRef,
-                           chainHandler: ActorRef)
+  final case class PendingHeader(header: BlockHeader,
+                                 missingDeps: mutable.HashSet[Keccak256],
+                                 origin: DataOrigin,
+                                 broker: ActorRef,
+                                 chainHandler: ActorRef)
       extends PendingData
       with Command
 
   sealed trait Event
-  case class BlockFlowTemplate(index: ChainIndex,
-                               deps: AVector[Keccak256],
-                               target: BigInt,
-                               transactions: AVector[Transaction])
+  final case class BlockFlowTemplate(index: ChainIndex,
+                                     deps: AVector[Keccak256],
+                                     target: BigInt,
+                                     transactions: AVector[Transaction])
       extends Event
-  case class CurrentTips(tips: AVector[Keccak256])                                  extends Event
-  case class BlocksLocated(blocks: AVector[Block])                                  extends Event
-  case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin)         extends Event
-  case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin) extends Event
+  final case class CurrentTips(tips: AVector[Keccak256])                          extends Event
+  final case class BlocksLocated(blocks: AVector[Block])                          extends Event
+  final case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin) extends Event
+  final case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+      extends Event
 }
 
 // TODO: set AddHeader and AddBlock with highest priority
@@ -67,6 +69,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
 
   override def receive: Receive = handleWith(None)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def handleWith(minerOpt: Option[ActorRef]): Receive = {
     case GetHeaders(locators) =>
       blockFlow.getHeaders(locators) match {
@@ -223,6 +226,7 @@ trait FlowHandlerState {
     blocks
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def checkSizeLimit(): Unit = {
     if (pendingStatus.size > statusSizeLimit) {
       val toRemove = pendingStatus.head._1

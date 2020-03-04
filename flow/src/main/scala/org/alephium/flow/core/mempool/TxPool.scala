@@ -65,7 +65,7 @@ object TxPool {
   def empty(capacity: Int): TxPool =
     new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
-  case class WeightedId(weight: Double, id: Keccak256) {
+  final case class WeightedId(weight: Double, id: Keccak256) {
     override def equals(obj: Any): Boolean = obj match {
       case that: WeightedId => this.id == that.id
       case _                => false
@@ -75,8 +75,8 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    implicit val keccak256Ord = Ordering.Iterable[Byte].on[Keccak256](_.bytes)
-    implicit val pairOrd      = Ordering.Tuple2[Double, Keccak256]
+    implicit val keccak256Ord: Ordering[Keccak256]      = Ordering.Iterable[Byte].on[Keccak256](_.bytes)
+    implicit val pairOrd: Ordering[(Double, Keccak256)] = Ordering.Tuple2[Double, Keccak256]
     Ordering.by(p => (-p.weight, p.id))
   }
 }

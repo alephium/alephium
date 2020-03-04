@@ -17,7 +17,7 @@ import org.alephium.util.{Duration, TimeStamp}
 
 object MockMiner {
 
-  case class MockMining(timestamp: TimeStamp)
+  final case class MockMining(timestamp: TimeStamp)
 
   trait Builder extends Miner.Builder {
     override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
@@ -31,6 +31,7 @@ class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
     extends Miner(address, node, chainIndex) {
   import node.allHandlers
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   override def _mine(template: BlockTemplate, lastTs: TimeStamp): Receive = {
     case Miner.Nonce(_, _) =>
       val delta     = Duration.unsafe(1000l * 30l + Random.nextInt(1000 * 60).toLong)

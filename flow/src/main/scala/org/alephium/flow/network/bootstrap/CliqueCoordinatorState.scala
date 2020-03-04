@@ -32,12 +32,14 @@ trait CliqueCoordinatorState {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def broadcast[T](message: T): Unit = {
     brokerConnectors.zipWithIndex.foreach {
       case (opt, idx) => if (idx != config.brokerInfo.id) opt.get ! message
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   protected def buildCliqueInfo: CliqueInfo = {
     val addresses = AVector.tabulate(config.brokerNum) { i =>
       if (i == config.brokerInfo.id) config.publicAddress else brokerAddresses(i).get
@@ -61,6 +63,7 @@ trait CliqueCoordinatorState {
     result
   }
   def isAllClosed: Boolean = closeds.forall(identity)
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def setClose(actor: ActorRef): Unit = {
     val id = brokerConnectors.indexWhere(opt => opt.nonEmpty && opt.get == actor)
     if (id != -1) closeds(id) = true

@@ -1,5 +1,5 @@
 package org.alephium.protocol
 
 object Protocol {
-  val version = 0
+  val version: Int = 0
 }
