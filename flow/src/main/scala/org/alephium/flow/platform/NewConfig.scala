@@ -20,6 +20,7 @@ trait NewConfig
     with NewConfig.PlatformMiningConfig
     with NewConfig.PlatformNetworkConfig
 
+@SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object NewConfig extends StrictLogging {
   trait PlatformCommonConfig { def rootPath: Path }
   trait PlatformGroupConfig  extends GroupConfig

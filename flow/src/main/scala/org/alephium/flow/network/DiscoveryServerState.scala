@@ -155,7 +155,8 @@ trait DiscoveryServerState {
     }
   }
 
-  def tryInsert(cliqueInfo: CliqueInfo): Unit = {
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  private def tryInsert(cliqueInfo: CliqueInfo): Unit = {
     val myself   = selfCliqueInfo.id
     val furthest = table.keys.maxBy(myself.hammingDist)
     if (myself.hammingDist(cliqueInfo.id) < myself.hammingDist(furthest)) {

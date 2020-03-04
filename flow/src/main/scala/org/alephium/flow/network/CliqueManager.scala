@@ -17,21 +17,21 @@ object CliqueManager {
     Props(new CliqueManager(builder, discoveryServer))
 
   sealed trait Command
-  case class Start(cliqueInfo: CliqueInfo) extends Command
-  case class BroadCastBlock(
+  final case class Start(cliqueInfo: CliqueInfo) extends Command
+  final case class BroadCastBlock(
       block: Block,
       blockMsg: ByteString,
       headerMsg: ByteString,
       origin: DataOrigin
   ) extends Command
-  case class BroadCastTx(tx: Transaction,
-                         txMsg: ByteString,
-                         chainIndex: ChainIndex,
-                         origin: DataOrigin)
+  final case class BroadCastTx(tx: Transaction,
+                               txMsg: ByteString,
+                               chainIndex: ChainIndex,
+                               origin: DataOrigin)
       extends Command
 
   sealed trait Event
-  case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
+  final case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
 }
 
 class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
@@ -51,6 +51,7 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
       context become awaitStart(AVector.empty)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitStart(pool: ConnectionPool): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")

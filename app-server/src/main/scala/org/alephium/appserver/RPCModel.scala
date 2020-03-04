@@ -14,18 +14,18 @@ object RPCModel {
     implicit val encoderTS: Encoder[TimeStamp] = Encoder.encodeLong.contramap(_.millis)
   }
 
-  case class FetchRequest(from: Option[TimeStamp])
+  final case class FetchRequest(from: Option[TimeStamp])
   object FetchRequest {
     import TimeStampCodec._
     implicit val codec: Codec[FetchRequest] = deriveCodec[FetchRequest]
   }
 
-  case class FetchResponse(blocks: Seq[FetchEntry])
+  final case class FetchResponse(blocks: Seq[FetchEntry])
   object FetchResponse {
     implicit val codec: Codec[FetchResponse] = deriveCodec[FetchResponse]
   }
 
-  case class FetchEntry(
+  final case class FetchEntry(
       hash: String,
       timestamp: TimeStamp,
       chainFrom: Int,
@@ -38,7 +38,7 @@ object RPCModel {
     implicit val codec: Codec[FetchEntry] = deriveCodec[FetchEntry]
   }
 
-  case class PeersResult(cliques: AVector[CliqueInfo])
+  final case class PeersResult(cliques: AVector[CliqueInfo])
   object PeersResult {
     def createId(s: String): Either[String, CliqueId] = {
       Hex.from(s).flatMap(CliqueId.from) match {
@@ -53,7 +53,7 @@ object RPCModel {
     implicit val codec: Codec[PeersResult]          = deriveCodec[PeersResult]
   }
 
-  case class GetBalance(address: String, `type`: String)
+  final case class GetBalance(address: String, `type`: String)
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
 
@@ -61,22 +61,22 @@ object RPCModel {
     val pkh = "pkh"
   }
 
-  case class Balance(balance: BigInt, utxoNum: Int)
+  final case class Balance(balance: BigInt, utxoNum: Int)
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
   }
 
-  case class Transfer(fromAddress: String,
-                      fromType: String,
-                      toAddress: String,
-                      toType: String,
-                      value: BigInt,
-                      fromPrivateKey: String)
+  final case class Transfer(fromAddress: String,
+                            fromType: String,
+                            toAddress: String,
+                            toType: String,
+                            value: BigInt,
+                            fromPrivateKey: String)
   object Transfer {
     implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
   }
 
-  case class TransferResult(txId: String)
+  final case class TransferResult(txId: String)
   object TransferResult {
     implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
   }

@@ -29,8 +29,8 @@ class TrieBench {
   }
   val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
-  val trie        = MerklePatriciaTrie.createEmptyTrie(db)
-  val genesisHash = trie.rootHash
+  val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
+  val genesisHash: Keccak256   = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {

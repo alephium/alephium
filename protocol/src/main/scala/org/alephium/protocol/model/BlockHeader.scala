@@ -12,7 +12,7 @@ import org.alephium.util.{AVector, TimeStamp}
   *                  the first G - 1 hashes are from groups different from _group_
   *                  the rest G hashes are from all the chain related to _group_
   */
-case class BlockHeader(
+final case class BlockHeader(
     blockDeps: AVector[Keccak256],
     txsHash: Keccak256,
     timestamp: TimeStamp,

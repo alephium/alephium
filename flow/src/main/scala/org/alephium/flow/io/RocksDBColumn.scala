@@ -1,17 +1,25 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ReadOptions, WriteOptions}
+import org.rocksdb.{ColumnFamilyHandle, ReadOptions, WriteOptions}
 
 import org.alephium.serde._
 
 object RocksDBColumn {
   import RocksDBStorage.Settings
 
+  def apply(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily): RocksDBColumn =
+    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+
   def apply(storage: RocksDBStorage,
             cf: RocksDBStorage.ColumnFamily,
-            writeOptions: WriteOptions = Settings.writeOptions,
-            readOptions: ReadOptions   = Settings.readOptions): RocksDBColumn =
+            writeOptions: WriteOptions): RocksDBColumn =
+    apply(storage, cf, writeOptions, Settings.readOptions)
+
+  def apply(storage: RocksDBStorage,
+            cf: RocksDBStorage.ColumnFamily,
+            writeOptions: WriteOptions,
+            readOptions: ReadOptions): RocksDBColumn =
     new RocksDBColumn(storage, cf, writeOptions, readOptions)
 }
 
@@ -23,7 +31,7 @@ class RocksDBColumn(
 ) extends KeyValueStorage {
   import IOUtils.tryExecute
 
-  val handle = storage.handle(cf)
+  val handle: ColumnFamilyHandle = storage.handle(cf)
 
   def getRaw(key: ByteString): IOResult[ByteString] = tryExecute {
     getRawUnsafe(key)

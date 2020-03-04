@@ -25,7 +25,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
 
   server ! TcpServer.Start(self)
 
-  val sink = if (config.isCoordinator) {
+  val sink: ActorRef = if (config.isCoordinator) {
     log.debug("Start as CliqueCoordinator")
     context.actorOf(CliqueCoordinator.props(), "CliqueCoordinator")
   } else {

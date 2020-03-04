@@ -269,6 +269,7 @@ trait MessageHandler extends BaseActor {
   def setSyncOn(): Unit           = _isSyncing = true
   def setSyncOff(): Unit          = _isSyncing = false
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def handleSendBlocks(blocks: AVector[Block],
                        notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = {
     assert(blocks.nonEmpty)
@@ -282,6 +283,7 @@ trait MessageHandler extends BaseActor {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def handleNewBlocks(forest: Forest[Keccak256, Block]): Unit = {
     assert(forest.nonEmpty)
     val chainIndex = forest.roots.head.value.chainIndex
