@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, tempfile, sys
+import argparse, multiprocessing, os, subprocess, sys, tempfile
 
 port_start = 9973
 
@@ -18,22 +18,36 @@ def get_env_default(key, default):
 def get_env_default_int(key, default):
     return int(get_env_default(key, default))
 
-def rpc_call(host, port, method, params):
+def rpc_call(args):
+    (host, port, method, params) = args
     json = """{{"jsonrpc":"2.0","id": 0,"method":"{}","params": {}}}"""
     cmd_tmp = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
     cmd = cmd_tmp.format(json.format(method, params), host, port)
-    print("[RPC]-[{}@{}]: {}".format(host, port, cmd))
-    run(cmd)
+    return (host, port, cmd, run_capture(cmd))
 
 def rpc_call_all(method, params):
     nodes = get_env_int('nodes')
     batch = get_env_default_int('batch', 0)
+
+    calls = []
     for node in range(batch * nodes, (batch + 1) * nodes):
         port = (port_start + 1000) + node
-        rpc_call('localhost', port, method, params)
+        calls.append(('localhost', port, method, params))
+
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    results = pool.map(rpc_call, calls)
+    pool.close()
+
+    for (host, port, cmd, result) in results:
+        print("\n[RPC]-[{}@{}]: {}".format(host, port, cmd))
+        print(result.stderr.decode('utf-8'))
+        print(result.stdout.decode('utf-8'))
 
 def run(cmd):
     os.system(cmd)
+
+def run_capture(args):
+    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
 class AlephiumMake(object):
     def __init__(self):
