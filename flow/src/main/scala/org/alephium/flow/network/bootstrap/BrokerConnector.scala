@@ -10,8 +10,9 @@ import org.alephium.serde._
 import org.alephium.util.BaseActor
 
 object BrokerConnector {
-  def props(connection: ActorRef)(implicit config: GroupConfig): Props =
-    Props(new BrokerConnector(connection))
+  def props(connection: ActorRef, cliqueCoordinator: ActorRef)(
+      implicit config: GroupConfig): Props =
+    Props(new BrokerConnector(connection, cliqueCoordinator))
 
   sealed trait Event
   final case class Ack(id: Int) extends Event
@@ -45,10 +46,12 @@ object BrokerConnector {
   }
 }
 
-class BrokerConnector(connection: ActorRef)(implicit config: GroupConfig) extends BaseActor {
+class BrokerConnector(connection: ActorRef, cliqueCoordinator: ActorRef)(
+    implicit config: GroupConfig)
+    extends BaseActor {
   import BrokerConnector._
 
-  connection ! Tcp.Register(self)
+  override def preStart(): Unit = connection ! Tcp.Register(self)
 
   override def receive: Receive =
     await[BrokerInfo](ByteString.empty,
@@ -75,7 +78,7 @@ class BrokerConnector(connection: ActorRef)(implicit config: GroupConfig) extend
     case Tcp.Received(data) =>
       deserialize(data) match {
         case Right(Some((event, _))) =>
-          context.parent ! event
+          cliqueCoordinator ! event
           next
         case Right(None) =>
           context become await[E](unaligned ++ data, next, deserialize)
