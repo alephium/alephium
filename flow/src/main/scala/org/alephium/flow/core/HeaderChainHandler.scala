@@ -45,6 +45,7 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandl
     case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
                                    broker: ActorRef,
                                    origin: DataOrigin): Unit = {

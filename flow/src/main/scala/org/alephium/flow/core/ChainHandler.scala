@@ -46,6 +46,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
     readies.foreach(handleData(_, broker, origin))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleData(data: T, broker: ActorRef, origin: DataOrigin): Unit = {
     log.debug(s"try to add ${data.shortHex}")
     if (blockFlow.includes(data)) {
@@ -66,6 +67,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
 
   def handleMissingParent(datas: Forest[Keccak256, T], broker: ActorRef, origin: DataOrigin): Unit
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handlePending(data: T, broker: ActorRef, origin: DataOrigin): Unit = {
     assert(!blockFlow.includes(data))
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
