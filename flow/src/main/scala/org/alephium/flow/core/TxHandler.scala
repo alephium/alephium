@@ -26,6 +26,7 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: 
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleTx(tx: Transaction, origin: DataOrigin): Unit = {
     val fromGroup  = tx.fromGroup
     val toGroup    = tx.toGroup
