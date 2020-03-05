@@ -17,8 +17,9 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   val env      = Env.resolve()
   val rootPath = Platform.getRootPath(env)
 
-  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + this.getClass.getSimpleName)
-  val groups0 = NewConfig.parseConfig(rootPath).getInt("alephium.groups")
+  val newPath   = rootPath.resolveSibling(rootPath.getFileName + "-" + this.getClass.getSimpleName)
+  val newConfig = NewConfig.parseConfig(newPath)
+  val groups0   = newConfig.getInt("alephium.groups")
 
   val groupConfig = new GroupConfig { override def groups: Int = groups0 }
 
@@ -29,7 +30,10 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
       (privateKey, publicKey, genesisBalance)
   }
   implicit val config =
-    PlatformProfile.load(newPath, Settings.syncWrite, Some(genesisBalances.map(p => (p._2, p._3))))
+    PlatformProfile.build(newConfig,
+                          newPath,
+                          Settings.syncWrite,
+                          Some(genesisBalances.map(p => (p._2, p._3))))
 
   after {
     TestUtils.clear(config.disk.blockFolder)
