@@ -151,7 +151,6 @@ val wartsCompileExcludes = Seq(
   Wart.Var,
   Wart.Overloading,
   Wart.ImplicitParameter,
-  Wart.IsInstanceOf, // Only use it inside assume test
   Wart.NonUnitStatements,
   Wart.Nothing,
   Wart.Null, // Partially covered by scalastyle, only use _ inside actors
