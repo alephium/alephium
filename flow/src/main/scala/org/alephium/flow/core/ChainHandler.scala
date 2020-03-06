@@ -46,7 +46,6 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
     readies.foreach(handleData(_, broker, origin))
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleData(data: T, broker: ActorRef, origin: DataOrigin): Unit = {
     log.debug(s"try to add ${data.shortHex}")
     if (blockFlow.includes(data)) {
@@ -58,25 +57,22 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
         case Left(e)                    => handleIOError(broker, e)
         case Right(MissingDeps(hashes)) => handleMissingDeps(data, hashes, broker, origin)
         case Right(x: InvalidStatus)    => handleInvalidData(broker, x)
-        case Right(s) =>
-          assert(s.isInstanceOf[ValidStatus]) // avoid and double check exhaustive matching issues
-          handleValidData(data, broker, origin)
+        case Right(_: ValidStatus)      => handleValidData(data, broker, origin)
+        case Right(unexpected)          => log.warning(s"Unexpected pattern matching: $unexpected")
       }
     }
   }
 
   def handleMissingParent(datas: Forest[Keccak256, T], broker: ActorRef, origin: DataOrigin): Unit
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handlePending(data: T, broker: ActorRef, origin: DataOrigin): Unit = {
     assert(!blockFlow.includes(data))
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
     validationResult match {
       case Left(e)                      => handleIOError(broker, e)
       case Right(x: InvalidBlockStatus) => handleInvalidData(broker, x)
-      case Right(s) =>
-        assert(s.isInstanceOf[ValidStatus]) // avoid and double check exhaustive matching issues
-        handleValidData(data, broker, origin)
+      case Right(_: ValidStatus)        => handleValidData(data, broker, origin)
+      case Right(unexpected)            => log.debug(s"Unexpected pattern matching $unexpected")
     }
   }
 

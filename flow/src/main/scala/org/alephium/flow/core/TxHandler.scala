@@ -26,7 +26,6 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: 
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleTx(tx: Transaction, origin: DataOrigin): Unit = {
     val fromGroup  = tx.fromGroup
     val toGroup    = tx.toGroup
@@ -36,9 +35,10 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: 
       TxValidation.validateNonCoinbase(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
           log.debug(s"failed in validating tx ${tx.shortHex} due to $s")
-        case Right(s) =>
-          assume(s.isInstanceOf[ValidTx.type])
+        case Right(_: ValidTx.type) =>
           handleValidTx(chainIndex, tx, mempool, origin)
+        case Right(unexpected) =>
+          log.warning(s"Unexpected pattern matching $unexpected")
         case Left(e) =>
           log.debug(s"IO failed in validating tx ${tx.shortHex} due to $e")
       }
