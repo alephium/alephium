@@ -13,14 +13,16 @@ object InboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
             remote: InetSocketAddress,
             connection: ActorRef,
-            allHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
-    Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers))
+            allHandlers: AllHandlers,
+            cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+    Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers, cliqueManager))
 }
 
 class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                            val remote: InetSocketAddress,
                            val connection: ActorRef,
-                           val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
+                           val allHandlers: AllHandlers,
+                           val cliqueManager: ActorRef)(implicit val config: PlatformProfile)
     extends BrokerHandler {
 
   var remoteCliqueId: CliqueId     = _
