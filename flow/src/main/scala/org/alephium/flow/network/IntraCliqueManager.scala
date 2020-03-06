@@ -10,9 +10,11 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.BaseActor
 
 object IntraCliqueManager {
-  def props(builder: BrokerHandler.Builder, cliqueInfo: CliqueInfo, allHandlers: AllHandlers)(
-      implicit config: PlatformProfile): Props =
-    Props(new IntraCliqueManager(builder, cliqueInfo, allHandlers))
+  def props(builder: BrokerHandler.Builder,
+            cliqueInfo: CliqueInfo,
+            allHandlers: AllHandlers,
+            cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+    Props(new IntraCliqueManager(builder, cliqueInfo, allHandlers, cliqueManager))
 
   sealed trait Command
   case object GetPeers extends Command
@@ -23,7 +25,8 @@ object IntraCliqueManager {
 
 class IntraCliqueManager(builder: BrokerHandler.Builder,
                          cliqueInfo: CliqueInfo,
-                         allHandlers: AllHandlers)(implicit config: PlatformProfile)
+                         allHandlers: AllHandlers,
+                         cliqueManager: ActorRef)(implicit config: PlatformProfile)
     extends BaseActor {
 
   cliqueInfo.peers.foreachWithIndex {
@@ -59,7 +62,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
         val newBrokers = brokers + (brokerInfo.id -> (brokerInfo -> sender()))
         if (newBrokers.size == cliqueInfo.peers.length - 1) {
           log.debug("All Brokers connected")
-          context.parent ! IntraCliqueManager.Ready
+          cliqueManager ! IntraCliqueManager.Ready
           context become handle(newBrokers)
         } else {
           context become awaitBrokers(newBrokers)
