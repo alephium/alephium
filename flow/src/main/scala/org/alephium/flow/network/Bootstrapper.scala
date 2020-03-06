@@ -23,11 +23,11 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
     extends BaseActor {
   import Bootstrapper._
 
-  server ! TcpServer.Start(self)
+  override def preStart(): Unit = server ! TcpServer.Start(self)
 
   val sink: ActorRef = if (config.isCoordinator) {
     log.debug("Start as CliqueCoordinator")
-    context.actorOf(CliqueCoordinator.props(), "CliqueCoordinator")
+    context.actorOf(CliqueCoordinator.props(self), "CliqueCoordinator")
   } else {
     log.debug("Start as Broker")
     context.actorOf(
