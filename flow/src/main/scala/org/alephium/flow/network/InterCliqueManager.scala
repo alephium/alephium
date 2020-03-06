@@ -51,8 +51,9 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
   def handleConnection: Receive = {
     case c: Tcp.Connected =>
-      val name  = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
-      val props = InboundBrokerHandler.props(selfCliqueInfo, c.remoteAddress, sender(), allHandlers)
+      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
+      val props =
+        InboundBrokerHandler.props(selfCliqueInfo, c.remoteAddress, sender(), allHandlers, self)
       context.actorOf(props, name)
       ()
     case CliqueManager.Connected(cliqueId, brokerInfo) =>
@@ -100,7 +101,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         val name =
           BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
         val props =
-          OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, brokerInfo, allHandlers)
+          OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, brokerInfo, allHandlers, self)
         context.actorOf(props, name)
       }
     }

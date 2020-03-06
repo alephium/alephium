@@ -35,7 +35,11 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
         log.debug(s"Connect to broker $index, $address")
         val remoteBroker = BrokerInfo(index, config.groupNumPerBroker, address)
         val props =
-          builder.createOutboundBrokerHandler(cliqueInfo, cliqueInfo.id, remoteBroker, allHandlers)
+          builder.createOutboundBrokerHandler(cliqueInfo,
+                                              cliqueInfo.id,
+                                              remoteBroker,
+                                              allHandlers,
+                                              self)
         context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
       }
   }
@@ -51,8 +55,9 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
       if (index < config.brokerInfo.id) {
         // Note: index == -1 is also the right condition
         log.debug(s"Inbound connection: $remote")
-        val name  = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
-        val props = builder.createInboundBrokerHandler(cliqueInfo, remote, sender(), allHandlers)
+        val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
+        val props =
+          builder.createInboundBrokerHandler(cliqueInfo, remote, sender(), allHandlers, self)
         context.actorOf(props, name)
         ()
       }
