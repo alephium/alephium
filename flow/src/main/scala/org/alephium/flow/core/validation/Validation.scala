@@ -110,7 +110,7 @@ object Validation {
     val headerTs = header.timestamp
 
     val ok1 = headerTs < now.plusHoursUnsafe(1)
-    val ok2 = isSyncing || (headerTs > now.plusHours(-1).get) // Note: now -1hour is always positive
+    val ok2 = isSyncing || (headerTs > now.plusHoursUnsafe(-1)) // Note: now -1hour is always positive
     if (ok1 && ok2) validHeader else invalidHeader(InvalidTimeStamp)
   }
 
