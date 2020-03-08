@@ -31,6 +31,7 @@ trait PlatformProfile
   def txMaxNumberPerBlock: Int
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object PlatformProfile {
   import NewConfig._
 
@@ -38,9 +39,13 @@ object PlatformProfile {
     PlatformProfile.load(Platform.getRootPath(Env.resolve()))
   }
 
+  def load(rootPath: Path): PlatformProfile = {
+    load(rootPath, Settings.writeOptions, None)
+  }
+
   def load(rootPath: Path,
-           rdbWriteOptions: WriteOptions                                = Settings.writeOptions,
-           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]] = None): PlatformProfile = {
+           rdbWriteOptions: WriteOptions,
+           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile = {
     val allCfg   = parseConfig(rootPath)
     val alephCfg = allCfg.getConfig("alephium")
     create(
@@ -72,82 +77,79 @@ object PlatformProfile {
              genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
     new PlatformProfile {
       /* Common */
-      final val all      = allCfg
-      final val aleph    = alephCfg
-      final val rootPath = rootPath0
+      val all      = allCfg
+      val aleph    = alephCfg
+      val rootPath = rootPath0
       /* Common */
 
       /* Group */
-      final val groups: Int = alephCfg.getInt("groups")
+      val groups: Int = alephCfg.getInt("groups")
       /* Group */
 
       /* Clique */
-      final val brokerNum: Int         = cliqueCfg.getInt("brokerNum")
-      final val groupNumPerBroker: Int = groups / brokerNum
+      val brokerNum: Int         = cliqueCfg.getInt("brokerNum")
+      val groupNumPerBroker: Int = groups / brokerNum
       require(groups % brokerNum == 0)
       /* Clique */
 
       /* Consensus */
-      final val numZerosAtLeastInHash: Int = consensusCfg.getInt("numZerosAtLeastInHash")
-      final val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
+      val numZerosAtLeastInHash: Int = consensusCfg.getInt("numZerosAtLeastInHash")
+      val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
-      final val blockTargetTime: Duration =
-        Duration.from(consensusCfg.getDuration("blockTargetTime")).get
-      final val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
-      final val expectedTimeSpan: Duration = blockTargetTime
+      val blockTargetTime: Duration  = Duration.from(consensusCfg.getDuration("blockTargetTime")).get
+      val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
+      val expectedTimeSpan: Duration = blockTargetTime
 
       final val blockCacheSize
         : Int = consensusCfg.getInt("blockCacheSizePerChain") * (2 * groups - 1)
 
-      final val medianTimeInterval = 11
-      final val diffAdjustDownMax  = 16
-      final val diffAdjustUpMax    = 8
-      final val timeSpanMin        = (expectedTimeSpan * (100l - diffAdjustDownMax)).get divUnsafe 100l
-      final val timeSpanMax        = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
+      val medianTimeInterval    = 11
+      val diffAdjustDownMax     = 16
+      val diffAdjustUpMax       = 8
+      val timeSpanMin: Duration = (expectedTimeSpan * (100l - diffAdjustDownMax)).get divUnsafe 100l
+      val timeSpanMax: Duration = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
       /* Consensus */
 
       /* mining */
-      final val nonceStep: BigInt = miningCfg.getInt("nonceStep")
+      val nonceStep: BigInt = miningCfg.getInt("nonceStep")
       /* mining */
 
       /* Network */
-      final val pingFrequency: Duration = getDuration(networkCfg, "pingFrequency")
-      final val retryTimeout: Duration  = getDuration(networkCfg, "retryTimeout")
-      final val publicAddress: InetSocketAddress = parseAddress(
-        networkCfg.getString("publicAddress"))
-      final val masterAddress: InetSocketAddress = parseAddress(
-        networkCfg.getString("masterAddress"))
-      final val numOfSyncBlocksLimit: Int = networkCfg.getInt("numOfSyncBlocksLimit")
-      final val isCoordinator: Boolean    = publicAddress == masterAddress
+      val pingFrequency: Duration          = getDuration(networkCfg, "pingFrequency")
+      val retryTimeout: Duration           = getDuration(networkCfg, "retryTimeout")
+      val publicAddress: InetSocketAddress = parseAddress(networkCfg.getString("publicAddress"))
+      val masterAddress: InetSocketAddress = parseAddress(networkCfg.getString("masterAddress"))
+      val numOfSyncBlocksLimit: Int        = networkCfg.getInt("numOfSyncBlocksLimit")
+      val isCoordinator: Boolean           = publicAddress == masterAddress
       /* Network */
 
       /* Broker */
-      final val brokerInfo: BrokerInfo = {
+      val brokerInfo: BrokerInfo = {
         val myId = brokerCfg.getInt("brokerId")
         BrokerInfo(myId, groupNumPerBroker, publicAddress)(this)
       }
       /* Broker */
 
       /* Discovery */
-      final val peersPerGroup                             = discoveryCfg.getInt("peersPerGroup")
-      final val scanMaxPerGroup                           = discoveryCfg.getInt("scanMaxPerGroup")
-      final val scanFrequency                             = getDuration(discoveryCfg, "scanFrequency")
-      final val scanFastFrequency                         = getDuration(discoveryCfg, "scanFastFrequency")
-      final val neighborsPerGroup                         = discoveryCfg.getInt("neighborsPerGroup")
-      final val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
-      final val bootstrap: AVector[InetSocketAddress] =
+      val peersPerGroup: Int                        = discoveryCfg.getInt("peersPerGroup")
+      val scanMaxPerGroup: Int                      = discoveryCfg.getInt("scanMaxPerGroup")
+      val scanFrequency: Duration                   = getDuration(discoveryCfg, "scanFrequency")
+      val scanFastFrequency: Duration               = getDuration(discoveryCfg, "scanFastFrequency")
+      val neighborsPerGroup: Int                    = discoveryCfg.getInt("neighborsPerGroup")
+      val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
+      val bootstrap: AVector[InetSocketAddress] =
         Network.parseAddresses(alephCfg.getString("bootstrap"))
       /* Discovery */
 
       /* Genesis */
-      final val genesisBlocks = genesisBalances match {
+      val genesisBlocks: AVector[AVector[Block]] = genesisBalances match {
         case None           => loadBlockFlow(alephCfg)(this)
         case Some(balances) => loadBlockFlow(balances)(this)
       }
       /* Genesis */
 
       /* IO */
-      final val (disk, headerDB, emptyTrie) = {
+      val (disk, headerDB, emptyTrie) = {
         val dbFolder = "db"
         val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"
         PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)

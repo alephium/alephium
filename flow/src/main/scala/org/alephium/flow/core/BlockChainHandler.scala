@@ -28,14 +28,15 @@ object BlockChainHandler {
   }
 
   sealed trait Command
-  case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin)     extends Command
-  case class AddPendingBlock(block: Block, broker: ActorRef, origin: DataOrigin) extends Command
+  final case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
+  final case class AddPendingBlock(block: Block, broker: ActorRef, origin: DataOrigin)
+      extends Command
 
-  sealed trait Event                              extends ChainHandler.Event
-  case class BlocksAdded(chainIndex: ChainIndex)  extends Event
-  case object BlocksAddingFailed                  extends Event
-  case object InvalidBlocks                       extends Event
-  case class FetchSince(tips: AVector[Keccak256]) extends Event
+  sealed trait Event                                    extends ChainHandler.Event
+  final case class BlocksAdded(chainIndex: ChainIndex)  extends Event
+  case object BlocksAddingFailed                        extends Event
+  case object InvalidBlocks                             extends Event
+  final case class FetchSince(tips: AVector[Keccak256]) extends Event
 }
 
 class BlockChainHandler(blockFlow: BlockFlow,
@@ -45,7 +46,7 @@ class BlockChainHandler(blockFlow: BlockFlow,
     extends ChainHandler[Block, BlockStatus](blockFlow, chainIndex, BlockValidation) {
   import BlockChainHandler._
 
-  val headerChain = blockFlow.getHashChain(chainIndex)
+  val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
   override def receive: Receive = {
     case AddBlocks(blocks, origin)              => handleDatas(blocks, sender(), origin)

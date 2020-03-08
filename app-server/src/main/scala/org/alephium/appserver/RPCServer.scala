@@ -43,6 +43,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetPeers(req: Request): FutureTry[PeersResult] =
     mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
       val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
@@ -147,7 +148,7 @@ object RPCServer extends StrictLogging {
   type Try[T]       = Either[Failure, T]
   type FutureTry[T] = Future[Try[T]]
 
-  val bufferSize = 64
+  val bufferSize: Int = 64
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
     req.paramsAs[T] match {
@@ -163,6 +164,7 @@ object RPCServer extends StrictLogging {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
       implicit rpc: RPCConfig,
       cfg: ConsensusConfig): Try[FetchResponse] = {

@@ -38,7 +38,7 @@ object Instruction {
 }
 
 // Stack Instructions
-case class OP_PUSH(bytes: ByteString) extends Instruction
+final case class OP_PUSH(bytes: ByteString) extends Instruction
 
 // BitwiseInstructions
 case object OP_EQUALVERIFY extends Instruction

@@ -5,7 +5,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
-case class Block(header: BlockHeader, transactions: AVector[Transaction])
+final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     extends Keccak256Hash[Block]
     with FlowData {
   override def hash: Keccak256 = header.hash

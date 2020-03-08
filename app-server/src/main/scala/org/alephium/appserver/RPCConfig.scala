@@ -6,13 +6,14 @@ import com.typesafe.config.Config
 
 import org.alephium.util.Duration
 
-case class RPCConfig(
+final case class RPCConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
     askTimeout: Duration
 )
 
 object RPCConfig {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def load(implicit config: Config): RPCConfig = {
     val rpc = config.getConfig("rpc")
     RPCConfig(

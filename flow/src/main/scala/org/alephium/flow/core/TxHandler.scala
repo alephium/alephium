@@ -17,7 +17,7 @@ object TxHandler {
     Props(new TxHandler(blockFlow, cliqueManager))
 
   sealed trait Command
-  case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
+  final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
 }
 
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: PlatformProfile)
@@ -35,9 +35,10 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: 
       TxValidation.validateNonCoinbase(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
           log.debug(s"failed in validating tx ${tx.shortHex} due to $s")
-        case Right(s) =>
-          assume(s.isInstanceOf[ValidTx.type])
+        case Right(_: ValidTx.type) =>
           handleValidTx(chainIndex, tx, mempool, origin)
+        case Right(unexpected) =>
+          log.warning(s"Unexpected pattern matching $unexpected")
         case Left(e) =>
           log.debug(s"IO failed in validating tx ${tx.shortHex} due to $e")
       }

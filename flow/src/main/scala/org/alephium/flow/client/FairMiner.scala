@@ -36,7 +36,9 @@ object FairMiner {
   }
 
   sealed trait Command
-  case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: BigInt)
+  final case class MiningResult(blockOpt: Option[Block],
+                                chainIndex: ChainIndex,
+                                miningCount: BigInt)
       extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(

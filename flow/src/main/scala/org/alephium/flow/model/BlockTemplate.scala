@@ -4,10 +4,10 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.model.{Block, BlockHeader, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 
-case class BlockTemplate(deps: AVector[Keccak256],
-                         target: BigInt,
-                         txHash: Keccak256,
-                         transactions: AVector[Transaction]) {
+final case class BlockTemplate(deps: AVector[Keccak256],
+                               target: BigInt,
+                               txHash: Keccak256,
+                               transactions: AVector[Transaction]) {
 
   def buildHeader(nonce: BigInt): BlockHeader =
     BlockHeader(deps, txHash, TimeStamp.now(), target, nonce)

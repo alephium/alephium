@@ -68,6 +68,7 @@ object Script {
       case OP_KECCAK256 =>
         if (stack.isEmpty) emptyStack(instruction)
         else {
+          @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
           val hash = Keccak256.hash(stack.last)
           stack.append(hash.bytes)
           Done
@@ -91,6 +92,7 @@ object Script {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def error(instruction: Instruction, message: String): RunResult = {
     Left(NonCategorized(s"${instruction.toString} failed, due to $message"))
   }

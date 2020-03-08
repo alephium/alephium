@@ -7,7 +7,7 @@ import org.alephium.protocol.model.RawTransaction
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-case class Witness(privateScript: AVector[Instruction], signatures: AVector[ByteString])
+final case class Witness(privateScript: AVector[Instruction], signatures: AVector[ByteString])
 
 object Witness {
   implicit val serde: Serde[Witness] =

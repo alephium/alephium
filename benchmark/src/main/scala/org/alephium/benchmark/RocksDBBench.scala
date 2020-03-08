@@ -26,6 +26,7 @@ class RocksDBBench {
   private val N      = 1000000
   private val tmpdir = Files.tmpDir
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def randomInsertAndLookup(db: RocksDBColumn): Unit = {
     val random = new Random(0)
 
@@ -41,7 +42,7 @@ class RocksDBBench {
     // Query N / 2
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.getRaw(key).right.get
+      db.getRaw(key).right.toOption.get
     }
 
     // Delete N / 2
