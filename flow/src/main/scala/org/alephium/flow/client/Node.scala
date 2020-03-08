@@ -1,6 +1,6 @@
 package org.alephium.flow.client
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem, Props}
 
 import org.alephium.flow.core._
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
@@ -8,23 +8,24 @@ import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.util.EventBus
 
-case class Node(builders: BrokerHandler.Builder, name: String)(implicit config: PlatformProfile) {
-  val system = ActorSystem(name, config.all)
+final case class Node(builders: BrokerHandler.Builder, name: String)(
+    implicit config: PlatformProfile) {
+  val system: ActorSystem = ActorSystem(name, config.all)
 
-  val blockFlow = BlockFlow.createUnsafe()
+  val blockFlow: BlockFlow = BlockFlow.createUnsafe()
 
-  val server = system.actorOf(TcpServer.props(config.publicAddress.getPort), "TcpServer")
+  val server: ActorRef = system.actorOf(TcpServer.props(config.publicAddress.getPort), "TcpServer")
 
-  val eventBus = system.actorOf(EventBus.props())
+  val eventBus: ActorRef = system.actorOf(EventBus.props())
 
-  val discoveryProps  = DiscoveryServer.props(config.bootstrap)(config)
-  val discoveryServer = system.actorOf(discoveryProps, "DiscoveryServer")
-  val cliqueManager =
+  val discoveryProps: Props     = DiscoveryServer.props(config.bootstrap)(config)
+  val discoveryServer: ActorRef = system.actorOf(discoveryProps, "DiscoveryServer")
+  val cliqueManager: ActorRef =
     system.actorOf(CliqueManager.props(builders, discoveryServer), "CliqueManager")
 
-  val allHandlers = AllHandlers.build(system, cliqueManager, blockFlow)
+  val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow)
   cliqueManager ! allHandlers
 
-  val boostraper =
+  val boostraper: ActorRef =
     system.actorOf(Bootstrapper.props(server, discoveryServer, cliqueManager), "Bootstrapper")
 }

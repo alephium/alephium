@@ -4,7 +4,7 @@ import org.alephium.crypto.{ED25519PublicKey, Keccak256, Keccak256Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, DjbHash}
 
-case class PubScript(instructions: AVector[Instruction]) extends Keccak256Hash[PubScript] {
+final case class PubScript(instructions: AVector[Instruction]) extends Keccak256Hash[PubScript] {
   override lazy val hash: Keccak256 = _getHash
 
   lazy val shortKey: Int = DjbHash.intHash(hash.bytes)

@@ -84,6 +84,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def confirmHashes(): Unit = {
     val oldestTip = tips.iterator.map(blockHashesTable.apply).minBy(_.height)
 
@@ -275,13 +276,13 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   }
 
   @tailrec
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def accDiff(todos: ArrayBuffer[Keccak256],
                       node: TreeNode,
                       currentHeight: Int,
                       targetHeight: Int): TreeNode = {
     if (currentHeight > targetHeight) {
       todos.append(node.blockHash)
-      assume(node.parentOpt.nonEmpty) // This should always be true
       accDiff(todos, node.parentOpt.get, currentHeight - 1, targetHeight)
     } else {
       node
@@ -289,6 +290,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   }
 
   @tailrec
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def calDiff(toRemove: ArrayBuffer[Keccak256],
                       toAdd: ArrayBuffer[Keccak256],
                       newNode: TreeNode,
@@ -296,7 +298,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     if (newNode.blockHash != oldNode.blockHash) {
       toRemove.append(oldNode.blockHash)
       toAdd.append(newNode.blockHash)
-      assume(newNode.parentOpt.nonEmpty && oldNode.parentOpt.nonEmpty) // This should always be true
       calDiff(toRemove, toAdd, newNode.parentOpt.get, oldNode.parentOpt.get)
     }
   }
@@ -325,7 +326,7 @@ object BlockHashChain {
     def parentOpt: Option[TreeNode]
   }
 
-  case class Root(
+  final case class Root(
       blockHash: Keccak256,
       successors: ArrayBuffer[Node],
       height: Int,
@@ -342,7 +343,7 @@ object BlockHashChain {
       Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
   }
 
-  case class Node(
+  final case class Node(
       blockHash: Keccak256,
       parent: TreeNode,
       successors: ArrayBuffer[Node],
@@ -365,5 +366,5 @@ object BlockHashChain {
     }
   }
 
-  case class ChainDiff(toRemove: AVector[Keccak256], toAdd: AVector[Keccak256])
+  final case class ChainDiff(toRemove: AVector[Keccak256], toAdd: AVector[Keccak256])
 }

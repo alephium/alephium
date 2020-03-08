@@ -25,6 +25,7 @@ object IOUtils {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def removeUnsafe(path: Path): Unit = {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {

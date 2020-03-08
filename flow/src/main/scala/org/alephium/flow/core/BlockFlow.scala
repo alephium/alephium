@@ -221,5 +221,5 @@ class BlockFlow()(implicit val config: PlatformProfile)
 object BlockFlow {
   def createUnsafe()(implicit config: PlatformProfile): BlockFlow = new BlockFlow()
 
-  case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
+  final case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

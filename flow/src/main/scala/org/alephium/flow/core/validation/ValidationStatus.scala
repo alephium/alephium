@@ -6,8 +6,8 @@ import org.alephium.protocol.script.RunFailed
 import org.alephium.util.AVector
 
 sealed trait ValidationStatus
-trait InvalidStatus extends ValidationStatus
-trait ValidStatus   extends ValidationStatus
+sealed trait InvalidStatus extends ValidationStatus
+sealed trait ValidStatus   extends ValidationStatus
 
 sealed trait BlockStatus        extends ValidationStatus
 sealed trait InvalidBlockStatus extends BlockStatus with InvalidStatus

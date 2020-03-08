@@ -14,7 +14,7 @@ object BrokerConnector {
     Props(new BrokerConnector(connection))
 
   sealed trait Event
-  case class Ack(id: Int) extends Event
+  final case class Ack(id: Int) extends Event
 
   object Ack {
     implicit val serde: Serde[Ack] = Serde.forProduct1(new Ack(_), _.id)
@@ -68,6 +68,7 @@ class BrokerConnector(connection: ActorRef)(implicit config: GroupConfig) extend
       context stop self
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def await[E](unaligned: ByteString,
                next: => Unit,
                deserialize: ByteString => SerdeResult[Option[(E, ByteString)]]): Receive = {

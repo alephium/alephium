@@ -23,14 +23,15 @@ object HeaderChainHandler {
   }
 
   sealed trait Command
-  case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin) extends Command
-  case class AddPendingHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+  final case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin)
+      extends Command
+  final case class AddPendingHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
       extends Command
 
-  sealed trait Event                              extends ChainHandler.Event
-  case class HeadersAdded(chainIndex: ChainIndex) extends Event
-  case object HeadersAddingFailed                 extends Event
-  case object InvalidHeaders                      extends Event
+  sealed trait Event                                    extends ChainHandler.Event
+  final case class HeadersAdded(chainIndex: ChainIndex) extends Event
+  case object HeadersAddingFailed                       extends Event
+  case object InvalidHeaders                            extends Event
 }
 
 class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
@@ -44,6 +45,7 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandl
     case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
                                    broker: ActorRef,
                                    origin: DataOrigin): Unit = {

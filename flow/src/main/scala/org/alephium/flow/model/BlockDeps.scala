@@ -10,7 +10,7 @@ import org.alephium.util.AVector
  * The first groups - 1 hashes are for the incoming chains of a specific group
  * The last groups hashes are for the outcoming chains of a specific group
  */
-case class BlockDeps(deps: AVector[Keccak256]) {
+final case class BlockDeps(deps: AVector[Keccak256]) {
   def getChainHash(to: GroupIndex)(implicit config: GroupConfig): Keccak256 = {
     deps.takeRight(config.groups)(to.value)
   }

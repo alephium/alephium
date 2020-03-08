@@ -14,7 +14,7 @@ import org.alephium.util.AVector
  * In this way, we could pad many coinbase transactions into one block without hacking any code
  *
  */
-case class Transaction(
+final case class Transaction(
     raw: RawTransaction,
     data: ByteString,
     witnesses: AVector[Witness]

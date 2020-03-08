@@ -15,10 +15,10 @@ object InterCliqueManager {
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 
   sealed trait Command
-  case class Syncing(cliqueId: CliqueId) extends Command
-  case class Synced(cliqueId: CliqueId)  extends Command
+  final case class Syncing(cliqueId: CliqueId) extends Command
+  final case class Synced(cliqueId: CliqueId)  extends Command
 
-  case class BrokerState(actor: ActorRef, isSynced: Boolean) {
+  final case class BrokerState(actor: ActorRef, isSynced: Boolean) {
     def setSyncing(): BrokerState = BrokerState(actor, isSynced = false)
 
     def setSynced(): BrokerState = BrokerState(actor, isSynced = true)

@@ -338,10 +338,12 @@ trait BlockFlowState {
 
 object BlockFlowState {
   sealed trait BlockCache
-  case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache
-  case class OutBlockCache(inputs: Set[TxOutputPoint], relatedOutputs: Map[TxOutputPoint, TxOutput])
+  final case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache
+  final case class OutBlockCache(inputs: Set[TxOutputPoint],
+                                 relatedOutputs: Map[TxOutputPoint, TxOutput])
       extends BlockCache
-  case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput], inputs: Set[TxOutputPoint])
+  final case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput],
+                                   inputs: Set[TxOutputPoint])
       extends BlockCache // For blocks on intra-group chain
 
   private def convertInputs(block: Block): Set[TxOutputPoint] = {

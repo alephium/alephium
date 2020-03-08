@@ -25,6 +25,7 @@ object CliqueId extends RandomBytes.Companion[CliqueId](new CliqueId(_), _.bytes
     fromBytesUnsafe(bytes)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.While"))
   def hammingDist(cliqueId0: CliqueId, cliqueId1: CliqueId): Int = {
     val bytes0 = cliqueId0.bytes
     val bytes1 = cliqueId1.bytes

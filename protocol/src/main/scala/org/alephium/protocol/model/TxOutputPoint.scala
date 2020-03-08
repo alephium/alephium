@@ -4,7 +4,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
-case class TxOutputPoint(shortKey: Int, txHash: Keccak256, outputIndex: Int) {
+final case class TxOutputPoint(shortKey: Int, txHash: Keccak256, outputIndex: Int) {
   def fromGroup(implicit config: GroupConfig): GroupIndex = GroupIndex.fromShortKey(shortKey)
 }
 

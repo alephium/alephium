@@ -57,9 +57,8 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
         case Left(e)                    => handleIOError(broker, e)
         case Right(MissingDeps(hashes)) => handleMissingDeps(data, hashes, broker, origin)
         case Right(x: InvalidStatus)    => handleInvalidData(broker, x)
-        case Right(s) =>
-          assert(s.isInstanceOf[ValidStatus]) // avoid and double check exhaustive matching issues
-          handleValidData(data, broker, origin)
+        case Right(_: ValidStatus)      => handleValidData(data, broker, origin)
+        case Right(unexpected)          => log.warning(s"Unexpected pattern matching: $unexpected")
       }
     }
   }
@@ -72,9 +71,8 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
     validationResult match {
       case Left(e)                      => handleIOError(broker, e)
       case Right(x: InvalidBlockStatus) => handleInvalidData(broker, x)
-      case Right(s) =>
-        assert(s.isInstanceOf[ValidStatus]) // avoid and double check exhaustive matching issues
-        handleValidData(data, broker, origin)
+      case Right(_: ValidStatus)        => handleValidData(data, broker, origin)
+      case Right(unexpected)            => log.debug(s"Unexpected pattern matching $unexpected")
     }
   }
 

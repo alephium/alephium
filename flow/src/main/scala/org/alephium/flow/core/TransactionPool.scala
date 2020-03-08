@@ -9,9 +9,9 @@ import org.alephium.util.{AVector, ConcurrentHashMap}
 
 object TransactionPool {
   sealed trait Error
-  case class InvalidTransaction(msg: String) extends Error
-  case class InvalidIndex(msg: String)       extends Error
-  case class IOError(error: ImportedIOError) extends Error
+  final case class InvalidTransaction(msg: String) extends Error
+  final case class InvalidIndex(msg: String)       extends Error
+  final case class IOError(error: ImportedIOError) extends Error
 
   object Error {
     def invalidTransaction(msg: String): InvalidTransaction = InvalidTransaction(msg)

@@ -24,7 +24,7 @@ object MerklePatriciaTrie {
 
     def preCut(n: Int): Node
   }
-  case class BranchNode(path: ByteString, children: AVector[Option[Keccak256]]) extends Node {
+  final case class BranchNode(path: ByteString, children: AVector[Option[Keccak256]]) extends Node {
     def replace(nibble: Int, childHash: Keccak256): BranchNode = {
       BranchNode(path, children.replace(nibble, Some(childHash)))
     }
@@ -36,7 +36,7 @@ object MerklePatriciaTrie {
       BranchNode(path.drop(n), children)
     }
   }
-  case class LeafNode(path: ByteString, data: ByteString) extends Node {
+  final case class LeafNode(path: ByteString, data: ByteString) extends Node {
     def preExtend(prefix: ByteString): Node = {
       LeafNode(prefix ++ path, data)
     }
@@ -127,10 +127,10 @@ object MerklePatriciaTrie {
     }
   }
 
-  case class TrieUpdateActions(newNodeOpt: Option[Node],
-                               toDelete: AVector[Keccak256],
-                               toAdd: AVector[Node])
-  case class MPTException(message: String) extends Exception(message)
+  final case class TrieUpdateActions(newNodeOpt: Option[Node],
+                                     toDelete: AVector[Keccak256],
+                                     toAdd: AVector[Node])
+  final case class MPTException(message: String) extends Exception(message)
   object MPTException {
     def keyNotFound(action: String): MPTException = MPTException("Key not found in " ++ action)
   }
@@ -200,7 +200,7 @@ object MerklePatriciaTrie {
 }
 
 // TODO: batch mode
-class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
+final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
   import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie] = {
@@ -240,7 +240,11 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
   }
 
   def getOpt(hash: Keccak256, nibbles: ByteString): IOResult[Option[ByteString]] = {
-    getNode(hash) flatMap {
+    getNode(hash).flatMap(getOpt(_, nibbles))
+  }
+
+  def getOpt(node: Node, nibbles: ByteString): IOResult[Option[ByteString]] = {
+    node match {
       case BranchNode(path, children) =>
         assert(nibbles.length > path.length)
         if (path == nibbles.take(path.length)) {
@@ -271,7 +275,14 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
   }
 
   private def remove(hash: Keccak256, nibbles: ByteString): IOResult[TrieUpdateActions] = {
-    getNode(hash) flatMap {
+    getNode(hash).flatMap(remove(hash, _, nibbles))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def remove(hash: Keccak256,
+                     node: Node,
+                     nibbles: ByteString): IOResult[TrieUpdateActions] = {
+    node match {
       case node @ BranchNode(path, children) =>
         assert(nibbles.length > path.length)
         val nibble   = getNibble(nibbles, path.length)
@@ -294,6 +305,7 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def handleChildUpdateResult(branchHash: Keccak256,
                               branchNode: BranchNode,
                               nibble: Int,
@@ -338,35 +350,39 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
   private def put(hash: Keccak256,
                   nibbles: ByteString,
                   value: ByteString): IOResult[TrieUpdateActions] = {
-    assert(nibbles.nonEmpty)
-    getNode(hash) flatMap { node =>
-      val path = node.path
-      assert(path.length <= nibbles.length)
-      val branchIndex = node.path.indices.indexWhere(i => nibbles(i) != path(i))
-      if (branchIndex == -1) {
-        node match {
-          case branchNode @ BranchNode(_, children) =>
-            val nibble       = getNibble(nibbles, path.length)
-            val nibblesRight = nibbles.drop(path.length + 1)
-            children(nibble) match {
-              case Some(childHash) =>
-                put(childHash, nibblesRight, value) flatMap { result =>
-                  handleChildUpdateResult(hash, branchNode, nibble, result)
-                }
-              case None =>
-                val newLeaf   = LeafNode(nibblesRight, value)
-                val newBranch = branchNode.replace(nibble, newLeaf.hash)
-                Right(
-                  TrieUpdateActions(Some(newBranch), AVector(hash), AVector(newBranch, newLeaf)))
-            }
-          case leaf: LeafNode =>
-            assert(path.length == nibbles.length)
-            val newLeaf = LeafNode(path, value)
-            Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
-        }
-      } else {
-        branch(hash, node, branchIndex, nibbles, value)
+    assume(nibbles.nonEmpty)
+    getNode(hash).flatMap(put(hash, _, nibbles, value))
+  }
+
+  private def put(hash: Keccak256,
+                  node: Node,
+                  nibbles: ByteString,
+                  value: ByteString): IOResult[TrieUpdateActions] = {
+    val path = node.path
+    assert(path.length <= nibbles.length)
+    val branchIndex = node.path.indices.indexWhere(i => nibbles(i) != path(i))
+    if (branchIndex == -1) {
+      node match {
+        case branchNode @ BranchNode(_, children) =>
+          val nibble       = getNibble(nibbles, path.length)
+          val nibblesRight = nibbles.drop(path.length + 1)
+          children(nibble) match {
+            case Some(childHash) =>
+              put(childHash, nibblesRight, value) flatMap { result =>
+                handleChildUpdateResult(hash, branchNode, nibble, result)
+              }
+            case None =>
+              val newLeaf   = LeafNode(nibblesRight, value)
+              val newBranch = branchNode.replace(nibble, newLeaf.hash)
+              Right(TrieUpdateActions(Some(newBranch), AVector(hash), AVector(newBranch, newLeaf)))
+          }
+        case leaf: LeafNode =>
+          assert(path.length == nibbles.length)
+          val newLeaf = LeafNode(path, value)
+          Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
       }
+    } else {
+      branch(hash, node, branchIndex, nibbles, value)
     }
   }
 
@@ -415,28 +431,35 @@ class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
     if (prefix.isEmpty) {
       getAllRaw(hash, acc)
     } else {
-      getNode(hash).flatMap {
-        case n: BranchNode =>
-          if (n.path.length >= prefix.length) {
-            if (n.path.startsWith(prefix)) getAllRaw(n, acc) else Right(AVector.empty)
-          } else {
-            if (prefix.startsWith(n.path)) {
-              val prefixRest = prefix.drop(n.path.length)
-              val nibble     = prefixRest.head
-              assert(nibble >= 0 && nibble < 16)
-              n.children(nibble.toInt) match {
-                case Some(child) => getAllRaw(prefixRest.tail, child, acc ++ n.path :+ nibble)
-                case None        => Right(AVector.empty)
-              }
-            } else Right(AVector.empty)
-          }
-        case n: LeafNode =>
-          if (n.path.take(prefix.length) == prefix) {
-            Right(AVector(acc ++ n.path -> n))
-          } else {
-            Right(AVector.empty)
-          }
-      }
+      getNode(hash).flatMap(getAllRaw(prefix, _, acc))
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  protected def getAllRaw(prefix: ByteString,
+                          node: Node,
+                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+    node match {
+      case n: BranchNode =>
+        if (n.path.length >= prefix.length) {
+          if (n.path.startsWith(prefix)) getAllRaw(n, acc) else Right(AVector.empty)
+        } else {
+          if (prefix.startsWith(n.path)) {
+            val prefixRest = prefix.drop(n.path.length)
+            val nibble     = prefixRest.head
+            assert(nibble >= 0 && nibble < 16)
+            n.children(nibble.toInt) match {
+              case Some(child) => getAllRaw(prefixRest.tail, child, acc ++ n.path :+ nibble)
+              case None        => Right(AVector.empty)
+            }
+          } else Right(AVector.empty)
+        }
+      case n: LeafNode =>
+        if (n.path.take(prefix.length) == prefix) {
+          Right(AVector(acc ++ n.path -> n))
+        } else {
+          Right(AVector.empty)
+        }
     }
   }
 

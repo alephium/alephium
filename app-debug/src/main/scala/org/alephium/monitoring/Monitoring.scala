@@ -5,8 +5,8 @@ import com.codahale.metrics.jmx.JmxReporter
 
 object Monitoring {
 
-  val metrics  = new MetricRegistry()
-  val reporter = JmxReporter.forRegistry(metrics).build()
+  val metrics: MetricRegistry = new MetricRegistry()
+  val reporter: JmxReporter   = JmxReporter.forRegistry(metrics).build()
 
   reporter.start()
 }

@@ -98,10 +98,10 @@ object HandShake {
   }
 }
 
-class Hello(val version: Int,
-            val timestamp: Long,
-            val cliqueId: CliqueId,
-            val brokerInfo: BrokerInfo)
+final class Hello(val version: Int,
+                  val timestamp: Long,
+                  val cliqueId: CliqueId,
+                  val brokerInfo: BrokerInfo)
     extends HandShake
 
 object Hello extends Payload.Code {
@@ -113,10 +113,10 @@ object Hello extends Payload.Code {
   }
 }
 
-class HelloAck(val version: Int,
-               val timestamp: Long,
-               val cliqueId: CliqueId,
-               val brokerInfo: BrokerInfo)
+final class HelloAck(val version: Int,
+                     val timestamp: Long,
+                     val cliqueId: CliqueId,
+                     val brokerInfo: BrokerInfo)
     extends HandShake
 
 object HelloAck extends Payload.Code {
@@ -128,43 +128,43 @@ object HelloAck extends Payload.Code {
   }
 }
 
-case class Ping(nonce: Int, timestamp: Long) extends Payload
+final case class Ping(nonce: Int, timestamp: Long) extends Payload
 
 object Ping extends Payload.Code {
   implicit val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
 }
 
-case class Pong(nonce: Int) extends Payload
+final case class Pong(nonce: Int) extends Payload
 
 object Pong extends Payload.Code {
   implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
-case class SendBlocks(blocks: AVector[Block]) extends Payload
+final case class SendBlocks(blocks: AVector[Block]) extends Payload
 
 object SendBlocks extends Payload.Code {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
-case class GetBlocks(locators: AVector[Keccak256]) extends Payload
+final case class GetBlocks(locators: AVector[Keccak256]) extends Payload
 
 object GetBlocks extends Payload.Code {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
 }
 
-case class SendHeaders(headers: AVector[BlockHeader]) extends Payload
+final case class SendHeaders(headers: AVector[BlockHeader]) extends Payload
 
 object SendHeaders extends Payload.Code {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
-case class GetHeaders(locators: AVector[Keccak256]) extends Payload
+final case class GetHeaders(locators: AVector[Keccak256]) extends Payload
 
 object GetHeaders extends Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
 }
 
-case class SendTxs(txs: AVector[Transaction]) extends Payload
+final case class SendTxs(txs: AVector[Transaction]) extends Payload
 
 object SendTxs extends Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
