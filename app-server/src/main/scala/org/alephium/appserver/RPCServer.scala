@@ -94,7 +94,7 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def withReqF[T: Decoder, R](req: Request)(f: T => Try[R]): Try[R] = {
+  def withReqF[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(f: T => Try[R]): Try[R] = {
     req.paramsAs[T] match {
       case Right(query)  => f(query)
       case Left(failure) => Left(failure)
@@ -227,7 +227,14 @@ object RPCServer extends StrictLogging {
       Right(true)
     }
 
-  def wrap[T: Encoder](req: Request, result: FutureTry[T])(
+  def wrap[T <: RPCModel: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
+  }
+
+  // Note: use wrap when T derives RPCModel
+  def simpleWrap[T: Encoder](req: Request, result: FutureTry[T])(
       implicit ec: ExecutionContext): Future[Response] = result.map {
     case Right(t)    => Response.successful(req, t)
     case Left(error) => error
