@@ -1,5 +1,7 @@
 package org.alephium.appserver
 
+import java.net.InetSocketAddress
+
 import io.circe._
 import io.circe.generic.semiauto._
 
@@ -53,6 +55,14 @@ object RPCModel {
     def from(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
       from(blockNotify.header, blockNotify.height)
     }
+  }
+
+  final case class SelfClique(peers: AVector[InetSocketAddress], groupNumPerBroker: Int)
+  object SelfClique {
+    def from(cliqueInfo: CliqueInfo): SelfClique =
+      SelfClique(cliqueInfo.peers, cliqueInfo.groupNumPerBroker)
+
+    implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
   final case class PeerCliques(cliques: AVector[CliqueInfo])

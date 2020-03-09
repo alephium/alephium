@@ -31,6 +31,7 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
+  case object GetSelfClique                    extends Command
   case object GetPeerCliques                   extends Command
   final case class Disable(cliqueId: CliqueId) extends Command
   case object Scan                             extends Command
@@ -109,6 +110,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       scan()
       if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
       else scheduleOnce(self, Scan, config.scanFrequency)
+    case GetSelfClique =>
+      sender() ! selfCliqueInfo
     case GetPeerCliques =>
       sender() ! PeerCliques(getActivePeers)
     case Disable(peerId) =>

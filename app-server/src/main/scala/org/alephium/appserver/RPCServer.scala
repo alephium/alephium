@@ -20,7 +20,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{Hex, TimeStamp}
@@ -47,6 +47,13 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
 
   def doBlockNotify(blockNotify: BlockNotify): Json =
     blockNotifyEncode(blockNotify)
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def doGetSelfClique(req: Request): FutureTry[SelfClique] =
+    mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).map { result =>
+      val cliqueInfo = result.asInstanceOf[CliqueInfo]
+      Right(SelfClique.from(cliqueInfo))
+    }
 
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
