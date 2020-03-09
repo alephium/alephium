@@ -8,7 +8,7 @@ import akka.actor.{ActorRef, Props}
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
+import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
@@ -17,22 +17,26 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 object FairMiner {
-  def props(node: Node)(implicit config: PlatformProfile): Props = {
+  def props(node: Node)(implicit config: PlatformProfile): Props =
+    props(node.blockFlow, node.allHandlers)
+
+  def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(
+      implicit config: PlatformProfile): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex.unsafe(i)
       val (_, publicKey) = index.generateP2pkhKey
       publicKey
     }
-    props(addresses, node)
+    props(addresses, blockFlow, allHandlers)
   }
 
-  def props(addresses: AVector[ED25519PublicKey], node: Node)(
+  def props(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit config: PlatformProfile): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
       require(GroupIndex.fromP2PKH(address).value == i)
     }
-    Props(new FairMiner(addresses, node))
+    Props(new FairMiner(addresses, blockFlow, allHandlers))
   }
 
   sealed trait Command
@@ -59,11 +63,12 @@ object FairMiner {
   }
 }
 
-class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
-    implicit val config: PlatformProfile)
+class FairMiner(addresses: AVector[ED25519PublicKey],
+                blockFlow: BlockFlow,
+                allHandlers: AllHandlers)(implicit val config: PlatformProfile)
     extends BaseActor
     with FairMinerState {
-  val handlers = node.allHandlers
+  val handlers = allHandlers
 
   def receive: Receive = awaitStart
 
@@ -116,7 +121,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey], node: Node)(
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assume(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
     val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
-    val flowTemplate = node.blockFlow.prepareBlockFlowUnsafe(index)
+    val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
     BlockTemplate(flowTemplate.deps, flowTemplate.target, flowTemplate.transactions :+ coinbase(to))
   }
 
