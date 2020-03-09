@@ -58,8 +58,8 @@ trait RPCServerAbstract extends StrictLogging {
     "self_clique"     -> (req => wrap(req, doGetSelfClique(req))),
     "get_balance"     -> (req => wrap(req, doGetBalance(req))),
     "transfer"        -> (req => wrap(req, doTransfer(req))),
-    "mining_start"    -> (req => wrap(req, doStartMining(miner))),
-    "mining_stop"     -> (req => wrap(req, doStopMining(miner)))
+    "mining_start"    -> (req => simpleWrap(req, doStartMining(miner))),
+    "mining_stop"     -> (req => simpleWrap(req, doStopMining(miner)))
   )
 
   def routeHttp(miner: ActorRef): Route =
