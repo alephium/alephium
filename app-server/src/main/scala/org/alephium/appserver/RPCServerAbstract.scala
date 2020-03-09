@@ -11,17 +11,18 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import io.circe.Encoder
 import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
-import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request}
+import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
 import org.alephium.util.EventBus
 
 trait RPCServerAbstract extends StrictLogging {
-  import RPCServer._
+  import RPCServerAbstract._
 
   implicit def system: ActorSystem
   implicit def materializer: ActorMaterializer
@@ -87,5 +88,32 @@ trait RPCServerAbstract extends StrictLogging {
       .watchTermination() { (_, termination) =>
         termination.onComplete(_ => eventBus.tell(EventBus.Unsubscribe, actor))
       }
+  }
+}
+
+object RPCServerAbstract {
+  import Response.Failure
+  type Try[T]       = Either[Failure, T]
+  type FutureTry[T] = Future[Try[T]]
+
+  val bufferSize: Int = 64
+
+  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
+    Future {
+      f
+      Right(true)
+    }
+
+  def wrap[T <: RPCModel: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
+  }
+
+  // Note: use wrap when T derives RPCModel
+  def simpleWrap[T: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
   }
 }

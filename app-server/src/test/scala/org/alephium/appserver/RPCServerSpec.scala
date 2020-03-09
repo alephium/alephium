@@ -26,7 +26,7 @@ import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
 object RPCServerSpec {
-  import RPCServer._
+  import RPCServerAbstract.FutureTry
 
   val printer         = org.alephium.rpc.CirceUtils.printer
   val jsonObjectEmpty = JsonObject.empty.asJson

@@ -27,6 +27,7 @@ import org.alephium.util.{Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
+  import RPCServerAbstract.FutureTry
 
   implicit val system: ActorSystem                = mode.node.system
   implicit val materializer: ActorMaterializer    = ActorMaterializer()
@@ -81,11 +82,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
 }
 
 object RPCServer extends StrictLogging {
-  import Response.Failure
-  type Try[T]       = Either[Failure, T]
-  type FutureTry[T] = Future[Try[T]]
-
-  val bufferSize: Int = 64
+  import RPCServerAbstract._
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
     req.paramsAs[T] match {
@@ -176,7 +173,7 @@ object RPCServer extends StrictLogging {
   def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
-        val result = for {
+        val resultE = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
           _              <- checkGroup(blockFlow, fromAddress)
           toAddress      <- decodePublicKey(query.toAddress)
@@ -187,7 +184,7 @@ object RPCServer extends StrictLogging {
           txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
           TransferResult(Hex.toHexString(tx.hash.bytes))
         }
-        result match {
+        resultE match {
           case Right(result) => Right(result)
           case Left(error)   => Left(error)
         }
@@ -219,25 +216,6 @@ object RPCServer extends StrictLogging {
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
       implicit config: ConsensusConfig): BlockEntry = {
     BlockEntry.from(header, chain.getHeight(header))
-  }
-
-  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
-    Future {
-      f
-      Right(true)
-    }
-
-  def wrap[T <: RPCModel: Encoder](req: Request, result: FutureTry[T])(
-      implicit ec: ExecutionContext): Future[Response] = result.map {
-    case Right(t)    => Response.successful(req, t)
-    case Left(error) => error
-  }
-
-  // Note: use wrap when T derives RPCModel
-  def simpleWrap[T: Encoder](req: Request, result: FutureTry[T])(
-      implicit ec: ExecutionContext): Future[Response] = result.map {
-    case Right(t)    => Response.successful(req, t)
-    case Left(error) => error
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
