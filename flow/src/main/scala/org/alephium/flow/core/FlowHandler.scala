@@ -54,7 +54,8 @@ object FlowHandler {
   final case class CurrentTips(tips: AVector[Keccak256])                          extends Event
   final case class BlocksLocated(blocks: AVector[Block])                          extends Event
   final case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin) extends Event
-  final case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin) extends Event
+  final case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+      extends Event
   final case class BlockNotify(header: BlockHeader, height: Int) extends EventBus.Event
 }
 
