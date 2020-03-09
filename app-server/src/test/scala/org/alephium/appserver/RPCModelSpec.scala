@@ -1,5 +1,7 @@
 package org.alephium.appserver
 
+import java.net.InetSocketAddress
+
 import io.circe.{Codec, Decoder, Encoder}
 import io.circe.parser._
 import io.circe.syntax._
@@ -17,8 +19,9 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
-  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector.empty, 1)
+    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, List(i.toString))
+  val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
+  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
@@ -58,14 +61,15 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   it should "encode/decode SelfClique" in {
     val selfClique = SelfClique.from(dummyCliqueInfo)
-    val jsonRaw    = s"""{"peers":[],"groupNumPerBroker":1}"""
+    val jsonRaw    = s"""{"peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}"""
     checkData(selfClique, jsonRaw)
   }
 
   it should "encode/decode PeerCliques" in {
     val peerCliques    = PeerCliques(AVector(dummyCliqueInfo))
     val cliqueIdString = dummyCliqueInfo.id.toHexString
-    val jsonRaw        = s"""{"cliques":[{"id":"$cliqueIdString","peers":[],"groupNumPerBroker":1}]}"""
+    val jsonRaw =
+      s"""{"cliques":[{"id":"$cliqueIdString","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
     checkData(peerCliques, jsonRaw)
   }
 
