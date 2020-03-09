@@ -7,6 +7,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
@@ -17,6 +18,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
+  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector.empty, 1)
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
@@ -52,6 +54,13 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     val jsonRaw =
       """{"blocks":[{"hash":"0","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["0"]},{"hash":"1","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["1"]}]}"""
     checkData(response, jsonRaw)
+  }
+
+  it should "encode/decode PeerCliques" in {
+    val peerCliques    = PeerCliques(AVector(dummyCliqueInfo))
+    val cliqueIdString = dummyCliqueInfo.id.toHexString
+    val jsonRaw        = s"""{"cliques":[{"id":"$cliqueIdString","peers":[],"groupNumPerBroker":1}]}"""
+    checkData(peerCliques, jsonRaw)
   }
 
   it should "encode/decode GetBalance" in {
