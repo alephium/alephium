@@ -13,7 +13,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.syntax._
 
-import org.alephium.appserver.RPCModel.{Balance, FetchResponse, PeerCliques, TransferResult}
+import org.alephium.appserver.RPCModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
@@ -32,6 +32,7 @@ trait RPCServerAbstract extends StrictLogging {
 
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
   def doGetPeerCliques(req: Request): FutureTry[PeerCliques]
+  def doGetSelfClique(req: Request): FutureTry[SelfClique]
   def doGetBalance(req: Request): FutureTry[Balance]
   def doTransfer(req: Request): FutureTry[TransferResult]
   def doStartMining(miner: ActorRef): FutureTry[Boolean] =
@@ -54,6 +55,7 @@ trait RPCServerAbstract extends StrictLogging {
   def handlerRPC(miner: ActorRef): Handler = Map.apply(
     "blockflow_fetch" -> (req => wrap(req, doBlockflowFetch(req))),
     "peer_cliques"    -> (req => wrap(req, doGetPeerCliques(req))),
+    "self_clique"     -> (req => wrap(req, doGetSelfClique(req))),
     "get_balance"     -> (req => wrap(req, doGetBalance(req))),
     "transfer"        -> (req => wrap(req, doTransfer(req))),
     "mining_start"    -> (req => wrap(req, doStartMining(miner))),
