@@ -10,6 +10,7 @@ import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.{Decoder, Json, JsonObject}
 import io.circe.parser._
 import io.circe.syntax._
@@ -22,7 +23,6 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.{BlockHeader}
-import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
@@ -58,7 +58,7 @@ object RPCServerSpec {
     override def handleEvent(event: EventBus.Event): TextMessage = {
       event match {
         case _ =>
-          val result = JsonRPC.Notification("events_fake", jsonObjectEmpty)
+          val result = Notification("events_fake", jsonObjectEmpty)
           TextMessage(result.asJson.noSpaces)
       }
     }
@@ -82,20 +82,15 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     lazy val server: RPCServerDummy = new RPCServerDummy {}
     lazy val route: Route           = server.routeHttp(TestProbe().ref)
 
-    def checkCallResult[T: Decoder](method: String)(expected: T): Assertion =
-      checkCall(method) { case (_, json) => json.result.as[T].right.value is expected }
-
-    def checkCall[T](method: String)(f: (String, JsonRPC.Response.Success) => T): T = {
-      rpcRequest(method, jsonObjectEmpty, 0) ~> route ~> check {
+    def checkCall[T](method: String)(f: Response.Success => T): T = {
+      rpcRequest(method, Json.obj(), 0) ~> route ~> check {
         status.intValue is 200
-        val response                         = responseAs[HttpResponse]
-        val HttpEntity.Strict(_, httpEntity) = response.entity
-        val jsonRaw                          = httpEntity.utf8String
-        val json                             = parse(jsonRaw).right.value
-        val success                          = json.as[JsonRPC.Response.Success].right.value
-        f(jsonRaw, success)
+        f(responseAs[Response.Success])
       }
     }
+
+    def checkCallResult[T: Decoder](method: String)(expected: T): Assertion =
+      checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
       val jsonRequest = Request(method, params, id).asJson.noSpaces
@@ -147,7 +142,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       """{"header":{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]},"height":1}"""
   }
 
-  it should "http - mining_start" in new MiningMock {
+  it should "call mining_start" in new MiningMock {
     checkCallResult("mining_start")(true)
     miner.expectMsg(Miner.Start)
   }
