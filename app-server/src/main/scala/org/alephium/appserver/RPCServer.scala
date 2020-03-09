@@ -2,15 +2,10 @@ package org.alephium.appserver
 
 import scala.concurrent._
 
-import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.TextMessage
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.{ActorMaterializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.ActorMaterializer
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -18,8 +13,8 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.client.{FairMiner, Miner}
-import org.alephium.flow.core.{BlockFlow, FlowHandler, MultiChain, TxHandler}
+import org.alephium.flow.client.FairMiner
+import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
@@ -27,10 +22,8 @@ import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
-import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.rpc.model.JsonRPC.Response
-import org.alephium.util.{EventBus, Hex, TimeStamp}
+import org.alephium.util.{Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
@@ -77,74 +70,6 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
                      rpcConfig.networkInterface.getHostAddress,
                      mode.rpcWsPort)
       .map(_ => ())
-  }
-}
-
-trait RPCServerAbstract extends StrictLogging {
-  import RPCServer._
-
-  implicit def system: ActorSystem
-  implicit def materializer: ActorMaterializer
-  implicit def executionContext: ExecutionContext
-  implicit def config: PlatformProfile
-  implicit def rpcConfig: RPCConfig
-  implicit def askTimeout: Timeout
-
-  def doBlockNotify(blockNotify: BlockNotify): Json
-  def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
-  def doGetPeers(req: Request): FutureTry[PeersResult]
-  def doGetBalance(req: Request): FutureTry[Balance]
-  def doTransfer(req: Request): FutureTry[TransferResult]
-  def doStartMining(miner: ActorRef): FutureTry[Boolean] =
-    execute(miner ! Miner.Start)
-  def doStopMining(miner: ActorRef): FutureTry[Boolean] =
-    execute(miner ! Miner.Stop)
-
-  def runServer(): Future[Unit]
-
-  def handleEvent(event: EventBus.Event): TextMessage = {
-    event match {
-      case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params = doBlockNotify(bn)
-        val notif  = Notification("block_notify", params)
-        TextMessage(notif.asJson.noSpaces)
-    }
-  }
-
-  def handlerRPC(miner: ActorRef): Handler = Map.apply(
-    "blockflow_fetch" -> (req => wrap(req, doBlockflowFetch(req))),
-    "clique_info"     -> (req => wrap(req, doGetPeers(req))),
-    "get_balance"     -> (req => wrap(req, doGetBalance(req))),
-    "transfer"        -> (req => wrap(req, doTransfer(req))),
-    "mining_start"    -> (req => wrap(req, doStartMining(miner))),
-    "mining_stop"     -> (req => wrap(req, doStopMining(miner)))
-  )
-
-  def routeHttp(miner: ActorRef): Route =
-    CORSHandler(JsonRPCHandler.routeHttp(handlerRPC(miner)))
-
-  def routeWs(eventBus: ActorRef): Route = {
-    path("events") {
-      CORSHandler(get {
-        extractUpgradeToWebSocket { upgrade =>
-          val (actor, source) =
-            Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
-          eventBus.tell(EventBus.Subscribe, actor)
-          val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
-          complete(response)
-        }
-      })
-    }
-  }
-
-  def wsFlow(eventBus: ActorRef,
-             actor: ActorRef,
-             source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
-    Flow
-      .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
-      .watchTermination() { (_, termination) =>
-        termination.onComplete(_ => eventBus.tell(EventBus.Unsubscribe, actor))
-      }
   }
 }
 
