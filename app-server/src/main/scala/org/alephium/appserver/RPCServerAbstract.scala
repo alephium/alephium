@@ -19,7 +19,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
+import org.alephium.rpc.{CirceUtils, CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
 import org.alephium.util.EventBus
 
@@ -49,9 +49,9 @@ trait RPCServerAbstract extends StrictLogging {
   def handleEvent(event: EventBus.Event): TextMessage = {
     event match {
       case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params = doBlockNotify(bn)
-        val notif  = Notification("block_notify", params)
-        TextMessage(notif.asJson.noSpaces)
+        val params       = doBlockNotify(bn)
+        val notification = Notification("block_notify", params)
+        TextMessage(CirceUtils.print(notification.asJson))
     }
   }
 

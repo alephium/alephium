@@ -22,17 +22,17 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.BlockHeader
+import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
 object RPCServerSpec {
   import RPCServerAbstract.FutureTry
 
-  val printer         = org.alephium.rpc.CirceUtils.printer
   val jsonObjectEmpty = JsonObject.empty.asJson
 
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    printer.print(t.asJson)
+    CirceUtils.print(t.asJson)
   }
 
   case object Dummy extends EventBus.Event
@@ -99,7 +99,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
-      val jsonRequest = Request(method, params, id).asJson.noSpaces
+      val jsonRequest = CirceUtils.print((method, params, id).asJson)
 
       HttpRequest(HttpMethods.POST,
                   "/",

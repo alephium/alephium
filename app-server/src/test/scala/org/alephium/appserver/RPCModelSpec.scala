@@ -10,12 +10,12 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.rpc.CirceUtils
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
-  val printer = org.alephium.rpc.CirceUtils.printer
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    printer.print(t.asJson)
+    CirceUtils.print(t.asJson)
   }
 
   def entryDummy(i: Int): BlockEntry =
