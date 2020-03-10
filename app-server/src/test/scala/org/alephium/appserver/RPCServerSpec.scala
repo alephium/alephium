@@ -47,13 +47,13 @@ object RPCServerSpec {
     def successful[T](t: T): FutureTry[T] = Future.successful(Right(t))
 
     val dummyFetchResponse  = FetchResponse(Seq.empty)
-    val dummyClique         = SelfClique(AVector.empty, 1)
+    val dummySelfClique     = SelfClique(AVector.empty, 1)
     val dummyPeerCliques    = PeerCliques(AVector.empty)
     val dummyBalance        = Balance(1, 1)
     val dummyTransferResult = TransferResult("foobar")
 
     def doBlockflowFetch(req: Request): FutureTry[FetchResponse] = successful(dummyFetchResponse)
-    def doGetSelfClique(req: Request): FutureTry[SelfClique]     = successful(dummyClique)
+    def doGetSelfClique(req: Request): FutureTry[SelfClique]     = successful(dummySelfClique)
     def doGetPeerCliques(req: Request): FutureTry[PeerCliques]   = successful(dummyPeerCliques)
     def doGetBalance(req: Request): FutureTry[Balance]           = successful(dummyBalance)
     def doTransfer(req: Request): FutureTry[TransferResult]      = successful(dummyTransferResult)
@@ -166,7 +166,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   it should "call self_clique" in new RouteHTTP {
-    checkCallResult("self_clique")(server.dummyClique)
+    checkCallResult("self_clique")(server.dummySelfClique)
   }
 
   it should "call get_balance" in new RouteHTTP {

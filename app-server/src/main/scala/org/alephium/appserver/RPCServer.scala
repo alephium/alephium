@@ -36,6 +36,9 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
+  def doBlockNotify(blockNotify: BlockNotify): Json =
+    blockNotifyEncode(blockNotify)
+
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
@@ -45,9 +48,6 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
       peerCliques =>
         Right(PeerCliques(peerCliques.cliques))
     }
-
-  def doBlockNotify(blockNotify: BlockNotify): Json =
-    blockNotifyEncode(blockNotify)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
