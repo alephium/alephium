@@ -11,11 +11,13 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.flow.client.Miner
+import org.alephium.flow.core.FlowHandler
+import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
@@ -31,6 +33,7 @@ trait RPCServerAbstract extends StrictLogging {
   implicit def rpcConfig: RPCConfig
   implicit def askTimeout: Timeout
 
+  def doBlockNotify(blockNotify: BlockNotify): Json
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
   def doGetPeerCliques(req: Request): FutureTry[PeerCliques]
   def doGetSelfClique(req: Request): FutureTry[SelfClique]
@@ -44,12 +47,11 @@ trait RPCServerAbstract extends StrictLogging {
   def runServer(): Future[Unit]
 
   def handleEvent(event: EventBus.Event): TextMessage = {
-    // TODO Replace with concrete implementation.
     event match {
-      case _ =>
-        val ts     = System.currentTimeMillis()
-        val result = Notification("events_fake", ts.asJson)
-        TextMessage(result.asJson.noSpaces)
+      case bn @ FlowHandler.BlockNotify(_, _) =>
+        val params = doBlockNotify(bn)
+        val notif  = Notification("block_notify", params)
+        TextMessage(notif.asJson.noSpaces)
     }
   }
 

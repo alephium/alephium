@@ -19,7 +19,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, List(i.toString))
+    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
   val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
 
