@@ -3,7 +3,9 @@ package org.alephium.appserver
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo}
 import org.alephium.rpc.CirceUtils._
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
@@ -31,11 +33,26 @@ object RPCModel {
       chainFrom: Int,
       chainTo: Int,
       height: Int,
-      deps: List[String]
+      deps: AVector[String]
   )
   object FetchEntry {
     import TimeStampCodec._
     implicit val codec: Codec[FetchEntry] = deriveCodec[FetchEntry]
+
+    def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): FetchEntry = {
+      FetchEntry(
+        hash      = header.shortHex,
+        timestamp = header.timestamp,
+        chainFrom = header.chainIndex.from.value,
+        chainTo   = header.chainIndex.to.value,
+        height    = height,
+        deps      = header.blockDeps.map(_.shortHex)
+      )
+    }
+
+    def from(blockNotify: BlockNotify)(implicit config: GroupConfig): FetchEntry = {
+      from(blockNotify.header, blockNotify.height)
+    }
   }
 
   final case class PeersResult(cliques: AVector[CliqueInfo])
