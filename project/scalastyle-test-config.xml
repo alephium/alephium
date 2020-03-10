@@ -98,8 +98,9 @@
     </check>
     <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
         <parameters>
-            <parameter name="regex"><![CDATA[println]]></parameter>
+            <parameter name="regex"><![CDATA[println|noSpaces]]></parameter>
         </parameters>
+        <customMessage><![CDATA[println|noSpaces are disabled]]></customMessage>
     </check>
     <check customId="scalatest-matcher" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
         <parameters>

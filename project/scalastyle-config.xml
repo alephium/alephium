@@ -92,9 +92,10 @@
         </parameters>
     </check>
     <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
-    <parameters>
-        <parameter name="regex"><![CDATA[println]]></parameter>
-    </parameters>
+        <parameters>
+            <parameter name="regex"><![CDATA[println|noSpaces]]></parameter>
+        </parameters>
+        <customMessage><![CDATA[println|noSpaces are disabled]]></customMessage>
     </check>
     <check level="error" class="org.scalastyle.scalariform.ImportOrderChecker" enabled="true">
         <parameters>
