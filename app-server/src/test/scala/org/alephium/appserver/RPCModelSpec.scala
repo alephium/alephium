@@ -7,7 +7,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.util.{AlephiumSpec, Hex, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
   val printer = org.alephium.rpc.CirceUtils.printer
@@ -15,8 +15,8 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     printer.print(t.asJson)
   }
 
-  def entryDummy(i: Int): FetchEntry =
-    FetchEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, List(i.toString))
+  def entryDummy(i: Int): BlockEntry =
+    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
