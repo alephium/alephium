@@ -99,11 +99,12 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
-      val jsonRequest = CirceUtils.print((method, params, id).asJson)
+      // scalastyle:off regex
+      val jsonRequest = Request(method, params, id).asJson.noSpaces
+      val entity      = HttpEntity(MediaTypes.`application/json`, jsonRequest)
+      // scalastyle:on
 
-      HttpRequest(HttpMethods.POST,
-                  "/",
-                  entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
+      HttpRequest(HttpMethods.POST, entity = entity)
     }
   }
 
@@ -187,10 +188,8 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   it should "reject wrong content type" in new RouteHTTP {
-    val request = HttpRequest(HttpMethods.POST,
-                              "/",
-                              entity =
-                                HttpEntity(ContentTypes.`text/plain(UTF-8)`, Json.Null.noSpaces))
+    val entity  = HttpEntity(ContentTypes.`text/plain(UTF-8)`, CirceUtils.print(Json.Null))
+    val request = HttpRequest(HttpMethods.POST, entity = entity)
 
     request ~> route ~> check {
       val List(rejection: UnsupportedRequestContentTypeRejection) = rejections
