@@ -11,7 +11,7 @@ import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe.{Decoder, Json, JsonObject}
+import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
@@ -29,7 +29,12 @@ import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 object RPCServerSpec {
   import RPCServer._
 
+  val printer         = org.alephium.rpc.CirceUtils.printer
   val jsonObjectEmpty = JsonObject.empty.asJson
+
+  def show[T](t: T)(implicit encoder: Encoder[T]): String = {
+    printer.print(t.asJson)
+  }
 
   case object Dummy extends EventBus.Event
 
@@ -59,7 +64,7 @@ object RPCServerSpec {
       event match {
         case _ =>
           val result = Notification("events_fake", jsonObjectEmpty)
-          TextMessage(result.asJson.noSpaces)
+          TextMessage(show(result))
       }
     }
 
@@ -138,8 +143,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
     val result = RPCServer.blockNotifyEncode(notify, 1)
 
-    result.asJson.noSpaces is
-      """{"header":{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]},"height":1}"""
+    show(result) is """{"header":{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]},"height":1}"""
   }
 
   it should "call mining_start" in new MiningMock {
