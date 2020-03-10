@@ -41,9 +41,9 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetPeerCliques(req: Request): FutureTry[PeerCliques] =
-    mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
-      val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
-      Right(PeerCliques(peers))
+    mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).mapTo[PeerCliques].map {
+      peerCliques =>
+        Right(PeerCliques(peerCliques.cliques))
     }
 
   def doBlockNotify(blockNotify: BlockNotify): Json =
@@ -51,9 +51,9 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
-    mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).map { result =>
-      val cliqueInfo = result.asInstanceOf[CliqueInfo]
-      Right(SelfClique.from(cliqueInfo))
+    mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).mapTo[CliqueInfo].map {
+      cliqueInfo =>
+        Right(SelfClique.from(cliqueInfo))
     }
 
   def doGetBalance(req: Request): FutureTry[Balance] =
