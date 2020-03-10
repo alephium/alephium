@@ -285,8 +285,8 @@ object RPCServer extends StrictLogging {
   }
 
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
-      implicit config: ConsensusConfig): FetchEntry = {
-    FetchEntry.from(header, chain.getHeight(header))
+      implicit config: ConsensusConfig): BlockEntry = {
+    BlockEntry.from(header, chain.getHeight(header))
   }
 
   def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
@@ -304,5 +304,5 @@ object RPCServer extends StrictLogging {
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 
   def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: ConsensusConfig): Json =
-    FetchEntry.from(blockNotify).asJson
+    BlockEntry.from(blockNotify).asJson
 }
