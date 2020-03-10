@@ -53,7 +53,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
     }
 
   def doBlockNotify(blockNotify: BlockNotify): Json =
-    blockNotifyEncoder(mode.node.blockFlow).apply(blockNotify)
+    blockNotifyEncode(blockNotify)
 
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
@@ -286,16 +286,7 @@ object RPCServer extends StrictLogging {
 
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
       implicit config: ConsensusConfig): FetchEntry = {
-    val index = header.chainIndex
-
-    FetchEntry(
-      hash      = header.shortHex,
-      timestamp = header.timestamp,
-      chainFrom = index.from.value,
-      chainTo   = index.to.value,
-      height    = chain.getHeight(header),
-      deps      = header.blockDeps.toIterable.map(_.shortHex).toList
-    )
+    FetchEntry.from(header, chain.getHeight(header))
   }
 
   def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
@@ -312,21 +303,6 @@ object RPCServer extends StrictLogging {
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 
-  def fetchEntryEncode(header: BlockHeader, height: Int)(implicit config: ConsensusConfig): Json =
-    FetchEntry(
-      hash      = header.shortHex,
-      timestamp = header.timestamp,
-      chainFrom = header.chainIndex.from.value,
-      chainTo   = header.chainIndex.to.value,
-      height    = height,
-      deps      = header.blockDeps.toIterable.map(_.shortHex).toList
-    ).asJson
-
-  def blockNotifyEncode(bn: BlockNotify, height: Int)(implicit config: ConsensusConfig): Json =
-    Json.obj(("header", fetchEntryEncode(bn.header, height)), ("height", Json.fromInt(height)))
-
-  def blockNotifyEncoder(chain: MultiChain)(implicit cfg: ConsensusConfig): Encoder[BlockNotify] =
-    new Encoder[BlockNotify] {
-      final def apply(bn: BlockNotify): Json = blockNotifyEncode(bn, chain.getHeight(bn.header))
-    }
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: ConsensusConfig): Json =
+    FetchEntry.from(blockNotify).asJson
 }

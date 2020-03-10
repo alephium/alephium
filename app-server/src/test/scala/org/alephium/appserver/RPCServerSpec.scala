@@ -19,10 +19,9 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
-import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.model.{BlockHeader}
+import org.alephium.protocol.model.BlockHeader
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
@@ -89,7 +88,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
     def checkCall[T](method: String)(f: Response.Success => T): T = {
       rpcRequest(method, Json.obj(), 0) ~> route ~> check {
-        status.intValue is 200
+        status is StatusCodes.OK
         f(responseAs[Response.Success])
       }
     }
@@ -141,9 +140,9 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       BlockHeader(AVector(Keccak256.hash("foo")), Keccak256.hash("bar"), TimeStamp.zero, 1, 2)
     val notify = BlockNotify(header, 1)
 
-    val result = RPCServer.blockNotifyEncode(notify, 1)
+    val result = RPCServer.blockNotifyEncode(notify)
 
-    show(result) is """{"header":{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]},"height":1}"""
+    show(result) is """{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]}"""
   }
 
   it should "call mining_start" in new MiningMock {
