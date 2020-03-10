@@ -22,12 +22,12 @@ object RPCModel {
     implicit val codec: Codec[FetchRequest] = deriveCodec[FetchRequest]
   }
 
-  final case class FetchResponse(blocks: Seq[FetchEntry])
+  final case class FetchResponse(blocks: Seq[BlockEntry])
   object FetchResponse {
     implicit val codec: Codec[FetchResponse] = deriveCodec[FetchResponse]
   }
 
-  final case class FetchEntry(
+  final case class BlockEntry(
       hash: String,
       timestamp: TimeStamp,
       chainFrom: Int,
@@ -35,12 +35,12 @@ object RPCModel {
       height: Int,
       deps: AVector[String]
   )
-  object FetchEntry {
+  object BlockEntry {
     import TimeStampCodec._
-    implicit val codec: Codec[FetchEntry] = deriveCodec[FetchEntry]
+    implicit val codec: Codec[BlockEntry] = deriveCodec[BlockEntry]
 
-    def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): FetchEntry = {
-      FetchEntry(
+    def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): BlockEntry = {
+      BlockEntry(
         hash      = header.shortHex,
         timestamp = header.timestamp,
         chainFrom = header.chainIndex.from.value,
@@ -50,7 +50,7 @@ object RPCModel {
       )
     }
 
-    def from(blockNotify: BlockNotify)(implicit config: GroupConfig): FetchEntry = {
+    def from(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
       from(blockNotify.header, blockNotify.height)
     }
   }

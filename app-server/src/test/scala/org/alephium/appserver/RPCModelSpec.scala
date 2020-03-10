@@ -15,8 +15,8 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     printer.print(t.asJson)
   }
 
-  def entryDummy(i: Int): FetchEntry =
-    FetchEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
+  def entryDummy(i: Int): BlockEntry =
+    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
