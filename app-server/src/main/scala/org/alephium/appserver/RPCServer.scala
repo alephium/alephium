@@ -311,7 +311,8 @@ object RPCServer extends StrictLogging {
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
-  def blockHeaderEncode(header: BlockHeader, height: Int)(implicit config: ConsensusConfig): Json =
+
+  def fetchEntryEncode(header: BlockHeader, height: Int)(implicit config: ConsensusConfig): Json =
     FetchEntry(
       hash      = header.shortHex,
       timestamp = header.timestamp,
@@ -322,12 +323,7 @@ object RPCServer extends StrictLogging {
     ).asJson
 
   def blockNotifyEncode(bn: BlockNotify, height: Int)(implicit config: ConsensusConfig): Json =
-    Json.obj(("header", blockHeaderEncode(bn.header, height)), ("height", Json.fromInt(height)))
-
-  def blockHeaderEncoder(chain: MultiChain)(
-      implicit config: ConsensusConfig): Encoder[BlockHeader] = new Encoder[BlockHeader] {
-    final def apply(header: BlockHeader): Json = blockHeaderEncode(header, chain.getHeight(header))
-  }
+    Json.obj(("header", fetchEntryEncode(bn.header, height)), ("height", Json.fromInt(height)))
 
   def blockNotifyEncoder(chain: MultiChain)(implicit cfg: ConsensusConfig): Encoder[BlockNotify] =
     new Encoder[BlockNotify] {
