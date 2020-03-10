@@ -11,19 +11,29 @@ import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe.{Decoder, Json}
+import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
+import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
+import org.alephium.protocol.model.BlockHeader
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AlephiumSpec, AVector, EventBus}
+import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
 object RPCServerSpec {
   import RPCServer._
+
+  val printer         = org.alephium.rpc.CirceUtils.printer
+  val jsonObjectEmpty = JsonObject.empty.asJson
+
+  def show[T](t: T)(implicit encoder: Encoder[T]): String = {
+    printer.print(t.asJson)
+  }
 
   case object Dummy extends EventBus.Event
 
@@ -45,8 +55,18 @@ object RPCServerSpec {
     def doGetPeers(req: Request): FutureTry[PeersResult]         = successful(dummyPeers)
     def doGetBalance(req: Request): FutureTry[Balance]           = successful(dummyBalance)
     def doTransfer(req: Request): FutureTry[TransferResult]      = successful(dummyTransferResult)
+    def doBlockNotify(blockNotify: BlockNotify): Json            = Json.Null
 
     def runServer(): Future[Unit] = Future.successful(())
+
+    override def handleEvent(event: EventBus.Event): TextMessage = {
+      event match {
+        case _ =>
+          val result = Notification("events_fake", jsonObjectEmpty)
+          TextMessage(show(result))
+      }
+    }
+
   }
 }
 
@@ -57,7 +77,8 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
   implicit val config: PlatformProfile = PlatformProfile.loadDefault()
 
-  val rpcSuccess = Response.Success(Json.fromInt(42), 1)
+  val rpcSuccess    = Response.Success(Json.fromInt(42), 1)
+  val rpcSuccessRaw = """{"jsonrpc":"2.0","result":42,"id":1}"""
 
   trait RouteHTTP {
     implicit lazy val askTimeout = Timeout(server.rpcConfig.askTimeout.asScala)
@@ -67,7 +88,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
     def checkCall[T](method: String)(f: Response.Success => T): T = {
       rpcRequest(method, Json.obj(), 0) ~> route ~> check {
-        status.intValue is 200
+        status is StatusCodes.OK
         f(responseAs[Response.Success])
       }
     }
@@ -76,7 +97,8 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
-      val jsonRequest = Request(method, Some(params), id).asJson.noSpaces
+      val jsonRequest = Request(method, params, id).asJson.noSpaces
+
       HttpRequest(HttpMethods.POST,
                   "/",
                   entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
@@ -112,6 +134,16 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   behavior of "http"
+
+  it should "encode BlockNotify" in {
+    val header =
+      BlockHeader(AVector(Keccak256.hash("foo")), Keccak256.hash("bar"), TimeStamp.zero, 1, 2)
+    val notify = BlockNotify(header, 1)
+
+    val result = RPCServer.blockNotifyEncode(notify)
+
+    show(result) is """{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]}"""
+  }
 
   it should "call mining_start" in new MiningMock {
     checkCallResult("mining_start")(true)

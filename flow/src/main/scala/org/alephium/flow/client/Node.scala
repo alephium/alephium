@@ -23,7 +23,8 @@ final case class Node(builders: BrokerHandler.Builder, name: String)(
   val cliqueManager: ActorRef =
     system.actorOf(CliqueManager.props(builders, discoveryServer), "CliqueManager")
 
-  val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow)
+  val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
+
   cliqueManager ! allHandlers
 
   val boostraper: ActorRef =

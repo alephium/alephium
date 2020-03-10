@@ -13,8 +13,8 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
-  def props(blockFlow: BlockFlow)(implicit config: PlatformProfile): Props =
-    Props(new FlowHandler(blockFlow))
+  def props(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformProfile): Props =
+    Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
   final case class AddHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
@@ -56,11 +56,12 @@ object FlowHandler {
   final case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin) extends Event
   final case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
       extends Event
+  final case class BlockNotify(header: BlockHeader, height: Int) extends EventBus.Event
 }
 
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
+class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformProfile)
     extends BaseActor
     with FlowHandlerState {
   import FlowHandler._
@@ -143,6 +144,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit config: PlatformProfile)
             case _: DataOrigin.FromClique =>
               minerOpt.foreach(_ ! Miner.UpdateTemplate)
           }
+          eventBus ! BlockNotify(block.header, blockFlow.getHeight(block))
           logInfo(block.header)
       }
     }
