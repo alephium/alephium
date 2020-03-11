@@ -2,15 +2,10 @@ package org.alephium.appserver
 
 import scala.concurrent._
 
-import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.TextMessage
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.{ActorMaterializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.ActorMaterializer
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -18,22 +13,21 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.client.{FairMiner, Miner}
-import org.alephium.flow.core.{BlockFlow, FlowHandler, MultiChain, TxHandler}
+import org.alephium.flow.client.FairMiner
+import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.platform.{Mode, PlatformProfile}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
-import org.alephium.rpc.{CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.rpc.model.JsonRPC.Response
-import org.alephium.util.{EventBus, Hex, TimeStamp}
+import org.alephium.util.{Hex, TimeStamp}
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
+  import RPCServerAbstract.FutureTry
 
   implicit val system: ActorSystem                = mode.node.system
   implicit val materializer: ActorMaterializer    = ActorMaterializer()
@@ -42,18 +36,23 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 
+  def doBlockNotify(blockNotify: BlockNotify): Json =
+    blockNotifyEncode(blockNotify)
+
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def doGetPeers(req: Request): FutureTry[PeersResult] =
-    mode.node.discoveryServer.ask(DiscoveryServer.GetPeerCliques).map { result =>
-      val peers = result.asInstanceOf[DiscoveryServer.PeerCliques].peers
-      Right(PeersResult(peers))
+  def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
+    mode.node.discoveryServer.ask(DiscoveryServer.GetNeighborCliques).mapTo[NeighborCliques].map {
+      neighborCliques =>
+        Right(NeighborCliques(neighborCliques.cliques))
     }
 
-  def doBlockNotify(blockNotify: BlockNotify): Json =
-    blockNotifyEncode(blockNotify)
+  def doGetSelfClique(req: Request): FutureTry[SelfClique] =
+    mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).mapTo[CliqueInfo].map {
+      cliqueInfo =>
+        Right(SelfClique.from(cliqueInfo))
+    }
 
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
@@ -80,80 +79,8 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   }
 }
 
-trait RPCServerAbstract extends StrictLogging {
-  import RPCServer._
-
-  implicit def system: ActorSystem
-  implicit def materializer: ActorMaterializer
-  implicit def executionContext: ExecutionContext
-  implicit def config: PlatformProfile
-  implicit def rpcConfig: RPCConfig
-  implicit def askTimeout: Timeout
-
-  def doBlockNotify(blockNotify: BlockNotify): Json
-  def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
-  def doGetPeers(req: Request): FutureTry[PeersResult]
-  def doGetBalance(req: Request): FutureTry[Balance]
-  def doTransfer(req: Request): FutureTry[TransferResult]
-  def doStartMining(miner: ActorRef): FutureTry[Boolean] =
-    execute(miner ! Miner.Start)
-  def doStopMining(miner: ActorRef): FutureTry[Boolean] =
-    execute(miner ! Miner.Stop)
-
-  def runServer(): Future[Unit]
-
-  def handleEvent(event: EventBus.Event): TextMessage = {
-    event match {
-      case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params = doBlockNotify(bn)
-        val notif  = Notification("block_notify", params)
-        TextMessage(notif.asJson.noSpaces)
-    }
-  }
-
-  def handlerRPC(miner: ActorRef): Handler = Map.apply(
-    "blockflow_fetch" -> (req => wrap(req, doBlockflowFetch(req))),
-    "clique_info"     -> (req => wrap(req, doGetPeers(req))),
-    "get_balance"     -> (req => wrap(req, doGetBalance(req))),
-    "transfer"        -> (req => wrap(req, doTransfer(req))),
-    "mining_start"    -> (req => wrap(req, doStartMining(miner))),
-    "mining_stop"     -> (req => wrap(req, doStopMining(miner)))
-  )
-
-  def routeHttp(miner: ActorRef): Route =
-    CORSHandler(JsonRPCHandler.routeHttp(handlerRPC(miner)))
-
-  def routeWs(eventBus: ActorRef): Route = {
-    path("events") {
-      CORSHandler(get {
-        extractUpgradeToWebSocket { upgrade =>
-          val (actor, source) =
-            Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
-          eventBus.tell(EventBus.Subscribe, actor)
-          val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
-          complete(response)
-        }
-      })
-    }
-  }
-
-  def wsFlow(eventBus: ActorRef,
-             actor: ActorRef,
-             source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
-    Flow
-      .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
-      .watchTermination() { (_, termination) =>
-        termination.onComplete(_ => eventBus.tell(EventBus.Unsubscribe, actor))
-      }
-  }
-}
-
 object RPCServer extends StrictLogging {
-  import Response.Failure
-  type Try[T]       = Either[Failure, T]
-  type FutureTry[T] = Future[Try[T]]
-
-  val bufferSize: Int = 64
+  import RPCServerAbstract._
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
     req.paramsAs[T] match {
@@ -162,7 +89,7 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def withReqF[T: Decoder, R](req: Request)(f: T => Try[R]): Try[R] = {
+  def withReqF[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(f: T => Try[R]): Try[R] = {
     req.paramsAs[T] match {
       case Right(query)  => f(query)
       case Left(failure) => Left(failure)
@@ -244,7 +171,7 @@ object RPCServer extends StrictLogging {
   def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
-        val result = for {
+        val resultEither = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
           _              <- checkGroup(blockFlow, fromAddress)
           toAddress      <- decodePublicKey(query.toAddress)
@@ -255,7 +182,7 @@ object RPCServer extends StrictLogging {
           txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
           TransferResult(Hex.toHexString(tx.hash.bytes))
         }
-        result match {
+        resultEither match {
           case Right(result) => Right(result)
           case Left(error)   => Left(error)
         }
@@ -287,18 +214,6 @@ object RPCServer extends StrictLogging {
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
       implicit config: ConsensusConfig): BlockEntry = {
     BlockEntry.from(header, chain.getHeight(header))
-  }
-
-  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
-    Future {
-      f
-      Right(true)
-    }
-
-  def wrap[T: Encoder](req: Request, result: FutureTry[T])(
-      implicit ec: ExecutionContext): Future[Response] = result.map {
-    case Right(t)    => Response.successful(req, t)
-    case Left(error) => error
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
