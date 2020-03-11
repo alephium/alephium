@@ -171,7 +171,7 @@ object RPCServer extends StrictLogging {
   def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
-        val resultE = for {
+        val resultEither = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
           _              <- checkGroup(blockFlow, fromAddress)
           toAddress      <- decodePublicKey(query.toAddress)
@@ -182,7 +182,7 @@ object RPCServer extends StrictLogging {
           txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
           TransferResult(Hex.toHexString(tx.hash.bytes))
         }
-        resultE match {
+        resultEither match {
           case Right(result) => Right(result)
           case Left(error)   => Left(error)
         }
