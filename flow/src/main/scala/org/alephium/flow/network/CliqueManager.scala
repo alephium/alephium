@@ -56,7 +56,7 @@ class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
-        context.actorOf(IntraCliqueManager.props(builder, cliqueInfo, allHandlers),
+        context.actorOf(IntraCliqueManager.props(builder, cliqueInfo, allHandlers, self),
                         "IntraCliqueManager")
       pool.foreach {
         case (connection, message) =>

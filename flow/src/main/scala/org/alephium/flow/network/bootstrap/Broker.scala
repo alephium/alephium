@@ -1,36 +1,50 @@
 package org.alephium.flow.network.bootstrap
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.model.CliqueInfo
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{BaseActor, Duration, TimeStamp}
 
 object Broker {
-  def props()(implicit config: PlatformProfile): Props = Props(new Broker())
+  def props(masterAddress: InetSocketAddress,
+            brokerInfo: BrokerInfo,
+            retryTimeout: Duration,
+            bootstrapper: ActorRef)(
+      implicit groupConfig: GroupConfig
+  ): Props =
+    Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
 
   sealed trait Command
   case object Retry extends Command
 }
 
-class Broker()(implicit config: PlatformProfile) extends BaseActor {
-  IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
+class Broker(masterAddress: InetSocketAddress,
+             brokerInfo: BrokerInfo,
+             retryTimeout: Duration,
+             bootstrapper: ActorRef)(implicit groupConfig: GroupConfig)
+    extends BaseActor {
 
-  def until: TimeStamp = TimeStamp.now() + config.retryTimeout
+  def until: TimeStamp = TimeStamp.now() + retryTimeout
+
+  override def preStart(): Unit =
+    IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
 
   override def receive: Receive = awaitMaster(until)
 
   def awaitMaster(until: TimeStamp): Receive = {
     case Broker.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(config.masterAddress)
+      IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
 
     case _: Tcp.Connected =>
-      log.debug(s"Connected to master: ${config.masterAddress}")
+      log.debug(s"Connected to master: ${masterAddress}")
       val connection = sender()
       connection ! Tcp.Register(self)
-      connection ! BrokerConnector.envolop(config.brokerInfo)
+      connection ! BrokerConnector.envelop(brokerInfo)
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -48,9 +62,8 @@ class Broker()(implicit config: PlatformProfile) extends BaseActor {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeTryWithValidation[CliqueInfo, CliqueInfo.Unsafe](unaligned ++ data) match {
         case Right(Some((cliqueInfo, _))) =>
-          log.debug("Received clique info from master")
-          val ack = BrokerConnector.Ack(config.brokerInfo.id)
-          connection ! BrokerConnector.envolop(ack)
+          val ack = BrokerConnector.Ack(brokerInfo.id)
+          connection ! BrokerConnector.envelop(ack)
           context become awaitReady(connection, cliqueInfo, ByteString.empty)
         case Right(None) =>
           context become awaitCliqueInfo(connection, unaligned ++ data)
@@ -79,7 +92,7 @@ class Broker()(implicit config: PlatformProfile) extends BaseActor {
   def awaitClose(cliqueInfo: CliqueInfo): Receive = {
     case Tcp.ConfirmedClosed =>
       log.debug("Close connection to master")
-      context.parent ! cliqueInfo
+      bootstrapper ! cliqueInfo
       context.stop(self)
   }
 }

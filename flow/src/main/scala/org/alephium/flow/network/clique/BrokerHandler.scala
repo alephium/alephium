@@ -59,20 +59,30 @@ object BrokerHandler {
         selfCliqueInfo: CliqueInfo,
         remote: InetSocketAddress,
         connection: ActorRef,
-        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
-      Props(new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers))
+        blockHandlers: AllHandlers,
+        cliqueManager: ActorRef
+    )(implicit config: PlatformProfile): Props =
+      Props(
+        new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers, cliqueManager))
 
     def createOutboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
-        blockHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
-      Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, blockHandlers))
+        blockHandlers: AllHandlers,
+        cliqueManager: ActorRef
+    )(implicit config: PlatformProfile): Props =
+      Props(
+        new OutboundBrokerHandler(selfCliqueInfo,
+                                  remoteCliqueId,
+                                  remoteBroker,
+                                  blockHandlers,
+                                  cliqueManager))
   }
 }
 
 trait BrokerHandler extends HandShake with Relay with Sync {
-  def cliqueManager: ActorRef = context.parent
+  def cliqueManager: ActorRef
 
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
