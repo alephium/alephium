@@ -1,5 +1,7 @@
 package org.alephium.appserver
 
+import java.net.InetSocketAddress
+
 import io.circe.{Codec, Decoder, Encoder}
 import io.circe.parser._
 import io.circe.syntax._
@@ -7,16 +9,19 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.rpc.CirceUtils
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
-  val printer = org.alephium.rpc.CirceUtils.printer
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    printer.print(t.asJson)
+    CirceUtils.print(t.asJson)
   }
 
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
+  val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
+  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
@@ -52,6 +57,20 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     val jsonRaw =
       """{"blocks":[{"hash":"0","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["0"]},{"hash":"1","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["1"]}]}"""
     checkData(response, jsonRaw)
+  }
+
+  it should "encode/decode SelfClique" in {
+    val selfClique = SelfClique.from(dummyCliqueInfo)
+    val jsonRaw    = s"""{"peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}"""
+    checkData(selfClique, jsonRaw)
+  }
+
+  it should "encode/decode NeighborCliques" in {
+    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo))
+    val cliqueIdString  = dummyCliqueInfo.id.toHexString
+    val jsonRaw =
+      s"""{"cliques":[{"id":"$cliqueIdString","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
+    checkData(neighborCliques, jsonRaw)
   }
 
   it should "encode/decode GetBalance" in {

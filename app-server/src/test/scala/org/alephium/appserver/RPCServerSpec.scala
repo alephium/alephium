@@ -22,17 +22,17 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
 import org.alephium.protocol.model.BlockHeader
+import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
 
 object RPCServerSpec {
-  import RPCServer._
+  import RPCServerAbstract.FutureTry
 
-  val printer         = org.alephium.rpc.CirceUtils.printer
   val jsonObjectEmpty = JsonObject.empty.asJson
 
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    printer.print(t.asJson)
+    CirceUtils.print(t.asJson)
   }
 
   case object Dummy extends EventBus.Event
@@ -46,16 +46,19 @@ object RPCServerSpec {
 
     def successful[T](t: T): FutureTry[T] = Future.successful(Right(t))
 
-    val dummyFetchResponse  = FetchResponse(Seq.empty)
-    val dummyPeers          = PeersResult(AVector.empty)
-    val dummyBalance        = Balance(1, 1)
-    val dummyTransferResult = TransferResult("foobar")
+    val dummyFetchResponse   = FetchResponse(Seq.empty)
+    val dummySelfClique      = SelfClique(AVector.empty, 1)
+    val dummyNeighborCliques = NeighborCliques(AVector.empty)
+    val dummyBalance         = Balance(1, 1)
+    val dummyTransferResult  = TransferResult("foobar")
 
     def doBlockflowFetch(req: Request): FutureTry[FetchResponse] = successful(dummyFetchResponse)
-    def doGetPeers(req: Request): FutureTry[PeersResult]         = successful(dummyPeers)
-    def doGetBalance(req: Request): FutureTry[Balance]           = successful(dummyBalance)
-    def doTransfer(req: Request): FutureTry[TransferResult]      = successful(dummyTransferResult)
-    def doBlockNotify(blockNotify: BlockNotify): Json            = Json.Null
+    def doGetSelfClique(req: Request): FutureTry[SelfClique]     = successful(dummySelfClique)
+    def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
+      successful(dummyNeighborCliques)
+    def doGetBalance(req: Request): FutureTry[Balance]      = successful(dummyBalance)
+    def doTransfer(req: Request): FutureTry[TransferResult] = successful(dummyTransferResult)
+    def doBlockNotify(blockNotify: BlockNotify): Json       = Json.Null
 
     def runServer(): Future[Unit] = Future.successful(())
 
@@ -97,11 +100,12 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       checkCall(method)(json => json.result.as[T].right.value is expected)
 
     def rpcRequest(method: String, params: Json, id: Long): HttpRequest = {
+      // scalastyle:off regex
       val jsonRequest = Request(method, params, id).asJson.noSpaces
+      val entity      = HttpEntity(MediaTypes.`application/json`, jsonRequest)
+      // scalastyle:on
 
-      HttpRequest(HttpMethods.POST,
-                  "/",
-                  entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
+      HttpRequest(HttpMethods.POST, entity = entity)
     }
   }
 
@@ -159,8 +163,12 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     checkCallResult("blockflow_fetch")(server.dummyFetchResponse)
   }
 
-  it should "call clique_info" in new RouteHTTP {
-    checkCallResult("clique_info")(server.dummyPeers)
+  it should "call neighbor_cliques" in new RouteHTTP {
+    checkCallResult("neighbor_cliques")(server.dummyNeighborCliques)
+  }
+
+  it should "call self_clique" in new RouteHTTP {
+    checkCallResult("self_clique")(server.dummySelfClique)
   }
 
   it should "call get_balance" in new RouteHTTP {
@@ -181,10 +189,8 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   it should "reject wrong content type" in new RouteHTTP {
-    val request = HttpRequest(HttpMethods.POST,
-                              "/",
-                              entity =
-                                HttpEntity(ContentTypes.`text/plain(UTF-8)`, Json.Null.noSpaces))
+    val entity  = HttpEntity(ContentTypes.`text/plain(UTF-8)`, CirceUtils.print(Json.Null))
+    val request = HttpRequest(HttpMethods.POST, entity = entity)
 
     request ~> route ~> check {
       val List(rejection: UnsupportedRequestContentTypeRejection) = rejections

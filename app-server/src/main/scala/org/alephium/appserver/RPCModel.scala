@@ -1,5 +1,7 @@
 package org.alephium.appserver
 
+import java.net.InetSocketAddress
+
 import io.circe._
 import io.circe.generic.semiauto._
 
@@ -9,6 +11,8 @@ import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo}
 import org.alephium.rpc.CirceUtils._
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
+sealed trait RPCModel
+
 object RPCModel {
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
@@ -16,13 +20,13 @@ object RPCModel {
     implicit val encoderTS: Encoder[TimeStamp] = Encoder.encodeLong.contramap(_.millis)
   }
 
-  final case class FetchRequest(from: Option[TimeStamp])
+  final case class FetchRequest(from: Option[TimeStamp]) extends RPCModel
   object FetchRequest {
     import TimeStampCodec._
     implicit val codec: Codec[FetchRequest] = deriveCodec[FetchRequest]
   }
 
-  final case class FetchResponse(blocks: Seq[BlockEntry])
+  final case class FetchResponse(blocks: Seq[BlockEntry]) extends RPCModel
   object FetchResponse {
     implicit val codec: Codec[FetchResponse] = deriveCodec[FetchResponse]
   }
@@ -34,7 +38,7 @@ object RPCModel {
       chainTo: Int,
       height: Int,
       deps: AVector[String]
-  )
+  ) extends RPCModel
   object BlockEntry {
     import TimeStampCodec._
     implicit val codec: Codec[BlockEntry] = deriveCodec[BlockEntry]
@@ -55,8 +59,17 @@ object RPCModel {
     }
   }
 
-  final case class PeersResult(cliques: AVector[CliqueInfo])
-  object PeersResult {
+  final case class SelfClique(peers: AVector[InetSocketAddress], groupNumPerBroker: Int)
+      extends RPCModel
+  object SelfClique {
+    def from(cliqueInfo: CliqueInfo): SelfClique =
+      SelfClique(cliqueInfo.peers, cliqueInfo.groupNumPerBroker)
+
+    implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
+  }
+
+  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends RPCModel
+  object NeighborCliques {
     def createId(s: String): Either[String, CliqueId] = {
       Hex.from(s).flatMap(CliqueId.from) match {
         case Some(id) => Right(id)
@@ -67,10 +80,10 @@ object RPCModel {
     implicit val idEncoder: Encoder[CliqueId]       = Encoder.encodeString.contramap(_.toHexString)
     implicit val idDecoder: Decoder[CliqueId]       = Decoder.decodeString.emap(createId)
     implicit val cliqueInfoCodec: Codec[CliqueInfo] = deriveCodec[CliqueInfo]
-    implicit val codec: Codec[PeersResult]          = deriveCodec[PeersResult]
+    implicit val codec: Codec[NeighborCliques]      = deriveCodec[NeighborCliques]
   }
 
-  final case class GetBalance(address: String, `type`: String)
+  final case class GetBalance(address: String, `type`: String) extends RPCModel
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
 
@@ -78,7 +91,7 @@ object RPCModel {
     val pkh = "pkh"
   }
 
-  final case class Balance(balance: BigInt, utxoNum: Int)
+  final case class Balance(balance: BigInt, utxoNum: Int) extends RPCModel
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
   }
@@ -89,11 +102,12 @@ object RPCModel {
                             toType: String,
                             value: BigInt,
                             fromPrivateKey: String)
+      extends RPCModel
   object Transfer {
     implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
   }
 
-  final case class TransferResult(txId: String)
+  final case class TransferResult(txId: String) extends RPCModel
   object TransferResult {
     implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
   }
