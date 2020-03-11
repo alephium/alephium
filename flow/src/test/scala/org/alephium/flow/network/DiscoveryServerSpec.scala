@@ -63,18 +63,18 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     Thread.sleep(2000)
 
     val probo0 = TestProbe()
-    server0.tell(DiscoveryServer.GetPeerCliques, probo0.ref)
+    server0.tell(DiscoveryServer.GetNeighborCliques, probo0.ref)
     val probo1 = TestProbe()
-    server1.tell(DiscoveryServer.GetPeerCliques, probo1.ref)
+    server1.tell(DiscoveryServer.GetNeighborCliques, probo1.ref)
 
     val waitTime = Duration.ofSecondsUnsafe(40).asScala
     probo0.expectMsgPF(waitTime) {
-      case DiscoveryServer.PeerCliques(peers) =>
+      case DiscoveryServer.NeighborCliques(peers) =>
         peers.length is 1
         peers.head is cliqueInfo1
     }
     probo1.expectMsgPF(waitTime) {
-      case DiscoveryServer.PeerCliques(peers) =>
+      case DiscoveryServer.NeighborCliques(peers) =>
         peers.length is 1
         peers.head is cliqueInfo0
     }
