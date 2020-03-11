@@ -32,12 +32,12 @@ object DiscoveryServer {
 
   sealed trait Command
   case object GetSelfClique                    extends Command
-  case object GetPeerCliques                   extends Command
+  case object GetNeighborCliques               extends Command
   final case class Disable(cliqueId: CliqueId) extends Command
   case object Scan                             extends Command
 
   sealed trait Event
-  final case class PeerCliques(peers: AVector[CliqueInfo]) extends Event
+  final case class NeighborCliques(peers: AVector[CliqueInfo]) extends Event
 }
 
 /*
@@ -112,8 +112,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       else scheduleOnce(self, Scan, config.scanFrequency)
     case GetSelfClique =>
       sender() ! selfCliqueInfo
-    case GetPeerCliques =>
-      sender() ! PeerCliques(getActivePeers)
+    case GetNeighborCliques =>
+      sender() ! NeighborCliques(getActivePeers)
     case Disable(peerId) =>
       table -= peerId
       ()

@@ -68,8 +68,8 @@ object RPCModel {
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
-  final case class PeerCliques(cliques: AVector[CliqueInfo]) extends RPCModel
-  object PeerCliques {
+  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends RPCModel
+  object NeighborCliques {
     def createId(s: String): Either[String, CliqueId] = {
       Hex.from(s).flatMap(CliqueId.from) match {
         case Some(id) => Right(id)
@@ -80,7 +80,7 @@ object RPCModel {
     implicit val idEncoder: Encoder[CliqueId]       = Encoder.encodeString.contramap(_.toHexString)
     implicit val idDecoder: Decoder[CliqueId]       = Decoder.decodeString.emap(createId)
     implicit val cliqueInfoCodec: Codec[CliqueInfo] = deriveCodec[CliqueInfo]
-    implicit val codec: Codec[PeerCliques]          = deriveCodec[PeerCliques]
+    implicit val codec: Codec[NeighborCliques]      = deriveCodec[NeighborCliques]
   }
 
   final case class GetBalance(address: String, `type`: String) extends RPCModel
