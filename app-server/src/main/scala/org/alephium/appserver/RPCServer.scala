@@ -42,14 +42,12 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
     mode.node.discoveryServer.ask(DiscoveryServer.GetNeighborCliques).mapTo[NeighborCliques].map {
       neighborCliques =>
         Right(NeighborCliques(neighborCliques.cliques))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
     mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).mapTo[CliqueInfo].map {
       cliqueInfo =>
