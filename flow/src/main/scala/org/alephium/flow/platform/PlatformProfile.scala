@@ -45,12 +45,17 @@ object PlatformProfile {
 
   def load(rootPath: Path,
            rdbWriteOptions: WriteOptions,
-           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile = {
-    val allCfg   = parseConfig(rootPath)
-    val alephCfg = allCfg.getConfig("alephium")
+           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
+    build(parseConfig(rootPath), rootPath, rdbWriteOptions, genesisBalances)
+
+  def build(config: Config,
+            rootPath: Path,
+            rdbWriteOptions: WriteOptions,
+            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile = {
+    val alephCfg = config.getConfig("alephium")
     create(
       rootPath,
-      allCfg,
+      config,
       alephCfg,
       alephCfg.getConfig("clique"),
       alephCfg.getConfig("broker"),

@@ -14,8 +14,14 @@ object OutboundBrokerHandler {
   def props(selfCliqueInfo: CliqueInfo,
             remoteCliqueId: CliqueId,
             remoteBroker: BrokerInfo,
-            allHandlers: AllHandlers)(implicit config: PlatformProfile): Props =
-    Props(new OutboundBrokerHandler(selfCliqueInfo, remoteCliqueId, remoteBroker, allHandlers))
+            allHandlers: AllHandlers,
+            cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+    Props(
+      new OutboundBrokerHandler(selfCliqueInfo,
+                                remoteCliqueId,
+                                remoteBroker,
+                                allHandlers,
+                                cliqueManager))
 
   sealed trait Command
   case object Retry extends Command
@@ -26,7 +32,8 @@ object OutboundBrokerHandler {
 class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val remoteCliqueId: CliqueId,
                             val remoteBrokerInfo: BrokerInfo,
-                            val allHandlers: AllHandlers)(implicit val config: PlatformProfile)
+                            val allHandlers: AllHandlers,
+                            val cliqueManager: ActorRef)(implicit val config: PlatformProfile)
     extends BrokerHandler {
   override def remote: InetSocketAddress = remoteBrokerInfo.address
 

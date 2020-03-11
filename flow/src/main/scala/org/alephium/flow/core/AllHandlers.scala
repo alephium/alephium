@@ -25,8 +25,14 @@ final case class AllHandlers(
 object AllHandlers {
   def build(system: ActorSystem, cliqueManager: ActorRef, blockFlow: BlockFlow, eventBus: ActorRef)(
       implicit config: PlatformProfile): AllHandlers = {
-    val flowProps      = FlowHandler.props(blockFlow, eventBus)
-    val flowHandler    = system.actorOf(flowProps, "FlowHandler")
+    val flowProps   = FlowHandler.props(blockFlow, eventBus)
+    val flowHandler = system.actorOf(flowProps, "FlowHandler")
+    buildWithFlowHandler(system, cliqueManager, blockFlow, flowHandler)
+  }
+  def buildWithFlowHandler(system: ActorSystem,
+                           cliqueManager: ActorRef,
+                           blockFlow: BlockFlow,
+                           flowHandler: ActorRef)(implicit config: PlatformProfile): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow, cliqueManager)
     val txHandler      = system.actorOf(txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
