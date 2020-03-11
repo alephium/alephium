@@ -30,19 +30,21 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          discoveryServer: ActorRef)(implicit config: PlatformProfile)
     extends BaseActor
     with InterCliqueManagerState {
-  discoveryServer ! DiscoveryServer.GetPeerCliques
+  discoveryServer ! DiscoveryServer.GetNeighborCliques
 
-  override def receive: Receive = handleMessage orElse handleConnection orElse awaitPeerCliques
+  override def receive: Receive = handleMessage orElse handleConnection orElse awaitNeighborCliques
 
-  def awaitPeerCliques: Receive = {
-    case DiscoveryServer.PeerCliques(peerCliques) =>
-      if (peerCliques.nonEmpty) {
-        log.debug(s"Got ${peerCliques.length} from discovery server")
-        peerCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
+  def awaitNeighborCliques: Receive = {
+    case DiscoveryServer.NeighborCliques(neighborCliques) =>
+      if (neighborCliques.nonEmpty) {
+        log.debug(s"Got ${neighborCliques.length} from discovery server")
+        neighborCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
       } else {
         // TODO: refine the condition, check the number of brokers for example
         if (config.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer, DiscoveryServer.GetPeerCliques, Duration.ofSecondsUnsafe(2))
+          scheduleOnce(discoveryServer,
+                       DiscoveryServer.GetNeighborCliques,
+                       Duration.ofSecondsUnsafe(2))
         }
       }
   }

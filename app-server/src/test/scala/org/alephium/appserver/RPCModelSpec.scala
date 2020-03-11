@@ -65,12 +65,12 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     checkData(selfClique, jsonRaw)
   }
 
-  it should "encode/decode PeerCliques" in {
-    val peerCliques    = PeerCliques(AVector(dummyCliqueInfo))
-    val cliqueIdString = dummyCliqueInfo.id.toHexString
+  it should "encode/decode NeighborCliques" in {
+    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo))
+    val cliqueIdString  = dummyCliqueInfo.id.toHexString
     val jsonRaw =
       s"""{"cliques":[{"id":"$cliqueIdString","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
-    checkData(peerCliques, jsonRaw)
+    checkData(neighborCliques, jsonRaw)
   }
 
   it should "encode/decode GetBalance" in {
