@@ -6,8 +6,9 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
+import org.alephium.serde.Serde
 import org.alephium.util.{BaseActor, Duration, TimeStamp}
 
 object Broker {
@@ -15,7 +16,7 @@ object Broker {
             brokerInfo: BrokerInfo,
             retryTimeout: Duration,
             bootstrapper: ActorRef)(
-      implicit groupConfig: GroupConfig
+      implicit config: PlatformConfig
   ): Props =
     Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
 
@@ -26,8 +27,9 @@ object Broker {
 class Broker(masterAddress: InetSocketAddress,
              brokerInfo: BrokerInfo,
              retryTimeout: Duration,
-             bootstrapper: ActorRef)(implicit groupConfig: GroupConfig)
+             bootstrapper: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
+  implicit val peerInfoSerde: Serde[PeerInfo] = PeerInfo.serde
 
   def until: TimeStamp = TimeStamp.now() + retryTimeout
 
@@ -41,10 +43,11 @@ class Broker(masterAddress: InetSocketAddress,
       IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
 
     case _: Tcp.Connected =>
-      log.debug(s"Connected to master: ${masterAddress}")
+      log.debug(s"Connected to master: $masterAddress")
       val connection = sender()
       connection ! Tcp.Register(self)
-      connection ! BrokerConnector.envelop(brokerInfo)
+
+      connection ! BrokerConnector.envelop(PeerInfo.self)
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>

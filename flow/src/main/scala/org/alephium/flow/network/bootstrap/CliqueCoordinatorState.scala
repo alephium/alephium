@@ -1,33 +1,31 @@
 package org.alephium.flow.network.bootstrap
 
-import java.net.InetSocketAddress
-
 import akka.actor.ActorRef
 
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.CliqueId
 import org.alephium.util.AVector
 
 trait CliqueCoordinatorState {
   implicit def config: PlatformConfig
 
   val brokerNum        = config.brokerNum
-  val brokerAddresses  = Array.fill[Option[InetSocketAddress]](brokerNum)(None)
+  val brokerInfos      = Array.fill[Option[PeerInfo]](brokerNum)(None)
   val brokerConnectors = Array.fill[Option[ActorRef]](brokerNum)(None)
 
-  def addBrokerInfo(info: BrokerInfo, sender: ActorRef): Boolean = {
+  def addBrokerInfo(info: PeerInfo, sender: ActorRef): Boolean = {
     val id = info.id
     if (id != config.brokerInfo.id &&
         info.groupNumPerBroker == config.groupNumPerBroker &&
-        brokerAddresses(id).isEmpty) {
-      brokerAddresses(id)  = Some(info.address)
+        brokerInfos(id).isEmpty) {
+      brokerInfos(id)      = Some(info)
       brokerConnectors(id) = Some(sender)
       true
     } else false
   }
 
   def isBrokerInfoFull: Boolean = {
-    brokerAddresses.zipWithIndex.forall {
+    brokerInfos.zipWithIndex.forall {
       case (opt, idx) => opt.nonEmpty || idx == config.brokerInfo.id
     }
   }
@@ -40,13 +38,13 @@ trait CliqueCoordinatorState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  protected def buildCliqueInfo: CliqueInfo = {
-    val addresses = AVector.tabulate(config.brokerNum) { i =>
-      if (i == config.brokerInfo.id) config.publicAddress else brokerAddresses(i).get
+  protected def buildCliqueInfo: IntraCliqueInfo = {
+    val infos = AVector.tabulate(config.brokerNum) { i =>
+      if (i == config.brokerInfo.id) PeerInfo.self else brokerInfos(i).get
     }
-    CliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
-                      addresses,
-                      config.groupNumPerBroker)
+    IntraCliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
+                           infos,
+                           config.groupNumPerBroker)
   }
 
   val readys: Array[Boolean] = {

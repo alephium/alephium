@@ -17,7 +17,7 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") {
       system.actorOf(BrokerConnector.props(connection.ref, cliqueCoordinator.ref))
     val randomId      = Random.nextInt(config.brokerNum)
     val randomAddress = ModelGen.socketAddress.sample.get
-    val randomInfo    = BrokerInfo(randomId, config.groupNumPerBroker, randomAddress)
+    val randomInfo    = BrokerInfo.unsafe(randomId, config.groupNumPerBroker, randomAddress)
 
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)

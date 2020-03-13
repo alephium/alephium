@@ -50,12 +50,19 @@ object Configs extends StrictLogging {
     def isCoordinator: Boolean
 
     def bootstrap: AVector[InetSocketAddress]
+
+    def rpcPort: Option[Int]
+    def wsPort: Option[Int]
   }
   trait PlatformGenesisConfig { def genesisBlocks: AVector[AVector[Block]] }
 
   def parseAddress(s: String): InetSocketAddress = {
     val List(left, right) = s.split(':').toList
     new InetSocketAddress(left, right.toInt)
+  }
+
+  def validatePort(port: Int): Option[Int] = {
+    if (port > 0x0400 && port <= 0xFFFF) Some(port) else None
   }
 
   def getDuration(config: Config, path: String): Duration = {
