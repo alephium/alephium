@@ -5,7 +5,6 @@ import scala.concurrent._
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -30,7 +29,6 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServerAbstract.FutureTry
 
   implicit val system: ActorSystem                = mode.node.system
-  implicit val materializer: ActorMaterializer    = ActorMaterializer()
   implicit val executionContext: ExecutionContext = system.dispatcher
   implicit val config: PlatformProfile            = mode.profile
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
