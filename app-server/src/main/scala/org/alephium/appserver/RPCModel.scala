@@ -1,11 +1,12 @@
 package org.alephium.appserver
 
-import java.net.InetSocketAddress
+import java.net.InetAddress
 
 import io.circe._
 import io.circe.generic.semiauto._
 
 import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo}
 import org.alephium.rpc.CirceUtils._
@@ -73,11 +74,17 @@ object RPCModel {
     }
   }
 
-  final case class SelfClique(peers: AVector[InetSocketAddress], groupNumPerBroker: Int)
-      extends RPCModel
+  final case class PeerAddress(address: InetAddress, rpcPort: Option[Int], wsPort: Option[Int])
+  object PeerAddress {
+    implicit val codec: Codec[PeerAddress] = deriveCodec[PeerAddress]
+  }
+
+  final case class SelfClique(peers: AVector[PeerAddress], groupNumPerBroker: Int) extends RPCModel
   object SelfClique {
-    def from(cliqueInfo: CliqueInfo): SelfClique =
-      SelfClique(cliqueInfo.peers, cliqueInfo.groupNumPerBroker)
+    def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
+      SelfClique(cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
+                 cliqueInfo.groupNumPerBroker)
+    }
 
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }

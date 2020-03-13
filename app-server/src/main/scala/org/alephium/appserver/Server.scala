@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.platform.Mode
 
 class Server(mode: Mode) extends StrictLogging {
-  val rpcServer: RPCServer = new RPCServer(mode)
+  val rpcServer: RPCServer = RPCServer(mode)
 
   rpcServer
     .runServer()
