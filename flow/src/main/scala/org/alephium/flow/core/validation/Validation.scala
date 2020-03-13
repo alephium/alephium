@@ -3,7 +3,7 @@ package org.alephium.flow.core.validation
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
@@ -13,12 +13,12 @@ import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformProfile): IOResult[S]
+      implicit config: PlatformConfig): IOResult[S]
 
   def validateUntilDependencies(data: T, flow: BlockFlow, isSyncing: Boolean): IOResult[S]
 
   def validateAfterDependencies(data: T, flow: BlockFlow)(
-      implicit config: PlatformProfile): IOResult[S]
+      implicit config: PlatformConfig): IOResult[S]
 }
 
 // scalastyle:off number.of.methods
@@ -37,7 +37,7 @@ object Validation {
   }
 
   private[validation] def validateHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
-      implicit config: PlatformProfile): HeaderValidationResult = {
+      implicit config: PlatformConfig): HeaderValidationResult = {
     val headerChain = flow.getHeaderChain(header)
     for {
       _ <- checkWorkTarget(header, headerChain)
@@ -45,7 +45,7 @@ object Validation {
   }
 
   private[validation] def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformProfile): HeaderValidationResult = {
+      implicit config: PlatformConfig): HeaderValidationResult = {
     for {
       _ <- validateHeaderUntilDependencies(header, flow, isSyncing)
       _ <- validateHeaderAfterDependencies(header, flow)
@@ -60,7 +60,7 @@ object Validation {
   }
 
   private[validation] def validateBlockAfterDependencies(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult = {
     for {
       _ <- validateHeaderAfterDependencies(block.header, flow)
       _ <- validateBlockAfterHeader(block, flow)
@@ -68,7 +68,7 @@ object Validation {
   }
 
   private[validation] def validateBlock(block: Block, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformProfile): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult = {
     for {
       _ <- validateHeader(block.header, flow, isSyncing)
       _ <- validateBlockAfterHeader(block, flow)
@@ -76,7 +76,7 @@ object Validation {
   }
 
   private[validation] def validateBlockAfterHeader(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult = {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
@@ -87,7 +87,7 @@ object Validation {
   }
 
   private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
-      implicit config: PlatformProfile): TxValidationResult = {
+      implicit config: PlatformConfig): TxValidationResult = {
     val index = ChainIndex(tx.fromGroup, tx.toGroup)
     val trie  = flow.getBestTrie(index)
     checkNonCoinbaseTx(index, tx, trie)
@@ -98,7 +98,7 @@ object Validation {
    */
 
   private[validation] def checkGroup(block: Block)(
-      implicit config: PlatformProfile): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult = {
     if (block.chainIndex.relateTo(config.brokerInfo)) validBlock
     else invalidBlock(InvalidGroup)
   }
@@ -154,7 +154,7 @@ object Validation {
   }
 
   private[validation] def checkNonCoinbases(block: Block, flow: BlockFlow)(
-      implicit config: PlatformProfile): TxsValidationResult = {
+      implicit config: PlatformConfig): TxsValidationResult = {
     val index      = block.chainIndex
     val brokerInfo = config.brokerInfo
     assert(index.relateTo(brokerInfo))

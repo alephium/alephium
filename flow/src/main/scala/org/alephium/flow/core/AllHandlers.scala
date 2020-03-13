@@ -2,14 +2,14 @@ package org.alephium.flow.core
 
 import akka.actor.{ActorRef, ActorSystem}
 
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 
 final case class AllHandlers(
     flowHandler: ActorRef,
     txHandler: ActorRef,
     blockHandlers: Map[ChainIndex, ActorRef],
-    headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformProfile) {
+    headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformConfig) {
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRef = {
     assert(chainIndex.relateTo(config.brokerInfo))
@@ -24,7 +24,7 @@ final case class AllHandlers(
 
 object AllHandlers {
   def build(system: ActorSystem, cliqueManager: ActorRef, blockFlow: BlockFlow, eventBus: ActorRef)(
-      implicit config: PlatformProfile): AllHandlers = {
+      implicit config: PlatformConfig): AllHandlers = {
     val flowProps   = FlowHandler.props(blockFlow, eventBus)
     val flowHandler = system.actorOf(flowProps, "FlowHandler")
     buildWithFlowHandler(system, cliqueManager, blockFlow, flowHandler)
@@ -32,7 +32,7 @@ object AllHandlers {
   def buildWithFlowHandler(system: ActorSystem,
                            cliqueManager: ActorRef,
                            blockFlow: BlockFlow,
-                           flowHandler: ActorRef)(implicit config: PlatformProfile): AllHandlers = {
+                           flowHandler: ActorRef)(implicit config: PlatformConfig): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow, cliqueManager)
     val txHandler      = system.actorOf(txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
@@ -44,7 +44,7 @@ object AllHandlers {
       system: ActorSystem,
       cliqueManager: ActorRef,
       blockFlow: BlockFlow,
-      flowHandler: ActorRef)(implicit config: PlatformProfile): Map[ChainIndex, ActorRef] = {
+      flowHandler: ActorRef)(implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
     val handlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
@@ -60,7 +60,7 @@ object AllHandlers {
   }
 
   private def buildHeaderHandlers(system: ActorSystem, blockFlow: BlockFlow, flowHandler: ActorRef)(
-      implicit config: PlatformProfile): Map[ChainIndex, ActorRef] = {
+      implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
     val headerHandlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups

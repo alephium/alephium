@@ -7,13 +7,13 @@ import akka.util.ByteString
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 object CliqueManager {
   def props(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
-      implicit config: PlatformProfile): Props =
+      implicit config: PlatformConfig): Props =
     Props(new CliqueManager(builder, discoveryServer))
 
   sealed trait Command
@@ -35,7 +35,7 @@ object CliqueManager {
 }
 
 class CliqueManager(builder: BrokerHandler.Builder, discoveryServer: ActorRef)(
-    implicit config: PlatformProfile)
+    implicit config: PlatformConfig)
     extends BaseActor {
   import CliqueManager._
 

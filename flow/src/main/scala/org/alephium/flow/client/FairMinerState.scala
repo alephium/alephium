@@ -4,11 +4,11 @@ import akka.actor.ActorRef
 
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 
 trait FairMinerState {
-  implicit def config: PlatformProfile
+  implicit def config: PlatformConfig
 
   def handlers: AllHandlers
 

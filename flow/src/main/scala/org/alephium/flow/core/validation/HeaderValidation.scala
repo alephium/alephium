@@ -2,14 +2,14 @@ package org.alephium.flow.core.validation
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.IOResult
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.BlockHeader
 
 object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
   import ValidationStatus.convert
 
   def validate(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformProfile
+      implicit config: PlatformConfig
   ): IOResult[HeaderStatus] = {
     convert(Validation.validateHeader(header, flow, isSyncing), ValidHeader)
   }
@@ -21,7 +21,7 @@ object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
   }
 
   def validateAfterDependencies(header: BlockHeader, flow: BlockFlow)(
-      implicit config: PlatformProfile): IOResult[HeaderStatus] = {
+      implicit config: PlatformConfig): IOResult[HeaderStatus] = {
     convert(Validation.validateHeaderAfterDependencies(header, flow), ValidHeader)
   }
 }
