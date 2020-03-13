@@ -11,7 +11,7 @@ import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{Duration, TimeStamp}
 
@@ -21,13 +21,13 @@ object MockMiner {
 
   trait Builder extends Miner.Builder {
     override def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-        implicit config: PlatformProfile): Props =
+        implicit config: PlatformConfig): Props =
       Props(new MockMiner(address, node, chainIndex))
   }
 }
 
 class MockMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-    implicit config: PlatformProfile)
+    implicit config: PlatformConfig)
     extends Miner(address, node, chainIndex) {
   import node.allHandlers
 

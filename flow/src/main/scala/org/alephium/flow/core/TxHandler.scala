@@ -6,21 +6,20 @@ import org.alephium.flow.core.mempool.MemPool
 import org.alephium.flow.core.validation.{InvalidTxStatus, TxValidation, ValidTx}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor}
 
 object TxHandler {
-  def props(blockFlow: BlockFlow, cliqueManager: ActorRef)(
-      implicit config: PlatformProfile): Props =
+  def props(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
     Props(new TxHandler(blockFlow, cliqueManager))
 
   sealed trait Command
   final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
 }
 
-class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: PlatformProfile)
+class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
   override def receive: Receive = {
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)

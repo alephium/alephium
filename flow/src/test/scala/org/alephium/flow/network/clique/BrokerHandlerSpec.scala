@@ -12,7 +12,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
@@ -52,7 +52,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           connection: ActorRef,
           blockHandlers: AllHandlers,
           cliqueManager: ActorRef
-      )(implicit config: PlatformProfile): Props =
+      )(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
                                        connection,
@@ -100,7 +100,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           remoteBroker: BrokerInfo,
           blockHandlers: AllHandlers,
           cliqueManager: ActorRef
-      )(implicit config: PlatformProfile): Props = {
+      )(implicit config: PlatformConfig): Props = {
         Props(
           new OutboundBrokerHandler(selfCliqueInfo,
                                     remoteCliqueId,
@@ -148,7 +148,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           remote: InetSocketAddress,
           connection: ActorRef,
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+          cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
                                        connection,
@@ -245,7 +245,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           remote: InetSocketAddress,
           connection: ActorRef,
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+          cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
                                        connection,
@@ -297,7 +297,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
 
   trait SyncFixture extends BaseFixture { Base =>
     val syncHandlerRef = TestActorRef(new BrokerHandler {
-      override def config: PlatformProfile    = Spec.config
+      override def config: PlatformConfig     = Spec.config
       override def remote: InetSocketAddress  = Base.remote
       var remoteCliqueId: CliqueId            = _
       var remoteBrokerInfo: BrokerInfo        = _

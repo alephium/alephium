@@ -4,13 +4,13 @@ import scala.reflect.ClassTag
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.IOResult
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
-  implicit def config: PlatformProfile
+  implicit def config: PlatformConfig
 
   def groups: Int
 

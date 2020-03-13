@@ -8,13 +8,13 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.FlowHandler.HeaderAdded
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.Forest
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
-      implicit config: PlatformProfile): Props =
+      implicit config: PlatformConfig): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
@@ -35,7 +35,7 @@ object HeaderChainHandler {
 }
 
 class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
-    implicit val config: PlatformProfile)
+    implicit val config: PlatformConfig)
     extends ChainHandler[BlockHeader, HeaderStatus](blockFlow, chainIndex, HeaderValidation) {
   import HeaderChainHandler._
 
