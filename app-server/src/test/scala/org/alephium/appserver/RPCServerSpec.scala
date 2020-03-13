@@ -7,7 +7,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.{MethodRejection, Route, UnsupportedRequestContentTypeRejection}
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -40,7 +39,6 @@ object RPCServerSpec {
 
   class RPCServerDummy(implicit val config: PlatformProfile) extends RPCServerAbstract {
     implicit val system: ActorSystem                = ActorSystem()
-    implicit val materializer: ActorMaterializer    = ActorMaterializer()
     implicit val executionContext: ExecutionContext = system.dispatcher
     implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
     implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)

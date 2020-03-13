@@ -102,7 +102,7 @@ object RPCModel {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
 
     // TODO: refactor this once script system gets mature
-    val pkh = "pkh"
+    val pkh: String = "pkh"
   }
 
   final case class Balance(balance: BigInt, utxoNum: Int) extends RPCModel
