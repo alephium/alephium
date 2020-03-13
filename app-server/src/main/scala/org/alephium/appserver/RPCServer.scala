@@ -23,7 +23,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{Hex, TimeStamp}
+import org.alephium.util.Hex
 
 class RPCServer(mode: Mode) extends RPCServerAbstract {
   import RPCServer._
@@ -35,6 +35,8 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
   implicit val config: PlatformProfile            = mode.profile
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
+
+  private implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
   def doBlockNotify(blockNotify: BlockNotify): Json =
     blockNotifyEncode(blockNotify)
@@ -96,19 +98,13 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
-      implicit rpc: RPCConfig,
-      cfg: ConsensusConfig): Try[FetchResponse] = {
+      implicit cfg: ConsensusConfig,
+      fetchRequestDecoder: Decoder[FetchRequest]): Try[FetchResponse] = {
     withReq[FetchRequest, FetchResponse](req) { query =>
-      val now        = TimeStamp.now()
-      val lowerBound = (now - rpc.blockflowFetchMaxAge).get // Note: get should be safe
-      val from = query.from match {
-        case Some(ts) => if (ts > lowerBound) ts else lowerBound
-        case None     => lowerBound
-      }
-
-      val headers = blockFlow.getHeadersUnsafe(header => header.timestamp > from)
+      val headers =
+        blockFlow.getHeadersUnsafe(header =>
+          header.timestamp >= query.fromTs && header.timestamp <= query.toTs)
       FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
     }
   }
