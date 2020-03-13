@@ -7,13 +7,13 @@ import akka.actor.{ActorRef, Props}
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
-  def props(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformProfile): Props =
+  def props(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformConfig): Props =
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
@@ -61,7 +61,7 @@ object FlowHandler {
 
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformProfile)
+class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor
     with FlowHandlerState {
   import FlowHandler._

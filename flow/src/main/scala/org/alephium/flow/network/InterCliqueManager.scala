@@ -5,13 +5,13 @@ import akka.io.Tcp
 
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{BaseActor, Duration}
 
 object InterCliqueManager {
   def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
-      implicit config: PlatformProfile): Props =
+      implicit config: PlatformConfig): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 
   sealed trait Command
@@ -27,7 +27,7 @@ object InterCliqueManager {
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          allHandlers: AllHandlers,
-                         discoveryServer: ActorRef)(implicit config: PlatformProfile)
+                         discoveryServer: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor
     with InterCliqueManagerState {
   discoveryServer ! DiscoveryServer.GetNeighborCliques

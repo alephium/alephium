@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io.{Disk, IOResult}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
@@ -48,18 +48,18 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 }
 
 object BlockChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformProfile): BlockChain =
+  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockChain =
     createUnsafe(genesis, 0, 0)
 
   private def createUnsafe(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformProfile): BlockChain = {
+      implicit _config: PlatformConfig): BlockChain = {
     val timestamp = rootBlock.header.timestamp
     val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
     new BlockChain {
       override val disk                                = _config.disk
       override val headerDB                            = _config.headerDB
-      override implicit val config: PlatformProfile    = _config
+      override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
       this.persistBlockUnsafe(rootBlock)

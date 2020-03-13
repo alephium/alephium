@@ -1,6 +1,6 @@
 package org.alephium.flow.core.mempool
 
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.{AVector, RWLock}
 
@@ -9,7 +9,7 @@ import org.alephium.util.{AVector, RWLock}
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
-class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit config: PlatformProfile)
+class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit config: PlatformConfig)
     extends RWLock {
   def getPool(index: ChainIndex): TxPool = {
     assume(group == index.from)
@@ -51,7 +51,7 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
 }
 
 object MemPool {
-  def empty(groupIndex: GroupIndex)(implicit config: PlatformProfile): MemPool = {
+  def empty(groupIndex: GroupIndex)(implicit config: PlatformConfig): MemPool = {
     val pools = AVector.fill(config.groups)(TxPool.empty(config.txPoolCapacity))
     new MemPool(groupIndex, pools)
   }

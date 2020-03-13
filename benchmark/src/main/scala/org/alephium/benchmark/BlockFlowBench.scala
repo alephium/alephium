@@ -6,7 +6,7 @@ import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.GroupIndex
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -14,8 +14,8 @@ import org.alephium.protocol.model.GroupIndex
 @State(Scope.Thread)
 class BlockFlowBench {
 
-  implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
-  val blockFlow: BlockFlow              = BlockFlow.createUnsafe()(profile)
+  implicit val config: PlatformConfig = PlatformConfig.loadDefault()
+  val blockFlow: BlockFlow            = BlockFlow.createUnsafe()(config)
 
   // TODO: benchmark blockheader verification
 

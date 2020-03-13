@@ -5,7 +5,7 @@ import org.alephium.flow.network.clique.BrokerHandler
 
 // scalastyle:off magic.number
 trait Mode {
-  implicit def profile: PlatformProfile
+  implicit def config: PlatformConfig
 
   def port: Int
 
@@ -27,17 +27,17 @@ object Mode {
   def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
 
   class Aws extends Mode {
-    final implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
+    final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    val port: Int = profile.publicAddress.getPort
+    val port: Int = config.publicAddress.getPort
 
     override val node: Node = Node(builders, "Root")
   }
 
   class Local extends Mode {
-    final implicit val profile: PlatformProfile = PlatformProfile.loadDefault()
+    final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    val port: Int = profile.publicAddress.getPort
+    val port: Int = config.publicAddress.getPort
 
     override val node: Node = Node(builders, "Root")
   }

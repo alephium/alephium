@@ -4,13 +4,13 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
 
 object CliqueCoordinator {
-  def props(bootstrapper: ActorRef)(implicit config: PlatformProfile): Props =
+  def props(bootstrapper: ActorRef)(implicit config: PlatformConfig): Props =
     Props(new CliqueCoordinator(bootstrapper))
 
   sealed trait Event
@@ -21,7 +21,7 @@ object CliqueCoordinator {
   }
 }
 
-class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformProfile)
+class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformConfig)
     extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers

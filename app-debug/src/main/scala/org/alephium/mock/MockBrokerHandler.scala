@@ -7,7 +7,7 @@ import com.codahale.metrics.{Histogram, MetricRegistry}
 
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{BrokerHandler, InboundBrokerHandler, OutboundBrokerHandler}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.monitoring.Monitoring
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 
@@ -19,7 +19,7 @@ object MockBrokerHandler {
         connection: ActorRef,
         blockHandlers: AllHandlers,
         cliqueManager: ActorRef
-    )(implicit config: PlatformProfile): Props =
+    )(implicit config: PlatformConfig): Props =
       Props(
         new MockInboundBrokerHandler(selfCliqueInfo,
                                      remote,
@@ -33,7 +33,7 @@ object MockBrokerHandler {
         remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers,
         cliqueManager: ActorRef
-    )(implicit config: PlatformProfile): Props =
+    )(implicit config: PlatformConfig): Props =
       Props(
         new MockOutboundBrokerHandler(selfCliqueInfo,
                                       remoteCliqueId,
@@ -48,7 +48,7 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                remote: InetSocketAddress,
                                connection: ActorRef,
                                allHandlers: AllHandlers,
-                               cliqueManager: ActorRef)(implicit config: PlatformProfile)
+                               cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers, cliqueManager) {
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
@@ -64,7 +64,7 @@ class MockOutboundBrokerHandler(selfCliqueInfo: CliqueInfo,
                                 remoteCliqueId: CliqueId,
                                 remoteBroker: BrokerInfo,
                                 allHandlers: AllHandlers,
-                                cliqueManager: ActorRef)(implicit config: PlatformProfile)
+                                cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends OutboundBrokerHandler(selfCliqueInfo,
                                   remoteCliqueId,
                                   remoteBroker,

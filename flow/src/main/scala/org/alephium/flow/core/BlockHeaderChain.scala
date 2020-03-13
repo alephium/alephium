@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{HeaderDB, IOResult}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{Block, BlockHeader}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
@@ -57,17 +57,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 }
 
 object BlockHeaderChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformProfile): BlockHeaderChain =
+  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
     createUnsafe(genesis.header, 0, 0)
 
   private def createUnsafe(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformProfile): BlockHeaderChain = {
+      implicit _config: PlatformConfig): BlockHeaderChain = {
     val timestamp = rootHeader.timestamp
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
       override val headerDB: HeaderDB                  = _config.headerDB
-      override implicit def config: PlatformProfile    = _config
+      override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
       this.addHeaderUnsafe(rootHeader)
