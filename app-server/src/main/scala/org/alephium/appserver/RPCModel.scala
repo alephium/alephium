@@ -20,10 +20,24 @@ object RPCModel {
     implicit val encoderTS: Encoder[TimeStamp] = Encoder.encodeLong.contramap(_.millis)
   }
 
-  final case class FetchRequest(from: Option[TimeStamp]) extends RPCModel
+  final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends RPCModel
   object FetchRequest {
     import TimeStampCodec._
-    implicit val codec: Codec[FetchRequest] = deriveCodec[FetchRequest]
+    def decoder(implicit rpcConfig: RPCConfig): Decoder[FetchRequest] =
+      deriveDecoder[FetchRequest]
+        .ensure(
+          fetchRequest => fetchRequest.fromTs <= fetchRequest.toTs,
+          "`toTs` cannot be before `fromTs`"
+        )
+        .ensure(
+          fetchRequest =>
+            (fetchRequest.toTs -- fetchRequest.fromTs)
+              .exists(_ <= rpcConfig.blockflowFetchMaxAge),
+          s"interval cannot be greater than ${rpcConfig.blockflowFetchMaxAge}"
+        )
+    implicit val encoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
+    def codec(implicit rpcConfig: RPCConfig): Codec[FetchRequest] =
+      Codec.from(decoder, encoder)
   }
 
   final case class FetchResponse(blocks: Seq[BlockEntry]) extends RPCModel

@@ -11,7 +11,7 @@ import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.rpc.CirceUtils
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp}
 
 class RPCModelSpec extends AlephiumSpec with EitherValues {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
@@ -23,6 +23,12 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
 
+  val blockflowFetchMaxAge = Duration.unsafe(1000)
+
+  implicit val rpcConfig: RPCConfig =
+    RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
+  implicit val fetchRequestCodec = FetchRequest.codec
+
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
     json.as[A].right.value
@@ -33,16 +39,21 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     parseAs[T](jsonRaw) is data
   }
 
-  it should "encode/decode empty request" in {
-    val request = FetchRequest(None)
-    val jsonRaw = """{}"""
+  def parseFail[A](jsonRaw: String)(implicit A: Decoder[A]): String = {
+    parse(jsonRaw).right.value.as[A].left.value.message
+  }
+
+  it should "encode/decode FetchRequest" in {
+    val request =
+      FetchRequest(TimeStamp.unsafe(1L), TimeStamp.unsafe(42L))
+    val jsonRaw = """{"fromTs":1,"toTs":42}"""
     checkData(request, jsonRaw)
   }
 
-  it should "encode/decode request" in {
-    val request = FetchRequest(Some(TimeStamp.unsafe(42L)))
-    val jsonRaw = """{"from":42}"""
-    checkData(request, jsonRaw)
+  it should "validate FetchRequest" in {
+    parseFail[FetchRequest]("""{"fromTs":42,"toTs":1}""") is "`toTs` cannot be before `fromTs`"
+    parseFail[FetchRequest]("""{"fromTs":1,"toTs":100000}""") is s"interval cannot be greater than $blockflowFetchMaxAge"
+    parseFail[FetchRequest]("""{}""") is s"Attempt to decode value on failed cursor"
   }
 
   it should "encode/decode empty FetchResponse" in {
