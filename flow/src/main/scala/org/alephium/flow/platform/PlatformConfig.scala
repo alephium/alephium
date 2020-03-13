@@ -14,16 +14,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.util._
 
-trait PlatformConfig
-    extends NewConfig.PlatformGroupConfig
-    with NewConfig.PlatformCliqueConfig
-    with NewConfig.PlatformConsensusConfig
-    with NewConfig.PlatformDiscoveryConfig
-    with NewConfig.PlatformBrokerConfig
-    with NewConfig.PlatformGenesisConfig
-    with NewConfig.PlatformMiningConfig
-    with NewConfig.PlatformNetworkConfig
-    with PlatformIO {
+trait PlatformConfig extends Configs with PlatformIO {
   def all: Config
   def aleph: Config
 
@@ -33,7 +24,7 @@ trait PlatformConfig
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object PlatformConfig {
-  import NewConfig._
+  import Configs._
 
   def loadDefault(): PlatformConfig = {
     PlatformConfig.load(Platform.getRootPath(Env.resolve()))
