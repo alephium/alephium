@@ -2,7 +2,7 @@ package org.alephium.appserver
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.{MethodRejection, Route, UnsupportedRequestContentTypeRejection}
@@ -11,7 +11,7 @@ import akka.stream.ActorMaterializer
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe._
+import io.circe.{Decoder, Encoder, Json, JsonObject}
 import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
@@ -19,12 +19,13 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformProfile
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, ModelGen}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AlephiumSpec, AVector, EventBus, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, EventBus, TimeStamp}
 
 object RPCServerSpec {
   import RPCServerAbstract.FutureTry
@@ -196,6 +197,47 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
       val List(rejection: UnsupportedRequestContentTypeRejection) = rejections
       rejection.supported is Set(ContentTypeRange(ContentTypes.`application/json`))
     }
+  }
+
+  behavior of "companion object"
+
+  it should "safely handle `blockflowFetch` function" in {
+    val dummyAddress         = ModelGen.socketAddress.sample.get
+    val now                  = TimeStamp.now()
+    val blockflowFetchMaxAge = Duration.ofMinutes(10).get
+    val blockHeader =
+      ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
+
+    class BlockFlowDummy(probe: ActorRef)(implicit config: PlatformProfile) extends BlockFlow {
+      override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
+        probe ! predicate(blockHeader)
+        Seq.empty
+      }
+    }
+
+    implicit val rpcConfig: RPCConfig =
+      RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
+    implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
+
+    val blockFlowProbe = TestProbe()
+    val blockFlow      = new BlockFlowDummy(blockFlowProbe.ref)
+    def blockflowFetch(params: String) = {
+      RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).right.value, 0))
+    }
+    val invalidParams = Response.Failure(Error.InvalidParams, Some(0L))
+
+    blockflowFetch(
+      s"""{"fromTs":${(now - blockflowFetchMaxAge).get.millis},"toTs":${now.millis}}""")
+    blockFlowProbe.expectMsg(true)
+
+    blockflowFetch(s"""{"fromTs":${now.millis},"toTs":${now.millis}}""")
+    blockFlowProbe.expectMsg(false)
+
+    blockflowFetch("""{}""").left.value is invalidParams
+    blockflowFetch("""{"fromTs":42,"toTs":1}""").left.value is invalidParams
+    blockflowFetch("""{"fromTs":1,"toTs":1000000000}""").left.value is invalidParams
+    blockflowFetch("""{"toTs":1}""").left.value is invalidParams
+    blockflowFetch("""{"fromTs":1}""").left.value is invalidParams
   }
 
   behavior of "ws"
