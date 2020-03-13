@@ -5,7 +5,6 @@ import akka.io.Tcp
 
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.BaseActor
 
@@ -33,7 +32,7 @@ class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformCon
       val name       = BaseActor.envalidActorName(s"Broker-$remote")
       context.actorOf(BrokerConnector.props(connection, self), name)
       ()
-    case info: BrokerInfo =>
+    case info: PeerInfo =>
       log.debug(s"Received broker info from ${info.address} id: ${info.id}")
       if (addBrokerInfo(info, sender())) {
         context watch sender()
@@ -59,7 +58,7 @@ class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformCon
       }
   }
 
-  def awaitTerminated(cliqueInfo: CliqueInfo): Receive = {
+  def awaitTerminated(cliqueInfo: IntraCliqueInfo): Receive = {
     case Terminated(actor) =>
       setClose(actor)
       if (isAllClosed) {

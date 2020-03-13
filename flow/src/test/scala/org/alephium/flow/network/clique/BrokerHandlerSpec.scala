@@ -26,7 +26,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val cliqueInfo = ModelGen.cliqueInfo.sample.get
     val id         = Random.nextInt(cliqueInfo.brokerNum)
     val address    = cliqueInfo.peers(id)
-    val brokerInfo = BrokerInfo(id, cliqueInfo.groupNumPerBroker, address)
+    val brokerInfo = BrokerInfo.unsafe(id, cliqueInfo.groupNumPerBroker, address)
     (address, cliqueInfo, brokerInfo)
   }
 

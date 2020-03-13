@@ -38,11 +38,10 @@ object BrokerInfo { self =>
   implicit val serializer: Serializer[BrokerInfo] =
     Serializer.forProduct3(t => (t.id, t.groupNumPerBroker, t.address))
 
-  def apply(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
-      implicit config: GroupConfig): BrokerInfo = {
-    require(validate(id, groupNumPerBroker))
-
-    new BrokerInfo(id, groupNumPerBroker, address)
+  def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
+      implicit config: GroupConfig): Option[BrokerInfo] = {
+    if (validate(id, groupNumPerBroker)) Some(new BrokerInfo(id, groupNumPerBroker, address))
+    else None
   }
 
   def unsafe(id: Int, groupNumPerBroker: Int, address: InetSocketAddress): BrokerInfo =

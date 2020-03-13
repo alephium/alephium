@@ -10,9 +10,7 @@ import org.alephium.util.AVector
 // Assume the peers are ordered according to the groups they correspond to
 final case class CliqueInfo(id: CliqueId,
                             peers: AVector[InetSocketAddress],
-                            groupNumPerBroker: Int) {
-  self =>
-
+                            groupNumPerBroker: Int) { self =>
   def cliqueConfig: CliqueConfig = new CliqueConfig {
     val groups: Int            = peers.length * self.groupNumPerBroker
     val brokerNum: Int         = peers.length
