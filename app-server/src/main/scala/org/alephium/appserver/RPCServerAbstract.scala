@@ -7,7 +7,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives.{complete, extractUpgradeToWebSocket, get, path}
 import akka.http.scaladsl.server.Route
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{CompletionStrategy, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -27,7 +27,6 @@ trait RPCServerAbstract extends StrictLogging {
   import RPCServerAbstract._
 
   implicit def system: ActorSystem
-  implicit def materializer: ActorMaterializer
   implicit def executionContext: ExecutionContext
   implicit def config: PlatformProfile
   implicit def rpcConfig: RPCConfig
@@ -72,8 +71,7 @@ trait RPCServerAbstract extends StrictLogging {
     path("events") {
       CORSHandler(get {
         extractUpgradeToWebSocket { upgrade =>
-          val (actor, source) =
-            Source.actorRef(bufferSize, OverflowStrategy.fail).preMaterialize()
+          val (actor, source) = Websocket.actorRef
           eventBus.tell(EventBus.Subscribe, actor)
           val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
           complete(response)
@@ -117,5 +115,27 @@ object RPCServerAbstract {
       implicit ec: ExecutionContext): Future[Response] = result.map {
     case Right(t)    => Response.successful(req, t)
     case Left(error) => error
+  }
+
+  object Websocket {
+
+    case object Completed
+    case object Failed
+
+    def actorRef(implicit system: ActorSystem): (ActorRef, Source[Nothing, NotUsed]) =
+      Source
+        .actorRef(
+          {
+            case Websocket.Completed =>
+              CompletionStrategy.draining
+          }, {
+            case Websocket.Failed =>
+              new Throwable("failure on events websocket")
+          },
+          bufferSize,
+          OverflowStrategy.fail
+        )
+        .preMaterialize()
+
   }
 }
