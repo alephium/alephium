@@ -21,7 +21,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
   val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
-  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
+  val dummyCliqueInfo = CliqueInfo.unsafe(CliqueId.generate, AVector(dummyAddress), 1)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
