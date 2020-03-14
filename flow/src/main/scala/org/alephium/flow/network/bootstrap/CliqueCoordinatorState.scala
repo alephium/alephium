@@ -42,6 +42,7 @@ trait CliqueCoordinatorState {
     val infos = AVector.tabulate(config.brokerNum) { i =>
       if (i == config.brokerInfo.id) PeerInfo.self else brokerInfos(i).get
     }
+    assume(infos.length * config.groupNumPerBroker == config.groups)
     IntraCliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
                            infos,
                            config.groupNumPerBroker)
