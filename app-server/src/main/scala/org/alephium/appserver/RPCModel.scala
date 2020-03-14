@@ -98,10 +98,14 @@ object RPCModel {
       }
     }
 
-    implicit val idEncoder: Encoder[CliqueId]       = Encoder.encodeString.contramap(_.toHexString)
-    implicit val idDecoder: Decoder[CliqueId]       = Decoder.decodeString.emap(createId)
-    implicit val cliqueInfoCodec: Codec[CliqueInfo] = deriveCodec[CliqueInfo]
-    implicit val codec: Codec[NeighborCliques]      = deriveCodec[NeighborCliques]
+    implicit val idEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
+    implicit val idDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createId)
+    implicit val cliqueEncoder: Encoder[CliqueInfo] =
+      Encoder.forProduct3("id", "peers", "groupNumPerBroker")(info =>
+        (info.id, info.peers, info.groupNumPerBroker))
+    implicit val cliqueDecoder: Decoder[CliqueInfo] =
+      Decoder.forProduct3("id", "peers", "groupNumPerBroker")(CliqueInfo.unsafe)
+    implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 
   final case class GetBalance(address: String, `type`: String) extends RPCModel

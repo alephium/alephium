@@ -5,7 +5,11 @@ import java.net.InetSocketAddress
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
-class BrokerInfo private (val id: Int, val groupNumPerBroker: Int, val address: InetSocketAddress) {
+sealed abstract case class BrokerInfo(
+    id: Int,
+    groupNumPerBroker: Int,
+    address: InetSocketAddress
+) {
   val groupFrom: Int = id * groupNumPerBroker
 
   val groupUntil: Int = (id + 1) * groupNumPerBroker
@@ -40,18 +44,18 @@ object BrokerInfo { self =>
 
   def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
       implicit config: GroupConfig): Option[BrokerInfo] = {
-    if (validate(id, groupNumPerBroker)) Some(new BrokerInfo(id, groupNumPerBroker, address))
+    if (validate(id, groupNumPerBroker)) Some(new BrokerInfo(id, groupNumPerBroker, address) {})
     else None
   }
 
   def unsafe(id: Int, groupNumPerBroker: Int, address: InetSocketAddress): BrokerInfo =
-    new BrokerInfo(id, groupNumPerBroker, address)
+    new BrokerInfo(id, groupNumPerBroker, address) {}
 
   class Unsafe(val id: Int, val groupNumPerBroker: Int, val address: InetSocketAddress)
       extends UnsafeModel[BrokerInfo] {
     def validate(implicit config: GroupConfig): Either[String, BrokerInfo] = {
       if (self.validate(id, groupNumPerBroker)) {
-        Right(new BrokerInfo(id, groupNumPerBroker, address))
+        Right(new BrokerInfo(id, groupNumPerBroker, address) {})
       } else {
         val groups = config.groups
         Left(s"Invalid broker info: id: $id, groupNumPerBroker: $groupNumPerBroker groups: $groups")
