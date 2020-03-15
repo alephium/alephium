@@ -2,6 +2,7 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
+import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
@@ -38,9 +39,14 @@ sealed abstract case class BrokerInfo(
   }
 }
 
-object BrokerInfo { self =>
-  implicit val serializer: Serializer[BrokerInfo] =
-    Serializer.forProduct3(t => (t.id, t.groupNumPerBroker, t.address))
+object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
+  val _serde: Serde[BrokerInfo] =
+    Serde.forProduct3(unsafe, t => (t.id, t.groupNumPerBroker, t.address))
+
+  override def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (validate(info.id, info.groupNumPerBroker)) Right(())
+    else Left(s"invalid BrokerInfo: $info")
+  }
 
   def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
       implicit config: GroupConfig): Option[BrokerInfo] = {
@@ -50,23 +56,6 @@ object BrokerInfo { self =>
 
   def unsafe(id: Int, groupNumPerBroker: Int, address: InetSocketAddress): BrokerInfo =
     new BrokerInfo(id, groupNumPerBroker, address) {}
-
-  class Unsafe(val id: Int, val groupNumPerBroker: Int, val address: InetSocketAddress)
-      extends UnsafeModel[BrokerInfo] {
-    def validate(implicit config: GroupConfig): Either[String, BrokerInfo] = {
-      if (self.validate(id, groupNumPerBroker)) {
-        Right(new BrokerInfo(id, groupNumPerBroker, address) {})
-      } else {
-        val groups = config.groups
-        Left(s"Invalid broker info: id: $id, groupNumPerBroker: $groupNumPerBroker groups: $groups")
-      }
-    }
-  }
-
-  object Unsafe {
-    implicit val serde: Serde[Unsafe] =
-      Serde.forProduct3(new Unsafe(_, _, _), t => (t.id, t.groupNumPerBroker, t.address))
-  }
 
   def validate(id: Int, groupNumPerBroker: Int)(implicit config: GroupConfig): Boolean = {
     0 <= id && (config.groups % groupNumPerBroker == 0) && {
