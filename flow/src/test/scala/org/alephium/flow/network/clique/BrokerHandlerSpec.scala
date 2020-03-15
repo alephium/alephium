@@ -86,7 +86,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       case _ => assert(false)
     }
 
-    val helloAck = HelloAck(remoteCliqueInfo.id, remoteBrokerInfo)
+    val helloAck = HelloAck.unsafe(remoteCliqueInfo.id, remoteBrokerInfo)
     inboundBrokerHandler ! Tcp.Received(Message.serialize(helloAck))
     pingpongProbe.expectMsg("start")
   }
@@ -125,7 +125,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
 
-    val hello = Hello(remoteCliqueInfo.id, remoteBrokerInfo)
+    val hello = Hello.unsafe(remoteCliqueInfo.id, remoteBrokerInfo)
     outboundBrokerHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>

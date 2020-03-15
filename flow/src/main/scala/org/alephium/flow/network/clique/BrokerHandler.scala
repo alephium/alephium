@@ -190,7 +190,7 @@ trait HandShake extends ConnectionReaderWriter {
   def selfCliqueInfo: CliqueInfo
 
   def handshakeOut(): Unit = {
-    sendPayload(Hello(selfCliqueInfo.id, config.brokerInfo))
+    sendPayload(Hello.unsafe(selfCliqueInfo.id, config.brokerInfo))
     setPayloadHandler(awaitHelloAck)
     context become handleReadWrite
   }
@@ -202,7 +202,7 @@ trait HandShake extends ConnectionReaderWriter {
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
-      sendPayload(HelloAck(selfCliqueInfo.id, config.brokerInfo))
+      sendPayload(HelloAck.unsafe(selfCliqueInfo.id, config.brokerInfo))
       uponHandshaked(hello.cliqueId, hello.brokerInfo)
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")

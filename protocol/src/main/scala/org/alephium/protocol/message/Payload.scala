@@ -1,5 +1,7 @@
 package org.alephium.protocol.message
 
+import scala.language.existentials
+
 import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
@@ -14,20 +16,20 @@ sealed trait Payload
 object Payload {
   def serialize(payload: Payload): ByteString = {
     val (code, data) = payload match {
-      case x: Hello       => (Hello, Serializer[Hello].serialize(x))
-      case x: HelloAck    => (HelloAck, Serializer[HelloAck].serialize(x))
-      case x: Ping        => (Ping, Serializer[Ping].serialize(x))
-      case x: Pong        => (Pong, Serializer[Pong].serialize(x))
-      case x: SendBlocks  => (SendBlocks, Serializer[SendBlocks].serialize(x))
-      case x: GetBlocks   => (GetBlocks, Serializer[GetBlocks].serialize(x))
-      case x: SendHeaders => (SendHeaders, Serializer[SendHeaders].serialize(x))
-      case x: GetHeaders  => (GetHeaders, Serializer[GetHeaders].serialize(x))
-      case x: SendTxs     => (SendTxs, Serializer[SendTxs].serialize(x))
+      case x: Hello       => (Hello, Hello.serialize(x))
+      case x: HelloAck    => (HelloAck, HelloAck.serialize(x))
+      case x: Ping        => (Ping, Ping.serialize(x))
+      case x: Pong        => (Pong, Pong.serialize(x))
+      case x: SendBlocks  => (SendBlocks, SendBlocks.serialize(x))
+      case x: GetBlocks   => (GetBlocks, GetBlocks.serialize(x))
+      case x: SendHeaders => (SendHeaders, SendHeaders.serialize(x))
+      case x: GetHeaders  => (GetHeaders, GetHeaders.serialize(x))
+      case x: SendTxs     => (SendTxs, SendTxs.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
 
-  val deserializerCode: Deserializer[Code] =
+  val deserializerCode: Deserializer[Code[_]] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
   def _deserialize(input: ByteString)(
@@ -35,137 +37,142 @@ object Payload {
     deserializerCode._deserialize(input).flatMap {
       case (code, rest) =>
         code match {
-          case Hello       => _deserializeHandShake(new Hello(_, _, _, _))(rest)
-          case HelloAck    => _deserializeHandShake(new HelloAck(_, _, _, _))(rest)
-          case Ping        => serdeImpl[Ping]._deserialize(rest)
-          case Pong        => serdeImpl[Pong]._deserialize(rest)
-          case SendBlocks  => serdeImpl[SendBlocks]._deserialize(rest)
-          case GetBlocks   => serdeImpl[GetBlocks]._deserialize(rest)
-          case SendHeaders => serdeImpl[SendHeaders]._deserialize(rest)
-          case GetHeaders  => serdeImpl[GetHeaders]._deserialize(rest)
-          case SendTxs     => serdeImpl[SendTxs]._deserialize(rest)
+          case Hello       => Hello._deserialize(rest)
+          case HelloAck    => HelloAck._deserialize(rest)
+          case Ping        => Ping._deserialize(rest)
+          case Pong        => Pong._deserialize(rest)
+          case SendBlocks  => SendBlocks._deserialize(rest)
+          case GetBlocks   => GetBlocks._deserialize(rest)
+          case SendHeaders => SendHeaders._deserialize(rest)
+          case GetHeaders  => GetHeaders._deserialize(rest)
+          case SendTxs     => SendTxs._deserialize(rest)
         }
     }
   }
 
-  def _deserializeHandShake[T <: Payload](build: (Int, Long, CliqueId, BrokerInfo) => T)(
-      input: ByteString)(implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
-    HandShake.Unsafe.serde._deserialize(input).flatMap[SerdeError, (Payload, ByteString)] {
-      case (unsafe, rest) =>
-        unsafe.validate(build) match {
-          case Left(error)  => Left(SerdeError.validation(error))
-          case Right(hello) => Right((hello, rest))
-        }
-    }
+  trait FixUnused[T] {
+    def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[(T, ByteString)]
   }
 
-  sealed trait Code
+  sealed trait Code[T] extends FixUnused[T] {
+    protected def serde: Serde[T]
+
+    def serialize(t: T): ByteString = serde.serialize(t)
+
+    def _deserialize(input: ByteString)(
+        implicit config: GroupConfig): SerdeResult[(T, ByteString)] =
+      serde._deserialize(input)
+  }
+
+  sealed trait ValidatedCode[T] extends Code[T] {
+    override def _deserialize(input: ByteString)(
+        implicit config: GroupConfig): SerdeResult[(T, ByteString)] = {
+      serde._deserialize(input).flatMap {
+        case (message, rest) =>
+          validate(message) match {
+            case Right(_)    => Right((message, rest))
+            case Left(error) => Left(SerdeError.validation(error))
+          }
+      }
+    }
+
+    def validate(t: T)(implicit config: GroupConfig): Either[String, Unit]
+  }
+
   object Code {
-    private[message] val values: AVector[Code] =
+    private[message] val values: AVector[Code[_]] =
       AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders, SendTxs)
 
-    val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
-    def fromInt(code: Int): Option[Code] =
+    val toInt: Map[Code[_], Int] = values.toIterable.zipWithIndex.toMap
+    def fromInt(code: Int): Option[Code[_]] =
       if (code >= 0 && code < values.length) Some(values(code)) else None
   }
 }
 
-sealed trait HandShake extends Payload
-
-object HandShake {
-  class Unsafe(val version: Int,
-               val timestamp: Long,
-               val cliqueId: CliqueId,
-               val brokerInfoUnsafe: BrokerInfo.Unsafe) {
-    def validate[T](build: (Int, Long, CliqueId, BrokerInfo) => T)(
-        implicit config: GroupConfig): Either[String, T] = {
-      if (version != Protocol.version) {
-        Left(s"Invalid protoco version: got $version, expect ${Protocol.version}")
-      } else if (timestamp <= 0) {
-        Left(s"Invalid timestamp: got $timestamp, expect positive number")
-      } else {
-        brokerInfoUnsafe.validate match {
-          case Left(message)     => Left(message)
-          case Right(brokerInfo) => Right(build(version, timestamp, cliqueId, brokerInfo))
-        }
-      }
-    }
-  }
-  object Unsafe {
-    implicit val serde: Serde[Unsafe] = Serde.forProduct4(
-      new Unsafe(_, _, _, _),
-      t => (t.version, t.timestamp, t.cliqueId, t.brokerInfoUnsafe))
-  }
+sealed trait HandShake extends Payload {
+  val version: Int
+  val timestamp: Long
+  val cliqueId: CliqueId
+  val brokerInfo: BrokerInfo
 }
 
-final class Hello(val version: Int,
-                  val timestamp: Long,
-                  val cliqueId: CliqueId,
-                  val brokerInfo: BrokerInfo)
-    extends HandShake
+sealed trait HandShakeCode[T <: HandShake] extends Payload.ValidatedCode[T] {
+  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): T
 
-object Hello extends Payload.Code {
-  implicit val serializer: Serializer[Hello] =
-    Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueId, t.brokerInfo))
+  def unsafe(cliqueId: CliqueId, brokerInfo: BrokerInfo): T =
+    unsafe(Protocol.version, System.currentTimeMillis(), cliqueId, brokerInfo)
 
-  def apply(cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello = {
-    new Hello(Protocol.version, System.currentTimeMillis(), cliqueId, brokerInfo)
-  }
+  private implicit val brokerSerde: Serde[BrokerInfo] = BrokerInfo._serde
+  val serde: Serde[T] =
+    Serde.forProduct4(unsafe, t => (t.version, t.timestamp, t.cliqueId, t.brokerInfo))
+
+  def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
+    if (message.version == Protocol.version && message.timestamp > 0) Right(())
+    else Left(s"invalid HandShake: $message")
 }
 
-final class HelloAck(val version: Int,
-                     val timestamp: Long,
-                     val cliqueId: CliqueId,
-                     val brokerInfo: BrokerInfo)
-    extends HandShake
+sealed abstract case class Hello(
+    version: Int,
+    timestamp: Long,
+    cliqueId: CliqueId,
+    brokerInfo: BrokerInfo
+) extends HandShake
 
-object HelloAck extends Payload.Code {
-  implicit val serializer: Serializer[HelloAck] =
-    Serializer.forProduct4(t => (t.version, t.timestamp, t.cliqueId, t.brokerInfo))
+object Hello extends HandShakeCode[Hello] {
+  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello =
+    new Hello(version, timestamp, cliqueId, brokerInfo) {}
+}
 
-  def apply(cliqueId: CliqueId, brokerInfo: BrokerInfo): HelloAck = {
-    new HelloAck(Protocol.version, System.currentTimeMillis(), cliqueId, brokerInfo)
-  }
+sealed abstract case class HelloAck(
+    version: Int,
+    timestamp: Long,
+    cliqueId: CliqueId,
+    brokerInfo: BrokerInfo
+) extends HandShake
+
+object HelloAck extends HandShakeCode[HelloAck] {
+  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): HelloAck =
+    new HelloAck(version, timestamp, cliqueId, brokerInfo) {}
 }
 
 final case class Ping(nonce: Int, timestamp: Long) extends Payload
 
-object Ping extends Payload.Code {
-  implicit val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
+object Ping extends Payload.Code[Ping] {
+  val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
 }
 
 final case class Pong(nonce: Int) extends Payload
 
-object Pong extends Payload.Code {
-  implicit val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
+object Pong extends Payload.Code[Pong] {
+  val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
 final case class SendBlocks(blocks: AVector[Block]) extends Payload
 
-object SendBlocks extends Payload.Code {
+object SendBlocks extends Payload.Code[SendBlocks] {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
 final case class GetBlocks(locators: AVector[Keccak256]) extends Payload
 
-object GetBlocks extends Payload.Code {
+object GetBlocks extends Payload.Code[GetBlocks] {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
 }
 
 final case class SendHeaders(headers: AVector[BlockHeader]) extends Payload
 
-object SendHeaders extends Payload.Code {
+object SendHeaders extends Payload.Code[SendHeaders] {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
 final case class GetHeaders(locators: AVector[Keccak256]) extends Payload
 
-object GetHeaders extends Payload.Code {
+object GetHeaders extends Payload.Code[GetHeaders] {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
 }
 
 final case class SendTxs(txs: AVector[Transaction]) extends Payload
 
-object SendTxs extends Payload.Code {
+object SendTxs extends Payload.Code[SendTxs] {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }

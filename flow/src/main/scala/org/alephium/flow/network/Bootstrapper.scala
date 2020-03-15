@@ -53,7 +53,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
       sink.forward(c)
     case ForwardConnection =>
       server ! cliqueManager
-      context become awaitInfo
+      context become (awaitInfo orElse forwardConnection)
   }
 
   def awaitInfo: Receive = {
@@ -62,13 +62,16 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
       cliqueManager ! CliqueManager.Start(cliqueInfo)
       discoveryServer ! cliqueInfo
 
-      context become ready(intraCliqueInfo)
-    case c: Tcp.Connected =>
-      log.debug(s"Forward connection to clique manager")
-      cliqueManager.forward(c)
+      context become (ready(intraCliqueInfo) orElse forwardConnection)
   }
 
   def ready(cliqueInfo: IntraCliqueInfo): Receive = {
     case GetIntraCliqueInfo => sender() ! cliqueInfo
+  }
+
+  def forwardConnection: Receive = {
+    case c: Tcp.Connected =>
+      log.debug(s"Forward connection to clique manager")
+      cliqueManager.forward(c)
   }
 }

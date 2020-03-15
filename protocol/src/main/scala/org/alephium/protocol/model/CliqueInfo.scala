@@ -2,6 +2,7 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
+import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -27,28 +28,23 @@ sealed abstract case class CliqueInfo(
 
   def brokerNum: Int = peers.length
 
-  // TODO: add a field for master broker
   def masterAddress: InetSocketAddress = peers.head
 }
 
-object CliqueInfo {
-  implicit val peerSerde: Serde[AVector[InetSocketAddress]] = avectorSerde[InetSocketAddress]
-  implicit val serializer: Serializer[CliqueInfo] =
-    Serializer.forProduct3(t => (t.id, t.peers, t.groupNumPerBroker))
+object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
+  private implicit val peerSerde: Serde[AVector[InetSocketAddress]] =
+    avectorSerde[InetSocketAddress]
+  val _serde: Serde[CliqueInfo] =
+    Serde.forProduct3(unsafe, t => (t.id, t.peers, t.groupNumPerBroker))
 
-  class Unsafe(val id: CliqueId, val peers: AVector[InetSocketAddress], val groupNumPerBroker: Int)
-      extends UnsafeModel[CliqueInfo] {
-    def validate(implicit config: GroupConfig): Either[String, CliqueInfo] = {
-      if (peers.isEmpty) Left("Peers vector is empty")
-      else if (groupNumPerBroker < 0) Left("Group number per broker is not positive")
-      else if (peers.length * groupNumPerBroker != config.groups)
-        Left(s"Number of groups: got: ${peers.length * groupNumPerBroker} expect: ${config.groups}")
-      else Right(CliqueInfo.unsafe(id, peers, groupNumPerBroker))
-    }
-  }
-  object Unsafe {
-    implicit val serde: Serde[Unsafe] =
-      Serde.forProduct3(new Unsafe(_, _, _), t => (t.id, t.peers, t.groupNumPerBroker))
+  override def validate(info: CliqueInfo)(implicit config: GroupConfig): Either[String, Unit] = {
+    val peers             = info.peers
+    val groupNumPerBroker = info.groupNumPerBroker
+    if (peers.isEmpty) Left("Peers vector is empty")
+    else if (groupNumPerBroker < 0) Left("Group number per broker is not positive")
+    else if (peers.length * groupNumPerBroker != config.groups)
+      Left(s"Number of groups: got: ${peers.length * groupNumPerBroker} expect: ${config.groups}")
+    else Right(())
   }
 
   def unsafe(id: CliqueId,

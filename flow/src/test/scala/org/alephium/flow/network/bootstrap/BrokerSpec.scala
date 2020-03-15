@@ -6,9 +6,8 @@ import akka.util.ByteString
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.protocol.model.ModelGen
 
-class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
+class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
   it should "follow this workflow" in {
     val connection    = TestProbe()
     val bootstrapper  = TestProbe()
@@ -29,10 +28,10 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
 
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        PeerInfo.serde._deserialize(data).right.value is ((PeerInfo.self, ByteString.empty))
+        PeerInfo._deserialize(data).right.value is ((PeerInfo.self, ByteString.empty))
     }
 
-    val randomInfo = ModelGen.cliqueInfo.sample.get
+    val randomInfo = genIntraCliqueInfo
     val infoData   = BrokerConnector.envelop(randomInfo).data
     broker.tell(Tcp.Received(infoData), connection.ref)
     connection.expectMsgPF() {
