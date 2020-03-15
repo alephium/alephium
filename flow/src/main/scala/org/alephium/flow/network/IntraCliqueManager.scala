@@ -29,33 +29,17 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
                          cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
 
-  cliqueInfo.brokers.foreachWithIndex {
-    case (remoteBroker, index) =>
-      if (index > config.brokerInfo.id) {
-        val address = remoteBroker.address
-        log.debug(s"Connect to broker $index, $address")
-        val props = builder.createOutboundBrokerHandler(cliqueInfo,
-                                                        cliqueInfo.id,
-                                                        remoteBroker,
-                                                        allHandlers,
-                                                        self)
-        context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
-      }
-  }
-
-  cliqueInfo.peers.foreachWithIndex {
-    case (address, index) =>
-      if (index > config.brokerInfo.id) {
-        log.debug(s"Connect to broker $index, $address")
-        val remoteBroker = BrokerInfo.unsafe(index, config.groupNumPerBroker, address)
-        val props =
-          builder.createOutboundBrokerHandler(cliqueInfo,
-                                              cliqueInfo.id,
-                                              remoteBroker,
-                                              allHandlers,
-                                              self)
-        context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
-      }
+  cliqueInfo.brokers.foreach { remoteBroker =>
+    if (remoteBroker.id > config.brokerInfo.id) {
+      val address = remoteBroker.address
+      log.debug(s"Connect to broker $remoteBroker")
+      val props = builder.createOutboundBrokerHandler(cliqueInfo,
+                                                      cliqueInfo.id,
+                                                      remoteBroker,
+                                                      allHandlers,
+                                                      self)
+      context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
+    }
   }
 
   override def receive: Receive = awaitBrokers(Map.empty)

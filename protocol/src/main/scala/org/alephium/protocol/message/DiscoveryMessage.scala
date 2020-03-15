@@ -74,23 +74,20 @@ object DiscoveryMessage {
 
   final case class Ping(cliqueInfo: CliqueInfo) extends Payload
   object Ping extends Code[Ping] {
-    def serialize(ping: Ping): ByteString =
-      implicitly[Serializer[CliqueInfo]].serialize(ping.cliqueInfo)
+    def serialize(ping: Ping): ByteString = CliqueInfo.serialize(ping.cliqueInfo)
 
     def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Ping] = {
-      val unsafe = implicitly[Serde[CliqueInfo.Unsafe]].deserialize(input)
-      unsafe.flatMap(_.validate.left.map(SerdeError.validation)).map(Ping.apply)
+      CliqueInfo.deserialize(input).map(Ping.apply)
     }
   }
 
   final case class Pong(cliqueInfo: CliqueInfo) extends Payload
   object Pong extends Code[Pong] {
     def serialize(pong: Pong): ByteString =
-      implicitly[Serializer[CliqueInfo]].serialize(pong.cliqueInfo)
+      CliqueInfo.serialize(pong.cliqueInfo)
 
     def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Pong] = {
-      val unsafe = implicitly[Serde[CliqueInfo.Unsafe]].deserialize(input)
-      unsafe.flatMap(_.validate.left.map(SerdeError.validation)).map(Pong.apply)
+      CliqueInfo.deserialize(input).map(Pong.apply)
     }
   }
 
@@ -111,12 +108,13 @@ object DiscoveryMessage {
 
     def serialize(data: Neighbors): ByteString = serializer.serialize(data.peers)
 
-    private val deserializer = avectorDeserializer[CliqueInfo.Unsafe]
+    private implicit val infoDeserializer = CliqueInfo._serde
+    private val deserializer              = avectorDeserializer[CliqueInfo]
     def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Neighbors] = {
       deserializer.deserialize(input).flatMap { peers =>
-        peers.mapE(_.validate) match {
-          case Left(message) => Left(SerdeError.validation(message))
-          case Right(infos)  => Right(Neighbors(infos))
+        peers.foreachE(CliqueInfo.validate) match {
+          case Right(_)    => Right(Neighbors(peers))
+          case Left(error) => Left(SerdeError.validation(error))
         }
       }
     }
