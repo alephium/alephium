@@ -1,7 +1,5 @@
 package org.alephium.protocol.message
 
-import scala.language.existentials
-
 import akka.util.ByteString
 
 import org.alephium.crypto.Keccak256
@@ -14,8 +12,9 @@ import org.alephium.util.AVector
 sealed trait Payload
 
 object Payload {
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   def serialize(payload: Payload): ByteString = {
-    val (code, data) = payload match {
+    val (code, data: ByteString) = payload match {
       case x: Hello       => (Hello, Hello.serialize(x))
       case x: HelloAck    => (HelloAck, HelloAck.serialize(x))
       case x: Ping        => (Ping, Ping.serialize(x))
@@ -29,7 +28,7 @@ object Payload {
     intSerde.serialize(Code.toInt(code)) ++ data
   }
 
-  val deserializerCode: Deserializer[Code[_]] =
+  val deserializerCode: Deserializer[Code] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
   def _deserialize(input: ByteString)(
@@ -50,11 +49,13 @@ object Payload {
     }
   }
 
+  sealed trait Code
+
   trait FixUnused[T] {
     def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[(T, ByteString)]
   }
 
-  sealed trait Code[T] extends FixUnused[T] {
+  sealed trait Serding[T] extends FixUnused[T] {
     protected def serde: Serde[T]
 
     def serialize(t: T): ByteString = serde.serialize(t)
@@ -64,7 +65,7 @@ object Payload {
       serde._deserialize(input)
   }
 
-  sealed trait ValidatedCode[T] extends Code[T] {
+  sealed trait ValidatedSerding[T] extends Serding[T] {
     override def _deserialize(input: ByteString)(
         implicit config: GroupConfig): SerdeResult[(T, ByteString)] = {
       serde._deserialize(input).flatMap {
@@ -80,11 +81,11 @@ object Payload {
   }
 
   object Code {
-    private[message] val values: AVector[Code[_]] =
+    private[message] val values: AVector[Code] =
       AVector(Hello, HelloAck, Ping, Pong, SendBlocks, GetBlocks, SendHeaders, GetHeaders, SendTxs)
 
-    val toInt: Map[Code[_], Int] = values.toIterable.zipWithIndex.toMap
-    def fromInt(code: Int): Option[Code[_]] =
+    val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
+    def fromInt(code: Int): Option[Code] =
       if (code >= 0 && code < values.length) Some(values(code)) else None
   }
 }
@@ -96,7 +97,7 @@ sealed trait HandShake extends Payload {
   val brokerInfo: BrokerInfo
 }
 
-sealed trait HandShakeCode[T <: HandShake] extends Payload.ValidatedCode[T] {
+sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
   def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): T
 
   def unsafe(cliqueId: CliqueId, brokerInfo: BrokerInfo): T =
@@ -118,7 +119,7 @@ sealed abstract case class Hello(
     brokerInfo: BrokerInfo
 ) extends HandShake
 
-object Hello extends HandShakeCode[Hello] {
+object Hello extends HandShakeSerding[Hello] with Payload.Code {
   def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello =
     new Hello(version, timestamp, cliqueId, brokerInfo) {}
 }
@@ -130,49 +131,49 @@ sealed abstract case class HelloAck(
     brokerInfo: BrokerInfo
 ) extends HandShake
 
-object HelloAck extends HandShakeCode[HelloAck] {
+object HelloAck extends HandShakeSerding[HelloAck] with Payload.Code {
   def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): HelloAck =
     new HelloAck(version, timestamp, cliqueId, brokerInfo) {}
 }
 
 final case class Ping(nonce: Int, timestamp: Long) extends Payload
 
-object Ping extends Payload.Code[Ping] {
+object Ping extends Payload.Serding[Ping] with Payload.Code {
   val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
 }
 
 final case class Pong(nonce: Int) extends Payload
 
-object Pong extends Payload.Code[Pong] {
+object Pong extends Payload.Serding[Pong] with Payload.Code {
   val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
 }
 
 final case class SendBlocks(blocks: AVector[Block]) extends Payload
 
-object SendBlocks extends Payload.Code[SendBlocks] {
+object SendBlocks extends Payload.Serding[SendBlocks] with Payload.Code {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
 final case class GetBlocks(locators: AVector[Keccak256]) extends Payload
 
-object GetBlocks extends Payload.Code[GetBlocks] {
+object GetBlocks extends Payload.Serding[GetBlocks] with Payload.Code {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
 }
 
 final case class SendHeaders(headers: AVector[BlockHeader]) extends Payload
 
-object SendHeaders extends Payload.Code[SendHeaders] {
+object SendHeaders extends Payload.Serding[SendHeaders] with Payload.Code {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
 final case class GetHeaders(locators: AVector[Keccak256]) extends Payload
 
-object GetHeaders extends Payload.Code[GetHeaders] {
+object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
 }
 
 final case class SendTxs(txs: AVector[Transaction]) extends Payload
 
-object SendTxs extends Payload.Code[SendTxs] {
+object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }
