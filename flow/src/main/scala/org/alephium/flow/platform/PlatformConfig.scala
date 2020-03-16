@@ -106,6 +106,10 @@ object PlatformConfig {
       val timeSpanMax: Duration = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
       /* Consensus */
 
+      /* Script */
+      val maxStackSize: Int = 1024
+      /* Script */
+
       /* mining */
       val nonceStep: BigInt = miningCfg.getInt("nonceStep")
       /* mining */

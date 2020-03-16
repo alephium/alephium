@@ -36,7 +36,7 @@ class InstructionSpec extends AlephiumSpec {
   }
 
   it should "test OP_DUP" in new Fixture {
-    val state0 = buildState(OP_DUP, stackElems = AVector(data))
+    val state0 = buildState(OP_DUP.unsafe(1), stackElems = AVector(data))
 
     val state1 = state0.run().right.value
     state1.instructionCount is 1
