@@ -1,11 +1,10 @@
 package org.alephium.flow.client
 
-import akka.actor.ActorRef
-
-import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.core.{AllHandlers, BlockChainHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.util.ActorRefT
 
 trait FairMinerState {
   implicit def config: PlatformConfig
@@ -68,5 +67,8 @@ trait FairMinerState {
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
 
-  def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit
+  def startTask(fromShift: Int,
+                to: Int,
+                template: BlockTemplate,
+                blockHandler: ActorRefT[BlockChainHandler.Command]): Unit
 }

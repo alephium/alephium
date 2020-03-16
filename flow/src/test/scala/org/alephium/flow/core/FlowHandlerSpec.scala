@@ -8,6 +8,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.util.ActorRefT
 
 class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
   import FlowHandler._
@@ -24,7 +25,11 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
   }
 
   def genPending(block: Block, missings: mutable.HashSet[Keccak256]): PendingBlock = {
-    PendingBlock(block, missings, DataOrigin.Local, TestProbe().ref, TestProbe().ref)
+    PendingBlock(block,
+                 missings,
+                 DataOrigin.Local,
+                 ActorRefT(TestProbe().ref),
+                 ActorRefT(TestProbe().ref))
   }
 
   trait StateFix {

@@ -2,23 +2,26 @@ package org.alephium.mock
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
+import akka.io.Tcp
 import com.codahale.metrics.{Histogram, MetricRegistry}
 
 import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.clique.{BrokerHandler, InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.monitoring.Monitoring
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.util.ActorRefT
 
 object MockBrokerHandler {
   trait Builder extends BrokerHandler.Builder {
     override def createInboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remote: InetSocketAddress,
-        connection: ActorRef,
+        connection: ActorRefT[Tcp.Command],
         blockHandlers: AllHandlers,
-        cliqueManager: ActorRef
+        cliqueManager: ActorRefT[CliqueManager.Command]
     )(implicit config: PlatformConfig): Props =
       Props(
         new MockInboundBrokerHandler(selfCliqueInfo,
@@ -32,7 +35,7 @@ object MockBrokerHandler {
         remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers,
-        cliqueManager: ActorRef
+        cliqueManager: ActorRefT[CliqueManager.Command]
     )(implicit config: PlatformConfig): Props =
       Props(
         new MockOutboundBrokerHandler(selfCliqueInfo,
@@ -44,11 +47,12 @@ object MockBrokerHandler {
   }
 }
 
-class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
-                               remote: InetSocketAddress,
-                               connection: ActorRef,
-                               allHandlers: AllHandlers,
-                               cliqueManager: ActorRef)(implicit config: PlatformConfig)
+class MockInboundBrokerHandler(
+    selfCliqueInfo: CliqueInfo,
+    remote: InetSocketAddress,
+    connection: ActorRefT[Tcp.Command],
+    allHandlers: AllHandlers,
+    cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
     extends InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers, cliqueManager) {
   val delays: Histogram =
     Monitoring.metrics.histogram(MetricRegistry.name(remote.toString, "delay"))
@@ -60,11 +64,12 @@ class MockInboundBrokerHandler(selfCliqueInfo: CliqueInfo,
   }
 }
 
-class MockOutboundBrokerHandler(selfCliqueInfo: CliqueInfo,
-                                remoteCliqueId: CliqueId,
-                                remoteBroker: BrokerInfo,
-                                allHandlers: AllHandlers,
-                                cliqueManager: ActorRef)(implicit config: PlatformConfig)
+class MockOutboundBrokerHandler(
+    selfCliqueInfo: CliqueInfo,
+    remoteCliqueId: CliqueId,
+    remoteBroker: BrokerInfo,
+    allHandlers: AllHandlers,
+    cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
     extends OutboundBrokerHandler(selfCliqueInfo,
                                   remoteCliqueId,
                                   remoteBroker,

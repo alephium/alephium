@@ -14,7 +14,7 @@ import org.scalatest.EitherValues._
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
-import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
   import DiscoveryServerSpec._
@@ -42,7 +42,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
           AVector.tabulate(config.brokerNum)(_ => ModelGen.socketAddress.sample.get),
           config.groupNumPerBroker)
 
-      setSocket(socketProbe.ref)
+      setSocket(ActorRefT[Udp.Command](socketProbe.ref))
     }
     val peerClique: CliqueInfo = ModelGen.cliqueInfo.sample.get
 

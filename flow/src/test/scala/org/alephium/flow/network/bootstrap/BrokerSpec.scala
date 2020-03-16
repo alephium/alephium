@@ -6,6 +6,8 @@ import akka.util.ByteString
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.network.Bootstrapper
+import org.alephium.util.ActorRefT
 
 class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
   it should "follow this workflow" in {
@@ -17,7 +19,10 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     expectMsgType[Tcp.Bound]
 
     val broker = system.actorOf(
-      Broker.props(masterAddress, config.brokerInfo, config.retryTimeout, bootstrapper.ref))
+      Broker.props(masterAddress,
+                   config.brokerInfo,
+                   config.retryTimeout,
+                   ActorRefT[Bootstrapper.Command](bootstrapper.ref)))
     watch(broker)
 
     connection.expectMsgPF() {
@@ -45,7 +50,7 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     connection.expectMsg(Tcp.PeerClosed)
 
     broker ! Tcp.ConfirmedClosed
-    bootstrapper.expectMsg(randomInfo)
+    bootstrapper.expectMsg(Bootstrapper.SendIntraCliqueInfo(randomInfo))
     expectTerminated(broker)
   }
 }

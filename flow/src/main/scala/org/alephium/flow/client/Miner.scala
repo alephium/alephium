@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.Random
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
@@ -14,7 +14,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
-import org.alephium.util.{AVector, BaseActor, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object Miner {
   sealed trait Command
@@ -49,7 +49,7 @@ class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
   var taskStartingTime: Long    = 0l // This is the starting time for current task
   val taskRefreshDuration: Long = 5.seconds.toMillis
 
-  val blockHandler: ActorRef = allHandlers.getBlockHandler(chainIndex)
+  val blockHandler: ActorRefT[BlockChainHandler.Command] = allHandlers.getBlockHandler(chainIndex)
 
   override def receive: Receive = awaitStart
 

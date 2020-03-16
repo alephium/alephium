@@ -5,6 +5,7 @@ import akka.testkit.TestProbe
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, BlockFlow, FlowHandler}
 import org.alephium.flow.network.CliqueManager
+import org.alephium.util.ActorRefT
 
 class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
   it should "initialize FairMiner" in {
@@ -12,7 +13,10 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
     val flowHandler          = TestProbe("flowHandler")
     val blockFlow: BlockFlow = BlockFlow.createUnsafe()
     val allHandlers: AllHandlers =
-      AllHandlers.buildWithFlowHandler(system, cliqueManager.ref, blockFlow, flowHandler.ref)
+      AllHandlers.buildWithFlowHandler(system,
+                                       ActorRefT(cliqueManager.ref),
+                                       blockFlow,
+                                       ActorRefT(flowHandler.ref))
 
     val miner = system.actorOf(FairMiner.props(blockFlow, allHandlers))
 
