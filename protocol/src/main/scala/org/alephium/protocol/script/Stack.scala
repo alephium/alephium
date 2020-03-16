@@ -11,39 +11,46 @@ object Stack {
     new Stack(underlying, 0)
   }
 
-  def unsafe[T: ClassTag](elems: AVector[T])(implicit config: ScriptConfig): Stack[T] = {
-    assume(elems.length <= config.maxStackSize)
-    val underlying = Array.ofDim[T](config.maxStackSize)
+  def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
+    unsafe(elems, elems.length)
+  }
+
+  def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
+    assume(elems.length <= maxSize)
+    val underlying = Array.ofDim[T](maxSize)
     elems.foreachWithIndex((elem, index) => underlying(index) = elem)
     new Stack(underlying, elems.length)
   }
 }
 
 // Note: current place at underlying is empty
-class Stack[T] private (underlying: Array[T], currentIndex: Int) {
+class Stack[T] private (underlying: Array[T], var currentIndex: Int) {
   def isEmpty: Boolean = currentIndex == 0
 
   def size: Int = currentIndex
 
-  def push(elem: T): RunResult[Stack[T]] = {
+  def push(elem: T): RunResult[Unit] = {
     if (currentIndex < underlying.length) {
       underlying(currentIndex) = elem
-      Right(new Stack(underlying, currentIndex + 1))
+      currentIndex += 1
+      Right(())
     } else {
       Left(StackOverflow)
     }
   }
 
-  def pop(): RunResult[(T, Stack[T])] = {
-    if (currentIndex > 0) {
-      val elem     = underlying(currentIndex - 1)
-      val newStack = new Stack(underlying, currentIndex - 1)
-      Right((elem, newStack))
+  def pop(): RunResult[T] = {
+    val elemIndex = currentIndex - 1
+    if (elemIndex >= 0) {
+      val elem = underlying(elemIndex)
+      currentIndex = elemIndex
+      Right(elem)
     } else {
       Left(StackUnderflow)
     }
   }
 
+  // Note: index starts from 1
   def peek(index: Int): RunResult[T] = {
     val elemIndex = currentIndex - index
     if (index < 1) {
@@ -55,7 +62,8 @@ class Stack[T] private (underlying: Array[T], currentIndex: Int) {
     }
   }
 
-  def swap(index: Int): RunResult[Stack[T]] = {
+  // Note: index starts from 2
+  def swap(index: Int): RunResult[Unit] = {
     val fromIndex = currentIndex - 1
     val toIndex   = currentIndex - index
     if (index <= 1) {
@@ -66,7 +74,7 @@ class Stack[T] private (underlying: Array[T], currentIndex: Int) {
       val tmp = underlying(fromIndex)
       underlying(fromIndex) = underlying(toIndex)
       underlying(toIndex)   = tmp
-      Right(new Stack(underlying, currentIndex))
+      Right(())
     }
   }
 }
