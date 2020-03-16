@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, BlockFlow, TestUtils}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
@@ -17,9 +17,9 @@ class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec 
   val blockFlow: BlockFlow = BlockFlow.createUnsafe()
 
   trait Fixture extends FairMinerState {
-    override implicit def config: PlatformProfile = Spec.config
-    val handlers: AllHandlers                     = TestUtils.createBlockHandlersProbe
-    val probes                                    = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
+    override implicit def config: PlatformConfig = Spec.config
+    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe
+    val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
 
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)

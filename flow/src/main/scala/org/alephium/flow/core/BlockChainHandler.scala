@@ -10,7 +10,7 @@ import org.alephium.flow.core.FlowHandler.BlockAdded
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, Forest}
@@ -19,7 +19,7 @@ object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
             cliqueManager: ActorRef,
-            flowHandler: ActorRef)(implicit config: PlatformProfile): Props =
+            flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
@@ -42,7 +42,7 @@ object BlockChainHandler {
 class BlockChainHandler(blockFlow: BlockFlow,
                         chainIndex: ChainIndex,
                         cliqueManager: ActorRef,
-                        flowHandler: ActorRef)(implicit val config: PlatformProfile)
+                        flowHandler: ActorRef)(implicit val config: PlatformConfig)
     extends ChainHandler[Block, BlockStatus](blockFlow, chainIndex, BlockValidation) {
   import BlockChainHandler._
 

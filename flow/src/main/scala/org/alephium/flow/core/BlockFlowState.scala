@@ -5,7 +5,7 @@ import scala.reflect.ClassTag
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -17,7 +17,7 @@ import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 trait BlockFlowState {
   import BlockFlowState._
 
-  implicit def config: PlatformProfile
+  implicit def config: PlatformConfig
 
   val brokerInfo: BrokerInfo = config.brokerInfo
 
@@ -366,7 +366,7 @@ object BlockFlowState {
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
-      implicit config: PlatformProfile): BlockCache = {
+      implicit config: PlatformConfig): BlockCache = {
     val index = block.chainIndex
     assert(index.relateTo(groupIndex))
     if (index.isIntraGroup) {

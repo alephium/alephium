@@ -12,16 +12,16 @@ import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, FlowHa
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, BaseActor}
 
 object FairMiner {
-  def props(node: Node)(implicit config: PlatformProfile): Props =
+  def props(node: Node)(implicit config: PlatformConfig): Props =
     props(node.blockFlow, node.allHandlers)
 
   def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(
-      implicit config: PlatformProfile): Props = {
+      implicit config: PlatformConfig): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex.unsafe(i)
       val (_, publicKey) = index.generateP2pkhKey
@@ -31,7 +31,7 @@ object FairMiner {
   }
 
   def props(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
-      implicit config: PlatformProfile): Props = {
+      implicit config: PlatformConfig): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
       require(GroupIndex.fromP2PKH(address).value == i)
@@ -46,7 +46,7 @@ object FairMiner {
       extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
-      implicit config: PlatformProfile): Option[(Block, BigInt)] = {
+      implicit config: PlatformConfig): Option[(Block, BigInt)] = {
     val nonceStart = BigInt(Random.nextInt(Integer.MAX_VALUE))
     val nonceEnd   = nonceStart + config.nonceStep
 
@@ -65,7 +65,7 @@ object FairMiner {
 
 class FairMiner(addresses: AVector[ED25519PublicKey],
                 blockFlow: BlockFlow,
-                allHandlers: AllHandlers)(implicit val config: PlatformProfile)
+                allHandlers: AllHandlers)(implicit val config: PlatformConfig)
     extends BaseActor
     with FairMinerState {
   val handlers = allHandlers

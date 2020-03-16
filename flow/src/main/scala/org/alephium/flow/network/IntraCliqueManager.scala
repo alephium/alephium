@@ -5,7 +5,7 @@ import akka.io.Tcp
 
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.BaseActor
 
@@ -13,7 +13,7 @@ object IntraCliqueManager {
   def props(builder: BrokerHandler.Builder,
             cliqueInfo: CliqueInfo,
             allHandlers: AllHandlers,
-            cliqueManager: ActorRef)(implicit config: PlatformProfile): Props =
+            cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
     Props(new IntraCliqueManager(builder, cliqueInfo, allHandlers, cliqueManager))
 
   sealed trait Command
@@ -26,7 +26,7 @@ object IntraCliqueManager {
 class IntraCliqueManager(builder: BrokerHandler.Builder,
                          cliqueInfo: CliqueInfo,
                          allHandlers: AllHandlers,
-                         cliqueManager: ActorRef)(implicit config: PlatformProfile)
+                         cliqueManager: ActorRef)(implicit config: PlatformConfig)
     extends BaseActor {
 
   cliqueInfo.peers.foreachWithIndex {
