@@ -44,11 +44,29 @@ class Stack[T] private (underlying: Array[T], currentIndex: Int) {
     }
   }
 
-  def peek(): RunResult[T] = {
-    if (currentIndex > 0) {
-      Right(underlying(currentIndex - 1))
+  def peek(index: Int): RunResult[T] = {
+    val elemIndex = currentIndex - index
+    if (index < 1) {
+      Left(IndexUnderflow)
+    } else if (elemIndex < 0) {
+      Left(IndexOverflow)
     } else {
-      Left(StackUnderflow)
+      Right(underlying(elemIndex))
+    }
+  }
+
+  def swap(index: Int): RunResult[Stack[T]] = {
+    val fromIndex = currentIndex - 1
+    val toIndex   = currentIndex - index
+    if (index <= 1) {
+      Left(IndexUnderflow)
+    } else if (toIndex < 0) {
+      Left(IndexOverflow)
+    } else {
+      val tmp = underlying(fromIndex)
+      underlying(fromIndex) = underlying(toIndex)
+      underlying(toIndex)   = tmp
+      Right(new Stack(underlying, currentIndex))
     }
   }
 }
