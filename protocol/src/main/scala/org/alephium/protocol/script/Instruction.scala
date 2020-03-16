@@ -15,10 +15,12 @@ object Instruction {
   implicit val serde: Serde[Instruction] = new Serde[Instruction] {
     override def serialize(input: Instruction): ByteString = input match {
       case x: OP_PUSH     => ByteString.apply(0x01) ++ bytestringSerde.serialize(x.bytes)
-      case OP_DUP         => ByteString.apply(0x02)
-      case OP_EQUALVERIFY => ByteString.apply(0x02)
-      case OP_KECCAK256   => ByteString.apply(0x03)
-      case OP_CHECKSIG    => ByteString.apply(0x04)
+      case x: OP_DUP      => ByteString.apply(0x02) ++ intSerde.serialize(x.index)
+      case OP_POP         => ByteString.apply(0x03)
+      case x: OP_SWAP     => ByteString.apply(0x04) ++ intSerde.serialize(x.index)
+      case OP_EQUALVERIFY => ByteString.apply(0x05)
+      case OP_KECCAK256   => ByteString.apply(0x06)
+      case OP_CHECKSIG    => ByteString.apply(0x07)
     }
 
     override def _deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)] = {
@@ -30,13 +32,25 @@ object Instruction {
                 case (bytes, rest1) => (OP_PUSH(bytes), rest1)
               }
             case 0x02 =>
-              Right((OP_DUP, rest))
-            case 0x03 =>
-              Right((OP_EQUALVERIFY, rest))
+              intSerde._deserialize(rest).flatMap {
+                case (index, rest1) =>
+                  OP_DUP.from(index) match {
+                    case Some(dup) => Right((dup, rest1))
+                    case None      => Left(SerdeError.validation(s"Invalid DUP index: $index"))
+                  }
+              }
+            case 0x03 => Right((OP_POP, rest))
             case 0x04 =>
-              Right((OP_KECCAK256, rest))
-            case 0x05 =>
-              Right((OP_CHECKSIG, rest))
+              intSerde._deserialize(rest).flatMap {
+                case (index, rest1) =>
+                  OP_SWAP.from(index) match {
+                    case Some(swap) => Right((swap, rest1))
+                    case None       => Left(SerdeError.validation(s"Invalid SWAP index: $index"))
+                  }
+              }
+            case 0x05 => Right((OP_EQUALVERIFY, rest))
+            case 0x06 => Right((OP_KECCAK256, rest))
+            case 0x07 => Right((OP_CHECKSIG, rest))
           }
       }
     }
@@ -72,13 +86,56 @@ final case class OP_PUSH(bytes: ByteString) extends Instruction {
     } yield state.update(newStack)
   }
 }
-case object OP_DUP extends Instruction {
+
+sealed abstract case class OP_DUP(index: Int) extends Instruction {
   override def runWith(state: RunState): RunResult[RunState] = {
     val stack = state.stack
     for {
-      topElement <- stack.peek()
+      topElement <- stack.peek(index)
       newStack   <- stack.push(topElement)
     } yield state.update(newStack)
+  }
+}
+object OP_DUP {
+  @inline private def validate(index: Int): Boolean = index > 0
+
+  def from(index: Int): Option[OP_DUP] = {
+    if (validate(index)) Some(new OP_DUP(index) {}) else None
+  }
+
+  def unsafe(index: Int): OP_DUP = {
+    assume(validate(index))
+    new OP_DUP(index) {}
+  }
+}
+
+case object OP_POP extends Instruction {
+  override def runWith(state: RunState): RunResult[RunState] = {
+    val stack = state.stack
+    for {
+      bytes_newStack <- stack.pop()
+    } yield state.update(bytes_newStack._2)
+  }
+}
+
+sealed abstract case class OP_SWAP(index: Int) extends Instruction {
+  override def runWith(state: RunState): RunResult[RunState] = {
+    val stack = state.stack
+    for {
+      newStack <- stack.swap(index)
+    } yield state.update(newStack)
+  }
+}
+object OP_SWAP {
+  def validate(index: Int): Boolean = index > 1
+
+  def from(index: Int): Option[OP_SWAP] = {
+    if (validate(index)) Some(new OP_SWAP(index) {}) else None
+  }
+
+  def unsafe(index: Int): OP_SWAP = {
+    assume(validate(index))
+    new OP_SWAP(index) {}
   }
 }
 

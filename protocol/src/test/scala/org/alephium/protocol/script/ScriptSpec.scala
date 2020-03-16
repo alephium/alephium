@@ -17,7 +17,7 @@ class ScriptSpec extends AlephiumSpec {
       val signature = ED25519.sign(data, sk)
 
       val pubScript = PubScript(
-        AVector[Instruction](OP_DUP,
+        AVector[Instruction](OP_DUP.unsafe(1),
                              OP_KECCAK256,
                              OP_PUSH(pkHash.bytes),
                              OP_EQUALVERIFY,
@@ -33,7 +33,7 @@ class ScriptSpec extends AlephiumSpec {
       Script.run(data, pubScript, witness).isRight is true
       Script.run(data0, pubScript, witness).left.value is VerificationFailed
       Script.run(data, pubScript, witness0).left.value is InsufficientSignatures
-      Script.run(data, pubScript, witness1).left.value is StackUnderflow
+      Script.run(data, pubScript, witness1).left.value is IndexOverflow
       Script.run(data, pubScript, witness2).left.value is InvalidFinalState
     }
   }

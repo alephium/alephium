@@ -6,7 +6,7 @@ import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.{PubScript, Script, Witness}
 import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
@@ -171,10 +171,10 @@ object Validation {
     }
   }
 
-  private[validation] def checkBlockNonCoinbase(
-      index: ChainIndex,
-      tx: Transaction,
-      trie: MerklePatriciaTrie)(implicit config: GroupConfig): TxValidationResult = {
+  private[validation] def checkBlockNonCoinbase(index: ChainIndex,
+                                                tx: Transaction,
+                                                trie: MerklePatriciaTrie)(
+      implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
@@ -183,10 +183,10 @@ object Validation {
     } yield ()
   }
 
-  private[validation] def checkNonCoinbaseTx(
-      index: ChainIndex,
-      tx: Transaction,
-      trie: MerklePatriciaTrie)(implicit config: GroupConfig): TxValidationResult = {
+  private[validation] def checkNonCoinbaseTx(index: ChainIndex,
+                                             tx: Transaction,
+                                             trie: MerklePatriciaTrie)(
+      implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
@@ -250,8 +250,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction,
-                                        trie: MerklePatriciaTrie): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction, trie: MerklePatriciaTrie)(
+      implicit config: ScriptConfig): TxValidationResult = {
     val query = tx.raw.inputs.mapE { input =>
       trie.get[TxOutputPoint, TxOutput](input)
     }
@@ -262,8 +262,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction,
-                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction, preOutputs: AVector[TxOutput])(
+      implicit config: ScriptConfig): TxValidationResult = {
     for {
       _ <- checkBalance(tx, preOutputs)
       _ <- checkWitnesses(tx, preOutputs)
@@ -277,8 +277,8 @@ object Validation {
     if (outputSum <= inputSum) validTx else invalidTx(InvalidBalance)
   }
 
-  private[validation] def checkWitnesses(tx: Transaction,
-                                         preOutputs: AVector[TxOutput]): TxValidationResult = {
+  private[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput])(
+      implicit config: ScriptConfig): TxValidationResult = {
     assume(tx.raw.inputs.length == preOutputs.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val witness = tx.witnesses(idx)
@@ -287,9 +287,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkWitness(hash: Keccak256,
-                                       pubScript: PubScript,
-                                       witness: Witness): TxValidationResult = {
+  private[validation] def checkWitness(hash: Keccak256, pubScript: PubScript, witness: Witness)(
+      implicit config: ScriptConfig): TxValidationResult = {
     Script.run(hash.bytes, pubScript, witness) match {
       case Left(error) => invalidTx(InvalidWitness(error))
       case Right(_)    => validTx
