@@ -21,7 +21,7 @@ import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.rpc.{CirceUtils, CORSHandler, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
-import org.alephium.util.EventBus
+import org.alephium.util.{ActorRefT, EventBus}
 
 trait RPCServerAbstract extends StrictLogging {
   import RPCServerAbstract._
@@ -67,7 +67,7 @@ trait RPCServerAbstract extends StrictLogging {
   def routeHttp(miner: ActorRef): Route =
     CORSHandler(JsonRPCHandler.routeHttp(handlerRPC(miner)))
 
-  def routeWs(eventBus: ActorRef): Route = {
+  def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
     path("events") {
       CORSHandler(get {
         extractUpgradeToWebSocket { upgrade =>
@@ -80,7 +80,7 @@ trait RPCServerAbstract extends StrictLogging {
     }
   }
 
-  def wsFlow(eventBus: ActorRef,
+  def wsFlow(eventBus: ActorRefT[EventBus.Message],
              actor: ActorRef,
              source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
     Flow

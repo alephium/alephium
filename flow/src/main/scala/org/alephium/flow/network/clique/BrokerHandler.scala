@@ -21,7 +21,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.{SerdeError, SerdeResult}
-import org.alephium.util.{AVector, BaseActor, Forest}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest}
 
 object BrokerHandler {
   sealed trait Command
@@ -58,9 +58,9 @@ object BrokerHandler {
     def createInboundBrokerHandler(
         selfCliqueInfo: CliqueInfo,
         remote: InetSocketAddress,
-        connection: ActorRef,
+        connection: ActorRefT[Tcp.Command],
         blockHandlers: AllHandlers,
-        cliqueManager: ActorRef
+        cliqueManager: ActorRefT[CliqueManager.Command]
     )(implicit config: PlatformConfig): Props =
       Props(
         new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers, cliqueManager))
@@ -70,7 +70,7 @@ object BrokerHandler {
         remoteCliqueId: CliqueId,
         remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers,
-        cliqueManager: ActorRef
+        cliqueManager: ActorRefT[CliqueManager.Command]
     )(implicit config: PlatformConfig): Props =
       Props(
         new OutboundBrokerHandler(selfCliqueInfo,
@@ -82,7 +82,7 @@ object BrokerHandler {
 }
 
 trait BrokerHandler extends HandShake with Relay with Sync {
-  def cliqueManager: ActorRef
+  def cliqueManager: ActorRefT[CliqueManager.Command]
 
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
@@ -113,7 +113,7 @@ trait BrokerHandler extends HandShake with Relay with Sync {
 }
 
 trait ConnectionWriter extends BaseActor {
-  def connection: ActorRef
+  def connection: ActorRefT[Tcp.Command]
 
   private var isWaitingAck   = false
   private val messagesToSent = collection.mutable.Queue.empty[ByteString]
@@ -223,7 +223,7 @@ trait HandShake extends ConnectionReaderWriter {
 trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
   def config: PlatformConfig
 
-  def connection: ActorRef
+  def connection: ActorRefT[Tcp.Command]
 
   private var pingNonce: Int = 0
 
@@ -354,8 +354,8 @@ trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler 
 }
 
 trait Sync extends P2PStage {
-  def cliqueManager: ActorRef
-  def flowHandler: ActorRef = allHandlers.flowHandler
+  def cliqueManager: ActorRefT[CliqueManager.Command]
+  def flowHandler: ActorRef = allHandlers.flowHandler.ref
 
   private var selfSynced   = false
   private var remoteSynced = false
@@ -463,7 +463,7 @@ trait Relay extends P2PStage {
 }
 
 trait ConnectionUtil extends BaseActor {
-  def connection: ActorRef
+  def connection: ActorRefT[Tcp.Command]
 
   def remote: InetSocketAddress
 

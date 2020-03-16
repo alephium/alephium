@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.Utils
@@ -13,13 +13,13 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{AVector, Forest}
+import org.alephium.util.{ActorRefT, AVector, Forest}
 
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
-            cliqueManager: ActorRef,
-            flowHandler: ActorRef)(implicit config: PlatformConfig): Props =
+            cliqueManager: ActorRefT[CliqueManager.Command],
+            flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
@@ -29,7 +29,9 @@ object BlockChainHandler {
 
   sealed trait Command
   final case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
-  final case class AddPendingBlock(block: Block, broker: ActorRef, origin: DataOrigin)
+  final case class AddPendingBlock(block: Block,
+                                   broker: ActorRefT[ChainHandler.Event],
+                                   origin: DataOrigin)
       extends Command
 
   sealed trait Event                                    extends ChainHandler.Event
@@ -39,23 +41,27 @@ object BlockChainHandler {
   final case class FetchSince(tips: AVector[Keccak256]) extends Event
 }
 
-class BlockChainHandler(blockFlow: BlockFlow,
-                        chainIndex: ChainIndex,
-                        cliqueManager: ActorRef,
-                        flowHandler: ActorRef)(implicit val config: PlatformConfig)
-    extends ChainHandler[Block, BlockStatus](blockFlow, chainIndex, BlockValidation) {
+class BlockChainHandler(
+    blockFlow: BlockFlow,
+    chainIndex: ChainIndex,
+    cliqueManager: ActorRefT[CliqueManager.Command],
+    flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
+    extends ChainHandler[Block, BlockStatus, BlockChainHandler.Command](blockFlow,
+                                                                        chainIndex,
+                                                                        BlockValidation) {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
   override def receive: Receive = {
-    case AddBlocks(blocks, origin)              => handleDatas(blocks, sender(), origin)
+    case AddBlocks(blocks, origin) =>
+      handleDatas(blocks, ActorRefT[ChainHandler.Event](sender()), origin)
     case AddPendingBlock(block, broker, origin) => handlePending(block, broker, origin)
     case BlockAdded(block, broker, origin)      => handleDataAdded(block, broker, origin)
   }
 
   override def handleMissingParent(blocks: Forest[Keccak256, Block],
-                                   broker: ActorRef,
+                                   broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin): Unit = {
     if (origin.isSyncing) {
       log.warning(s"missing parent blocks in syncing, might be DoS attack")
@@ -77,15 +83,17 @@ class BlockChainHandler(blockFlow: BlockFlow,
     }
   }
 
-  override def addToFlowHandler(block: Block, broker: ActorRef, origin: DataOrigin): Unit = {
+  override def addToFlowHandler(block: Block,
+                                broker: ActorRefT[ChainHandler.Event],
+                                origin: DataOrigin): Unit = {
     flowHandler ! FlowHandler.AddBlock(block, broker, origin)
   }
 
   override def pendingToFlowHandler(block: Block,
                                     missings: mutable.HashSet[Keccak256],
-                                    broker: ActorRef,
+                                    broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin,
-                                    self: ActorRef): Unit = {
+                                    self: ActorRefT[BlockChainHandler.Command]): Unit = {
     flowHandler ! FlowHandler.PendingBlock(block, missings, origin, broker, self)
   }
 

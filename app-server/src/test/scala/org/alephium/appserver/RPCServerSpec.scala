@@ -1,6 +1,7 @@
 package org.alephium.appserver
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model._
@@ -24,7 +25,7 @@ import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BlockHeader, ModelGen}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AlephiumSpec, AVector, Duration, EventBus, TimeStamp}
+import org.alephium.util.{ActorRefT, AlephiumSpec, AVector, Duration, EventBus, TimeStamp}
 
 object RPCServerSpec {
   import RPCServerAbstract.FutureTry
@@ -114,10 +115,11 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   }
 
   trait RouteWS {
-    val client   = WSProbe()
-    val server   = new RPCServerDummy {}
-    val eventBus = system.actorOf(EventBus.props())
-    val route    = server.routeWs(eventBus)
+    val client = WSProbe()
+    val server = new RPCServerDummy {}
+    val eventBus =
+      ActorRefT.build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.nextInt}")
+    val route = server.routeWs(eventBus)
 
     def sendEventAndCheck: Assertion = {
       eventBus ! Dummy

@@ -1,57 +1,64 @@
 package org.alephium.flow.core
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorSystem
 
+import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.util.{ActorRefT, EventBus}
 
 final case class AllHandlers(
-    flowHandler: ActorRef,
-    txHandler: ActorRef,
-    blockHandlers: Map[ChainIndex, ActorRef],
-    headerHandlers: Map[ChainIndex, ActorRef])(implicit config: PlatformConfig) {
+    flowHandler: ActorRefT[FlowHandler.Command],
+    txHandler: ActorRefT[TxHandler.Command],
+    blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])(
+    implicit config: PlatformConfig) {
 
-  def getBlockHandler(chainIndex: ChainIndex): ActorRef = {
+  def getBlockHandler(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
     assert(chainIndex.relateTo(config.brokerInfo))
     blockHandlers(chainIndex)
   }
 
-  def getHeaderHandler(chainIndex: ChainIndex): ActorRef = {
+  def getHeaderHandler(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
     assert(!chainIndex.relateTo(config.brokerInfo))
     headerHandlers(chainIndex)
   }
 }
 
 object AllHandlers {
-  def build(system: ActorSystem, cliqueManager: ActorRef, blockFlow: BlockFlow, eventBus: ActorRef)(
-      implicit config: PlatformConfig): AllHandlers = {
+  def build(system: ActorSystem,
+            cliqueManager: ActorRefT[CliqueManager.Command],
+            blockFlow: BlockFlow,
+            eventBus: ActorRefT[EventBus.Message])(implicit config: PlatformConfig): AllHandlers = {
     val flowProps   = FlowHandler.props(blockFlow, eventBus)
-    val flowHandler = system.actorOf(flowProps, "FlowHandler")
+    val flowHandler = ActorRefT.build[FlowHandler.Command](system, flowProps, "FlowHandler")
     buildWithFlowHandler(system, cliqueManager, blockFlow, flowHandler)
   }
-  def buildWithFlowHandler(system: ActorSystem,
-                           cliqueManager: ActorRef,
-                           blockFlow: BlockFlow,
-                           flowHandler: ActorRef)(implicit config: PlatformConfig): AllHandlers = {
+  def buildWithFlowHandler(
+      system: ActorSystem,
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      blockFlow: BlockFlow,
+      flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow, cliqueManager)
-    val txHandler      = system.actorOf(txProps, "TxHandler")
+    val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
     AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
   }
 
-  private def buildBlockHandlers(
-      system: ActorSystem,
-      cliqueManager: ActorRef,
-      blockFlow: BlockFlow,
-      flowHandler: ActorRef)(implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
+  private def buildBlockHandlers(system: ActorSystem,
+                                 cliqueManager: ActorRefT[CliqueManager.Command],
+                                 blockFlow: BlockFlow,
+                                 flowHandler: ActorRefT[FlowHandler.Command])(
+      implicit config: PlatformConfig): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex.unsafe(from, to)
       if chainIndex.relateTo(config.brokerInfo)
     } yield {
-      val handler = system.actorOf(
+      val handler = ActorRefT.build[BlockChainHandler.Command](
+        system,
         BlockChainHandler.props(blockFlow, chainIndex, cliqueManager, flowHandler),
         s"BlockChainHandler-$from-$to")
       chainIndex -> handler
@@ -59,15 +66,18 @@ object AllHandlers {
     handlers.toMap
   }
 
-  private def buildHeaderHandlers(system: ActorSystem, blockFlow: BlockFlow, flowHandler: ActorRef)(
-      implicit config: PlatformConfig): Map[ChainIndex, ActorRef] = {
+  private def buildHeaderHandlers(system: ActorSystem,
+                                  blockFlow: BlockFlow,
+                                  flowHandler: ActorRefT[FlowHandler.Command])(
+      implicit config: PlatformConfig): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex.unsafe(from, to)
       if !chainIndex.relateTo(config.brokerInfo)
     } yield {
-      val headerHander = system.actorOf(
+      val headerHander = ActorRefT.build[HeaderChainHandler.Command](
+        system,
         HeaderChainHandler.props(blockFlow, chainIndex, flowHandler),
         s"HeaderChainHandler-$from-$to")
       chainIndex -> headerHander

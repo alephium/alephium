@@ -1,15 +1,15 @@
 package org.alephium.flow.network.bootstrap
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.serde._
-import org.alephium.util.BaseActor
+import org.alephium.util.{ActorRefT, BaseActor}
 
 object CliqueCoordinator {
-  def props(bootstrapper: ActorRef)(implicit config: PlatformConfig): Props =
+  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit config: PlatformConfig): Props =
     Props(new CliqueCoordinator(bootstrapper))
 
   sealed trait Event
@@ -20,7 +20,8 @@ object CliqueCoordinator {
   }
 }
 
-class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformConfig)
+class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
+    implicit val config: PlatformConfig)
     extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers
@@ -40,7 +41,7 @@ class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformCon
       if (isBrokerInfoFull) {
         log.debug(s"Broadcast clique info")
         bootstrapper ! Bootstrapper.ForwardConnection
-        broadcast(buildCliqueInfo)
+        broadcast(Bootstrapper.SendIntraCliqueInfo(buildCliqueInfo))
         context become awaitAck
       }
   }
@@ -63,7 +64,7 @@ class CliqueCoordinator(bootstrapper: ActorRef)(implicit val config: PlatformCon
       setClose(actor)
       if (isAllClosed) {
         log.debug("All the brokers are closed")
-        bootstrapper ! cliqueInfo
+        bootstrapper ! Bootstrapper.SendIntraCliqueInfo(cliqueInfo)
         context stop self
       }
   }

@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
 
+import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.serde._
 import org.alephium.util.BaseActor
@@ -52,7 +53,7 @@ class BrokerConnector(connection: ActorRef, cliqueCoordinator: ActorRef)(
                     bs => BrokerConnector.unwrap(PeerInfo._deserialize(bs)))
 
   def forwardCliqueInfo: Receive = {
-    case cliqueInfo: IntraCliqueInfo =>
+    case Bootstrapper.SendIntraCliqueInfo(cliqueInfo) =>
       connection ! envelop(cliqueInfo)
       context become await[Ack](ByteString.empty, context become forwardReady, deserializeTry(_))
   }

@@ -12,6 +12,7 @@ object TcpServer {
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef) extends Command
+  final case class WorkFor(another: ActorRef)    extends Command
 
   sealed trait Event
   case object Bound extends Event
@@ -41,7 +42,7 @@ class TcpServer(port: Int) extends BaseActor {
   def workFor(actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
       actor.forward(c)
-    case another: ActorRef =>
+    case TcpServer.WorkFor(another) =>
       context become workFor(another)
   }
 }

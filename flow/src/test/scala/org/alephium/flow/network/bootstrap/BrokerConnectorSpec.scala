@@ -7,6 +7,7 @@ import akka.testkit.TestProbe
 import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.ModelGen
 import org.alephium.serde.Serde
 
@@ -35,7 +36,7 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") with 
     cliqueCoordinator.expectMsgType[PeerInfo]
 
     val randomCliqueInfo = genIntraCliqueInfo
-    brokerConnector ! randomCliqueInfo
+    brokerConnector ! Bootstrapper.SendIntraCliqueInfo(randomCliqueInfo)
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
         BrokerConnector.unwrap(IntraCliqueInfo._deserialize(data)) is Right(

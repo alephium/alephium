@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
@@ -12,11 +12,12 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils}
+import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
-import org.alephium.util.AVector
+import org.alephium.util.{ActorRefT, AVector}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spec =>
 
@@ -38,9 +39,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val data    = Message.serialize(message)
 
     val connection     = TestProbe("connection")
+    val connectionT    = ActorRefT[Tcp.Command](connection.ref)
     val blockHandlers  = TestUtils.createBlockHandlersProbe
     val payloadHandler = TestProbe("payload-probe")
     val cliqueManager  = TestProbe("clique-manager")
+    val cliqueManagerT = ActorRefT[CliqueManager.Command](cliqueManager.ref)
   }
 
   it should "send hello to inbound connections" in new BaseFixture {
@@ -49,9 +52,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       override def createInboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
-          connection: ActorRef,
+          connection: ActorRefT[Tcp.Command],
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef
+          cliqueManager: ActorRefT[CliqueManager.Command]
       )(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
@@ -69,9 +72,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       system.actorOf(
         builder.createInboundBrokerHandler(selfCliqueInfo,
                                            remote,
-                                           connection.ref,
+                                           connectionT,
                                            blockHandlers,
-                                           cliqueManager.ref))
+                                           cliqueManagerT))
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
@@ -99,7 +102,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           remoteCliqueId: CliqueId,
           remoteBroker: BrokerInfo,
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef
+          cliqueManager: ActorRefT[CliqueManager.Command]
       )(implicit config: PlatformConfig): Props = {
         Props(
           new OutboundBrokerHandler(selfCliqueInfo,
@@ -120,7 +123,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
                                           remoteCliqueInfo.id,
                                           remoteBrokerInfo,
                                           blockHandlers,
-                                          cliqueManager.ref))
+                                          cliqueManagerT))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
@@ -146,9 +149,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       override def createInboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
-          connection: ActorRef,
+          connection: ActorRefT[Tcp.Command],
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
+          cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
                                        connection,
@@ -162,9 +165,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val tcpHandler = system.actorOf(
       builder.createInboundBrokerHandler(selfCliqueInfo,
                                          remote,
-                                         connection.ref,
+                                         connectionT,
                                          blockHandlers,
-                                         cliqueManager.ref))
+                                         cliqueManagerT))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -243,9 +246,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       override def createInboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
-          connection: ActorRef,
+          connection: ActorRefT[Tcp.Command],
           blockHandlers: AllHandlers,
-          cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
+          cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
         Props(new InboundBrokerHandler(selfCliqueInfo,
                                        remote,
                                        connection,
@@ -259,9 +262,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val tcpHandler = system.actorOf(
       builder.createInboundBrokerHandler(selfCliqueInfo,
                                          remote,
-                                         connection.ref,
+                                         connectionT,
                                          blockHandlers,
-                                         cliqueManager.ref))
+                                         cliqueManagerT))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -297,13 +300,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
 
   trait SyncFixture extends BaseFixture { Base =>
     val syncHandlerRef = TestActorRef(new BrokerHandler {
-      override def config: PlatformConfig     = Spec.config
-      override def remote: InetSocketAddress  = Base.remote
-      var remoteCliqueId: CliqueId            = _
-      var remoteBrokerInfo: BrokerInfo        = _
-      override def selfCliqueInfo: CliqueInfo = Base.selfCliqueInfo
-      override def connection: ActorRef       = Base.connection.ref
-      override def cliqueManager: ActorRef    = Base.cliqueManager.ref
+      override def config: PlatformConfig                          = Spec.config
+      override def remote: InetSocketAddress                       = Base.remote
+      var remoteCliqueId: CliqueId                                 = _
+      var remoteBrokerInfo: BrokerInfo                             = _
+      override def selfCliqueInfo: CliqueInfo                      = Base.selfCliqueInfo
+      override def connection: ActorRefT[Tcp.Command]              = Base.connectionT
+      override def cliqueManager: ActorRefT[CliqueManager.Command] = Base.cliqueManagerT
       override def allHandlers: AllHandlers =
         TestUtils.createBlockHandlersProbe(Spec.config, Spec.system)
 

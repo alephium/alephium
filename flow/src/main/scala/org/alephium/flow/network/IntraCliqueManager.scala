@@ -7,26 +7,26 @@ import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
-import org.alephium.util.BaseActor
+import org.alephium.util.{ActorRefT, BaseActor}
 
 object IntraCliqueManager {
-  def props(builder: BrokerHandler.Builder,
-            cliqueInfo: CliqueInfo,
-            allHandlers: AllHandlers,
-            cliqueManager: ActorRef)(implicit config: PlatformConfig): Props =
+  def props(
+      builder: BrokerHandler.Builder,
+      cliqueInfo: CliqueInfo,
+      allHandlers: AllHandlers,
+      cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
     Props(new IntraCliqueManager(builder, cliqueInfo, allHandlers, cliqueManager))
 
-  sealed trait Command
-  case object GetPeers extends Command
+  sealed trait Command    extends CliqueManager.Command
+  final case object Ready extends Command
 
-  sealed trait Event
-  case object Ready extends Event
 }
 
-class IntraCliqueManager(builder: BrokerHandler.Builder,
-                         cliqueInfo: CliqueInfo,
-                         allHandlers: AllHandlers,
-                         cliqueManager: ActorRef)(implicit config: PlatformConfig)
+class IntraCliqueManager(
+    builder: BrokerHandler.Builder,
+    cliqueInfo: CliqueInfo,
+    allHandlers: AllHandlers,
+    cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
     extends BaseActor {
 
   cliqueInfo.brokers.foreach { remoteBroker =>
@@ -37,7 +37,7 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
                                                       cliqueInfo.id,
                                                       remoteBroker,
                                                       allHandlers,
-                                                      self)
+                                                      ActorRefT[CliqueManager.Command](self))
       context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
     }
   }
@@ -55,7 +55,11 @@ class IntraCliqueManager(builder: BrokerHandler.Builder,
         log.debug(s"Inbound connection: $remote")
         val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
         val props =
-          builder.createInboundBrokerHandler(cliqueInfo, remote, sender(), allHandlers, self)
+          builder.createInboundBrokerHandler(cliqueInfo,
+                                             remote,
+                                             ActorRefT[Tcp.Command](sender()),
+                                             allHandlers,
+                                             ActorRefT[CliqueManager.Command](self))
         context.actorOf(props, name)
         ()
       }
