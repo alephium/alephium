@@ -5,12 +5,12 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.BlockHashChain.{ChainDiff, TreeNode}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
-  implicit def config: PlatformProfile
+  implicit def config: PlatformConfig
 
   protected def root: BlockHashChain.Root
 

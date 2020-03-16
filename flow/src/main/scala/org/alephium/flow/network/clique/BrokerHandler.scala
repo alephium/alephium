@@ -16,7 +16,7 @@ import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin._
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
@@ -61,7 +61,7 @@ object BrokerHandler {
         connection: ActorRef,
         blockHandlers: AllHandlers,
         cliqueManager: ActorRef
-    )(implicit config: PlatformProfile): Props =
+    )(implicit config: PlatformConfig): Props =
       Props(
         new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers, cliqueManager))
 
@@ -71,7 +71,7 @@ object BrokerHandler {
         remoteBroker: BrokerInfo,
         blockHandlers: AllHandlers,
         cliqueManager: ActorRef
-    )(implicit config: PlatformProfile): Props =
+    )(implicit config: PlatformConfig): Props =
       Props(
         new OutboundBrokerHandler(selfCliqueInfo,
                                   remoteCliqueId,
@@ -186,7 +186,7 @@ trait ConnectionReaderWriter extends ConnectionReader with ConnectionWriter {
 }
 
 trait HandShake extends ConnectionReaderWriter {
-  def config: PlatformProfile
+  def config: PlatformConfig
   def selfCliqueInfo: CliqueInfo
 
   def handshakeOut(): Unit = {
@@ -221,7 +221,7 @@ trait HandShake extends ConnectionReaderWriter {
 }
 
 trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
-  def config: PlatformProfile
+  def config: PlatformConfig
 
   def connection: ActorRef
 
@@ -263,7 +263,7 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
 }
 
 trait MessageHandler extends BaseActor {
-  implicit def config: PlatformProfile
+  implicit def config: PlatformConfig
   def allHandlers: AllHandlers
   def remote: InetSocketAddress
   def remoteCliqueId: CliqueId

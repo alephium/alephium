@@ -6,13 +6,13 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 
 import org.alephium.flow.io.IOUtils
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{Files => AFiles}
 
 object TestUtils {
 
-  def createBlockHandlersProbe(implicit config: PlatformProfile,
+  def createBlockHandlersProbe(implicit config: PlatformConfig,
                                system: ActorSystem): AllHandlers = {
     val flowHandler = TestProbe().ref
     val txHandler   = TestProbe().ref

@@ -14,16 +14,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.util._
 
-trait PlatformProfile
-    extends NewConfig.PlatformGroupConfig
-    with NewConfig.PlatformCliqueConfig
-    with NewConfig.PlatformConsensusConfig
-    with NewConfig.PlatformDiscoveryConfig
-    with NewConfig.PlatformBrokerConfig
-    with NewConfig.PlatformGenesisConfig
-    with NewConfig.PlatformMiningConfig
-    with NewConfig.PlatformNetworkConfig
-    with PlatformIO {
+trait PlatformConfig extends Configs with PlatformIO {
   def all: Config
   def aleph: Config
 
@@ -32,26 +23,26 @@ trait PlatformProfile
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-object PlatformProfile {
-  import NewConfig._
+object PlatformConfig {
+  import Configs._
 
-  def loadDefault(): PlatformProfile = {
-    PlatformProfile.load(Platform.getRootPath(Env.resolve()))
+  def loadDefault(): PlatformConfig = {
+    PlatformConfig.load(Platform.getRootPath(Env.resolve()))
   }
 
-  def load(rootPath: Path): PlatformProfile = {
+  def load(rootPath: Path): PlatformConfig = {
     load(rootPath, Settings.writeOptions, None)
   }
 
   def load(rootPath: Path,
            rdbWriteOptions: WriteOptions,
-           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
+           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
     build(parseConfig(rootPath), rootPath, rdbWriteOptions, genesisBalances)
 
   def build(config: Config,
             rootPath: Path,
             rdbWriteOptions: WriteOptions,
-            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile = {
+            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig = {
     val alephCfg = config.getConfig("alephium")
     create(
       rootPath,
@@ -79,8 +70,8 @@ object PlatformProfile {
              networkCfg: Config,
              discoveryCfg: Config,
              rdbWriteOptions: WriteOptions,
-             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformProfile =
-    new PlatformProfile {
+             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
+    new PlatformConfig {
       /* Common */
       val all      = allCfg
       val aleph    = alephCfg

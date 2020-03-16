@@ -17,7 +17,7 @@ import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.DiscoveryServer
-import org.alephium.flow.platform.{Mode, PlatformProfile}
+import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
@@ -30,7 +30,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
 
   implicit val system: ActorSystem                = mode.node.system
   implicit val executionContext: ExecutionContext = system.dispatcher
-  implicit val config: PlatformProfile            = mode.profile
+  implicit val config: PlatformConfig             = mode.config
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
 

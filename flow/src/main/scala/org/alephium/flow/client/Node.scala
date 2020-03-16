@@ -5,11 +5,11 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import org.alephium.flow.core._
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.EventBus
 
 final case class Node(builders: BrokerHandler.Builder, name: String)(
-    implicit config: PlatformProfile) {
+    implicit config: PlatformConfig) {
   val system: ActorSystem = ActorSystem(name, config.all)
 
   val blockFlow: BlockFlow = BlockFlow.createUnsafe()

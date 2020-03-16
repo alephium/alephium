@@ -6,7 +6,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.core.TestUtils
 import org.alephium.flow.io.RocksDBStorage
 import org.alephium.flow.io.RocksDBStorage.Settings
-import org.alephium.flow.platform.{NewConfig, Platform, PlatformProfile}
+import org.alephium.flow.platform.{Configs, Platform, PlatformConfig}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.{AlephiumActorSpec, AlephiumSpec, AVector, Env}
@@ -18,7 +18,7 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
   val rootPath = Platform.getRootPath(env)
 
   val newPath   = rootPath.resolveSibling(rootPath.getFileName + "-" + this.getClass.getSimpleName)
-  val newConfig = NewConfig.parseConfig(newPath)
+  val newConfig = Configs.parseConfig(newPath)
   val groups0   = newConfig.getInt("alephium.groups")
 
   val groupConfig = new GroupConfig { override def groups: Int = groups0 }
@@ -30,10 +30,10 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfter {
       (privateKey, publicKey, genesisBalance)
   }
   implicit val config =
-    PlatformProfile.build(newConfig,
-                          newPath,
-                          Settings.syncWrite,
-                          Some(genesisBalances.map(p => (p._2, p._3))))
+    PlatformConfig.build(newConfig,
+                         newPath,
+                         Settings.syncWrite,
+                         Some(genesisBalances.map(p => (p._2, p._3))))
 
   after {
     TestUtils.clear(config.disk.blockFolder)

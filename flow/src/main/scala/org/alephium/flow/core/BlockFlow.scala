@@ -3,11 +3,11 @@ package org.alephium.flow.core
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
-class BlockFlow()(implicit val config: PlatformProfile)
+class BlockFlow()(implicit val config: PlatformConfig)
     extends MultiChain
     with BlockFlowState
     with FlowUtils {
@@ -219,7 +219,7 @@ class BlockFlow()(implicit val config: PlatformProfile)
 }
 
 object BlockFlow {
-  def createUnsafe()(implicit config: PlatformProfile): BlockFlow = new BlockFlow()
+  def createUnsafe()(implicit config: PlatformConfig): BlockFlow = new BlockFlow()
 
   final case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

@@ -10,7 +10,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.validation._
 import org.alephium.flow.io.IOError
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util.{AVector, BaseActor, Forest, TimeStamp}
 
@@ -21,7 +21,7 @@ object ChainHandler {
 abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
-    validator: Validation[T, S])(implicit config: PlatformProfile)
+    validator: Validation[T, S])(implicit config: PlatformConfig)
     extends ChainHandlerState[T]
     with BaseActor {
   import ChainHandler.Event

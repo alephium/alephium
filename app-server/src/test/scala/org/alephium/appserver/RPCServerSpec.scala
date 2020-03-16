@@ -20,7 +20,7 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowHandler.BlockNotify
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BlockHeader, ModelGen}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
@@ -37,7 +37,7 @@ object RPCServerSpec {
 
   case object Dummy extends EventBus.Event
 
-  class RPCServerDummy(implicit val config: PlatformProfile) extends RPCServerAbstract {
+  class RPCServerDummy(implicit val config: PlatformConfig) extends RPCServerAbstract {
     implicit val system: ActorSystem                = ActorSystem()
     implicit val executionContext: ExecutionContext = system.dispatcher
     implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
@@ -77,7 +77,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
   behavior of "RPCServer"
 
-  implicit val config: PlatformProfile = PlatformProfile.loadDefault()
+  implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
   val rpcSuccess    = Response.Success(Json.fromInt(42), 1)
   val rpcSuccessRaw = """{"jsonrpc":"2.0","result":42,"id":1}"""
@@ -206,7 +206,7 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     val blockHeader =
       ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
 
-    class BlockFlowDummy(probe: ActorRef)(implicit config: PlatformProfile) extends BlockFlow {
+    class BlockFlowDummy(probe: ActorRef)(implicit config: PlatformConfig) extends BlockFlow {
       override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
         probe ! predicate(blockHeader)
         Seq.empty

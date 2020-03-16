@@ -11,17 +11,18 @@ import org.alephium.protocol.config.{DiscoveryConfig => DC, _}
 import org.alephium.protocol.model._
 import org.alephium.util._
 
-trait NewConfig
-    extends NewConfig.PlatformGroupConfig
-    with NewConfig.PlatformCliqueConfig
-    with NewConfig.PlatformConsensusConfig
-    with NewConfig.PlatformDiscoveryConfig
-    with NewConfig.PlatformBrokerConfig
-    with NewConfig.PlatformMiningConfig
-    with NewConfig.PlatformNetworkConfig
+trait Configs
+    extends Configs.PlatformGroupConfig
+    with Configs.PlatformCliqueConfig
+    with Configs.PlatformConsensusConfig
+    with Configs.PlatformDiscoveryConfig
+    with Configs.PlatformBrokerConfig
+    with Configs.PlatformGenesisConfig
+    with Configs.PlatformMiningConfig
+    with Configs.PlatformNetworkConfig
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-object NewConfig extends StrictLogging {
+object Configs extends StrictLogging {
   trait PlatformCommonConfig { def rootPath: Path }
   trait PlatformGroupConfig  extends GroupConfig
   trait PlatformCliqueConfig extends CliqueConfig

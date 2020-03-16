@@ -12,7 +12,7 @@ import org.alephium.flow.core.{BlockChainHandler, FlowHandler}
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.platform.PlatformProfile
+import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{Block, ChainIndex, Transaction}
 import org.alephium.util.{AVector, BaseActor, TimeStamp}
 
@@ -24,7 +24,7 @@ object Miner {
   final case class MinedBlockAdded(index: ChainIndex) extends Command
   final case class Nonce(from: BigInt, to: BigInt)    extends Command
 
-  def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformProfile): Block = {
+  def mineGenesis(chainIndex: ChainIndex)(implicit config: PlatformConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.genesis(AVector.empty, config.maxMiningTarget, nonce)
@@ -36,13 +36,13 @@ object Miner {
 
   trait Builder {
     def createMiner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-        implicit config: PlatformProfile): Props =
+        implicit config: PlatformConfig): Props =
       Props(new Miner(address, node, chainIndex))
   }
 }
 
 class Miner(address: ED25519PublicKey, node: Node, chainIndex: ChainIndex)(
-    implicit config: PlatformProfile)
+    implicit config: PlatformConfig)
     extends BaseActor {
   import node.allHandlers
   var totalMiningCount: Int     = 0 // This counts how many mining tasks got run so far
