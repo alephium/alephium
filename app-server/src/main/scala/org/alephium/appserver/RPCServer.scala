@@ -2,9 +2,8 @@ package org.alephium.appserver
 
 import scala.concurrent._
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.pattern.ask
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -23,7 +22,7 @@ import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.Hex
+import org.alephium.util.{ActorRefT, Hex}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract {
   import RPCServer._
@@ -173,7 +172,9 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def transfer(blockFlow: BlockFlow, txHandler: ActorRef, req: Request): Try[TransferResult] = {
+  def transfer(blockFlow: BlockFlow,
+               txHandler: ActorRefT[TxHandler.Command],
+               req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
         val resultEither = for {

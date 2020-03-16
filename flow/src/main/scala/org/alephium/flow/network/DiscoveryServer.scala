@@ -9,7 +9,7 @@ import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.{AVector, BaseActor, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
   def props(bootstrap: AVector[InetSocketAddress])(implicit config: DiscoveryConfig): Props =
@@ -31,10 +31,11 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetSelfClique                    extends Command
-  case object GetNeighborCliques               extends Command
-  final case class Disable(cliqueId: CliqueId) extends Command
-  case object Scan                             extends Command
+  case object GetSelfClique                               extends Command
+  case object GetNeighborCliques                          extends Command
+  final case class Disable(cliqueId: CliqueId)            extends Command
+  case object Scan                                        extends Command
+  final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
 
   sealed trait Event
   final case class NeighborCliques(peers: AVector[CliqueInfo]) extends Event
@@ -66,7 +67,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   var selfCliqueInfo: CliqueInfo = _
 
   def awaitCliqueInfo: Receive = {
-    case cliqueInfo: CliqueInfo =>
+    case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
       IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.publicAddress.getPort))
@@ -76,7 +77,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
   def binding: Receive = {
     case Udp.Bound(address) =>
       log.debug(s"UDP server bound to $address")
-      setSocket(sender())
+      setSocket(ActorRefT[Udp.Command](sender()))
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
       scheduleOnce(self, Scan, config.scanFastFrequency)

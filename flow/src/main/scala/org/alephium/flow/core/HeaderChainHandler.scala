@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.FlowHandler.HeaderAdded
@@ -10,11 +10,12 @@ import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.Forest
+import org.alephium.util.{ActorRefT, Forest}
 
 object HeaderChainHandler {
-  def props(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
-      implicit config: PlatformConfig): Props =
+  def props(blockFlow: BlockFlow,
+            chainIndex: ChainIndex,
+            flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
@@ -25,7 +26,9 @@ object HeaderChainHandler {
   sealed trait Command
   final case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin)
       extends Command
-  final case class AddPendingHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+  final case class AddPendingHeader(header: BlockHeader,
+                                    broker: ActorRefT[ChainHandler.Event],
+                                    origin: DataOrigin)
       extends Command
 
   sealed trait Event                                    extends ChainHandler.Event
@@ -34,20 +37,25 @@ object HeaderChainHandler {
   case object InvalidHeaders                            extends Event
 }
 
-class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandler: ActorRef)(
-    implicit val config: PlatformConfig)
-    extends ChainHandler[BlockHeader, HeaderStatus](blockFlow, chainIndex, HeaderValidation) {
+class HeaderChainHandler(
+    blockFlow: BlockFlow,
+    chainIndex: ChainIndex,
+    flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
+    extends ChainHandler[BlockHeader, HeaderStatus, HeaderChainHandler.Command](blockFlow,
+                                                                                chainIndex,
+                                                                                HeaderValidation) {
   import HeaderChainHandler._
 
   override def receive: Receive = {
-    case AddHeaders(headers, origin)              => handleDatas(headers, sender(), origin)
+    case AddHeaders(headers, origin) =>
+      handleDatas(headers, ActorRefT[ChainHandler.Event](sender()), origin)
     case AddPendingHeader(header, broker, origin) => handlePending(header, broker, origin)
     case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
-                                   broker: ActorRef,
+                                   broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin): Unit = {
     assert(origin.isInstanceOf[DataOrigin.IntraClique])
     log.warning(s"missing parent headers, might be bug or compromised node in the clique")
@@ -56,15 +64,17 @@ class HeaderChainHandler(blockFlow: BlockFlow, chainIndex: ChainIndex, flowHandl
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
-  override def addToFlowHandler(header: BlockHeader, broker: ActorRef, origin: DataOrigin): Unit = {
+  override def addToFlowHandler(header: BlockHeader,
+                                broker: ActorRefT[ChainHandler.Event],
+                                origin: DataOrigin): Unit = {
     flowHandler ! FlowHandler.AddHeader(header, broker, origin)
   }
 
   override def pendingToFlowHandler(header: BlockHeader,
                                     missings: mutable.HashSet[Keccak256],
-                                    broker: ActorRef,
+                                    broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin,
-                                    self: ActorRef): Unit = {
+                                    self: ActorRefT[Command]): Unit = {
     flowHandler ! FlowHandler.PendingHeader(header, missings, origin, broker, self)
   }
 

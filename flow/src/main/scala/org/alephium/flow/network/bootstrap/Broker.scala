@@ -6,15 +6,16 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
+import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.BrokerInfo
-import org.alephium.util.{BaseActor, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
 
 object Broker {
   def props(masterAddress: InetSocketAddress,
             brokerInfo: BrokerInfo,
             retryTimeout: Duration,
-            bootstrapper: ActorRef)(
+            bootstrapper: ActorRefT[Bootstrapper.Command])(
       implicit config: PlatformConfig
   ): Props =
     Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
@@ -26,7 +27,7 @@ object Broker {
 class Broker(masterAddress: InetSocketAddress,
              brokerInfo: BrokerInfo,
              retryTimeout: Duration,
-             bootstrapper: ActorRef)(implicit val config: PlatformConfig)
+             bootstrapper: ActorRefT[Bootstrapper.Command])(implicit val config: PlatformConfig)
     extends BaseActor
     with SerdeUtils {
   def until: TimeStamp = TimeStamp.now() + retryTimeout
@@ -94,7 +95,7 @@ class Broker(masterAddress: InetSocketAddress,
   def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = {
     case Tcp.ConfirmedClosed =>
       log.debug("Close connection to master")
-      bootstrapper ! cliqueInfo
+      bootstrapper ! Bootstrapper.SendIntraCliqueInfo(cliqueInfo)
       context.stop(self)
   }
 }

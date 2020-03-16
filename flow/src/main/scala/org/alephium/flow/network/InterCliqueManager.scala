@@ -7,14 +7,17 @@ import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.util.{BaseActor, Duration}
+import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
-  def props(selfCliqueInfo: CliqueInfo, allHandlers: AllHandlers, discoveryServer: ActorRef)(
-      implicit config: PlatformConfig): Props =
+  def props(
+      selfCliqueInfo: CliqueInfo,
+      allHandlers: AllHandlers,
+      discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 
-  sealed trait Command
+  sealed trait Command extends CliqueManager.Command
+
   final case class Syncing(cliqueId: CliqueId) extends Command
   final case class Synced(cliqueId: CliqueId)  extends Command
 
@@ -25,9 +28,10 @@ object InterCliqueManager {
   }
 }
 
-class InterCliqueManager(selfCliqueInfo: CliqueInfo,
-                         allHandlers: AllHandlers,
-                         discoveryServer: ActorRef)(implicit config: PlatformConfig)
+class InterCliqueManager(
+    selfCliqueInfo: CliqueInfo,
+    allHandlers: AllHandlers,
+    discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig)
     extends BaseActor
     with InterCliqueManagerState {
   discoveryServer ! DiscoveryServer.GetNeighborCliques
@@ -42,7 +46,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       } else {
         // TODO: refine the condition, check the number of brokers for example
         if (config.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer,
+          scheduleOnce(discoveryServer.ref,
                        DiscoveryServer.GetNeighborCliques,
                        Duration.ofSecondsUnsafe(2))
         }
@@ -53,7 +57,11 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case c: Tcp.Connected =>
       val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
       val props =
-        InboundBrokerHandler.props(selfCliqueInfo, c.remoteAddress, sender(), allHandlers, self)
+        InboundBrokerHandler.props(selfCliqueInfo,
+                                   c.remoteAddress,
+                                   ActorRefT[Tcp.Command](sender()),
+                                   allHandlers,
+                                   ActorRefT[CliqueManager.Command](self))
       context.actorOf(props, name)
       ()
     case CliqueManager.Connected(cliqueId, brokerInfo) =>
@@ -101,7 +109,11 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         val name =
           BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
         val props =
-          OutboundBrokerHandler.props(selfCliqueInfo, remoteCliqueId, brokerInfo, allHandlers, self)
+          OutboundBrokerHandler.props(selfCliqueInfo,
+                                      remoteCliqueId,
+                                      brokerInfo,
+                                      allHandlers,
+                                      ActorRefT[CliqueManager.Command](self))
         context.actorOf(props, name)
       }
     }

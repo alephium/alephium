@@ -2,16 +2,15 @@ package org.alephium.flow.client
 
 import scala.util.Random
 
-import akka.actor.ActorRef
 import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, BlockFlow, TestUtils}
+import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, TestUtils}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.AVector
+import org.alephium.util.{ActorRefT, AVector}
 
 class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   val blockFlow: BlockFlow = BlockFlow.createUnsafe()
@@ -30,7 +29,7 @@ class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec 
     override def startTask(fromShift: Int,
                            to: Int,
                            template: BlockTemplate,
-                           blockHandler: ActorRef): Unit = {
+                           blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
       probes(fromShift)(to).ref ! template
     }
   }

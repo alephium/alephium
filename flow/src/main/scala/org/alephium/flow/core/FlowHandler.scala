@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
@@ -13,19 +13,23 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
-  def props(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformConfig): Props =
+  def props(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
+      implicit config: PlatformConfig): Props =
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
-  final case class AddHeader(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+  final case class AddHeader(header: BlockHeader,
+                             broker: ActorRefT[ChainHandler.Event],
+                             origin: DataOrigin)
       extends Command
-  final case class AddBlock(block: Block, broker: ActorRef, origin: DataOrigin) extends Command
-  final case class GetBlocks(locators: AVector[Keccak256])                      extends Command
-  final case class GetHeaders(locators: AVector[Keccak256])                     extends Command
-  final case class GetTips(broker: BrokerInfo)                                  extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)                     extends Command
-  final case class Register(miner: ActorRef)                                    extends Command
-  case object UnRegister                                                        extends Command
+  final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
+      extends Command
+  final case class GetBlocks(locators: AVector[Keccak256])   extends Command
+  final case class GetHeaders(locators: AVector[Keccak256])  extends Command
+  final case class GetTips(broker: BrokerInfo)               extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
+  final case class Register(miner: ActorRefT[Miner.Command]) extends Command
+  case object UnRegister                                     extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Keccak256]
@@ -33,15 +37,15 @@ object FlowHandler {
   final case class PendingBlock(block: Block,
                                 missingDeps: mutable.HashSet[Keccak256],
                                 origin: DataOrigin,
-                                broker: ActorRef,
-                                chainHandler: ActorRef)
+                                broker: ActorRefT[ChainHandler.Event],
+                                chainHandler: ActorRefT[BlockChainHandler.Command])
       extends PendingData
       with Command
   final case class PendingHeader(header: BlockHeader,
                                  missingDeps: mutable.HashSet[Keccak256],
                                  origin: DataOrigin,
-                                 broker: ActorRef,
-                                 chainHandler: ActorRef)
+                                 broker: ActorRefT[ChainHandler.Event],
+                                 chainHandler: ActorRefT[HeaderChainHandler.Command])
       extends PendingData
       with Command
 
@@ -51,17 +55,23 @@ object FlowHandler {
                                      target: BigInt,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class CurrentTips(tips: AVector[Keccak256])                          extends Event
-  final case class BlocksLocated(blocks: AVector[Block])                          extends Event
-  final case class BlockAdded(block: Block, broker: ActorRef, origin: DataOrigin) extends Event
-  final case class HeaderAdded(header: BlockHeader, broker: ActorRef, origin: DataOrigin)
+  final case class CurrentTips(tips: AVector[Keccak256]) extends Event
+  final case class BlocksLocated(blocks: AVector[Block]) extends Event
+  final case class BlockAdded(block: Block,
+                              broker: ActorRefT[ChainHandler.Event],
+                              origin: DataOrigin)
+      extends Event
+  final case class HeaderAdded(header: BlockHeader,
+                               broker: ActorRefT[ChainHandler.Event],
+                               origin: DataOrigin)
       extends Event
   final case class BlockNotify(header: BlockHeader, height: Int) extends EventBus.Event
 }
 
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: PlatformConfig)
+class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
+    implicit config: PlatformConfig)
     extends BaseActor
     with FlowHandlerState {
   import FlowHandler._
@@ -71,7 +81,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: Pla
   override def receive: Receive = handleWith(None)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def handleWith(minerOpt: Option[ActorRef]): Receive = {
+  def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive = {
     case GetHeaders(locators) =>
       blockFlow.getHeaders(locators) match {
         case Left(error) =>
@@ -108,9 +118,9 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: Pla
     }
   }
 
-  def handleHeader(minerOpt: Option[ActorRef],
+  def handleHeader(minerOpt: Option[ActorRefT[Miner.Command]],
                    header: BlockHeader,
-                   broker: ActorRef,
+                   broker: ActorRefT[ChainHandler.Event],
                    origin: DataOrigin): Unit = {
     if (!blockFlow.contains(header)) {
       blockFlow.add(header) match {
@@ -126,9 +136,9 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRef)(implicit config: Pla
     }
   }
 
-  def handleBlock(minerOpt: Option[ActorRef],
+  def handleBlock(minerOpt: Option[ActorRefT[Miner.Command]],
                   block: Block,
-                  broker: ActorRef,
+                  broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
     if (!blockFlow.contains(block)) {
       blockFlow.add(block) match {

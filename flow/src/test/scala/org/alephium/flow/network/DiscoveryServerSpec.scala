@@ -57,8 +57,8 @@ class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
     val config1     = createConfig(groups, port1, 1)
     val server1     = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
 
-    server0 ! cliqueInfo0
-    server1 ! cliqueInfo1
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
 
     Thread.sleep(2000)
 

@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
@@ -14,7 +14,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object FairMiner {
   def props(node: Node)(implicit config: PlatformConfig): Props =
@@ -75,7 +75,7 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
   def awaitStart: Receive = {
     case Miner.Start =>
       log.info("Start mining")
-      handlers.flowHandler ! FlowHandler.Register(self)
+      handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
       updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
@@ -125,7 +125,10 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
     BlockTemplate(flowTemplate.deps, flowTemplate.target, flowTemplate.transactions :+ coinbase(to))
   }
 
-  def startTask(fromShift: Int, to: Int, template: BlockTemplate, blockHandler: ActorRef): Unit = {
+  def startTask(fromShift: Int,
+                to: Int,
+                template: BlockTemplate,
+                blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
     val task = Future {
       val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
       FairMiner.mine(index, template) match {

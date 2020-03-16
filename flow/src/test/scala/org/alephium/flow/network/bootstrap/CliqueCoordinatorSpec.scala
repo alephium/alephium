@@ -4,12 +4,13 @@ import akka.testkit.{SocketUtil, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
+import org.alephium.util.ActorRefT
 
 class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec") {
 
   it should "await all the brokers" in {
     val bootstrapper = TestProbe()
-    val coordinator  = system.actorOf(CliqueCoordinator.props(bootstrapper.ref))
+    val coordinator  = system.actorOf(CliqueCoordinator.props(ActorRefT(bootstrapper.ref)))
 
     val probs = (0 until config.brokerNum)
       .filter(_ != config.brokerInfo.id)
@@ -27,7 +28,7 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec
       }
       .toMap
 
-    probs.values.foreach(_.expectMsgType[IntraCliqueInfo])
+    probs.values.foreach(_.expectMsgType[Bootstrapper.SendIntraCliqueInfo])
 
     bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
 
@@ -40,7 +41,7 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec
     watch(coordinator)
     probs.values.foreach(p => system.stop(p.ref))
 
-    bootstrapper.expectMsgType[IntraCliqueInfo]
+    bootstrapper.expectMsgType[Bootstrapper.SendIntraCliqueInfo]
 
     expectTerminated(coordinator)
   }
