@@ -10,41 +10,40 @@ import org.alephium.util.AVector
 
 object RunState {
   def empty(context: RunContext, signatures: AVector[ED25519Signature])(
-      implicit config: ScriptConfig): RunState =
-    RunState(context, 0, Stack.empty, signatures)
-
-  @tailrec
-  def run(state: RunState): RunResult[RunState] = {
-    if (state.isTerminated) Right(state)
-    else {
-      state.currentInstruction.runWith(state) match {
-        case Left(error)     => Left(error)
-        case Right(newState) => run(newState)
-      }
-    }
+      implicit config: ScriptConfig): RunState = {
+    val signatureStack = Stack.popOnly(signatures)
+    RunState(context, 0, Stack.empty, signatureStack)
   }
 }
 
 final case class RunState(context: RunContext,
-                          instructionCount: Int,
+                          var instructionCount: Int,
                           stack: Stack[ByteString],
-                          signatures: AVector[ED25519Signature]) {
+                          signatures: Stack[ED25519Signature]) {
   def currentInstruction: Instruction = context.instructions(instructionCount)
 
-  def run(): RunResult[RunState] = RunState.run(this)
+  @tailrec
+  def run(): RunResult[Unit] = {
+    if (isTerminated) Right(())
+    else {
+      step() match {
+        case Left(error) => Left(error)
+        case Right(_)    => run()
+      }
+    }
+  }
+
+  def step(): RunResult[Unit] = {
+    currentInstruction.runWith(this).map { _ =>
+      instructionCount += 1
+    }
+  }
 
   def isTerminated: Boolean = instructionCount == context.instructions.length
 
   def isValidFinalState: Boolean = stack.isEmpty && signatures.isEmpty
 
-  def load(newContext: RunContext): RunState =
+  def reload(newContext: RunContext): RunState = {
     this.copy(context = newContext, instructionCount = 0)
-
-  def update(newStack: Stack[ByteString]): RunState =
-    this.copy(stack = newStack, instructionCount = instructionCount + 1)
-
-  def update(newState: Stack[ByteString], restSignatures: AVector[ED25519Signature]): RunState =
-    this.copy(stack            = newState,
-              instructionCount = instructionCount + 1,
-              signatures       = restSignatures)
+  }
 }
