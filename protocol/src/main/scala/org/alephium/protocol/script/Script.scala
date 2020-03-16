@@ -10,12 +10,12 @@ object Script {
     val contextPri = RunContext(data, witness.privateScript)
     val contextPub = RunContext(data, pubScript.instructions)
 
-    val initialState = RunState.empty(contextPri, witness.signatures)
+    val statePri = RunState.empty(contextPri, witness.signatures)
     for {
-      statePri <- initialState.run()
-      newInitialState = statePri.load(contextPub)
-      statePub <- newInitialState.run()
-      _        <- if (statePub.isValidFinalState) Right(()) else Left(InvalidFinalState)
+      _ <- statePri.run()
+      statePub = statePri.reload(contextPub)
+      _ <- statePub.run()
+      _ <- if (statePub.isValidFinalState) Right(()) else Left(InvalidFinalState)
     } yield ()
   }
 }

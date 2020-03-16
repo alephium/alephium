@@ -13,22 +13,19 @@ class StackSpec extends AlephiumSpec {
     stack.isEmpty is true
     stack.pop().isLeft is true
 
-    val stack1 = stack.push(1).right.value
-    stack1.size is 1
-    val stack2 = stack1.push(2).right.value
-    stack1.size is 1
-    stack2.size is 2
-    stack2.push(3).isLeft is true
-    stack2.size is 2
+    stack.push(1).isRight is true
+    stack.size is 1
+    stack.push(2).isRight is true
+    stack.size is 2
+    stack.push(3).isLeft is true
+    stack.size is 2
 
-    val (n3, stack3) = stack2.pop().right.value
-    n3 is 2
-    stack2.size is 2
-    stack3.size is 1
-    val (n4, stack4) = stack3.pop().right.value
-    n4 is 1
-    stack3.size is 1
-    stack4.size is 0
-    stack4.isEmpty
+    val n1 = stack.pop().right.value
+    n1 is 2
+    stack.size is 1
+    val n2 = stack.pop().right.value
+    n2 is 1
+    stack.size is 0
+    stack.isEmpty
   }
 }

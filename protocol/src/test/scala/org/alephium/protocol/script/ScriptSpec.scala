@@ -32,7 +32,7 @@ class ScriptSpec extends AlephiumSpec {
       implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 100 }
       Script.run(data, pubScript, witness).isRight is true
       Script.run(data0, pubScript, witness).left.value is VerificationFailed
-      Script.run(data, pubScript, witness0).left.value is InsufficientSignatures
+      Script.run(data, pubScript, witness0).left.value is StackUnderflow
       Script.run(data, pubScript, witness1).left.value is IndexOverflow
       Script.run(data, pubScript, witness2).left.value is InvalidFinalState
     }
