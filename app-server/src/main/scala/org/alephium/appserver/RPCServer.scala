@@ -57,6 +57,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))
 
+  def doGetGroup(req: Request): FutureTry[Group] =
+    Future.successful(getGroup(mode.node.blockFlow, req))
+
   def doTransfer(req: Request): FutureTry[TransferResult] = {
     val txHandler = mode.node.allHandlers.txHandler
     Future.successful(transfer(mode.node.blockFlow, txHandler, req))
@@ -134,6 +137,17 @@ object RPCServer extends StrictLogging {
       }
     }
   }
+
+  def getGroup(blockFlow: BlockFlow, req: Request): Try[Group] =
+    withReqF[GetGroup, Group](req) { query =>
+      for {
+        address <- decodeAddress(query.address)
+      } yield {
+        val pubScript  = PubScript.p2pkh(address)
+        val groupIndex = GroupIndex.from(pubScript)(blockFlow.config)
+        Group(groupIndex.value)
+      }
+    }
 
   def decodeAddress(raw: String): Try[ED25519PublicKey] = {
     val addressOpt = for {

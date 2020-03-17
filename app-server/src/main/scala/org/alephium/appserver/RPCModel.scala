@@ -116,9 +116,19 @@ object RPCModel {
     val pkh: String = "pkh"
   }
 
+  final case class GetGroup(address: String) extends RPCModel
+  object GetGroup {
+    implicit val codec: Codec[GetGroup] = deriveCodec[GetGroup]
+  }
+
   final case class Balance(balance: BigInt, utxoNum: Int) extends RPCModel
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
+  }
+
+  final case class Group(group: Int) extends RPCModel
+  object Group {
+    implicit val codec: Codec[Group] = deriveCodec[Group]
   }
 
   final case class Transfer(fromAddress: String,
