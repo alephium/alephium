@@ -16,6 +16,6 @@ object Witness {
             publicKey: ED25519PublicKey,
             privateKey: ED25519PrivateKey): Witness = {
     val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
-    Witness(AVector[Instruction](OP_PUSH(publicKey.bytes)), AVector(signature))
+    Witness(AVector[Instruction](OP_PUSH.unsafe(publicKey.bytes)), AVector(signature))
   }
 }

@@ -50,6 +50,14 @@ class Stack[T] private (underlying: Array[T], var currentIndex: Int) {
     }
   }
 
+  def remove(total: Int): RunResult[Unit] = {
+    if (size < total) Left(IndexOverflow)
+    else {
+      currentIndex -= total
+      Right(())
+    }
+  }
+
   // Note: index starts from 1
   def peek(index: Int): RunResult[T] = {
     val elemIndex = currentIndex - index
