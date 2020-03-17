@@ -58,7 +58,7 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
 
   def awaitInfo: Receive = {
     case intraCliqueInfo: IntraCliqueInfo =>
-      val cliqueInfo = intraCliqueInfo.simple
+      val cliqueInfo = intraCliqueInfo.cliqueInfo
       cliqueManager ! CliqueManager.Start(cliqueInfo)
       discoveryServer ! cliqueInfo
 

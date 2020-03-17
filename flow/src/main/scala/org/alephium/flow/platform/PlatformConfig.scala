@@ -118,8 +118,8 @@ object PlatformConfig {
       val numOfSyncBlocksLimit: Int        = networkCfg.getInt("numOfSyncBlocksLimit")
       val isCoordinator: Boolean           = publicAddress == masterAddress
 
-      val rpcPort: Option[Int] = validatePort(networkCfg.getInt("rpcPort"))
-      val wsPort: Option[Int]  = validatePort(networkCfg.getInt("wsPort"))
+      val rpcPort: Option[Int] = extractPort(networkCfg.getInt("rpcPort"))
+      val wsPort: Option[Int]  = extractPort(networkCfg.getInt("wsPort"))
       /* Network */
 
       /* Broker */

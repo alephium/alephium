@@ -61,8 +61,25 @@ object Configs extends StrictLogging {
     new InetSocketAddress(left, right.toInt)
   }
 
-  def validatePort(port: Int): Option[Int] = {
-    if (port > 0x0400 && port <= 0xFFFF) Some(port) else None
+  private def check(port: Int): Boolean = {
+    port > 0x0400 && port <= 0xFFFF
+  }
+
+  def extractPort(port: Int): Option[Int] = {
+    if (port == 0) None
+    else if (check(port)) Some(port)
+    else throw new RuntimeException(s"Invalid port: $port")
+  }
+
+  def validatePort(port: Int): Either[String, Unit] = {
+    if (check(port)) Right(()) else Left(s"Invalid port: $port")
+  }
+
+  def validatePort(portOpt: Option[Int]): Either[String, Unit] = {
+    portOpt match {
+      case Some(port) => validatePort(port)
+      case None       => Right(())
+    }
   }
 
   def getDuration(config: Config, path: String): Duration = {
