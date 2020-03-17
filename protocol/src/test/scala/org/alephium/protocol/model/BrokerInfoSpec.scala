@@ -41,13 +41,13 @@ class BrokerInfoSpec extends AlephiumSpec {
         override def groups: Int            = self.groups
       }
       0 until cliqueConfig.brokerNum foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker) is true
+        BrokerInfo.validate(id, _groupNumPerBroker).isRight is true
       }
       cliqueConfig.brokerNum until (2 * cliqueConfig.brokerNum) foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig) is false
+        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig).isRight is false
       }
       -cliqueConfig.brokerNum until 0 foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig) is false
+        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig).isRight is false
       }
     }
   }

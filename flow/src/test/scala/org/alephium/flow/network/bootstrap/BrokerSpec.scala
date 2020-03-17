@@ -3,11 +3,11 @@ package org.alephium.flow.network.bootstrap
 import akka.io.{IO, Tcp}
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
+import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.protocol.model.{BrokerInfo, ModelGen}
 
-class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
+class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
   it should "follow this workflow" in {
     val connection    = TestProbe()
     val bootstrapper  = TestProbe()
@@ -28,11 +28,10 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") {
 
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        BrokerConnector.deserializeTryWithValidation[BrokerInfo, BrokerInfo.Unsafe](data) is Right(
-          Some((config.brokerInfo, ByteString.empty)))
+        PeerInfo._deserialize(data).right.value is ((PeerInfo.self, ByteString.empty))
     }
 
-    val randomInfo = ModelGen.cliqueInfo.sample.get
+    val randomInfo = genIntraCliqueInfo
     val infoData   = BrokerConnector.envelop(randomInfo).data
     broker.tell(Tcp.Received(infoData), connection.ref)
     connection.expectMsgPF() {

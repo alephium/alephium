@@ -16,15 +16,16 @@ import org.alephium.flow.client.FairMiner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.DiscoveryServer
+import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
+import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, CliqueInfo, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.Hex
 
-class RPCServer(mode: Mode) extends RPCServerAbstract {
+class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
@@ -49,7 +50,7 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
     }
 
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
-    mode.node.discoveryServer.ask(DiscoveryServer.GetSelfClique).mapTo[CliqueInfo].map {
+    mode.node.boostraper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
       cliqueInfo =>
         Right(SelfClique.from(cliqueInfo))
     }
@@ -69,18 +70,28 @@ class RPCServer(mode: Mode) extends RPCServerAbstract {
     }
 
     Http()
-      .bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, mode.rpcHttpPort)
+      .bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, rpcPort)
       .map(_ => ())
     Http()
-      .bindAndHandle(routeWs(mode.node.eventBus),
-                     rpcConfig.networkInterface.getHostAddress,
-                     mode.rpcWsPort)
+      .bindAndHandle(routeWs(mode.node.eventBus), rpcConfig.networkInterface.getHostAddress, wsPort)
       .map(_ => ())
   }
 }
 
 object RPCServer extends StrictLogging {
   import RPCServerAbstract._
+
+  def apply(mode: Mode): RPCServer = {
+    (for {
+      rpcPort <- mode.config.rpcPort
+      wsPort  <- mode.config.wsPort
+    } yield {
+      new RPCServer(mode, rpcPort, wsPort)
+    }) match {
+      case Some(server) => server
+      case None         => throw new RuntimeException("rpc and ws ports are required")
+    }
+  }
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
     req.paramsAs[T] match {

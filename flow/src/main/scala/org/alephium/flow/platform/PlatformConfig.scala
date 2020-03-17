@@ -117,12 +117,15 @@ object PlatformConfig {
       val masterAddress: InetSocketAddress = parseAddress(networkCfg.getString("masterAddress"))
       val numOfSyncBlocksLimit: Int        = networkCfg.getInt("numOfSyncBlocksLimit")
       val isCoordinator: Boolean           = publicAddress == masterAddress
+
+      val rpcPort: Option[Int] = extractPort(networkCfg.getInt("rpcPort"))
+      val wsPort: Option[Int]  = extractPort(networkCfg.getInt("wsPort"))
       /* Network */
 
       /* Broker */
       val brokerInfo: BrokerInfo = {
         val myId = brokerCfg.getInt("brokerId")
-        BrokerInfo(myId, groupNumPerBroker, publicAddress)(this)
+        BrokerInfo.from(myId, groupNumPerBroker, publicAddress)(this).get
       }
       /* Broker */
 
