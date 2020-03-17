@@ -104,6 +104,8 @@ class AlephiumMake(object):
 
         for node in range(batch * nodes, (batch + 1) * nodes):
             port = 9973 + node
+            rpcPort = port + 1000
+            wsPort = port + 2000
             publicAddress = "localhost:" + str(port)
             masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
@@ -120,7 +122,7 @@ class AlephiumMake(object):
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, bootstrap, homedir, homedir))
+            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, bootstrap, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]

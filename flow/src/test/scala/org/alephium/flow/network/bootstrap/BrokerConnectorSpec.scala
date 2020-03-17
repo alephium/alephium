@@ -7,9 +7,10 @@ import akka.testkit.TestProbe
 import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, ModelGen}
+import org.alephium.protocol.model.ModelGen
+import org.alephium.serde.Serde
 
-class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") {
+class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") with InfoFixture {
   it should "follow this workflow" in {
     val connection        = TestProbe()
     val cliqueCoordinator = TestProbe()
@@ -17,21 +18,27 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") {
       system.actorOf(BrokerConnector.props(connection.ref, cliqueCoordinator.ref))
     val randomId      = Random.nextInt(config.brokerNum)
     val randomAddress = ModelGen.socketAddress.sample.get
-    val randomInfo    = BrokerInfo(randomId, config.groupNumPerBroker, randomAddress)
+    val randomInfo = PeerInfo.unsafe(randomId,
+                                     config.groupNumPerBroker,
+                                     randomAddress.getAddress,
+                                     randomAddress.getPort,
+                                     None,
+                                     None)
 
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)
 
-    val infoData = BrokerConnector.envelop(randomInfo).data
+    implicit val peerInfoSerde: Serde[PeerInfo] = PeerInfo._serde
+    val infoData                                = BrokerConnector.envelop(randomInfo).data
     brokerConnector ! Tcp.Received(infoData)
 
-    cliqueCoordinator.expectMsgType[BrokerInfo]
+    cliqueCoordinator.expectMsgType[PeerInfo]
 
-    val randomCliqueInfo = ModelGen.cliqueInfo.sample.get
+    val randomCliqueInfo = genIntraCliqueInfo
     brokerConnector ! randomCliqueInfo
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        BrokerConnector.deserializeTryWithValidation[CliqueInfo, CliqueInfo.Unsafe](data) is Right(
+        BrokerConnector.unwrap(IntraCliqueInfo._deserialize(data)) is Right(
           Some((randomCliqueInfo, ByteString.empty)))
     }
 

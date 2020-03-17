@@ -1,6 +1,6 @@
 package org.alephium.appserver
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import io.circe.{Codec, Decoder, Encoder}
 import io.circe.parser._
@@ -21,7 +21,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString))
   val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
-  val dummyCliqueInfo = CliqueInfo(CliqueId.generate, AVector(dummyAddress), 1)
+  val dummyCliqueInfo = CliqueInfo.unsafe(CliqueId.generate, AVector(dummyAddress), 1)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
@@ -71,8 +71,10 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode SelfClique" in {
-    val selfClique = SelfClique.from(dummyCliqueInfo)
-    val jsonRaw    = s"""{"peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}"""
+    val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), Some(9000), Some(9001))
+    val selfClique  = SelfClique(AVector(peerAddress), 1)
+    val jsonRaw =
+      s"""{"peers":[{"address":"127.0.0.1","rpcPort":9000,"wsPort":9001}],"groupNumPerBroker":1}"""
     checkData(selfClique, jsonRaw)
   }
 

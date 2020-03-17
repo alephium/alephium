@@ -3,9 +3,8 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
-import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator}
+import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo}
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.BaseActor
 
 object Bootstrapper {
@@ -14,7 +13,8 @@ object Bootstrapper {
     Props(new Bootstrapper(server, discoveryServer, cliqueManager))
 
   sealed trait Command
-  case object ForwardConnection extends Command
+  case object ForwardConnection  extends Command
+  case object GetIntraCliqueInfo extends Command
 }
 
 // TODO: close this properly
@@ -53,13 +53,23 @@ class Bootstrapper(server: ActorRef, discoveryServer: ActorRef, cliqueManager: A
       sink.forward(c)
     case ForwardConnection =>
       server ! cliqueManager
-      context become awaitInfo
+      context become (awaitInfo orElse forwardConnection)
   }
 
   def awaitInfo: Receive = {
-    case cliqueInfo: CliqueInfo =>
+    case intraCliqueInfo: IntraCliqueInfo =>
+      val cliqueInfo = intraCliqueInfo.cliqueInfo
       cliqueManager ! CliqueManager.Start(cliqueInfo)
       discoveryServer ! cliqueInfo
+
+      context become (ready(intraCliqueInfo) orElse forwardConnection)
+  }
+
+  def ready(cliqueInfo: IntraCliqueInfo): Receive = {
+    case GetIntraCliqueInfo => sender() ! cliqueInfo
+  }
+
+  def forwardConnection: Receive = {
     case c: Tcp.Connected =>
       log.debug(s"Forward connection to clique manager")
       cliqueManager.forward(c)

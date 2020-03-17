@@ -6,8 +6,8 @@ import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
+import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{BaseActor, Duration, TimeStamp}
 
 object Broker {
@@ -15,7 +15,7 @@ object Broker {
             brokerInfo: BrokerInfo,
             retryTimeout: Duration,
             bootstrapper: ActorRef)(
-      implicit groupConfig: GroupConfig
+      implicit config: PlatformConfig
   ): Props =
     Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
 
@@ -26,9 +26,9 @@ object Broker {
 class Broker(masterAddress: InetSocketAddress,
              brokerInfo: BrokerInfo,
              retryTimeout: Duration,
-             bootstrapper: ActorRef)(implicit groupConfig: GroupConfig)
-    extends BaseActor {
-
+             bootstrapper: ActorRef)(implicit val config: PlatformConfig)
+    extends BaseActor
+    with SerdeUtils {
   def until: TimeStamp = TimeStamp.now() + retryTimeout
 
   override def preStart(): Unit =
@@ -41,10 +41,10 @@ class Broker(masterAddress: InetSocketAddress,
       IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
 
     case _: Tcp.Connected =>
-      log.debug(s"Connected to master: ${masterAddress}")
+      log.debug(s"Connected to master: $masterAddress")
       val connection = sender()
       connection ! Tcp.Register(self)
-      connection ! BrokerConnector.envelop(brokerInfo)
+      connection ! BrokerConnector.envelop(PeerInfo.self)
       context become awaitCliqueInfo(connection, ByteString.empty)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -60,7 +60,7 @@ class Broker(masterAddress: InetSocketAddress,
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitCliqueInfo(connection: ActorRef, unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
-      BrokerConnector.deserializeTryWithValidation[CliqueInfo, CliqueInfo.Unsafe](unaligned ++ data) match {
+      BrokerConnector.unwrap(IntraCliqueInfo._deserialize(unaligned ++ data)) match {
         case Right(Some((cliqueInfo, _))) =>
           val ack = BrokerConnector.Ack(brokerInfo.id)
           connection ! BrokerConnector.envelop(ack)
@@ -74,7 +74,9 @@ class Broker(masterAddress: InetSocketAddress,
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def awaitReady(connection: ActorRef, cliqueInfo: CliqueInfo, unaligned: ByteString): Receive = {
+  def awaitReady(connection: ActorRef,
+                 cliqueInfo: IntraCliqueInfo,
+                 unaligned: ByteString): Receive = {
     case Tcp.Received(data) =>
       BrokerConnector.deserializeTry[CliqueCoordinator.Ready.type](unaligned ++ data) match {
         case Right(Some((_, _))) =>
@@ -89,7 +91,7 @@ class Broker(masterAddress: InetSocketAddress,
       }
   }
 
-  def awaitClose(cliqueInfo: CliqueInfo): Receive = {
+  def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = {
     case Tcp.ConfirmedClosed =>
       log.debug("Close connection to master")
       bootstrapper ! cliqueInfo
