@@ -13,7 +13,7 @@ sealed abstract case class IntraCliqueInfo(
     peers: AVector[PeerInfo],
     groupNumPerBroker: Int
 ) {
-  def simple: CliqueInfo = {
+  def cliqueInfo: CliqueInfo = {
     val addresses = peers.map(info => new InetSocketAddress(info.address, info.tcpPort))
     CliqueInfo.unsafe(id, addresses, groupNumPerBroker)
   }

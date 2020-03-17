@@ -81,10 +81,16 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract
 object RPCServer extends StrictLogging {
   import RPCServerAbstract._
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def apply(mode: Mode): RPCServer = {
-    require(mode.config.rpcPort.nonEmpty && mode.config.wsPort.nonEmpty)
-    new RPCServer(mode, mode.config.rpcPort.get, mode.config.wsPort.get)
+    (for {
+      rpcPort <- mode.config.rpcPort
+      wsPort  <- mode.config.wsPort
+    } yield {
+      new RPCServer(mode, rpcPort, wsPort)
+    }) match {
+      case Some(server) => server
+      case None         => throw new RuntimeException("rpc and ws ports are required")
+    }
   }
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {

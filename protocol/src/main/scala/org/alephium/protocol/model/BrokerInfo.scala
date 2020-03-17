@@ -44,24 +44,27 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
     Serde.forProduct3(unsafe, t => (t.id, t.groupNumPerBroker, t.address))
 
   override def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    if (validate(info.id, info.groupNumPerBroker)) Right(())
-    else Left(s"invalid BrokerInfo: $info")
+    validate(info.id, info.groupNumPerBroker)
   }
 
   def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
       implicit config: GroupConfig): Option[BrokerInfo] = {
-    if (validate(id, groupNumPerBroker)) Some(new BrokerInfo(id, groupNumPerBroker, address) {})
+    if (validate(id, groupNumPerBroker).isRight)
+      Some(new BrokerInfo(id, groupNumPerBroker, address) {})
     else None
   }
 
   def unsafe(id: Int, groupNumPerBroker: Int, address: InetSocketAddress): BrokerInfo =
     new BrokerInfo(id, groupNumPerBroker, address) {}
 
-  def validate(id: Int, groupNumPerBroker: Int)(implicit config: GroupConfig): Boolean = {
-    0 <= id && (config.groups % groupNumPerBroker == 0) && {
-      val brokerNum = config.groups / groupNumPerBroker
-      id < brokerNum
-    }
+  def validate(id: Int, groupNumPerBroker: Int)(
+      implicit config: GroupConfig): Either[String, Unit] = {
+    if (id < 0 || id >= config.groups) Left(s"BrokerInfo - invalid id: $id")
+    else if (groupNumPerBroker <= 0 || (config.groups % groupNumPerBroker != 0))
+      Left(s"BrokerInfo - invalid groupNumPerBroker: $groupNumPerBroker")
+    else if (id >= (config.groups / groupNumPerBroker))
+      Left(s"BrokerInfo - invalid id: $id")
+    else Right(())
   }
 
   // Check if two segments intersect or not

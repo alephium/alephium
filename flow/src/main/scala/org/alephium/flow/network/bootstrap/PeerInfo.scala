@@ -31,14 +31,12 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
                       t => (t.id, t.groupNumPerBroker, t.address, t.tcpPort, t.rpcPort, t.wsPort))
 
   override def validate(info: PeerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    if (!BrokerInfo.validate(info.id, info.groupNumPerBroker)) Left(s"invalid peer info: $info")
-    else if (Configs.validatePort(info.tcpPort).isEmpty)
-      Left(s"invalid tcp port: ${info.tcpPort}")
-    else if (info.rpcPort.nonEmpty && info.rpcPort.exists(Configs.validatePort(_).isEmpty))
-      Left(s"invalid rpc port: ${info.rpcPort}")
-    else if (info.wsPort.nonEmpty && info.wsPort.exists(Configs.validatePort(_).isEmpty))
-      Left(s"invalid wsPort: ${info.wsPort}")
-    else Right(())
+    for {
+      _ <- BrokerInfo.validate(info.id, info.groupNumPerBroker)
+      _ <- Configs.validatePort(info.tcpPort)
+      _ <- Configs.validatePort(info.rpcPort)
+      _ <- Configs.validatePort(info.wsPort)
+    } yield ()
   }
 
   def self(implicit config: PlatformConfig): PeerInfo = {
