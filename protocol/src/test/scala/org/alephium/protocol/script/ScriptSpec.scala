@@ -19,15 +19,15 @@ class ScriptSpec extends AlephiumSpec {
       val pubScript = PubScript(
         AVector[Instruction](OP_DUP.unsafe(1),
                              OP_KECCAK256,
-                             OP_PUSH(pkHash.bytes),
+                             OP_PUSH.unsafe(pkHash.bytes),
                              OP_EQUALVERIFY,
                              OP_CHECKSIG))
-      val priScript  = AVector[Instruction](OP_PUSH(pk.bytes))
+      val priScript  = AVector[Instruction](OP_PUSH.unsafe(pk.bytes))
       val signatures = AVector(signature)
       val witness    = Witness(priScript, signatures)
       val witness0   = Witness(priScript, AVector.empty)
       val witness1   = Witness(priScript.init, signatures)
-      val witness2   = Witness(OP_PUSH(pk.bytes) +: priScript, signatures)
+      val witness2   = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
 
       implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 100 }
       Script.run(data, pubScript, witness).isRight is true

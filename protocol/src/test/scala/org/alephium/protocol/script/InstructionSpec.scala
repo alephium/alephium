@@ -25,7 +25,7 @@ class InstructionSpec extends AlephiumSpec {
   }
 
   it should "test OP_PUSH" in new Fixture {
-    val state = buildState(OP_PUSH(data))
+    val state = buildState(OP_PUSH.unsafe(data))
 
     state.run().isRight is true
     state.instructionCount is 1
