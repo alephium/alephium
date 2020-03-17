@@ -50,6 +50,7 @@ object RPCServerSpec {
     val dummySelfClique      = SelfClique(AVector.empty, 1)
     val dummyNeighborCliques = NeighborCliques(AVector.empty)
     val dummyBalance         = Balance(1, 1)
+    val dummyGroup           = Group(42)
     val dummyTransferResult  = TransferResult("foobar")
 
     def doBlockflowFetch(req: Request): FutureTry[FetchResponse] = successful(dummyFetchResponse)
@@ -57,6 +58,7 @@ object RPCServerSpec {
     def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
       successful(dummyNeighborCliques)
     def doGetBalance(req: Request): FutureTry[Balance]      = successful(dummyBalance)
+    def doGetGroup(req: Request): FutureTry[Group]      = successful(dummyGroup)
     def doTransfer(req: Request): FutureTry[TransferResult] = successful(dummyTransferResult)
     def doBlockNotify(blockNotify: BlockNotify): Json       = Json.Null
 
@@ -174,6 +176,10 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
 
   it should "call get_balance" in new RouteHTTP {
     checkCallResult("get_balance")(server.dummyBalance)
+  }
+
+  it should "call get_group" in new RouteHTTP {
+    checkCallResult("get_group")(server.dummyGroup)
   }
 
   it should "call transfer" in new RouteHTTP {
