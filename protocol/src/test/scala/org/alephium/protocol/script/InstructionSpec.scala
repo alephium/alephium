@@ -1,6 +1,7 @@
 package org.alephium.protocol.script
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519Signature, Keccak256}
@@ -36,6 +37,28 @@ class InstructionSpec extends AlephiumSpec {
     state.stack.pop().isLeft is true
   }
 
+  it should "serde OP_PUSH" in {
+    def opGen(n: Int): OP_PUSH = OP_PUSH.unsafe(ByteString(Array.ofDim[Byte](n)))
+    def test(n: Int, prefix: Int*): Assertion = {
+      val op = opGen(n)
+      op.serialize() is (ByteString(prefix: _*) ++ op.bytes)
+      OP_PUSH.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+
+    assertThrows[AssertionError](test(0))
+    test(1, 0x00)
+    test(2, 0x01)
+    test(4, 0x02)
+    test(8, 0x03)
+    test(16, 0x04)
+    test(32, 0x05)
+    test(64, 0x06)
+    test(17, 0x07, 17)
+    test(65, 0x07, 65)
+    test(255, 0x07, 255)
+    assertThrows[AssertionError](test(256, 0x07, 255))
+  }
+
   it should "test OP_DUP" in new Fixture {
     val state = buildState(OP_DUP.unsafe(1), stackElems = AVector(data))
 
@@ -46,6 +69,96 @@ class InstructionSpec extends AlephiumSpec {
     val data1 = state.stack.pop().right.value
     data1 is data
     state.stack.size is 1
+  }
+
+  it should "serde OP_DUP" in {
+    def opGen(index: Int): OP_DUP = OP_DUP.unsafe(index)
+    def test0(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x0F + index)
+      OP_DUP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+    def test1(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x1F, index)
+      OP_DUP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+
+    assertThrows[AssertionError](test0(0))
+    (1 to 15).foreach(index => test0(index))
+    test1(16)
+    test1(33)
+    test1(255)
+    assertThrows[AssertionError](test0(256))
+    assertThrows[AssertionError](test1(256))
+  }
+
+  it should "test OP_SWAP" in new Fixture {
+    val state = buildState(OP_SWAP.unsafe(2), stackElems = AVector(data, data ++ data))
+    state.stack.peek(1).right.value is data ++ data
+    state.stack.peek(2).right.value is data
+
+    state.run().isRight is true
+    state.instructionCount is 1
+    state.stack.size is 2
+
+    val data0 = state.stack.pop().right.value
+    data0 is data
+    val data1 = state.stack.pop().right.value
+    data1 is data ++ data
+  }
+
+  it should "serde OP_SWAP" in {
+    def opGen(index: Int): OP_SWAP = OP_SWAP.unsafe(index)
+    def test0(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x1E + index)
+      OP_SWAP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+    def test1(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x2F, index)
+      OP_SWAP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+
+    assertThrows[AssertionError](test0(0))
+    assertThrows[AssertionError](test0(1))
+    (2 to 16).foreach(index => test0(index))
+    test1(17)
+    test1(33)
+    test1(255)
+    assertThrows[AssertionError](test0(256))
+    assertThrows[AssertionError](test1(256))
+  }
+
+  it should "test OP_POP" in new Fixture {
+    val state = buildState(OP_POP.unsafe(2), stackElems = AVector(data, data))
+
+    state.run().isRight is true
+    state.instructionCount is 1
+    state.stack.isEmpty is true
+  }
+
+  it should "serde OP_POP" in {
+    def opGen(index: Int): OP_POP = OP_POP.unsafe(index)
+    def test0(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x2F + index)
+      OP_POP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+    def test1(index: Int): Assertion = {
+      val op = opGen(index)
+      op.serialize() is ByteString(0x3F, index)
+      OP_POP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+    }
+
+    assertThrows[AssertionError](test0(0))
+    (1 to 15).foreach(test0)
+    test1(16)
+    test1(33)
+    test1(255)
+    assertThrows[AssertionError](test0(256))
+    assertThrows[AssertionError](test1(256))
   }
 
   it should "test OP_EQUALVERIFY" in new Fixture {

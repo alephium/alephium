@@ -114,15 +114,15 @@ sealed abstract case class OP_PUSH(bytes: ByteString) extends Instruction {
 
   override def serialize(): ByteString = {
     bytes.length match {
-      case 1                    => ByteString(0x00) ++ bytes
-      case 2                    => ByteString(0x01) ++ bytes
-      case 4                    => ByteString(0x02) ++ bytes
-      case 8                    => ByteString(0x03) ++ bytes
-      case 16                   => ByteString(0x04) ++ bytes
-      case 32                   => ByteString(0x05) ++ bytes
-      case 64                   => ByteString(0x06) ++ bytes
-      case n if n > 0 && n < 64 => ByteString(0x07, bytes.length) ++ bytes
-      case n                    => throw new RuntimeException(s"OP_PUSH - Invalid bytes length $n")
+      case 1                       => ByteString(0x00) ++ bytes
+      case 2                       => ByteString(0x01) ++ bytes
+      case 4                       => ByteString(0x02) ++ bytes
+      case 8                       => ByteString(0x03) ++ bytes
+      case 16                      => ByteString(0x04) ++ bytes
+      case 32                      => ByteString(0x05) ++ bytes
+      case 64                      => ByteString(0x06) ++ bytes
+      case n if n > 0 && n <= 0xFF => ByteString(0x07, bytes.length) ++ bytes
+      case n                       => throw new RuntimeException(s"OP_PUSH - Invalid bytes length $n")
     }
   }
 }
@@ -182,7 +182,7 @@ sealed abstract case class OP_DUP(index: Int) extends Instruction {
   override def serialize(): ByteString = {
     index match {
       case n if n > 0 && n <= 15    => ByteString(0x0F + n)
-      case n if n > 16 && n < 0x100 => ByteString(0x1F, n)
+      case n if n > 15 && n < 0x100 => ByteString(0x1F, n)
       case _                        => throw new RuntimeException(s"OP_PUSH - invalid index $index")
     }
   }
@@ -267,9 +267,9 @@ sealed abstract case class OP_POP(total: Int) extends Instruction {
 
   override def serialize(): ByteString = {
     total match {
-      case n if n >= 1 && n < 16    => ByteString(0x2F + n)
-      case n if n > 16 && n < 0x100 => ByteString(0x3F, n)
-      case _                        => throw new RuntimeException(s"OP_POP - invalid total $total")
+      case n if n >= 1 && n < 16     => ByteString(0x2F + n)
+      case n if n >= 16 && n < 0x100 => ByteString(0x3F, n)
+      case _                         => throw new RuntimeException(s"OP_POP - invalid total $total")
     }
   }
 }
