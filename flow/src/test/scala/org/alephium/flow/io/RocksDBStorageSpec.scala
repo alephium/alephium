@@ -1,6 +1,7 @@
 package org.alephium.flow.io
 
-import org.alephium.util.{AlephiumSpec, AVector, EnumerationMacros}
+import org.alephium.macros.EnumerationMacros
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class RocksDBStorageSpec extends AlephiumSpec {
   import RocksDBStorage.ColumnFamily
