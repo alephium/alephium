@@ -5,9 +5,10 @@ import java.net.InetSocketAddress
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, EnumerationMacros}
+import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code

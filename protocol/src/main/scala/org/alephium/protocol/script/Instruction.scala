@@ -3,6 +3,7 @@ package org.alephium.protocol.script
 import akka.util.ByteString
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
+import org.alephium.macros.EnumerationMacros
 import org.alephium.serde._
 import org.alephium.util.Bits
 
@@ -15,7 +16,9 @@ sealed trait Instruction {
 }
 
 object Instruction {
-  private val codeRegistry: Array[Option[InstructionCompanion]] = Array.fill(0xFF)(None)
+  private val codeRegistry: Array[Option[InstructionCompanion]] = Array.fill(0x100)(None)
+  implicit val ordering: Ordering[Registrable]                  = Ordering.by(_.hashCode())
+  EnumerationMacros.sealedInstancesOf[Registrable].foreach(_.register())
 
   def register(from: Int, to: Int, obj: InstructionCompanion): Unit = {
     if (from >= 0 && from <= to && to <= 0xFF) {
@@ -43,12 +46,13 @@ object Instruction {
     override def serialize(input: Instruction): ByteString = input.serialize()
 
     override def _deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)] = {
-      if (input.isEmpty) Left(SerdeError.notEnoughBytes(1, 0))
-      else {
-        getRegistered(input.head) match {
-          case Some(obj) => obj.deserialize(input)
-          case None      => Left(SerdeError.validation(s"Instruction - invalid code ${input.head}"))
-        }
+      input.headOption match {
+        case Some(code) =>
+          getRegistered(code) match {
+            case Some(obj) => obj.deserialize(input)
+            case None      => Left(SerdeError.validation(s"Instruction - invalid code $code"))
+          }
+        case None => Left(SerdeError.notEnoughBytes(1, 0))
       }
     }
   }
@@ -67,8 +71,10 @@ object Instruction {
   }
 
   private[script] def safeHead(bytes: ByteString): SerdeResult[(Byte, ByteString)] = {
-    if (bytes.nonEmpty) Right((bytes.head, bytes.tail))
-    else Left(SerdeError.notEnoughBytes(1, bytes.length))
+    bytes.headOption match {
+      case Some(head) => Right((head, bytes.drop(1)))
+      case None       => Left(SerdeError.notEnoughBytes(1, bytes.length))
+    }
   }
 
   private[script] def safeTake(bytes: ByteString,
@@ -80,6 +86,10 @@ object Instruction {
 
 sealed trait InstructionCompanion {
   def deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)]
+}
+
+sealed trait Registrable {
+  def register(): Unit
 }
 
 sealed trait SimpleInstruction extends Instruction with InstructionCompanion {
@@ -117,8 +127,9 @@ sealed abstract case class OP_PUSH(bytes: ByteString) extends Instruction {
   }
 }
 
-object OP_PUSH extends InstructionCompanion {
-  Instruction.register(0x00, 0x07, this)
+object OP_PUSH extends InstructionCompanion with Registrable {
+  override def register(): Unit =
+    Instruction.register(0x00, 0x07, this)
 
   @inline private def validate(bytes: ByteString): Boolean =
     bytes.nonEmpty && bytes.length <= 0xFF
@@ -177,8 +188,8 @@ sealed abstract case class OP_DUP(index: Int) extends Instruction {
   }
 }
 
-object OP_DUP extends InstructionCompanion {
-  Instruction.register(0x10, 0x1F, this)
+object OP_DUP extends InstructionCompanion with Registrable {
+  override def register(): Unit = Instruction.register(0x10, 0x1F, this)
 
   @inline private def validate(index: Int): Boolean = index > 0 && index < 0x100
 
@@ -220,8 +231,8 @@ sealed abstract case class OP_SWAP(index: Int) extends Instruction {
   }
 }
 
-object OP_SWAP extends InstructionCompanion {
-  Instruction.register(0x20, 0x2F, this)
+object OP_SWAP extends InstructionCompanion with Registrable {
+  override def register(): Unit = Instruction.register(0x20, 0x2F, this)
 
   def validate(index: Int): Boolean = index > 1 && index < 0x100
 
@@ -263,8 +274,8 @@ sealed abstract case class OP_POP(total: Int) extends Instruction {
   }
 }
 
-case object OP_POP extends InstructionCompanion {
-  Instruction.register(0x30, 0x3F, this)
+case object OP_POP extends InstructionCompanion with Registrable {
+  override def register(): Unit = Instruction.register(0x30, 0x3F, this)
 
   def validate(index: Int): Boolean = index >= 1 && index < 0x100
 
@@ -293,7 +304,7 @@ case object OP_POP extends InstructionCompanion {
 }
 
 // BitwiseInstructions
-case object OP_EQUALVERIFY extends SimpleInstruction {
+case object OP_EQUALVERIFY extends SimpleInstruction with Registrable {
   def checkPoped(item0: ByteString, item1: ByteString): RunResult[Unit] = {
     if (item0 == item1) Right(()) else Left(VerificationFailed)
   }
@@ -307,12 +318,13 @@ case object OP_EQUALVERIFY extends SimpleInstruction {
     } yield ()
   }
 
-  override val code: Byte = 0x30
-  Instruction.register(code, this)
+  override val code: Byte = 0x40
+
+  override def register(): Unit = Instruction.register(code, this)
 }
 
 // Crypto Instructions
-case object OP_KECCAK256 extends SimpleInstruction {
+case object OP_KECCAK256 extends SimpleInstruction with Registrable {
   override def runWith(state: RunState): RunResult[Unit] = {
     val stack = state.stack
     for {
@@ -321,11 +333,12 @@ case object OP_KECCAK256 extends SimpleInstruction {
     } yield ()
   }
 
-  override val code: Byte = 0x40
-  Instruction.register(code, this)
+  override val code: Byte = 0x50
+
+  override def register(): Unit = Instruction.register(code, this)
 }
 
-case object OP_CHECKSIG extends SimpleInstruction {
+case object OP_CHECKSIG extends SimpleInstruction with Registrable {
   override def runWith(state: RunState): RunResult[Unit] = {
     val rawData    = state.context.rawData
     val stack      = state.stack
@@ -338,6 +351,7 @@ case object OP_CHECKSIG extends SimpleInstruction {
     } yield ()
   }
 
-  override val code: Byte = 0x41
-  Instruction.register(code, this)
+  override val code: Byte = 0x51
+
+  override def register(): Unit = Instruction.register(code, this)
 }
