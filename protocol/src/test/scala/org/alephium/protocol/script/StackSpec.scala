@@ -7,7 +7,6 @@ import org.alephium.protocol.config.ScriptConfig
 import org.alephium.util.AlephiumSpec
 
 class StackSpec extends AlephiumSpec {
-
   it should "push/pop/peek" in {
     implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 2 }
 
