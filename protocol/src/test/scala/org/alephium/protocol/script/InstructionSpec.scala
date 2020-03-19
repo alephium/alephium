@@ -161,10 +161,76 @@ class InstructionSpec extends AlephiumSpec {
     assertThrows[AssertionError](test1(256))
   }
 
+  abstract class ArithmeticFixture(OP: SimpleInstruction) extends Fixture {
+    def validate(bs: ByteString): Assertion = {
+      (bs.size <= 32) is true
+    }
+
+    def toByteString(i: BigInt): ByteString = ByteString(i.toByteArray)
+
+    def test(a: BigInt, b: BigInt, expected: BigInt): Assertion = {
+      val state = buildState(OP, stackElems = AVector(toByteString(b), toByteString(a)))
+
+      state.run().isRight is true
+      state.instructionCount is 1
+      state.stack.size is 1
+
+      val data0 = state.stack.peek(1).right.value
+      validate(data0)
+      data0 is toByteString(expected)
+    }
+
+    def testFailure(a: BigInt, b: BigInt, failure: RunFailure = IntegerOverFlow): Assertion = {
+      val state = buildState(OP, stackElems = AVector(toByteString(b), toByteString(a)))
+
+      state.run().left.value is failure
+    }
+  }
+
+  it should "test OP_ADD" in new ArithmeticFixture(OP_ADD) {
+    forAll { (x: Int, y: Int) =>
+      test(BigInt(x), BigInt(y), BigInt(x) + BigInt(y))
+    }
+
+    test(BigInt(1) << 254, BigInt(0), BigInt(1) << 254)
+    testFailure(BigInt(1) << 255, BigInt(0))
+  }
+
+  it should "test OP_SUB" in new ArithmeticFixture(OP_SUB) {
+    forAll { (x: Int, y: Int) =>
+      test(BigInt(x), BigInt(y), BigInt(x) - BigInt(y))
+    }
+
+    test(BigInt(1) << 254, BigInt(0), BigInt(1) << 254)
+    testFailure(BigInt(1) << 255, BigInt(0))
+    testFailure(BigInt(0), BigInt(1) << 255 + 1)
+  }
+
+  it should "test OP_MUL" in new ArithmeticFixture(OP_MUL) {
+    forAll { (x: Int, y: Int) =>
+      test(BigInt(x), BigInt(y), BigInt(x) * BigInt(y))
+    }
+
+    test(BigInt(1) << 127, BigInt(1) << 127, BigInt(1) << 254)
+    testFailure(BigInt(1) << 128, BigInt(1) << 127)
+  }
+
+  it should "test OP_DIV" in new ArithmeticFixture(OP_DIV) {
+    forAll { (x: Int, y: Int) =>
+      whenever(y != 0) {
+        test(BigInt(x), BigInt(y), BigInt(x) / BigInt(y))
+      }
+    }
+
+    test(BigInt(1) << 255 - 1, BigInt(1), BigInt(1) << 255 - 1)
+    testFailure(BigInt(1) << 255, BigInt(1))
+    testFailure(BigInt(1), BigInt(0), Arithmetic("BigInteger divide by zero"))
+  }
+
   it should "test OP_EQUALVERIFY" in new Fixture {
     val state = buildState(OP_EQUALVERIFY, stackElems = AVector(data, data))
 
-    state.run().right.value
+    state.run().isRight is true
     state.instructionCount is 1
     state.stack.isEmpty is true
 

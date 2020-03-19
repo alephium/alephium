@@ -10,3 +10,5 @@ case object IndexOverflow                        extends RunFailure
 case object IndexUnderflow                       extends RunFailure
 case object InsufficientSignatures               extends RunFailure
 case object InvalidPublicKey                     extends RunFailure
+case object IntegerOverFlow                      extends RunFailure
+case class Arithmetic(message: String)           extends RunFailure

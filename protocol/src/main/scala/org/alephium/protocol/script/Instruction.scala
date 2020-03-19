@@ -95,6 +95,8 @@ sealed trait Registrable {
 sealed trait SimpleInstruction extends Instruction with InstructionCompanion {
   def code: Byte
 
+  def register(): Unit = Instruction.register(code, this)
+
   override def serialize(): ByteString = ByteString(code)
 
   override def deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)] = {
@@ -303,7 +305,65 @@ case object OP_POP extends InstructionCompanion with Registrable {
   }
 }
 
-// BitwiseInstructions
+// Arithmetic Operations
+trait BinaryArithmetic extends SimpleInstruction {
+  protected def op(x: BigInt, y: BigInt): RunResult[BigInt]
+
+  def checkedOp(x: BigInt, y: BigInt): RunResult[ByteString] = {
+    op(x, y).flatMap { z =>
+      val result = ByteString(z.toByteArray)
+      if (result.length <= 32) Right(result)
+      else Left(IntegerOverFlow)
+    }
+  }
+
+  override def runWith(state: RunState): RunResult[Unit] = {
+    val stack = state.stack
+    for {
+      x   <- stack.pop()
+      y   <- stack.pop()
+      out <- checkedOp(BigInt(x.toArray), BigInt(y.toArray))
+      _   <- stack.push(out)
+    } yield ()
+  }
+}
+
+case object OP_ADD extends BinaryArithmetic with Registrable {
+  protected def op(x: BigInt, y: BigInt): RunResult[BigInt] = {
+    Right(x + y)
+  }
+
+  override val code: Byte = 0x40
+}
+
+case object OP_SUB extends BinaryArithmetic with Registrable {
+  protected def op(x: BigInt, y: BigInt): RunResult[BigInt] = {
+    Right(x - y)
+  }
+
+  override val code: Byte = 0x41
+}
+
+case object OP_MUL extends BinaryArithmetic with Registrable {
+  protected def op(x: BigInt, y: BigInt): RunResult[BigInt] = {
+    Right(x * y)
+  }
+
+  override val code: Byte = 0x42
+}
+
+case object OP_DIV extends BinaryArithmetic with Registrable {
+  protected def op(x: BigInt, y: BigInt): RunResult[BigInt] = {
+    try Right(x / y)
+    catch {
+      case e: ArithmeticException => Left(Arithmetic(e.getMessage))
+    }
+  }
+
+  override val code: Byte = 0x43
+}
+
+// Bitwise Instructions
 case object OP_EQUALVERIFY extends SimpleInstruction with Registrable {
   def checkPoped(item0: ByteString, item1: ByteString): RunResult[Unit] = {
     if (item0 == item1) Right(()) else Left(VerificationFailed)
@@ -318,9 +378,7 @@ case object OP_EQUALVERIFY extends SimpleInstruction with Registrable {
     } yield ()
   }
 
-  override val code: Byte = 0x40
-
-  override def register(): Unit = Instruction.register(code, this)
+  override val code: Byte = 0x50
 }
 
 // Crypto Instructions
@@ -333,9 +391,7 @@ case object OP_KECCAK256 extends SimpleInstruction with Registrable {
     } yield ()
   }
 
-  override val code: Byte = 0x50
-
-  override def register(): Unit = Instruction.register(code, this)
+  override val code: Byte = 0x60
 }
 
 case object OP_CHECKSIG extends SimpleInstruction with Registrable {
@@ -351,7 +407,5 @@ case object OP_CHECKSIG extends SimpleInstruction with Registrable {
     } yield ()
   }
 
-  override val code: Byte = 0x51
-
-  override def register(): Unit = Instruction.register(code, this)
+  override val code: Byte = 0x61
 }
