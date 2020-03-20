@@ -58,7 +58,7 @@ object RPCServerSpec {
     def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
       successful(dummyNeighborCliques)
     def doGetBalance(req: Request): FutureTry[Balance]      = successful(dummyBalance)
-    def doGetGroup(req: Request): FutureTry[Group]      = successful(dummyGroup)
+    def doGetGroup(req: Request): FutureTry[Group]          = successful(dummyGroup)
     def doTransfer(req: Request): FutureTry[TransferResult] = successful(dummyTransferResult)
     def doBlockNotify(blockNotify: BlockNotify): Json       = Json.Null
 
