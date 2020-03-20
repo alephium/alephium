@@ -14,6 +14,8 @@ class InstructionSpec extends AlephiumSpec {
 
     val data = ByteString.fromInts(1)
 
+    def toByteString(i: BigInt): ByteString = ByteString(i.toByteArray)
+
     def buildState(instruction: Instruction,
                    rawData: ByteString                   = ByteString.empty,
                    stackElems: AVector[ByteString]       = AVector.empty,
@@ -166,8 +168,6 @@ class InstructionSpec extends AlephiumSpec {
       (bs.size <= 32) is true
     }
 
-    def toByteString(i: BigInt): ByteString = ByteString(i.toByteArray)
-
     def test(a: BigInt, b: BigInt, expected: BigInt): Assertion = {
       val state = buildState(OP, stackElems = AVector(toByteString(b), toByteString(a)))
 
@@ -225,6 +225,59 @@ class InstructionSpec extends AlephiumSpec {
     test(BigInt(1) << 255 - 1, BigInt(1), BigInt(1) << 255 - 1)
     testFailure(BigInt(1) << 255, BigInt(1))
     testFailure(BigInt(1), BigInt(0), ArithmeticError("BigInteger divide by zero"))
+  }
+
+  behavior of "Logic Instructions"
+
+  abstract class LogicFixture(OP: Instruction) extends Fixture {
+    def op(x: Int, y: Int): Boolean
+
+    def test(): Assertion = {
+      forAll { (x: Int, y: Int) =>
+        val state = buildState(OP, stackElems = AVector(toByteString(y), toByteString(x)))
+
+        state.run().isRight is true
+        state.instructionCount is 1
+        state.stack.size is 1
+
+        val expected = if (op(x, y)) Instruction.True else Instruction.False
+        state.stack.pop().right.value is expected
+      }
+    }
+  }
+
+  it should "test OP_EQ" in new LogicFixture(OP_EQ) {
+    override def op(x: Int, y: Int): Boolean = x == y
+    test()
+  }
+
+  it should "test OP_NE" in new LogicFixture(OP_NE) {
+    override def op(x: Int, y: Int): Boolean = x != y
+    test()
+  }
+
+  it should "test OP_LT" in new LogicFixture(OP_LT) {
+    override def op(x: Int, y: Int): Boolean = x < y
+    test()
+  }
+
+  it should "test OP_GT" in new LogicFixture(OP_GT) {
+    override def op(x: Int, y: Int): Boolean = x > y
+    test()
+  }
+
+  it should "test OP_LE" in new LogicFixture(OP_LE) {
+    override def op(x: Int, y: Int): Boolean = x <= y
+    test()
+  }
+
+  it should "test OP_GE" in new LogicFixture(OP_GE) {
+    override def op(x: Int, y: Int): Boolean = x >= y
+    test()
+  }
+
+  it should "test OP_EQUAL" in new LogicFixture(OP_EQUAL) {
+    override def op(x: Int, y: Int): Boolean = x == y
   }
 
   it should "test OP_EQUALVERIFY" in new Fixture {
