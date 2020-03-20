@@ -2,7 +2,6 @@ package org.alephium.flow.platform
 
 import com.typesafe.scalalogging.StrictLogging
 import java.nio.file.Path
-
 import org.rocksdb.WriteOptions
 
 import org.alephium.flow.io.{Disk, HeaderDB, IOUtils, RocksDBColumn, RocksDBStorage}
