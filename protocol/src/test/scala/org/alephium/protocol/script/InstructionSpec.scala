@@ -20,7 +20,14 @@ class InstructionSpec extends AlephiumSpec {
                    rawData: ByteString                   = ByteString.empty,
                    stackElems: AVector[ByteString]       = AVector.empty,
                    signatures: AVector[ED25519Signature] = AVector.empty): RunState = {
-      val context        = RunContext(rawData, AVector(instruction))
+      buildState1(AVector(instruction), rawData, stackElems, signatures)
+    }
+
+    def buildState1(instructions: AVector[Instruction],
+                    rawData: ByteString                   = ByteString.empty,
+                    stackElems: AVector[ByteString]       = AVector.empty,
+                    signatures: AVector[ED25519Signature] = AVector.empty): RunState = {
+      val context        = RunContext(rawData, instructions)
       val stack          = Stack.unsafe(stackElems, config.maxStackSize)
       val signatureStack = Stack.popOnly(signatures)
       RunState(context, 0, stack, signatureStack)
@@ -31,7 +38,7 @@ class InstructionSpec extends AlephiumSpec {
     val state = buildState(OP_PUSH.unsafe(data))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.isEmpty is false
 
     val data0 = state.stack.pop().right.value
@@ -65,7 +72,7 @@ class InstructionSpec extends AlephiumSpec {
     val state = buildState(OP_DUP.unsafe(1), stackElems = AVector(data))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.size is 2
 
     val data1 = state.stack.pop().right.value
@@ -101,7 +108,7 @@ class InstructionSpec extends AlephiumSpec {
     state.stack.peek(2).right.value is data
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.size is 2
 
     val data0 = state.stack.pop().right.value
@@ -137,7 +144,7 @@ class InstructionSpec extends AlephiumSpec {
     val state = buildState(OP_POP.unsafe(2), stackElems = AVector(data, data))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.isEmpty is true
   }
 
@@ -172,7 +179,7 @@ class InstructionSpec extends AlephiumSpec {
       val state = buildState(OP, stackElems = AVector(toByteString(b), toByteString(a)))
 
       state.run().isRight is true
-      state.instructionCount is 1
+      state.instructionIndex is 1
       state.stack.size is 1
 
       val data0 = state.stack.peek(1).right.value
@@ -227,6 +234,143 @@ class InstructionSpec extends AlephiumSpec {
     testFailure(BigInt(1), BigInt(0), ArithmeticError("BigInteger divide by zero"))
   }
 
+  behavior of "Flow Control"
+
+  trait IfFixture extends Fixture {
+    def instructions: AVector[Instruction]
+    def test(input: ByteString): Assertion                       = test(input, None)
+    def test(input: ByteString, expected: ByteString): Assertion = test(input, Some(expected))
+    def test(input: ByteString, expected: Option[ByteString]): Assertion = {
+      val state = buildState1(instructions, stackElems = AVector(input))
+
+      state.run().isRight is true
+      state.instructionIndex is instructions.length
+
+      if (expected.nonEmpty) {
+        state.stack.size is 1
+        state.stack.pop().right.value is expected.get
+      } else {
+        state.stack.size is 0
+      }
+    }
+    def testFailure(initial: ByteString, expected: RunFailure): Assertion = {
+      val state = buildState1(instructions, stackElems = AVector(initial))
+      state.run().left.value is expected
+    }
+  }
+
+  it should "test OP_IF case 0" in new IfFixture {
+    val instructions = AVector[Instruction](OP_IF, OP_PUSH.unsafe(data), OP_ENDIF)
+    test(Instruction.True, data)
+    test(Instruction.False)
+  }
+
+  it should "test OP_IF case 1" in new IfFixture {
+    val instructions =
+      AVector[Instruction](OP_IF,
+                           OP_PUSH.unsafe(data),
+                           OP_ELSE,
+                           OP_PUSH.unsafe(data ++ data),
+                           OP_ENDIF)
+    test(Instruction.True, data)
+    test(Instruction.False, data ++ data)
+  }
+
+  it should "test OP_IF case 2" in new IfFixture {
+    val instructions =
+      AVector[Instruction](OP_IF, OP_PUSH.unsafe(Instruction.True), OP_IF, OP_ENDIF, OP_ENDIF)
+    test(Instruction.True)
+    test(Instruction.False)
+  }
+
+  it should "test OP_IF case 3" in new IfFixture {
+    val instructions =
+      AVector[Instruction](OP_IF,
+                           OP_PUSH.unsafe(Instruction.True),
+                           OP_IF,
+                           OP_ENDIF,
+                           OP_ELSE,
+                           OP_ENDIF)
+    test(Instruction.True)
+    test(Instruction.False)
+  }
+
+  it should "test OP_IF case 4" in new IfFixture {
+    val instructions =
+      AVector[Instruction](OP_IF,
+                           OP_PUSH.unsafe(Instruction.True),
+                           OP_IF,
+                           OP_ELSE,
+                           OP_ENDIF,
+                           OP_ENDIF)
+    test(Instruction.True)
+    test(Instruction.False)
+  }
+
+  it should "test OP_IF case 5" in new IfFixture {
+    val instructions =
+      AVector[Instruction](
+        OP_IF,
+        OP_PUSH.unsafe(Instruction.True),
+        OP_IF,
+        OP_PUSH.unsafe(data),
+        OP_ELSE,
+        OP_ENDIF,
+        OP_ELSE,
+        OP_PUSH.unsafe(Instruction.False),
+        OP_IF,
+        OP_ELSE,
+        OP_PUSH.unsafe(data ++ data),
+        OP_ENDIF,
+        OP_ENDIF
+      )
+    test(Instruction.True, data)
+    test(Instruction.False, data ++ data)
+  }
+
+  it should "fail OP_IF case 0" in new IfFixture {
+    val instructions = AVector[Instruction](OP_IF, OP_PUSH.unsafe(data), OP_ENDIF)
+    testFailure(data ++ data, InvalidBoolean)
+  }
+
+  it should "fail OP_IF case 1" in new IfFixture {
+    val instructions = AVector[Instruction](OP_IF, OP_PUSH.unsafe(data))
+    testFailure(Instruction.True, IncompleteIfScript)
+  }
+
+  it should "fail OP_IF case 2" in new IfFixture {
+    val instructions = AVector[Instruction](OP_IF, OP_PUSH.unsafe(data), OP_ELSE)
+    testFailure(Instruction.True, IncompleteIfScript)
+  }
+
+  it should "fail OP_IF case 3" in new IfFixture {
+    val instructions = AVector[Instruction](OP_PUSH.unsafe(data), OP_ENDIF)
+    testFailure(Instruction.True, IncompleteIfScript)
+  }
+
+  it should "fail OP_IF case 4" in new IfFixture {
+    val instructions = AVector[Instruction](OP_PUSH.unsafe(data), OP_ELSE, OP_ENDIF)
+    testFailure(Instruction.True, IncompleteIfScript)
+  }
+
+  it should "test OP_ELSE" in new Fixture {
+    val state = buildState(OP_ELSE)
+    state.run().left.value is IncompleteIfScript
+  }
+
+  it should "test OP_ENDIF" in new Fixture {
+    val state = buildState(OP_ENDIF)
+    state.run().left.value is IncompleteIfScript
+  }
+
+  it should "test OP_VERIFY" in new Fixture {
+    val state0 = buildState(OP_VERIFY, stackElems = AVector(Instruction.True))
+    state0.run().isRight is true
+
+    val state1 = buildState(OP_VERIFY, stackElems = AVector(Instruction.False))
+    state1.run().left.value is VerificationFailed
+  }
+
   behavior of "Logic Instructions"
 
   abstract class LogicFixture(OP: Instruction) extends Fixture {
@@ -237,7 +381,7 @@ class InstructionSpec extends AlephiumSpec {
         val state = buildState(OP, stackElems = AVector(toByteString(y), toByteString(x)))
 
         state.run().isRight is true
-        state.instructionCount is 1
+        state.instructionIndex is 1
         state.stack.size is 1
 
         val expected = if (op(x, y)) Instruction.True else Instruction.False
@@ -247,7 +391,7 @@ class InstructionSpec extends AlephiumSpec {
   }
 
   it should "test OP_EQ" in new LogicFixture(OP_EQ) {
-    override def op(x: Int, y: Int): Boolean = x == y
+    override def op(x: Int, y: Int): Boolean = x.equals(y)
     test()
   }
 
@@ -277,14 +421,14 @@ class InstructionSpec extends AlephiumSpec {
   }
 
   it should "test OP_EQUAL" in new LogicFixture(OP_EQUAL) {
-    override def op(x: Int, y: Int): Boolean = x == y
+    override def op(x: Int, y: Int): Boolean = x.equals(y)
   }
 
   it should "test OP_EQUALVERIFY" in new Fixture {
     val state = buildState(OP_EQUALVERIFY, stackElems = AVector(data, data))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.isEmpty is true
 
     val data0  = ByteString.fromInts(2)
@@ -296,7 +440,7 @@ class InstructionSpec extends AlephiumSpec {
     val state = buildState(OP_KECCAK256, stackElems = AVector(data))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.size is 1
 
     val data0 = state.stack.pop().right.value
@@ -314,7 +458,7 @@ class InstructionSpec extends AlephiumSpec {
                            signatures = AVector(signature))
 
     state.run().isRight is true
-    state.instructionCount is 1
+    state.instructionIndex is 1
     state.stack.isEmpty is true
   }
 }
