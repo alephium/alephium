@@ -85,6 +85,12 @@ object Instruction {
 
   val True: ByteString  = ByteString(BigInt(1).toByteArray)
   val False: ByteString = ByteString(BigInt(0).toByteArray)
+
+  def bool(raw: ByteString): RunResult[Boolean] = {
+    if (raw == Instruction.True) Right(true)
+    else if (raw == Instruction.False) Right(false)
+    else Left(InvalidBoolean)
+  }
 }
 
 sealed trait InstructionCompanion {
@@ -106,7 +112,7 @@ sealed trait SimpleInstruction extends Instruction with InstructionCompanion {
     Instruction.safeHead(input).flatMap {
       case (codeRaw, rest) =>
         if (codeRaw == code) Right((this, rest))
-        else Left(SerdeError.validation(s"OP_POP - invalid code"))
+        else Left(SerdeError.validation(s"SimpleInstruction - invalid code"))
     }
   }
 }
@@ -309,7 +315,7 @@ case object OP_POP extends InstructionCompanion with Registrable {
 }
 
 object Arithmetic {
-  val maxLen = 32
+  val maxLen: Int = 32
 
   def validate(bs: ByteString): RunResult[BigInt] = {
     if (bs.length <= maxLen) Right(BigInt(bs.toArray))
@@ -324,7 +330,7 @@ object Arithmetic {
 }
 
 // Arithmetic Operations
-trait BinaryArithmetic extends SimpleInstruction {
+sealed trait BinaryArithmetic extends SimpleInstruction {
   protected def op(x: BigInt, y: BigInt): RunResult[BigInt]
 
   def checkedOp(x: BigInt, y: BigInt): RunResult[ByteString] = {
@@ -382,21 +388,40 @@ case object OP_DIV extends BinaryArithmetic with Registrable {
 
 // Flow Control
 case object OP_IF extends SimpleInstruction with Registrable {
-  override def runWith(state: RunState): RunResult[Unit] = ???
+  override def runWith(state: RunState): RunResult[Unit] = {
+    val stack = state.stack
+    for {
+      raw       <- stack.pop()
+      condition <- Instruction.bool(raw)
+      _         <- state.runIf(condition)
+    } yield ()
+  }
 
   override val code: Byte = 0x50
 }
 
 case object OP_ELSE extends SimpleInstruction with Registrable {
-  override def runWith(state: RunState): RunResult[Unit] = ???
+  override def runWith(state: RunState): RunResult[Unit] = Left(IncompleteIfScript)
 
   override val code: Byte = 0x51
 }
 
 case object OP_ENDIF extends SimpleInstruction with Registrable {
-  override def runWith(state: RunState): RunResult[Unit] = ???
+  override def runWith(state: RunState): RunResult[Unit] = Left(IncompleteIfScript)
 
   override val code: Byte = 0x52
+}
+
+case object OP_VERIFY extends SimpleInstruction with Registrable {
+  override def runWith(state: RunState): RunResult[Unit] = {
+    for {
+      raw       <- state.stack.pop()
+      condition <- Instruction.bool(raw)
+      _         <- if (condition) Right(()) else Left(VerificationFailed)
+    } yield ()
+  }
+
+  override val code: Byte = 0x53
 }
 
 // Logic Instructions
