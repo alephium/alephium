@@ -29,6 +29,11 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
   implicit val fetchRequestCodec = FetchRequest.codec
 
+  def generateKeyHash(): String = {
+    val address = ED25519PublicKey.generate
+    Hex.toHexString(address.bytes)
+  }
+
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).right.value
     json.as[A].right.value
@@ -87,16 +92,28 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode GetBalance" in {
-    val address    = ED25519PublicKey.generate
-    val addressHex = Hex.toHexString(address.bytes)
+    val addressHex = generateKeyHash
     val request    = GetBalance(addressHex, GetBalance.pkh)
     val jsonRaw    = s"""{"address":"$addressHex","type":"${GetBalance.pkh}"}"""
+    checkData(request, jsonRaw)
+  }
+
+  it should "encode/decode GetGroup" in {
+    val addressHex = generateKeyHash
+    val request    = GetGroup(addressHex)
+    val jsonRaw    = s"""{"address":"$addressHex"}"""
     checkData(request, jsonRaw)
   }
 
   it should "encode/decode Balance" in {
     val response = Balance(100, 1)
     val jsonRaw  = """{"balance":100,"utxoNum":1}"""
+    checkData(response, jsonRaw)
+  }
+
+  it should "encode/decode Group" in {
+    val response = Group(42)
+    val jsonRaw  = """{"group":42}"""
     checkData(response, jsonRaw)
   }
 

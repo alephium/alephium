@@ -1,7 +1,7 @@
 package org.alephium.flow.platform
 
+import com.typesafe.scalalogging.StrictLogging
 import java.nio.file.Path
-
 import org.rocksdb.WriteOptions
 
 import org.alephium.flow.io.{Disk, HeaderDB, IOUtils, RocksDBColumn, RocksDBStorage}
@@ -18,7 +18,7 @@ trait PlatformIO {
   def txPoolCapacity: Int
 }
 
-object PlatformIO {
+object PlatformIO extends StrictLogging {
   def init(rootPath: Path,
            dbFolder: String,
            dbName: String,
@@ -37,6 +37,7 @@ object PlatformIO {
     val emptyTrie: MerklePatriciaTrie =
       MerklePatriciaTrie.createStateTrie(RocksDBColumn(dbStorage, ColumnFamily.Trie, writeOptions))
 
+    logger.info(s"Platform root path: $rootPath")
     (disk, headerDB, emptyTrie)
   }
 }
