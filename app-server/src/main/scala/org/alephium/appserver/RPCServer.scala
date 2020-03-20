@@ -143,8 +143,7 @@ object RPCServer extends StrictLogging {
       for {
         address <- decodeAddress(query.address)
       } yield {
-        val pubScript  = PubScript.p2pkh(address)
-        val groupIndex = GroupIndex.from(pubScript)(blockFlow.config)
+        val groupIndex = GroupIndex.fromP2PKH(address)(blockFlow.config)
         Group(groupIndex.value)
       }
     }
