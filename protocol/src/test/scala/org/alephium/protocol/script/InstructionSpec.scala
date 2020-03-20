@@ -224,7 +224,7 @@ class InstructionSpec extends AlephiumSpec {
 
     test(BigInt(1) << 255 - 1, BigInt(1), BigInt(1) << 255 - 1)
     testFailure(BigInt(1) << 255, BigInt(1))
-    testFailure(BigInt(1), BigInt(0), Arithmetic("BigInteger divide by zero"))
+    testFailure(BigInt(1), BigInt(0), ArithmeticError("BigInteger divide by zero"))
   }
 
   it should "test OP_EQUALVERIFY" in new Fixture {
