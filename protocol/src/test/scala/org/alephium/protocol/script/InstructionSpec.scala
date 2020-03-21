@@ -436,6 +436,8 @@ class InstructionSpec extends AlephiumSpec {
     state0.run().left.value is VerificationFailed
   }
 
+  behavior of "Crypto Instructions"
+
   it should "test OP_KECCAK256" in new Fixture {
     val state = buildState(OP_KECCAK256, stackElems = AVector(data))
 
