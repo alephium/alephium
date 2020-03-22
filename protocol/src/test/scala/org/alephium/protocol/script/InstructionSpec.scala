@@ -450,11 +450,11 @@ class InstructionSpec extends AlephiumSpec {
     state.stack.isEmpty is true
   }
 
-  it should "test OP_CHECKSIG" in new Fixture {
+  it should "test OP_CHECKSIGVERIFY" in new Fixture {
     val (priKey, pubKey) = ED25519.generatePriPub()
     val signature        = ED25519.sign(data, priKey)
 
-    val state = buildState(OP_CHECKSIG,
+    val state = buildState(OP_CHECKSIGVERIFY,
                            rawData    = data,
                            stackElems = AVector(pubKey.bytes),
                            signatures = AVector(signature))
@@ -462,6 +462,33 @@ class InstructionSpec extends AlephiumSpec {
     state.run().isRight is true
     state.instructionIndex is 1
     state.stack.isEmpty is true
+  }
+
+  it should "test OP_CHECKMULTISIGVERIFY" in new Fixture {
+    val (priKey0, pubKey0) = ED25519.generatePriPub()
+    val signature0         = ED25519.sign(data, priKey0)
+    val (priKey1, pubKey1) = ED25519.generatePriPub()
+    val signature1         = ED25519.sign(data, priKey1)
+
+    val state0 = buildState(OP_CHECKMULTISIGVERIFY,
+                            rawData    = data,
+                            stackElems = AVector(pubKey0.bytes, pubKey1.bytes, ByteString(2)),
+                            signatures = AVector(signature0, signature1))
+    state0.run().isRight is true
+    state0.instructionIndex is 1
+    state0.stack.isEmpty is true
+
+    val state1 = buildState(OP_CHECKMULTISIGVERIFY,
+                            rawData    = data,
+                            stackElems = AVector(pubKey0.bytes, ByteString(2)),
+                            signatures = AVector(signature0, signature1))
+    state1.run().left.value is StackUnderflow
+
+    val state2 = buildState(OP_CHECKMULTISIGVERIFY,
+                            rawData    = data,
+                            stackElems = AVector(pubKey0.bytes, pubKey1.bytes, ByteString(2)),
+                            signatures = AVector(signature0, signature0))
+    state2.run().left.value is VerificationFailed
   }
 
   behavior of "Script Instructions"

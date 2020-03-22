@@ -19,7 +19,10 @@ object PubScript {
   def p2pkh(publicKey: ED25519PublicKey): PubScript = {
     val pkHash = Keccak256.hash(publicKey.bytes)
     val instructions =
-      AVector[Instruction](OP_KECCAK256, OP_PUSH.unsafe(pkHash.bytes), OP_EQUALVERIFY, OP_CHECKSIG)
+      AVector[Instruction](OP_KECCAK256,
+                           OP_PUSH.unsafe(pkHash.bytes),
+                           OP_EQUALVERIFY,
+                           OP_CHECKSIGVERIFY)
     PubScript(instructions)
   }
 }
