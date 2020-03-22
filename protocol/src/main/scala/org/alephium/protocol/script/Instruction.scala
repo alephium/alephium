@@ -568,7 +568,7 @@ case object OP_CHECKSIGVERIFY extends SimpleInstruction with Registrable {
 case object OP_CHECKMULTISIGVERIFY extends SimpleInstruction with Registrable {
   private def validate(nRaw: ByteString): RunResult[Int] = {
     if (nRaw.length == 1) Right(Bits.toPosInt(nRaw(0)))
-    else Left(IndexOverflow)
+    else Left(InvalidParameters)
   }
 
   override def runWith(state: RunState): RunResult[Unit] = {
