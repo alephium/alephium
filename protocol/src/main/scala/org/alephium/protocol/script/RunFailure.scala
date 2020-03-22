@@ -15,3 +15,5 @@ case object IntegerOverFlow                       extends RunFailure
 final case class ArithmeticError(message: String) extends RunFailure
 case object TooManyElses                          extends RunFailure
 case object IncompleteIfScript                    extends RunFailure
+final case class InvalidScript(message: String)   extends RunFailure
+case object InvalidScriptHash                     extends RunFailure

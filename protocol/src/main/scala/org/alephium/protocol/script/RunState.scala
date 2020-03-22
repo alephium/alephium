@@ -88,8 +88,7 @@ final case class RunState(context: RunContext,
   //scalastyle:on return
 
   def run(instructions: AVector[Instruction]): RunResult[Unit] = {
-    val newContest = context.copy(instructions = instructions)
-    val newState   = reload(newContest)
+    val newState = reload(instructions)
     newState.run()
   }
 
@@ -102,6 +101,11 @@ final case class RunState(context: RunContext,
   def isTerminated: Boolean = instructionIndex == context.instructions.length
 
   def isValidFinalState: Boolean = stack.isEmpty && signatures.isEmpty
+
+  def reload(instructions: AVector[Instruction]): RunState = {
+    val newContext = context.copy(instructions = instructions)
+    reload(newContext)
+  }
 
   def reload(newContext: RunContext): RunState = {
     this.copy(context = newContext, instructionIndex = 0)
