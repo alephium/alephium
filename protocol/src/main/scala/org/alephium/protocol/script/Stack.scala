@@ -1,5 +1,6 @@
 package org.alephium.protocol.script
 
+import scala.{specialized => sp}
 import scala.reflect.ClassTag
 
 import org.alephium.protocol.config.ScriptConfig
@@ -24,7 +25,7 @@ object Stack {
 }
 
 // Note: current place at underlying is empty
-class Stack[T] private (underlying: Array[T], var currentIndex: Int) {
+class Stack[@sp T: ClassTag] private (underlying: Array[T], var currentIndex: Int) {
   def isEmpty: Boolean = currentIndex == 0
 
   def size: Int = currentIndex
@@ -48,6 +49,18 @@ class Stack[T] private (underlying: Array[T], var currentIndex: Int) {
     } else {
       Left(StackUnderflow)
     }
+  }
+
+  def pop(n: Int): RunResult[AVector[T]] = {
+    assume(n > 0)
+    if (n <= size) {
+      val start = currentIndex - n
+      val elems = AVector.tabulate(n) { k =>
+        underlying(start + k)
+      }
+      currentIndex = start
+      Right(elems)
+    } else Left(StackUnderflow)
   }
 
   def remove(total: Int): RunResult[Unit] = {
