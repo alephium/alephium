@@ -1,11 +1,13 @@
 package org.alephium.protocol.script
 
+import scala.annotation.tailrec
+
 import akka.util.ByteString
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
 import org.alephium.macros.EnumerationMacros
 import org.alephium.serde._
-import org.alephium.util.Bits
+import org.alephium.util.{AVector, Bits}
 
 //scalastyle:off magic.number
 
@@ -53,6 +55,26 @@ object Instruction {
             case None      => Left(SerdeError.validation(s"Instruction - invalid code $code"))
           }
         case None => Left(SerdeError.notEnoughBytes(1, 0))
+      }
+    }
+  }
+
+  def serializeScript(input: AVector[Instruction]): ByteString = {
+    input.fold(ByteString.empty)(_ ++ _.serialize())
+  }
+
+  def deserializeScript(input: ByteString): RunResult[AVector[Instruction]] = {
+    deserializeScript(input, AVector.empty)
+  }
+
+  @tailrec
+  private def deserializeScript(input: ByteString,
+                                acc: AVector[Instruction]): RunResult[AVector[Instruction]] = {
+    if (input.isEmpty) Right(acc)
+    else {
+      serde._deserialize(input) match {
+        case Right((instruction, rest)) => deserializeScript(rest, acc :+ instruction)
+        case Left(error)                => Left(InvalidScript(error.getMessage))
       }
     }
   }
@@ -530,4 +552,49 @@ case object OP_CHECKSIG extends SimpleInstruction with Registrable {
   }
 
   override val code: Byte = 0x71
+}
+
+// Script Instructions
+
+sealed abstract case class OP_SCRIPTKECCAK256(hash: Keccak256) extends Instruction {
+  private def validateHash(scriptRaw: ByteString): RunResult[Unit] = {
+    if (Keccak256.hash(scriptRaw) == hash) Right(())
+    else Left(InvalidScriptHash)
+  }
+
+  override def runWith(state: RunState): RunResult[Unit] = {
+    for {
+      scriptRaw <- state.stack.pop()
+      _         <- validateHash(scriptRaw)
+      script    <- Instruction.deserializeScript(scriptRaw)
+      _         <- state.run(script)
+    } yield ()
+  }
+
+  override def serialize(): ByteString = {
+    ByteString(OP_SCRIPTKECCAK256.code) ++ hash.bytes
+  }
+}
+
+object OP_SCRIPTKECCAK256 extends InstructionCompanion with Registrable {
+  val code: Byte = 0x80.toByte
+
+  override def register(): Unit = Instruction.register(code, this)
+
+  def from(hash: Keccak256): OP_SCRIPTKECCAK256 = new OP_SCRIPTKECCAK256(hash) {}
+
+  def unsafe(rawHash: ByteString): OP_SCRIPTKECCAK256 = {
+    new OP_SCRIPTKECCAK256(Keccak256.unsafeFrom(rawHash)) {}
+  }
+
+  override def deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)] = {
+    Instruction.safeHead(input).flatMap {
+      case (codeRaw, rest) =>
+        if (codeRaw == code) {
+          Instruction.safeTake(rest, Keccak256.length).map {
+            case (rawHash, newRest) => OP_SCRIPTKECCAK256.unsafe(rawHash) -> newRest
+          }
+        } else Left(SerdeError.validation("OP_SCRIPTKECCAK256 - invalid code"))
+    }
+  }
 }

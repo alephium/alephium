@@ -463,4 +463,28 @@ class InstructionSpec extends AlephiumSpec {
     state.instructionIndex is 1
     state.stack.isEmpty is true
   }
+
+  behavior of "Script Instructions"
+
+  it should "test OP_SCRIPTKECCAK256" in new Fixture {
+    val script =
+      AVector[Instruction](OP_PUSH.unsafe(data), OP_POP.unsafe(1), OP_PUSH.unsafe(data ++ data))
+    val scriptRaw = Instruction.serializeScript(script)
+    val hash      = Keccak256.hash(scriptRaw)
+
+    val state0 = buildState(OP_PUSH.unsafe(scriptRaw))
+    state0.run().isRight is true
+    state0.stack.size is 1
+    state0.stack.peek(1).right.value is scriptRaw
+
+    val state1 = state0.reload(AVector[Instruction](OP_SCRIPTKECCAK256.from(hash)))
+    state1.run().isRight is true
+    state1.stack.size is 1
+    state1.stack.pop().right.value is data ++ data
+
+    val state2 = buildState(OP_PUSH.unsafe(scriptRaw ++ ByteString(0)))
+    state2.run().isRight is true
+    val state3 = state2.reload(AVector[Instruction](OP_SCRIPTKECCAK256.from(hash)))
+    state3.run().left.value is InvalidScriptHash
+  }
 }
