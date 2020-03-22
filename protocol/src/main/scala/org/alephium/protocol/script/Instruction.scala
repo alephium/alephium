@@ -7,7 +7,7 @@ import akka.util.ByteString
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
 import org.alephium.macros.EnumerationMacros
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits}
+import org.alephium.util.{AVector, Bits, EitherF}
 
 //scalastyle:off magic.number
 
@@ -90,6 +90,17 @@ object Instruction {
                              signature: ED25519Signature,
                              publicKey: ED25519PublicKey): RunResult[Unit] = {
     if (ED25519.verify(rawData, signature, publicKey)) Right(()) else Left(VerificationFailed)
+  }
+
+  private[script] def verify(rawData: ByteString,
+                             signatures: AVector[ED25519Signature],
+                             publicKeys: AVector[ED25519PublicKey]): RunResult[Unit] = {
+    assume(signatures.length == publicKeys.length)
+    EitherF.foreachTry(signatures.indices) { index =>
+      val signature = signatures(index)
+      val publicKey = publicKeys(index)
+      verify(rawData, signature, publicKey)
+    }
   }
 
   private[script] def safeHead(bytes: ByteString): SerdeResult[(Byte, ByteString)] = {
@@ -538,7 +549,7 @@ case object OP_KECCAK256 extends SimpleInstruction with Registrable {
   override val code: Byte = 0x70
 }
 
-case object OP_CHECKSIG extends SimpleInstruction with Registrable {
+case object OP_CHECKSIGVERIFY extends SimpleInstruction with Registrable {
   override def runWith(state: RunState): RunResult[Unit] = {
     val rawData    = state.context.rawData
     val stack      = state.stack
@@ -552,6 +563,26 @@ case object OP_CHECKSIG extends SimpleInstruction with Registrable {
   }
 
   override val code: Byte = 0x71
+}
+
+case object OP_CHECKMULTISIGVERIFY extends SimpleInstruction with Registrable {
+  private def validate(nRaw: ByteString): RunResult[Int] = {
+    if (nRaw.length == 1) Right(Bits.toPosInt(nRaw(0)))
+    else Left(IndexOverflow)
+  }
+
+  override def runWith(state: RunState): RunResult[Unit] = {
+    val rawData = state.context.rawData
+    val stack   = state.stack
+    for {
+      n          <- stack.pop().flatMap(validate)
+      publicKeys <- stack.pop(n).flatMap(_.mapE(Instruction.decodePublicKey))
+      signatures <- state.signatures.pop(n)
+      _          <- Instruction.verify(rawData, signatures, publicKeys)
+    } yield ()
+  }
+
+  override val code: Byte = 0x72
 }
 
 // Script Instructions

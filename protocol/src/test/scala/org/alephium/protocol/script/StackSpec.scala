@@ -4,7 +4,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.protocol.config.ScriptConfig
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class StackSpec extends AlephiumSpec {
   it should "push/pop/peek" in {
@@ -35,6 +35,13 @@ class StackSpec extends AlephiumSpec {
     stack.peek(1).isLeft is true
     stack.size is 0
     stack.isEmpty
+  }
+
+  it should "pop a number of elements" in {
+    val stack = Stack.unsafe(AVector(1, 2, 3), 3)
+    stack.pop(4).left.value is StackUnderflow
+    stack.size is 3
+    stack.pop(2).right.value is AVector(2, 3)
   }
 
   it should "swap/remove" in {

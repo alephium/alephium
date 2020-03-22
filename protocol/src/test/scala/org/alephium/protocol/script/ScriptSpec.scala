@@ -24,7 +24,7 @@ class ScriptSpec extends AlephiumSpec {
                            OP_KECCAK256,
                            OP_PUSH.unsafe(pkHash.bytes),
                            OP_EQUALVERIFY,
-                           OP_CHECKSIG))
+                           OP_CHECKSIGVERIFY))
     val priScript  = AVector[Instruction](OP_PUSH.unsafe(pk.bytes))
     val signatures = AVector(signature)
     val witness    = Witness(priScript, signatures)
@@ -40,7 +40,7 @@ class ScriptSpec extends AlephiumSpec {
   }
 
   it should "test for script hash" in new Fixture {
-    val scriptToHash = AVector[Instruction](OP_PUSH.unsafe(pk.bytes), OP_CHECKSIG)
+    val scriptToHash = AVector[Instruction](OP_PUSH.unsafe(pk.bytes), OP_CHECKSIGVERIFY)
     val scriptRaw    = Instruction.serializeScript(scriptToHash)
     val scriptHash   = Keccak256.hash(scriptRaw)
     val pubScript    = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
@@ -50,6 +50,30 @@ class ScriptSpec extends AlephiumSpec {
     val witness0     = Witness(priScript, AVector.empty)
     val witness1     = Witness(priScript.init, signatures)
     val witness2     = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
+
+    Script.run(data, pubScript, witness).isRight is true
+    Script.run(data0, pubScript, witness).left.value is VerificationFailed
+    Script.run(data, pubScript, witness0).left.value is StackUnderflow
+    Script.run(data, pubScript, witness1).left.value is StackUnderflow
+    Script.run(data, pubScript, witness2).left.value is InvalidFinalState
+  }
+
+  it should "test for multi signatures" in new Fixture {
+    val (sk1, pk1) = ED25519.generatePriPub()
+    val signature1 = ED25519.sign(data, sk1)
+    val scriptToHash = AVector[Instruction](OP_PUSH.unsafe(pk.bytes),
+                                            OP_PUSH.unsafe(pk1.bytes),
+                                            OP_PUSH.unsafe(ByteString(2)),
+                                            OP_CHECKMULTISIGVERIFY)
+    val scriptRaw  = Instruction.serializeScript(scriptToHash)
+    val scriptHash = Keccak256.hash(scriptRaw)
+    val pubScript  = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
+    val priScript  = AVector[Instruction](OP_PUSH.unsafe(scriptRaw))
+    val signatures = AVector(signature, signature1)
+    val witness    = Witness(priScript, signatures)
+    val witness0   = Witness(priScript, AVector.empty)
+    val witness1   = Witness(priScript.init, signatures)
+    val witness2   = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
 
     Script.run(data, pubScript, witness).isRight is true
     Script.run(data0, pubScript, witness).left.value is VerificationFailed
