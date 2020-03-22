@@ -1,6 +1,7 @@
 package org.alephium.protocol.script
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto._
@@ -16,6 +17,23 @@ class ScriptSpec extends AlephiumSpec {
     val signature = ED25519.sign(data, sk)
 
     implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 100 }
+
+    def priScript: AVector[Instruction]
+    def pubScript: PubScript
+    def signatures: AVector[ED25519Signature]
+
+    def test(): Assertion = {
+      val witness  = Witness(priScript, signatures)
+      val witness0 = Witness(priScript, AVector.empty)
+      val witness1 = Witness(priScript.init, signatures)
+      val witness2 = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
+
+      Script.run(data, pubScript, witness).isRight is true
+      Script.run(data0, pubScript, witness).left.value is VerificationFailed
+      Script.run(data, pubScript, witness0).left.value is StackUnderflow
+      Script.run(data, pubScript, witness1).left.value is StackUnderflow
+      Script.run(data, pubScript, witness2).left.value is InvalidFinalState
+    }
   }
 
   it should "test for public key hash scripts" in new Fixture {
@@ -27,16 +45,8 @@ class ScriptSpec extends AlephiumSpec {
                            OP_CHECKSIGVERIFY))
     val priScript  = AVector[Instruction](OP_PUSH.unsafe(pk.bytes))
     val signatures = AVector(signature)
-    val witness    = Witness(priScript, signatures)
-    val witness0   = Witness(priScript, AVector.empty)
-    val witness1   = Witness(priScript.init, signatures)
-    val witness2   = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
 
-    Script.run(data, pubScript, witness).isRight is true
-    Script.run(data0, pubScript, witness).left.value is VerificationFailed
-    Script.run(data, pubScript, witness0).left.value is StackUnderflow
-    Script.run(data, pubScript, witness1).left.value is IndexOverflow
-    Script.run(data, pubScript, witness2).left.value is InvalidFinalState
+    test()
   }
 
   it should "test for script hash" in new Fixture {
@@ -46,16 +56,8 @@ class ScriptSpec extends AlephiumSpec {
     val pubScript    = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
     val priScript    = AVector[Instruction](OP_PUSH.unsafe(scriptRaw))
     val signatures   = AVector(signature)
-    val witness      = Witness(priScript, signatures)
-    val witness0     = Witness(priScript, AVector.empty)
-    val witness1     = Witness(priScript.init, signatures)
-    val witness2     = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
 
-    Script.run(data, pubScript, witness).isRight is true
-    Script.run(data0, pubScript, witness).left.value is VerificationFailed
-    Script.run(data, pubScript, witness0).left.value is StackUnderflow
-    Script.run(data, pubScript, witness1).left.value is StackUnderflow
-    Script.run(data, pubScript, witness2).left.value is InvalidFinalState
+    test()
   }
 
   it should "test for multi signatures" in new Fixture {
@@ -70,15 +72,7 @@ class ScriptSpec extends AlephiumSpec {
     val pubScript  = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
     val priScript  = AVector[Instruction](OP_PUSH.unsafe(scriptRaw))
     val signatures = AVector(signature, signature1)
-    val witness    = Witness(priScript, signatures)
-    val witness0   = Witness(priScript, AVector.empty)
-    val witness1   = Witness(priScript.init, signatures)
-    val witness2   = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
 
-    Script.run(data, pubScript, witness).isRight is true
-    Script.run(data0, pubScript, witness).left.value is VerificationFailed
-    Script.run(data, pubScript, witness0).left.value is StackUnderflow
-    Script.run(data, pubScript, witness1).left.value is StackUnderflow
-    Script.run(data, pubScript, witness2).left.value is InvalidFinalState
+    test()
   }
 }

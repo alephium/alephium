@@ -6,8 +6,6 @@ case object VerificationFailed                    extends RunFailure
 final case class NonCategorized(message: String)  extends RunFailure
 case object StackOverflow                         extends RunFailure
 case object StackUnderflow                        extends RunFailure
-case object IndexOverflow                         extends RunFailure
-case object IndexUnderflow                        extends RunFailure
 case object InsufficientSignatures                extends RunFailure
 case object InvalidPublicKey                      extends RunFailure
 case object InvalidBoolean                        extends RunFailure
@@ -17,3 +15,4 @@ case object TooManyElses                          extends RunFailure
 case object IncompleteIfScript                    extends RunFailure
 final case class InvalidScript(message: String)   extends RunFailure
 case object InvalidScriptHash                     extends RunFailure
+case object InvalidParameters                     extends RunFailure

@@ -64,7 +64,7 @@ class Stack[@sp T: ClassTag] private (underlying: Array[T], var currentIndex: In
   }
 
   def remove(total: Int): RunResult[Unit] = {
-    if (size < total) Left(IndexOverflow)
+    if (size < total) Left(StackUnderflow)
     else {
       currentIndex -= total
       Right(())
@@ -75,9 +75,9 @@ class Stack[@sp T: ClassTag] private (underlying: Array[T], var currentIndex: In
   def peek(index: Int): RunResult[T] = {
     val elemIndex = currentIndex - index
     if (index < 1) {
-      Left(IndexUnderflow)
+      Left(StackOverflow)
     } else if (elemIndex < 0) {
-      Left(IndexOverflow)
+      Left(StackUnderflow)
     } else {
       Right(underlying(elemIndex))
     }
@@ -88,9 +88,9 @@ class Stack[@sp T: ClassTag] private (underlying: Array[T], var currentIndex: In
     val fromIndex = currentIndex - 1
     val toIndex   = currentIndex - index
     if (index <= 1) {
-      Left(IndexUnderflow)
+      Left(StackOverflow)
     } else if (toIndex < 0) {
-      Left(IndexOverflow)
+      Left(StackUnderflow)
     } else {
       val tmp = underlying(fromIndex)
       underlying(fromIndex) = underlying(toIndex)
