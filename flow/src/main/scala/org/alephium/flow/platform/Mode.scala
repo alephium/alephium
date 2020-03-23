@@ -22,12 +22,12 @@ object Mode {
   class Aws extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    override val node: Node = Node(builders, "Root")
+    override val node: Node = Node.build(builders, "Root")
   }
 
   class Local extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    override val node: Node = Node(builders, "Root")
+    override val node: Node = Node.build(builders, "Root")
   }
 }
