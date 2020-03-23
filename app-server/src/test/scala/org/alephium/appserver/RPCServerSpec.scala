@@ -21,8 +21,9 @@ import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.{BlockHeader, ModelGen}
+import org.alephium.protocol.model.{BlockHeader, BrokerInfo, GroupIndex, ModelGen}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, AlephiumSpec, AVector, Duration, EventBus, TimeStamp}
@@ -213,13 +214,32 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
     val blockHeader =
       ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
 
-    class BlockFlowDummy(probe: ActorRef)(implicit config: PlatformConfig) extends BlockFlow {
+    class BlockFlowDummy(probe: ActorRef)(implicit val config: PlatformConfig) extends BlockFlow {
       override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
         probe ! predicate(blockHeader)
         Seq.empty
       }
+      def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256]          = ???
+      def calBestDepsUnsafe(group: GroupIndex): BlockDeps                      = ???
+      def getAllTips: org.alephium.util.AVector[org.alephium.crypto.Keccak256] = ???
+      def getBestTip: org.alephium.crypto.Keccak256                            = ???
+      def add(header: org.alephium.protocol.model.BlockHeader,
+              parentHash: org.alephium.crypto.Keccak256,
+              weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
+      def add(header: org.alephium.protocol.model.BlockHeader,
+              weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
+      def add(block: org.alephium.protocol.model.Block,
+              parentHash: org.alephium.crypto.Keccak256,
+              weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
+      def add(block: org.alephium.protocol.model.Block,
+              weight: Int): org.alephium.flow.io.IOResult[Unit]                              = ???
+      def calBestDepsUnsafe(): Unit                                                          = ???
+      def updateBestDeps(): org.alephium.flow.io.IOResult[Unit]                              = ???
+      def add(block: org.alephium.protocol.model.Block): org.alephium.flow.io.IOResult[Unit] = ???
+      def add(
+          header: org.alephium.protocol.model.BlockHeader): org.alephium.flow.io.IOResult[Unit] =
+        ???
     }
-
     implicit val rpcConfig: RPCConfig =
       RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
     implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
