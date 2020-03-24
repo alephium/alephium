@@ -7,6 +7,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.{MethodRejection, UnsupportedRequestContentTypeRejection}
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestProbe
 import akka.util.{ByteString, Timeout}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -203,6 +204,27 @@ class RPCServerSpec
       (0 to 3).foreach { _ =>
         sendEventAndCheck
       }
+    }
+  }
+
+  it should "complete on `complete` command" in new AlephiumActorSpec("Websocket") {
+    val (actorRef, source) = RPCServerAbstract.Websocket.actorRef
+    val sinkProbe          = source.runWith(TestSink.probe[String])
+    val message            = "Hello"
+    actorRef ! message
+    actorRef ! RPCServerAbstract.Websocket.Completed
+    sinkProbe.request(1).expectNext(message).expectComplete()
+  }
+
+  it should "stop on `Failed` command" in new AlephiumActorSpec("Websocket") {
+    val (actorRef, source) = RPCServerAbstract.Websocket.actorRef
+    val sinkProbe          = source.runWith(TestSink.probe[String])
+    val message            = "Hello"
+    actorRef ! message
+    actorRef ! RPCServerAbstract.Websocket.Failed
+    sinkProbe.request(1).expectNextOrError() match {
+      case Right(hello) => hello is message
+      case Left(error)  => error.getMessage is "failure on events websocket"
     }
   }
 
