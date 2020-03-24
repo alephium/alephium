@@ -119,7 +119,7 @@ object Instruction {
   val True: ByteString  = ByteString(BigInt(1).toByteArray)
   val False: ByteString = ByteString(BigInt(0).toByteArray)
 
-  def bool(raw: ByteString): RunResult[Boolean] = {
+  private[script] def bool(raw: ByteString): RunResult[Boolean] = {
     if (raw == Instruction.True) Right(true)
     else if (raw == Instruction.False) Right(false)
     else Left(InvalidBoolean)
@@ -175,8 +175,8 @@ object OP_PUSH extends InstructionCompanion with Registrable {
   override def register(): Unit =
     Instruction.register(0x00, 0x07, this)
 
-  @inline private def validate(bytes: ByteString): Boolean =
-    bytes.nonEmpty && bytes.length <= 0xFF
+  @inline private def validate(bytes: ByteString): Boolean = validateSize(bytes.size)
+  @inline private def validateSize(size: Int): Boolean     = size > 0 && size < 0x100
 
   def from(bytes: ByteString): Either[String, OP_PUSH] = {
     if (validate(bytes)) Right(new OP_PUSH(bytes) {})
@@ -205,7 +205,7 @@ object OP_PUSH extends InstructionCompanion with Registrable {
             Instruction.safeHead(rest).flatMap {
               case (_length, newRest) =>
                 val length = Bits.toPosInt(_length)
-                if (length > 0 && length <= 0xFF) safeDeserialize(newRest, length)
+                if (validateSize(length)) safeDeserialize(newRest, length)
                 else Left(SerdeError.validation(s"OP_PUSH - invalid bytes length $length"))
             }
           case _ => Left(SerdeError.validation(s"OP_PUSH - invalid code"))
@@ -237,8 +237,9 @@ object OP_DUP extends InstructionCompanion with Registrable {
 
   @inline private def validate(index: Int): Boolean = index > 0 && index < 0x100
 
-  def from(index: Int): Option[OP_DUP] = {
-    if (validate(index)) Some(new OP_DUP(index) {}) else None
+  def from(index: Int): Either[String, OP_DUP] = {
+    if (validate(index)) Right(new OP_DUP(index) {})
+    else Left(s"OP_DUP - invalid index $index")
   }
 
   def unsafe(index: Int): OP_DUP = {
@@ -278,10 +279,11 @@ sealed abstract case class OP_SWAP(index: Int) extends Instruction {
 object OP_SWAP extends InstructionCompanion with Registrable {
   override def register(): Unit = Instruction.register(0x20, 0x2F, this)
 
-  def validate(index: Int): Boolean = index > 1 && index < 0x100
+  @inline private def validate(index: Int): Boolean = index > 1 && index < 0x100
 
-  def from(index: Int): Option[OP_SWAP] = {
-    if (validate(index)) Some(new OP_SWAP(index) {}) else None
+  def from(index: Int): Either[String, OP_SWAP] = {
+    if (validate(index)) Right(new OP_SWAP(index) {})
+    else Left(s"OP_SWAP: invalid index $index")
   }
 
   def unsafe(index: Int): OP_SWAP = {
@@ -321,10 +323,11 @@ sealed abstract case class OP_POP(total: Int) extends Instruction {
 case object OP_POP extends InstructionCompanion with Registrable {
   override def register(): Unit = Instruction.register(0x30, 0x3F, this)
 
-  def validate(index: Int): Boolean = index >= 1 && index < 0x100
+  private def validate(index: Int): Boolean = index >= 1 && index < 0x100
 
-  def from(index: Int): Option[OP_POP] = {
-    if (validate(index)) Some(new OP_POP(index) {}) else None
+  def from(index: Int): Either[String, OP_POP] = {
+    if (validate(index)) Right(new OP_POP(index) {})
+    else Left(s"OP_POP - invalid index $index")
   }
 
   def unsafe(index: Int): OP_POP = {
@@ -350,12 +353,12 @@ case object OP_POP extends InstructionCompanion with Registrable {
 object Arithmetic {
   val maxLen: Int = 32
 
-  def validate(bs: ByteString): RunResult[BigInt] = {
+  private[script] def validate(bs: ByteString): RunResult[BigInt] = {
     if (bs.length <= maxLen) Right(BigInt(bs.toArray))
     else Left(IntegerOverFlow)
   }
 
-  def validate(n: BigInt): RunResult[BigInt] = {
+  private[script] def validate(n: BigInt): RunResult[BigInt] = {
     val byteLen = n.bitLength / 8 + 1
     if (byteLen <= maxLen) Right(n)
     else Left(IntegerOverFlow)
@@ -366,7 +369,7 @@ object Arithmetic {
 sealed trait BinaryArithmetic extends SimpleInstruction {
   protected def op(x: BigInt, y: BigInt): RunResult[BigInt]
 
-  def checkedOp(x: BigInt, y: BigInt): RunResult[ByteString] = {
+  private def checkedOp(x: BigInt, y: BigInt): RunResult[ByteString] = {
     for {
       out       <- op(x, y)
       validated <- Arithmetic.validate(out)
@@ -520,7 +523,7 @@ case object OP_EQUAL extends SimpleInstruction with Registrable {
 }
 
 case object OP_EQUALVERIFY extends SimpleInstruction with Registrable {
-  def checkPoped(item0: ByteString, item1: ByteString): RunResult[Unit] = {
+  private def checkPoped(item0: ByteString, item1: ByteString): RunResult[Unit] = {
     if (item0 == item1) Right(()) else Left(VerificationFailed)
   }
 
@@ -567,8 +570,10 @@ case object OP_CHECKSIGVERIFY extends SimpleInstruction with Registrable {
 
 case object OP_CHECKMULTISIGVERIFY extends SimpleInstruction with Registrable {
   private def validate(nRaw: ByteString): RunResult[Int] = {
-    if (nRaw.length == 1) Right(Bits.toPosInt(nRaw(0)))
-    else Left(InvalidParameters)
+    if (nRaw.length == 1) {
+      val n = Bits.toPosInt(nRaw(0))
+      if (n > 0) Right(n) else Left(InvalidParameters)
+    } else Left(InvalidParameters)
   }
 
   override def runWith(state: RunState): RunResult[Unit] = {
