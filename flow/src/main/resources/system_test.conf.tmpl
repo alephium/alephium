@@ -52,3 +52,16 @@ alephium {
     "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77:100"
   ]
 }
+
+akka {
+  actor {
+    mining-dispatcher {
+      type = Dispatcher
+      executor = "fork-join-executor"
+      fork-join-executor {
+        parallelism-factor = 0.5
+      }
+      throughput = 1
+    }
+  }
+}

@@ -70,14 +70,32 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   val httpRoute: Route = routeHttp(miner)
   val wsRoute: Route   = routeWs(mode.node.eventBus)
 
+  private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
+  private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
+
   def runServer(): Future[Unit] = {
-    Http()
-      .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
-      .map(_ => ())
-    Http()
-      .bindAndHandle(wsRoute, rpcConfig.networkInterface.getHostAddress, wsPort)
-      .map(_ => ())
+    for {
+      httpBinding <- Http()
+        .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
+      wsBinding <- Http()
+        .bindAndHandle(wsRoute, rpcConfig.networkInterface.getHostAddress, wsPort)
+    } yield {
+      logger.info(s"Listening http request on $httpBinding")
+      logger.info(s"Listening ws request on $wsBinding")
+      httpBindingPromise.success(httpBinding)
+      wsBindingPromise.success(wsBinding)
+    }
   }
+
+  def stopServer(): Future[akka.Done] =
+    for {
+      httpStop <- httpBindingPromise.future.flatMap(_.unbind)
+      wsStop   <- wsBindingPromise.future.flatMap(_.unbind)
+    } yield {
+      logger.info(s"http unbound with message $httpStop.")
+      logger.info(s"ws unbound with message $wsStop.")
+      akka.Done
+    }
 }
 
 object RPCServer extends StrictLogging {
