@@ -40,9 +40,9 @@ trait RPCServerAbstract extends StrictLogging {
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
   def doTransfer(req: Request): FutureTry[TransferResult]
-  def doStartMining(miner: ActorRef): FutureTry[Boolean] =
+  def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
     execute(miner ! Miner.Start)
-  def doStopMining(miner: ActorRef): FutureTry[Boolean] =
+  def doStopMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
     execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
@@ -56,7 +56,7 @@ trait RPCServerAbstract extends StrictLogging {
     }
   }
 
-  def handlerRPC(miner: ActorRef): Handler = Map.apply(
+  def handlerRPC(miner: ActorRefT[Miner.Command]): Handler = Map.apply(
     "blockflow_fetch"  -> (req => wrap(req, doBlockflowFetch(req))),
     "get_balance"      -> (req => wrap(req, doGetBalance(req))),
     "get_group"        -> (req => wrap(req, doGetGroup(req))),
@@ -67,7 +67,7 @@ trait RPCServerAbstract extends StrictLogging {
     "transfer"         -> (req => wrap(req, doTransfer(req)))
   )
 
-  def routeHttp(miner: ActorRef): Route =
+  def routeHttp(miner: ActorRefT[Miner.Command]): Route =
     cors()((JsonRPCHandler.routeHttp(handlerRPC(miner))))
 
   def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {

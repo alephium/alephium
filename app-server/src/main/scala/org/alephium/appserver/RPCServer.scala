@@ -4,6 +4,7 @@ import scala.concurrent._
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Route
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -11,7 +12,7 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.client.FairMiner
+import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
@@ -24,7 +25,8 @@ import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Hex}
 
-class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract {
+class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
+    extends RPCServerAbstract {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
@@ -65,17 +67,15 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract
     Future.successful(transfer(mode.node.blockFlow, txHandler, req))
   }
 
-  def runServer(): Future[Unit] = {
-    val miner = {
-      val props = FairMiner.props(mode.node).withDispatcher("akka.actor.mining-dispatcher")
-      system.actorOf(props, s"FairMiner")
-    }
+  val httpRoute: Route = routeHttp(miner)
+  val wsRoute: Route   = routeWs(mode.node.eventBus)
 
+  def runServer(): Future[Unit] = {
     Http()
-      .bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, rpcPort)
+      .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
       .map(_ => ())
     Http()
-      .bindAndHandle(routeWs(mode.node.eventBus), rpcConfig.networkInterface.getHostAddress, wsPort)
+      .bindAndHandle(wsRoute, rpcConfig.networkInterface.getHostAddress, wsPort)
       .map(_ => ())
   }
 }
@@ -83,12 +83,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract
 object RPCServer extends StrictLogging {
   import RPCServerAbstract._
 
-  def apply(mode: Mode): RPCServer = {
+  def apply(mode: Mode, miner: ActorRefT[Miner.Command]): RPCServer = {
     (for {
       rpcPort <- mode.config.rpcPort
       wsPort  <- mode.config.wsPort
     } yield {
-      new RPCServer(mode, rpcPort, wsPort)
+      new RPCServer(mode, rpcPort, wsPort, miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")
