@@ -1,6 +1,6 @@
 package org.alephium.appserver
 
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -10,6 +10,8 @@ import org.alephium.util.ActorRefT
 
 class Server(mode: Mode) extends StrictLogging {
 
+  implicit val executionContext: ExecutionContext = (mode.node.system.dispatcher)
+
   private val miner: ActorRefT[Miner.Command] = {
     val props =
       FairMiner.props(mode.node)(mode.config).withDispatcher("akka.actor.mining-dispatcher")
@@ -18,10 +20,15 @@ class Server(mode: Mode) extends StrictLogging {
 
   val rpcServer: RPCServer = RPCServer(mode, miner)
 
-  rpcServer
-    .runServer()
-    .onComplete {
-      case Success(_) => ()
-      case Failure(e) => logger.error("Fatal error during initialization.", e)
-    }(mode.node.system.dispatcher)
+  def start(): Future[Unit] =
+    rpcServer
+      .runServer()
+
+  def stop(): Future[Unit] =
+    for {
+      _ <- rpcServer.stopServer()
+      _ <- mode.node.system.terminate()
+    } yield {
+      ()
+    }
 }
