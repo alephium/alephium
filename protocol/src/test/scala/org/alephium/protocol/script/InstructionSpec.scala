@@ -4,8 +4,9 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.{ED25519, ED25519Signature, Keccak256}
+import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
 import org.alephium.protocol.config.ScriptConfig
+import org.alephium.serde.SerdeError
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class InstructionSpec extends AlephiumSpec {
@@ -32,6 +33,57 @@ class InstructionSpec extends AlephiumSpec {
       val signatureStack = Stack.popOnly(signatures)
       RunState(context, 0, stack, signatureStack)
     }
+  }
+
+  behavior of "Instruction helper functions"
+
+  it should "test op_code register" in {
+    assertThrows[RuntimeException](Instruction.register(0, OP_CHECKMULTISIGVERIFY))
+    assertThrows[RuntimeException](Instruction.register(-1, OP_CHECKMULTISIGVERIFY))
+    assertThrows[RuntimeException](Instruction.register(256, OP_CHECKMULTISIGVERIFY))
+  }
+
+  it should "fail serde" in {
+    Instruction.serde.deserialize(ByteString.empty).left.value is a[SerdeError.NotEnoughBytes]
+    Instruction.serde.deserialize(ByteString(0xFF)).left.value is a[SerdeError.Validation]
+  }
+
+  it should "serde scripts" in {
+    val script       = AVector[Instruction](OP_IF, OP_ELSE, OP_ENDIF)
+    val serialized   = Instruction.serializeScript(script)
+    val deserialized = Instruction.deserializeScript(serialized).right.value
+    deserialized is script
+
+    Instruction.deserializeScript(ByteString(0xFF)).left.value is a[InvalidScript]
+  }
+
+  it should "decode publicKey" in {
+    val publicKey = ED25519PublicKey.generate
+    Instruction.decodePublicKey(publicKey.bytes).right.value is publicKey
+    Instruction.decodePublicKey(publicKey.bytes.init).left.value is InvalidPublicKey
+  }
+
+  it should "test safeHead/safeTake" in {
+    Instruction.safeHead(ByteString(0)).right.value._1 is 0.toByte
+    Instruction.safeHead(ByteString.empty).left.value is a[SerdeError.NotEnoughBytes]
+    Instruction.safeTake(ByteString(0), 1).right.value._1 is ByteString(0)
+    Instruction.safeTake(ByteString(0), 2).left.value is a[SerdeError.NotEnoughBytes]
+  }
+
+  it should "fail serialization of SimpleInstruction" in {
+    OP_IF.deserialize(ByteString(0)).left.value is a[SerdeError.Validation]
+  }
+
+  behavior of "Stack Instructions"
+
+  it should "test the constructors of OP_PUSH" in {
+    val bytes0 = ByteString.empty
+    assertThrows[AssertionError](OP_PUSH.unsafe(bytes0))
+    OP_PUSH.from(bytes0).isLeft is true
+
+    val bytes1 = ByteString.fromArray(Array.ofDim[Byte](0xFF + 1))
+    assertThrows[AssertionError](OP_PUSH.unsafe(bytes1))
+    OP_PUSH.from(bytes1).isLeft is true
   }
 
   it should "test OP_PUSH" in new Fixture {
@@ -68,6 +120,13 @@ class InstructionSpec extends AlephiumSpec {
     assertThrows[AssertionError](test(256, 0x07, 255))
   }
 
+  it should "test the constructors of OP_DUP" in {
+    assertThrows[AssertionError](OP_DUP.unsafe(0))
+    assertThrows[AssertionError](OP_DUP.unsafe(0x100))
+    OP_DUP.from(0).isLeft is true
+    OP_DUP.from(0x100).isLeft is true
+  }
+
   it should "test OP_DUP" in new Fixture {
     val state = buildState(OP_DUP.unsafe(1), stackElems = AVector(data))
 
@@ -100,6 +159,15 @@ class InstructionSpec extends AlephiumSpec {
     test1(255)
     assertThrows[AssertionError](test0(256))
     assertThrows[AssertionError](test1(256))
+  }
+
+  it should "test the constructors of OP_SWAP" in {
+    assertThrows[AssertionError](OP_SWAP.unsafe(0))
+    assertThrows[AssertionError](OP_SWAP.unsafe(1))
+    assertThrows[AssertionError](OP_SWAP.unsafe(0x100))
+    OP_SWAP.from(0).isLeft is true
+    OP_SWAP.from(1).isLeft is true
+    OP_SWAP.from(0x100).isLeft is true
   }
 
   it should "test OP_SWAP" in new Fixture {
@@ -138,6 +206,13 @@ class InstructionSpec extends AlephiumSpec {
     test1(255)
     assertThrows[AssertionError](test0(256))
     assertThrows[AssertionError](test1(256))
+  }
+
+  it should "test the constructors of OP_POP" in {
+    assertThrows[AssertionError](OP_POP.unsafe(0))
+    assertThrows[AssertionError](OP_POP.unsafe(0x100))
+    OP_POP.from(0).isLeft is true
+    OP_POP.from(0x100).isLeft is true
   }
 
   it should "test OP_POP" in new Fixture {
@@ -422,6 +497,7 @@ class InstructionSpec extends AlephiumSpec {
 
   it should "test OP_EQUAL" in new LogicFixture(OP_EQUAL) {
     override def op(x: Int, y: Int): Boolean = x.equals(y)
+    test()
   }
 
   it should "test OP_EQUALVERIFY" in new Fixture {
@@ -489,6 +565,12 @@ class InstructionSpec extends AlephiumSpec {
                             stackElems = AVector(pubKey0.bytes, pubKey1.bytes, ByteString(2)),
                             signatures = AVector(signature0, signature0))
     state2.run().left.value is VerificationFailed
+
+    val state3 = buildState(OP_CHECKMULTISIGVERIFY, stackElems = AVector(ByteString(0)))
+    state3.run().left.value is InvalidParameters
+
+    val state4 = buildState(OP_CHECKMULTISIGVERIFY, stackElems = AVector(ByteString(0, 1)))
+    state4.run().left.value is InvalidParameters
   }
 
   behavior of "Script Instructions"
@@ -513,5 +595,12 @@ class InstructionSpec extends AlephiumSpec {
     state2.run().isRight is true
     val state3 = state2.reload(AVector[Instruction](OP_SCRIPTKECCAK256.from(hash)))
     state3.run().left.value is InvalidScriptHash
+  }
+
+  it should "serde OP_SCRIPTKECCAK256" in {
+    val instruction = OP_SCRIPTKECCAK256.from(Keccak256.random)
+    Instruction.serde.deserialize(instruction.serialize()).right.value is instruction
+
+    OP_SCRIPTKECCAK256.deserialize(ByteString(0)).left.value is a[SerdeError.Validation]
   }
 }

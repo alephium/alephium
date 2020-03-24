@@ -17,9 +17,12 @@ class StackSpec extends AlephiumSpec {
     stack.push(1).isRight is true
     stack.size is 1
     stack.peek(1).right.value is 1
+    stack.peek(0).left.value is StackOverflow
+    stack.peek(2).left.value is StackUnderflow
     stack.push(2).isRight is true
     stack.peek(1).right.value is 2
     stack.peek(2).right.value is 1
+    stack.peek(3).left.value is StackUnderflow
     stack.size is 2
     stack.push(3).isLeft is true
     stack.peek(1).right.value is 2
@@ -58,12 +61,14 @@ class StackSpec extends AlephiumSpec {
     stack.push(2)
     stack.push(3)
     check(stack, 3, 2, 1)
+    stack.swap(4).left.value is StackUnderflow
     stack.swap(3).isRight is true
     check(stack, 1, 2, 3)
     stack.swap(2).isRight is true
     check(stack, 2, 1, 3)
     stack.swap(1).isLeft is true
-    stack.remove(3)
+    stack.remove(4).left.value is StackUnderflow
+    stack.remove(3).isRight is true
     stack.isEmpty is true
   }
 }
