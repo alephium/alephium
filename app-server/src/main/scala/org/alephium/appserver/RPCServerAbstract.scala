@@ -10,6 +10,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.{CompletionStrategy, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.{Encoder, Json}
 import io.circe.syntax._
@@ -19,7 +20,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.rpc.{CirceUtils, CORSHandler, JsonRPCHandler}
+import org.alephium.rpc.{CirceUtils, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
 import org.alephium.util.{ActorRefT, EventBus}
 
@@ -67,11 +68,11 @@ trait RPCServerAbstract extends StrictLogging {
   )
 
   def routeHttp(miner: ActorRef): Route =
-    CORSHandler(JsonRPCHandler.routeHttp(handlerRPC(miner)))
+    cors()((JsonRPCHandler.routeHttp(handlerRPC(miner))))
 
   def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
     path("events") {
-      CORSHandler(get {
+      cors()(get {
         extractUpgradeToWebSocket { upgrade =>
           val (actor, source) = Websocket.actorRef
           eventBus.tell(EventBus.Subscribe, actor)

@@ -52,6 +52,7 @@ lazy val `app-server` = project("app-server")
     libraryDependencies ++= Seq(
       `alephium-rpc`,
       `alephium-util` % "test" classifier "tests",
+      akkahttpcors,
       akkahttptest,
       akkastreamtest
     )
