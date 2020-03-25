@@ -189,7 +189,6 @@ class RPCServerSpec extends AlephiumSpec with ScalatestRouteTest with EitherValu
   it should "reject GET" in new RouteHTTP {
     Get() ~> route ~> check {
       rejections is List(
-        MethodRejection(HttpMethods.OPTIONS),
         MethodRejection(HttpMethods.POST)
       )
     }
