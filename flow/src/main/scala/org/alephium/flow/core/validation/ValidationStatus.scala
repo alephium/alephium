@@ -2,7 +2,7 @@ package org.alephium.flow.core.validation
 
 import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult}
-import org.alephium.protocol.script.RunFailed
+import org.alephium.protocol.script.RunFailure
 import org.alephium.util.AVector
 
 sealed trait ValidationStatus
@@ -72,13 +72,13 @@ sealed trait TxStatus        extends ValidationStatus
 sealed trait InvalidTxStatus extends TxStatus
 final case object ValidTx    extends TxStatus with ValidStatus
 
-final case object EmptyInputs                     extends InvalidTxStatus
-final case object EmptyOutputs                    extends InvalidTxStatus
-final case object NegativeOutputValue             extends InvalidTxStatus
-final case object OutputValueOverFlow             extends InvalidTxStatus
-final case object InvalidChainIndex               extends InvalidTxStatus
-final case object DoubleSpent                     extends InvalidTxStatus
-final case object NonExistInput                   extends InvalidTxStatus
-final case object InvalidBalance                  extends InvalidTxStatus
-final case object InvalidWitnessLength            extends InvalidTxStatus
-final case class InvalidWitness(error: RunFailed) extends InvalidTxStatus
+final case object EmptyInputs                      extends InvalidTxStatus
+final case object EmptyOutputs                     extends InvalidTxStatus
+final case object NegativeOutputValue              extends InvalidTxStatus
+final case object OutputValueOverFlow              extends InvalidTxStatus
+final case object InvalidChainIndex                extends InvalidTxStatus
+final case object DoubleSpent                      extends InvalidTxStatus
+final case object NonExistInput                    extends InvalidTxStatus
+final case object InvalidBalance                   extends InvalidTxStatus
+final case object InvalidWitnessLength             extends InvalidTxStatus
+final case class InvalidWitness(error: RunFailure) extends InvalidTxStatus
