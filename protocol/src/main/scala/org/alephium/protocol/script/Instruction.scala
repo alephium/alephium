@@ -80,10 +80,7 @@ object Instruction {
   }
 
   private[script] def decodePublicKey(bytes: ByteString): RunResult[ED25519PublicKey] = {
-    ED25519PublicKey.from(bytes) match {
-      case Some(key) => Right(key)
-      case None      => Left(InvalidPublicKey)
-    }
+    ED25519PublicKey.from(bytes).toRight(InvalidPublicKey)
   }
 
   private[script] def verify(rawData: ByteString,
@@ -116,8 +113,8 @@ object Instruction {
     else Left(SerdeError.notEnoughBytes(length, bytes.length))
   }
 
-  val True: ByteString  = ByteString(BigInt(1).toByteArray)
-  val False: ByteString = ByteString(BigInt(0).toByteArray)
+  val True: ByteString  = ByteString(1)
+  val False: ByteString = ByteString(0)
 
   private[script] def bool(raw: ByteString): RunResult[Boolean] = {
     if (raw == Instruction.True) Right(true)
@@ -580,9 +577,9 @@ case object OP_CHECKMULTISIGVERIFY extends SimpleInstruction with Registrable {
     val rawData = state.context.rawData
     val stack   = state.stack
     for {
-      n          <- stack.pop().flatMap(validate)
-      publicKeys <- stack.pop(n).flatMap(_.mapE(Instruction.decodePublicKey))
-      signatures <- state.signatures.pop(n)
+      sigNum     <- stack.pop().flatMap(validate)
+      publicKeys <- stack.pop(sigNum).flatMap(_.mapE(Instruction.decodePublicKey))
+      signatures <- state.signatures.pop(sigNum)
       _          <- Instruction.verify(rawData, signatures, publicKeys)
     } yield ()
   }
