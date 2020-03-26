@@ -122,7 +122,7 @@ class AlephiumMake(object):
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} bootstrap={} ALEPHIUM_HOME={} ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, bootstrap, homedir, homedir))
+            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} bootstrap={} ALEPHIUM_HOME={} nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, bootstrap, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]
