@@ -20,10 +20,10 @@ class ScriptSpec extends AlephiumSpec {
 
     def priScript: AVector[Instruction]
     def pubScript: PubScript
-    def signatures: AVector[ED25519Signature]
+    def signatures: AVector[ED25519Signature] = AVector(signature)
+    def witness: Witness                      = Witness(priScript, signatures)
 
     def test(): Assertion = {
-      val witness  = Witness(priScript, signatures)
       val witness0 = Witness(priScript, AVector.empty)
       val witness1 = Witness(priScript.init, signatures)
       val witness2 = Witness(OP_PUSH.unsafe(pk.bytes) +: priScript, signatures)
@@ -37,36 +37,33 @@ class ScriptSpec extends AlephiumSpec {
   }
 
   it should "test for public key hash scripts" in new Fixture {
-    val pubScript  = PubScript.p2pkh(pk)
-    val priScript  = AVector[Instruction](OP_PUSH.unsafe(pk.bytes))
-    val signatures = AVector(signature)
+    val pubScript        = PubScript.p2pkh(pk)
+    val priScript        = PriScript.p2pkh(pk)
+    override val witness = Witness.p2pkh(pk, signature)
 
     test()
   }
 
   it should "test for script hash" in new Fixture {
-    val scriptToHash = AVector[Instruction](OP_PUSH.unsafe(pk.bytes), OP_CHECKSIGVERIFY)
-    val scriptRaw    = Instruction.serializeScript(scriptToHash)
-    val scriptHash   = Keccak256.hash(scriptRaw)
-    val pubScript    = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
-    val priScript    = AVector[Instruction](OP_PUSH.unsafe(scriptRaw))
-    val signatures   = AVector(signature)
+    val pubScript        = PubScript.p2sh(pk)
+    val priScript        = PriScript.p2sh(pk)
+    override val witness = Witness.p2sh(pk, signature)
 
     test()
   }
 
   it should "test for multi signatures" in new Fixture {
-    val (sk1, pk1) = ED25519.generatePriPub()
-    val signature1 = ED25519.sign(data, sk1)
+    val (sk1, pk1)          = ED25519.generatePriPub()
+    val signature1          = ED25519.sign(data, sk1)
+    override val signatures = AVector(signature, signature1)
+
     val scriptToHash = AVector[Instruction](OP_PUSH.unsafe(pk.bytes),
                                             OP_PUSH.unsafe(pk1.bytes),
                                             OP_PUSH.unsafe(ByteString(2)),
                                             OP_CHECKMULTISIGVERIFY)
-    val scriptRaw  = Instruction.serializeScript(scriptToHash)
-    val scriptHash = Keccak256.hash(scriptRaw)
-    val pubScript  = PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
-    val priScript  = AVector[Instruction](OP_PUSH.unsafe(scriptRaw))
-    val signatures = AVector(signature, signature1)
+    val scriptRaw = Instruction.serializeScript(scriptToHash)
+    val pubScript = PubScript.p2sh(scriptRaw)
+    val priScript = PriScript.p2sh(scriptRaw)
 
     test()
   }
