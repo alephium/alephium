@@ -207,7 +207,7 @@ object RPCServer extends StrictLogging {
                txHandler: ActorRefT[TxHandler.Command],
                req: Request): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
-      if (query.fromType == GetBalance.pkh || query.toType == GetBalance.pkh) {
+      if (query.fromType == GetBalance.pkh && query.toType == GetBalance.pkh) {
         val resultEither = for {
           fromAddress    <- decodePublicKey(query.fromAddress)
           _              <- checkGroup(blockFlow, fromAddress)
