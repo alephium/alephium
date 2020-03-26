@@ -4,7 +4,7 @@ import scala.collection.JavaConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
@@ -18,11 +18,11 @@ trait PlatformConfigFixture {
   val env      = Env.resolve()
   val rootPath = Platform.getRootPath(env)
 
-  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + this.getClass.getSimpleName)
+  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + Keccak256.random.toHexString)
 
   lazy val newConfig =
     ConfigFactory
-      .parseMap(configValues.mapValues(ConfigValueFactory.fromAnyRef(_)).asJava)
+      .parseMap(configValues.mapValues(ConfigValueFactory.fromAnyRef).asJava)
       .withFallback(Configs.parseConfig(newPath))
 
   lazy val groups0 = newConfig.getInt("alephium.groups")

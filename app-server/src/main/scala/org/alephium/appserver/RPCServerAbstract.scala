@@ -68,7 +68,7 @@ trait RPCServerAbstract extends StrictLogging {
   )
 
   def routeHttp(miner: ActorRefT[Miner.Command]): Route =
-    cors()((JsonRPCHandler.routeHttp(handlerRPC(miner))))
+    cors()(JsonRPCHandler.routeHttp(handlerRPC(miner)))
 
   def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
     path("events") {
