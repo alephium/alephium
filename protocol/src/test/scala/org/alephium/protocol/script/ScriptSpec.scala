@@ -37,12 +37,7 @@ class ScriptSpec extends AlephiumSpec {
   }
 
   it should "test for public key hash scripts" in new Fixture {
-    val pubScript = PubScript(
-      AVector[Instruction](OP_DUP.unsafe(1),
-                           OP_KECCAK256,
-                           OP_PUSH.unsafe(pkHash.bytes),
-                           OP_EQUALVERIFY,
-                           OP_CHECKSIGVERIFY))
+    val pubScript  = PubScript.p2pkh(pk)
     val priScript  = AVector[Instruction](OP_PUSH.unsafe(pk.bytes))
     val signatures = AVector(signature)
 
