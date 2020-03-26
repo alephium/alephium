@@ -1,5 +1,7 @@
 package org.alephium.protocol.script
 
+import akka.util.ByteString
+
 import org.alephium.crypto.{ED25519PublicKey, Keccak256, Keccak256Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, DjbHash}
@@ -24,5 +26,16 @@ object PubScript {
                                             OP_EQUALVERIFY,
                                             OP_CHECKSIGVERIFY)
     PubScript(instructions)
+  }
+
+  def p2sh(publicKey: ED25519PublicKey): PubScript = {
+    val script    = AVector[Instruction](OP_PUSH.unsafe(publicKey.bytes), OP_CHECKSIGVERIFY)
+    val scriptRaw = Instruction.serializeScript(script)
+    p2sh(scriptRaw)
+  }
+
+  def p2sh(scriptRaw: ByteString): PubScript = {
+    val scriptHash = Keccak256.hash(scriptRaw)
+    PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
   }
 }

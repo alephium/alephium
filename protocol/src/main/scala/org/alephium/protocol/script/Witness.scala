@@ -11,11 +11,27 @@ object Witness {
   implicit val serde: Serde[Witness] =
     Serde.forProduct2(Witness(_, _), t => (t.privateScript, t.signatures))
 
-  // TODO: optimize this using cache
+  // TODO: optimize the following scripts using cache
+
   def p2pkh(rawTransaction: RawTransaction,
             publicKey: ED25519PublicKey,
             privateKey: ED25519PrivateKey): Witness = {
     val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
-    Witness(AVector[Instruction](OP_PUSH.unsafe(publicKey.bytes)), AVector(signature))
+    p2pkh(publicKey, signature)
+  }
+
+  def p2pkh(publicKey: ED25519PublicKey, signatures: ED25519Signature): Witness = {
+    Witness(PriScript.p2pkh(publicKey), AVector(signatures))
+  }
+
+  def p2sh(rawTransaction: RawTransaction,
+           publicKey: ED25519PublicKey,
+           privateKey: ED25519PrivateKey): Witness = {
+    val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
+    p2sh(publicKey, signature)
+  }
+
+  def p2sh(publicKey: ED25519PublicKey, signature: ED25519Signature): Witness = {
+    Witness(PriScript.p2sh(publicKey), AVector(signature))
   }
 }
