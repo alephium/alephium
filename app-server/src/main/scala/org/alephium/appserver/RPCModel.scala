@@ -19,6 +19,7 @@ object RPCModel {
     implicit val decoderTS: Decoder[TimeStamp] =
       Decoder.decodeLong.ensure(_ >= 0, s"expect positive timestamp").map(TimeStamp.unsafe)
     implicit val encoderTS: Encoder[TimeStamp] = Encoder.encodeLong.contramap(_.millis)
+    implicit val codec: Codec[TimeStamp]       = Codec.from(decoderTS, encoderTS)
   }
 
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends RPCModel

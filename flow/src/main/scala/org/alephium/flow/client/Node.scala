@@ -8,31 +8,46 @@ import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
-final case class Node(builders: BrokerHandler.Builder, name: String)(
-    implicit config: PlatformConfig) {
-  val system: ActorSystem = ActorSystem(name, config.all)
+trait Node {
+  implicit def config: PlatformConfig
+  def system: ActorSystem
+  def blockFlow: BlockFlow
+  def allHandlers: AllHandlers
+  def server: ActorRefT[TcpServer.Command]
+  def eventBus: ActorRefT[EventBus.Message]
+  def discoveryServer: ActorRefT[DiscoveryServer.Command]
+  def cliqueManager: ActorRefT[CliqueManager.Command]
+  def boostraper: ActorRefT[Bootstrapper.Command]
+}
 
-  val blockFlow: BlockFlow = BlockFlow.createUnsafe()
+object Node {
+  def build(builders: BrokerHandler.Builder, name: String)(
+      implicit platformConfig: PlatformConfig): Node = new Node {
+    val config              = platformConfig
+    val system: ActorSystem = ActorSystem(name, config.all)
 
-  val server: ActorRefT[TcpServer.Command] = ActorRefT
-    .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")
+    val blockFlow: BlockFlow = BlockFlow.createUnsafe()
 
-  val eventBus: ActorRefT[EventBus.Message] =
-    ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
+    val server: ActorRefT[TcpServer.Command] = ActorRefT
+      .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")
 
-  val discoveryProps: Props = DiscoveryServer.props(config.bootstrap)(config)
-  val discoveryServer: ActorRefT[DiscoveryServer.Command] =
-    ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
-  val cliqueManager: ActorRefT[CliqueManager.Command] =
-    ActorRefT.build(system, CliqueManager.props(builders, discoveryServer), "CliqueManager")
+    val eventBus: ActorRefT[EventBus.Message] =
+      ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
 
-  val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
+    val discoveryProps: Props = DiscoveryServer.props(config.bootstrap)(config)
+    val discoveryServer: ActorRefT[DiscoveryServer.Command] =
+      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
+    val cliqueManager: ActorRefT[CliqueManager.Command] =
+      ActorRefT.build(system, CliqueManager.props(builders, discoveryServer), "CliqueManager")
 
-  cliqueManager ! CliqueManager.SendAllHandlers(allHandlers)
+    val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
 
-  val boostraper: ActorRefT[Bootstrapper.Command] =
-    ActorRefT.build[Bootstrapper.Command](
-      system,
-      Bootstrapper.props(server, discoveryServer, cliqueManager),
-      "Bootstrapper")
+    cliqueManager ! CliqueManager.SendAllHandlers(allHandlers)
+
+    val boostraper: ActorRefT[Bootstrapper.Command] =
+      ActorRefT.build[Bootstrapper.Command](
+        system,
+        Bootstrapper.props(server, discoveryServer, cliqueManager),
+        "Bootstrapper")
+  }
 }

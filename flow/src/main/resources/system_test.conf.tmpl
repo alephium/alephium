@@ -27,10 +27,8 @@ alephium {
     masterAddress = "localhost:9972"
     numOfSyncBlocksLimit = 4
 
-    rpcPort = 0
-    rpcPort = ${?rpcPort}
-    wsPort = 0
-    wsPort = ${?wsPort}
+    rpcPort = 10973
+    wsPort = 11973
   }
 
   discovery {
@@ -53,4 +51,17 @@ alephium {
   genesis = [
     "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77:100"
   ]
+}
+
+akka {
+  actor {
+    mining-dispatcher {
+      type = Dispatcher
+      executor = "fork-join-executor"
+      fork-join-executor {
+        parallelism-factor = 0.5
+      }
+      throughput = 1
+    }
+  }
 }
