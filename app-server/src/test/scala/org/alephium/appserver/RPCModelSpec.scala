@@ -5,6 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import io.circe.{Codec, Decoder, Encoder}
 import io.circe.parser._
 import io.circe.syntax._
+import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
@@ -48,6 +49,21 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     parse(jsonRaw).right.value.as[A].left.value.message
   }
 
+  it should "encode/decode TimeStamp" in {
+    import TimeStampCodec._
+
+    checkData(TimeStamp.unsafe(0), "0")
+
+    forAll(Gen.posNum[Long]) { long =>
+      val timestamp = TimeStamp.unsafe(long)
+      checkData(timestamp, s"$long")
+    }
+
+    forAll(Gen.negNum[Long]) { long =>
+      parseFail[TimeStamp](s"$long") is "expect positive timestamp"
+    }
+  }
+
   it should "encode/decode FetchRequest" in {
     val request =
       FetchRequest(TimeStamp.unsafe(1L), TimeStamp.unsafe(42L))
@@ -86,9 +102,11 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   it should "encode/decode NeighborCliques" in {
     val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo))
     val cliqueIdString  = dummyCliqueInfo.id.toHexString
-    val jsonRaw =
-      s"""{"cliques":[{"id":"$cliqueIdString","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
-    checkData(neighborCliques, jsonRaw)
+    def jsonRaw(cliqueId: String) =
+      s"""{"cliques":[{"id":"$cliqueId","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
+    checkData(neighborCliques, jsonRaw(cliqueIdString))
+
+    parseFail[NeighborCliques](jsonRaw("OOPS")) is "invalid clique id"
   }
 
   it should "encode/decode GetBalance" in {

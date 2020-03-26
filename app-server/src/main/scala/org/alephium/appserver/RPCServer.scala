@@ -4,6 +4,7 @@ import scala.concurrent._
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Route
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe._
@@ -11,7 +12,7 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.client.FairMiner
+import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
@@ -24,7 +25,8 @@ import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Hex}
 
-class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract {
+class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
+    extends RPCServerAbstract {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
@@ -65,30 +67,46 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int) extends RPCServerAbstract
     Future.successful(transfer(mode.node.blockFlow, txHandler, req))
   }
 
-  def runServer(): Future[Unit] = {
-    val miner = {
-      val props = FairMiner.props(mode.node).withDispatcher("akka.actor.mining-dispatcher")
-      system.actorOf(props, s"FairMiner")
-    }
+  val httpRoute: Route = routeHttp(miner)
+  val wsRoute: Route   = routeWs(mode.node.eventBus)
 
-    Http()
-      .bindAndHandle(routeHttp(miner), rpcConfig.networkInterface.getHostAddress, rpcPort)
-      .map(_ => ())
-    Http()
-      .bindAndHandle(routeWs(mode.node.eventBus), rpcConfig.networkInterface.getHostAddress, wsPort)
-      .map(_ => ())
+  private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
+  private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
+
+  def runServer(): Future[Unit] = {
+    for {
+      httpBinding <- Http()
+        .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
+      wsBinding <- Http()
+        .bindAndHandle(wsRoute, rpcConfig.networkInterface.getHostAddress, wsPort)
+    } yield {
+      logger.info(s"Listening http request on $httpBinding")
+      logger.info(s"Listening ws request on $wsBinding")
+      httpBindingPromise.success(httpBinding)
+      wsBindingPromise.success(wsBinding)
+    }
   }
+
+  def stopServer(): Future[akka.Done] =
+    for {
+      httpStop <- httpBindingPromise.future.flatMap(_.unbind)
+      wsStop   <- wsBindingPromise.future.flatMap(_.unbind)
+    } yield {
+      logger.info(s"http unbound with message $httpStop.")
+      logger.info(s"ws unbound with message $wsStop.")
+      akka.Done
+    }
 }
 
 object RPCServer extends StrictLogging {
   import RPCServerAbstract._
 
-  def apply(mode: Mode): RPCServer = {
+  def apply(mode: Mode, miner: ActorRefT[Miner.Command]): RPCServer = {
     (for {
       rpcPort <- mode.config.rpcPort
       wsPort  <- mode.config.wsPort
     } yield {
-      new RPCServer(mode, rpcPort, wsPort)
+      new RPCServer(mode, rpcPort, wsPort, miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")
