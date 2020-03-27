@@ -1,0 +1,86 @@
+akka {
+  loglevel = "DEBUG"
+  loggers = ["akka.event.slf4j.Slf4jLogger"]
+  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
+
+  io.tcp.register-timeout = 1m
+
+  actor {
+    default-dispatcher {
+      executor = "fork-join-executor"
+      fork-join-executor {
+        parallelism-factor = 0.5
+      }
+      throughput = 1
+    }
+
+    mining-dispatcher {
+      type = Dispatcher
+      executor = "fork-join-executor"
+      fork-join-executor {
+        parallelism-factor = 0.5
+      }
+      throughput = 1
+    }
+
+    guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
+  }
+}
+
+alephium {
+  groups = 4
+
+  clique {
+    brokerNum = 2
+  }
+
+  broker {
+    brokerId = 0
+  }
+
+  consensus {
+    numZerosAtLeastInHash = 12
+    blockTargetTime = 4 minutes
+    blockConfirmNum = 100
+    blockCacheSizePerChain = 25
+  }
+
+  mining {
+    nonceStep = 10000
+  }
+
+  network {
+    pingFrequency = 300 second
+    retryTimeout = 300 second
+    masterAddress = "localhost:9973"
+    publicAddress = "localhost:9972"
+    numOfSyncBlocksLimit = 128
+
+    rpcPort = 0
+    rpcPort = ${?rpcPort}
+    wsPort = 0
+    wsPort = ${?wsPort}
+  }
+
+  discovery {
+    peersPerGroup = 16
+    scanMaxPerGroup = 8
+    scanFrequency = 120.seconds
+    scanFastFrequency = 10.seconds
+    neighborsPerGroup = 8
+  }
+
+  rpc {
+    network.interface = "127.0.0.1"
+    blockflowFetch.maxAge = 30 minutes
+    ask.timeout = 500 millis
+  }
+
+  bootstrap=""
+  bootstrap = ${?bootstrap}
+
+  genesis = [
+    "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77:100"
+  ]
+}
+

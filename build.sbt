@@ -29,9 +29,13 @@ def mainProject(id: String): Project =
 
 def project(path: String): Project = {
   baseProject(path)
+    .configs(IntegrationTest)
     .settings(
+      inConfig(IntegrationTest)(Defaults.itSettings),
+      inConfig(IntegrationTest)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings),
       Compile / scalastyleConfig := root.base / scalastyleCfgFile,
-      Test / scalastyleConfig := root.base / scalastyleTestCfgFile
+      Test / scalastyleConfig := root.base / scalastyleTestCfgFile,
+      IntegrationTest / scalastyleConfig := root.base / scalastyleTestCfgFile
     )
 }
 
@@ -47,11 +51,11 @@ lazy val `app-debug` = mainProject("app-debug")
   )
 
 lazy val `app-server` = project("app-server")
-  .dependsOn(flow, flow % "test->test")
+  .dependsOn(flow, flow % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
       `alephium-rpc`,
-      `alephium-util` % "test" classifier "tests",
+      `alephium-util` % "it,test" classifier "tests",
       akkahttpcors,
       akkahttptest,
       akkastreamtest
@@ -67,7 +71,7 @@ lazy val flow = project("flow")
     libraryDependencies ++= Seq(
       `alephium-crypto`,
       `alephium-serde`,
-      `alephium-util` % "test" classifier "tests",
+      `alephium-util` % "it,test" classifier "tests",
       akka,
       logback,
       rocksdb,
@@ -81,7 +85,7 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       `alephium-crypto`,
       `alephium-serde`,
-      `alephium-util` % "test" classifier "tests"
+      `alephium-util` % "it,test" classifier "tests"
     )
   )
 
@@ -135,10 +139,12 @@ val commonSettings = Seq(
   ),
   wartremoverErrors in (Compile, compile) := Warts.allBut(wartsCompileExcludes: _*),
   wartremoverErrors in (Test, test) := Warts.allBut(wartsTestExcludes: _*),
+  wartremoverErrors in (IntegrationTest, test) := Warts.allBut(wartsTestExcludes: _*),
   fork := true,
   Test / scalacOptions += "-Xcheckinit",
   Test / javaOptions += "-Xss2m",
-  Test / envVars += "ALEPHIUM_ENV" -> "test",
+  Test / envVars += "ALEPHIUM_ENV"            -> "test",
+  IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",
   run / javaOptions += "-Xmx4g",
   libraryDependencies ++= Seq(
     akkatest,
