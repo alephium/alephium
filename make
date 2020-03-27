@@ -57,6 +57,7 @@ class AlephiumMake(object):
             clean        Clean the project workspace
             build        Build the project
             test         Run the test suite
+            itest        Run the integration test suite
             benchmark    Run the benchmark suite
             package      Produce the project deliverable
 
@@ -81,6 +82,9 @@ class AlephiumMake(object):
 
     def test(self):
         run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
+
+    def itest(self):
+        run('sbt it:scalafmt it:scalastyle it:test')
 
     def package(self):
         run('sbt app/universal:packageBin')
