@@ -13,6 +13,8 @@ object Platform {
         Files.homeDir.resolve(s".alephium-${env.name}")
       case Env.Test =>
         Files.tmpDir.resolve(s".alephium-${env.name}")
+      case Env.Integration =>
+        Files.tmpDir.resolve(s".alephium-${env.name}")
     }
   }
 }
