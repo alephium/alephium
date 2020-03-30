@@ -77,6 +77,8 @@ class InstructionSpec extends AlephiumSpec {
   behavior of "Stack Instructions"
 
   it should "test the constructors of OP_PUSH" in {
+    OP_PUSH.from(ByteString(0, 1)).isRight is true
+
     val bytes0 = ByteString.empty
     assertThrows[AssertionError](OP_PUSH.unsafe(bytes0))
     OP_PUSH.from(bytes0).isLeft is true
@@ -118,12 +120,20 @@ class InstructionSpec extends AlephiumSpec {
     test(65, 0x07, 65)
     test(255, 0x07, 255)
     assertThrows[AssertionError](test(256, 0x07, 255))
+
+    val data1 = ByteString(0x07, 0xFF) ++ ByteString.fromArray(Array.fill(0x100)(0x07))
+    OP_PUSH.deserialize(data1).isRight is true
+    val data2 = ByteString(0x07, 0x100) ++ ByteString.fromArray(Array.fill(0x101)(0x07))
+    OP_PUSH.deserialize(data2).left.value is a[SerdeError.Validation]
+    val data3 = ByteString(0x08, 0xFF) ++ ByteString.fromArray(Array.fill(0x100)(0x07))
+    OP_PUSH.deserialize(data3).left.value is a[SerdeError.Validation]
   }
 
   it should "test the constructors of OP_DUP" in {
     assertThrows[AssertionError](OP_DUP.unsafe(0))
     assertThrows[AssertionError](OP_DUP.unsafe(0x100))
     OP_DUP.from(0).isLeft is true
+    OP_DUP.from(1).isRight is true
     OP_DUP.from(0x100).isLeft is true
   }
 
@@ -159,6 +169,9 @@ class InstructionSpec extends AlephiumSpec {
     test1(255)
     assertThrows[AssertionError](test0(256))
     assertThrows[AssertionError](test1(256))
+
+    OP_DUP.deserialize(ByteString(0x0F)).left.value is a[SerdeError.Validation]
+    OP_DUP.deserialize(ByteString(0x20)).left.value is a[SerdeError.Validation]
   }
 
   it should "test the constructors of OP_SWAP" in {
@@ -167,6 +180,7 @@ class InstructionSpec extends AlephiumSpec {
     assertThrows[AssertionError](OP_SWAP.unsafe(0x100))
     OP_SWAP.from(0).isLeft is true
     OP_SWAP.from(1).isLeft is true
+    OP_SWAP.from(2).isRight is true
     OP_SWAP.from(0x100).isLeft is true
   }
 
@@ -183,6 +197,9 @@ class InstructionSpec extends AlephiumSpec {
     data0 is data
     val data1 = state.stack.pop().right.value
     data1 is data ++ data
+
+    OP_SWAP.deserialize(ByteString(0x1F)).left.value is a[SerdeError.Validation]
+    OP_SWAP.deserialize(ByteString(0x30)).left.value is a[SerdeError.Validation]
   }
 
   it should "serde OP_SWAP" in {
@@ -212,6 +229,7 @@ class InstructionSpec extends AlephiumSpec {
     assertThrows[AssertionError](OP_POP.unsafe(0))
     assertThrows[AssertionError](OP_POP.unsafe(0x100))
     OP_POP.from(0).isLeft is true
+    OP_POP.from(1).isRight is true
     OP_POP.from(0x100).isLeft is true
   }
 
@@ -243,6 +261,9 @@ class InstructionSpec extends AlephiumSpec {
     test1(255)
     assertThrows[AssertionError](test0(256))
     assertThrows[AssertionError](test1(256))
+
+    OP_POP.deserialize(ByteString(0x2F)).left.value is a[SerdeError.Validation]
+    OP_POP.deserialize(ByteString(0x40)).left.value is a[SerdeError.Validation]
   }
 
   abstract class ArithmeticFixture(OP: SimpleInstruction) extends Fixture {
@@ -453,15 +474,21 @@ class InstructionSpec extends AlephiumSpec {
 
     def test(): Assertion = {
       forAll { (x: Int, y: Int) =>
-        val state = buildState(OP, stackElems = AVector(toByteString(y), toByteString(x)))
-
-        state.run().isRight is true
-        state.instructionIndex is 1
-        state.stack.size is 1
-
-        val expected = if (op(x, y)) Instruction.True else Instruction.False
-        state.stack.pop().right.value is expected
+        test(x, x)
+        test(x, y)
+        test(y, y)
       }
+    }
+
+    def test(x: Int, y: Int): Assertion = {
+      val state = buildState(OP, stackElems = AVector(toByteString(y), toByteString(x)))
+
+      state.run().isRight is true
+      state.instructionIndex is 1
+      state.stack.size is 1
+
+      val expected = if (op(x, y)) Instruction.True else Instruction.False
+      state.stack.pop().right.value is expected
     }
   }
 

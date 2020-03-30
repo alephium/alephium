@@ -111,6 +111,18 @@ class RPCServerSpec
     checkFailCallResult(
       "transfer",
       parse(
+        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"OOPS","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
+    )("Server error")
+
+    checkFailCallResult(
+      "transfer",
+      parse(
+        s"""{"fromAddress":"$dummyKey","fromType":"OOPS","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
+    )("Server error")
+
+    checkFailCallResult(
+      "transfer",
+      parse(
         s"""{"fromAddress":"OOPS","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
     )("Server error")
   }
