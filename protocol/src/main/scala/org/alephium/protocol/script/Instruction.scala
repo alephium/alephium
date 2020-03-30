@@ -617,7 +617,7 @@ object OP_SCRIPTKECCAK256 extends InstructionCompanion with Registrable {
   def from(hash: Keccak256): OP_SCRIPTKECCAK256 = new OP_SCRIPTKECCAK256(hash) {}
 
   def unsafe(rawHash: ByteString): OP_SCRIPTKECCAK256 = {
-    new OP_SCRIPTKECCAK256(Keccak256.unsafeFrom(rawHash)) {}
+    new OP_SCRIPTKECCAK256(Keccak256.unsafe(rawHash)) {}
   }
 
   override def deserialize(input: ByteString): SerdeResult[(Instruction, ByteString)] = {
