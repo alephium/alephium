@@ -5,6 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
+import org.alephium.flow.Utils
+import org.alephium.flow.client.Node
 import org.alephium.util.BaseActor
 
 object TcpServer {
@@ -34,7 +36,9 @@ class TcpServer(port: Int) extends BaseActor {
       log.debug(s"Server bound to $localAddress")
       context.become(workFor(bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
-      log.warning(s"Binding failed")
+      log.error(s"Binding failed")
+      val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
+      nodeMonitor ! Node.Stop
       context stop self
   }
 

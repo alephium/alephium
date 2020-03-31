@@ -5,6 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
+import org.alephium.flow.Utils
+import org.alephium.flow.client.Node
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
@@ -85,6 +87,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
+      val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
+      nodeMonitor ! Node.Stop
       context stop self
   }
 
