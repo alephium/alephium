@@ -367,6 +367,9 @@ object RPCServerSpec {
 
     val boostraperDummy                             = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val boostraper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
+
+    val monitorProbe                     = TestProbe()
+    val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
   }
 
   class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef)(
