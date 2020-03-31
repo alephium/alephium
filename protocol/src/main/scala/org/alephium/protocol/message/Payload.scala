@@ -2,7 +2,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -154,7 +154,7 @@ object SendBlocks extends Payload.Serding[SendBlocks] with Payload.Code {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
-final case class GetBlocks(locators: AVector[Keccak256]) extends Payload
+final case class GetBlocks(locators: AVector[Hash]) extends Payload
 
 object GetBlocks extends Payload.Serding[GetBlocks] with Payload.Code {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
@@ -166,7 +166,7 @@ object SendHeaders extends Payload.Serding[SendHeaders] with Payload.Code {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
-final case class GetHeaders(locators: AVector[Keccak256]) extends Payload
+final case class GetHeaders(locators: AVector[Hash]) extends Payload
 
 object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)

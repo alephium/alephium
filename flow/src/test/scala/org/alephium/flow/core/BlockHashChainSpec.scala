@@ -2,20 +2,20 @@ package org.alephium.flow.core
 
 import org.scalatest.Assertion
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, TimeStamp}
 
 class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
   trait Fixture extends BlockHashChain {
-    val root   = BlockHashChain.Root(Keccak256.zero, 0, 0, TimeStamp.zero)
+    val root   = BlockHashChain.Root(Hash.zero, 0, 0, TimeStamp.zero)
     val config = Self.config
 
     var currentNode: BlockHashChain.TreeNode = root
     def addNewHash(n: Int): Unit = {
       val timestamp = TimeStamp.unsafe(n.toLong)
-      val newHash   = Keccak256.random
+      val newHash   = Hash.random
       addHash(newHash, currentNode, 0, timestamp)
       currentNode = getNode(newHash)
     }

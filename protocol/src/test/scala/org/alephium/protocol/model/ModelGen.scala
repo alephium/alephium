@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.scalacheck.Gen
 
-import org.alephium.crypto._
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
 import org.alephium.protocol.script.Witness
 import org.alephium.util.AVector
@@ -15,7 +15,7 @@ object ModelGen {
     shortKey <- Gen.choose(0, 5)
     index    <- Gen.choose(0, 5)
   } yield {
-    TxOutputPoint(shortKey, Keccak256.random, index)
+    TxOutputPoint(shortKey, Hash.random, index)
   }
 
   val txOutputGen: Gen[TxOutput] = for {
@@ -33,7 +33,7 @@ object ModelGen {
     for {
       txNum <- Gen.choose(0, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
-    } yield Block.from(AVector(Keccak256.zero), AVector.from(txs), config.maxMiningTarget, 0)
+    } yield Block.from(AVector(Hash.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
   def blockGenNonEmpty(implicit config: ConsensusConfig): Gen[Block] =
     blockGen.retryUntil(_.transactions.nonEmpty)
@@ -49,7 +49,7 @@ object ModelGen {
     blockGenNonEmpty.retryUntil(_.chainIndex.from equals group)
   }
 
-  def blockGenWith(deps: AVector[Keccak256])(implicit config: ConsensusConfig): Gen[Block] =
+  def blockGenWith(deps: AVector[Hash])(implicit config: ConsensusConfig): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
@@ -59,9 +59,9 @@ object ModelGen {
     chainGen(length, block.hash)
 
   def chainGen(length: Int)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
-    chainGen(length, Keccak256.zero)
+    chainGen(length, Hash.zero)
 
-  def chainGen(length: Int, initialHash: Keccak256)(
+  def chainGen(length: Int, initialHash: Hash)(
       implicit config: ConsensusConfig): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
       blocks.foldLeft(AVector.empty[Block]) {

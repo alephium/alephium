@@ -18,7 +18,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.{AllHandlers, BlockFlow}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -27,6 +27,7 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
@@ -43,7 +44,7 @@ class RPCServerSpec
 
   it should "encode BlockNotify" in new Fixture {
     val header =
-      BlockHeader(AVector(Keccak256.hash("foo")), Keccak256.hash("bar"), TimeStamp.zero, 1, 2)
+      BlockHeader(AVector(Hash.hash("foo")), Hash.hash("bar"), TimeStamp.zero, 1, 2)
     val blockNotify = BlockNotify(header, 1)
 
     val result = RPCServer.blockNotifyEncode(blockNotify)
@@ -396,27 +397,23 @@ object RPCServerSpec {
       Right(Some(dummyTx))
     }
 
-    override def getHeight(hash: Keccak256): Int = {
+    override def getHeight(hash: Hash): Int = {
       1
     }
-    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256]          = ???
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps                      = ???
-    def getAllTips: org.alephium.util.AVector[org.alephium.crypto.Keccak256] = ???
-    def getBestTip: org.alephium.crypto.Keccak256                            = ???
+    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
+    def calBestDepsUnsafe(group: GroupIndex): BlockDeps        = ???
+    def getAllTips: AVector[Hash]                              = ???
+    def getBestTip: Hash                                       = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
-            parentHash: org.alephium.crypto.Keccak256,
-            weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
-    def add(header: org.alephium.protocol.model.BlockHeader,
-            weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
-    def add(block: org.alephium.protocol.model.Block,
-            parentHash: org.alephium.crypto.Keccak256,
-            weight: Int): org.alephium.flow.io.IOResult[Unit] = ???
-    def add(block: org.alephium.protocol.model.Block,
-            weight: Int): org.alephium.flow.io.IOResult[Unit]                              = ???
-    def calBestDepsUnsafe(): Unit                                                          = ???
-    def updateBestDeps(): org.alephium.flow.io.IOResult[Unit]                              = ???
-    def add(block: org.alephium.protocol.model.Block): org.alephium.flow.io.IOResult[Unit] = ???
-    def add(header: org.alephium.protocol.model.BlockHeader): org.alephium.flow.io.IOResult[Unit] =
+            parentHash: Hash,
+            weight: Int): IOResult[Unit]                                 = ???
+    def add(header: BlockHeader, weight: Int): IOResult[Unit]            = ???
+    def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = ???
+    def add(block: Block, weight: Int): IOResult[Unit]                   = ???
+    def calBestDepsUnsafe(): Unit                                        = ???
+    def updateBestDeps(): IOResult[Unit]                                 = ???
+    def add(block: Block): IOResult[Unit]                                = ???
+    def add(header: BlockHeader): IOResult[Unit] =
       ???
   }
 

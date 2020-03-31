@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, StandardOpenOption => Option}
 
 import akka.util.ByteString
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
@@ -36,7 +36,7 @@ class Disk private (root: Path) {
     getBlockPath(header.hash)
   }
 
-  def getBlockPath(blockHash: Keccak256): Path = {
+  def getBlockPath(blockHash: Hash): Path = {
     blockFolder.resolve(blockHash.shortHex + ".dat")
   }
 
@@ -64,7 +64,7 @@ class Disk private (root: Path) {
     }
   }
 
-  def getBlock(blockHash: Keccak256): IOResult[Block] = {
+  def getBlock(blockHash: Hash): IOResult[Block] = {
     val dataIOResult = tryExecute {
       val inPath = getBlockPath(blockHash)
       val bytes  = Files.readAllBytes(inPath)
@@ -75,7 +75,7 @@ class Disk private (root: Path) {
     }
   }
 
-  def getBlockUnsafe(blockHash: Keccak256): Block = {
+  def getBlockUnsafe(blockHash: Hash): Block = {
     val inPath = getBlockPath(blockHash)
     val bytes  = Files.readAllBytes(inPath)
     val data   = ByteString.fromArrayUnsafe(bytes)
@@ -85,7 +85,7 @@ class Disk private (root: Path) {
     }
   }
 
-  def checkBlockFile(blockHash: Keccak256): Boolean = {
+  def checkBlockFile(blockHash: Hash): Boolean = {
     val result = tryExecute {
       val inPath = getBlockPath(blockHash)
       Files.isRegularFile(inPath)

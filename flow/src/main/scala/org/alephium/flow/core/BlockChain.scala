@@ -1,9 +1,9 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io.{Disk, IOResult}
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
@@ -11,11 +11,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def disk: Disk
 
-  def getBlock(hash: Keccak256): IOResult[Block] = {
+  def getBlock(hash: Hash): IOResult[Block] = {
     disk.getBlock(hash)
   }
 
-  def getBlockUnsafe(hash: Keccak256): Block = {
+  def getBlockUnsafe(hash: Hash): Block = {
     disk.getBlockUnsafe(hash)
   }
 
@@ -23,7 +23,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     add(block, block.parentHash, weight)
   }
 
-  def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+  def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
     assert(!contains(block.hash) && contains(parentHash))
     for {
       _ <- persistBlock(block)
@@ -41,7 +41,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     ()
   }
 
-  def calBlockDiffUnsafe(newTip: Keccak256, oldTip: Keccak256): ChainDiff = {
+  def calBlockDiffUnsafe(newTip: Hash, oldTip: Hash): ChainDiff = {
     val hashDiff = calHashDiff(newTip, oldTip)
     ChainDiff(hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
   }

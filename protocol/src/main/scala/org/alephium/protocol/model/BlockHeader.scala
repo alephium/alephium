@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto._
+import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
@@ -13,14 +13,14 @@ import org.alephium.util.{AVector, TimeStamp}
   *                  the rest G hashes are from all the chain related to _group_
   */
 final case class BlockHeader(
-    blockDeps: AVector[Keccak256],
-    txsHash: Keccak256,
+    blockDeps: AVector[Hash],
+    txsHash: Hash,
     timestamp: TimeStamp,
     target: BigInt,
     nonce: BigInt
-) extends Keccak256Hash[BlockHeader]
+) extends HashSerde[BlockHeader]
     with FlowData {
-  override lazy val hash: Keccak256 = _getHash
+  override lazy val hash: Hash = _getHash
 
   def chainIndex(implicit config: GroupConfig): ChainIndex = {
     ChainIndex.from(hash)
@@ -28,26 +28,26 @@ final case class BlockHeader(
 
   def isGenesis: Boolean = blockDeps.isEmpty
 
-  def parentHash(implicit config: GroupConfig): Keccak256 = {
+  def parentHash(implicit config: GroupConfig): Hash = {
     uncleHash(chainIndex.to)
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Keccak256 = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash = {
     assert(!isGenesis)
     blockDeps.takeRight(config.groups)(toIndex.value)
   }
 
-  def inDeps(implicit config: GroupConfig): AVector[Keccak256] = {
+  def inDeps(implicit config: GroupConfig): AVector[Hash] = {
     assert(!isGenesis)
     blockDeps.dropRight(config.groups)
   }
 
-  def outDeps(implicit config: GroupConfig): AVector[Keccak256] = {
+  def outDeps(implicit config: GroupConfig): AVector[Hash] = {
     assert(!isGenesis)
     blockDeps.takeRight(config.groups)
   }
 
-  def outTips(implicit config: GroupConfig): AVector[Keccak256] = {
+  def outTips(implicit config: GroupConfig): AVector[Hash] = {
     assert(!isGenesis)
     blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
   }

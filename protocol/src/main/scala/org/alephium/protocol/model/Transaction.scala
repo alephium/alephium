@@ -18,8 +18,8 @@ final case class Transaction(
     raw: RawTransaction,
     data: ByteString,
     witnesses: AVector[Witness]
-) extends Keccak256Hash[Transaction] {
-  override val hash: Keccak256 = raw.hash
+) extends ALF.HashSerde[Transaction] {
+  override val hash: ALF.Hash = raw.hash
 
   def fromGroup(implicit config: GroupConfig): GroupIndex  = raw.inputs.head.fromGroup
   def toGroup(implicit config: GroupConfig): GroupIndex    = raw.outputs.head.toGroup
