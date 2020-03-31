@@ -31,11 +31,14 @@ def project(path: String): Project = {
   baseProject(path)
     .configs(IntegrationTest)
     .settings(
-      inConfig(IntegrationTest)(Defaults.itSettings),
+      Defaults.itSettings,
       inConfig(IntegrationTest)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings),
       Compile / scalastyleConfig := root.base / scalastyleCfgFile,
       Test / scalastyleConfig := root.base / scalastyleTestCfgFile,
-      IntegrationTest / scalastyleConfig := root.base / scalastyleTestCfgFile
+      inConfig(IntegrationTest)(ScalastylePlugin.rawScalastyleSettings()),
+      IntegrationTest / scalastyleConfig := root.base / scalastyleTestCfgFile,
+      IntegrationTest / scalastyleTarget := target.value / "scalastyle-it-results.xml",
+      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value
     )
 }
 

@@ -10,14 +10,14 @@ import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.TestProbe
-import org.scalatest.EitherValues._
 import io.circe.Decoder
 import io.circe.parser.parse
+import org.scalatest.EitherValues._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.appserver.Server
 import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.Server
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBStorage.Settings
