@@ -1,9 +1,9 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError => ImportedIOError}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, ConcurrentHashMap}
 
@@ -28,7 +28,7 @@ trait TransactionPool { self: BlockFlowState =>
 
   private val pool = AVector.tabulate(config.brokerInfo.groupNumPerBroker, config.groups) {
     (_, _) =>
-      ConcurrentHashMap.empty[Keccak256, Transaction]
+      ConcurrentHashMap.empty[Hash, Transaction]
   }
 
   def validateIndex(input: TxOutputPoint,

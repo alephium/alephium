@@ -1,12 +1,12 @@
 package org.alephium.flow.model
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, BlockHeader, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 
-final case class BlockTemplate(deps: AVector[Keccak256],
+final case class BlockTemplate(deps: AVector[Hash],
                                target: BigInt,
-                               txHash: Keccak256,
+                               txHash: Hash,
                                transactions: AVector[Transaction]) {
 
   def buildHeader(nonce: BigInt): BlockHeader =
@@ -20,10 +20,10 @@ final case class BlockTemplate(deps: AVector[Keccak256],
 
 object BlockTemplate {
 
-  def apply(deps: AVector[Keccak256],
+  def apply(deps: AVector[Hash],
             target: BigInt,
             transactions: AVector[Transaction]): BlockTemplate = {
-    val txHash = Keccak256.hash(transactions)
+    val txHash = Hash.hash(transactions)
     BlockTemplate(deps, target, txHash, transactions)
   }
 }

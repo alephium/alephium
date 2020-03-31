@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.TimeStamp
 
@@ -9,15 +9,15 @@ trait FlowData {
 
   def target: BigInt
 
-  def hash: Keccak256
+  def hash: Hash
 
   def chainIndex(implicit config: GroupConfig): ChainIndex
 
   def isGenesis: Boolean
 
-  def parentHash(implicit config: GroupConfig): Keccak256
+  def parentHash(implicit config: GroupConfig): Hash
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Keccak256
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash
 
   def shortHex: String
 }

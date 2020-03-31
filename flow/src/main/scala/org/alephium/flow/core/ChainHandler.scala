@@ -3,12 +3,12 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.Utils
 import org.alephium.flow.core.validation._
 import org.alephium.flow.io.IOError
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest, TimeStamp}
 
@@ -24,7 +24,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     with BaseActor {
   import ChainHandler.Event
 
-  def handleDatas(datas: Forest[Keccak256, T],
+  def handleDatas(datas: Forest[Hash, T],
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
     if (checkContinuity(datas, broker)) {
@@ -35,8 +35,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     }
   }
 
-  def checkContinuity(datas: Forest[Keccak256, T],
-                      broker: ActorRefT[ChainHandler.Event]): Boolean = {
+  def checkContinuity(datas: Forest[Hash, T], broker: ActorRefT[ChainHandler.Event]): Boolean = {
     datas.roots.forall { node =>
       blockFlow.contains(node.value.parentHash) || isProcessing(broker, node.value.parentHash)
     }
@@ -66,7 +65,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     }
   }
 
-  def handleMissingParent(datas: Forest[Keccak256, T],
+  def handleMissingParent(datas: Forest[Hash, T],
                           broker: ActorRefT[ChainHandler.Event],
                           origin: DataOrigin): Unit
 
@@ -87,7 +86,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleMissingDeps(data: T,
-                        hashes: AVector[Keccak256],
+                        hashes: AVector[Hash],
                         broker: ActorRefT[ChainHandler.Event],
                         origin: DataOrigin): Unit = {
     log.debug(s"${data.shortHex} missing depes: ${Utils.show(hashes)}")
@@ -127,7 +126,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   def addToFlowHandler(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit
 
   def pendingToFlowHandler(data: T,
-                           missings: mutable.HashSet[Keccak256],
+                           missings: mutable.HashSet[Hash],
                            broker: ActorRefT[ChainHandler.Event],
                            origin: DataOrigin,
                            self: ActorRefT[Command]): Unit
@@ -142,9 +141,9 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
 abstract class ChainHandlerState[T <: FlowData: ClassTag] {
   import ChainHandler.Event
 
-  private val tasks = mutable.HashMap.empty[ActorRefT[ChainHandler.Event], Forest[Keccak256, T]]
+  private val tasks = mutable.HashMap.empty[ActorRefT[ChainHandler.Event], Forest[Hash, T]]
 
-  def addTasks(broker: ActorRefT[ChainHandler.Event], forest: Forest[Keccak256, T]): Unit = {
+  def addTasks(broker: ActorRefT[ChainHandler.Event], forest: Forest[Hash, T]): Unit = {
     tasks.get(broker) match {
       case Some(existing) => existing.simpleMerge(forest)
       case None           => tasks(broker) = forest
@@ -160,13 +159,11 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
     }
   }
 
-  def isProcessing(broker: ActorRefT[ChainHandler.Event], task: Keccak256): Boolean = {
+  def isProcessing(broker: ActorRefT[ChainHandler.Event], task: Hash): Boolean = {
     tasks.get(broker).exists(_.contains(task))
   }
 
-  def removeTask(broker: ActorRefT[ChainHandler.Event],
-                 hash: Keccak256,
-                 origin: DataOrigin): Unit = {
+  def removeTask(broker: ActorRefT[ChainHandler.Event], hash: Hash, origin: DataOrigin): Unit = {
     tasks(broker).removeRootNode(hash)
     if (tasks(broker).isEmpty) {
       origin match {

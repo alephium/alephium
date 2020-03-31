@@ -4,10 +4,10 @@ import scala.collection.mutable
 
 import akka.actor.Props
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -24,25 +24,25 @@ object FlowHandler {
       extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
-  final case class GetBlocks(locators: AVector[Keccak256])   extends Command
-  final case class GetHeaders(locators: AVector[Keccak256])  extends Command
+  final case class GetBlocks(locators: AVector[Hash])        extends Command
+  final case class GetHeaders(locators: AVector[Hash])       extends Command
   final case class GetTips(broker: BrokerInfo)               extends Command
   final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
   final case class Register(miner: ActorRefT[Miner.Command]) extends Command
   case object UnRegister                                     extends Command
 
   sealed trait PendingData {
-    def missingDeps: mutable.HashSet[Keccak256]
+    def missingDeps: mutable.HashSet[Hash]
   }
   final case class PendingBlock(block: Block,
-                                missingDeps: mutable.HashSet[Keccak256],
+                                missingDeps: mutable.HashSet[Hash],
                                 origin: DataOrigin,
                                 broker: ActorRefT[ChainHandler.Event],
                                 chainHandler: ActorRefT[BlockChainHandler.Command])
       extends PendingData
       with Command
   final case class PendingHeader(header: BlockHeader,
-                                 missingDeps: mutable.HashSet[Keccak256],
+                                 missingDeps: mutable.HashSet[Hash],
                                  origin: DataOrigin,
                                  broker: ActorRefT[ChainHandler.Event],
                                  chainHandler: ActorRefT[HeaderChainHandler.Command])
@@ -51,11 +51,11 @@ object FlowHandler {
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
-                                     deps: AVector[Keccak256],
+                                     deps: AVector[Hash],
                                      target: BigInt,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class CurrentTips(tips: AVector[Keccak256]) extends Event
+  final case class CurrentTips(tips: AVector[Hash])      extends Event
   final case class BlocksLocated(blocks: AVector[Block]) extends Event
   final case class BlockAdded(block: Block,
                               broker: ActorRefT[ChainHandler.Event],
@@ -89,7 +89,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
         case Right(headers) =>
           sender() ! Message(SendHeaders(headers))
       }
-    case GetBlocks(locators: AVector[Keccak256]) =>
+    case GetBlocks(locators: AVector[Hash]) =>
       locators.flatMapE(blockFlow.getBlocksAfter) match {
         case Left(error) =>
           log.warning(s"IO Failure while getting blocks: $error")
@@ -170,7 +170,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
   }
 
-  def updateUponNewData(hash: Keccak256): Unit = {
+  def updateUponNewData(hash: Hash): Unit = {
     val readies = updateStatus(hash)
     if (readies.nonEmpty) {
       log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
@@ -228,7 +228,7 @@ trait FlowHandlerState {
     checkSizeLimit()
   }
 
-  def updateStatus(hash: Keccak256): IndexedSeq[PendingData] = {
+  def updateStatus(hash: Hash): IndexedSeq[PendingData] = {
     val toRemove: IndexedSeq[Int] = pendingStatus.collect {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts

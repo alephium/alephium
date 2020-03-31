@@ -3,7 +3,7 @@ package org.alephium.flow.io
 import RocksDBStorage.ColumnFamily
 import org.rocksdb.{ReadOptions, WriteOptions}
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.BlockHeader
 
 object HeaderDB {
@@ -28,16 +28,16 @@ class HeaderDB(val storage: RocksDBStorage,
                writeOptions: WriteOptions,
                readOptions: ReadOptions)
     extends RocksDBColumn(storage, cf, writeOptions, readOptions) {
-  def getHeaderOpt(hash: Keccak256): IOResult[Option[BlockHeader]] =
+  def getHeaderOpt(hash: Hash): IOResult[Option[BlockHeader]] =
     getOpt(hash.bytes)
 
-  def getHeaderOptUnsafe(hash: Keccak256): Option[BlockHeader] =
+  def getHeaderOptUnsafe(hash: Hash): Option[BlockHeader] =
     getOptUnsafe[BlockHeader](hash.bytes)
 
-  def getHeader(hash: Keccak256): IOResult[BlockHeader] =
+  def getHeader(hash: Hash): IOResult[BlockHeader] =
     get[BlockHeader](hash.bytes)
 
-  def getHeaderUnsafe(hash: Keccak256): BlockHeader =
+  def getHeaderUnsafe(hash: Hash): BlockHeader =
     getUnsafe[BlockHeader](hash.bytes)
 
   def putHeader(header: BlockHeader): IOResult[Unit] =
@@ -46,11 +46,11 @@ class HeaderDB(val storage: RocksDBStorage,
   def putHeaderUnsafe(header: BlockHeader): Unit =
     putUnsafe[BlockHeader](header.hash.bytes, header)
 
-  def deleteHeader(hash: Keccak256): IOResult[Unit] = {
+  def deleteHeader(hash: Hash): IOResult[Unit] = {
     delete(hash.bytes)
   }
 
-  def deleteHeaderUnsafe(hash: Keccak256): Unit = {
+  def deleteHeaderUnsafe(hash: Hash): Unit = {
     deleteUnsafe(hash.bytes)
   }
 }
