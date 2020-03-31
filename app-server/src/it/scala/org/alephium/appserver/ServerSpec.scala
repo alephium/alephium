@@ -24,6 +24,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
+import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 
 class ServerSpec extends AlephiumSpec {
@@ -47,10 +48,9 @@ class ServerSpec extends AlephiumSpec {
 
   it should "work with 2 nodes" in new Fixture("2-nodes") {
 
-    val boot0 = bootNode(publicPort = masterPort, brokerId = 0).start
-    val boot1 = bootNode(publicPort = peerPort, brokerId   = 1).start
-    boot0.futureValue is (())
-    boot1.futureValue is (())
+    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    Seq(server0.start, server1.start).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
     val group      = request[Group](rpcMasterPort, getGroup(publicKey))
@@ -61,21 +61,21 @@ class ServerSpec extends AlephiumSpec {
 
     startWS(wsMasterPort)
 
-    request[TransferResult](rpcPort, transfer(publicKey, tranferKey, privateKey, transferAmount))
+    val tx =
+      request[TransferResult](rpcPort, transfer(publicKey, tranferKey, privateKey, transferAmount))
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, startMining) is true
     }
 
-    blockNotifyProbe.receiveN(30, Duration.unsafe(1000 * 120).asScala)
+    awaitNewBlock(tx.from, tx.to)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, stopMining) is true
     }
 
-    request[Balance](rpcPort, getBalance(publicKey)) is Balance(
-      initialBalance.balance - transferAmount,
-      1)
+    request[Balance](rpcPort, getBalance(publicKey)) is
+      Balance(initialBalance.balance - transferAmount, 1)
   }
 
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
@@ -108,6 +108,19 @@ class ServerSpec extends AlephiumSpec {
         request <- json.as[JsonRPC.Response.Success]
         t       <- request.result.as[T]
       } yield t).right.value
+    }
+
+    def awaitNewBlock(from: Int, to: Int): Seq[Unit] = {
+      var count   = 0
+      val timeout = Duration.ofSecondsUnsafe(120).asScala
+      blockNotifyProbe.receiveWhile(max = timeout) {
+        case TextMessage.Strict(text) if count < 2 =>
+          val json         = parse(text).right.value
+          val notification = json.as[NotificationUnsafe].right.value.asNotification.right.value
+          val blockEntry   = notification.params.as[BlockEntry].right.value
+          if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to))
+            count += 1
+      }
     }
 
     def bootNode(publicPort: Int, brokerId: Int): Server = {

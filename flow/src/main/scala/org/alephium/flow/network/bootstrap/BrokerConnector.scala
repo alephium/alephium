@@ -45,7 +45,7 @@ class BrokerConnector(connection: ActorRef, cliqueCoordinator: ActorRef)(
     with SerdeUtils {
   import BrokerConnector._
 
-  override def preStart(): Unit = connection ! Tcp.Register(self)
+  connection ! Tcp.Register(self)
 
   override def receive: Receive =
     await[PeerInfo](ByteString.empty,

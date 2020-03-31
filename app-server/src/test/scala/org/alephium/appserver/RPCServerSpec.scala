@@ -9,7 +9,7 @@ import akka.http.scaladsl.server.{MethodRejection, UnsupportedRequestContentType
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestProbe
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.parser._
@@ -39,7 +39,6 @@ class RPCServerSpec
     with ScalaFutures {
   import RPCServerSpec._
 
-  behavior of "RPCServer"
   behavior of "http"
 
   it should "encode BlockNotify" in new Fixture {
@@ -166,7 +165,8 @@ class RPCServerSpec
     val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                    dummyNeighborCliques,
                                    dummmyBlockHeader,
-                                   blockFlowProbe.ref)
+                                   blockFlowProbe.ref,
+                                   dummyTx)
 
     assertThrows[RuntimeException] {
       RPCServer(mode, ActorRefT(TestProbe().ref))
@@ -183,7 +183,7 @@ class RPCServerSpec
       RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
     implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
-    val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref)
+    val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref, dummyTx)
     def blockflowFetch(params: String) = {
       RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).right.value, 0))
     }
@@ -251,12 +251,19 @@ class RPCServerSpec
     val dummyNeighborCliques      = NeighborCliques(AVector.empty)
     val dummyBalance              = Balance(0, 0)
     val dummyGroup                = Group(0)
-    val dummyTransferResult = TransferResult(
-      "011b4d03dd8c01f1049143cf9c4c817e4b167f1d1b83e5c6f0f10d89ba1e7bce")
-    val dummyKey        = "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77"
-    val dummyToAddres   = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
-    val dummyPrivateKey = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
-    val blockFlowProbe  = TestProbe()
+    val dummyKey                  = "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77"
+    val dummyToAddres             = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
+    val dummyPrivateKey           = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
+    val dummyTx = ModelGen.transactionGen
+      .retryUntil(tx => tx.raw.inputs.nonEmpty && tx.raw.outputs.nonEmpty)
+      .sample
+      .get
+    lazy val dummyTransferResult = TransferResult(
+      dummyTx.hash.toHexString,
+      dummyTx.fromGroup.value,
+      dummyTx.toGroup.value
+    )
+    val blockFlowProbe = TestProbe()
   }
 
   trait RPCServerFixture extends Fixture {
@@ -266,7 +273,8 @@ class RPCServerSpec
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                         dummyNeighborCliques,
                                         dummmyBlockHeader,
-                                        blockFlowProbe.ref)
+                                        blockFlowProbe.ref,
+                                        dummyTx)
 
     lazy val server: RPCServer = RPCServer(mode, miner)
   }
@@ -343,10 +351,11 @@ object RPCServerSpec {
   class NodeDummy(intraCliqueInfo: IntraCliqueInfo,
                   neighborCliques: NeighborCliques,
                   blockHeader: BlockHeader,
-                  blockFlowProbe: ActorRef)(implicit val config: PlatformConfig)
+                  blockFlowProbe: ActorRef,
+                  dummyTx: Transaction)(implicit val config: PlatformConfig)
       extends Node {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
-    val blockFlow: BlockFlow         = new BlockFlowDummy(blockHeader, blockFlowProbe)
+    val blockFlow: BlockFlow         = new BlockFlowDummy(blockHeader, blockFlowProbe, dummyTx)
 
     val serverProbe                          = TestProbe()
     val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
@@ -372,7 +381,7 @@ object RPCServerSpec {
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
   }
 
-  class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef)(
+  class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef, dummyTx: Transaction)(
       implicit val config: PlatformConfig)
       extends BlockFlow {
     override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
@@ -384,8 +393,7 @@ object RPCServerSpec {
         to: ED25519PublicKey,
         value: BigInt,
         fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
-      Right(Some(
-        Transaction(RawTransaction(AVector.empty, AVector.empty), ByteString.empty, AVector.empty)))
+      Right(Some(dummyTx))
     }
 
     override def getHeight(hash: Keccak256): Int = {
@@ -415,9 +423,10 @@ object RPCServerSpec {
   class ModeDummy(intraCliqueInfo: IntraCliqueInfo,
                   neighborCliques: NeighborCliques,
                   blockHeader: BlockHeader,
-                  blockFlowProbe: ActorRef)(implicit val config: PlatformConfig)
+                  blockFlowProbe: ActorRef,
+                  dummyTx: Transaction)(implicit val config: PlatformConfig)
       extends Mode {
-    val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe)
+    val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe, dummyTx)
   }
 
 }
