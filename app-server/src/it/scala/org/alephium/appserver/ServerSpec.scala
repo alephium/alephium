@@ -1,15 +1,17 @@
 package org.alephium.appserver
 
-import java.net.ServerSocket
+import java.net.InetSocketAddress
 
 import scala.concurrent.Promise
 
+import akka.actor.Terminated
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest}
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.io.{IO, Tcp}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.testkit.TestProbe
+import akka.testkit.{SocketUtil, TestProbe}
 import io.circe.Decoder
 import io.circe.parser.parse
 import org.scalatest.EitherValues._
@@ -25,6 +27,24 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.util._
 
 class ServerSpec extends AlephiumSpec {
+  it should "shutdown the node when Tcp port is used" in new Fixture("1-node") {
+    val connection = TestProbe()
+    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
+
+    val server = bootNode(publicPort = masterPort, brokerId = 0)
+    server.mode.node.system.whenTerminated.futureValue is a[Terminated]
+  }
+
+  it should "shutdown the clique when one node of the clique is down" in new Fixture("2-nodes") {
+
+    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
+
+    server0.stop().futureValue is (())
+    server1.mode.node.system.whenTerminated.futureValue is a[Terminated]
+  }
+
   it should "work with 2 nodes" in new Fixture("2-nodes") {
 
     val boot0 = bootNode(publicPort = masterPort, brokerId = 0).start
@@ -68,10 +88,10 @@ class ServerSpec extends AlephiumSpec {
     val initialBalance = Balance(100, 1)
     val transferAmount = 10
 
-    val masterPort    = new ServerSocket(0).getLocalPort
-    val rpcMasterPort = masterPort + 1000
-    val wsMasterPort  = masterPort + 2000
-    def peerPort      = new ServerSocket(0).getLocalPort
+    val masterPort    = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+    val rpcMasterPort = masterPort - 100
+    val wsMasterPort  = masterPort - 200
+    def peerPort      = SocketUtil.temporaryLocalPort(SocketUtil.Both)
 
     val blockNotifyProbe = TestProbe()
 
@@ -93,14 +113,11 @@ class ServerSpec extends AlephiumSpec {
     def bootNode(publicPort: Int, brokerId: Int): Server = {
       new Server(
         new Mode with PlatformConfigFixture {
-          override val newPath = rootPath.resolveSibling(
-            s"${rootPath.getFileName}-${this.getClass.getSimpleName}-${brokerId}")
-
           override val configValues = Map(
             ("alephium.network.masterAddress", s"localhost:$masterPort"),
             ("alephium.network.publicAddress", s"localhost:$publicPort"),
-            ("alephium.network.rpcPort", publicPort + 1000),
-            ("alephium.network.wsPort", publicPort + 2000),
+            ("alephium.network.rpcPort", publicPort - 100),
+            ("alephium.network.wsPort", publicPort - 200),
             ("alephium.broker.brokerId", brokerId)
           )
           override implicit lazy val config =

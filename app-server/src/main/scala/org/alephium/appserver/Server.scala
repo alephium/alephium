@@ -8,7 +8,7 @@ import org.alephium.flow.client.{FairMiner, Miner}
 import org.alephium.flow.platform.Mode
 import org.alephium.util.ActorRefT
 
-class Server(mode: Mode) extends StrictLogging {
+class Server(val mode: Mode) extends StrictLogging {
 
   implicit val executionContext: ExecutionContext = mode.node.system.dispatcher
 

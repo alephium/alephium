@@ -154,7 +154,7 @@ class RPCServerSpec
 
   it should "run/stop the server" in new RouteHTTP {
     server.runServer().futureValue is (())
-    server.stopServer().futureValue is akka.Done
+    server.stopServer().futureValue is (())
   }
 
   it should "make sure rps and ws port are provided" in new Fixture {
