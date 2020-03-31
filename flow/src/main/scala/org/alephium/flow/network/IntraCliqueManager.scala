@@ -1,8 +1,10 @@
 package org.alephium.flow.network
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
+import org.alephium.flow.Utils
+import org.alephium.flow.client.Node
 import org.alephium.flow.core.AllHandlers
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
@@ -64,8 +66,9 @@ class IntraCliqueManager(
         ()
       }
     case CliqueManager.Connected(cliqueId, brokerInfo) =>
-      if (cliqueId == cliqueInfo.id) {
+      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.id)) {
         log.debug(s"Broker connected: $brokerInfo")
+        context watch sender()
         val newBrokers = brokers + (brokerInfo.id -> (brokerInfo -> sender()))
         if (newBrokers.size == cliqueInfo.peers.length - 1) {
           log.debug("All Brokers connected")
@@ -75,6 +78,7 @@ class IntraCliqueManager(
           context become awaitBrokers(newBrokers)
         }
       }
+    case Terminated(actor) => handleTerminated(actor, brokers)
   }
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
@@ -94,5 +98,17 @@ class IntraCliqueManager(
             }
           }
       }
+    case Terminated(actor) => handleTerminated(actor, brokers)
+  }
+
+  def handleTerminated(actor: ActorRef, brokers: Map[Int, (BrokerInfo, ActorRef)]): Unit = {
+    brokers.foreach {
+      case (_, (info, broker)) if broker == actor =>
+        log.error(s"Clique node $info is not functioning")
+        val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
+        nodeMonitor ! Node.Stop
+        context stop self
+      case _ => ()
+    }
   }
 }

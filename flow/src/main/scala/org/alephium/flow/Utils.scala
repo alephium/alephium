@@ -2,9 +2,12 @@ package org.alephium.flow
 
 import org.alephium.protocol.model.FlowData
 import org.alephium.serde.RandomBytes
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Duration}
 
 object Utils {
+  val nodeMonitorPath: String   = "/user/NodeMonitor"
+  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
+
   def show[T <: RandomBytes](elems: AVector[T]): String = {
     elems.map(_.shortHex).mkString("-")
   }
