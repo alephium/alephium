@@ -19,7 +19,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
@@ -203,9 +203,8 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def transfer(blockFlow: BlockFlow,
-               txHandler: ActorRefT[TxHandler.Command],
-               req: Request): Try[TransferResult] = {
+  def transfer(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command], req: Request)(
+      implicit config: GroupConfig): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
       if (query.fromType == GetBalance.pkh && query.toType == GetBalance.pkh) {
         val resultEither = for {
@@ -217,7 +216,7 @@ object RPCServer extends StrictLogging {
         } yield {
           // publish transaction
           txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
-          TransferResult(Hex.toHexString(tx.hash.bytes))
+          TransferResult(Hex.toHexString(tx.hash.bytes), tx.fromGroup.value, tx.toGroup.value)
         }
         resultEither match {
           case Right(result) => Right(result)

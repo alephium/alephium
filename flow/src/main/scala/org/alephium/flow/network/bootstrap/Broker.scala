@@ -32,8 +32,7 @@ class Broker(masterAddress: InetSocketAddress,
     with SerdeUtils {
   def until: TimeStamp = TimeStamp.now() + retryTimeout
 
-  override def preStart(): Unit =
-    IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
+  IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
 
   override def receive: Receive = awaitMaster(until)
 
