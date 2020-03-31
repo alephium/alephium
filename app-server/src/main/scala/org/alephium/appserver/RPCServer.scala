@@ -87,14 +87,14 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     }
   }
 
-  def stopServer(): Future[akka.Done] =
+  def stopServer(): Future[Unit] =
     for {
       httpStop <- httpBindingPromise.future.flatMap(_.unbind)
       wsStop   <- wsBindingPromise.future.flatMap(_.unbind)
     } yield {
       logger.info(s"http unbound with message $httpStop.")
       logger.info(s"ws unbound with message $wsStop.")
-      akka.Done
+      ()
     }
 }
 
