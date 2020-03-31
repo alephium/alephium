@@ -99,7 +99,7 @@ class BrokerBootstrapper(val server: ActorRefT[TcpServer.Command],
 
 // TODO: close this properly
 trait BootstrapperHandler extends BaseActor {
-  override def preStart(): Unit = server ! TcpServer.Start(self)
+  server ! TcpServer.Start(self)
 
   val server: ActorRefT[TcpServer.Command]
   val discoveryServer: ActorRefT[DiscoveryServer.Command]
