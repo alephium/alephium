@@ -2,8 +2,8 @@ package org.alephium.flow.core.mempool
 
 import scala.collection.mutable
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.mempool.TxPool.WeightedId
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Transaction
 import org.alephium.util.{AVector, RWLock}
 
@@ -11,7 +11,7 @@ import org.alephium.util.{AVector, RWLock}
  * Transaction pool implementation
  */
 class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
-                      weights: mutable.HashMap[Keccak256, Double],
+                      weights: mutable.HashMap[Hash, Double],
                       _capacity: Int)
     extends RWLock {
   def isFull: Boolean = pool.size == _capacity
@@ -65,7 +65,7 @@ object TxPool {
   def empty(capacity: Int): TxPool =
     new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
-  final case class WeightedId(weight: Double, id: Keccak256) {
+  final case class WeightedId(weight: Double, id: Hash) {
     override def equals(obj: Any): Boolean = obj match {
       case that: WeightedId => this.id == that.id
       case _                => false
@@ -75,8 +75,8 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    implicit val keccak256Ord: Ordering[Keccak256]      = Ordering.Iterable[Byte].on[Keccak256](_.bytes)
-    implicit val pairOrd: Ordering[(Double, Keccak256)] = Ordering.Tuple2[Double, Keccak256]
+    implicit val keccak256Ord: Ordering[Hash]      = Ordering.Iterable[Byte].on[Hash](_.bytes)
+    implicit val pairOrd: Ordering[(Double, Hash)] = Ordering.Tuple2[Double, Hash]
     Ordering.by(p => (-p.weight, p.id))
   }
 }

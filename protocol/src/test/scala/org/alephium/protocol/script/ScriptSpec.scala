@@ -5,6 +5,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto._
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.ScriptConfig
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -13,7 +14,7 @@ class ScriptSpec extends AlephiumSpec {
     val data      = ByteString.fromInts(1, 2)
     val data0     = ByteString.fromInts(3, 4)
     val (sk, pk)  = ED25519.generatePriPub()
-    val pkHash    = Keccak256.hash(pk.bytes)
+    val pkHash    = Hash.hash(pk.bytes)
     val signature = ED25519.sign(data, sk)
 
     implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 100 }

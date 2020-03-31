@@ -2,12 +2,13 @@ package org.alephium.protocol.script
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519PublicKey, Keccak256, Keccak256Hash}
+import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.serde._
 import org.alephium.util.{AVector, DjbHash}
 
-final case class PubScript(instructions: AVector[Instruction]) extends Keccak256Hash[PubScript] {
-  override lazy val hash: Keccak256 = _getHash
+final case class PubScript(instructions: AVector[Instruction]) extends HashSerde[PubScript] {
+  override lazy val hash: Hash = _getHash
 
   lazy val shortKey: Int = DjbHash.intHash(hash.bytes)
 }
@@ -19,7 +20,7 @@ object PubScript {
 
   // TODO: optimize this using cache
   def p2pkh(publicKey: ED25519PublicKey): PubScript = {
-    val pkHash = Keccak256.hash(publicKey.bytes)
+    val pkHash = Hash.hash(publicKey.bytes)
     val instructions = AVector[Instruction](OP_DUP.unsafe(1),
                                             OP_KECCAK256,
                                             OP_PUSH.unsafe(pkHash.bytes),
@@ -35,7 +36,7 @@ object PubScript {
   }
 
   def p2sh(scriptRaw: ByteString): PubScript = {
-    val scriptHash = Keccak256.hash(scriptRaw)
+    val scriptHash = Hash.hash(scriptRaw)
     PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
   }
 }

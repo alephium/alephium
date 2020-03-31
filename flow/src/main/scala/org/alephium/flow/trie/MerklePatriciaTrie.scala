@@ -2,8 +2,8 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bits}
@@ -16,7 +16,7 @@ object MerklePatriciaTrie {
    */
   sealed trait Node {
     lazy val serialized: ByteString = Node.SerdeNode.serialize(this)
-    lazy val hash: Keccak256        = Keccak256.hash(serialized)
+    lazy val hash: Hash             = Hash.hash(serialized)
 
     def path: ByteString
 
@@ -24,8 +24,8 @@ object MerklePatriciaTrie {
 
     def preCut(n: Int): Node
   }
-  final case class BranchNode(path: ByteString, children: AVector[Option[Keccak256]]) extends Node {
-    def replace(nibble: Int, childHash: Keccak256): BranchNode = {
+  final case class BranchNode(path: ByteString, children: AVector[Option[Hash]]) extends Node {
+    def replace(nibble: Int, childHash: Hash): BranchNode = {
       BranchNode(path, children.replace(nibble, Some(childHash)))
     }
     def preExtend(prefix: ByteString): BranchNode = {
@@ -53,7 +53,7 @@ object MerklePatriciaTrie {
                nibble2: Int,
                node2: Node): BranchNode = {
       assert(nibble1 != nibble2 && nibble1 < 16 && nibble2 < 16)
-      val array = Array.fill[Option[Keccak256]](16)(None)
+      val array = Array.fill[Option[Hash]](16)(None)
       array(nibble1) = Some(node1.hash)
       array(nibble2) = Some(node2.hash)
       BranchNode(path, AVector.unsafe(array))
@@ -91,7 +91,7 @@ object MerklePatriciaTrie {
         ByteString.fromArrayUnsafe(bytes)
       }
 
-      val childrenSerde: Serde[AVector[Option[Keccak256]]] = {
+      val childrenSerde: Serde[AVector[Option[Hash]]] = {
         fixedSizeSerde(16)
       }
 
@@ -128,7 +128,7 @@ object MerklePatriciaTrie {
   }
 
   final case class TrieUpdateActions(newNodeOpt: Option[Node],
-                                     toDelete: AVector[Keccak256],
+                                     toDelete: AVector[Hash],
                                      toAdd: AVector[Node])
   final case class MPTException(message: String) extends Exception(message)
   object MPTException {
@@ -176,7 +176,7 @@ object MerklePatriciaTrie {
   }
 
   def createEmptyTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
-    val genesisKey = Keccak256.zero.bytes
+    val genesisKey = Hash.zero.bytes
     val genesisNode = {
       val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
       val genesisOutput = TxOutput.burn(0)
@@ -187,7 +187,7 @@ object MerklePatriciaTrie {
   }
 
   def createStateTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
-    val genesisOutputPoint = TxOutputPoint(0, Keccak256.zero, 0)
+    val genesisOutputPoint = TxOutputPoint(0, Hash.zero, 0)
     val genesisOutput      = TxOutput.burn(0)
     val genesisKey         = serialize(genesisOutputPoint)
     val genesisNode = {
@@ -200,7 +200,7 @@ object MerklePatriciaTrie {
 }
 
 // TODO: batch mode
-final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage) {
+final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage) {
   import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie] = {
@@ -239,7 +239,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     getOpt(rootHash, nibbles)
   }
 
-  def getOpt(hash: Keccak256, nibbles: ByteString): IOResult[Option[ByteString]] = {
+  def getOpt(hash: Hash, nibbles: ByteString): IOResult[Option[ByteString]] = {
     getNode(hash).flatMap(getOpt(_, nibbles))
   }
 
@@ -260,7 +260,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     }
   }
 
-  def getNode(hash: Keccak256): IOResult[Node] = storage.get[Node](hash.bytes)
+  def getNode(hash: Hash): IOResult[Node] = storage.get[Node](hash.bytes)
 
   def remove[K: Serde](key: K): IOResult[MerklePatriciaTrie] = {
     removeRaw(serialize[K](key))
@@ -274,14 +274,12 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     } yield trie
   }
 
-  private def remove(hash: Keccak256, nibbles: ByteString): IOResult[TrieUpdateActions] = {
+  private def remove(hash: Hash, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     getNode(hash).flatMap(remove(hash, _, nibbles))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def remove(hash: Keccak256,
-                     node: Node,
-                     nibbles: ByteString): IOResult[TrieUpdateActions] = {
+  private def remove(hash: Hash, node: Node, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     node match {
       case node @ BranchNode(path, children) =>
         assert(nibbles.length > path.length)
@@ -306,7 +304,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def handleChildUpdateResult(branchHash: Keccak256,
+  def handleChildUpdateResult(branchHash: Hash,
                               branchNode: BranchNode,
                               nibble: Int,
                               result: TrieUpdateActions): IOResult[TrieUpdateActions] = {
@@ -347,14 +345,14 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     } yield trie
   }
 
-  private def put(hash: Keccak256,
+  private def put(hash: Hash,
                   nibbles: ByteString,
                   value: ByteString): IOResult[TrieUpdateActions] = {
     assume(nibbles.nonEmpty)
     getNode(hash).flatMap(put(hash, _, nibbles, value))
   }
 
-  private def put(hash: Keccak256,
+  private def put(hash: Hash,
                   node: Node,
                   nibbles: ByteString,
                   value: ByteString): IOResult[TrieUpdateActions] = {
@@ -386,7 +384,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     }
   }
 
-  private def branch(hash: Keccak256,
+  private def branch(hash: Hash,
                      node: Node,
                      branchIndex: Int,
                      nibbles: ByteString,
@@ -426,7 +424,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
   }
 
   protected def getAllRaw(prefix: ByteString,
-                          hash: Keccak256,
+                          hash: Hash,
                           acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
     if (prefix.isEmpty) {
       getAllRaw(hash, acc)
@@ -463,7 +461,7 @@ final class MerklePatriciaTrie(val rootHash: Keccak256, storage: KeyValueStorage
     }
   }
 
-  protected def getAllRaw(hash: Keccak256,
+  protected def getAllRaw(hash: Hash,
                           acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
     getNode(hash).flatMap {
       case n: BranchNode =>

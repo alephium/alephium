@@ -6,9 +6,10 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.{ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PublicKey}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.validation.Validation
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Hex}
 
@@ -241,7 +242,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       .mkString("", "\n", "\n")
   }
 
-  def showHash(hash: Keccak256): String = {
+  def showHash(hash: Hash): String = {
     Hex.toHexString(hash.bytes).take(8)
   }
 

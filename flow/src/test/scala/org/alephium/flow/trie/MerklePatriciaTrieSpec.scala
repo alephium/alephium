@@ -5,8 +5,8 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Files}
 
@@ -46,7 +46,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       data      <- Gen.listOfN(dataLengh, Arbitrary.arbByte.arbitrary)
     } yield LeafNode(ByteString(path.toArray), ByteString(data.toArray))
 
-    val keccak256Gen = Gen.const(()).map(_ => Keccak256.random)
+    val keccak256Gen = Gen.const(()).map(_ => Hash.random)
     val branchGen = for {
       path     <- nibblesGen
       children <- Gen.listOfN(16, Gen.option(keccak256Gen))
@@ -85,7 +85,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   behavior of "Merkle Patricia Trie"
 
-  val genesisKey = Keccak256.zero.bytes
+  val genesisKey = Hash.zero.bytes
   val genesisNode = {
     val genesisPath = bytes2Nibbles(genesisKey)
     LeafNode(genesisPath, ByteString.empty)
@@ -105,7 +105,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     var trie = MerklePatriciaTrie.create(db, genesisNode)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
-      val key  = Keccak256.random.bytes
+      val key  = Hash.random.bytes
       val data = ByteString.fromString(Gen.alphaStr.sample.get)
       (keyPrefix ++ key.drop(keyPrefix.length), data)
     }
@@ -190,7 +190,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     show(trie, Seq(trie.rootHash))
   }
 
-  def show(trie: MerklePatriciaTrie, hashes: Seq[Keccak256]): Unit = {
+  def show(trie: MerklePatriciaTrie, hashes: Seq[Hash]): Unit = {
     import org.alephium.util.Hex
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))

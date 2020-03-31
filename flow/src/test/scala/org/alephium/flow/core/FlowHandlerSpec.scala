@@ -4,9 +4,9 @@ import scala.collection.mutable
 
 import akka.testkit.TestProbe
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ModelGen}
 import org.alephium.util.ActorRefT
 
@@ -19,12 +19,12 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
     genPending(block, mutable.HashSet.empty)
   }
 
-  def genPending(missings: mutable.HashSet[Keccak256]): PendingBlock = {
+  def genPending(missings: mutable.HashSet[Hash]): PendingBlock = {
     val block = ModelGen.blockGen.sample.get
     genPending(block, missings)
   }
 
-  def genPending(block: Block, missings: mutable.HashSet[Keccak256]): PendingBlock = {
+  def genPending(block: Block, missings: mutable.HashSet[Hash]): PendingBlock = {
     PendingBlock(block,
                  missings,
                  DataOrigin.Local,
@@ -40,21 +40,21 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
     val state = new FlowHandlerState { override def statusSizeLimit: Int = 2 }
     state.pendingStatus.size is 0
 
-    val pending0 = genPending(mutable.HashSet.empty[Keccak256])
+    val pending0 = genPending(mutable.HashSet.empty[Hash])
     state.addStatus(pending0)
     state.pendingStatus.size is 1
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending0
     state.counter is 1
 
-    val pending1 = genPending(mutable.HashSet.empty[Keccak256])
+    val pending1 = genPending(mutable.HashSet.empty[Hash])
     state.addStatus(pending1)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending1
     state.counter is 2
 
-    val pending2 = genPending(mutable.HashSet.empty[Keccak256])
+    val pending2 = genPending(mutable.HashSet.empty[Hash])
     state.addStatus(pending2)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending1

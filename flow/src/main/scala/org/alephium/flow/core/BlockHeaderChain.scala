@@ -1,19 +1,19 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{HeaderDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, BlockHeader}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def headerDB: HeaderDB
 
-  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] = {
+  def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
     headerDB.getHeader(hash)
   }
 
-  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader = {
+  def getBlockHeaderUnsafe(hash: Hash): BlockHeader = {
     headerDB.getHeaderUnsafe(hash)
   }
 
@@ -21,7 +21,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     add(blockHeader, blockHeader.parentHash, weight)
   }
 
-  def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+  def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit] = {
     assert(!contains(header.hash) && contains(parentHash))
     val parent = blockHashesTable(parentHash)
     addHeader(header).map { _ =>
@@ -44,13 +44,13 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getHashTargetUnsafe(hash: Keccak256): BigInt = {
+  def getHashTargetUnsafe(hash: Hash): BigInt = {
     assert(contains(hash))
     val header = getBlockHeaderUnsafe(hash)
     calHashTarget(hash, header.target)
   }
 
-  def getHashTarget(hash: Keccak256): IOResult[BigInt] = {
+  def getHashTarget(hash: Hash): IOResult[BigInt] = {
     assert(contains(hash))
     getBlockHeader(hash).map(header => calHashTarget(hash, header.target))
   }
