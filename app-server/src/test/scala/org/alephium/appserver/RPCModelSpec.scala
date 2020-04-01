@@ -144,7 +144,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   it should "encode/decode TransferResult" in {
     val result  = TransferResult("txId", 0, 1)
-    val jsonRaw = """{"txId":"txId","from":0,"to":1}"""
+    val jsonRaw = """{"txId":"txId","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
 }
