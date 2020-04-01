@@ -1,7 +1,7 @@
 package org.alephium.flow.core.validation
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOError, IOResult}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.script.RunFailure
 import org.alephium.util.AVector
 
@@ -18,14 +18,14 @@ sealed trait InvalidHeaderStatus extends HeaderStatus with InvalidBlockStatus
 final case object ValidHeader    extends HeaderStatus with ValidStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
-final case object InvalidGroup                           extends InvalidBlockStatus
-final case object InvalidTimeStamp                       extends InvalidHeaderStatus
-final case object InvalidWorkAmount                      extends InvalidHeaderStatus
-final case object InvalidWorkTarget                      extends InvalidHeaderStatus
-final case class MissingDeps(hashes: AVector[Keccak256]) extends InvalidHeaderStatus
-final case object EmptyTransactionList                   extends InvalidBlockStatus
-final case object InvalidCoinbase                        extends InvalidBlockStatus
-final case object InvalidMerkleRoot                      extends InvalidBlockStatus
+final case object InvalidGroup                      extends InvalidBlockStatus
+final case object InvalidTimeStamp                  extends InvalidHeaderStatus
+final case object InvalidWorkAmount                 extends InvalidHeaderStatus
+final case object InvalidWorkTarget                 extends InvalidHeaderStatus
+final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
+final case object EmptyTransactionList              extends InvalidBlockStatus
+final case object InvalidCoinbase                   extends InvalidBlockStatus
+final case object InvalidMerkleRoot                 extends InvalidBlockStatus
 
 sealed trait InvalidTxsStatus                       extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidTxsStatus

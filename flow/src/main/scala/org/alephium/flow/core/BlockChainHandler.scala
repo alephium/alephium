@@ -4,13 +4,13 @@ import scala.collection.mutable
 
 import akka.actor.Props
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.Utils
 import org.alephium.flow.core.FlowHandler.BlockAdded
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, Forest}
@@ -23,22 +23,22 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
-    val forets = Forest.build[Keccak256, Block](block, _.hash)
+    val forets = Forest.build[Hash, Block](block, _.hash)
     AddBlocks(forets, origin)
   }
 
   sealed trait Command
-  final case class AddBlocks(blocks: Forest[Keccak256, Block], origin: DataOrigin) extends Command
+  final case class AddBlocks(blocks: Forest[Hash, Block], origin: DataOrigin) extends Command
   final case class AddPendingBlock(block: Block,
                                    broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin)
       extends Command
 
-  sealed trait Event                                    extends ChainHandler.Event
-  final case class BlocksAdded(chainIndex: ChainIndex)  extends Event
-  case object BlocksAddingFailed                        extends Event
-  case object InvalidBlocks                             extends Event
-  final case class FetchSince(tips: AVector[Keccak256]) extends Event
+  sealed trait Event                                   extends ChainHandler.Event
+  final case class BlocksAdded(chainIndex: ChainIndex) extends Event
+  case object BlocksAddingFailed                       extends Event
+  case object InvalidBlocks                            extends Event
+  final case class FetchSince(tips: AVector[Hash])     extends Event
 }
 
 class BlockChainHandler(
@@ -60,7 +60,7 @@ class BlockChainHandler(
     case BlockAdded(block, broker, origin)      => handleDataAdded(block, broker, origin)
   }
 
-  override def handleMissingParent(blocks: Forest[Keccak256, Block],
+  override def handleMissingParent(blocks: Forest[Hash, Block],
                                    broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin): Unit = {
     if (origin.isSyncing) {
@@ -90,7 +90,7 @@ class BlockChainHandler(
   }
 
   override def pendingToFlowHandler(block: Block,
-                                    missings: mutable.HashSet[Keccak256],
+                                    missings: mutable.HashSet[Hash],
                                     broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin,
                                     self: ActorRefT[BlockChainHandler.Command]): Unit = {

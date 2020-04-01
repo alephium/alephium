@@ -1,27 +1,27 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
 import org.alephium.util.ConcurrentHashMap
 
 trait BlockChainWithState extends BlockChain {
-  private val tries = ConcurrentHashMap.empty[Keccak256, MerklePatriciaTrie]
+  private val tries = ConcurrentHashMap.empty[Hash, MerklePatriciaTrie]
 
-  def getTrie(hash: Keccak256): MerklePatriciaTrie = {
+  def getTrie(hash: Hash): MerklePatriciaTrie = {
     assert(tries.contains(hash))
     tries(hash)
   }
 
-  protected def addTrie(hash: Keccak256, trie: MerklePatriciaTrie): Unit = {
+  protected def addTrie(hash: Hash, trie: MerklePatriciaTrie): Unit = {
     tries.add(hash, trie)
   }
 
   def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie]
 
-  override def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+  override def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
     val trie = getTrie(block.parentHash)
     for {
       newTrie <- updateState(trie, block)

@@ -1,6 +1,6 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.AVector
 
 trait BlockHashPool {
@@ -10,28 +10,28 @@ trait BlockHashPool {
 
   def maxHeight: Int
 
-  def contains(hash: Keccak256): Boolean
+  def contains(hash: Hash): Boolean
 
-  def getWeight(hash: Keccak256): Int
+  def getWeight(hash: Hash): Int
 
-  def getHeight(hash: Keccak256): Int
+  def getHeight(hash: Hash): Int
 
-  def isTip(hash: Keccak256): Boolean
+  def isTip(hash: Hash): Boolean
 
   // The return includes locator
-  def getHashesAfter(locator: Keccak256): AVector[Keccak256]
+  def getHashesAfter(locator: Hash): AVector[Hash]
 
-  def getPredecessor(hash: Keccak256, height: Int): Keccak256
+  def getPredecessor(hash: Hash, height: Int): Hash
 
-  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256]
+  def getBlockHashSlice(hash: Hash): AVector[Hash]
 
-  def getBestTip: Keccak256
+  def getBestTip: Hash
 
-  def getAllTips: AVector[Keccak256]
+  def getAllTips: AVector[Hash]
 
-  def getAllBlockHashes: Iterator[Keccak256]
+  def getAllBlockHashes: Iterator[Hash]
 
-  def show(hash: Keccak256): String = {
+  def show(hash: Hash): String = {
     val shortHash = hash.shortHex
     val weight    = getWeight(hash)
     val hashNum   = numHashes - 1 // exclude genesis block

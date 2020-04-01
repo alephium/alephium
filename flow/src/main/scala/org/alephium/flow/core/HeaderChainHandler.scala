@@ -4,11 +4,11 @@ import scala.collection.mutable
 
 import akka.actor.Props
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.FlowHandler.HeaderAdded
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{ActorRefT, Forest}
 
@@ -19,13 +19,12 @@ object HeaderChainHandler {
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
-    val forest = Forest.build[Keccak256, BlockHeader](header, _.hash)
+    val forest = Forest.build[Hash, BlockHeader](header, _.hash)
     AddHeaders(forest, origin)
   }
 
   sealed trait Command
-  final case class AddHeaders(header: Forest[Keccak256, BlockHeader], origin: DataOrigin)
-      extends Command
+  final case class AddHeaders(header: Forest[Hash, BlockHeader], origin: DataOrigin) extends Command
   final case class AddPendingHeader(header: BlockHeader,
                                     broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin)
@@ -54,7 +53,7 @@ class HeaderChainHandler(
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  override def handleMissingParent(headers: Forest[Keccak256, BlockHeader],
+  override def handleMissingParent(headers: Forest[Hash, BlockHeader],
                                    broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin): Unit = {
     assert(origin.isInstanceOf[DataOrigin.IntraClique])
@@ -71,7 +70,7 @@ class HeaderChainHandler(
   }
 
   override def pendingToFlowHandler(header: BlockHeader,
-                                    missings: mutable.HashSet[Keccak256],
+                                    missings: mutable.HashSet[Hash],
                                     broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin,
                                     self: ActorRefT[Command]): Unit = {

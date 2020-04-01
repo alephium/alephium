@@ -10,13 +10,13 @@ import akka.actor.{ActorRef, Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.Utils
 import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin._
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
@@ -294,7 +294,7 @@ trait MessageHandler extends BaseActor {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def handleNewBlocks(forest: Forest[Keccak256, Block]): Unit = {
+  private def handleNewBlocks(forest: Forest[Hash, Block]): Unit = {
     assert(forest.nonEmpty)
     val chainIndex = forest.roots.head.value.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
@@ -305,7 +305,7 @@ trait MessageHandler extends BaseActor {
     }
   }
 
-  def handleGetBlocks(locators: AVector[Keccak256]): Unit = {
+  def handleGetBlocks(locators: AVector[Hash]): Unit = {
     log.debug(s"GetBlocks received: #${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetBlocks(locators)
   }
@@ -325,7 +325,7 @@ trait MessageHandler extends BaseActor {
     }
   }
 
-  def handleGetHeaders(locators: AVector[Keccak256]): Unit = {
+  def handleGetHeaders(locators: AVector[Hash]): Unit = {
     log.debug(s"GetHeaders received: ${Utils.show(locators)}")
     allHandlers.flowHandler ! FlowHandler.GetHeaders(locators)
   }
