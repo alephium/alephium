@@ -2,9 +2,9 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
@@ -24,13 +24,13 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   /* BlockHash apis */
 
-  def contains(hash: Keccak256): Boolean = {
+  def contains(hash: Hash): Boolean = {
     val index = ChainIndex.from(hash)
     val chain = getHashChain(index)
     chain.contains(hash)
   }
 
-  def getIndex(hash: Keccak256): ChainIndex = {
+  def getIndex(hash: Hash): ChainIndex = {
     ChainIndex.from(hash)
   }
 
@@ -40,32 +40,32 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(chainIndex.from, chainIndex.to)
   }
 
-  def getHashChain(hash: Keccak256): BlockHashChain = {
+  def getHashChain(hash: Hash): BlockHashChain = {
     val index = ChainIndex.from(hash)
     getHashChain(index.from, index.to)
   }
 
-  def isTip(hash: Keccak256): Boolean = {
+  def isTip(hash: Hash): Boolean = {
     getHashChain(hash).isTip(hash)
   }
 
-  def getHashesAfter(locator: Keccak256): AVector[Keccak256] =
+  def getHashesAfter(locator: Hash): AVector[Hash] =
     getHashChain(locator).getHashesAfter(locator)
 
-  def getPredecessor(hash: Keccak256, height: Int): Keccak256 =
+  def getPredecessor(hash: Hash, height: Int): Hash =
     getHashChain(hash).getPredecessor(hash, height)
 
-  def getHeight(hash: Keccak256): Int = {
+  def getHeight(hash: Hash): Int = {
     getHashChain(hash).getHeight(hash)
   }
 
-  def getWeight(hash: Keccak256): Int = {
+  def getWeight(hash: Hash): Int = {
     getHashChain(hash).getWeight(hash)
   }
 
-  def getAllBlockHashes: Iterator[Keccak256] = aggregate(_.getAllBlockHashes)(_ ++ _)
+  def getAllBlockHashes: Iterator[Hash] = aggregate(_.getAllBlockHashes)(_ ++ _)
 
-  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] =
+  def getBlockHashSlice(hash: Hash): AVector[Hash] =
     getHashChain(hash).getBlockHashSlice(hash)
 
   /* BlockHeader apis */
@@ -80,14 +80,14 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHeaderChain(header.chainIndex)
   }
 
-  def getHeaderChain(hash: Keccak256): BlockHeaderChain = {
+  def getHeaderChain(hash: Hash): BlockHeaderChain = {
     getHeaderChain(ChainIndex.from(hash))
   }
 
-  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader] =
+  def getBlockHeader(hash: Hash): IOResult[BlockHeader] =
     getHeaderChain(hash).getBlockHeader(hash)
 
-  def getBlockHeaderUnsafe(hash: Keccak256): BlockHeader =
+  def getBlockHeaderUnsafe(hash: Hash): BlockHeader =
     getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
   def add(header: BlockHeader): IOResult[Unit]
@@ -102,11 +102,11 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getBlockChain(block: Block): BlockChain = getBlockChain(block.chainIndex)
 
-  def getBlockChain(hash: Keccak256): BlockChain = {
+  def getBlockChain(hash: Hash): BlockChain = {
     getBlockChain(ChainIndex.from(hash))
   }
 
-  def getBlock(hash: Keccak256): IOResult[Block] = {
+  def getBlock(hash: Hash): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
   }
 

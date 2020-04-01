@@ -2,11 +2,12 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PubScript
@@ -110,7 +111,7 @@ trait BlockFlowState {
     }(op)
   }
 
-  def getBlockChain(hash: Keccak256): BlockChain
+  def getBlockChain(hash: Hash): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
     assert(brokerInfo.contains(from) || brokerInfo.contains(to))
@@ -138,7 +139,7 @@ trait BlockFlowState {
     blockHeaderChains(from.value)(to.value)
   }
 
-  private def getTrie(deps: AVector[Keccak256], groupIndex: GroupIndex): MerklePatriciaTrie = {
+  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): MerklePatriciaTrie = {
     assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
@@ -170,9 +171,9 @@ trait BlockFlowState {
     bestDeps(groupShift) = deps
   }
 
-  def getBlockHeader(hash: Keccak256): IOResult[BlockHeader]
+  def getBlockHeader(hash: Hash): IOResult[BlockHeader]
 
-  def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Keccak256] = {
+  def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Hash] = {
     val index = header.chainIndex
     if (header.isGenesis) {
       config.genesisBlocks(index.from.value).map(_.hash)
@@ -185,7 +186,7 @@ trait BlockFlowState {
     }
   }
 
-  def getInTip(dep: Keccak256, currentGroup: GroupIndex): IOResult[Keccak256] = {
+  def getInTip(dep: Hash, currentGroup: GroupIndex): IOResult[Hash] = {
     getBlockHeader(dep).map { header =>
       val from = header.chainIndex.from
       if (header.isGenesis) config.genesisBlocks(from.value)(currentGroup.value).hash
@@ -196,7 +197,7 @@ trait BlockFlowState {
   // if inclusive is true, the current header would be included
   def getInOutTips(header: BlockHeader,
                    currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[Keccak256]] = {
+                   inclusive: Boolean): IOResult[AVector[Hash]] = {
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         if (i < currentGroup.value) config.genesisBlocks(i)(currentGroup.value).hash
@@ -210,20 +211,19 @@ trait BlockFlowState {
     }
   }
 
-  def getInOutTips(hash: Keccak256,
+  def getInOutTips(hash: Hash,
                    currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[Keccak256]] = {
+                   inclusive: Boolean): IOResult[AVector[Hash]] = {
     getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup, inclusive))
   }
 
-  def getTipsDiff(newTip: Keccak256, oldTip: Keccak256): AVector[Keccak256] = {
+  def getTipsDiff(newTip: Hash, oldTip: Hash): AVector[Hash] = {
     getBlockChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
-  protected def getTipsDiff(newTips: AVector[Keccak256],
-                            oldTips: AVector[Keccak256]): AVector[Keccak256] = {
+  protected def getTipsDiff(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
     assert(newTips.length == oldTips.length)
-    newTips.indices.foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
+    newTips.indices.foldLeft(AVector.empty[Hash]) { (acc, i) =>
       acc ++ getTipsDiff(newTips(i), oldTips(i))
     }
   }
@@ -272,7 +272,7 @@ trait BlockFlowState {
         AVector.empty
       } else {
         val persistedOutDeps = header.outDeps.replace(groupIndex.value, intraDep)
-        outDeps.indices.foldLeft(AVector.empty[Keccak256]) { (acc, i) =>
+        outDeps.indices.foldLeft(AVector.empty[Hash]) { (acc, i) =>
           acc ++ getTipsDiff(outDeps(i), persistedOutDeps(i))
         }
       }
@@ -379,12 +379,12 @@ object BlockFlowState {
   }
 
   class GroupCache(
-      val inblockcaches: ConcurrentHashMap[Keccak256, InBlockCache],
-      val outblockcaches: ConcurrentHashMap[Keccak256, OutBlockCache],
-      val inoutblockcaches: ConcurrentHashMap[Keccak256, InOutBlockCache],
-      val cachedHashes: ConcurrentQueue[Keccak256]
+      val inblockcaches: ConcurrentHashMap[Hash, InBlockCache],
+      val outblockcaches: ConcurrentHashMap[Hash, OutBlockCache],
+      val inoutblockcaches: ConcurrentHashMap[Hash, InOutBlockCache],
+      val cachedHashes: ConcurrentQueue[Hash]
   ) {
-    def getBlockCache(hash: Keccak256): BlockCache = {
+    def getBlockCache(hash: Hash): BlockCache = {
       assert(
         inblockcaches.contains(hash) ||
           outblockcaches.contains(hash) ||

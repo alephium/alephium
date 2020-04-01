@@ -3,9 +3,9 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.core.BlockHashChain.{ChainDiff, TreeNode}
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -15,12 +15,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   protected def root: BlockHashChain.Root
 
   protected override val blockHashesTable =
-    ConcurrentHashMap.empty[Keccak256, BlockHashChain.TreeNode]
+    ConcurrentHashMap.empty[Hash, BlockHashChain.TreeNode]
 
-  protected val tips            = ConcurrentHashSet.empty[Keccak256]
+  protected val tips            = ConcurrentHashSet.empty[Hash]
   protected val confirmedHashes = ArrayBuffer.empty[BlockHashChain.TreeNode]
 
-  protected def getNode(hash: Keccak256): BlockHashChain.TreeNode = blockHashesTable(hash)
+  protected def getNode(hash: Hash): BlockHashChain.TreeNode = blockHashesTable(hash)
 
   protected def addNode(node: BlockHashChain.TreeNode): Unit = {
     assert(node.isLeaf && !contains(node.blockHash))
@@ -41,7 +41,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     ()
   }
 
-  protected def addHash(hash: Keccak256,
+  protected def addHash(hash: Hash,
                         parent: BlockHashChain.TreeNode,
                         weight: Int,
                         timestamp: TimeStamp): Unit = {
@@ -111,23 +111,23 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   def maxHeight: Int = blockHashesTable.reduceValuesBy(_.height)(math.max)
 
-  def contains(hash: Keccak256): Boolean = blockHashesTable.contains(hash)
+  def contains(hash: Hash): Boolean = blockHashesTable.contains(hash)
 
-  def getHeight(hash: Keccak256): Int = {
+  def getHeight(hash: Hash): Int = {
     assert(contains(hash))
     blockHashesTable(hash).height
   }
 
-  def getWeight(hash: Keccak256): Int = {
+  def getWeight(hash: Hash): Int = {
     assert(contains(hash))
     blockHashesTable(hash).weight
   }
 
-  def isTip(hash: Keccak256): Boolean = {
+  def isTip(hash: Hash): Boolean = {
     tips.contains(hash)
   }
 
-  def getHashesAfter(locator: Keccak256): AVector[Keccak256] = {
+  def getHashesAfter(locator: Hash): AVector[Hash] = {
     blockHashesTable.get(locator) match {
       case Some(node) => getHashesSince(AVector.from(node.successors))
       case None       => AVector.empty
@@ -135,10 +135,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   }
 
   // Note: this is BFS search instead of DFS search
-  private def getHashesSince(nodes: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
+  private def getHashesSince(nodes: AVector[BlockHashChain.Node]): AVector[Hash] = {
     @tailrec
-    def iter(acc: AVector[Keccak256],
-             currents: AVector[BlockHashChain.Node]): AVector[Keccak256] = {
+    def iter(acc: AVector[Hash], currents: AVector[BlockHashChain.Node]): AVector[Hash] = {
       if (currents.nonEmpty) {
         val nexts = currents.flatMap(node => AVector.from(node.successors))
         iter(acc ++ currents.map(_.blockHash), nexts)
@@ -148,20 +147,20 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     iter(AVector.empty, nodes)
   }
 
-  def getBestTip: Keccak256 = {
+  def getBestTip: Hash = {
     getAllTips.map(blockHashesTable.apply).maxBy(_.height).blockHash
   }
 
-  def getAllTips: AVector[Keccak256] = {
+  def getAllTips: AVector[Hash] = {
     AVector.fromIterator(tips.iterator)
   }
 
   // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
   // Otherwise, it returns the hash path until newHash
   // TODO: make this safer
-  def getBlockHashesBetween(newHash: Keccak256, oldHash: Keccak256): AVector[Keccak256] = {
+  def getBlockHashesBetween(newHash: Hash, oldHash: Hash): AVector[Hash] = {
     @tailrec
-    def iter(acc: AVector[Keccak256], current: BlockHashChain.TreeNode): AVector[Keccak256] = {
+    def iter(acc: AVector[Hash], current: BlockHashChain.TreeNode): AVector[Hash] = {
       if (current.blockHash == oldHash) acc
       else {
         current match {
@@ -177,7 +176,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     }
   }
 
-  def getBlockHashSlice(hash: Keccak256): AVector[Keccak256] = {
+  def getBlockHashSlice(hash: Hash): AVector[Hash] = {
     blockHashesTable.get(hash) match {
       case Some(node) =>
         getChain(node).map(_.blockHash)
@@ -198,18 +197,18 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     iter(AVector.empty, node).reverse
   }
 
-  def getAllBlockHashes: Iterator[Keccak256] = {
+  def getAllBlockHashes: Iterator[Hash] = {
     blockHashesTable.values.map(_.blockHash)
   }
 
-  def isBefore(hash1: Keccak256, hash2: Keccak256): Boolean = {
+  def isBefore(hash1: Hash, hash2: Hash): Boolean = {
     assert(blockHashesTable.contains(hash1) && blockHashesTable.contains(hash2))
     val node1 = blockHashesTable(hash1)
     val node2 = blockHashesTable(hash2)
     isBefore(node1, node2)
   }
 
-  def getPredecessor(hash: Keccak256, height: Int): Keccak256 = {
+  def getPredecessor(hash: Hash, height: Int): Hash = {
     val node = getNode(hash)
     getPredecessor(node, height).blockHash
   }
@@ -251,17 +250,17 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     } else false
   }
 
-  def calHashDiff(newHash: Keccak256, oldHash: Keccak256): ChainDiff = {
-    val toRemove = ArrayBuffer.empty[Keccak256]
-    val toAdd    = ArrayBuffer.empty[Keccak256]
+  def calHashDiff(newHash: Hash, oldHash: Hash): ChainDiff = {
+    val toRemove = ArrayBuffer.empty[Hash]
+    val toAdd    = ArrayBuffer.empty[Hash]
     calDiff(toRemove, toAdd, newHash, oldHash)
     ChainDiff(AVector.from(toRemove), AVector.fromIterator(toAdd.reverseIterator))
   }
 
-  private def calDiff(toRemove: ArrayBuffer[Keccak256],
-                      toAdd: ArrayBuffer[Keccak256],
-                      newHash: Keccak256,
-                      oldHash: Keccak256): Unit = {
+  private def calDiff(toRemove: ArrayBuffer[Hash],
+                      toAdd: ArrayBuffer[Hash],
+                      newHash: Hash,
+                      oldHash: Hash): Unit = {
     val newNode = getNode(newHash)
     val oldNode = getNode(oldHash)
     if (newNode.height > oldNode.height) {
@@ -277,7 +276,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   @tailrec
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def accDiff(todos: ArrayBuffer[Keccak256],
+  private def accDiff(todos: ArrayBuffer[Hash],
                       node: TreeNode,
                       currentHeight: Int,
                       targetHeight: Int): TreeNode = {
@@ -291,8 +290,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 
   @tailrec
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def calDiff(toRemove: ArrayBuffer[Keccak256],
-                      toAdd: ArrayBuffer[Keccak256],
+  private def calDiff(toRemove: ArrayBuffer[Hash],
+                      toAdd: ArrayBuffer[Hash],
                       newNode: TreeNode,
                       oldNode: TreeNode): Unit = {
     if (newNode.blockHash != oldNode.blockHash) {
@@ -302,7 +301,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     }
   }
 
-  def getConfirmedHash(height: Int): Option[Keccak256] = {
+  def getConfirmedHash(height: Int): Option[Hash] = {
     assert(height >= 0)
     if (height < confirmedHashes.size) {
       Some(confirmedHashes(height).blockHash)
@@ -314,7 +313,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
 object BlockHashChain {
 
   sealed trait TreeNode {
-    val blockHash: Keccak256
+    val blockHash: Hash
     val successors: ArrayBuffer[Node]
     val height: Int
     val weight: Int
@@ -327,7 +326,7 @@ object BlockHashChain {
   }
 
   final case class Root(
-      blockHash: Keccak256,
+      blockHash: Hash,
       successors: ArrayBuffer[Node],
       height: Int,
       weight: Int,
@@ -339,12 +338,12 @@ object BlockHashChain {
   }
 
   object Root {
-    def apply(blockHash: Keccak256, height: Int, weight: Int, timestamp: TimeStamp): Root =
+    def apply(blockHash: Hash, height: Int, weight: Int, timestamp: TimeStamp): Root =
       Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
   }
 
   final case class Node(
-      blockHash: Keccak256,
+      blockHash: Hash,
       parent: TreeNode,
       successors: ArrayBuffer[Node],
       height: Int,
@@ -357,7 +356,7 @@ object BlockHashChain {
   }
 
   object Node {
-    def apply(blockHash: Keccak256,
+    def apply(blockHash: Hash,
               parent: TreeNode,
               height: Int,
               weight: Int,
@@ -366,5 +365,5 @@ object BlockHashChain {
     }
   }
 
-  final case class ChainDiff(toRemove: AVector[Keccak256], toAdd: AVector[Keccak256])
+  final case class ChainDiff(toRemove: AVector[Hash], toAdd: AVector[Hash])
 }

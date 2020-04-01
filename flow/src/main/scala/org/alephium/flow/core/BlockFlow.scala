@@ -1,14 +1,14 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
-  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256]
+  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash]
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 }
 
@@ -34,7 +34,7 @@ object BlockFlow {
       ???
     }
 
-    def add(block: Block, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+    def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
       ???
     }
 
@@ -53,7 +53,7 @@ object BlockFlow {
       ???
     }
 
-    def add(header: BlockHeader, parentHash: Keccak256, weight: Int): IOResult[Unit] = {
+    def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit] = {
       ???
     }
 
@@ -74,7 +74,7 @@ object BlockFlow {
       }
     }
 
-    private def calGroupWeightUnsafe(hash: Keccak256): Int = {
+    private def calGroupWeightUnsafe(hash: Hash): Int = {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) 0
       else {
@@ -82,20 +82,20 @@ object BlockFlow {
       }
     }
 
-    override def getBestTip: Keccak256 = {
-      val ordering = Ordering.Int.on[Keccak256](getWeight)
+    override def getBestTip: Hash = {
+      val ordering = Ordering.Int.on[Hash](getWeight)
       aggregate(_.getBestTip)(ordering.max)
     }
 
-    override def getAllTips: AVector[Keccak256] = {
+    override def getAllTips: AVector[Hash] = {
       aggregate(_.getAllTips)(_ ++ _)
     }
 
-    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Keccak256] = {
+    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = {
       val (low, high) = brokerInfo.calIntersection(config.brokerInfo)
       assert(low < high)
 
-      var tips = AVector.empty[Keccak256]
+      var tips = AVector.empty[Hash]
       for {
         from <- low until high
         to   <- 0 until groups
@@ -104,8 +104,8 @@ object BlockFlow {
     }
 
     // Rtips means tip representatives for all groups
-    private def getRtipsUnsafe(tip: Keccak256, from: GroupIndex): Array[Keccak256] = {
-      val rdeps = new Array[Keccak256](groups)
+    private def getRtipsUnsafe(tip: Hash, from: GroupIndex): Array[Hash] = {
+      val rdeps = new Array[Hash](groups)
       rdeps(from.value) = tip
 
       val header = getBlockHeaderUnsafe(tip)
@@ -123,7 +123,7 @@ object BlockFlow {
       rdeps
     }
 
-    private def isExtending(current: Keccak256, previous: Keccak256): Boolean = {
+    private def isExtending(current: Hash, previous: Hash): Boolean = {
       val index1 = ChainIndex.from(current)
       val index2 = ChainIndex.from(previous)
       assert(index1.from == index2.from)
@@ -136,8 +136,8 @@ object BlockFlow {
       }
     }
 
-    private def isCompatibleUnsafe(rtips: IndexedSeq[Keccak256],
-                                   tip: Keccak256,
+    private def isCompatibleUnsafe(rtips: IndexedSeq[Hash],
+                                   tip: Hash,
                                    from: GroupIndex): Boolean = {
       val newRtips = getRtipsUnsafe(tip, from)
       assert(rtips.length == newRtips.length)
@@ -148,9 +148,7 @@ object BlockFlow {
       }
     }
 
-    private def updateRtipsUnsafe(rtips: Array[Keccak256],
-                                  tip: Keccak256,
-                                  from: GroupIndex): Unit = {
+    private def updateRtipsUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Unit = {
       val newRtips = getRtipsUnsafe(tip, from)
       assert(rtips.length == newRtips.length)
       rtips.indices foreach { k =>
@@ -162,7 +160,7 @@ object BlockFlow {
       }
     }
 
-    private def getGroupDepsUnsafe(tip: Keccak256, from: GroupIndex): AVector[Keccak256] = {
+    private def getGroupDepsUnsafe(tip: Hash, from: GroupIndex): AVector[Hash] = {
       val header = getBlockHeaderUnsafe(tip)
       if (header.isGenesis) {
         config.genesisBlocks(from.value).map(_.hash)
@@ -177,12 +175,12 @@ object BlockFlow {
       val rtips     = getRtipsUnsafe(bestTip, bestIndex.from)
       val deps1 = (0 until groups)
         .filter(_ != group.value)
-        .foldLeft(AVector.empty[Keccak256]) {
+        .foldLeft(AVector.empty[Hash]) {
           case (deps, _k) =>
             val k = GroupIndex.unsafe(_k)
             if (k == bestIndex.from) deps :+ bestTip
             else {
-              val toTries = (0 until groups).foldLeft(AVector.empty[Keccak256]) { (acc, _l) =>
+              val toTries = (0 until groups).foldLeft(AVector.empty[Hash]) { (acc, _l) =>
                 val l = GroupIndex.unsafe(_l)
                 acc ++ getHashChain(k, l).getAllTips
               }

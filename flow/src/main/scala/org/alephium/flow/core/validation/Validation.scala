@@ -1,11 +1,11 @@
 package org.alephium.flow.core.validation
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.{PubScript, Script, Witness}
@@ -149,7 +149,7 @@ object Validation {
 
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult = {
-    if (block.header.txsHash == Keccak256.hash(block.transactions)) validBlock
+    if (block.header.txsHash == Hash.hash(block.transactions)) validBlock
     else invalidBlock(InvalidMerkleRoot)
   }
 
@@ -287,7 +287,7 @@ object Validation {
     }
   }
 
-  private[validation] def checkWitness(hash: Keccak256, pubScript: PubScript, witness: Witness)(
+  private[validation] def checkWitness(hash: Hash, pubScript: PubScript, witness: Witness)(
       implicit config: ScriptConfig): TxValidationResult = {
     Script.run(hash.bytes, pubScript, witness) match {
       case Left(error) => invalidTx(InvalidWitness(error))
@@ -301,9 +301,9 @@ object Validation {
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def validateFlowDAG[T <: FlowData](datas: AVector[T])(
-      implicit config: GroupConfig): Option[AVector[Forest[Keccak256, T]]] = {
+      implicit config: GroupConfig): Option[AVector[Forest[Hash, T]]] = {
     val splits = datas.splitBy(_.chainIndex)
-    val builds = splits.map(ds => Forest.tryBuild[Keccak256, T](ds, _.hash, _.parentHash))
+    val builds = splits.map(ds => Forest.tryBuild[Hash, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
   }
 

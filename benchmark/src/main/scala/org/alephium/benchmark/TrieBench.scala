@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.crypto.Keccak256
+import org.alephium.protocol.ALF.Hash
 import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.util.Files
@@ -30,13 +30,13 @@ class TrieBench {
   val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
   val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
-  val genesisHash: Keccak256   = trie.rootHash
+  val genesisHash: Hash   = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {
     val keys = Array.tabulate(1 << 10) { _ =>
-      val key  = Keccak256.random.bytes
-      val data = Keccak256.random.bytes
+      val key  = Hash.random.bytes
+      val data = Hash.random.bytes
       trie.putRaw(key, data)
       key
     }

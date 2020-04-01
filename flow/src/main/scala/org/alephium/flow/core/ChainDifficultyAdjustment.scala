@@ -1,13 +1,13 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
 trait ChainDifficultyAdjustment extends BlockHashPool {
   implicit def config: PlatformConfig
 
-  protected def blockHashesTable: ConcurrentHashMap[Keccak256, BlockHashChain.TreeNode]
+  protected def blockHashesTable: ConcurrentHashMap[Hash, BlockHashChain.TreeNode]
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   protected def calMedianBlockTime(node: BlockHashChain.TreeNode): Option[TimeStamp] = {
@@ -29,7 +29,7 @@ trait ChainDifficultyAdjustment extends BlockHashPool {
   }
 
   // Digi Shield DAA
-  protected def calHashTarget(hash: Keccak256, currentTarget: BigInt): BigInt = {
+  protected def calHashTarget(hash: Hash, currentTarget: BigInt): BigInt = {
     assert(contains(hash))
     val node = blockHashesTable(hash)
     val targetOpt = for {
