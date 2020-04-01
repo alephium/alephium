@@ -13,6 +13,9 @@ final case class AllHandlers(
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])(
     implicit config: PlatformConfig) {
+  def orderedHandlers: Seq[ActorRefT[_]] = {
+    (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
+  }
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
     assert(chainIndex.relateTo(config.brokerInfo))

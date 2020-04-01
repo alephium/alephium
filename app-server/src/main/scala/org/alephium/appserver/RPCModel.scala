@@ -143,7 +143,7 @@ object RPCModel {
     implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
   }
 
-  final case class TransferResult(txId: String) extends RPCModel
+  final case class TransferResult(txId: String, fromGroup: Int, toGroup: Int) extends RPCModel
   object TransferResult {
     implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
   }
