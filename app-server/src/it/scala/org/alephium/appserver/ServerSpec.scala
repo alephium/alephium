@@ -68,7 +68,7 @@ class ServerSpec extends AlephiumSpec {
       request[Boolean](peer.rpcPort.get, startMining) is true
     }
 
-    awaitNewBlock(tx.from, tx.to)
+    awaitNewBlock(tx.fromGroup, tx.toGroup)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, stopMining) is true
