@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.appserver
 
 import java.net.ServerSocket
 
@@ -17,7 +17,6 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.appserver.Server
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBStorage.Settings
