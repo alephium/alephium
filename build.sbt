@@ -20,7 +20,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(app, `app-debug`, `app-server`, flow, protocol)
+  .aggregate(app, `app-debug`, `app-server`, benchmark, flow, protocol)
 
 def mainProject(id: String): Project =
   project(id)
