@@ -1,15 +1,17 @@
 package org.alephium.appserver
 
-import java.net.ServerSocket
+import java.net.InetSocketAddress
 
 import scala.concurrent.Promise
 
+import akka.actor.Terminated
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest}
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.io.{IO, Tcp}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.testkit.TestProbe
+import akka.testkit.{SocketUtil, TestProbe}
 import io.circe.Decoder
 import io.circe.parser.parse
 import org.scalatest.EitherValues._
@@ -22,15 +24,33 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
+import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 
 class ServerSpec extends AlephiumSpec {
+  it should "shutdown the node when Tcp port is used" in new Fixture("1-node") {
+    val connection = TestProbe()
+    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
+
+    val server = bootNode(publicPort = masterPort, brokerId = 0)
+    server.mode.node.system.whenTerminated.futureValue is a[Terminated]
+  }
+
+  it should "shutdown the clique when one node of the clique is down" in new Fixture("2-nodes") {
+
+    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
+
+    server0.stop().futureValue is (())
+    server1.mode.node.system.whenTerminated.futureValue is a[Terminated]
+  }
+
   it should "work with 2 nodes" in new Fixture("2-nodes") {
 
-    val boot0 = bootNode(publicPort = masterPort, brokerId = 0).start
-    val boot1 = bootNode(publicPort = peerPort, brokerId   = 1).start
-    boot0.futureValue is (())
-    boot1.futureValue is (())
+    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    Seq(server0.start, server1.start).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
     val group      = request[Group](rpcMasterPort, getGroup(publicKey))
@@ -41,21 +61,21 @@ class ServerSpec extends AlephiumSpec {
 
     startWS(wsMasterPort)
 
-    request[TransferResult](rpcPort, transfer(publicKey, tranferKey, privateKey, transferAmount))
+    val tx =
+      request[TransferResult](rpcPort, transfer(publicKey, tranferKey, privateKey, transferAmount))
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, startMining) is true
     }
 
-    blockNotifyProbe.receiveN(30, Duration.unsafe(1000 * 120).asScala)
+    awaitNewBlock(tx.fromGroup, tx.toGroup)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, stopMining) is true
     }
 
-    request[Balance](rpcPort, getBalance(publicKey)) is Balance(
-      initialBalance.balance - transferAmount,
-      1)
+    request[Balance](rpcPort, getBalance(publicKey)) is
+      Balance(initialBalance.balance - transferAmount, 1)
   }
 
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
@@ -68,10 +88,10 @@ class ServerSpec extends AlephiumSpec {
     val initialBalance = Balance(100, 1)
     val transferAmount = 10
 
-    val masterPort    = new ServerSocket(0).getLocalPort
-    val rpcMasterPort = masterPort + 1000
-    val wsMasterPort  = masterPort + 2000
-    def peerPort      = new ServerSocket(0).getLocalPort
+    val masterPort    = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+    val rpcMasterPort = masterPort - 100
+    val wsMasterPort  = masterPort - 200
+    def peerPort      = SocketUtil.temporaryLocalPort(SocketUtil.Both)
 
     val blockNotifyProbe = TestProbe()
 
@@ -90,17 +110,27 @@ class ServerSpec extends AlephiumSpec {
       } yield t).right.value
     }
 
+    def awaitNewBlock(from: Int, to: Int): Seq[Unit] = {
+      var count   = 0
+      val timeout = Duration.ofSecondsUnsafe(120).asScala
+      blockNotifyProbe.receiveWhile(max = timeout) {
+        case TextMessage.Strict(text) if count < 2 =>
+          val json         = parse(text).right.value
+          val notification = json.as[NotificationUnsafe].right.value.asNotification.right.value
+          val blockEntry   = notification.params.as[BlockEntry].right.value
+          if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to))
+            count += 1
+      }
+    }
+
     def bootNode(publicPort: Int, brokerId: Int): Server = {
       new Server(
         new Mode with PlatformConfigFixture {
-          override val newPath = rootPath.resolveSibling(
-            s"${rootPath.getFileName}-${this.getClass.getSimpleName}-${brokerId}")
-
           override val configValues = Map(
             ("alephium.network.masterAddress", s"localhost:$masterPort"),
             ("alephium.network.publicAddress", s"localhost:$publicPort"),
-            ("alephium.network.rpcPort", publicPort + 1000),
-            ("alephium.network.wsPort", publicPort + 2000),
+            ("alephium.network.rpcPort", publicPort - 100),
+            ("alephium.network.wsPort", publicPort - 200),
             ("alephium.broker.brokerId", brokerId)
           )
           override implicit lazy val config =
