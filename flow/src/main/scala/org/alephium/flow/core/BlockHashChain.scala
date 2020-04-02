@@ -4,12 +4,13 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.flow.core.BlockHashChain.{ChainDiff, TreeNode}
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentHashSet, TimeStamp}
+import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 
 // scalastyle:off number.of.methods
-trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
+trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with HashTreeTipsHolder {
   implicit def config: PlatformConfig
 
   protected def root: BlockHashChain.Root
@@ -17,34 +18,25 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   protected override val blockHashesTable =
     ConcurrentHashMap.empty[Hash, BlockHashChain.TreeNode]
 
-  protected val tips            = ConcurrentHashSet.empty[Hash]
-  protected val confirmedHashes = ArrayBuffer.empty[BlockHashChain.TreeNode]
-
   protected def getNode(hash: Hash): BlockHashChain.TreeNode = blockHashesTable(hash)
 
-  protected def addNode(node: BlockHashChain.TreeNode): Unit = {
+  protected def addNode(node: BlockHashChain.TreeNode): IOResult[Unit] = {
     assert(node.isLeaf && !contains(node.blockHash))
 
     val hash = node.blockHash
-    blockHashesTable.put(hash, node)
-    tips.add(hash)
+    blockHashesTable.add(hash, node)
     node match {
-      case _: BlockHashChain.Root =>
-        ()
+      case n: BlockHashChain.Root =>
+        addGenesisTip(hash, n.timestamp)
       case n: BlockHashChain.Node =>
-        tips.removeIfExist(n.parent.blockHash)
-        ()
+        addNewTip(hash, n.timestamp, n.parent.blockHash)
     }
-
-    pruneDueto(node)
-    confirmHashes()
-    ()
   }
 
   protected def addHash(hash: Hash,
                         parent: BlockHashChain.TreeNode,
                         weight: Int,
-                        timestamp: TimeStamp): Unit = {
+                        timestamp: TimeStamp): IOResult[Unit] = {
     val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight, timestamp)
     parent.successors += newNode
     addNode(newNode)
@@ -55,19 +47,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     if (tips.contains(hash)) tips.remove(hash)
     blockHashesTable.remove(hash)
     ()
-  }
-
-  private def pruneDueto(newNode: BlockHashChain.TreeNode): Boolean = {
-    val toCut = tips.iterator.filter { key =>
-      val tipNode = blockHashesTable(key)
-      newNode.height >= tipNode.height + config.blockConfirmNum
-    }
-
-    toCut.foreach { key =>
-      val node = blockHashesTable(key)
-      pruneBranchFrom(node)
-    }
-    toCut.nonEmpty
   }
 
   @tailrec
@@ -84,32 +63,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def confirmHashes(): Unit = {
-    val oldestTip = tips.iterator.map(blockHashesTable.apply).minBy(_.height)
-
-    @tailrec
-    def iter(): Unit = {
-      if (confirmedHashes.isEmpty && root.successors.size == 1) {
-        confirmedHashes.append(root)
-        iter()
-      } else if (confirmedHashes.nonEmpty) {
-        val lastConfirmed = confirmedHashes.last
-        if (lastConfirmed.successors.size == 1 && (oldestTip.height >= lastConfirmed.height + config.blockConfirmNum)) {
-          confirmedHashes.append(lastConfirmed.successors.head)
-          iter()
-        }
-      }
-    }
-
-    iter()
-  }
-
   def numHashes: Int = blockHashesTable.size
 
-  def maxWeight: Int = blockHashesTable.reduceValuesBy(_.weight)(math.max)
+  def maxWeight: Int = tips.keys.foldLeft(0) { (weight, hash) =>
+    math.max(weight, blockHashesTable(hash).weight)
+  }
 
-  def maxHeight: Int = blockHashesTable.reduceValuesBy(_.height)(math.max)
+  def maxHeight: Int = tips.keys.foldLeft(0) { (height, hash) =>
+    math.max(height, blockHashesTable(hash).height)
+  }
 
   def contains(hash: Hash): Boolean = blockHashesTable.contains(hash)
 
@@ -152,7 +114,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
   }
 
   def getAllTips: AVector[Hash] = {
-    AVector.fromIterator(tips.iterator)
+    AVector.from(tips.keys)
   }
 
   // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
@@ -197,8 +159,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
     iter(AVector.empty, node).reverse
   }
 
+  // TODO: optimize this, very inefficient
   def getAllBlockHashes: Iterator[Hash] = {
-    blockHashesTable.values.map(_.blockHash)
+    blockHashesTable.values.toIterator.map(_.blockHash)
   }
 
   def isBefore(hash1: Hash, hash2: Hash): Boolean = {
@@ -231,12 +194,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
       }
     }
 
-    if (height < confirmedHashes.size) {
-      val targetHash = confirmedHashes(height).blockHash
-      getNode(targetHash)
-    } else {
-      iter(node)
-    }
+    iter(node)
   }
 
   private def isBefore(node1: BlockHashChain.TreeNode, node2: BlockHashChain.TreeNode): Boolean = {
@@ -299,13 +257,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment {
       toAdd.append(newNode.blockHash)
       calDiff(toRemove, toAdd, newNode.parentOpt.get, oldNode.parentOpt.get)
     }
-  }
-
-  def getConfirmedHash(height: Int): Option[Hash] = {
-    assert(height >= 0)
-    if (height < confirmedHashes.size) {
-      Some(confirmedHashes(height).blockHash)
-    } else None
   }
 }
 // scalastyle:on number.of.methods
