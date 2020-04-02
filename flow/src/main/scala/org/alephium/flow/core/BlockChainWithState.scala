@@ -1,10 +1,10 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{HashTreeTipsDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.ConcurrentHashMap
 
 trait BlockChainWithState extends BlockChain {
@@ -33,15 +33,25 @@ trait BlockChainWithState extends BlockChain {
 }
 
 object BlockChainWithState {
+  def fromGenesisUnsafe(chainIndex: ChainIndex,
+                        updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
+      implicit config: PlatformConfig): BlockChainWithState = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    val tipsDB       = config.nodeStateDB.hashTreeTipsDB(chainIndex)
+    fromGenesisUnsafe(genesisBlock, tipsDB, updateState)
+  }
+
   def fromGenesisUnsafe(genesis: Block,
+                        tipsDB: HashTreeTipsDB,
                         updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
       implicit config: PlatformConfig): BlockChainWithState =
-    createUnsafe(genesis, 0, 0, config.emptyTrie, updateState)
+    createUnsafe(genesis, 0, 0, tipsDB, config.emptyTrie, updateState)
 
   private def createUnsafe(
       rootBlock: Block,
       initialHeight: Int,
       initialWeight: Int,
+      _tipsDB: HashTreeTipsDB,
       initialTrie: MerklePatriciaTrie,
       _updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
       implicit _config: PlatformConfig): BlockChainWithState = {
@@ -51,6 +61,7 @@ object BlockChainWithState {
     new BlockChainWithState {
       override val disk                                = _config.disk
       override val headerDB                            = _config.headerDB
+      override val tipsDB                              = _tipsDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

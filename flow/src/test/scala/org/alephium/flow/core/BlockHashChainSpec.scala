@@ -4,15 +4,19 @@ import org.scalatest.Assertion
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, TimeStamp}
 
 class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
   trait Fixture extends BlockHashChain {
-    val root   = BlockHashChain.Root(Hash.zero, 0, 0, TimeStamp.zero)
-    val config = Self.config
+    implicit val config = Self.config
 
+    val root   = BlockHashChain.Root(Hash.zero, 0, 0, TimeStamp.zero)
+    val tipsDB = config.nodeStateDB.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+
+    addNode(root)
     var currentNode: BlockHashChain.TreeNode = root
+
     def addNewHash(n: Int): Unit = {
       val timestamp = TimeStamp.unsafe(n.toLong)
       val newHash   = Hash.random

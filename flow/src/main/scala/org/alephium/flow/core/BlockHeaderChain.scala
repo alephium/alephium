@@ -1,9 +1,9 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{HeaderDB, IOResult}
+import org.alephium.flow.io.{HashTreeTipsDB, HeaderDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, BlockHeader}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
@@ -24,7 +24,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit] = {
     assert(!contains(header.hash) && contains(parentHash))
     val parent = blockHashesTable(parentHash)
-    addHeader(header).map { _ =>
+    addHeader(header).flatMap { _ =>
       addHash(header.hash, parent, weight, header.timestamp)
     }
   }
@@ -35,13 +35,6 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   protected def addHeaderUnsafe(header: BlockHeader): Unit = {
     headerDB.putHeaderUnsafe(header)
-  }
-
-  def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
-    getConfirmedHash(height) match {
-      case Some(hash) => headerDB.getHeader(hash).map(Some.apply)
-      case None       => Right(None)
-    }
   }
 
   def getHashTargetUnsafe(hash: Hash): BigInt = {
@@ -57,16 +50,29 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 }
 
 object BlockHeaderChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
-    createUnsafe(genesis.header, 0, 0)
+  def fromGenesisUnsafe(chainIndex: ChainIndex)(
+      implicit config: PlatformConfig): BlockHeaderChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    val tipsDB       = config.nodeStateDB.hashTreeTipsDB(chainIndex)
+    fromGenesisUnsafe(genesisBlock, tipsDB)
+  }
 
-  private def createUnsafe(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformConfig): BlockHeaderChain = {
+  def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB)(
+      implicit config: PlatformConfig): BlockHeaderChain =
+    createUnsafe(genesis.header, 0, 0, tipsDB)
+
+  private def createUnsafe(
+      rootHeader: BlockHeader,
+      initialHeight: Int,
+      initialWeight: Int,
+      _tipsDB: HashTreeTipsDB
+  )(implicit _config: PlatformConfig): BlockHeaderChain = {
     val timestamp = rootHeader.timestamp
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
       override val headerDB: HeaderDB                  = _config.headerDB
+      override val tipsDB: HashTreeTipsDB              = _tipsDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 

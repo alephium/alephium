@@ -1,10 +1,10 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.BlockChain.ChainDiff
-import org.alephium.flow.io.{Disk, IOResult}
+import org.alephium.flow.io.{Disk, HashTreeTipsDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
@@ -48,17 +48,29 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 }
 
 object BlockChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockChain =
-    createUnsafe(genesis, 0, 0)
+  def fromGenesisUnsafe(chainIndex: ChainIndex)(implicit config: PlatformConfig): BlockChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    val tipsDB       = config.nodeStateDB.hashTreeTipsDB(chainIndex)
+    fromGenesisUnsafe(genesisBlock, tipsDB)
+  }
 
-  private def createUnsafe(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformConfig): BlockChain = {
+  def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB)(
+      implicit config: PlatformConfig): BlockChain =
+    createUnsafe(genesis, 0, 0, tipsDB)
+
+  private def createUnsafe(
+      rootBlock: Block,
+      initialHeight: Int,
+      initialWeight: Int,
+      _tipsDB: HashTreeTipsDB
+  )(implicit _config: PlatformConfig): BlockChain = {
     val timestamp = rootBlock.header.timestamp
     val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
     new BlockChain {
       override val disk                                = _config.disk
       override val headerDB                            = _config.headerDB
+      override val tipsDB                              = _tipsDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
 
