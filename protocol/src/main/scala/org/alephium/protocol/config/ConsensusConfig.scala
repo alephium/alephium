@@ -9,4 +9,5 @@ trait ConsensusConfig extends GroupConfig {
 
   def blockTargetTime: Duration
   def blockConfirmNum: Int
+  def blockConfirmTS: Duration = blockTargetTime.timesUnsafe(blockConfirmNum.toLong)
 }

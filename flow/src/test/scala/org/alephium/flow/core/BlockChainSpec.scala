@@ -3,7 +3,8 @@ package org.alephium.flow.core
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.flow.io.HashTreeTipsDB
+import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util.AVector
 
 class BlockChainSpec extends AlephiumFlowSpec {
@@ -11,11 +12,13 @@ class BlockChainSpec extends AlephiumFlowSpec {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
+
+    val tipsDB: HashTreeTipsDB = config.nodeStateDB.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
   }
 
   it should "add block correctly" in new Fixture {
     forAll(blockGen) { block =>
-      val chain = BlockChain.fromGenesisUnsafe(genesis)
+      val chain = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
       chain.numHashes is 1
       val blocksSize1 = chain.numHashes
       chain.add(block, 0).isRight is true
@@ -30,7 +33,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
 
   it should "add blocks correctly" in new Fixture {
     forAll(chainGen) { blocks =>
-      val chain       = BlockChain.fromGenesisUnsafe(genesis)
+      val chain       = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
       val blocksSize1 = chain.numHashes
       blocks.foreach(block => chain.add(block, 0).isRight is true)
       val blocksSize2 = chain.numHashes
@@ -39,14 +42,12 @@ class BlockChainSpec extends AlephiumFlowSpec {
       val midHashes = chain.getBlockHashesBetween(blocks.last.hash, blocks.head.hash)
       val expected  = blocks.tail.map(_.hash)
       midHashes is expected
-
-      checkConfirmedBlocks(chain, blocks)
     }
   }
 
   it should "work correctly for a chain of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis)) { blocks =>
-      val chain0 = BlockChain.fromGenesisUnsafe(genesis)
+      val chain0 = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
       blocks.foreach(block => chain0.add(block, 0))
       val headBlock = genesis
       val lastBlock = blocks.last
@@ -61,7 +62,6 @@ class BlockChainSpec extends AlephiumFlowSpec {
       chain0.getBestTip is lastBlock.hash
       chain0.maxHeight is blocks.length
       chain0.getAllTips is AVector(lastBlock.hash)
-      checkConfirmedBlocks(chain0, blocks)
 
       val diff = chain0.calHashDiff(blocks.last.hash, genesis.hash)
       diff.toRemove.isEmpty is true
@@ -72,7 +72,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
   it should "work correctly with two chains of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis)) { longChain =>
       forAll(ModelGen.chainGen(2, genesis)) { shortChain =>
-        val chain0 = BlockChain.fromGenesisUnsafe(genesis)
+        val chain0 = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
 
         shortChain.foreach(block => chain0.add(block, 0))
         chain0.getHeight(shortChain.head) is 1
@@ -95,7 +95,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
         chain0.isTip(longChain.last) is true
         chain0.getBestTip is longChain.last.hash
         chain0.maxHeight is longChain.length
-        chain0.getAllTips.toIterable.toSet is Set(longChain.last.hash)
+        chain0.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
   }
@@ -103,7 +103,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
   it should "test chain diffs with two chains of blocks" in new Fixture {
     forAll(ModelGen.chainGen(4, genesis)) { longChain =>
       forAll(ModelGen.chainGen(3, genesis)) { shortChain =>
-        val chain = BlockChain.fromGenesisUnsafe(genesis)
+        val chain = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
         shortChain.foreach(block => chain.add(block, 0))
         longChain.foreach(block  => chain.add(block, 0))
 
@@ -118,9 +118,9 @@ class BlockChainSpec extends AlephiumFlowSpec {
     }
   }
 
-  it should "compute correct weights for a single chain" in {
+  it should "compute correct weights for a single chain" in new Fixture {
     forAll(ModelGen.chainGen(5)) { blocks =>
-      val chain = createBlockChain(blocks.init)
+      val chain = createBlockChain(blocks.init, tipsDB)
       blocks.init.foreach(block => chain.contains(block) is true)
       chain.maxHeight is 3
       chain.maxWeight is 6
@@ -131,10 +131,10 @@ class BlockChainSpec extends AlephiumFlowSpec {
     }
   }
 
-  it should "compute corrent weights for two chains with same root" in {
+  it should "compute corrent weights for two chains with same root" in new Fixture {
     forAll(ModelGen.chainGen(5)) { blocks1 =>
       forAll(ModelGen.chainGen(1, blocks1.head)) { blocks2 =>
-        val chain = createBlockChain(blocks1)
+        val chain = createBlockChain(blocks1, tipsDB)
         blocks2.foreach(block => chain.add(block, 0))
         blocks1.foreach(block => chain.contains(block) is true)
         blocks2.foreach(block => chain.contains(block) is true)
@@ -150,21 +150,9 @@ class BlockChainSpec extends AlephiumFlowSpec {
     }
   }
 
-  def checkConfirmedBlocks(chain: BlockChain, newBlocks: AVector[Block]): Unit = {
-    newBlocks.indices.foreach { index =>
-      val height    = index + 1
-      val headerOpt = chain.getConfirmedHeader(height).right.value
-      if (height + config.blockConfirmNum <= newBlocks.length) {
-        headerOpt.get is newBlocks(index).header
-      } else {
-        headerOpt.isEmpty
-      }
-    }
-  }
-
-  def createBlockChain(blocks: AVector[Block]): BlockChain = {
+  def createBlockChain(blocks: AVector[Block], tipsDB: HashTreeTipsDB): BlockChain = {
     assert(blocks.nonEmpty)
-    val chain = BlockChain.fromGenesisUnsafe(blocks.head)
+    val chain = BlockChain.fromGenesisUnsafe(blocks.head, tipsDB)
     blocks.toIterable.zipWithIndex.tail foreach {
       case (block, index) =>
         chain.add(block, index * 2)

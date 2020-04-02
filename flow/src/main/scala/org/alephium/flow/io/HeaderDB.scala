@@ -1,14 +1,12 @@
 package org.alephium.flow.io
 
-import RocksDBStorage.ColumnFamily
+import RocksDBStorage.{ColumnFamily, Settings}
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.BlockHeader
 
 object HeaderDB {
-  import RocksDBStorage.Settings
-
   def apply(storage: RocksDBStorage, cf: ColumnFamily): HeaderDB =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
