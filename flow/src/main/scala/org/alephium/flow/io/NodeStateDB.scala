@@ -37,5 +37,9 @@ class NodeStateDB(val storage: RocksDBStorage,
     private val tipKey = tipKeys(chainIndex.from.value)(chainIndex.to.value)
 
     override def updateTips(tips: AVector[Hash]): IOResult[Unit] = put[AVector[Hash]](tipKey, tips)
+
+    override def loadTips(): IOResult[AVector[Hash]] = get[AVector[Hash]](tipKey)
+
+    override def clearTips(): IOResult[Unit] = delete(tipKey)
   }
 }
