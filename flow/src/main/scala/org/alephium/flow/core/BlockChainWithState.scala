@@ -33,17 +33,14 @@ trait BlockChainWithState extends BlockChain {
 }
 
 object BlockChainWithState {
-  def fromGenesisUnsafe(chainIndex: ChainIndex,
-                        updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
+  def fromGenesisUnsafe(chainIndex: ChainIndex, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
     val tipsDB       = config.nodeStateDB.hashTreeTipsDB(chainIndex)
     fromGenesisUnsafe(genesisBlock, tipsDB, updateState)
   }
 
-  def fromGenesisUnsafe(genesis: Block,
-                        tipsDB: HashTreeTipsDB,
-                        updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
+  def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState =
     createUnsafe(genesis, 0, 0, tipsDB, config.emptyTrie, updateState)
 
@@ -53,8 +50,8 @@ object BlockChainWithState {
       initialWeight: Int,
       _tipsDB: HashTreeTipsDB,
       initialTrie: MerklePatriciaTrie,
-      _updateState: (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie])(
-      implicit _config: PlatformConfig): BlockChainWithState = {
+      _updateState: BlockFlow.TrieUpdater
+  )(implicit _config: PlatformConfig): BlockChainWithState = {
     val timestamp = rootBlock.header.timestamp
     val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
