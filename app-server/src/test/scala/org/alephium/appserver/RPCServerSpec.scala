@@ -20,7 +20,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.core.{AllHandlers, BlockFlow}
+import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
@@ -435,6 +435,13 @@ object RPCServerSpec {
                            fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }
+
+    def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState =
+      BlockChainWithState.fromGenesisUnsafe
+    def blockchainBuilder: ChainIndex => BlockChain =
+      BlockChain.fromGenesisUnsafe
+    def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
+      BlockHeaderChain.fromGenesisUnsafe
 
     override def getHeight(hash: Hash): Int                    = 1
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
