@@ -8,9 +8,9 @@ import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 trait HashTreeTipsHolder {
   protected val tips = ConcurrentHashMap.empty[Hash, TimeStamp]
 
-  def config: ConsensusConfig
+  protected def config: ConsensusConfig
 
-  def tipsDB: HashTreeTipsDB
+  protected def tipsDB: HashTreeTipsDB
 
   def addGenesisTip(newTip: Hash, timeStamp: TimeStamp): IOResult[Unit] = {
     tips.add(newTip, timeStamp)
