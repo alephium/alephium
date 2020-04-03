@@ -3,6 +3,7 @@ package org.alephium.flow.core
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
@@ -10,9 +11,20 @@ import org.alephium.util.AVector
 trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils
 
 object BlockFlow {
-  def build()(implicit config: PlatformConfig): BlockFlow = new BlockFlowImpl()
+  type TrieUpdater = (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie]
 
-  class BlockFlowImpl()(implicit val config: PlatformConfig) extends BlockFlow {
+  def fromGenesisUnsafe()(implicit config: PlatformConfig): BlockFlow = {
+    new BlockFlowImpl(BlockChainWithState.fromGenesisUnsafe,
+                      BlockChain.fromGenesisUnsafe,
+                      BlockHeaderChain.fromGenesisUnsafe)
+  }
+
+  class BlockFlowImpl(
+      val blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState,
+      val blockchainBuilder: ChainIndex                                   => BlockChain,
+      val blockheaderChainBuilder: ChainIndex                             => BlockHeaderChain
+  )(implicit val config: PlatformConfig)
+      extends BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
       assert(index.relateTo(config.brokerInfo))
@@ -219,6 +231,4 @@ object BlockFlow {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
   }
-
-  final case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)
 }

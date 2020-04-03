@@ -34,10 +34,14 @@ trait BlockFlowState {
     BlockDeps(deps1 ++ deps2)
   }
 
+  def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState
+  def blockchainBuilder: ChainIndex                                   => BlockChain
+  def blockheaderChainBuilder: ChainIndex                             => BlockHeaderChain
+
   private val intraGroupChains: AVector[BlockChainWithState] = {
     AVector.tabulate(config.groupNumPerBroker) { groupShift =>
       val group = brokerInfo.groupFrom + groupShift
-      BlockChainWithState.fromGenesisUnsafe(ChainIndex.unsafe(group, group), updateState)
+      blockchainWithStateBuilder(ChainIndex.unsafe(group, group), updateState)
     }
   }
 
@@ -45,7 +49,7 @@ trait BlockFlowState {
     AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
       val mainGroup = brokerInfo.groupFrom + toShift
       val fromIndex = if (k < brokerInfo.groupFrom) k else k + config.groupNumPerBroker
-      BlockChain.fromGenesisUnsafe(ChainIndex.unsafe(fromIndex, mainGroup))
+      blockchainBuilder(ChainIndex.unsafe(fromIndex, mainGroup))
     }
   private val outBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(config.groupNumPerBroker, groups) { (fromShift, to) =>
@@ -53,7 +57,7 @@ trait BlockFlowState {
       if (mainGroup == to) {
         intraGroupChains(fromShift)
       } else {
-        BlockChain.fromGenesisUnsafe(ChainIndex.unsafe(mainGroup, to))
+        blockchainBuilder(ChainIndex.unsafe(mainGroup, to))
       }
     }
   private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
@@ -66,7 +70,7 @@ trait BlockFlowState {
           val toShift   = to - brokerInfo.groupFrom
           val fromIndex = if (from < brokerInfo.groupFrom) from else from - config.groupNumPerBroker
           inBlockChains(toShift)(fromIndex)
-        } else BlockHeaderChain.fromGenesisUnsafe(ChainIndex.unsafe(from, to))
+        } else blockheaderChainBuilder(ChainIndex.unsafe(from, to))
     }
 
   // Cache latest blocks for assisting merkle trie
