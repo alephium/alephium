@@ -415,7 +415,7 @@ object RPCServerSpec {
       Seq(blockHeader)
     }
 
-    def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
+    override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
       Right((BigInt(0), 0))
 
     override def prepareUnsignedTx(
@@ -436,9 +436,7 @@ object RPCServerSpec {
       Right(Some(dummyTx))
     }
 
-    override def getHeight(hash: Hash): Int = {
-      1
-    }
+    override def getHeight(hash: Hash): Int                    = 1
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps        = ???
     def getAllTips: AVector[Hash]                              = ???
@@ -449,11 +447,10 @@ object RPCServerSpec {
     def add(header: BlockHeader, weight: Int): IOResult[Unit]            = ???
     def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = ???
     def add(block: Block, weight: Int): IOResult[Unit]                   = ???
-    def calBestDepsUnsafe(): Unit                                        = ???
+    def updateBestDepsUnsafe(): Unit                                     = ???
     def updateBestDeps(): IOResult[Unit]                                 = ???
     def add(block: Block): IOResult[Unit]                                = ???
-    def add(header: BlockHeader): IOResult[Unit] =
-      ???
+    def add(header: BlockHeader): IOResult[Unit]                         = ???
   }
 
   class ModeDummy(intraCliqueInfo: IntraCliqueInfo,

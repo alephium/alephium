@@ -16,7 +16,7 @@ import org.alephium.util.{AVector, Hex}
 
 class BlockFlowSpec extends AlephiumFlowSpec {
   it should "compute correct blockflow height" in {
-    val blockFlow = BlockFlow.createUnsafe()
+    val blockFlow = BlockFlow.build()
 
     config.genesisBlocks.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block.hash) is 0
@@ -27,7 +27,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   it should "work for at least 2 user group when adding blocks sequentially" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow.createUnsafe()
+      val blockFlow = BlockFlow.build()
 
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
@@ -61,7 +61,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow.createUnsafe()
+      val blockFlow = BlockFlow.build()
 
       val newBlocks1 = for {
         i <- 0 to 1
@@ -118,7 +118,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   it should "work for 2 user group when there is a fork" in {
     if (config.groups >= 2) {
-      val blockFlow = BlockFlow.createUnsafe()
+      val blockFlow = BlockFlow.build()
 
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block11     = mine(blockFlow, chainIndex1)
@@ -159,7 +159,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     if (config.groups >= 2) {
       val broker = config.brokerInfo
       forAll(Gen.choose(broker.groupFrom, broker.groupUntil - 1)) { mainGroup =>
-        val blockFlow = BlockFlow.createUnsafe()
+        val blockFlow = BlockFlow.build()
 
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
         val block11    = mine(blockFlow, chainIndex)

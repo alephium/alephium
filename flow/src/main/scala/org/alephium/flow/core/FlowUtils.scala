@@ -59,7 +59,9 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
 
   def updateBestDeps(): IOResult[Unit]
 
-  def calBestDepsUnsafe(): Unit
+  def updateBestDepsUnsafe(): Unit
+
+  def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
   private def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
     getPool(chainIndex).collectForBlock(chainIndex, config.txMaxNumberPerBlock)
