@@ -1,24 +1,18 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
 import org.alephium.util.AVector
 
-trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
-  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash]
-  def calBestDepsUnsafe(group: GroupIndex): BlockDeps
-  def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)]
-}
+trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils
 
 object BlockFlow {
-  def createUnsafe()(implicit config: PlatformConfig): BlockFlow = new Unsafe()
+  def build()(implicit config: PlatformConfig): BlockFlow = new BlockFlowImpl()
 
-  class Unsafe()(implicit val config: PlatformConfig) extends BlockFlow {
+  class BlockFlowImpl()(implicit val config: PlatformConfig) extends BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
       assert(index.relateTo(config.brokerInfo))
@@ -90,12 +84,6 @@ object BlockFlow {
       aggregate(_.getBestTip)(ordering.max)
     }
 
-    def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] = {
-      getUtxos(payTo, address).map { utxos =>
-        (utxos.sumBy(_._2.value), utxos.length)
-      }
-
-    }
     override def getAllTips: AVector[Hash] = {
       aggregate(_.getAllTips)(_ ++ _)
     }
@@ -220,7 +208,7 @@ object BlockFlow {
       BlockDeps(deps2)
     }
 
-    def calBestDepsUnsafe(): Unit =
+    def updateBestDepsUnsafe(): Unit =
       brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateMemPoolUnsafe(mainGroup, deps)
@@ -228,9 +216,8 @@ object BlockFlow {
       }
 
     def updateBestDeps(): IOResult[Unit] = {
-      IOUtils.tryExecute(calBestDepsUnsafe())
+      IOUtils.tryExecute(updateBestDepsUnsafe())
     }
-
   }
 
   final case class BlockInfo(timestamp: Long, chainIndex: ChainIndex)

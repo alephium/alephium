@@ -194,6 +194,8 @@ trait BlockFlowState {
     }
   }
 
+  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash]
+
   // if inclusive is true, the current header would be included
   def getInOutTips(header: BlockHeader,
                    currentGroup: GroupIndex,
@@ -304,6 +306,12 @@ trait BlockFlowState {
     }
   }
 
+  def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] = {
+    getUtxos(payTo, address).map { utxos =>
+      (utxos.sumBy(_._2.value), utxos.length)
+    }
+  }
+
   def getUtxosInCache(pubScript: PubScript,
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
@@ -335,6 +343,7 @@ trait BlockFlowState {
       }
     }
   }
+
   def prepareTx(from: ED25519PublicKey,
                 fromPayTo: PayTo,
                 to: ED25519PublicKey,
