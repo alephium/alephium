@@ -12,11 +12,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def disk: BlockStorage
 
   def getBlock(hash: Hash): IOResult[Block] = {
-    disk.getBlock(hash)
+    disk.get(hash)
   }
 
   def getBlockUnsafe(hash: Hash): Block = {
-    disk.getBlockUnsafe(hash)
+    disk.getUnsafe(hash)
   }
 
   def add(block: Block, weight: Int): IOResult[Unit] = {
@@ -32,12 +32,12 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
-    disk.putBlock(block).right.map(_ => ())
+    disk.put(block).right.map(_ => ())
     // TODO: handle transactions later
   }
 
   protected def persistBlockUnsafe(block: Block): Unit = {
-    disk.putBlockUnsafe(block)
+    disk.putUnsafe(block)
     ()
   }
 

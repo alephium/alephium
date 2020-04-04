@@ -26,19 +26,19 @@ object RocksDBColumn {
     }
 }
 
-trait RocksDBColumn {
+trait RocksDBColumn extends RawKeyValueStorage {
   protected def db: RocksDB
   protected def handle: ColumnFamilyHandle
   protected def writeOptions: WriteOptions
   protected def readOptions: ReadOptions
 
-  def getRawUnsafe(key: ByteString): ByteString = {
+  override def getRawUnsafe(key: ByteString): ByteString = {
     val result = db.get(handle, readOptions, key.toArray)
     if (result == null) throw IOError.RocksDB.keyNotFound.e
     else ByteString.fromArrayUnsafe(result)
   }
 
-  def getOptRawUnsafe(key: ByteString): Option[ByteString] = {
+  override def getOptRawUnsafe(key: ByteString): Option[ByteString] = {
     val result = db.get(handle, key.toArray)
     if (result == null) None
     else {
@@ -46,16 +46,16 @@ trait RocksDBColumn {
     }
   }
 
-  def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
+  override def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
     db.put(handle, writeOptions, key.toArray, value.toArray)
   }
 
-  def existsRawUnsafe(key: ByteString): Boolean = {
+  override def existsRawUnsafe(key: ByteString): Boolean = {
     val result = db.get(handle, key.toArray)
     result != null
   }
 
-  def deleteRawUnsafe(key: ByteString): Unit = {
+  override def deleteRawUnsafe(key: ByteString): Unit = {
     db.delete(handle, key.toArray)
   }
 }

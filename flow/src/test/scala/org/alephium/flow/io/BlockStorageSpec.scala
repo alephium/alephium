@@ -8,35 +8,33 @@ import org.scalatest.EitherValues._
 import org.alephium.flow.core.TestUtils
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.ModelGen
-import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Files => AFiles}
 
 class BlockStorageSpec extends AlephiumSpec {
   trait Fixture {
-    val root = AFiles.tmpDir.resolve(".alephium-test-diskspec")
-    val disk = BlockStorage.create(root).right.value
+    val root    = AFiles.tmpDir.resolve(".alephium-test-diskspec")
+    val storage = BlockStorage.create(root).right.value
 
     def postTest(): Assertion = {
-      disk.clear()
+      storage.clear()
       Files.exists(root) is true
-      Files.exists(disk.blockFolder) is false
+      Files.exists(storage.folder) is false
     }
   }
 
   it should "create related folders" in new Fixture {
     Files.exists(root) is true
-    Files.exists(disk.blockFolder) is true
+    Files.exists(storage.folder) is true
     BlockStorage.create(root).isRight is true
   }
 
   it should "save and read blocks" in new Fixture with ConsensusConfigFixture {
     forAll(ModelGen.blockGen) { block =>
-      disk.checkBlockFile(block.hash) is false
-      val data = serialize(block)
-      disk.putBlock(block).right.value is data.length
-      disk.checkBlockFile(block.hash) is true
-      disk.getBlockUnsafe(block.hash) is block
-      disk.getBlock(block.hash).right.value is block
+      storage.existsUnsafe(block.hash) is false
+      storage.put(block).isRight is true
+      storage.existsUnsafe(block.hash) is true
+      storage.getUnsafe(block.hash) is block
+      storage.get(block.hash).right.value is block
     }
     TestUtils.clear(root)
   }
