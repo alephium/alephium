@@ -4,18 +4,18 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 object RocksDBColumn {
-  import RocksDBStorage.Settings
+  import RocksDBSource.Settings
 
-  def apply(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily): RocksDBColumn =
+  def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
-            cf: RocksDBStorage.ColumnFamily,
+  def apply(storage: RocksDBSource,
+            cf: RocksDBSource.ColumnFamily,
             writeOptions: WriteOptions): RocksDBColumn =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
-            cf: RocksDBStorage.ColumnFamily,
+  def apply(storage: RocksDBSource,
+            cf: RocksDBSource.ColumnFamily,
             _writeOptions: WriteOptions,
             _readOptions: ReadOptions): RocksDBColumn =
     new RocksDBColumn {

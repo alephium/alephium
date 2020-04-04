@@ -1,21 +1,21 @@
 package org.alephium.flow.io
 
-import RocksDBStorage.{ColumnFamily, Settings}
+import RocksDBSource.{ColumnFamily, Settings}
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.BlockHeader
 
 object BlockHeaderStorage {
-  def apply(storage: RocksDBStorage, cf: ColumnFamily): BlockHeaderStorage =
+  def apply(storage: RocksDBSource, cf: ColumnFamily): BlockHeaderStorage =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
+  def apply(storage: RocksDBSource,
             cf: ColumnFamily,
             writeOptions: WriteOptions): BlockHeaderStorage =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
+  def apply(storage: RocksDBSource,
             cf: ColumnFamily,
             writeOptions: WriteOptions,
             readOptions: ReadOptions): BlockHeaderStorage = {
@@ -24,7 +24,7 @@ object BlockHeaderStorage {
 }
 
 class BlockHeaderStorage(
-    val storage: RocksDBStorage,
+    val storage: RocksDBSource,
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions

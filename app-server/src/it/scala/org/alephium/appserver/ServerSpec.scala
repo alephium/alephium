@@ -22,7 +22,7 @@ import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
-import org.alephium.flow.io.RocksDBStorage.Settings
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
