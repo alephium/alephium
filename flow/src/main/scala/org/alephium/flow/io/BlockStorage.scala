@@ -14,9 +14,9 @@ object BlockStorage {
 
   def createUnsafe(root: Path): BlockStorage = {
     createDirUnsafe(root)
-    val disk = new BlockStorage(root)
-    createDirUnsafe(disk.folder)
-    disk
+    val storage = new BlockStorage(root)
+    createDirUnsafe(storage.folder)
+    storage
   }
 }
 

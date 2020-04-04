@@ -10,11 +10,11 @@ import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 
 trait PlatformIO {
-  def disk: BlockStorage
+  def blockStorage: BlockStorage
 
-  def headerDB: BlockHeaderStorage
+  def headerStorage: BlockHeaderStorage
 
-  def nodeStateDB: NodeStateStorage
+  def nodeStateStorage: NodeStateStorage
 
   def emptyTrie: MerklePatriciaTrie
 
@@ -25,7 +25,7 @@ object PlatformIO {
   def init(rootPath: Path, dbFolder: String, dbName: String, writeOptions: WriteOptions)(
       implicit config: GroupConfig)
     : (BlockStorage, BlockHeaderStorage, NodeStateStorage, MerklePatriciaTrie) = {
-    val disk: BlockStorage = BlockStorage.createUnsafe(rootPath)
+    val blockStorage: BlockStorage = BlockStorage.createUnsafe(rootPath)
     val dbStorage = {
       val dbPath = {
         val path = rootPath.resolve(dbFolder)
@@ -35,12 +35,12 @@ object PlatformIO {
       val path = dbPath.resolve(dbName)
       RocksDBSource.openUnsafe(path, RocksDBSource.Compaction.HDD)
     }
-    val headerDB    = BlockHeaderStorage(dbStorage, ColumnFamily.All, writeOptions)
-    val nodeStateDB = NodeStateStorage(dbStorage, ColumnFamily.All, writeOptions)
+    val headerStorage    = BlockHeaderStorage(dbStorage, ColumnFamily.All, writeOptions)
+    val nodeStateStorage = NodeStateStorage(dbStorage, ColumnFamily.All, writeOptions)
     val emptyTrie =
       MerklePatriciaTrie.createStateTrie(
         RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie, writeOptions))
 
-    (disk, headerDB, nodeStateDB, emptyTrie)
+    (blockStorage, headerStorage, nodeStateStorage, emptyTrie)
   }
 }
