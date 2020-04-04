@@ -3,6 +3,7 @@ package org.alephium.flow.trie
 import akka.util.ByteString
 
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
 import org.alephium.serde._
@@ -15,7 +16,7 @@ object MerklePatriciaTrie {
    * encoding flag byte = path length (7 bits) ++ type (1 bit)
    */
   sealed trait Node {
-    lazy val serialized: ByteString = Node.SerdeNode.serialize(this)
+    lazy val serialized: ByteString = Node.SerdeNode._serialize(this)
     lazy val hash: Hash             = Hash.hash(serialized)
 
     def path: ByteString
@@ -95,7 +96,7 @@ object MerklePatriciaTrie {
         fixedSizeSerde(16)
       }
 
-      override def serialize(node: Node): ByteString = node match {
+      def _serialize(node: Node): ByteString = node match {
         case n: BranchNode =>
           val flag     = SerdeNode.encodeFlag(n.path.length, isLeaf = false)
           val nibbles  = encodeNibbles(n.path)
@@ -106,6 +107,8 @@ object MerklePatriciaTrie {
           val nibbles = encodeNibbles(n.path)
           (intSerde.serialize(flag) ++ nibbles) ++ bytestringSerde.serialize(n.data)
       }
+
+      override def serialize(node: Node): ByteString = node.serialized
 
       override def _deserialize(input: ByteString): SerdeResult[(Node, ByteString)] = {
         intSerde._deserialize(input).flatMap {
@@ -170,12 +173,12 @@ object MerklePatriciaTrie {
     ByteString.fromArrayUnsafe(bytes)
   }
 
-  def create(storage: KeyValueStorage, genesisNode: LeafNode): MerklePatriciaTrie = {
-    storage.put[Node](genesisNode.hash.bytes, genesisNode)
+  def create(storage: KeyValueStorage[Hash, Node], genesisNode: LeafNode): MerklePatriciaTrie = {
+    storage.put(genesisNode.hash, genesisNode)
     new MerklePatriciaTrie(genesisNode.hash, storage)
   }
 
-  def createEmptyTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
+  def createEmptyTrie(storage: KeyValueStorage[Hash, Node]): MerklePatriciaTrie = {
     val genesisKey = Hash.zero.bytes
     val genesisNode = {
       val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
@@ -186,7 +189,7 @@ object MerklePatriciaTrie {
     create(storage, genesisNode)
   }
 
-  def createStateTrie(storage: KeyValueStorage): MerklePatriciaTrie = {
+  def createStateTrie(storage: KeyValueStorage[Hash, Node]): MerklePatriciaTrie = {
     val genesisOutputPoint = TxOutputPoint(0, Hash.zero, 0)
     val genesisOutput      = TxOutput.burn(0)
     val genesisKey         = serialize(genesisOutputPoint)
@@ -200,13 +203,13 @@ object MerklePatriciaTrie {
 }
 
 // TODO: batch mode
-final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage) {
+final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage[Hash, Node]) {
   import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie] = {
     result.toAdd
       .foreachE { node =>
-        storage.putRaw(node.hash.bytes, node.serialized)
+        storage.put(node.hash, node)
       }
       .map { _ =>
         result.newNodeOpt match {
@@ -260,7 +263,7 @@ final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage) {
     }
   }
 
-  def getNode(hash: Hash): IOResult[Node] = storage.get[Node](hash.bytes)
+  def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
 
   def remove[K: Serde](key: K): IOResult[MerklePatriciaTrie] = {
     removeRaw(serialize[K](key))
