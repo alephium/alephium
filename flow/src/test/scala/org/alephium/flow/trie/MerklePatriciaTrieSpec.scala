@@ -5,7 +5,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
+import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBStorage}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Files}
@@ -101,7 +101,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     private val storage =
       RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
 
-    val db   = HeaderDB(storage, ColumnFamily.Trie)
+    val db   = RocksDBKeyValueStorage[Hash, MerklePatriciaTrie.Node](storage, ColumnFamily.Trie)
     var trie = MerklePatriciaTrie.create(db, genesisNode)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {

@@ -1,20 +1,20 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{HashTreeTipsDB, HeaderDB, IOResult}
+import org.alephium.flow.io.{BlockHeaderStorage, HashTreeTipsDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  def headerDB: HeaderDB
+  def headerDB: BlockHeaderStorage
 
   def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
-    headerDB.getHeader(hash)
+    headerDB.get(hash)
   }
 
   def getBlockHeaderUnsafe(hash: Hash): BlockHeader = {
-    headerDB.getHeaderUnsafe(hash)
+    headerDB.getUnsafe(hash)
   }
 
   def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
@@ -30,11 +30,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
-    headerDB.putHeader(header)
+    headerDB.put(header)
   }
 
   protected def addHeaderUnsafe(header: BlockHeader): Unit = {
-    headerDB.putHeaderUnsafe(header)
+    headerDB.putUnsafe(header)
   }
 
   def getHashTargetUnsafe(hash: Hash): BigInt = {
@@ -71,7 +71,7 @@ object BlockHeaderChain {
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
-      override val headerDB: HeaderDB                  = _config.headerDB
+      override val headerDB: BlockHeaderStorage        = _config.headerDB
       override val tipsDB: HashTreeTipsDB              = _tipsDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode

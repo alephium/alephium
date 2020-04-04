@@ -33,7 +33,7 @@ class RocksDBBench {
     // Insert N
     val keys = (0 to N).map { _ =>
       val bytes = Hash.random.bytes
-      db.put(bytes, bytes)
+      db.putRawUnsafe(bytes, bytes)
       bytes
     }
 
@@ -42,19 +42,19 @@ class RocksDBBench {
     // Query N / 2
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.getRaw(key).right.toOption.get
+      db.getRawUnsafe(key)
     }
 
     // Delete N / 2
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.delete(key)
+      db.deleteRawUnsafe(key)
     }
 
     // Query N / 2 (ignoring key which are not found)
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.getRaw(key)
+      db.getRawUnsafe(key)
     }
   }
 

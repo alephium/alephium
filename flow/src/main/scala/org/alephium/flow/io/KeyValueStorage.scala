@@ -1,21 +1,25 @@
 package org.alephium.flow.io
 
-import akka.util.ByteString
+import org.alephium.serde.{Serde, Serializer}
 
-import org.alephium.serde.Serde
+abstract class KeyValueStorage[K: Serializer, V: Serde] {
+  def get(key: K): IOResult[V]
 
-trait KeyValueStorage {
-  def getRaw(key: ByteString): IOResult[ByteString]
+  def getUnsafe(key: K): V
 
-  def get[V: Serde](key: ByteString): IOResult[V]
+  def getOpt(key: K): IOResult[Option[V]]
 
-  def getOptRaw(key: ByteString): IOResult[Option[ByteString]]
+  def getOptUnsafe(key: K): Option[V]
 
-  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]]
+  def put(key: K, value: V): IOResult[Unit]
 
-  def putRaw(key: ByteString, value: ByteString): IOResult[Unit]
+  def putUnsafe(Key: K, value: V): Unit
 
-  def put[V: Serde](key: ByteString, value: V): IOResult[Unit]
+  def exists(key: K): IOResult[Boolean]
 
-  def delete(key: ByteString): IOResult[Unit]
+  def existsUnsafe(key: K): Boolean
+
+  def delete(key: K): IOResult[Unit]
+
+  def deleteUnsafe(key: K): Unit
 }
