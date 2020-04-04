@@ -1,12 +1,9 @@
 package org.alephium.flow.io
 
-import java.nio.file.{Files, Path, StandardOpenOption => Option}
-
-import akka.util.ByteString
+import java.nio.file.Path
 
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, BlockHeader}
-import org.alephium.serde._
+import org.alephium.protocol.model.Block
 
 object BlockStorage {
   import IOUtils._
@@ -18,82 +15,16 @@ object BlockStorage {
   def createUnsafe(root: Path): BlockStorage = {
     createDirUnsafe(root)
     val disk = new BlockStorage(root)
-    createDirUnsafe(disk.blockFolder)
+    createDirUnsafe(disk.folder)
     disk
   }
 }
 
-class BlockStorage private (root: Path) {
-  import IOUtils.{tryExecute, tryExecuteF}
+class BlockStorage private (root: Path) extends KeyValueStorage[Hash, Block] with DiskSource {
 
-  val blockFolder: Path = root.resolve("blocks")
+  val folder: Path = root.resolve("blocks")
 
-  def getBlockPath(block: Block): Path = {
-    getBlockPath(block.hash)
-  }
+  def put(block: Block): IOResult[Unit] = put(block.hash, block)
 
-  def getBlockPath(header: BlockHeader): Path = {
-    getBlockPath(header.hash)
-  }
-
-  def getBlockPath(blockHash: Hash): Path = {
-    blockFolder.resolve(blockHash.shortHex + ".dat")
-  }
-
-  def putBlock(block: Block): IOResult[Int] = tryExecuteF {
-    val data    = serialize(block)
-    val outPath = getBlockPath(block)
-    val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
-    try {
-      val length = out.write(data.toByteBuffer)
-      Right(length)
-    } catch { IOUtils.error } finally {
-      out.close()
-    }
-  }
-
-  def putBlockUnsafe(block: Block): Int = {
-    val data    = serialize(block)
-    val outPath = getBlockPath(block)
-    val out     = Files.newByteChannel(outPath, Option.CREATE, Option.WRITE)
-    try {
-      val length = out.write(data.toByteBuffer)
-      length
-    } finally {
-      out.close()
-    }
-  }
-
-  def getBlock(blockHash: Hash): IOResult[Block] = {
-    val dataIOResult = tryExecute {
-      val inPath = getBlockPath(blockHash)
-      val bytes  = Files.readAllBytes(inPath)
-      ByteString.fromArrayUnsafe(bytes)
-    }
-    dataIOResult.flatMap { data =>
-      deserialize[Block](data).left.map(IOError.Serde)
-    }
-  }
-
-  def getBlockUnsafe(blockHash: Hash): Block = {
-    val inPath = getBlockPath(blockHash)
-    val bytes  = Files.readAllBytes(inPath)
-    val data   = ByteString.fromArrayUnsafe(bytes)
-    deserialize[Block](data) match {
-      case Left(error)  => throw error
-      case Right(block) => block
-    }
-  }
-
-  def checkBlockFile(blockHash: Hash): Boolean = {
-    val result = tryExecute {
-      val inPath = getBlockPath(blockHash)
-      Files.isRegularFile(inPath)
-    }
-    result.fold(_ => false, identity)
-  }
-
-  def clear(): IOResult[Unit] = tryExecute {
-    IOUtils.clearUnsafe(root)
-  }
+  def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
 }
