@@ -21,7 +21,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
   protected def getNode(hash: Hash): BlockHashChain.TreeNode = blockHashesTable(hash)
 
   protected def addNode(node: BlockHashChain.TreeNode): IOResult[Unit] = {
-    assert(node.isLeaf && !contains(node.blockHash))
+    assert(!contains(node.blockHash) && node.parentOpt.forall(p => contains(p.blockHash)))
 
     val hash = node.blockHash
     blockHashesTable.add(hash, node)
@@ -47,20 +47,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
     if (tips.contains(hash)) tips.remove(hash)
     blockHashesTable.remove(hash)
     ()
-  }
-
-  @tailrec
-  private def pruneBranchFrom(node: BlockHashChain.TreeNode): Unit = {
-    removeNode(node)
-
-    node match {
-      case n: BlockHashChain.Node =>
-        val parent = n.parent
-        if (parent.successors.size == 1) {
-          pruneBranchFrom(parent)
-        }
-      case _: BlockHashChain.Root => ()
-    }
   }
 
   def numHashes: Int = blockHashesTable.size
@@ -271,7 +257,6 @@ object BlockHashChain {
     val timestamp: TimeStamp
 
     def isRoot: Boolean
-    def isLeaf: Boolean = successors.isEmpty
 
     def parentOpt: Option[TreeNode]
   }
