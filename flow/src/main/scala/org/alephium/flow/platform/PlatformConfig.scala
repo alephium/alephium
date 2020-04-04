@@ -153,7 +153,7 @@ object PlatformConfig {
       /* Genesis */
 
       /* IO */
-      val (disk, headerDB, nodeStateDB, emptyTrie) = {
+      val (blockStorage, headerStorage, nodeStateStorage, emptyTrie) = {
         val dbFolder = "db"
         val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"
         PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)(this)
