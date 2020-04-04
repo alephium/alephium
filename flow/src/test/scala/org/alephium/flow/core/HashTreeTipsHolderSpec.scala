@@ -17,7 +17,7 @@ class HashTreeTipsHolderSpec extends AlephiumFlowSpec { Test =>
     val tipsHolder = new HashTreeTipsHolder {
       private val dummyIndex               = ChainIndex.unsafe(0, 0)(config)
       override def config: ConsensusConfig = Test.config
-      override def tipsDB: HashTreeTipsDB  = Test.config.nodeStateDB.hashTreeTipsDB(dummyIndex)
+      override def tipsDB: HashTreeTipsDB  = Test.config.nodeStateStorage.hashTreeTipsDB(dummyIndex)
 
       def allTipsInMem: ConcurrentHashMap[Hash, TimeStamp] = tips
 

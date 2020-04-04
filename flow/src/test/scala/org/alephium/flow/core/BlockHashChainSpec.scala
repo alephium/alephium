@@ -12,7 +12,7 @@ class BlockHashChainSpec extends AlephiumFlowSpec { Self =>
     implicit val config = Self.config
 
     val root   = BlockHashChain.Root(Hash.zero, 0, 0, TimeStamp.zero)
-    val tipsDB = config.nodeStateDB.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+    val tipsDB = config.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
 
     addNode(root)
     var currentNode: BlockHashChain.TreeNode = root

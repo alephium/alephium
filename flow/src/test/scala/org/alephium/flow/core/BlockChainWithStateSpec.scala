@@ -11,7 +11,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
-    val tipsDB   = config.nodeStateDB.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+    val tipsDB   = config.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
 
     def myUpdateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
       import BlockFlowState._

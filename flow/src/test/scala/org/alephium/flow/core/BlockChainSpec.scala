@@ -13,7 +13,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
 
-    val tipsDB: HashTreeTipsDB = config.nodeStateDB.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+    val tipsDB: HashTreeTipsDB = config.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
   }
 
   it should "add block correctly" in new Fixture {

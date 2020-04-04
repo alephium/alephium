@@ -7,14 +7,14 @@ import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  def headerDB: BlockHeaderStorage
+  def headerStorage: BlockHeaderStorage
 
   def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
-    headerDB.get(hash)
+    headerStorage.get(hash)
   }
 
   def getBlockHeaderUnsafe(hash: Hash): BlockHeader = {
-    headerDB.getUnsafe(hash)
+    headerStorage.getUnsafe(hash)
   }
 
   def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
@@ -30,11 +30,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
-    headerDB.put(header)
+    headerStorage.put(header)
   }
 
   protected def addHeaderUnsafe(header: BlockHeader): Unit = {
-    headerDB.putUnsafe(header)
+    headerStorage.putUnsafe(header)
   }
 
   def getHashTargetUnsafe(hash: Hash): BigInt = {
@@ -53,7 +53,7 @@ object BlockHeaderChain {
   def fromGenesisUnsafe(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val tipsDB       = config.nodeStateDB.hashTreeTipsDB(chainIndex)
+    val tipsDB       = config.nodeStateStorage.hashTreeTipsDB(chainIndex)
     fromGenesisUnsafe(genesisBlock, tipsDB)
   }
 
@@ -71,7 +71,7 @@ object BlockHeaderChain {
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
-      override val headerDB: BlockHeaderStorage        = _config.headerDB
+      override val headerStorage: BlockHeaderStorage   = _config.headerStorage
       override val tipsDB: HashTreeTipsDB              = _tipsDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
