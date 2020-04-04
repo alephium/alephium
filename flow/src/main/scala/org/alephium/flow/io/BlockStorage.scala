@@ -8,22 +8,22 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.serde._
 
-object Disk {
+object BlockStorage {
   import IOUtils._
 
-  def create(root: Path): IOResult[Disk] = tryExecute {
+  def create(root: Path): IOResult[BlockStorage] = tryExecute {
     createUnsafe(root)
   }
 
-  def createUnsafe(root: Path): Disk = {
+  def createUnsafe(root: Path): BlockStorage = {
     createDirUnsafe(root)
-    val disk = new Disk(root)
+    val disk = new BlockStorage(root)
     createDirUnsafe(disk.blockFolder)
     disk
   }
 }
 
-class Disk private (root: Path) {
+class BlockStorage private (root: Path) {
   import IOUtils.{tryExecute, tryExecuteF}
 
   val blockFolder: Path = root.resolve("blocks")

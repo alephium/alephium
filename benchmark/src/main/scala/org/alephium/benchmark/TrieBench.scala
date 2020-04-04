@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
+import org.alephium.flow.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
@@ -27,8 +27,8 @@ class TrieBench {
 
     RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.SSD)
   }
-  val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
-
+  val db: KeyValueStorage[Hash, MerklePatriciaTrie.Node] =
+    RocksDBKeyValueStorage(dbStorage, ColumnFamily.All)
   val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
   val genesisHash: Hash        = trie.rootHash
 

@@ -1,7 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.BlockChain.ChainDiff
-import org.alephium.flow.io.{Disk, HashTreeTipsDB, IOResult}
+import org.alephium.flow.io.{BlockStorage, HashTreeTipsDB, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex}
@@ -9,7 +9,7 @@ import org.alephium.util.AVector
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
-  def disk: Disk
+  def disk: BlockStorage
 
   def getBlock(hash: Hash): IOResult[Block] = {
     disk.getBlock(hash)
