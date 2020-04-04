@@ -5,27 +5,27 @@ import org.rocksdb._
 import org.alephium.serde._
 
 object RocksDBKeyValueStorage {
-  import RocksDBStorage.Settings
+  import RocksDBSource.Settings
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBStorage,
-                                     cf: RocksDBStorage.ColumnFamily): KeyValueStorage[K, V] =
+  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
+                                     cf: RocksDBSource.ColumnFamily): KeyValueStorage[K, V] =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBStorage,
-                                     cf: RocksDBStorage.ColumnFamily,
+  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
+                                     cf: RocksDBSource.ColumnFamily,
                                      writeOptions: WriteOptions): KeyValueStorage[K, V] =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBStorage,
-                                     cf: RocksDBStorage.ColumnFamily,
+  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
+                                     cf: RocksDBSource.ColumnFamily,
                                      writeOptions: WriteOptions,
                                      readOptions: ReadOptions): KeyValueStorage[K, V] =
     new RocksDBKeyValueStorage(storage, cf, writeOptions, readOptions)
 }
 
 class RocksDBKeyValueStorage[K: Serializer, V: Serde](
-    storage: RocksDBStorage,
-    cf: RocksDBStorage.ColumnFamily,
+    storage: RocksDBSource,
+    cf: RocksDBSource.ColumnFamily,
     val writeOptions: WriteOptions,
     val readOptions: ReadOptions
 ) extends KeyValueStorage[K, V]

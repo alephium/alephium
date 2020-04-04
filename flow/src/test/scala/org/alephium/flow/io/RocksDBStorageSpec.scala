@@ -4,7 +4,7 @@ import org.alephium.macros.EnumerationMacros
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class RocksDBStorageSpec extends AlephiumSpec {
-  import RocksDBStorage.ColumnFamily
+  import RocksDBSource.ColumnFamily
 
   behavior of "RocksDBStorage"
 

@@ -5,7 +5,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBStorage}
+import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Files}
@@ -92,14 +92,14 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   }
 
   trait TrieFixture {
-    import RocksDBStorage.ColumnFamily
+    import RocksDBSource.ColumnFamily
 
     private val tmpdir = Files.tmpDir
     private val dbname = "trie"
     private val dbPath = tmpdir.resolve(dbname)
 
     private val storage =
-      RocksDBStorage.openUnsafe(dbPath, RocksDBStorage.Compaction.HDD)
+      RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
 
     val db   = RocksDBKeyValueStorage[Hash, MerklePatriciaTrie.Node](storage, ColumnFamily.Trie)
     var trie = MerklePatriciaTrie.create(db, genesisNode)
@@ -112,7 +112,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     protected def postTest(): Assertion = {
       storage.close()
-      RocksDBStorage.dESTROY(dbPath).isRight is true
+      RocksDBSource.dESTROY(dbPath).isRight is true
     }
   }
 

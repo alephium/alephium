@@ -5,7 +5,7 @@ import scala.collection.JavaConverters._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.io.RocksDBStorage.Settings
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex

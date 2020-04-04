@@ -9,7 +9,7 @@ import com.typesafe.config.Config
 import org.rocksdb.WriteOptions
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
-import org.alephium.flow.io.RocksDBStorage.Settings
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PayTo

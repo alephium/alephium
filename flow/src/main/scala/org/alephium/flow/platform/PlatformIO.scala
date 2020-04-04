@@ -5,7 +5,7 @@ import java.nio.file.Path
 import org.rocksdb.WriteOptions
 
 import org.alephium.flow.io._
-import org.alephium.flow.io.RocksDBStorage.ColumnFamily
+import org.alephium.flow.io.RocksDBSource.ColumnFamily
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.config.GroupConfig
 
@@ -33,7 +33,7 @@ object PlatformIO {
         path
       }
       val path = dbPath.resolve(dbName)
-      RocksDBStorage.openUnsafe(path, RocksDBStorage.Compaction.HDD)
+      RocksDBSource.openUnsafe(path, RocksDBSource.Compaction.HDD)
     }
     val headerDB    = BlockHeaderStorage(dbStorage, ColumnFamily.All, writeOptions)
     val nodeStateDB = NodeStateStorage(dbStorage, ColumnFamily.All, writeOptions)
