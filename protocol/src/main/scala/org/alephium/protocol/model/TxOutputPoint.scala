@@ -10,8 +10,8 @@ final case class TxOutputPoint(shortKey: Int, txHash: Hash, outputIndex: Int) {
 
 object TxOutputPoint {
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputPoint = {
-    assume(outputIndex >= 0 && outputIndex < transaction.raw.outputs.length)
-    val output = transaction.raw.outputs(outputIndex)
+    assume(outputIndex >= 0 && outputIndex < transaction.unsigned.outputs.length)
+    val output = transaction.unsigned.outputs(outputIndex)
     TxOutputPoint(output.shortKey, transaction.hash, outputIndex)
   }
 
