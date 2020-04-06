@@ -1,20 +1,12 @@
 package org.alephium.flow.io
 
-import RocksDBSource.{ColumnFamily, Settings}
+import RocksDBSource.ColumnFamily
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.BlockHeader
 
-object BlockHeaderStorage {
-  def apply(storage: RocksDBSource, cf: ColumnFamily): BlockHeaderStorage =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
-
-  def apply(storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions): BlockHeaderStorage =
-    apply(storage, cf, writeOptions, Settings.readOptions)
-
+object BlockHeaderStorage extends RocksDBKeyValueCompanion[BlockHeaderStorage] {
   def apply(storage: RocksDBSource,
             cf: ColumnFamily,
             writeOptions: WriteOptions,

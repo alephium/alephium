@@ -7,7 +7,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Bits}
 
 object NodeStateStorage {
   def apply(storage: RocksDBSource, cf: ColumnFamily)(
@@ -39,7 +39,7 @@ class NodeStateStorage(val storage: RocksDBSource,
   protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   private val tipKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
-    Hash.hash(s"TipKeys-$from-$to").bytes
+    (Bits.toBytes(from) ++ Bits.toBytes(to)) :+ Storages.tipsPostfix
   }
 
   def hashTreeTipsDB(chainIndex: ChainIndex): HashTreeTipsDB = new HashTreeTipsDB {

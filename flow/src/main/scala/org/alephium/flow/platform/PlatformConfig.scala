@@ -10,6 +10,7 @@ import org.rocksdb.WriteOptions
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.flow.io.Storages
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PayTo
@@ -153,10 +154,10 @@ object PlatformConfig {
       /* Genesis */
 
       /* IO */
-      val (blockStorage, headerStorage, nodeStateStorage, emptyTrie) = {
+      val storages = {
         val dbFolder = "db"
         val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"
-        PlatformIO.init(rootPath, dbFolder, dbName, rdbWriteOptions)(this)
+        Storages.createUnsafe(rootPath, dbFolder, dbName, rdbWriteOptions)(this)
       }
       /* IO */
 
