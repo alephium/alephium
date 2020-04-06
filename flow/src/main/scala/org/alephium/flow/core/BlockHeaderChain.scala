@@ -53,7 +53,7 @@ object BlockHeaderChain {
   def fromGenesisUnsafe(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val tipsDB       = config.nodeStateStorage.hashTreeTipsDB(chainIndex)
+    val tipsDB       = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
     fromGenesisUnsafe(genesisBlock, tipsDB)
   }
 
@@ -71,7 +71,7 @@ object BlockHeaderChain {
     val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
 
     new BlockHeaderChain {
-      override val headerStorage: BlockHeaderStorage   = _config.headerStorage
+      override val headerStorage: BlockHeaderStorage   = _config.storages.headerStorage
       override val tipsDB: HashTreeTipsDB              = _tipsDB
       override implicit def config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode

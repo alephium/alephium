@@ -9,8 +9,8 @@ import org.alephium.util.{AlephiumActorSpec, AlephiumSpec}
 
 trait AlephiumFlowSpec extends AlephiumSpec with PlatformConfigFixture with BeforeAndAfter {
   after {
-    TestUtils.clear(config.blockStorage.folder)
-    RocksDBSource.dESTROY(config.headerStorage.storage)
+    TestUtils.clear(config.storages.blockStorage.folder)
+    RocksDBSource.dESTROY(config.storages.headerStorage.storage)
   }
 }
 
