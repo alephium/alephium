@@ -4,9 +4,9 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.protocol.ALF.Hash
 import org.alephium.flow.io.{HeaderDB, RocksDBStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -30,7 +30,7 @@ class TrieBench {
   val db: HeaderDB = HeaderDB(dbStorage, ColumnFamily.All)
 
   val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
-  val genesisHash: Hash   = trie.rootHash
+  val genesisHash: Hash        = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {

@@ -8,8 +8,8 @@ import org.openjdk.jmh.annotations._
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
 
-import org.alephium.protocol.ALF.Hash
 import org.alephium.flow.io.{RocksDBColumn, RocksDBStorage}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.SingleShotTime))
