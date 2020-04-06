@@ -39,6 +39,7 @@ trait RPCServerAbstract extends StrictLogging {
   def doGetSelfClique(req: Request): FutureTry[SelfClique]
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
+  def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
   def doTransfer(req: Request): FutureTry[TransferResult]
   def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
     execute(miner ! Miner.Start)
@@ -57,14 +58,15 @@ trait RPCServerAbstract extends StrictLogging {
   }
 
   def handlerRPC(miner: ActorRefT[Miner.Command]): Handler = Map.apply(
-    "blockflow_fetch"  -> (req => wrap(req, doBlockflowFetch(req))),
-    "get_balance"      -> (req => wrap(req, doGetBalance(req))),
-    "get_group"        -> (req => wrap(req, doGetGroup(req))),
-    "mining_start"     -> (req => simpleWrap(req, doStartMining(miner))),
-    "mining_stop"      -> (req => simpleWrap(req, doStopMining(miner))),
-    "neighbor_cliques" -> (req => wrap(req, doGetNeighborCliques(req))),
-    "self_clique"      -> (req => wrap(req, doGetSelfClique(req))),
-    "transfer"         -> (req => wrap(req, doTransfer(req)))
+    "blockflow_fetch"    -> (req => wrap(req, doBlockflowFetch(req))),
+    "get_balance"        -> (req => wrap(req, doGetBalance(req))),
+    "get_group"          -> (req => wrap(req, doGetGroup(req))),
+    "mining_start"       -> (req => simpleWrap(req, doStartMining(miner))),
+    "mining_stop"        -> (req => simpleWrap(req, doStopMining(miner))),
+    "neighbor_cliques"   -> (req => wrap(req, doGetNeighborCliques(req))),
+    "create_transaction" -> (req => wrap(req, doCreateTransaction(req))),
+    "self_clique"        -> (req => wrap(req, doGetSelfClique(req))),
+    "transfer"           -> (req => wrap(req, doTransfer(req)))
   )
 
   def routeHttp(miner: ActorRefT[Miner.Command]): Route =

@@ -73,14 +73,9 @@ object Transaction {
                      to: ED25519PublicKey,
                      value: BigInt,
                      privateKey: ED25519PrivateKey): Transaction = {
-    assume(inputSum >= value)
-    val fromPubScript = PubScript.p2pkh(from)
-    val toPubScript   = PubScript.p2pkh(to)
-    val toOutput      = TxOutput(value, toPubScript)
-    val fromOutput    = TxOutput(inputSum - value, fromPubScript)
-    val outputs       = if (inputSum - value > 0) AVector(toOutput, fromOutput) else AVector(toOutput)
-    val unsigned      = UnsignedTransaction(inputs, outputs, ByteString.empty)
-    val witness       = Witness.p2pkh(unsigned, from, privateKey)
+    val unsigned = UnsignedTransaction.simpleTransfer(inputs, inputSum, from, to, value)
+
+    val witness = Witness.p2pkh(unsigned, from, privateKey)
     Transaction(unsigned, AVector.fill(inputs.length)(witness))
   }
 }

@@ -95,9 +95,10 @@ class ValidationSpec extends AlephiumFlowSpec {
     val block3    = block0.copy(transactions = AVector(coinbase3))
     check(checkCoinbase(block3), InvalidCoinbase)
 
-    val unsignedTransaction = UnsignedTransaction(emptyInputs, AVector(output0.head), ByteString.empty)
-    val coinbase4           = Transaction.from(unsignedTransaction, publicKey, privateKey)
-    val block4              = block0.copy(transactions = AVector(coinbase4))
+    val unsignedTransaction =
+      UnsignedTransaction(emptyInputs, AVector(output0.head), ByteString.empty)
+    val coinbase4 = Transaction.from(unsignedTransaction, publicKey, privateKey)
+    val block4    = block0.copy(transactions = AVector(coinbase4))
     check(checkCoinbase(block4), InvalidCoinbase)
 
     val coinbase5 = Transaction.from(AVector(input0.head), AVector(output0.head), emptyWitnesses)
