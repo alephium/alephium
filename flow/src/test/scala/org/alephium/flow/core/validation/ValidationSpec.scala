@@ -5,7 +5,13 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.ED25519
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{ModelGen, RawTransaction, Transaction, TxOutput, TxOutputPoint}
+import org.alephium.protocol.model.{
+  ModelGen,
+  Transaction,
+  TxOutput,
+  TxOutputPoint,
+  UnsignedTransaction
+}
 import org.alephium.protocol.script.Witness
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -58,8 +64,8 @@ class ValidationSpec extends AlephiumFlowSpec {
       .retryUntil { block =>
         val txs = block.transactions
         txs.nonEmpty && {
-          val raw = txs.head.raw
-          raw.inputs.nonEmpty && raw.outputs.length > 1
+          val unsigned = txs.head.unsigned
+          unsigned.inputs.nonEmpty && unsigned.outputs.length > 1
         }
       }
       .sample
@@ -67,14 +73,14 @@ class ValidationSpec extends AlephiumFlowSpec {
     val (privateKey, publicKey) = ED25519.generatePriPub()
 
     val coinbase0 = block0.transactions.head
-    val input0    = coinbase0.raw.inputs
-    val output0   = coinbase0.raw.outputs
+    val input0    = coinbase0.unsigned.inputs
+    val output0   = coinbase0.unsigned.outputs
     check(checkCoinbase(block0), InvalidCoinbase)
 
     val emptyInputs    = AVector.empty[TxOutputPoint]
     val emptyOutputs   = AVector.empty[TxOutput]
     val emptyWitnesses = AVector.empty[Witness]
-    val testWitness    = AVector(Witness.p2pkh(coinbase0.raw, publicKey, privateKey))
+    val testWitness    = AVector(Witness.p2pkh(coinbase0.unsigned, publicKey, privateKey))
 
     val coinbase1 = Transaction.from(emptyInputs, AVector(output0.head), emptyWitnesses)
     val block1    = block0.copy(transactions = AVector(coinbase1))
@@ -88,9 +94,9 @@ class ValidationSpec extends AlephiumFlowSpec {
     val block3    = block0.copy(transactions = AVector(coinbase3))
     check(checkCoinbase(block3), InvalidCoinbase)
 
-    val rawTransaction = RawTransaction(emptyInputs, AVector(output0.head))
-    val coinbase4      = Transaction.from(rawTransaction, publicKey, privateKey)
-    val block4         = block0.copy(transactions = AVector(coinbase4))
+    val unsignedTransaction = UnsignedTransaction(emptyInputs, AVector(output0.head))
+    val coinbase4           = Transaction.from(unsignedTransaction, publicKey, privateKey)
+    val block4              = block0.copy(transactions = AVector(coinbase4))
     check(checkCoinbase(block4), InvalidCoinbase)
 
     val coinbase5 = Transaction.from(AVector(input0.head), AVector(output0.head), emptyWitnesses)

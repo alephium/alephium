@@ -6,22 +6,22 @@ import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-final case class RawTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
-    extends HashSerde[RawTransaction] {
+final case class UnsignedTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
+    extends HashSerde[UnsignedTransaction] {
   override val hash: Hash = _getHash
 }
 
-object RawTransaction {
-  implicit val serde: Serde[RawTransaction] = new Serde[RawTransaction] {
+object UnsignedTransaction {
+  implicit val serde: Serde[UnsignedTransaction] = new Serde[UnsignedTransaction] {
     val inputsSerde: Serde[AVector[TxOutputPoint]] = serdeImpl[AVector[TxOutputPoint]]
     val outputsSerde: Serde[AVector[TxOutput]]     = serdeImpl[AVector[TxOutput]]
 
-    override def serialize(input: RawTransaction): ByteString = {
+    override def serialize(input: UnsignedTransaction): ByteString = {
       inputsSerde.serialize(input.inputs) ++
         outputsSerde.serialize(input.outputs)
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(RawTransaction, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[(UnsignedTransaction, ByteString)] = {
       for {
         inputsPair <- inputsSerde._deserialize(input)
         inputs = inputsPair._1
@@ -29,7 +29,7 @@ object RawTransaction {
         outputsPair <- outputsSerde._deserialize(rest1)
         outputs = outputsPair._1
         rest2   = outputsPair._2
-      } yield (RawTransaction(inputs, outputs), rest2)
+      } yield (UnsignedTransaction(inputs, outputs), rest2)
     }
   }
 }

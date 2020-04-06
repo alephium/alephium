@@ -1,7 +1,7 @@
 package org.alephium.protocol.script
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
-import org.alephium.protocol.model.RawTransaction
+import org.alephium.protocol.model.UnsignedTransaction
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
@@ -13,10 +13,10 @@ object Witness {
 
   // TODO: optimize the following scripts using cache
 
-  def p2pkh(rawTransaction: RawTransaction,
+  def p2pkh(unsignedTransaction: UnsignedTransaction,
             publicKey: ED25519PublicKey,
             privateKey: ED25519PrivateKey): Witness = {
-    val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
+    val signature = ED25519.sign(unsignedTransaction.hash.bytes, privateKey)
     p2pkh(publicKey, signature)
   }
 
@@ -24,10 +24,10 @@ object Witness {
     Witness(PriScript.p2pkh(publicKey), AVector(signatures))
   }
 
-  def p2sh(rawTransaction: RawTransaction,
+  def p2sh(unsignedTransaction: UnsignedTransaction,
            publicKey: ED25519PublicKey,
            privateKey: ED25519PrivateKey): Witness = {
-    val signature = ED25519.sign(rawTransaction.hash.bytes, privateKey)
+    val signature = ED25519.sign(unsignedTransaction.hash.bytes, privateKey)
     p2sh(publicKey, signature)
   }
 
