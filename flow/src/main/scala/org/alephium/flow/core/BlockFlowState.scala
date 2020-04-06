@@ -322,17 +322,25 @@ trait BlockFlowState {
     getP2pkhUtxos(address).map(_.sumBy(_._2.value))
   }
 
-  def prepareP2pkhTx(from: ED25519PublicKey,
-                     to: ED25519PublicKey,
-                     value: BigInt,
-                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+  def prepareP2pkhUnsignedTx(from: ED25519PublicKey,
+                             to: ED25519PublicKey,
+                             value: BigInt): IOResult[Option[UnsignedTransaction]] = {
     getP2pkhUtxos(from).map { utxos =>
       val balance = utxos.sumBy(_._2.value)
       if (balance >= value) {
-        Some(Transaction.simpleTransfer(utxos.map(_._1), balance, from, to, value, fromPrivateKey))
-      } else None
+        Some(UnsignedTransaction.simpleTransfer(utxos.map(_._1), balance, from, to, value))
+      } else {
+        None
+      }
     }
   }
+  def prepareP2pkhTx(from: ED25519PublicKey,
+                     to: ED25519PublicKey,
+                     value: BigInt,
+                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
+    prepareP2pkhUnsignedTx(from, to, value).map(_.map { unsigned =>
+      Transaction.from(unsigned, from, fromPrivateKey)
+    })
 }
 // scalastyle:on number.of.methods
 

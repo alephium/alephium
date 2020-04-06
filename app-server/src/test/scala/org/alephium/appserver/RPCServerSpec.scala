@@ -31,6 +31,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 class RPCServerSpec
@@ -99,6 +100,14 @@ class RPCServerSpec
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
     )(dummyTransferResult)
+  }
+
+  it should "call create_transaction" in new RouteHTTP {
+    checkCallResult(
+      "create_transaction",
+      parse(
+        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1}""").toOption
+    )(dummyCreateTransactionResult)
   }
 
   it should "reject wrong transfer call" in new RouteHTTP {
@@ -264,6 +273,10 @@ class RPCServerSpec
       dummyTx.fromGroup.value,
       dummyTx.toGroup.value
     )
+    lazy val dummyCreateTransactionResult = CreateTransactionResult(
+      Hex.toHexString(serialize(dummyTx.unsigned)),
+      dummyTx.unsigned.hash.toHexString
+    )
     val blockFlowProbe = TestProbe()
   }
 
@@ -389,6 +402,13 @@ object RPCServerSpec {
       blockFlowProbe ! predicate(blockHeader)
       Seq(blockHeader)
     }
+    override def prepareP2pkhUnsignedTx(
+        from: ED25519PublicKey,
+        to: ED25519PublicKey,
+        value: BigInt
+    ): IOResult[Option[UnsignedTransaction]] =
+      Right(Some(dummyTx.unsigned))
+
     override def prepareP2pkhTx(
         from: ED25519PublicKey,
         to: ED25519PublicKey,

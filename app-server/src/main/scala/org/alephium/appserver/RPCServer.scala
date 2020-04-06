@@ -20,9 +20,10 @@ import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.script.PubScript
 import org.alephium.rpc.model.JsonRPC._
+import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, Hex}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
@@ -61,6 +62,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   def doGetGroup(req: Request): FutureTry[Group] =
     Future.successful(getGroup(mode.node.blockFlow, req))
+
+  def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult] =
+    Future.successful(createTransaction(mode.node.blockFlow, req))
 
   def doTransfer(req: Request): FutureTry[TransferResult] = {
     val txHandler = mode.node.allHandlers.txHandler
@@ -203,6 +207,27 @@ object RPCServer extends StrictLogging {
     }
   }
 
+  def createTransaction(blockFlow: BlockFlow, req: Request): Try[CreateTransactionResult] = {
+    withReqF[CreateTransaction, CreateTransactionResult](req) { query =>
+      if (query.fromType == GetBalance.pkh && query.toType == GetBalance.pkh) {
+        val resultEither = for {
+          fromAddress <- decodePublicKey(query.fromAddress)
+          _           <- checkGroup(blockFlow, fromAddress)
+          toAddress   <- decodePublicKey(query.toAddress)
+          unsignedTx  <- prepareUnsignedTransaction(blockFlow, fromAddress, toAddress, query.value)
+        } yield {
+          CreateTransactionResult.from(unsignedTx)
+        }
+        resultEither match {
+          case Right(result) => Right(result)
+          case Left(error)   => Left(error)
+        }
+      } else {
+        Left(Response.failed(s"Invalid address types: ${query.fromType} or ${query.toType}"))
+      }
+    }
+  }
+
   def transfer(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command], req: Request)(
       implicit config: GroupConfig): Try[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
@@ -237,6 +262,17 @@ object RPCServer extends StrictLogging {
       case Right(Some(transaction)) => Right(transaction)
       case Right(None)              => Left(Response.failed("Not enough balance"))
       case Left(_)                  => failedInIO
+    }
+  }
+
+  def prepareUnsignedTransaction(blockFlow: BlockFlow,
+                                 fromAddress: ED25519PublicKey,
+                                 toAddress: ED25519PublicKey,
+                                 value: BigInt): Try[UnsignedTransaction] = {
+    blockFlow.prepareP2pkhUnsignedTx(fromAddress, toAddress, value) match {
+      case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(None)                      => Left(Response.failed("Not enough balance"))
+      case Left(_)                          => failedInIO
     }
   }
 
