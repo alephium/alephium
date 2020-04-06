@@ -8,8 +8,9 @@ import io.circe.generic.semiauto._
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo, UnsignedTransaction}
 import org.alephium.rpc.CirceUtils._
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
 sealed trait RPCModel
@@ -130,6 +131,25 @@ object RPCModel {
   final case class Group(group: Int) extends RPCModel
   object Group {
     implicit val codec: Codec[Group] = deriveCodec[Group]
+  }
+
+  final case class CreateTransaction(fromAddress: String,
+                                     fromType: String,
+                                     toAddress: String,
+                                     toType: String,
+                                     value: BigInt)
+      extends RPCModel
+  object CreateTransaction {
+    implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
+  }
+
+  final case class CreateTransactionResult(unsignedTx: String, hash: String) extends RPCModel
+  object CreateTransactionResult {
+    implicit val codec: Codec[CreateTransactionResult] = deriveCodec[CreateTransactionResult]
+
+    def from(unsignedTx: UnsignedTransaction): CreateTransactionResult =
+      CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
+                              Hex.toHexString(unsignedTx.hash.bytes))
   }
 
   final case class Transfer(fromAddress: String,
