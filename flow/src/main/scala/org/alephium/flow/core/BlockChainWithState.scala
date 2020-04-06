@@ -36,13 +36,13 @@ object BlockChainWithState {
   def fromGenesisUnsafe(chainIndex: ChainIndex, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val tipsDB       = config.nodeStateStorage.hashTreeTipsDB(chainIndex)
+    val tipsDB       = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
     fromGenesisUnsafe(genesisBlock, tipsDB, updateState)
   }
 
   def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState =
-    createUnsafe(genesis, 0, 0, tipsDB, config.emptyTrie, updateState)
+    createUnsafe(genesis, 0, 0, tipsDB, config.storages.trie, updateState)
 
   private def createUnsafe(
       rootBlock: Block,
@@ -56,8 +56,8 @@ object BlockChainWithState {
     val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
 
     new BlockChainWithState {
-      override val blockStorage                        = _config.blockStorage
-      override val headerStorage                       = _config.headerStorage
+      override val blockStorage                        = _config.storages.blockStorage
+      override val headerStorage                       = _config.storages.headerStorage
       override val tipsDB                              = _tipsDB
       override implicit val config: PlatformConfig     = _config
       override protected def root: BlockHashChain.Root = rootNode
