@@ -16,7 +16,6 @@ import org.alephium.util.AVector
  */
 final case class Transaction(
     unsigned: UnsignedTransaction,
-    data: ByteString,
     witnesses: AVector[Witness]
 ) extends ALF.HashSerde[Transaction] {
   override val hash: ALF.Hash = unsigned.hash
@@ -28,19 +27,19 @@ final case class Transaction(
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.data, t.witnesses))
+    Serde.forProduct2(Transaction.apply, t => (t.unsigned, t.witnesses))
 
   def from(inputs: AVector[TxOutputPoint],
            outputs: AVector[TxOutput],
            publicKey: ED25519PublicKey,
            privateKey: ED25519PrivateKey): Transaction = {
-    from(UnsignedTransaction(inputs, outputs), publicKey, privateKey)
+    from(UnsignedTransaction(inputs, outputs, ByteString.empty), publicKey, privateKey)
   }
 
   def from(inputs: AVector[TxOutputPoint],
            outputs: AVector[TxOutput],
            witnesses: AVector[Witness]): Transaction = {
-    Transaction(UnsignedTransaction(inputs, outputs), ByteString.empty, witnesses)
+    Transaction(UnsignedTransaction(inputs, outputs, ByteString.empty), witnesses)
   }
 
   def from(unsigned: UnsignedTransaction,
@@ -48,14 +47,14 @@ object Transaction {
            privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
     val witness = Witness.p2pkh(unsigned, publicKey, privateKey)
-    Transaction(unsigned, ByteString.empty, AVector(witness))
+    Transaction(unsigned, AVector(witness))
   }
 
   def coinbase(publicKey: ED25519PublicKey, data: ByteString): Transaction = {
     val pkScript = PubScript.p2pkh(publicKey)
     val txOutput = TxOutput(ALF.CoinBaseValue, pkScript)
-    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
-    Transaction(unsigned, data, AVector.empty)
+    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput), data)
+    Transaction(unsigned, AVector.empty)
   }
 
   def genesis(balances: AVector[(ED25519PublicKey, BigInt)]): Transaction = {
@@ -64,8 +63,8 @@ object Transaction {
         val pkScript = PubScript.p2pkh(publicKey)
         TxOutput(value, pkScript)
     }
-    val unsigned = UnsignedTransaction(AVector.empty, outputs)
-    Transaction(unsigned, ByteString.empty, AVector.empty)
+    val unsigned = UnsignedTransaction(AVector.empty, outputs, ByteString.empty)
+    Transaction(unsigned, AVector.empty)
   }
 
   def simpleTransfer(inputs: AVector[TxOutputPoint],
@@ -80,8 +79,8 @@ object Transaction {
     val toOutput      = TxOutput(value, toPubScript)
     val fromOutput    = TxOutput(inputSum - value, fromPubScript)
     val outputs       = if (inputSum - value > 0) AVector(toOutput, fromOutput) else AVector(toOutput)
-    val unsigned      = UnsignedTransaction(inputs, outputs)
+    val unsigned      = UnsignedTransaction(inputs, outputs, ByteString.empty)
     val witness       = Witness.p2pkh(unsigned, from, privateKey)
-    Transaction(unsigned, ByteString.empty, AVector.fill(inputs.length)(witness))
+    Transaction(unsigned, AVector.fill(inputs.length)(witness))
   }
 }

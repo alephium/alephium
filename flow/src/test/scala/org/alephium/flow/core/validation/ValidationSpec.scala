@@ -1,5 +1,6 @@
 package org.alephium.flow.core.validation
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
@@ -94,7 +95,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val block3    = block0.copy(transactions = AVector(coinbase3))
     check(checkCoinbase(block3), InvalidCoinbase)
 
-    val unsignedTransaction = UnsignedTransaction(emptyInputs, AVector(output0.head))
+    val unsignedTransaction = UnsignedTransaction(emptyInputs, AVector(output0.head), ByteString.empty)
     val coinbase4           = Transaction.from(unsignedTransaction, publicKey, privateKey)
     val block4              = block0.copy(transactions = AVector(coinbase4))
     check(checkCoinbase(block4), InvalidCoinbase)
