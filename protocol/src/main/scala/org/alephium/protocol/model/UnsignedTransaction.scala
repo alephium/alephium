@@ -6,30 +6,14 @@ import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-final case class UnsignedTransaction(inputs: AVector[TxOutputPoint], outputs: AVector[TxOutput])
+final case class UnsignedTransaction(inputs: AVector[TxOutputPoint],
+                                     outputs: AVector[TxOutput],
+                                     data: ByteString)
     extends HashSerde[UnsignedTransaction] {
   override val hash: Hash = _getHash
 }
 
 object UnsignedTransaction {
-  implicit val serde: Serde[UnsignedTransaction] = new Serde[UnsignedTransaction] {
-    val inputsSerde: Serde[AVector[TxOutputPoint]] = serdeImpl[AVector[TxOutputPoint]]
-    val outputsSerde: Serde[AVector[TxOutput]]     = serdeImpl[AVector[TxOutput]]
-
-    override def serialize(input: UnsignedTransaction): ByteString = {
-      inputsSerde.serialize(input.inputs) ++
-        outputsSerde.serialize(input.outputs)
-    }
-
-    override def _deserialize(input: ByteString): SerdeResult[(UnsignedTransaction, ByteString)] = {
-      for {
-        inputsPair <- inputsSerde._deserialize(input)
-        inputs = inputsPair._1
-        rest1  = inputsPair._2
-        outputsPair <- outputsSerde._deserialize(rest1)
-        outputs = outputsPair._1
-        rest2   = outputsPair._2
-      } yield (UnsignedTransaction(inputs, outputs), rest2)
-    }
-  }
+  implicit val serde: Serde[UnsignedTransaction] =
+    Serde.forProduct3(UnsignedTransaction(_, _, _), t => (t.inputs, t.outputs, t.data))
 }
