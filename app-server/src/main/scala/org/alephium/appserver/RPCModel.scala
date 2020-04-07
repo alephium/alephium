@@ -15,6 +15,7 @@ import org.alephium.util.{AVector, Hex, TimeStamp}
 
 sealed trait RPCModel
 
+// scalastyle:off number.of.methods
 object RPCModel {
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
@@ -150,6 +151,12 @@ object RPCModel {
     def from(unsignedTx: UnsignedTransaction): CreateTransactionResult =
       CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
                               Hex.toHexString(unsignedTx.hash.bytes))
+  }
+
+  final case class SendTransaction(tx: String, signature: String, publicKey: String)
+      extends RPCModel
+  object SendTransaction {
+    implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }
 
   final case class Transfer(fromAddress: String,

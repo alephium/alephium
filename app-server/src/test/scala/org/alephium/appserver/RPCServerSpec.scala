@@ -18,7 +18,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.{AllHandlers, BlockFlow}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -99,6 +99,14 @@ class RPCServerSpec
       "transfer",
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
+    )(dummyTransferResult)
+  }
+
+  it should "call send_transaction" in new RouteHTTP {
+    checkCallResult(
+      "send_transaction",
+      parse(s"""{"tx":"${Hex
+        .toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}""").toOption
     )(dummyTransferResult)
   }
 
@@ -268,6 +276,8 @@ class RPCServerSpec
       .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.outputs.nonEmpty)
       .sample
       .get
+    val dummySignature = ED25519.sign(dummyTx.unsigned.hash.bytes,
+                                      ED25519PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
     lazy val dummyTransferResult = TransferResult(
       dummyTx.hash.toHexString,
       dummyTx.fromGroup.value,
@@ -277,6 +287,7 @@ class RPCServerSpec
       Hex.toHexString(serialize(dummyTx.unsigned)),
       dummyTx.unsigned.hash.toHexString
     )
+
     val blockFlowProbe = TestProbe()
   }
 
