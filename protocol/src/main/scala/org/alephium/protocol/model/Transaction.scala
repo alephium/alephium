@@ -50,6 +50,10 @@ object Transaction {
     Transaction(unsigned, AVector(witness))
   }
 
+  def from(unsigned: UnsignedTransaction, witnesses: AVector[Witness]): Transaction = {
+    Transaction(unsigned, witnesses)
+  }
+
   def coinbase(publicKey: ED25519PublicKey, data: ByteString): Transaction = {
     val pkScript = PubScript.p2pkh(publicKey)
     val txOutput = TxOutput(ALF.CoinBaseValue, pkScript)

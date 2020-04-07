@@ -40,6 +40,7 @@ trait RPCServerAbstract extends StrictLogging {
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
+  def doSendTransaction(req: Request): FutureTry[TransferResult]
   def doTransfer(req: Request): FutureTry[TransferResult]
   def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
     execute(miner ! Miner.Start)
@@ -65,6 +66,7 @@ trait RPCServerAbstract extends StrictLogging {
     "mining_stop"        -> (req => simpleWrap(req, doStopMining(miner))),
     "neighbor_cliques"   -> (req => wrap(req, doGetNeighborCliques(req))),
     "create_transaction" -> (req => wrap(req, doCreateTransaction(req))),
+    "send_transaction"   -> (req => wrap(req, doSendTransaction(req))),
     "self_clique"        -> (req => wrap(req, doGetSelfClique(req))),
     "transfer"           -> (req => wrap(req, doTransfer(req)))
   )

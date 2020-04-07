@@ -11,7 +11,7 @@ import io.circe._
 import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -21,10 +21,10 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction, UnsignedTransaction}
-import org.alephium.protocol.script.PubScript
+import org.alephium.protocol.script.{PubScript, Witness}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
-import org.alephium.util.{ActorRefT, Hex}
+import org.alephium.util.{ActorRefT, AVector, Hex}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
     extends RPCServerAbstract {
@@ -65,6 +65,11 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult] =
     Future.successful(createTransaction(mode.node.blockFlow, req))
+
+  def doSendTransaction(req: Request): FutureTry[TransferResult] = {
+    val txHandler = mode.node.allHandlers.txHandler
+    Future.successful(sendTransaction(txHandler, req))
+  }
 
   def doTransfer(req: Request): FutureTry[TransferResult] = {
     val txHandler = mode.node.allHandlers.txHandler
@@ -188,6 +193,9 @@ object RPCServer extends StrictLogging {
   def decodePrivateKey(raw: String): Try[ED25519PrivateKey] =
     decodeRandomBytes(raw, ED25519PrivateKey.from, "private key")
 
+  def decodeSignature(raw: String): Try[ED25519Signature] =
+    decodeRandomBytes(raw, ED25519Signature.from, "signature")
+
   def decodeRandomBytes[T](raw: String, from: ByteString => Option[T], name: String): Try[T] = {
     val addressOpt = for {
       bytes   <- Hex.from(raw)
@@ -224,6 +232,24 @@ object RPCServer extends StrictLogging {
         }
       } else {
         Left(Response.failed(s"Invalid address types: ${query.fromType} or ${query.toType}"))
+      }
+    }
+  }
+
+  def sendTransaction(txHandler: ActorRefT[TxHandler.Command], req: Request)(
+      implicit config: GroupConfig): Try[TransferResult] = {
+    withReqF[SendTransaction, TransferResult](req) { query =>
+      for {
+        txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
+        unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
+          Response.failed(serdeError.getMessage))
+        signature <- decodeSignature(query.signature)
+        publickey <- decodePublicKey(query.publicKey)
+      } yield {
+        val witness = Witness.p2pkh(publickey, signature)
+        val tx      = Transaction.from(unsignedTx, AVector(witness))
+        txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
+        TransferResult(Hex.toHexString(tx.hash.bytes), tx.fromGroup.value, tx.toGroup.value)
       }
     }
   }
