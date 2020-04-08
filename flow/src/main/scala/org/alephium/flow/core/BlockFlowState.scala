@@ -115,6 +115,13 @@ trait BlockFlowState {
     }(op)
   }
 
+  protected def aggregateE[T: ClassTag](f: BlockHashPool => IOResult[T])(
+      op: (T, T)                                         => T): IOResult[T] = {
+    blockHeaderChains.reduceByE { chains =>
+      chains.reduceByE(f)(op)
+    }(op)
+  }
+
   def getBlockChain(hash: Hash): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
@@ -223,14 +230,15 @@ trait BlockFlowState {
     getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup, inclusive))
   }
 
-  def getTipsDiff(newTip: Hash, oldTip: Hash): AVector[Hash] = {
+  def getTipsDiff(newTip: Hash, oldTip: Hash): IOResult[AVector[Hash]] = {
     getBlockChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
-  protected def getTipsDiff(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
+  protected def getTipsDiff(newTips: AVector[Hash],
+                            oldTips: AVector[Hash]): IOResult[AVector[Hash]] = {
     assert(newTips.length == oldTips.length)
-    newTips.indices.foldLeft(AVector.empty[Hash]) { (acc, i) =>
-      acc ++ getTipsDiff(newTips(i), oldTips(i))
+    EitherF.foldTry(newTips.indices, AVector.empty[Hash]) { (acc, i) =>
+      getTipsDiff(newTips(i), oldTips(i)).map(acc ++ _)
     }
   }
 
@@ -240,11 +248,11 @@ trait BlockFlowState {
     val groupOffset = chainIndex.from.value - brokerInfo.groupFrom
     val groupCache  = groupCaches(groupOffset)
     for {
-      newTips <- getInOutTips(block.header, chainIndex.from, inclusive     = false)
+      newTips <- getInOutTips(block.header, chainIndex.from, inclusive = false)
       oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
+      diff    <- getTipsDiff(newTips, oldTips)
     } yield {
-      val newHashes = getTipsDiff(newTips, oldTips) :+ block.hash
-      newHashes.map(groupCache.getBlockCache)
+      (diff :+ block.hash).map(groupCache.getBlockCache)
     }
   }
 
@@ -273,13 +281,13 @@ trait BlockFlowState {
     val bestDeps = getBestDeps(groupIndex)
     val outDeps  = bestDeps.outDeps
     val intraDep = outDeps(groupIndex.value)
-    val diffE = getBlockHeader(intraDep).map { header =>
+    val diffE = getBlockHeader(intraDep).flatMap { header =>
       if (header.isGenesis) {
-        AVector.empty
+        Right(AVector.empty)
       } else {
         val persistedOutDeps = header.outDeps.replace(groupIndex.value, intraDep)
-        outDeps.indices.foldLeft(AVector.empty[Hash]) { (acc, i) =>
-          acc ++ getTipsDiff(outDeps(i), persistedOutDeps(i))
+        EitherF.foldTry(outDeps.indices, AVector.empty[Hash]) { (acc, i) =>
+          getTipsDiff(outDeps(i), persistedOutDeps(i)).map(acc ++ _)
         }
       }
     }

@@ -21,11 +21,11 @@ trait BlockChainWithState extends BlockChain {
 
   def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie]
 
-  override def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
+  override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     val trie = getTrie(block.parentHash)
     for {
       newTrie <- updateState(trie, block)
-      _       <- super.add(block, parentHash, weight)
+      _       <- super.add(block, weight)
     } yield {
       addTrie(block.hash, newTrie)
     }
@@ -42,37 +42,29 @@ object BlockChainWithState {
 
   def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState =
-    createUnsafe(genesis, 0, 0, tipsDB, config.storages.trie, updateState)
+    createUnsafe(genesis, tipsDB, config.storages.trie, updateState)
 
   private def createUnsafe(
       rootBlock: Block,
-      initialHeight: Int,
-      initialWeight: Int,
       _tipsDB: HashTreeTipsDB,
       initialTrie: MerklePatriciaTrie,
       _updateState: BlockFlow.TrieUpdater
   )(implicit _config: PlatformConfig): BlockChainWithState = {
-    val timestamp = rootBlock.header.timestamp
-    val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
-
     new BlockChainWithState {
-      override val blockStorage                        = _config.storages.blockStorage
-      override val headerStorage                       = _config.storages.headerStorage
-      override val tipsDB                              = _tipsDB
-      override implicit val config: PlatformConfig     = _config
-      override protected def root: BlockHashChain.Root = rootNode
+      override implicit val config: PlatformConfig = _config
+      override val heightIndexStorage              = _config.storages.heightIndexStorage
+      override val tipsDB                          = _tipsDB
+      override val genesisHash: Hash               = rootBlock.hash
 
       override def updateState(trie: MerklePatriciaTrie,
                                block: Block): IOResult[MerklePatriciaTrie] =
         _updateState(trie, block)
 
       val updateRes = for {
-        _       <- this.persistBlock(rootBlock)
-        _       <- this.addHeader(rootBlock.header)
+        _       <- this.addGenesis(rootBlock)
         newTrie <- _updateState(initialTrie, rootBlock)
       } yield {
-        this.addTrie(rootNode.blockHash, newTrie)
-        this.addNode(rootNode)
+        this.addTrie(rootBlock.hash, newTrie)
       }
       require(updateRes.isRight)
     }

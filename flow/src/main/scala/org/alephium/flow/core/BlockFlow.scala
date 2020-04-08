@@ -1,5 +1,6 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.Utils
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
@@ -8,7 +9,11 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
-trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils
+trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
+  def add(block: Block, weight: BigInt): IOResult[Unit] = ???
+
+  def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
+}
 
 object BlockFlow {
   type TrieUpdater = (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie]
@@ -28,42 +33,24 @@ object BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
       assert(index.relateTo(config.brokerInfo))
-      val chain  = getBlockChain(index)
-      val parent = block.uncleHash(index.to) // equal to parentHash
+      val chain = getBlockChain(index)
 
       cacheBlock(block)
       for {
         weight <- calWeight(block)
-        _      <- chain.add(block, parent, weight)
+        _      <- chain.add(block, weight)
         _      <- updateBestDeps()
       } yield ()
-    }
-
-    def add(block: Block, weight: Int): IOResult[Unit] = {
-      ???
-    }
-
-    def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
-      ???
     }
 
     def add(header: BlockHeader): IOResult[Unit] = {
-      val index  = header.chainIndex
-      val chain  = getHeaderChain(index)
-      val parent = header.uncleHash(index.to)
+      val index = header.chainIndex
+      val chain = getHeaderChain(index)
       for {
         weight <- calWeight(header)
-        _      <- chain.add(header, parent, weight)
+        _      <- chain.add(header, weight)
         _      <- updateBestDeps()
       } yield ()
-    }
-
-    def add(header: BlockHeader, weight: Int): IOResult[Unit] = {
-      ???
-    }
-
-    def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit] = {
-      ???
     }
 
     private def calWeight(block: Block): IOResult[Int] = {
@@ -78,7 +65,7 @@ object BlockFlow {
       if (header.isGenesis) 0
       else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
-        val weight2 = header.outDeps.sumBy(getHeight)
+        val weight2 = header.outDeps.sumBy(getHeightUnsafe)
         weight1 + weight2 + 1
       }
     }
@@ -87,13 +74,13 @@ object BlockFlow {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) 0
       else {
-        header.outDeps.sumBy(getHeight) + 1
+        header.outDeps.sumBy(getHeightUnsafe) + 1
       }
     }
 
-    override def getBestTip: Hash = {
-      val ordering = Ordering.Int.on[Hash](getWeight)
-      aggregate(_.getBestTip)(ordering.max)
+    def getBestTipUnsafe: Hash = {
+      val ordering = Ordering.BigInt.on[Hash](getWeightUnsafe)
+      aggregate(_.getBestTipUnsafe)(ordering.max)
     }
 
     override def getAllTips: AVector[Hash] = {
@@ -132,16 +119,16 @@ object BlockFlow {
       rdeps
     }
 
-    private def isExtending(current: Hash, previous: Hash): Boolean = {
+    private def isExtendingUnsafe(current: Hash, previous: Hash): Boolean = {
       val index1 = ChainIndex.from(current)
       val index2 = ChainIndex.from(previous)
       assert(index1.from == index2.from)
 
       val chain = getHashChain(index2)
-      if (index1.to == index2.to) chain.isBefore(previous, current)
+      if (index1.to == index2.to) Utils.unsafe(chain.isBefore(previous, current))
       else {
         val groupDeps = getGroupDepsUnsafe(current, index1.from)
-        chain.isBefore(previous, groupDeps(index2.to.value))
+        Utils.unsafe(chain.isBefore(previous, groupDeps(index2.to.value)))
       }
     }
 
@@ -153,7 +140,7 @@ object BlockFlow {
       rtips.indices forall { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)
-        isExtending(t1, t2) || isExtending(t2, t1)
+        isExtendingUnsafe(t1, t2) || isExtendingUnsafe(t2, t1)
       }
     }
 
@@ -163,7 +150,7 @@ object BlockFlow {
       rtips.indices foreach { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)
-        if (isExtending(t2, t1)) {
+        if (isExtendingUnsafe(t2, t1)) {
           rtips(k) = t2
         }
       }
@@ -179,7 +166,7 @@ object BlockFlow {
     }
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
-      val bestTip   = getBestTip
+      val bestTip   = getBestTipUnsafe
       val bestIndex = ChainIndex.from(bestTip)
       val rtips     = getRtipsUnsafe(bestTip, bestIndex.from)
       val deps1 = (0 until groups)
@@ -196,7 +183,7 @@ object BlockFlow {
               val validTries = toTries.filter(tip => isCompatibleUnsafe(rtips, tip, k))
               if (validTries.isEmpty) deps :+ rtips(k.value)
               else {
-                val bestTry = validTries.maxBy(getWeight) // TODO: improve
+                val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: improve
                 updateRtipsUnsafe(rtips, bestTry, k)
                 deps :+ bestTry
               }
@@ -207,13 +194,14 @@ object BlockFlow {
       val deps2 = (0 until groups)
         .foldLeft(deps1) {
           case (deps, _l) =>
-            val l          = GroupIndex.unsafe(_l)
-            val chain      = getHashChain(group, l)
-            val toTries    = chain.getAllTips
-            val validTries = toTries.filter(tip => chain.isBefore(groupDeps(l.value), tip))
+            val l       = GroupIndex.unsafe(_l)
+            val chain   = getHashChain(group, l)
+            val toTries = chain.getAllTips
+            val validTries =
+              toTries.filter(tip => Utils.unsafe(chain.isBefore(groupDeps(l.value), tip)))
             if (validTries.isEmpty) deps :+ groupDeps(l.value)
             else {
-              val bestTry = validTries.maxBy(getWeight) // TODO: improve
+              val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: improve
               deps :+ bestTry
             }
         }
