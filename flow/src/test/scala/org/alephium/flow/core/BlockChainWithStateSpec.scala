@@ -1,7 +1,9 @@
 package org.alephium.flow.core
 
+import org.alephium.crypto.Keccak256
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{IOResult, Storages}
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util.AVector
@@ -27,8 +29,11 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
       }
     }
 
-    def buildGenesis(): BlockChainWithState =
-      BlockChainWithState.fromGenesisUnsafe(genesis, heightDB, tipsDB, myUpdateState)
+    def buildGenesis(): BlockChainWithState = {
+      val storages =
+        Storages.createUnsafe(rootPath, "db", Keccak256.random.toHexString, Settings.syncWrite)
+      BlockChainWithState.createUnsafe(ChainIndex.unsafe(0, 0), genesis, storages, myUpdateState)
+    }
   }
 
   it should "add block" in new Fixture {

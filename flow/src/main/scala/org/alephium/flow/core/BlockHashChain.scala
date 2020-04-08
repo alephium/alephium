@@ -20,7 +20,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
 
   @volatile var numHashes: Int = 0
 
-  private val blockStateStorage: BlockStateStorage = config.storages.blockStateStorage
+  def blockStateStorage: BlockStateStorage
 
   def heightIndexStorage: HeightIndexStorage
 
