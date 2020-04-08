@@ -26,7 +26,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
       val blocksSize2 = chain.numHashes
       blocksSize1 + 1 is blocksSize2
 
-      val diff = chain.calHashDiff(block.hash, genesis.hash)
+      val diff = chain.calHashDiff(block.hash, genesis.hash).right.value
       diff.toAdd is AVector(block.hash)
       diff.toRemove.isEmpty is true
     }
@@ -42,7 +42,7 @@ class BlockChainSpec extends AlephiumFlowSpec {
 
       val midHashes = chain.getBlockHashesBetween(blocks.last.hash, blocks.head.hash)
       val expected  = blocks.tail.map(_.hash)
-      midHashes is expected
+      midHashes isE expected
     }
   }
 
@@ -54,17 +54,17 @@ class BlockChainSpec extends AlephiumFlowSpec {
       val lastBlock = blocks.last
       val chain     = AVector(genesis) ++ blocks
 
-      chain0.getHeight(headBlock) is 0
-      chain0.getHeight(lastBlock) is blocks.length
+      chain0.getHeight(headBlock) isE 0
+      chain0.getHeight(lastBlock) isE blocks.length
       chain0.getBlockSlice(headBlock).right.value is AVector(headBlock)
       chain0.getBlockSlice(lastBlock).right.value is chain
       chain0.isTip(headBlock) is false
       chain0.isTip(lastBlock) is true
-      chain0.getBestTip is lastBlock.hash
-      chain0.maxHeight is blocks.length
+      chain0.getBestTipUnsafe is lastBlock.hash
+      chain0.maxHeight isE blocks.length
       chain0.getAllTips is AVector(lastBlock.hash)
 
-      val diff = chain0.calHashDiff(blocks.last.hash, genesis.hash)
+      val diff = chain0.calHashDiff(blocks.last.hash, genesis.hash).right.value
       diff.toRemove.isEmpty is true
       diff.toAdd is blocks.map(_.hash)
     }
@@ -76,26 +76,26 @@ class BlockChainSpec extends AlephiumFlowSpec {
         val chain0 = BlockChain.fromGenesisUnsafe(genesis, tipsDB)
 
         shortChain.foreach(block => chain0.add(block, 0))
-        chain0.getHeight(shortChain.head) is 1
-        chain0.getHeight(shortChain.last) is shortChain.length
+        chain0.getHeight(shortChain.head) isE 1
+        chain0.getHeight(shortChain.last) isE shortChain.length
         chain0.getBlockSlice(shortChain.head).right.value is AVector(genesis, shortChain.head)
         chain0.getBlockSlice(shortChain.last).right.value is AVector(genesis) ++ shortChain
         chain0.isTip(shortChain.head) is false
         chain0.isTip(shortChain.last) is true
 
         longChain.init.foreach(block => chain0.add(block, 0))
-        chain0.maxHeight is longChain.length - 1
+        chain0.maxHeight isE longChain.length - 1
         chain0.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
         chain0.add(longChain.last, 0)
-        chain0.getHeight(longChain.head) is 1
-        chain0.getHeight(longChain.last) is longChain.length
+        chain0.getHeight(longChain.head) isE 1
+        chain0.getHeight(longChain.last) isE longChain.length
         chain0.getBlockSlice(longChain.head).right.value is AVector(genesis, longChain.head)
         chain0.getBlockSlice(longChain.last).right.value is AVector(genesis) ++ longChain
         chain0.isTip(longChain.head) is false
         chain0.isTip(longChain.last) is true
-        chain0.getBestTip is longChain.last.hash
-        chain0.maxHeight is longChain.length
+        chain0.getBestTipUnsafe is longChain.last.hash
+        chain0.maxHeight isE longChain.length
         chain0.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
       }
     }
@@ -108,11 +108,11 @@ class BlockChainSpec extends AlephiumFlowSpec {
         shortChain.foreach(block => chain.add(block, 0))
         longChain.foreach(block  => chain.add(block, 0))
 
-        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash)
+        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash).right.value
         diff0.toRemove is shortChain.map(_.hash).reverse
         diff0.toAdd is longChain.map(_.hash)
 
-        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash)
+        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash).right.value
         diff1.toRemove is longChain.map(_.hash).reverse
         diff1.toAdd is shortChain.map(_.hash)
       }
@@ -122,13 +122,13 @@ class BlockChainSpec extends AlephiumFlowSpec {
   it should "compute correct weights for a single chain" in new Fixture {
     forAll(ModelGen.chainGen(5)) { blocks =>
       val chain = createBlockChain(blocks.init, tipsDB)
-      blocks.init.foreach(block => chain.contains(block) is true)
-      chain.maxHeight is 3
-      chain.maxWeight is 6
+      blocks.init.foreach(block => chain.contains(block) isE true)
+      chain.maxHeight isE 3
+      chain.maxWeight isE 6
       chain.add(blocks.last, 8)
-      chain.contains(blocks.last) is true
-      chain.maxHeight is 4
-      chain.maxWeight is 8
+      chain.contains(blocks.last) isE true
+      chain.maxHeight isE 4
+      chain.maxWeight isE 8
     }
   }
 
@@ -137,16 +137,16 @@ class BlockChainSpec extends AlephiumFlowSpec {
       forAll(ModelGen.chainGen(1, blocks1.head)) { blocks2 =>
         val chain = createBlockChain(blocks1, tipsDB)
         blocks2.foreach(block => chain.add(block, 0))
-        blocks1.foreach(block => chain.contains(block) is true)
-        blocks2.foreach(block => chain.contains(block) is true)
-        chain.maxHeight is 4
-        chain.maxWeight is 8
-        chain.getHashesAfter(blocks1.head.hash) is {
+        blocks1.foreach(block => chain.contains(block) isE true)
+        blocks2.foreach(block => chain.contains(block) isE true)
+        chain.maxHeight isE 4
+        chain.maxWeight isE 8
+        chain.getHashesAfter(blocks1.head.hash) isE {
           val branch1 = blocks1.tail
           AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
         }
-        chain.getHashesAfter(blocks2.head.hash).length is 0
-        chain.getHashesAfter(blocks1.tail.head.hash) is blocks1.tail.tail.map(_.hash)
+        chain.getHashesAfter(blocks2.head.hash).map(_.length) isE 0
+        chain.getHashesAfter(blocks1.tail.head.hash) isE blocks1.tail.tail.map(_.hash)
       }
     }
   }

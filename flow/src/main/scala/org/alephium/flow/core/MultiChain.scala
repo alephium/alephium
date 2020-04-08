@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
+import org.alephium.flow.Utils
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
@@ -16,18 +17,26 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
 
+  protected def aggregateE[T: ClassTag](f: BlockHashPool => IOResult[T])(
+      op: (T, T)                                         => T): IOResult[T]
+
   def numHashes: Int = aggregate(_.numHashes)(_ + _)
 
-  def maxWeight: Int = aggregate(_.maxWeight)(math.max)
+  def maxWeight: IOResult[BigInt] = aggregateE(_.maxWeight)(_.max(_))
 
-  def maxHeight: Int = aggregate(_.maxHeight)(math.max)
+  def maxHeight: IOResult[Int] = aggregateE(_.maxHeight)(math.max)
 
   /* BlockHash apis */
-
-  def contains(hash: Hash): Boolean = {
+  def contains(hash: Hash): IOResult[Boolean] = {
     val index = ChainIndex.from(hash)
     val chain = getHashChain(index)
     chain.contains(hash)
+  }
+
+  def containsUnsafe(hash: Hash): Boolean = {
+    val index = ChainIndex.from(hash)
+    val chain = getHashChain(index)
+    chain.containsUnsafe(hash)
   }
 
   def getIndex(hash: Hash): ChainIndex = {
@@ -49,40 +58,45 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).isTip(hash)
   }
 
-  def getHashesAfter(locator: Hash): AVector[Hash] =
+  def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] =
     getHashChain(locator).getHashesAfter(locator)
 
-  def getPredecessor(hash: Hash, height: Int): Hash =
+  def getPredecessor(hash: Hash, height: Int): IOResult[Hash] =
     getHashChain(hash).getPredecessor(hash, height)
 
-  def getHeight(hash: Hash): Int = {
+  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] =
+    getHashChain(hash).chainBack(hash, heightUntil)
+
+  def getHeight(hash: Hash): IOResult[Int] =
     getHashChain(hash).getHeight(hash)
-  }
 
-  def getWeight(hash: Hash): Int = {
+  def getHeightUnsafe(hash: Hash): Int =
+    getHashChain(hash).getHeightUnsafe(hash)
+
+  def getWeight(hash: Hash): IOResult[BigInt] =
     getHashChain(hash).getWeight(hash)
-  }
 
-  def getAllBlockHashes: Iterator[Hash] = aggregate(_.getAllBlockHashes)(_ ++ _)
+  def getWeightUnsafe(hash: Hash): BigInt =
+    getHashChain(hash).getWeightUnsafe(hash)
 
-  def getBlockHashSlice(hash: Hash): AVector[Hash] =
+  def getAllBlockHashes: IOResult[AVector[Hash]] =
+    aggregateE(_.getAllBlockHashes)(_ ++ _)
+
+  def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] =
     getHashChain(hash).getBlockHashSlice(hash)
 
   /* BlockHeader apis */
 
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain
 
-  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain = {
+  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain =
     getHeaderChain(chainIndex.from, chainIndex.to)
-  }
 
-  def getHeaderChain(header: BlockHeader): BlockHeaderChain = {
+  def getHeaderChain(header: BlockHeader): BlockHeaderChain =
     getHeaderChain(header.chainIndex)
-  }
 
-  def getHeaderChain(hash: Hash): BlockHeaderChain = {
+  def getHeaderChain(hash: Hash): BlockHeaderChain =
     getHeaderChain(ChainIndex.from(hash))
-  }
 
   def getBlockHeader(hash: Hash): IOResult[BlockHeader] =
     getHeaderChain(hash).getBlockHeader(hash)
@@ -96,9 +110,8 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain
 
-  def getBlockChain(chainIndex: ChainIndex): BlockChain = {
+  def getBlockChain(chainIndex: ChainIndex): BlockChain =
     getBlockChain(chainIndex.from, chainIndex.to)
-  }
 
   def getBlockChain(block: Block): BlockChain = getBlockChain(block.chainIndex)
 
@@ -112,15 +125,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def add(block: Block): IOResult[Unit]
 
-  def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
-    for {
-      i    <- 0 until groups
-      j    <- 0 until groups
-      hash <- getHashChain(GroupIndex.unsafe(i), GroupIndex.unsafe(j)).getAllBlockHashes
-      header = getBlockHeaderUnsafe(hash)
-      if predicate(header)
-    } yield {
-      header
-    }
-  }
+  def getHeadersUnsafe(predicate: BlockHeader => Boolean): AVector[BlockHeader] =
+    Utils.unsafe(getAllBlockHashes).map(getBlockHeaderUnsafe).filter(predicate)
 }

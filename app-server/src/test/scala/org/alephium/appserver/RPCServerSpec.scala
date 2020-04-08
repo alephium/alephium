@@ -410,9 +410,9 @@ object RPCServerSpec {
   class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef, dummyTx: Transaction)(
       implicit val config: PlatformConfig)
       extends BlockFlow {
-    override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
+    override def getHeadersUnsafe(predicate: BlockHeader => Boolean): AVector[BlockHeader] = {
       blockFlowProbe ! predicate(blockHeader)
-      Seq(blockHeader)
+      AVector(blockHeader)
     }
 
     override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
@@ -443,21 +443,18 @@ object RPCServerSpec {
     def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
       BlockHeaderChain.fromGenesisUnsafe
 
-    override def getHeight(hash: Hash): Int                    = 1
+    override def getHeight(hash: Hash): IOResult[Int]          = Right(1)
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps        = ???
     def getAllTips: AVector[Hash]                              = ???
-    def getBestTip: Hash                                       = ???
+    def getBestTipUnsafe: Hash                                 = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
             parentHash: Hash,
-            weight: Int): IOResult[Unit]                                 = ???
-    def add(header: BlockHeader, weight: Int): IOResult[Unit]            = ???
-    def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = ???
-    def add(block: Block, weight: Int): IOResult[Unit]                   = ???
-    def updateBestDepsUnsafe(): Unit                                     = ???
-    def updateBestDeps(): IOResult[Unit]                                 = ???
-    def add(block: Block): IOResult[Unit]                                = ???
-    def add(header: BlockHeader): IOResult[Unit]                         = ???
+            weight: Int): IOResult[Unit]         = ???
+    def updateBestDepsUnsafe(): Unit             = ???
+    def updateBestDeps(): IOResult[Unit]         = ???
+    def add(block: Block): IOResult[Unit]        = ???
+    def add(header: BlockHeader): IOResult[Unit] = ???
   }
 
   class ModeDummy(intraCliqueInfo: IntraCliqueInfo,

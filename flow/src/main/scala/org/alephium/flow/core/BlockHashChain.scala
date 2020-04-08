@@ -1,305 +1,236 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.flow.core.BlockHashChain.{ChainDiff, TreeNode}
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.core.BlockHashChain.ChainDiff
+import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage, IOError, IOResult}
+import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
+import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with HashTreeTipsHolder {
   implicit def config: PlatformConfig
 
-  protected def root: BlockHashChain.Root
+  def genesisHash: Hash
 
-  protected override val blockHashesTable =
-    ConcurrentHashMap.empty[Hash, BlockHashChain.TreeNode]
+  def isGenesis(hash: Hash): Boolean = hash == genesisHash
 
-  protected def getNode(hash: Hash): BlockHashChain.TreeNode = blockHashesTable(hash)
+  @volatile var numHashes: Int = 0
 
-  protected def addNode(node: BlockHashChain.TreeNode): IOResult[Unit] = {
-    assert(!contains(node.blockHash) && node.parentOpt.forall(p => contains(p.blockHash)))
+  private val blockStateStorage: BlockStateStorage = config.storages.blockStateStorage
 
-    val hash = node.blockHash
-    blockHashesTable.add(hash, node)
-    node match {
-      case n: BlockHashChain.Root =>
-        addGenesisTip(hash, n.timestamp)
-      case n: BlockHashChain.Node =>
-        addNewTip(hash, n.timestamp, n.parent.blockHash)
-    }
-  }
+  def heightIndexStorage: HeightIndexStorage
 
   protected def addHash(hash: Hash,
-                        parent: BlockHashChain.TreeNode,
-                        weight: Int,
+                        parentHash: Hash,
+                        height: Int,
+                        weight: BigInt,
                         timestamp: TimeStamp): IOResult[Unit] = {
-    val newNode = BlockHashChain.Node(hash, parent, parent.height + 1, weight, timestamp)
-    parent.successors += newNode
-    addNode(newNode)
-  }
-
-  protected def removeNode(node: BlockHashChain.TreeNode): Unit = {
-    val hash = node.blockHash
-    if (tips.contains(hash)) tips.remove(hash)
-    blockHashesTable.remove(hash)
-    ()
-  }
-
-  def numHashes: Int = blockHashesTable.size
-
-  def maxWeight: Int = tips.keys.foldLeft(0) { (weight, hash) =>
-    math.max(weight, blockHashesTable(hash).weight)
-  }
-
-  def maxHeight: Int = tips.keys.foldLeft(0) { (height, hash) =>
-    math.max(height, blockHashesTable(hash).height)
-  }
-
-  def contains(hash: Hash): Boolean = blockHashesTable.contains(hash)
-
-  def getHeight(hash: Hash): Int = {
-    assert(contains(hash))
-    blockHashesTable(hash).height
-  }
-
-  def getWeight(hash: Hash): Int = {
-    assert(contains(hash))
-    blockHashesTable(hash).weight
-  }
-
-  def isTip(hash: Hash): Boolean = {
-    tips.contains(hash)
-  }
-
-  def getHashesAfter(locator: Hash): AVector[Hash] = {
-    blockHashesTable.get(locator) match {
-      case Some(node) => getHashesSince(AVector.from(node.successors))
-      case None       => AVector.empty
+    for {
+      _ <- blockStateStorage.put(hash, BlockState(height, weight))
+      _ <- updateHeightIndex(hash, height)
+      _ <- addNewTip(hash, timestamp, parentHash)
+    } yield {
+      numHashes += 1
     }
   }
 
-  // Note: this is BFS search instead of DFS search
-  private def getHashesSince(nodes: AVector[BlockHashChain.Node]): AVector[Hash] = {
-    @tailrec
-    def iter(acc: AVector[Hash], currents: AVector[BlockHashChain.Node]): AVector[Hash] = {
-      if (currents.nonEmpty) {
-        val nexts = currents.flatMap(node => AVector.from(node.successors))
-        iter(acc ++ currents.map(_.blockHash), nexts)
-      } else acc
+  protected def addGenesis(hash: Hash): IOResult[Unit] = {
+    assume(hash == genesisHash)
+    for {
+      _ <- blockStateStorage.put(genesisHash, BlockState(ALF.GenesisHeight, ALF.GenesisWeight))
+      _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight)
+      _ <- addGenesisTip(genesisHash, ALF.GenesisTimestamp)
+    } yield {
+      numHashes += 1
     }
-
-    iter(AVector.empty, nodes)
   }
 
-  def getBestTip: Hash = {
-    getAllTips.map(blockHashesTable.apply).maxBy(_.height).blockHash
+  @inline
+  private def updateHeightIndex(hash: Hash, height: Int): IOResult[Unit] = {
+    heightIndexStorage.getOpt(height).flatMap {
+      case Some(hashes) => heightIndexStorage.put(height, hashes :+ hash)
+      case None         => heightIndexStorage.put(height, AVector(hash))
+    }
+  }
+
+  def getParentHash(hash: Hash): IOResult[Hash]
+
+  def maxWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) { (weight, hash) =>
+    getWeight(hash).map(weight.max)
+  }
+
+  def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, 0) { (height, hash) =>
+    getHeight(hash).map(math.max(height, _))
+  }
+
+  def contains(hash: Hash): IOResult[Boolean] = blockStateStorage.exists(hash)
+  def containsUnsafe(hash: Hash): Boolean     = blockStateStorage.existsUnsafe(hash)
+  def getHeight(hash: Hash): IOResult[Int]    = blockStateStorage.get(hash).map(_.height)
+  def getHeightUnsafe(hash: Hash): Int        = blockStateStorage.getUnsafe(hash).height
+  def getWeight(hash: Hash): IOResult[BigInt] = blockStateStorage.get(hash).map(_.weight)
+  def getWeightUnsafe(hash: Hash): BigInt     = blockStateStorage.getUnsafe(hash).weight
+
+  def isTip(hash: Hash): Boolean = tips.contains(hash)
+
+  def getHashes(height: Int): IOResult[AVector[Hash]] = {
+    heightIndexStorage.getOpt(height).map {
+      case Some(hashes) => hashes
+      case None         => AVector.empty
+    }
+  }
+
+  def getBestTipUnsafe: Hash = {
+    assert(tips.size != 0)
+    val weighted = getAllTips.map { hash =>
+      hash -> getWeightUnsafe(hash)
+    }
+    weighted.maxBy(_._2)._1
   }
 
   def getAllTips: AVector[Hash] = {
     AVector.from(tips.keys)
   }
 
-  // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
-  // Otherwise, it returns the hash path until newHash
-  // TODO: make this safer
-  def getBlockHashesBetween(newHash: Hash, oldHash: Hash): AVector[Hash] = {
+  // TODO: optimize this, very inefficient
+  def getAllBlockHashes: IOResult[AVector[Hash]] = {
+    getHashesAfter(genesisHash)
+  }
+
+  private def getLink(hash: Hash): IOResult[BlockHashChain.Link] = {
+    getParentHash(hash).map(BlockHashChain.Link(_, hash))
+  }
+
+  def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] = {
+    for {
+      height <- getHeight(locator)
+      hashes <- getHashes(height + 1)
+      links  <- hashes.mapE(getLink)
+      all    <- getHashesAfter(height + 1, links.filter(_.parentHash == locator).map(_.hash))
+    } yield all
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def getHashesAfter(height: Int, hashes: AVector[Hash]): IOResult[AVector[Hash]] = {
+    if (hashes.isEmpty) Right(AVector.empty)
+    else {
+      for {
+        childHashes <- getHashes(height + 1)
+        childPairs  <- childHashes.mapE(getLink)
+        validChildHashes = childPairs.filter(p => hashes.contains(p.parentHash)).map(_.hash)
+        rest <- getHashesAfter(height + 1, validChildHashes)
+      } yield hashes ++ rest
+    }
+  }
+
+  def getPredecessor(hash: Hash, height: Int): IOResult[Hash] = {
+    assume(height >= ALF.GenesisHeight)
     @tailrec
-    def iter(acc: AVector[Hash], current: BlockHashChain.TreeNode): AVector[Hash] = {
-      if (current.blockHash == oldHash) acc
+    def iter(currentHash: Hash, currentHeight: Int): IOResult[Hash] = {
+      if (currentHeight == height) Right(currentHash)
       else {
-        current match {
-          case n: BlockHashChain.Root => acc :+ n.blockHash
-          case n: BlockHashChain.Node => iter(acc :+ n.blockHash, n.parent)
+        getParentHash(currentHash) match {
+          case Right(parentHash) => iter(parentHash, currentHeight - 1)
+          case Left(error)       => Left(error)
         }
       }
     }
 
-    blockHashesTable.get(newHash) match {
-      case Some(node) => iter(AVector.empty, node).reverse
-      case None       => AVector.empty
-    }
+    getHeight(hash).flatMap(iter(hash, _))
   }
 
-  def getBlockHashSlice(hash: Hash): AVector[Hash] = {
-    blockHashesTable.get(hash) match {
-      case Some(node) =>
-        getChain(node).map(_.blockHash)
-      case None =>
-        AVector.empty
-    }
+  // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
+  def getBlockHashesBetween(newHash: Hash, oldHash: Hash): IOResult[AVector[Hash]] = {
+    getHeight(oldHash).flatMap(getBlockHashesBetween(newHash, oldHash, _))
   }
 
-  private def getChain(node: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
-    @tailrec
-    def iter(acc: AVector[BlockHashChain.TreeNode],
-             current: BlockHashChain.TreeNode): AVector[BlockHashChain.TreeNode] = {
-      current match {
-        case n: BlockHashChain.Root => acc :+ n
-        case n: BlockHashChain.Node => iter(acc :+ current, n.parent)
-      }
-    }
-    iter(AVector.empty, node).reverse
-  }
-
-  // TODO: optimize this, very inefficient
-  def getAllBlockHashes: Iterator[Hash] = {
-    blockHashesTable.values.toIterator.map(_.blockHash)
-  }
-
-  def isBefore(hash1: Hash, hash2: Hash): Boolean = {
-    assert(blockHashesTable.contains(hash1) && blockHashesTable.contains(hash2))
-    val node1 = blockHashesTable(hash1)
-    val node2 = blockHashesTable(hash2)
-    isBefore(node1, node2)
-  }
-
-  def getPredecessor(hash: Hash, height: Int): Hash = {
-    val node = getNode(hash)
-    getPredecessor(node, height).blockHash
-  }
-
-  private def getPredecessor(node: BlockHashChain.TreeNode,
-                             height: Int): BlockHashChain.TreeNode = {
-    @tailrec
-    def iter(current: BlockHashChain.TreeNode): BlockHashChain.TreeNode = {
-      assert(current.height >= height && height >= root.height)
-      current match {
-        case n: BlockHashChain.Node =>
-          if (n.height == height) {
-            current
-          } else {
-            iter(n.parent)
+  def getBlockHashesBetween(newHash: Hash,
+                            oldHash: Hash,
+                            oldHeight: Int): IOResult[AVector[Hash]] = {
+    assume(oldHeight >= ALF.GenesisHeight)
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def iter(acc: AVector[Hash], current: Hash): IOResult[AVector[Hash]] = {
+      getHeight(current).flatMap { currentHeight =>
+        if (currentHeight == oldHeight) {
+          if (current == oldHash) Right(acc)
+          else {
+            val error = new RuntimeException(
+              s"Cannot calculate the hashes between new ${newHash.shortHex} and old ${oldHash.shortHex}")
+            Left(IOError.Other(error))
           }
-        case _: BlockHashChain.Root =>
-          assert(height == root.height)
-          current
+        } else {
+          getParentHash(current).flatMap(iter(acc :+ current, _))
+        }
       }
     }
 
-    iter(node)
+    iter(AVector.empty, newHash).map(_.reverse)
   }
 
-  private def isBefore(node1: BlockHashChain.TreeNode, node2: BlockHashChain.TreeNode): Boolean = {
-    val height1 = node1.height
-    val height2 = node2.height
+  def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] = {
+    @tailrec
+    def iter(acc: AVector[Hash], current: Hash): IOResult[AVector[Hash]] = {
+      if (isGenesis(current)) Right(acc :+ current)
+      else {
+        getParentHash(current) match {
+          case Right(parentHash) => iter(acc :+ current, parentHash)
+          case Left(error)       => Left(error)
+        }
+      }
+    }
+
+    iter(AVector.empty, hash).map(_.reverse)
+  }
+
+  def isBefore(hash1: Hash, hash2: Hash): IOResult[Boolean] = {
+    for {
+      height1 <- getHeight(hash1)
+      height2 <- getHeight(hash2)
+      result  <- isBefore(hash1, height1, hash2, height2)
+    } yield result
+  }
+
+  private def isBefore(hash1: Hash, height1: Int, hash2: Hash, height2: Int): IOResult[Boolean] = {
     if (height1 < height2) {
-      val node1Infer = getPredecessor(node2, node1.height)
-      node1Infer.eq(node1)
+      getPredecessor(hash2, height1).map(_.equals(hash1))
     } else if (height1 == height2) {
-      node1.eq(node2)
-    } else false
+      Right(hash1.equals(hash2))
+    } else Right(false)
   }
 
-  def calHashDiff(newHash: Hash, oldHash: Hash): ChainDiff = {
-    val toRemove = ArrayBuffer.empty[Hash]
-    val toAdd    = ArrayBuffer.empty[Hash]
-    calDiff(toRemove, toAdd, newHash, oldHash)
-    ChainDiff(AVector.from(toRemove), AVector.fromIterator(toAdd.reverseIterator))
-  }
-
-  private def calDiff(toRemove: ArrayBuffer[Hash],
-                      toAdd: ArrayBuffer[Hash],
-                      newHash: Hash,
-                      oldHash: Hash): Unit = {
-    val newNode = getNode(newHash)
-    val oldNode = getNode(oldHash)
-    if (newNode.height > oldNode.height) {
-      val newNode1 = accDiff(toAdd, newNode, newNode.height, oldNode.height)
-      calDiff(toRemove, toAdd, newNode1, oldNode)
-    } else if (oldNode.height > newNode.height) {
-      val oldNode1 = accDiff(toRemove, oldNode, oldNode.height, newNode.height)
-      calDiff(toRemove, toAdd, newNode, oldNode1)
-    } else {
-      calDiff(toRemove, toAdd, newNode, oldNode)
+  def calHashDiff(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
+    for {
+      newHeight <- getHeight(newHash)
+      oldHeight <- getHeight(oldHash)
+      heightUntil = math.min(newHeight, oldHeight) - 1 // h - 1 to include earlier one
+      newBack <- chainBack(newHash, heightUntil)
+      oldBack <- chainBack(oldHash, heightUntil)
+      diff    <- calHashDiffFromSameHeight(newBack.head, oldBack.head)
+    } yield {
+      ChainDiff(oldBack.tail.reverse ++ diff.toRemove.reverse, diff.toAdd ++ newBack.tail)
     }
   }
 
-  @tailrec
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def accDiff(todos: ArrayBuffer[Hash],
-                      node: TreeNode,
-                      currentHeight: Int,
-                      targetHeight: Int): TreeNode = {
-    if (currentHeight > targetHeight) {
-      todos.append(node.blockHash)
-      accDiff(todos, node.parentOpt.get, currentHeight - 1, targetHeight)
-    } else {
-      node
-    }
-  }
-
-  @tailrec
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def calDiff(toRemove: ArrayBuffer[Hash],
-                      toAdd: ArrayBuffer[Hash],
-                      newNode: TreeNode,
-                      oldNode: TreeNode): Unit = {
-    if (newNode.blockHash != oldNode.blockHash) {
-      toRemove.append(oldNode.blockHash)
-      toAdd.append(newNode.blockHash)
-      calDiff(toRemove, toAdd, newNode.parentOpt.get, oldNode.parentOpt.get)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def calHashDiffFromSameHeight(newHash: ALF.Hash,
+                                        oldHash: ALF.Hash): IOResult[ChainDiff] = {
+    if (newHash == oldHash) Right(ChainDiff(AVector.empty, AVector.empty))
+    else {
+      for {
+        newParent <- getParentHash(newHash)
+        oldParent <- getParentHash(oldHash)
+        diff      <- calHashDiffFromSameHeight(newParent, oldParent)
+      } yield ChainDiff(diff.toRemove :+ oldHash, diff.toAdd :+ newHash)
     }
   }
 }
 // scalastyle:on number.of.methods
 
 object BlockHashChain {
-
-  sealed trait TreeNode {
-    val blockHash: Hash
-    val successors: ArrayBuffer[Node]
-    val height: Int
-    val weight: Int
-    val timestamp: TimeStamp
-
-    def isRoot: Boolean
-
-    def parentOpt: Option[TreeNode]
-  }
-
-  final case class Root(
-      blockHash: Hash,
-      successors: ArrayBuffer[Node],
-      height: Int,
-      weight: Int,
-      timestamp: TimeStamp
-  ) extends TreeNode {
-    override def isRoot: Boolean = true
-
-    override def parentOpt: Option[TreeNode] = None
-  }
-
-  object Root {
-    def apply(blockHash: Hash, height: Int, weight: Int, timestamp: TimeStamp): Root =
-      Root(blockHash, ArrayBuffer.empty, height, weight, timestamp)
-  }
-
-  final case class Node(
-      blockHash: Hash,
-      parent: TreeNode,
-      successors: ArrayBuffer[Node],
-      height: Int,
-      weight: Int,
-      timestamp: TimeStamp
-  ) extends TreeNode {
-    override def isRoot: Boolean = false
-
-    override def parentOpt: Option[TreeNode] = Some(parent)
-  }
-
-  object Node {
-    def apply(blockHash: Hash,
-              parent: TreeNode,
-              height: Int,
-              weight: Int,
-              timestamp: TimeStamp): Node = {
-      new Node(blockHash, parent, ArrayBuffer.empty, height, weight, timestamp)
-    }
-  }
-
   final case class ChainDiff(toRemove: AVector[Hash], toAdd: AVector[Hash])
+
+  final case class Link(parentHash: Hash, hash: Hash)
 }
