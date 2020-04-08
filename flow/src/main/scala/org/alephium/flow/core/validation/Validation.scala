@@ -131,8 +131,11 @@ object Validation {
 
   private[validation] def checkDependencies(header: BlockHeader,
                                             flow: BlockFlow): HeaderValidationResult = {
-    val missings = header.blockDeps.filterNot(flow.contains)
-    if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
+    header.blockDeps.filterNotE(flow.contains) match {
+      case Left(error) => Left(Left(error))
+      case Right(missings) =>
+        if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
+    }
   }
 
   private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult = {

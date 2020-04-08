@@ -2,7 +2,7 @@ package org.alephium.flow.model
 
 import org.alephium.serde.Serde
 
-final case class BlockState(height: Int, weight: Int)
+final case class BlockState(height: Int, weight: BigInt)
 
 object BlockState {
   implicit val serde: Serde[BlockState] =

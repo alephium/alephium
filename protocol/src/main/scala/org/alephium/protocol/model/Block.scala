@@ -1,5 +1,6 @@
 package org.alephium.protocol.model
 
+import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
@@ -46,7 +47,7 @@ object Block {
   def genesis(transactions: AVector[Transaction], target: BigInt, nonce: BigInt): Block = {
     val txsHash = Hash.hash(transactions)
     val blockHeader =
-      BlockHeader(AVector.empty, txsHash, TimeStamp.unsafe(0), target, nonce)
+      BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
     Block(blockHeader, transactions)
   }
 }

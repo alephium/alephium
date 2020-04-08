@@ -7,23 +7,25 @@ import org.alephium.util.AVector
 
 trait BlockHeaderPool extends BlockHashPool {
 
-  def contains(bh: BlockHeader): Boolean = contains(bh.hash)
+  def contains(bh: BlockHeader): IOResult[Boolean] = contains(bh.hash)
 
   // Assuming the entity is in the pool
   def getBlockHeader(hash: Hash): IOResult[BlockHeader]
   def getBlockHeaderUnsafe(hash: Hash): BlockHeader
 
-  def add(header: BlockHeader, weight: Int): IOResult[Unit]
+  def add(header: BlockHeader, weight: BigInt): IOResult[Unit]
 
-  def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit]
-
+  // TODO: refactor this purely for syncing
   def getHeaders(locators: AVector[Hash]): IOResult[AVector[BlockHeader]] = {
-    locators.filter(contains).mapE(getBlockHeader)
+    for {
+      validLocators <- locators.filterE(contains)
+      headers       <- validLocators.mapE(getBlockHeader)
+    } yield headers
   }
 
-  def getHeight(bh: BlockHeader): Int = getHeight(bh.hash)
+  def getHeight(bh: BlockHeader): IOResult[Int] = getHeight(bh.hash)
 
-  def getWeight(bh: BlockHeader): Int = getWeight(bh.hash)
+  def getWeight(bh: BlockHeader): IOResult[BigInt] = getWeight(bh.hash)
 
   def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
 }

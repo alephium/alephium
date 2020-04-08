@@ -7,35 +7,34 @@ import org.alephium.util.AVector
 
 trait BlockPool extends BlockHashPool {
 
-  def contains(block: Block): Boolean = contains(block.hash)
+  def contains(block: Block): IOResult[Boolean] = contains(block.hash)
 
   // TODO: refactor and merge contains and includes
-  def includes[T <: FlowData](data: T): Boolean = contains(data.hash)
+  def includes[T <: FlowData](data: T): IOResult[Boolean] = contains(data.hash)
 
   // Assuming the hash is in the pool
   def getBlock(hash: Hash): IOResult[Block]
 
   // Assuming the block is verified
-  def add(block: Block, weight: Int): IOResult[Unit]
-
-  // Assuming the block is verified
-  def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit]
-
-  def getBlocks(hashes: AVector[Hash]): IOResult[AVector[Block]] = {
-    hashes.filter(contains).mapE(getBlock)
-  }
+  def add(block: Block, weight: BigInt): IOResult[Unit]
 
   def getBlocksAfter(locator: Hash): IOResult[AVector[Block]] = {
-    getHashesAfter(locator).mapE(getBlock)
+    for {
+      hashes <- getHashesAfter(locator)
+      blocks <- hashes.mapE(getBlock)
+    } yield blocks
   }
 
-  def getHeight(block: Block): Int = getHeight(block.hash)
+  def getHeight(block: Block): IOResult[Int] = getHeight(block.hash)
 
-  def getWeight(block: Block): Int = getWeight(block.hash)
+  def getWeight(block: Block): IOResult[BigInt] = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
   def getBlockSlice(hash: Hash): IOResult[AVector[Block]] = {
-    getBlockHashSlice(hash).mapE(getBlock)
+    for {
+      hashes <- getBlockHashSlice(hash)
+      blocks <- hashes.mapE(getBlock)
+    } yield blocks
   }
   def getBlockSlice(block: Block): IOResult[AVector[Block]] = getBlockSlice(block.hash)
 

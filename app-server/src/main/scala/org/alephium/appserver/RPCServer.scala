@@ -15,6 +15,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signatur
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
@@ -139,11 +140,15 @@ object RPCServer extends StrictLogging {
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
       implicit cfg: ConsensusConfig,
       fetchRequestDecoder: Decoder[FetchRequest]): Try[FetchResponse] = {
-    withReq[FetchRequest, FetchResponse](req) { query =>
+    withReqF[FetchRequest, FetchResponse](req) { query =>
       val headers =
         blockFlow.getHeadersUnsafe(header =>
           header.timestamp >= query.fromTs && header.timestamp <= query.toTs)
-      FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
+
+      headers.mapE(wrapBlockHeader(blockFlow, _)) match {
+        case Right(entries) => Right(FetchResponse(entries.toArray))
+        case Left(_)        => failedInIO[FetchResponse]
+      }
     }
   }
 
@@ -305,8 +310,8 @@ object RPCServer extends StrictLogging {
   }
 
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
-      implicit config: ConsensusConfig): BlockEntry = {
-    BlockEntry.from(header, chain.getHeight(header))
+      implicit config: ConsensusConfig): IOResult[BlockEntry] = {
+    chain.getHeight(header).map(BlockEntry.from(header, _))
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
