@@ -17,7 +17,7 @@ object Storages {
       implicit config: GroupConfig): Storages = {
     val blockStorage: BlockStorage = BlockStorage.createUnsafe(rootPath)
     val dbStorage                  = createRocksDBUnsafe(rootPath, dbFolder, dbName)
-    val headerStorage              = BlockHeaderStorage(dbStorage, ColumnFamily.All, writeOptions)
+    val headerStorage              = BlockHeaderStorage(dbStorage, ColumnFamily.Header, writeOptions)
     val blockStateStorage          = BlockStateStorage(dbStorage, ColumnFamily.All, writeOptions)
     val nodeStateStorage           = NodeStateStorage(dbStorage, ColumnFamily.All, writeOptions)
     val emptyTrie =
