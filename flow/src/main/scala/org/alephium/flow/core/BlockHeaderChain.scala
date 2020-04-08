@@ -83,22 +83,25 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 object BlockHeaderChain {
   def fromGenesisUnsafe(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val tipsDB       = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-    fromGenesisUnsafe(genesisBlock, tipsDB)
+    val genesisBlock       = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    val heightIndexStorage = config.storages.nodeStateStorage.heightIndexStorage(chainIndex)
+    val tipsStorage        = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+    fromGenesisUnsafe(genesisBlock, heightIndexStorage, tipsStorage)
   }
 
-  def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB)(
-      implicit config: PlatformConfig): BlockHeaderChain =
-    createUnsafe(genesis.header, tipsDB)
+  def fromGenesisUnsafe(genesis: Block,
+                        heightIndexStorage: HeightIndexStorage,
+                        tipsDB: HashTreeTipsDB)(implicit config: PlatformConfig): BlockHeaderChain =
+    createUnsafe(genesis.header, heightIndexStorage, tipsDB)
 
   private def createUnsafe(
       rootHeader: BlockHeader,
+      _heightIndexStorage: HeightIndexStorage,
       _tipsDB: HashTreeTipsDB
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
     new BlockHeaderChain {
       override implicit def config: PlatformConfig        = _config
-      override val heightIndexStorage: HeightIndexStorage = _config.storages.heightIndexStorage
+      override val heightIndexStorage: HeightIndexStorage = _heightIndexStorage
       override val tipsDB: HashTreeTipsDB                 = _tipsDB
       override val genesisHash: Hash                      = rootHeader.hash
 
