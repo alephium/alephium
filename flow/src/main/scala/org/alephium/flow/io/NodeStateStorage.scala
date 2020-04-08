@@ -29,7 +29,7 @@ object NodeStateStorage {
 }
 
 class NodeStateStorage(val storage: RocksDBSource,
-                       cf: ColumnFamily,
+                       val cf: ColumnFamily,
                        val writeOptions: WriteOptions,
                        val readOptions: ReadOptions)(implicit config: GroupConfig)
     extends RocksDBColumn {
@@ -60,4 +60,7 @@ class NodeStateStorage(val storage: RocksDBSource,
       deleteRawUnsafe(tipKey)
     }
   }
+
+  def heightIndexStorage(chainIndex: ChainIndex): HeightIndexStorage =
+    new HeightIndexStorage(chainIndex, storage, cf, writeOptions, readOptions)
 }
