@@ -1,6 +1,6 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{HashTreeTipsDB, HeightIndexStorage, IOResult}
+import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
@@ -35,31 +35,24 @@ trait BlockChainWithState extends BlockChain {
 object BlockChainWithState {
   def fromGenesisUnsafe(chainIndex: ChainIndex, updateState: BlockFlow.TrieUpdater)(
       implicit config: PlatformConfig): BlockChainWithState = {
-    val genesisBlock       = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val heightIndexStorage = config.storages.nodeStateStorage.heightIndexStorage(chainIndex)
-    val tipsStorage        = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-    fromGenesisUnsafe(genesisBlock, heightIndexStorage, tipsStorage, updateState)
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock, config.storages, updateState)
   }
 
-  def fromGenesisUnsafe(
-      genesis: Block,
-      heightIndexStorage: HeightIndexStorage,
-      tipsDB: HashTreeTipsDB,
-      updateState: BlockFlow.TrieUpdater)(implicit config: PlatformConfig): BlockChainWithState =
-    createUnsafe(genesis, heightIndexStorage, tipsDB, config.storages.trie, updateState)
-
-  private def createUnsafe(
+  def createUnsafe(
+      chainIndex: ChainIndex,
       rootBlock: Block,
-      _heightIndexStorage: HeightIndexStorage,
-      _tipsDB: HashTreeTipsDB,
-      initialTrie: MerklePatriciaTrie,
+      storages: Storages,
       _updateState: BlockFlow.TrieUpdater
   )(implicit _config: PlatformConfig): BlockChainWithState = {
     new BlockChainWithState {
-      override implicit val config: PlatformConfig = _config
-      override val heightIndexStorage              = _heightIndexStorage
-      override val tipsDB                          = _tipsDB
-      override val genesisHash: Hash               = rootBlock.hash
+      override implicit val config: PlatformConfig      = _config
+      override val blockStorage: BlockStorage           = storages.blockStorage
+      override val headerStorage: BlockHeaderStorage    = storages.headerStorage
+      override val blockStateStorage: BlockStateStorage = storages.blockStateStorage
+      override val heightIndexStorage                   = storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB                               = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash: Hash                    = rootBlock.hash
 
       override def updateState(trie: MerklePatriciaTrie,
                                block: Block): IOResult[MerklePatriciaTrie] =
@@ -67,7 +60,7 @@ object BlockChainWithState {
 
       val updateRes = for {
         _       <- this.addGenesis(rootBlock)
-        newTrie <- _updateState(initialTrie, rootBlock)
+        newTrie <- _updateState(storages.trie, rootBlock)
       } yield {
         this.addTrie(rootBlock.hash, newTrie)
       }

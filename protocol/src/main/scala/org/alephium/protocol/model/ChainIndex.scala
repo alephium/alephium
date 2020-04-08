@@ -49,6 +49,7 @@ object ChainIndex {
   private def validate(from: Int, to: Int)(implicit config: GroupConfig): Boolean = {
     0 <= from && from < config.groups && 0 <= to && to < config.groups
   }
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def from(randomBytes: RandomBytes)(implicit config: GroupConfig): ChainIndex = {
     val bytes = randomBytes.bytes

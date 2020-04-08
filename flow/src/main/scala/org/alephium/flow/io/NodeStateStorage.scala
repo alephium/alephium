@@ -1,5 +1,6 @@
 package org.alephium.flow.io
 
+import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
@@ -7,7 +8,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits}
+import org.alephium.util.AVector
 
 object NodeStateStorage {
   def apply(storage: RocksDBSource, cf: ColumnFamily)(
@@ -39,7 +40,7 @@ class NodeStateStorage(val storage: RocksDBSource,
   protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   private val tipKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
-    (Bits.toBytes(from) ++ Bits.toBytes(to)) :+ Storages.tipsPostfix
+    ByteString(from.toByte, to.toByte, Storages.tipsPostfix)
   }
 
   def hashTreeTipsDB(chainIndex: ChainIndex): HashTreeTipsDB = new HashTreeTipsDB {

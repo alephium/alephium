@@ -58,8 +58,9 @@ trait ChainDifficultyAdjustment {
 
 object ChainDifficultyAdjustment {
   def calMedian(timestamps: AVector[TimeStamp]): (TimeStamp, TimeStamp) = {
-    val median1 = timestamps.tail.sorted.apply(timestamps.length / 2)
-    val median2 = timestamps.init.sorted.apply(timestamps.length / 2)
+    val index   = (timestamps.length - 1) / 2
+    val median1 = timestamps.tail.sorted.apply(index)
+    val median2 = timestamps.init.sorted.apply(index)
     (median1, median2)
   }
 }

@@ -1,14 +1,14 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{BlockHeaderStorage, HashTreeTipsDB, HeightIndexStorage, IOResult}
+import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  val headerStorage: BlockHeaderStorage = config.storages.headerStorage
+  def headerStorage: BlockHeaderStorage
 
   def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
     headerStorage.get(hash)
@@ -83,27 +83,23 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 object BlockHeaderChain {
   def fromGenesisUnsafe(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
-    val genesisBlock       = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val heightIndexStorage = config.storages.nodeStateStorage.heightIndexStorage(chainIndex)
-    val tipsStorage        = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-    fromGenesisUnsafe(genesisBlock, heightIndexStorage, tipsStorage)
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock.header, config.storages)
   }
 
-  def fromGenesisUnsafe(genesis: Block,
-                        heightIndexStorage: HeightIndexStorage,
-                        tipsDB: HashTreeTipsDB)(implicit config: PlatformConfig): BlockHeaderChain =
-    createUnsafe(genesis.header, heightIndexStorage, tipsDB)
-
-  private def createUnsafe(
+  def createUnsafe(
+      chainIndex: ChainIndex,
       rootHeader: BlockHeader,
-      _heightIndexStorage: HeightIndexStorage,
-      _tipsDB: HashTreeTipsDB
+      storages: Storages
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
     new BlockHeaderChain {
-      override implicit def config: PlatformConfig        = _config
-      override val heightIndexStorage: HeightIndexStorage = _heightIndexStorage
-      override val tipsDB: HashTreeTipsDB                 = _tipsDB
-      override val genesisHash: Hash                      = rootHeader.hash
+      override implicit def config: PlatformConfig      = _config
+      override val headerStorage: BlockHeaderStorage    = storages.headerStorage
+      override val blockStateStorage: BlockStateStorage = storages.blockStateStorage
+      override val heightIndexStorage: HeightIndexStorage =
+        storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB: HashTreeTipsDB = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash: Hash      = rootHeader.hash
 
       require(this.addGenesis(rootHeader).isRight)
     }
