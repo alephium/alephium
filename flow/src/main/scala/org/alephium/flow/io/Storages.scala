@@ -19,18 +19,12 @@ object Storages {
     val dbStorage                  = createRocksDBUnsafe(rootPath, dbFolder, dbName)
     val headerStorage              = BlockHeaderStorage(dbStorage, ColumnFamily.All, writeOptions)
     val blockStateStorage          = BlockStateStorage(dbStorage, ColumnFamily.All, writeOptions)
-    val heightIndexStorage         = HeightIndexStorage(dbStorage, ColumnFamily.All, writeOptions)
     val nodeStateStorage           = NodeStateStorage(dbStorage, ColumnFamily.All, writeOptions)
     val emptyTrie =
       MerklePatriciaTrie.createStateTrie(
         RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie, writeOptions))
 
-    Storages(headerStorage,
-             blockStorage,
-             emptyTrie,
-             blockStateStorage,
-             heightIndexStorage,
-             nodeStateStorage)
+    Storages(headerStorage, blockStorage, emptyTrie, blockStateStorage, nodeStateStorage)
   }
 
   private def createRocksDBUnsafe(rootPath: Path,
@@ -51,6 +45,5 @@ final case class Storages(
     blockStorage: BlockStorage,
     trie: MerklePatriciaTrie,
     blockStateStorage: BlockStateStorage,
-    heightIndexStorage: HeightIndexStorage,
     nodeStateStorage: NodeStateStorage
 )

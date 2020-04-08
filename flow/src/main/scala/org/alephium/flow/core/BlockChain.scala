@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.ChainDiff
-import org.alephium.flow.io.{BlockStorage, HashTreeTipsDB, IOResult}
+import org.alephium.flow.io.{BlockStorage, HashTreeTipsDB, HeightIndexStorage, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex}
@@ -61,22 +61,25 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
 object BlockChain {
   def fromGenesisUnsafe(chainIndex: ChainIndex)(implicit config: PlatformConfig): BlockChain = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val tipsDB       = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-    fromGenesisUnsafe(genesisBlock, tipsDB)
+    val genesisBlock       = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    val tipsStorage        = config.storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+    val heightIndexStorage = config.storages.nodeStateStorage.heightIndexStorage(chainIndex)
+    fromGenesisUnsafe(genesisBlock, heightIndexStorage, tipsStorage)
   }
 
-  def fromGenesisUnsafe(genesis: Block, tipsDB: HashTreeTipsDB)(
-      implicit config: PlatformConfig): BlockChain =
-    createUnsafe(genesis, tipsDB)
+  def fromGenesisUnsafe(genesis: Block,
+                        heightIndexStorage: HeightIndexStorage,
+                        tipsStorage: HashTreeTipsDB)(implicit config: PlatformConfig): BlockChain =
+    createUnsafe(genesis, heightIndexStorage, tipsStorage)
 
   private def createUnsafe(
       rootBlock: Block,
+      _heightIndexStorage: HeightIndexStorage,
       _tipsDB: HashTreeTipsDB
   )(implicit _config: PlatformConfig): BlockChain = {
     new BlockChain {
       override implicit val config: PlatformConfig = _config
-      override val heightIndexStorage              = _config.storages.heightIndexStorage
+      override val heightIndexStorage              = _heightIndexStorage
       override val tipsDB                          = _tipsDB
       override val genesisHash: Hash               = rootBlock.hash
 
