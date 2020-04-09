@@ -59,7 +59,7 @@ class InstructionSpec extends AlephiumSpec {
 
   it should "decode publicKey" in {
     val publicKey = ED25519PublicKey.generate
-    Instruction.decodePublicKey(publicKey.bytes).right.value is publicKey
+    Instruction.decodePublicKey(publicKey.bytes) isE publicKey
     Instruction.decodePublicKey(publicKey.bytes.init).left.value is InvalidPublicKey
   }
 
@@ -105,7 +105,7 @@ class InstructionSpec extends AlephiumSpec {
     def test(n: Int, prefix: Int*): Assertion = {
       val op = opGen(n)
       op.serialize() is (ByteString(prefix: _*) ++ op.bytes)
-      OP_PUSH.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_PUSH.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
 
     assertThrows[AssertionError](test(0))
@@ -154,12 +154,12 @@ class InstructionSpec extends AlephiumSpec {
     def test0(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x0F + index)
-      OP_DUP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_DUP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
     def test1(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x1F, index)
-      OP_DUP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_DUP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
 
     assertThrows[AssertionError](test0(0))
@@ -186,8 +186,8 @@ class InstructionSpec extends AlephiumSpec {
 
   it should "test OP_SWAP" in new Fixture {
     val state = buildState(OP_SWAP.unsafe(2), stackElems = AVector(data, data ++ data))
-    state.stack.peek(1).right.value is data ++ data
-    state.stack.peek(2).right.value is data
+    state.stack.peek(1) isE data ++ data
+    state.stack.peek(2) isE data
 
     state.run().isRight is true
     state.instructionIndex is 1
@@ -207,12 +207,12 @@ class InstructionSpec extends AlephiumSpec {
     def test0(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x1E + index)
-      OP_SWAP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_SWAP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
     def test1(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x2F, index)
-      OP_SWAP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_SWAP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
 
     assertThrows[AssertionError](test0(0))
@@ -246,12 +246,12 @@ class InstructionSpec extends AlephiumSpec {
     def test0(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x2F + index)
-      OP_POP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_POP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
     def test1(index: Int): Assertion = {
       val op = opGen(index)
       op.serialize() is ByteString(0x3F, index)
-      OP_POP.deserialize(op.serialize()).right.value is (op -> ByteString.empty)
+      OP_POP.deserialize(op.serialize()) isE (op -> ByteString.empty)
     }
 
     assertThrows[AssertionError](test0(0))
@@ -344,7 +344,7 @@ class InstructionSpec extends AlephiumSpec {
 
       if (expected.nonEmpty) {
         state.stack.size is 1
-        state.stack.pop().right.value is expected.get
+        state.stack.pop() isE expected.get
       } else {
         state.stack.size is 0
       }
@@ -488,7 +488,7 @@ class InstructionSpec extends AlephiumSpec {
       state.stack.size is 1
 
       val expected = if (op(x, y)) Instruction.True else Instruction.False
-      state.stack.pop().right.value is expected
+      state.stack.pop() isE expected
     }
   }
 
@@ -611,12 +611,12 @@ class InstructionSpec extends AlephiumSpec {
     val state0 = buildState(OP_PUSH.unsafe(scriptRaw))
     state0.run().isRight is true
     state0.stack.size is 1
-    state0.stack.peek(1).right.value is scriptRaw
+    state0.stack.peek(1) isE scriptRaw
 
     val state1 = state0.reload(AVector[Instruction](OP_SCRIPTKECCAK256.from(hash)))
     state1.run().isRight is true
     state1.stack.size is 1
-    state1.stack.pop().right.value is data ++ data
+    state1.stack.pop() isE data ++ data
 
     val state2 = buildState(OP_PUSH.unsafe(scriptRaw ++ ByteString(0)))
     state2.run().isRight is true
@@ -626,7 +626,7 @@ class InstructionSpec extends AlephiumSpec {
 
   it should "serde OP_SCRIPTKECCAK256" in {
     val instruction = OP_SCRIPTKECCAK256.from(Keccak256.random)
-    Instruction.serde.deserialize(instruction.serialize()).right.value is instruction
+    Instruction.serde.deserialize(instruction.serialize()) isE instruction
 
     OP_SCRIPTKECCAK256.deserialize(ByteString(0)).left.value is a[SerdeError.Validation]
   }
