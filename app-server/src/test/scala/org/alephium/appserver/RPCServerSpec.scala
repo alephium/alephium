@@ -317,7 +317,7 @@ class RPCServerSpec
 
     def checkCallResult[T: Decoder](method: String, params: Option[Json] = None)(
         expected: T): Assertion =
-      checkCall(method, params)(json => json.result.as[T].right.value is expected)
+      checkCall(method, params)(json => json.result.as[T] isE expected)
 
     def checkFailCallResult(method: String, params: Option[Json] = None)(errorMessage: String) =
       rpcRequest(method, params.getOrElse(Json.obj()), 0) ~> server.httpRoute ~> check {

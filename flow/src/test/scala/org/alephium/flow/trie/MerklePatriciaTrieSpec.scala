@@ -79,7 +79,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "serde correctly" in new NodeFixture {
     forAll(nodeGen) { node =>
-      deserialize[Node](serialize[Node](node)).right.value is node
+      deserialize[Node](serialize[Node](node)) isE node
     }
   }
 

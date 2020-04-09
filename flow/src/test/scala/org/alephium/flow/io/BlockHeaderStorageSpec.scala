@@ -36,18 +36,18 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
 
   it should "check existence" in new Fixture {
     val blockHeader = generate()
-    db.exists(blockHeader).right.value is false
+    db.exists(blockHeader) isE false
     db.put(blockHeader).isRight is true
-    db.exists(blockHeader).right.value is true
+    db.exists(blockHeader) isE true
     postTest()
   }
 
   it should "delete entities" in new Fixture {
     val blockHeader = generate()
     db.put(blockHeader).isRight is true
-    db.exists(blockHeader).right.value is true
+    db.exists(blockHeader) isE true
     db.delete(blockHeader).isRight is true
-    db.exists(blockHeader).right.value is false
+    db.exists(blockHeader) isE false
     postTest()
   }
 
@@ -56,11 +56,11 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
       val header = block.header
       val hash   = block.hash
       db.put(header).isRight is true
-      db.get(hash).right.value is header
+      db.get(hash) isE header
       db.getOpt(hash).right.value.get is header
       db.delete(hash).isRight is true
       db.get(hash).isLeft is true
-      db.getOpt(hash).right.value is None
+      db.getOpt(hash) isE None
     }
     postTest()
   }

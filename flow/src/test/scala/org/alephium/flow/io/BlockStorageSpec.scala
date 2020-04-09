@@ -34,7 +34,7 @@ class BlockStorageSpec extends AlephiumSpec {
       storage.put(block).isRight is true
       storage.existsUnsafe(block.hash) is true
       storage.getUnsafe(block.hash) is block
-      storage.get(block.hash).right.value is block
+      storage.get(block.hash) isE block
     }
     TestUtils.clear(root)
   }
