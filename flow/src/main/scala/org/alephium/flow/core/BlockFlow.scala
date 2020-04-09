@@ -1,15 +1,18 @@
 package org.alephium.flow.core
 
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PayTo
 import org.alephium.util.AVector
 
 trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash]
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
+  def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)]
 }
 
 object BlockFlow {
@@ -87,6 +90,12 @@ object BlockFlow {
       aggregate(_.getBestTip)(ordering.max)
     }
 
+    def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] = {
+      getUtxos(payTo, address).map { utxos =>
+        (utxos.sumBy(_._2.value), utxos.length)
+      }
+
+    }
     override def getAllTips: AVector[Hash] = {
       aggregate(_.getAllTips)(_ ++ _)
     }

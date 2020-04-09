@@ -9,6 +9,7 @@ import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo, UnsignedTransaction}
+import org.alephium.protocol.script.PayTo
 import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex, TimeStamp}
@@ -111,12 +112,9 @@ object RPCModel {
     implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 
-  final case class GetBalance(address: String, `type`: String) extends RPCModel
+  final case class GetBalance(address: String, `type`: PayTo) extends RPCModel
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
-
-    // TODO: refactor this once script system gets mature
-    val pkh: String = "pkh"
   }
 
   final case class GetGroup(address: String) extends RPCModel
@@ -127,6 +125,9 @@ object RPCModel {
   final case class Balance(balance: BigInt, utxoNum: Int) extends RPCModel
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
+    def apply(balance_utxoNum: (BigInt, Int)): Balance = {
+      Balance(balance_utxoNum._1, balance_utxoNum._2)
+    }
   }
 
   final case class Group(group: Int) extends RPCModel
@@ -135,9 +136,9 @@ object RPCModel {
   }
 
   final case class CreateTransaction(fromAddress: String,
-                                     fromType: String,
+                                     fromType: PayTo,
                                      toAddress: String,
-                                     toType: String,
+                                     toType: PayTo,
                                      value: BigInt)
       extends RPCModel
   object CreateTransaction {
@@ -160,9 +161,9 @@ object RPCModel {
   }
 
   final case class Transfer(fromAddress: String,
-                            fromType: String,
+                            fromType: PayTo,
                             toAddress: String,
-                            toType: String,
+                            toType: PayTo,
                             value: BigInt,
                             fromPrivateKey: String)
       extends RPCModel
@@ -174,4 +175,12 @@ object RPCModel {
   object TransferResult {
     implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
   }
+
+  private val payToDecoder: Decoder[PayTo] = Decoder[String].emap {
+    case "pkh" => Right(PayTo.PKH)
+    case "sh"  => Right(PayTo.SH)
+    case other => Left(s"Invalid: $other")
+  }
+  private val payToEncoder: Encoder[PayTo] = Encoder[String].contramap(_.toString)
+  implicit val payToCodec: Codec[PayTo]    = Codec.from(payToDecoder, payToEncoder)
 }

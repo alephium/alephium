@@ -13,7 +13,7 @@ import org.alephium.protocol.model.{
   TxOutputPoint,
   UnsignedTransaction
 }
-import org.alephium.protocol.script.Witness
+import org.alephium.protocol.script.{PayTo, Witness}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ValidationSpec extends AlephiumFlowSpec {
@@ -81,7 +81,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val emptyInputs    = AVector.empty[TxOutputPoint]
     val emptyOutputs   = AVector.empty[TxOutput]
     val emptyWitnesses = AVector.empty[Witness]
-    val testWitness    = AVector(Witness.p2pkh(coinbase0.unsigned, publicKey, privateKey))
+    val testWitness    = AVector(Witness.build(PayTo.PKH, coinbase0.unsigned, publicKey, privateKey))
 
     val coinbase1 = Transaction.from(emptyInputs, AVector(output0.head), emptyWitnesses)
     val block1    = block0.copy(transactions = AVector(coinbase1))
@@ -97,7 +97,7 @@ class ValidationSpec extends AlephiumFlowSpec {
 
     val unsignedTransaction =
       UnsignedTransaction(emptyInputs, AVector(output0.head), ByteString.empty)
-    val coinbase4 = Transaction.from(unsignedTransaction, publicKey, privateKey)
+    val coinbase4 = Transaction.from(unsignedTransaction, PayTo.PKH, publicKey, privateKey)
     val block4    = block0.copy(transactions = AVector(coinbase4))
     check(checkCoinbase(block4), InvalidCoinbase)
 
