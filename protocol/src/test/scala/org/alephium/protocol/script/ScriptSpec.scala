@@ -38,17 +38,17 @@ class ScriptSpec extends AlephiumSpec {
   }
 
   it should "test for public key hash scripts" in new Fixture {
-    val pubScript        = PubScript.p2pkh(pk)
-    val priScript        = PriScript.p2pkh(pk)
-    override val witness = Witness.p2pkh(pk, signature)
+    val pubScript        = PubScript.build(PayTo.PKH, pk)
+    val priScript        = PriScript.build(PayTo.PKH, pk)
+    override val witness = Witness.build(PayTo.PKH, pk, signature)
 
     test()
   }
 
   it should "test for script hash" in new Fixture {
-    val pubScript        = PubScript.p2sh(pk)
-    val priScript        = PriScript.p2sh(pk)
-    override val witness = Witness.p2sh(pk, signature)
+    val pubScript        = PubScript.build(PayTo.SH, pk)
+    val priScript        = PriScript.build(PayTo.SH, pk)
+    override val witness = Witness.build(PayTo.SH, pk, signature)
 
     test()
   }

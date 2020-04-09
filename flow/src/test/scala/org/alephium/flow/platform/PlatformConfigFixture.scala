@@ -8,6 +8,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.script.PayTo
 import org.alephium.util.{AVector, Env}
 
 trait PlatformConfigFixture {
@@ -32,7 +33,7 @@ trait PlatformConfigFixture {
   lazy val genesisBalances =
     AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups0) { i =>
       val groupIndex              = GroupIndex.unsafe(i)(groupConfig)
-      val (privateKey, publicKey) = groupIndex.generateP2pkhKey(groupConfig)
+      val (privateKey, publicKey) = groupIndex.generateKey(PayTo.PKH)(groupConfig)
       (privateKey, publicKey, genesisBalance)
     }
 
