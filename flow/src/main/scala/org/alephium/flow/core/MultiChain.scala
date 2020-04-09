@@ -4,6 +4,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io.IOResult
+import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
@@ -67,6 +68,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] =
     getHashChain(hash).chainBack(hash, heightUntil)
 
+  def getState(hash: Hash): IOResult[BlockState] =
+    getHashChain(hash).getState(hash)
+
+  def getStateUnsafe(hash: Hash): BlockState =
+    getHashChain(hash).getStateUnsafe(hash)
+
   def getHeight(hash: Hash): IOResult[Int] =
     getHashChain(hash).getHeight(hash)
 
@@ -78,6 +85,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getWeightUnsafe(hash: Hash): BigInt =
     getHashChain(hash).getWeightUnsafe(hash)
+
+  def getChainWeight(hash: Hash): IOResult[BigInt] =
+    getHashChain(hash).getChainWeight(hash)
+
+  def getChainWeightUnsafe(hash: Hash): BigInt =
+    getHashChain(hash).getChainWeightUnsafe(hash)
 
   def getAllBlockHashes: IOResult[AVector[Hash]] =
     aggregateE(_.getAllBlockHashes)(_ ++ _)
