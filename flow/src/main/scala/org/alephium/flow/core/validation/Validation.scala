@@ -141,8 +141,8 @@ object Validation {
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.transactions.last // Note: validateNonEmptyTransactions first pls!
-    val raw      = coinbase.raw
-    if (raw.inputs.length == 0 && raw.outputs.length == 1 && coinbase.witnesses.isEmpty)
+    val unsigned = coinbase.unsigned
+    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witnesses.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -197,9 +197,9 @@ object Validation {
   }
 
   private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult = {
-    if (tx.raw.inputs.isEmpty) {
+    if (tx.unsigned.inputs.isEmpty) {
       invalidTx(EmptyInputs)
-    } else if (tx.raw.outputs.isEmpty) {
+    } else if (tx.unsigned.outputs.isEmpty) {
       invalidTx(EmptyOutputs)
     } else {
       validTx
@@ -207,9 +207,9 @@ object Validation {
   }
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
-    if (!tx.raw.outputs.forall(_.value >= 0)) {
+    if (!tx.unsigned.outputs.forall(_.value >= 0)) {
       invalidTx(NegativeOutputValue)
-    } else if (!(tx.raw.outputs.sumBy(_.value) < ALF.MaxALFValue)) {
+    } else if (!(tx.unsigned.outputs.sumBy(_.value) < ALF.MaxALFValue)) {
       invalidTx(OutputValueOverFlow)
     } else {
       validTx
@@ -218,18 +218,18 @@ object Validation {
 
   private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult = {
-    val fromOk = tx.raw.inputs.forall(_.fromGroup == index.from)
-    val toOk = tx.raw.outputs.forall { output =>
+    val fromOk = tx.unsigned.inputs.forall(_.fromGroup == index.from)
+    val toOk = tx.unsigned.outputs.forall { output =>
       output.toGroup == index.from || output.toGroup == index.to
     }
-    val existed = tx.raw.outputs.exists(_.toGroup == index.to)
+    val existed = tx.unsigned.outputs.exists(_.toGroup == index.to)
     if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
   }
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
     block.transactions.init.foreachE { tx =>
-      tx.raw.inputs.foreachE { input =>
+      tx.unsigned.inputs.foreachE { input =>
         if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {
           utxoUsed += input
@@ -241,7 +241,7 @@ object Validation {
 
   private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    tx.raw.inputs.foreachE { input =>
+    tx.unsigned.inputs.foreachE { input =>
       if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
       else {
         utxoUsed += input
@@ -252,7 +252,7 @@ object Validation {
 
   private[validation] def checkSpending(tx: Transaction, trie: MerklePatriciaTrie)(
       implicit config: ScriptConfig): TxValidationResult = {
-    val query = tx.raw.inputs.mapE { input =>
+    val query = tx.unsigned.inputs.mapE { input =>
       trie.get[TxOutputPoint, TxOutput](input)
     }
     query match {
@@ -273,13 +273,13 @@ object Validation {
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
     val inputSum  = preOutputs.sumBy(_.value)
-    val outputSum = tx.raw.outputs.sumBy(_.value)
+    val outputSum = tx.unsigned.outputs.sumBy(_.value)
     if (outputSum <= inputSum) validTx else invalidTx(InvalidBalance)
   }
 
   private[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput])(
       implicit config: ScriptConfig): TxValidationResult = {
-    assume(tx.raw.inputs.length == preOutputs.length)
+    assume(tx.unsigned.inputs.length == preOutputs.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val witness = tx.witnesses(idx)
       val output  = preOutputs(idx)

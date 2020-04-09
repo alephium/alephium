@@ -18,7 +18,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.{AllHandlers, BlockFlow}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -31,6 +31,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 class RPCServerSpec
@@ -99,6 +100,22 @@ class RPCServerSpec
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
     )(dummyTransferResult)
+  }
+
+  it should "call send_transaction" in new RouteHTTP {
+    checkCallResult(
+      "send_transaction",
+      parse(s"""{"tx":"${Hex
+        .toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}""").toOption
+    )(dummyTransferResult)
+  }
+
+  it should "call create_transaction" in new RouteHTTP {
+    checkCallResult(
+      "create_transaction",
+      parse(
+        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1}""").toOption
+    )(dummyCreateTransactionResult)
   }
 
   it should "reject wrong transfer call" in new RouteHTTP {
@@ -256,14 +273,21 @@ class RPCServerSpec
     val dummyToAddres             = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
     val dummyPrivateKey           = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
     val dummyTx = ModelGen.transactionGen
-      .retryUntil(tx => tx.raw.inputs.nonEmpty && tx.raw.outputs.nonEmpty)
+      .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.outputs.nonEmpty)
       .sample
       .get
+    val dummySignature = ED25519.sign(dummyTx.unsigned.hash.bytes,
+                                      ED25519PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
     lazy val dummyTransferResult = TransferResult(
       dummyTx.hash.toHexString,
       dummyTx.fromGroup.value,
       dummyTx.toGroup.value
     )
+    lazy val dummyCreateTransactionResult = CreateTransactionResult(
+      Hex.toHexString(serialize(dummyTx.unsigned)),
+      dummyTx.unsigned.hash.toHexString
+    )
+
     val blockFlowProbe = TestProbe()
   }
 
@@ -389,6 +413,13 @@ object RPCServerSpec {
       blockFlowProbe ! predicate(blockHeader)
       Seq(blockHeader)
     }
+    override def prepareP2pkhUnsignedTx(
+        from: ED25519PublicKey,
+        to: ED25519PublicKey,
+        value: BigInt
+    ): IOResult[Option[UnsignedTransaction]] =
+      Right(Some(dummyTx.unsigned))
+
     override def prepareP2pkhTx(
         from: ED25519PublicKey,
         to: ED25519PublicKey,

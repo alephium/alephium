@@ -147,4 +147,24 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     val jsonRaw = """{"txId":"txId","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
+
+  it should "encode/decode CreateTransaction" in {
+    val transfer = CreateTransaction("from", "pkh", "to", "pkh", 1)
+    val jsonRaw =
+      """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1}"""
+    checkData(transfer, jsonRaw)
+  }
+
+  it should "encode/decode CreateTransactionResult" in {
+    val result  = CreateTransactionResult("tx", "txHash")
+    val jsonRaw = """{"unsignedTx":"tx","hash":"txHash"}"""
+    checkData(result, jsonRaw)
+  }
+
+  it should "encode/decode SendTransaction" in {
+    val transfer = SendTransaction("tx", "signature", "publicKey")
+    val jsonRaw =
+      """{"tx":"tx","signature":"signature","publicKey":"publicKey"}"""
+    checkData(transfer, jsonRaw)
+  }
 }

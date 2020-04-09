@@ -258,7 +258,7 @@ trait BlockFlowState {
 
   def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
     val trie = getBestTrie(chainIndex)
-    tx.raw.inputs.mapE { input =>
+    tx.unsigned.inputs.mapE { input =>
       trie.get[TxOutputPoint, TxOutput](input)
     }
   }
@@ -322,17 +322,25 @@ trait BlockFlowState {
     getP2pkhUtxos(address).map(_.sumBy(_._2.value))
   }
 
-  def prepareP2pkhTx(from: ED25519PublicKey,
-                     to: ED25519PublicKey,
-                     value: BigInt,
-                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+  def prepareP2pkhUnsignedTx(from: ED25519PublicKey,
+                             to: ED25519PublicKey,
+                             value: BigInt): IOResult[Option[UnsignedTransaction]] = {
     getP2pkhUtxos(from).map { utxos =>
       val balance = utxos.sumBy(_._2.value)
       if (balance >= value) {
-        Some(Transaction.simpleTransfer(utxos.map(_._1), balance, from, to, value, fromPrivateKey))
-      } else None
+        Some(UnsignedTransaction.simpleTransfer(utxos.map(_._1), balance, from, to, value))
+      } else {
+        None
+      }
     }
   }
+  def prepareP2pkhTx(from: ED25519PublicKey,
+                     to: ED25519PublicKey,
+                     value: BigInt,
+                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
+    prepareP2pkhUnsignedTx(from, to, value).map(_.map { unsigned =>
+      Transaction.from(unsigned, from, fromPrivateKey)
+    })
 }
 // scalastyle:on number.of.methods
 
@@ -347,12 +355,12 @@ object BlockFlowState {
       extends BlockCache // For blocks on intra-group chain
 
   private def convertInputs(block: Block): Set[TxOutputPoint] = {
-    block.transactions.flatMap(_.raw.inputs).toIterable.toSet
+    block.transactions.flatMap(_.unsigned.inputs).toIterable.toSet
   }
 
   private def convertOutputs(block: Block): Map[TxOutputPoint, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
-      transaction.raw.outputs.mapWithIndex { (output, i) =>
+      transaction.unsigned.outputs.mapWithIndex { (output, i) =>
         val outputPoint = TxOutputPoint.unsafe(transaction, i)
         (outputPoint, output)
       }
