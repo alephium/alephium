@@ -19,6 +19,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.RPCModel._
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBStorage.Settings
@@ -70,12 +71,24 @@ class ServerSpec extends AlephiumSpec {
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
 
+    request[Balance](rpcPort, getBalance(publicKey)) is
+      Balance(initialBalance.balance - transferAmount, 1)
+
+    val createTx =
+      request[CreateTransactionResult](rpcPort,
+                                       createTransaction(publicKey, tranferKey, transferAmount))
+
+    val tx2 =
+      request[TransferResult](rpcPort, sendTransaction(createTx))
+
+    awaitNewBlock(tx2.fromGroup, tx2.toGroup)
+
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, stopMining) is true
     }
 
     request[Balance](rpcPort, getBalance(publicKey)) is
-      Balance(initialBalance.balance - transferAmount, 1)
+      Balance(initialBalance.balance - (2 * transferAmount), 1)
   }
 
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
@@ -171,6 +184,21 @@ class ServerSpec extends AlephiumSpec {
       "transfer",
       s"""{"fromAddress":"$from","fromType":"pkh","toAddress":"$to","toType":"pkh","value":$amount,"fromPrivateKey":"$fromPrivate"}"""
     )
+
+    def createTransaction(from: String, to: String, amount: Int) = jsonRpc(
+      "create_transaction",
+      s"""{"fromAddress":"$from","fromType":"pkh","toAddress":"$to","toType":"pkh","value":$amount}"""
+    )
+
+    def sendTransaction(createTransactionResult: CreateTransactionResult) = {
+      val signature: ED25519Signature = ED25519.sign(
+        Hex.unsafe(createTransactionResult.hash),
+        ED25519PrivateKey.unsafe(Hex.unsafe(privateKey)))
+      jsonRpc(
+        "send_transaction",
+        s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}","publicKey":"$publicKey"}"""
+      )
+    }
 
     val startMining = jsonRpc("mining_start", "{}")
     val stopMining  = jsonRpc("mining_stop", "{}")
