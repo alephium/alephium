@@ -38,9 +38,14 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
 
     for {
-      parentHeight <- getHeight(parentHash)
-      _            <- addHeader(header)
-      _            <- addHash(header.hash, parentHash, parentHeight + 1, weight, header.timestamp)
+      blockState <- getState(parentHash)
+      _          <- addHeader(header)
+      _ <- addHash(header.hash,
+                   parentHash,
+                   blockState.height + 1,
+                   weight,
+                   blockState.chainWeight + header.target,
+                   header.timestamp)
     } yield ()
   }
 
