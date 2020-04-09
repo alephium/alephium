@@ -25,7 +25,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   def check(res: BlockValidationResult, error: InvalidBlockStatus): Assertion = {
-    res.left.value.right.value is error
+    res.left.value isE error
   }
 
   it should "validate group for block" in {
