@@ -151,30 +151,32 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
 
   // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
   def getBlockHashesBetween(newHash: Hash, oldHash: Hash): IOResult[AVector[Hash]] = {
-    getHeight(oldHash).flatMap(getBlockHashesBetween(newHash, oldHash, _))
+    for {
+      newHeight <- getHeight(newHash)
+      oldHeight <- getHeight(oldHash)
+      result    <- getBlockHashesBetween(newHash, newHeight, oldHash, oldHeight)
+    } yield result
   }
 
   def getBlockHashesBetween(newHash: Hash,
+                            newHeight: Int,
                             oldHash: Hash,
                             oldHeight: Int): IOResult[AVector[Hash]] = {
     assume(oldHeight >= ALF.GenesisHeight)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(acc: AVector[Hash], current: Hash): IOResult[AVector[Hash]] = {
-      getHeight(current).flatMap { currentHeight =>
-        if (currentHeight == oldHeight) {
-          if (current == oldHash) Right(acc)
-          else {
-            val error = new RuntimeException(
-              s"Cannot calculate the hashes between new ${newHash.shortHex} and old ${oldHash.shortHex}")
-            Left(IOError.Other(error))
-          }
-        } else {
-          getParentHash(current).flatMap(iter(acc :+ current, _))
-        }
+    def iter(acc: AVector[Hash], currentHash: Hash, currentHeight: Int): IOResult[AVector[Hash]] = {
+      if (currentHeight > oldHeight) {
+        getParentHash(currentHash).flatMap(iter(acc :+ currentHash, _, currentHeight - 1))
+      } else if (currentHeight == oldHeight && currentHash == oldHash) {
+        Right(acc)
+      } else {
+        val error = new RuntimeException(
+          s"Cannot calculate the hashes between new ${newHash.shortHex} and old ${oldHash.shortHex}")
+        Left(IOError.Other(error))
       }
     }
 
-    iter(AVector.empty, newHash).map(_.reverse)
+    iter(AVector.empty, newHash, newHeight).map(_.reverse)
   }
 
   def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] = {

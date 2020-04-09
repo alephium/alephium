@@ -5,6 +5,7 @@ import org.alephium.flow.io.{IOResult, IOUtils}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
@@ -62,7 +63,7 @@ object BlockFlow {
     }
 
     private def calWeightUnsafe(header: BlockHeader): BigInt = {
-      if (header.isGenesis) 0
+      if (header.isGenesis) ALF.GenesisWeight
       else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
         val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
