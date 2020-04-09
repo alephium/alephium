@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.script.PubScript
+import org.alephium.protocol.script.{PayTo, PubScript}
 import org.alephium.serde._
 
 final case class TxOutput(value: BigInt, pubScript: PubScript) {
@@ -14,8 +14,8 @@ final case class TxOutput(value: BigInt, pubScript: PubScript) {
 object TxOutput {
   implicit val serde: Serde[TxOutput] = Serde.forProduct2(apply, to => (to.value, to.pubScript))
 
-  def p2pkh(value: BigInt, publicKey: ED25519PublicKey): TxOutput = {
-    val pubScript = PubScript.p2pkh(publicKey)
+  def build(payTo: PayTo, value: BigInt, publicKey: ED25519PublicKey): TxOutput = {
+    val pubScript = PubScript.build(payTo, publicKey)
     TxOutput(value, pubScript)
   }
 

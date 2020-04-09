@@ -10,7 +10,7 @@ import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PubScript
+import org.alephium.protocol.script.{PayTo, PubScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
 
@@ -286,8 +286,9 @@ trait BlockFlowState {
     getNonPersistedOutBlocks(groupIndex).map(_.forall(!_.inputs.contains(input)))
   }
 
-  def getP2pkhUtxos(address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
-    val pubScript  = PubScript.p2pkh(address)
+  def getUtxos(payTo: PayTo,
+               address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
+    val pubScript  = PubScript.build(payTo, address)
     val groupIndex = GroupIndex.from(pubScript)
     assert(config.brokerInfo.contains(groupIndex))
 
@@ -296,16 +297,16 @@ trait BlockFlowState {
       persistedUtxos <- getBestTrie(groupIndex)
         .getAll[TxOutputPoint, TxOutput](prefix)
         .map(_.filter(_._2.pubScript == pubScript))
-      pair <- getP2pkhUtxosInCache(pubScript, groupIndex, persistedUtxos)
+      pair <- getUtxosInCache(pubScript, groupIndex, persistedUtxos)
     } yield {
       val (usedUtxos, newUtxos) = pair
       persistedUtxos.filter(p => !usedUtxos.contains(p._1)) ++ newUtxos
     }
   }
 
-  def getP2pkhUtxosInCache(pubScript: PubScript,
-                           groupIndex: GroupIndex,
-                           persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
+  def getUtxosInCache(pubScript: PubScript,
+                      groupIndex: GroupIndex,
+                      persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
     : IOResult[(AVector[TxOutputPoint], AVector[(TxOutputPoint, TxOutput)])] = {
     getNonPersistedOutBlocks(groupIndex).map { blockCaches =>
       val result0 = blockCaches
@@ -318,28 +319,30 @@ trait BlockFlowState {
     }
   }
 
-  def getP2pkhBalance(address: ED25519PublicKey): IOResult[BigInt] = {
-    getP2pkhUtxos(address).map(_.sumBy(_._2.value))
-  }
-
-  def prepareP2pkhUnsignedTx(from: ED25519PublicKey,
-                             to: ED25519PublicKey,
-                             value: BigInt): IOResult[Option[UnsignedTransaction]] = {
-    getP2pkhUtxos(from).map { utxos =>
+  def prepareUnsignedTx(from: ED25519PublicKey,
+                        fromPayTo: PayTo,
+                        to: ED25519PublicKey,
+                        toPayTo: PayTo,
+                        value: BigInt): IOResult[Option[UnsignedTransaction]] = {
+    getUtxos(fromPayTo, from).map { utxos =>
       val balance = utxos.sumBy(_._2.value)
       if (balance >= value) {
-        Some(UnsignedTransaction.simpleTransfer(utxos.map(_._1), balance, from, to, value))
+        Some(
+          UnsignedTransaction
+            .simpleTransfer(utxos.map(_._1), balance, from, fromPayTo, to, toPayTo, value))
       } else {
         None
       }
     }
   }
-  def prepareP2pkhTx(from: ED25519PublicKey,
-                     to: ED25519PublicKey,
-                     value: BigInt,
-                     fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
-    prepareP2pkhUnsignedTx(from, to, value).map(_.map { unsigned =>
-      Transaction.from(unsigned, from, fromPrivateKey)
+  def prepareTx(from: ED25519PublicKey,
+                fromPayTo: PayTo,
+                to: ED25519PublicKey,
+                toPayTo: PayTo,
+                value: BigInt,
+                fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
+    prepareUnsignedTx(from, fromPayTo, to, toPayTo, value).map(_.map { unsigned =>
+      Transaction.from(unsigned, fromPayTo, from, fromPrivateKey)
     })
 }
 // scalastyle:on number.of.methods

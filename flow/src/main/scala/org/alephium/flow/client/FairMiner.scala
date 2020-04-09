@@ -14,6 +14,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PayTo
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object FairMiner {
@@ -24,7 +25,7 @@ object FairMiner {
       implicit config: PlatformConfig): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex.unsafe(i)
-      val (_, publicKey) = index.generateP2pkhKey
+      val (_, publicKey) = index.generateKey(PayTo.PKH)
       publicKey
     }
     props(addresses, blockFlow, allHandlers)
@@ -34,7 +35,7 @@ object FairMiner {
       implicit config: PlatformConfig): Props = {
     require(addresses.length == config.groups)
     addresses.foreachWithIndex { (address, i) =>
-      require(GroupIndex.fromP2PKH(address).value == i)
+      require(GroupIndex.from(PayTo.PKH, address).value == i)
     }
     Props(new FairMiner(addresses, blockFlow, allHandlers))
   }
