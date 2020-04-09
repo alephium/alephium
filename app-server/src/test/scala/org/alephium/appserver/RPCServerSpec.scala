@@ -29,6 +29,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PayTo
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.serialize
@@ -86,7 +87,7 @@ class RPCServerSpec
       "Server error")
     checkFailCallResult(
       "get_balance",
-      parse(s"""{"address":"$dummyKey","type":"OOPS"}""").toOption)("Server error")
+      parse(s"""{"address":"$dummyKey","type":"OOPS"}""").toOption)("Invalid params")
     checkFailCallResult("get_balance", parse(s"""{"OOPS":"OOPS"}""").toOption)("Invalid params")
   }
 
@@ -123,19 +124,19 @@ class RPCServerSpec
       "transfer",
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"OOPS","toAddress":"$dummyToAddres","toType":"OOPS","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Server error")
+    )("Invalid params")
 
     checkFailCallResult(
       "transfer",
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"OOPS","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Server error")
+    )("Invalid params")
 
     checkFailCallResult(
       "transfer",
       parse(
         s"""{"fromAddress":"$dummyKey","fromType":"OOPS","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Server error")
+    )("Invalid params")
 
     checkFailCallResult(
       "transfer",
@@ -413,18 +414,25 @@ object RPCServerSpec {
       blockFlowProbe ! predicate(blockHeader)
       Seq(blockHeader)
     }
-    override def prepareP2pkhUnsignedTx(
+
+    def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
+      Right((BigInt(0), 0))
+
+    override def prepareUnsignedTx(
         from: ED25519PublicKey,
+        fromPayTo: PayTo,
         to: ED25519PublicKey,
+        toPayTo: PayTo,
         value: BigInt
     ): IOResult[Option[UnsignedTransaction]] =
       Right(Some(dummyTx.unsigned))
 
-    override def prepareP2pkhTx(
-        from: ED25519PublicKey,
-        to: ED25519PublicKey,
-        value: BigInt,
-        fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+    override def prepareTx(from: ED25519PublicKey,
+                           fromPayTo: PayTo,
+                           to: ED25519PublicKey,
+                           toPayTo: PayTo,
+                           value: BigInt,
+                           fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }
 
