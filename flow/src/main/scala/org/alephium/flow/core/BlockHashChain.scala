@@ -28,9 +28,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
                         parentHash: Hash,
                         height: Int,
                         weight: BigInt,
+                        chainWeight: BigInt,
                         timestamp: TimeStamp): IOResult[Unit] = {
     for {
-      _ <- blockStateStorage.put(hash, BlockState(height, weight))
+      _ <- blockStateStorage.put(hash, BlockState(height, weight, chainWeight))
       _ <- updateHeightIndex(hash, height)
       _ <- addNewTip(hash, timestamp, parentHash)
     } yield {
@@ -41,7 +42,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
   protected def addGenesis(hash: Hash): IOResult[Unit] = {
     assume(hash == genesisHash)
     for {
-      _ <- blockStateStorage.put(genesisHash, BlockState(ALF.GenesisHeight, ALF.GenesisWeight))
+      _ <- blockStateStorage.put(
+        genesisHash,
+        BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight))
       _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight)
       _ <- addGenesisTip(genesisHash, ALF.GenesisTimestamp)
     } yield {
@@ -67,12 +70,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
     getHeight(hash).map(math.max(height, _))
   }
 
-  def contains(hash: Hash): IOResult[Boolean] = blockStateStorage.exists(hash)
-  def containsUnsafe(hash: Hash): Boolean     = blockStateStorage.existsUnsafe(hash)
-  def getHeight(hash: Hash): IOResult[Int]    = blockStateStorage.get(hash).map(_.height)
-  def getHeightUnsafe(hash: Hash): Int        = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: Hash): IOResult[BigInt] = blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: Hash): BigInt     = blockStateStorage.getUnsafe(hash).weight
+  def contains(hash: Hash): IOResult[Boolean]      = blockStateStorage.exists(hash)
+  def containsUnsafe(hash: Hash): Boolean          = blockStateStorage.existsUnsafe(hash)
+  def getState(hash: Hash): IOResult[BlockState]   = blockStateStorage.get(hash)
+  def getStateUnsafe(hash: Hash): BlockState       = blockStateStorage.getUnsafe(hash)
+  def getHeight(hash: Hash): IOResult[Int]         = blockStateStorage.get(hash).map(_.height)
+  def getHeightUnsafe(hash: Hash): Int             = blockStateStorage.getUnsafe(hash).height
+  def getWeight(hash: Hash): IOResult[BigInt]      = blockStateStorage.get(hash).map(_.weight)
+  def getWeightUnsafe(hash: Hash): BigInt          = blockStateStorage.getUnsafe(hash).weight
+  def getChainWeight(hash: Hash): IOResult[BigInt] = blockStateStorage.get(hash).map(_.chainWeight)
+  def getChainWeightUnsafe(hash: Hash): BigInt     = blockStateStorage.getUnsafe(hash).chainWeight
 
   def isTip(hash: Hash): Boolean = tips.contains(hash)
 

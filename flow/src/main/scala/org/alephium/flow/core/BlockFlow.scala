@@ -53,28 +53,28 @@ object BlockFlow {
       } yield ()
     }
 
-    private def calWeight(block: Block): IOResult[Int] = {
+    private def calWeight(block: Block): IOResult[BigInt] = {
       calWeight(block.header)
     }
 
-    private def calWeight(header: BlockHeader): IOResult[Int] = {
+    private def calWeight(header: BlockHeader): IOResult[BigInt] = {
       IOUtils.tryExecute(calWeightUnsafe(header))
     }
 
-    private def calWeightUnsafe(header: BlockHeader): Int = {
+    private def calWeightUnsafe(header: BlockHeader): BigInt = {
       if (header.isGenesis) 0
       else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
-        val weight2 = header.outDeps.sumBy(getHeightUnsafe)
-        weight1 + weight2 + 1
+        val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
+        weight1 + weight2 + header.target
       }
     }
 
-    private def calGroupWeightUnsafe(hash: Hash): Int = {
+    private def calGroupWeightUnsafe(hash: Hash): BigInt = {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) 0
       else {
-        header.outDeps.sumBy(getHeightUnsafe) + 1
+        header.outDeps.sumBy(getChainWeightUnsafe) + header.target
       }
     }
 

@@ -1,6 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.io.IOResult
+import org.alephium.flow.model.BlockState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.AVector
 
@@ -15,9 +16,17 @@ trait BlockHashPool {
 
   def containsUnsafe(hash: Hash): Boolean
 
+  def getState(hash: Hash): IOResult[BlockState]
+
+  def getStateUnsafe(hash: Hash): BlockState
+
   def getWeight(hash: Hash): IOResult[BigInt]
 
   def getWeightUnsafe(hash: Hash): BigInt
+
+  def getChainWeight(hash: Hash): IOResult[BigInt]
+
+  def getChainWeightUnsafe(hash: Hash): BigInt
 
   def getHeight(hash: Hash): IOResult[Int]
 
@@ -25,7 +34,7 @@ trait BlockHashPool {
 
   def isTip(hash: Hash): Boolean
 
-  // The return includes locator
+  // The return excludes locator
   def getHashesAfter(locator: Hash): IOResult[AVector[Hash]]
 
   def getPredecessor(hash: Hash, height: Int): IOResult[Hash]
