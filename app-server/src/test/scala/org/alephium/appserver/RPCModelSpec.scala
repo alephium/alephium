@@ -11,6 +11,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.script.PayTo
 import org.alephium.rpc.CirceUtils
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp}
 
@@ -111,8 +112,8 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
 
   it should "encode/decode GetBalance" in {
     val addressHex = generateKeyHash
-    val request    = GetBalance(addressHex, GetBalance.pkh)
-    val jsonRaw    = s"""{"address":"$addressHex","type":"${GetBalance.pkh}"}"""
+    val request    = GetBalance(addressHex, PayTo.PKH)
+    val jsonRaw    = s"""{"address":"$addressHex","type":"${PayTo.PKH}"}"""
     checkData(request, jsonRaw)
   }
 
@@ -136,7 +137,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode Transfer" in {
-    val transfer = Transfer("from", "pkh", "to", "pkh", 1, "key")
+    val transfer = Transfer("from", PayTo.PKH, "to", PayTo.PKH, 1, "key")
     val jsonRaw =
       """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1,"fromPrivateKey":"key"}"""
     checkData(transfer, jsonRaw)
@@ -149,7 +150,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode CreateTransaction" in {
-    val transfer = CreateTransaction("from", "pkh", "to", "pkh", 1)
+    val transfer = CreateTransaction("from", PayTo.PKH, "to", PayTo.PKH, 1)
     val jsonRaw =
       """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1}"""
     checkData(transfer, jsonRaw)
@@ -166,5 +167,13 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     val jsonRaw =
       """{"tx":"tx","signature":"signature","publicKey":"publicKey"}"""
     checkData(transfer, jsonRaw)
+  }
+
+  it should "encode/decode PayTo" in {
+    checkData[PayTo](PayTo.PKH, """"pkh"""")
+    checkData[PayTo](PayTo.SH, """"sh"""")
+
+    parseFail[PayTo](""""OOPS"""") is """Invalid: OOPS"""
+    parseFail[PayTo](""""OOPS"""") is """Invalid: OOPS"""
   }
 }

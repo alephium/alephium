@@ -12,6 +12,7 @@ import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.flow.io.RocksDBStorage.Settings
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PayTo
 import org.alephium.util._
 
 trait PlatformConfig extends Configs with PlatformIO {
@@ -188,7 +189,7 @@ object PlatformConfig {
     AVector.tabulate(config.groups, config.groups) {
       case (from, to) =>
         val transactions = if (from == to) {
-          val balancesOI  = balances.filter(p => GroupIndex.fromP2PKH(p._1).value == from)
+          val balancesOI  = balances.filter(p => GroupIndex.from(PayTo.PKH, p._1).value == from)
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]

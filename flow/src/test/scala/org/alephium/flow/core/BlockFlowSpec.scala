@@ -11,6 +11,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.validation.Validation
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.script.PayTo
 import org.alephium.util.{AVector, Hex}
 
 class BlockFlowSpec extends AlephiumFlowSpec {
@@ -185,12 +186,13 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val balances                   = blockFlow.getP2pkhUtxos(publicKey).right.value
+        val balances                   = blockFlow.getUtxos(PayTo.PKH, publicKey).right.value
         val total                      = balances.sumBy(_._2.value)
-        val (_, toPublicKey)           = chainIndex.to.generateP2pkhKey
+        val (_, toPublicKey)           = chainIndex.to.generateKey(PayTo.PKH)
         val inputs                     = balances.map(_._1)
-        val outputs                    = AVector(TxOutput.p2pkh(1, toPublicKey), TxOutput.p2pkh(total - 1, publicKey))
-        AVector(Transaction.from(inputs, outputs, publicKey, privateKey))
+        val outputs = AVector(TxOutput.build(PayTo.PKH, 1, toPublicKey),
+                              TxOutput.build(PayTo.PKH, total - 1, publicKey))
+        AVector(Transaction.from(PayTo.PKH, inputs, outputs, publicKey, privateKey))
       } else AVector.empty[Transaction]
     }
 
@@ -226,7 +228,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {
     val address = genesisBalances(groupIndex)._2
-    blockFlow.getP2pkhUtxos(address).right.value.sumBy(_._2.value) is expected
+    blockFlow.getUtxos(PayTo.PKH, address).right.value.sumBy(_._2.value) is expected
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -247,9 +249,9 @@ class BlockFlowSpec extends AlephiumFlowSpec {
   }
 
   def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
-    val groupIndex = GroupIndex.fromP2PKH(address)
+    val groupIndex = GroupIndex.from(PayTo.PKH, address)
     config.brokerInfo.contains(groupIndex) is true
-    val query = blockFlow.getP2pkhUtxos(address)
+    val query = blockFlow.getUtxos(PayTo.PKH, address)
     query.right.value.sumBy(_._2.value)
   }
 
@@ -259,7 +261,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     }
 
     val address   = genesisBalances(config.brokerInfo.id)._2
-    val txOutputs = blockFlow.getP2pkhUtxos(address).right.value.map(_._2)
+    val txOutputs = blockFlow.getUtxos(PayTo.PKH, address).right.value.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 }

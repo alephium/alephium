@@ -18,8 +18,13 @@ object PubScript {
 
   def empty: PubScript = PubScript(AVector.empty)
 
+  def build(payTo: PayTo, publicKey: ED25519PublicKey): PubScript = payTo match {
+    case PayTo.PKH => p2pkh(publicKey)
+    case PayTo.SH  => p2sh(publicKey)
+  }
+
   // TODO: optimize this using cache
-  def p2pkh(publicKey: ED25519PublicKey): PubScript = {
+  private def p2pkh(publicKey: ED25519PublicKey): PubScript = {
     val pkHash = Hash.hash(publicKey.bytes)
     val instructions = AVector[Instruction](OP_DUP.unsafe(1),
                                             OP_KECCAK256,
@@ -29,7 +34,7 @@ object PubScript {
     PubScript(instructions)
   }
 
-  def p2sh(publicKey: ED25519PublicKey): PubScript = {
+  private def p2sh(publicKey: ED25519PublicKey): PubScript = {
     val script    = AVector[Instruction](OP_PUSH.unsafe(publicKey.bytes), OP_CHECKSIGVERIFY)
     val scriptRaw = Instruction.serializeScript(script)
     p2sh(scriptRaw)
