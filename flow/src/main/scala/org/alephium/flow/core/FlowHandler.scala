@@ -203,7 +203,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
       i <- 0 until config.groups
       j <- 0 until config.groups
       height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight
-    } yield s"$i-$j:$height"
+    } yield s"$i-$j:${height.getOrElse(-1)}"
     val heightsInfo = heights.mkString(", ")
     val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
     val timeSpan = {

@@ -53,7 +53,7 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
                     mempool: MemPool,
                     origin: DataOrigin): Unit = {
     val count = mempool.add(chainIndex, AVector((tx, 1.0)))
-    log.debug(s"try to add tx ${tx.shortHex}, #$count txs added")
+    log.debug(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)))
     cliqueManager ! CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
   }
