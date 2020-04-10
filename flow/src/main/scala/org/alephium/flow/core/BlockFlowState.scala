@@ -102,9 +102,9 @@ trait BlockFlowState {
     import groupCache._
     if (cachedHashes.length > config.blockCacheSize) {
       val toRemove = cachedHashes.dequeue
-      inblockcaches.removeIfExist(toRemove)
-      outblockcaches.removeIfExist(toRemove)
-      inoutblockcaches.removeIfExist(toRemove)
+      inblockcaches.remove(toRemove)
+      outblockcaches.remove(toRemove)
+      inoutblockcaches.remove(toRemove)
       assert(cachedHashes.length <= config.blockCacheSize)
     }
   }
@@ -292,7 +292,7 @@ trait BlockFlowState {
       }
     }
     val cache = getGroupCache(groupIndex)
-    diffE.map(_.map(cache.outblockcaches.apply))
+    diffE.map(_.map(cache.outblockcaches.getUnsafe))
   }
 
   def isInputNotSpentInNewOutBlocks(groupIndex: GroupIndex,
@@ -423,11 +423,11 @@ object BlockFlowState {
           inoutblockcaches.contains(hash))
 
       if (inblockcaches.contains(hash)) {
-        inblockcaches(hash)
+        inblockcaches.getUnsafe(hash)
       } else if (outblockcaches.contains(hash)) {
-        outblockcaches(hash)
+        outblockcaches.getUnsafe(hash)
       } else {
-        inoutblockcaches(hash)
+        inoutblockcaches.getUnsafe(hash)
       }
     }
 
