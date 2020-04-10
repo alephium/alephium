@@ -78,7 +78,7 @@ trait TransactionPool { self: BlockFlowState =>
   }
 
   def removeTxFromPool(transaction: Transaction, chainIndex: ChainIndex): Unit = {
-    getPool(chainIndex).removeIfExist(transaction.hash)
+    getPool(chainIndex).remove(transaction.hash)
   }
 
   // TODO: consider complete block template view

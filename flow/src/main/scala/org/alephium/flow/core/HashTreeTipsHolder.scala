@@ -20,7 +20,7 @@ trait HashTreeTipsHolder {
 
   def addNewTip(newTip: Hash, timeStamp: TimeStamp, parent: Hash): IOResult[Unit] = {
     tips.add(newTip, timeStamp)
-    tips.removeIfExist(parent)
+    tips.remove(parent)
     pruneDueto(timeStamp)
     updateDB()
   }
