@@ -12,7 +12,7 @@ trait BlockChainWithState extends BlockChain {
 
   def getTrie(hash: Hash): MerklePatriciaTrie = {
     assert(tries.contains(hash))
-    tries(hash)
+    tries.getUnsafe(hash)
   }
 
   protected def addTrie(hash: Hash, trie: MerklePatriciaTrie): Unit = {
