@@ -30,7 +30,6 @@ object CliqueManager {
                                origin: DataOrigin)
       extends Command
   final case class SendAllHandlers(allHandlers: AllHandlers)             extends Command
-  final case class SendTcpConnected(connected: Tcp.Connected)            extends Command
   final case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
 }
 
@@ -64,7 +63,7 @@ class CliqueManager(
           intraCliqueManager.tell(message, connection)
       }
       context become awaitIntraCliqueReady(intraCliqueManager, cliqueInfo)
-    case SendTcpConnected(c) =>
+    case c: Tcp.Connected =>
       val pair = (sender(), c)
       context become awaitStart(pool :+ pair)
   }
@@ -75,7 +74,7 @@ class CliqueManager(
       val props              = InterCliqueManager.props(cliqueInfo, allHandlers, discoveryServer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       context become handleWith(intraCliqueManager, interCliqueManager)
-    case SendTcpConnected(c) =>
+    case c: Tcp.Connected =>
       intraCliqueManager.forward(c)
   }
 
