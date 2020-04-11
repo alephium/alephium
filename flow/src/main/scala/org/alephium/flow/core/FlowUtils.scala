@@ -36,8 +36,8 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
       val index  = ChainIndex.unsafe(mainGroup, i)
       getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
     }
-    val toRemove = diffs.map(_.toAdd.flatMap(_.transactions))
-    val toAdd    = diffs.map(_.toRemove.flatMap(_.transactions.map((_, 1.0))))
+    val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
+    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase.map((_, 1.0))))
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 

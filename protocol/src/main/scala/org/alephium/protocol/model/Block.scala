@@ -11,6 +11,10 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     with FlowData {
   override def hash: Hash = header.hash
 
+  def coinbase: Transaction = transactions.last
+
+  def nonCoinbase: AVector[Transaction] = transactions.init
+
   override def timestamp: TimeStamp = header.timestamp
 
   override def target: BigInt = header.target

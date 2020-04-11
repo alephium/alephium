@@ -31,7 +31,7 @@ object ModelGen {
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
-      txNum <- Gen.choose(0, 5)
+      txNum <- Gen.choose(1, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(AVector(Hash.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
