@@ -73,7 +73,7 @@ class ValidationSpec extends AlephiumFlowSpec {
       .get
     val (privateKey, publicKey) = ED25519.generatePriPub()
 
-    val coinbase0 = block0.transactions.head
+    val coinbase0 = block0.coinbase
     val input0    = coinbase0.unsigned.inputs
     val output0   = coinbase0.unsigned.outputs
     check(checkCoinbase(block0), InvalidCoinbase)
