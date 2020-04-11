@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
@@ -178,16 +179,18 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getChainHash(chainIndex.to)
         if (blockAdded equals block12.hash) {
           blockAdded is block12.hash
-          blockFlow.getPool(chainIndex).size is block11.transactions.length
+          blockFlow.getPool(chainIndex).size is block11.transactions.length - 1
           val template = blockFlow.prepareBlockFlow(chainIndex).right.value
-          template.transactions.length is block11.transactions.length
+          template.transactions.length is block11.transactions.length - 1
         }
       }
     }
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
-    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)
+    val coinbaseTx       = Transaction.coinbase(toPublicKey, ByteString.empty)
     val transactions = {
       if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
@@ -198,8 +201,9 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val inputs                     = balances.map(_._1)
         val outputs = AVector(TxOutput.build(PayTo.PKH, 1, toPublicKey),
                               TxOutput.build(PayTo.PKH, total - 1, publicKey))
-        AVector(Transaction.from(PayTo.PKH, inputs, outputs, publicKey, privateKey))
-      } else AVector.empty[Transaction]
+        val transferTx = Transaction.from(PayTo.PKH, inputs, outputs, publicKey, privateKey)
+        AVector(transferTx, coinbaseTx)
+      } else AVector(coinbaseTx)
     }
 
     @tailrec
