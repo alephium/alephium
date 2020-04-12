@@ -2,6 +2,7 @@ package org.alephium.appserver
 
 import java.net.InetSocketAddress
 
+import scala.annotation.tailrec
 import scala.concurrent.Promise
 
 import akka.actor.Terminated
@@ -70,6 +71,7 @@ class ServerSpec extends AlephiumSpec {
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
+    awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
     request[Balance](rpcPort, getBalance(publicKey)) is
       Balance(initialBalance.balance - transferAmount, 1)
@@ -82,6 +84,7 @@ class ServerSpec extends AlephiumSpec {
       request[TransferResult](rpcPort, sendTransaction(createTx))
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
+    awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](peer.rpcPort.get, stopMining) is true
@@ -123,16 +126,16 @@ class ServerSpec extends AlephiumSpec {
       } yield t).right.value
     }
 
-    def awaitNewBlock(from: Int, to: Int): Seq[Unit] = {
-      var count   = 0
-      val timeout = Duration.ofSecondsUnsafe(120).asScala
-      blockNotifyProbe.receiveWhile(max = timeout) {
-        case TextMessage.Strict(text) if count < 2 =>
+    @tailrec
+    final def awaitNewBlock(from: Int, to: Int): Unit = {
+      val timeout = Duration.ofMinutesUnsafe(2).asScala
+      blockNotifyProbe.receiveOne(max = timeout) match {
+        case TextMessage.Strict(text) =>
           val json         = parse(text).right.value
           val notification = json.as[NotificationUnsafe].right.value.asNotification.right.value
           val blockEntry   = notification.params.as[BlockEntry].right.value
-          if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to))
-            count += 1
+          if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) ()
+          else awaitNewBlock(from, to)
       }
     }
 

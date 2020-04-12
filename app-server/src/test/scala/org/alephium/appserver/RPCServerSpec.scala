@@ -395,8 +395,11 @@ object RPCServerSpec {
     val cliqueManagerProbe                              = TestProbe()
     val cliqueManager: ActorRefT[CliqueManager.Command] = ActorRefT(cliqueManagerProbe.ref)
 
+    val txHandlerRef = system.actorOf(AlephiumTestActors.identity(TxHandler.AddSucceeded))
+    val txHandler    = ActorRefT[TxHandler.Command](txHandlerRef)
+
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),
-                                               txHandler      = ActorRefT(TestProbe().ref),
+                                               txHandler      = txHandler,
                                                blockHandlers  = Map.empty,
                                                headerHandlers = Map.empty)
 
@@ -410,9 +413,10 @@ object RPCServerSpec {
   class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef, dummyTx: Transaction)(
       implicit val config: PlatformConfig)
       extends BlockFlow {
-    override def getHeadersUnsafe(predicate: BlockHeader => Boolean): AVector[BlockHeader] = {
+    override def getAllHeaders(
+        predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
       blockFlowProbe ! predicate(blockHeader)
-      AVector(blockHeader)
+      Right(AVector(blockHeader))
     }
 
     override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
@@ -465,5 +469,4 @@ object RPCServerSpec {
       extends Mode {
     val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe, dummyTx)
   }
-
 }

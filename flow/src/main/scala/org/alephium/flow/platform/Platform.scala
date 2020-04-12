@@ -2,6 +2,7 @@ package org.alephium.flow.platform
 
 import java.nio.file.Path
 
+import org.alephium.protocol.ALF.Hash
 import org.alephium.util.{Env, Files}
 
 object Platform {
@@ -12,9 +13,9 @@ object Platform {
       case Env.Debug =>
         Files.homeDir.resolve(s".alephium-${env.name}")
       case Env.Test =>
-        Files.tmpDir.resolve(s".alephium-${env.name}")
+        Files.tmpDir.resolve(s".alephium-${env.name}-${Hash.random.toHexString}")
       case Env.Integration =>
-        Files.tmpDir.resolve(s".alephium-${env.name}")
+        Files.tmpDir.resolve(s".alephium-${env.name}-${Hash.random.toHexString}")
     }
   }
 }
