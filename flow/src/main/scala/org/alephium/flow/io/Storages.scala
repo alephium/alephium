@@ -13,9 +13,13 @@ object Storages {
   val heightPostfix: Byte     = 1
   val tipsPostfix: Byte       = 2
 
+  trait Config {
+    def blockCacheCapacity: Int
+  }
+
   def createUnsafe(rootPath: Path, dbFolder: String, dbName: String, writeOptions: WriteOptions)(
-      implicit config: GroupConfig): Storages = {
-    val blockStorage: BlockStorage = BlockStorage.createUnsafe(rootPath)
+      implicit config: GroupConfig with Config): Storages = {
+    val blockStorage: BlockStorage = BlockStorage.createUnsafe(rootPath, config.blockCacheCapacity)
     val dbStorage                  = createRocksDBUnsafe(rootPath, dbFolder, dbName)
     val headerStorage              = BlockHeaderStorage(dbStorage, ColumnFamily.Header, writeOptions)
     val blockStateStorage          = BlockStateStorage(dbStorage, ColumnFamily.All, writeOptions)
