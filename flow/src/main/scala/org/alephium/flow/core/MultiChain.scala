@@ -2,7 +2,6 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.flow.Utils
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
@@ -138,6 +137,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def add(block: Block): IOResult[Unit]
 
-  def getHeadersUnsafe(predicate: BlockHeader => Boolean): AVector[BlockHeader] =
-    Utils.unsafe(getAllBlockHashes).map(getBlockHeaderUnsafe).filter(predicate)
+  def getAllHeaders(predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
+    for {
+      allHashes <- getAllBlockHashes
+      headers   <- allHashes.mapE(getBlockHeader)
+    } yield (headers.filter(predicate))
+  }
 }

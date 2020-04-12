@@ -18,6 +18,10 @@ object TxHandler {
 
   sealed trait Command
   final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
+
+  sealed trait Event
+  final case object AddSucceeded extends Event
+  final case object AddFailed    extends Event
 }
 
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Command])(
@@ -35,16 +39,20 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
     if (!mempool.contains(chainIndex, tx)) {
       TxValidation.validateNonCoinbase(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
-          log.debug(s"failed in validating tx ${tx.shortHex} due to $s")
+          log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
+          addFailed()
         case Right(_: ValidTx.type) =>
           handleValidTx(chainIndex, tx, mempool, origin)
         case Right(unexpected) =>
           log.warning(s"Unexpected pattern matching $unexpected")
+          addFailed()
         case Left(e) =>
-          log.debug(s"IO failed in validating tx ${tx.shortHex} due to $e")
+          log.warning(s"IO failed in validating tx ${tx.shortHex} due to $e")
+          addFailed()
       }
     } else {
       log.debug(s"tx ${tx.shortHex} is already included")
+      addFailed()
     }
   }
 
@@ -53,8 +61,17 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
                     mempool: MemPool,
                     origin: DataOrigin): Unit = {
     val count = mempool.add(chainIndex, AVector((tx, 1.0)))
-    log.debug(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
+    log.info(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)))
     cliqueManager ! CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
+    addSucceeded()
+  }
+
+  def addSucceeded(): Unit = {
+    sender() ! TxHandler.AddSucceeded
+  }
+
+  def addFailed(): Unit = {
+    sender() ! TxHandler.AddFailed
   }
 }
