@@ -57,7 +57,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    log.debug(s"try to add ${data.shortHex}")
+    log.debug(s"Try to add ${data.shortHex}")
     blockFlow.includes(data) match {
       case Right(true) =>
         log.debug(s"Data for ${data.chainIndex} already exists") // TODO: DoS prevention
