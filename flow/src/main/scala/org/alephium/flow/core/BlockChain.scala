@@ -43,7 +43,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
-    blockStorage.put(block).right.map(_ => ())
+    blockStorage.put(block)
     // TODO: handle transactions later
   }
 

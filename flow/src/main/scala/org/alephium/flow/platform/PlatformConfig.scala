@@ -154,6 +154,7 @@ object PlatformConfig {
       /* Genesis */
 
       /* IO */
+      val blockCacheCapacity: Int = 128 + 64
       val storages = {
         val dbFolder = "db"
         val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"

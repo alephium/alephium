@@ -4,7 +4,31 @@ import akka.util.ByteString
 
 import org.alephium.serde._
 
-abstract class KeyValueStorage[K: Serializer, V: Serde] extends RawKeyValueStorage {
+abstract class AbstractKeyValueStorage[K: Serializer, V: Serde] {
+  def get(key: K): IOResult[V]
+
+  def getUnsafe(key: K): V
+
+  def getOpt(key: K): IOResult[Option[V]]
+
+  def getOptUnsafe(key: K): Option[V]
+
+  def put(key: K, value: V): IOResult[Unit]
+
+  def putUnsafe(key: K, value: V): Unit
+
+  def exists(key: K): IOResult[Boolean]
+
+  def existsUnsafe(key: K): Boolean
+
+  def delete(key: K): IOResult[Unit]
+
+  def deleteUnsafe(key: K): Unit
+}
+
+abstract class KeyValueStorage[K: Serializer, V: Serde]
+    extends AbstractKeyValueStorage[K, V]
+    with RawKeyValueStorage {
   protected def storageKey(key: K): ByteString = serialize(key)
 
   def get(key: K): IOResult[V] = IOUtils.tryExecute(getUnsafe(key))
