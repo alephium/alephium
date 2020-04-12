@@ -4,27 +4,65 @@ import java.nio.file.Path
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
+import org.alephium.util.LruCache
 
 object BlockStorage {
   import IOUtils._
 
-  def create(root: Path): IOResult[BlockStorage] = tryExecute {
-    createUnsafe(root)
+  def create(root: Path, cacheCapacity: Int): IOResult[BlockStorage] = tryExecute {
+    createUnsafe(root, cacheCapacity)
   }
 
-  def createUnsafe(root: Path): BlockStorage = {
+  def createUnsafe(root: Path, cacheCapacity: Int): BlockStorage = {
     createDirUnsafe(root)
-    val storage = new BlockStorage(root)
+    val storage = new BlockStorageInner(root)
     createDirUnsafe(storage.folder)
-    storage
+    new BlockStorage(storage, cacheCapacity)
   }
 }
 
-class BlockStorage private (root: Path) extends KeyValueStorage[Hash, Block] with DiskSource {
+class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)
+    extends AbstractKeyValueStorage[Hash, Block] {
+  val folder: Path  = storage.folder
+  private val cache = LruCache[Hash, Block, IOError](cacheCapacity)
 
-  val folder: Path = root.resolve("blocks")
+  override def get(key: Hash): IOResult[Block] =
+    cache.get(key)(storage.get(key))
+
+  override def getUnsafe(key: Hash): Block =
+    cache.getUnsafe(key)(storage.getUnsafe(key))
+
+  override def getOpt(key: Hash): IOResult[Option[Block]] =
+    cache.getOpt(key)(storage.getOpt(key))
+
+  override def getOptUnsafe(key: Hash): Option[Block] =
+    cache.getOptUnsafe(key)(storage.getOptUnsafe(key))
+
+  override def put(key: Hash, value: Block): IOResult[Unit] =
+    storage.put(key, value).map(_ => cache.putInCache(key, value))
+
+  override def putUnsafe(key: Hash, value: Block): Unit = {
+    storage.putUnsafe(key, value)
+    cache.putInCache(key, value)
+  }
 
   def put(block: Block): IOResult[Unit] = put(block.hash, block)
 
   def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
+
+  override def exists(key: Hash): IOResult[Boolean] =
+    cache.exists(key)(storage.exists(key))
+
+  override def existsUnsafe(key: Hash): Boolean =
+    cache.existsUnsafe(key)(storage.existsUnsafe(key))
+
+  override def delete(key: Hash): IOResult[Unit] = ???
+
+  override def deleteUnsafe(key: Hash): Unit = ???
+
+  def clear(): IOResult[Unit] = storage.clear()
+}
+
+class BlockStorageInner(root: Path) extends KeyValueStorage[Hash, Block] with DiskSource {
+  val folder: Path = root.resolve("blocks")
 }
