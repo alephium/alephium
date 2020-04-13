@@ -34,22 +34,22 @@ object BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
       assert(index.relateTo(config.brokerInfo))
-      val chain = getBlockChain(index)
 
       cacheBlock(block)
       for {
         weight <- calWeight(block)
-        _      <- chain.add(block, weight)
+        _      <- getBlockChain(index).add(block, weight)
         _      <- updateBestDeps()
       } yield ()
     }
 
     def add(header: BlockHeader): IOResult[Unit] = {
       val index = header.chainIndex
-      val chain = getHeaderChain(index)
+      assert(!index.relateTo(config.brokerInfo))
+
       for {
         weight <- calWeight(header)
-        _      <- chain.add(header, weight)
+        _      <- getHeaderChain(index).add(header, weight)
         _      <- updateBestDeps()
       } yield ()
     }
