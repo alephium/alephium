@@ -32,29 +32,25 @@ class BlockFlowSpec extends AlephiumFlowSpec {
 
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
-      addAndCheck(blockFlow, block1)
-      blockFlow.getWeight(block1) isE config.maxMiningTarget * 1
+      addAndCheck(blockFlow, block1, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block1)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block2      = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block2.header)
-      blockFlow.getWeight(block2.header) isE config.maxMiningTarget * 2
+      addAndCheck(blockFlow, block2.header, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      addAndCheck(blockFlow, block3)
-      blockFlow.getWeight(block3) isE config.maxMiningTarget * 3
+      addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
       val block4      = mine(blockFlow, chainIndex4)
-      addAndCheck(blockFlow, block4)
-      blockFlow.getWeight(block4) isE config.maxMiningTarget * 4
+      addAndCheck(blockFlow, block4, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
       checkBalance(blockFlow, 0, genesisBalance - 3)
     }
@@ -71,12 +67,10 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       newBlocks1.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block)
-          blockFlow.getChainWeight(block.hash) isE config.maxMiningTarget * 1
+          addAndCheck(blockFlow, block, 1)
           blockFlow.getWeight(block) isE config.maxMiningTarget * 1
         } else {
-          addAndCheck(blockFlow, block.header)
-          blockFlow.getWeight(block.header) isE config.maxMiningTarget * 1
+          addAndCheck(blockFlow, block.header, 1)
         }
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
@@ -90,12 +84,10 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       newBlocks2.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block)
+          addAndCheck(blockFlow, block, 4)
           blockFlow.getChainWeight(block.hash) isE config.maxMiningTarget * 2
-          blockFlow.getWeight(block) isE config.maxMiningTarget * 4
         } else {
-          addAndCheck(blockFlow, block.header)
-          blockFlow.getWeight(block.header) isE config.maxMiningTarget * 4
+          addAndCheck(blockFlow, block.header, 4)
         }
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
@@ -109,12 +101,10 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       newBlocks3.foreach { block =>
         val index = block.chainIndex
         if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block)
+          addAndCheck(blockFlow, block, 8)
           blockFlow.getChainWeight(block.hash) isE config.maxMiningTarget * 3
-          blockFlow.getWeight(block) isE config.maxMiningTarget * 8
         } else {
-          addAndCheck(blockFlow, block.header)
-          blockFlow.getWeight(block.header) isE config.maxMiningTarget * 8
+          addAndCheck(blockFlow, block.header, 8)
         }
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
@@ -130,33 +120,27 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block11     = mine(blockFlow, chainIndex1)
       val block12     = mine(blockFlow, chainIndex1)
-      addAndCheck(blockFlow, block11)
-      addAndCheck(blockFlow, block12)
-      blockFlow.getWeight(block11) isE config.maxMiningTarget * 1
-      blockFlow.getWeight(block12) isE config.maxMiningTarget * 1
+      addAndCheck(blockFlow, block11, 1)
+      addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val block13 = mine(blockFlow, chainIndex1)
-      addAndCheck(blockFlow, block13)
-      blockFlow.getWeight(block13) isE config.maxMiningTarget * 2
+      addAndCheck(blockFlow, block13, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block13)
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block21     = mine(blockFlow, chainIndex2)
       val block22     = mine(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block21.header)
-      addAndCheck(blockFlow, block22.header)
-      blockFlow.getWeight(block21) isE config.maxMiningTarget * 3
-      blockFlow.getWeight(block22) isE config.maxMiningTarget * 3
+      addAndCheck(blockFlow, block21.header, 3)
+      addAndCheck(blockFlow, block22.header, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
       val block3      = mine(blockFlow, chainIndex3)
-      addAndCheck(blockFlow, block3)
-      blockFlow.getWeight(block3) isE config.maxMiningTarget * 4
+      addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - 3)
     }
@@ -172,9 +156,9 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         val block11    = mine(blockFlow, chainIndex)
         val block12    = mine(blockFlow, chainIndex)
         blockFlow.mempools.foreach(_.size is 0)
-        addAndCheck(blockFlow, block11)
+        addAndCheck(blockFlow, block11, 1)
         blockFlow.mempools.foreach(_.size is 0)
-        addAndCheck(blockFlow, block12)
+        addAndCheck(blockFlow, block12, 1)
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
@@ -215,8 +199,9 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     iter(0)
   }
 
-  def addAndCheck(blockFlow: BlockFlow, block: Block): Assertion = {
+  def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
     blockFlow.add(block).isRight is true
+    blockFlow.getWeight(block) isE config.maxMiningTarget * weightRatio
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
@@ -232,8 +217,9 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     } is true
   }
 
-  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
+  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
     blockFlow.add(header).isRight is true
+    blockFlow.getWeight(header) isE config.maxMiningTarget * weightFactor
   }
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {

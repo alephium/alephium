@@ -33,7 +33,7 @@ trait HashTreeTipsHolder {
   @inline
   private def pruneDueto(timeStamp: TimeStamp): Unit = {
     tips.entries.foreach { entry =>
-      if (entry.getValue + config.blockConfirmTS < timeStamp) {
+      if (entry.getValue + config.tipsPruneDuration < timeStamp) {
         tips.remove(entry.getKey)
       }
     }

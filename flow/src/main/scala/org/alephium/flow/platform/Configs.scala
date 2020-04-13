@@ -30,8 +30,6 @@ object Configs extends StrictLogging {
   trait PlatformConsensusConfig extends ConsensusConfig {
     def expectedTimeSpan: Duration
 
-    def blockCacheSize: Int
-
     // Digi Shields Difficulty Adjustment
     def medianTimeInterval: Int
     def diffAdjustDownMax: Int

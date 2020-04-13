@@ -50,7 +50,7 @@ class HashTreeTipsHolderSpec extends AlephiumFlowSpec { Test =>
     tipsHolder.addGenesisTip(hashes(0), TimeStamp.zero)
     tipsHolder.addGenesisTip(hashes(1), TimeStamp.unsafe(1))
     checkTips(Set(hashes(0), hashes(1)))
-    tipsHolder.addGenesisTip(hashes(2), TimeStamp.unsafe(1) + Test.config.blockConfirmTS)
+    tipsHolder.addGenesisTip(hashes(2), TimeStamp.unsafe(1) + Test.config.tipsPruneDuration)
     checkTips(Set(hashes(1), hashes(2)))
   }
 }
