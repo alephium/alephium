@@ -150,13 +150,13 @@ trait BlockFlowState {
     blockHeaderChains(from.value)(to.value)
   }
 
-  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): MerklePatriciaTrie = {
+  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): IOResult[MerklePatriciaTrie] = {
     assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
   }
 
-  def getTrie(block: Block): MerklePatriciaTrie = {
+  def getTrie(block: Block): IOResult[MerklePatriciaTrie] = {
     val header = block.header
     getTrie(header.blockDeps, header.chainIndex.from)
   }
@@ -166,11 +166,11 @@ trait BlockFlowState {
     bestDeps(groupShift)
   }
 
-  def getBestTrie(chainIndex: ChainIndex): MerklePatriciaTrie = {
+  def getBestTrie(chainIndex: ChainIndex): IOResult[MerklePatriciaTrie] = {
     getBestTrie(chainIndex.from)
   }
 
-  def getBestTrie(groupIndex: GroupIndex): MerklePatriciaTrie = {
+  def getBestTrie(groupIndex: GroupIndex): IOResult[MerklePatriciaTrie] = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getTrie(deps.deps, groupIndex)
@@ -271,10 +271,10 @@ trait BlockFlowState {
   }
 
   def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
-    val trie = getBestTrie(chainIndex)
-    tx.unsigned.inputs.mapE { input =>
-      trie.get[TxOutputPoint, TxOutput](input)
-    }
+    for {
+      trie   <- getBestTrie(chainIndex)
+      inputs <- tx.unsigned.inputs.mapE(input => trie.get[TxOutputPoint, TxOutput](input))
+    } yield inputs
   }
 
   def getNonPersistedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[OutBlockCache]] = {
@@ -308,7 +308,8 @@ trait BlockFlowState {
 
     val prefix = serialize(pubScript.shortKey)
     for {
-      persistedUtxos <- getBestTrie(groupIndex)
+      bestTrie <- getBestTrie(groupIndex)
+      persistedUtxos <- bestTrie
         .getAll[TxOutputPoint, TxOutput](prefix)
         .map(_.filter(_._2.pubScript == pubScript))
       pair <- getUtxosInCache(pubScript, groupIndex, persistedUtxos)

@@ -89,8 +89,10 @@ object Validation {
   private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
       implicit config: PlatformConfig): TxValidationResult = {
     val index = ChainIndex(tx.fromGroup, tx.toGroup)
-    val trie  = flow.getBestTrie(index)
-    checkNonCoinbaseTx(index, tx, trie)
+    for {
+      trie <- ValidationStatus.from(flow.getBestTrie(index))
+      _    <- checkNonCoinbaseTx(index, tx, trie)
+    } yield ()
   }
 
   /*
@@ -163,10 +165,10 @@ object Validation {
     assert(index.relateTo(brokerInfo))
 
     if (brokerInfo.contains(index.from)) {
-      val trie = flow.getTrie(block)
       val result = for {
-        _ <- checkBlockDoubleSpending(block)
-        _ <- block.nonCoinbase.foreachE(checkBlockNonCoinbase(index, _, trie))
+        _    <- checkBlockDoubleSpending(block)
+        trie <- ValidationStatus.from(flow.getTrie(block))
+        _    <- block.nonCoinbase.foreachE(checkBlockNonCoinbase(index, _, trie))
       } yield ()
       convert(result)
     } else {
