@@ -332,7 +332,7 @@ object RPCServer extends StrictLogging {
 
   def checkGroup(blockFlow: BlockFlow, address: ED25519PublicKey): Try[Unit] = {
     val pubScript  = PubScript.build(PayTo.PKH, address)
-    val groupIndex = GroupIndex.from(pubScript)(blockFlow.config)
+    val groupIndex = pubScript.groupIndex(blockFlow.config)
     if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
     else Left(Response.failed(s"Address ${address.shortHex} belongs to other groups"))
   }

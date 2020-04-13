@@ -8,7 +8,7 @@ import org.alephium.serde._
 final case class TxOutput(value: BigInt, pubScript: PubScript) {
   def shortKey: Int = pubScript.shortKey
 
-  def toGroup(implicit config: GroupConfig): GroupIndex = GroupIndex.from(pubScript)
+  def toGroup(implicit config: GroupConfig): GroupIndex = pubScript.groupIndex
 }
 
 object TxOutput {

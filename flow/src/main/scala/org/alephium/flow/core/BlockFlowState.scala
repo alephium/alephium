@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import scala.reflect.ClassTag
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
@@ -11,8 +11,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.{PayTo, PubScript}
-import org.alephium.serde.serialize
-import org.alephium.util.{AVector, ConcurrentHashMap, ConcurrentQueue, EitherF}
+import org.alephium.util._
 
 // scalastyle:off number.of.methods
 trait BlockFlowState {
@@ -74,10 +73,12 @@ trait BlockFlowState {
     }
 
   // Cache latest blocks for assisting merkle trie
-  private val groupCaches = AVector.fill(config.groupNumPerBroker)(GroupCache.empty)
+  private val groupCaches = AVector.fill(config.groupNumPerBroker) {
+    LruCache[Hash, BlockCache, IOError](config.blockCacheSize)
+  }
 
-  def getGroupCache(groupIndex: GroupIndex): GroupCache = {
-    assert(brokerInfo.contains(groupIndex))
+  def getGroupCache(groupIndex: GroupIndex): LruCache[Hash, BlockCache, IOError] = {
+    assume(brokerInfo.contains(groupIndex))
     groupCaches(groupIndex.value - brokerInfo.groupFrom)
   }
 
@@ -87,25 +88,15 @@ trait BlockFlowState {
       val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {
-        convertBlock(block, groupIndex) match {
-          case c: InBlockCache    => groupCache.inblockcaches.add(block.hash, c)
-          case c: OutBlockCache   => groupCache.outblockcaches.add(block.hash, c)
-          case c: InOutBlockCache => groupCache.inoutblockcaches.add(block.hash, c)
-        }
-        groupCache.cachedHashes.enqueue(block.hash)
-        pruneCaches(groupCache)
+        groupCache.putInCache(block.hash, convertBlock(block, groupIndex))
       }
     }
   }
 
-  protected def pruneCaches(groupCache: GroupCache): Unit = {
-    import groupCache._
-    if (cachedHashes.length > config.blockCacheSize) {
-      val toRemove = cachedHashes.dequeue
-      inblockcaches.remove(toRemove)
-      outblockcaches.remove(toRemove)
-      inoutblockcaches.remove(toRemove)
-      assert(cachedHashes.length <= config.blockCacheSize)
+  def getBlockCache(groupIndex: GroupIndex, hash: Hash): IOResult[BlockCache] = {
+    assert(ChainIndex.from(hash).relateTo(groupIndex))
+    getGroupCache(groupIndex).get(hash) {
+      getBlockChain(hash).getBlock(hash).map(convertBlock(_, groupIndex))
     }
   }
 
@@ -245,15 +236,13 @@ trait BlockFlowState {
   protected def getBlocksForUpdates(block: Block): IOResult[AVector[BlockCache]] = {
     val chainIndex = block.chainIndex
     assert(chainIndex.isIntraGroup)
-    val groupOffset = chainIndex.from.value - brokerInfo.groupFrom
-    val groupCache  = groupCaches(groupOffset)
+    val groupIndex = chainIndex.from
     for {
-      newTips <- getInOutTips(block.header, chainIndex.from, inclusive = false)
-      oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
-      diff    <- getTipsDiff(newTips, oldTips)
-    } yield {
-      (diff :+ block.hash).map(groupCache.getBlockCache)
-    }
+      newTips     <- getInOutTips(block.header, chainIndex.from, inclusive = false)
+      oldTips     <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
+      diff        <- getTipsDiff(newTips, oldTips)
+      blockCaches <- (diff :+ block.hash).mapE(getBlockCache(groupIndex, _))
+    } yield blockCaches
   }
 
   // Note: update state only for intra group blocks
@@ -277,7 +266,7 @@ trait BlockFlowState {
     } yield inputs
   }
 
-  def getNonPersistedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[OutBlockCache]] = {
+  def getCachedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {
     val bestDeps = getBestDeps(groupIndex)
     val outDeps  = bestDeps.outDeps
     val intraDep = outDeps(groupIndex.value)
@@ -291,22 +280,16 @@ trait BlockFlowState {
         }
       }
     }
-    val cache = getGroupCache(groupIndex)
-    diffE.map(_.map(cache.outblockcaches.getUnsafe))
-  }
-
-  def isInputNotSpentInNewOutBlocks(groupIndex: GroupIndex,
-                                    input: TxOutputPoint): IOResult[Boolean] = {
-    getNonPersistedOutBlocks(groupIndex).map(_.forall(!_.inputs.contains(input)))
+    diffE.flatMap(_.mapE(getBlockCache(groupIndex, _)))
   }
 
   def getUtxos(payTo: PayTo,
                address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val pubScript  = PubScript.build(payTo, address)
-    val groupIndex = GroupIndex.from(pubScript)
+    val groupIndex = pubScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
 
-    val prefix = serialize(pubScript.shortKey)
+    val prefix = pubScript.shortKeyBytes
     for {
       bestTrie <- getBestTrie(groupIndex)
       persistedUtxos <- bestTrie
@@ -329,14 +312,18 @@ trait BlockFlowState {
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
     : IOResult[(AVector[TxOutputPoint], AVector[(TxOutputPoint, TxOutput)])] = {
-    getNonPersistedOutBlocks(groupIndex).map { blockCaches =>
-      val result0 = blockCaches
-        .map(cache => cache.inputs.filter(i => persistedUtxos.exists(_._1 == i)))
-        .flatMap(AVector.from)
-      val result1 = blockCaches
-        .map(cache => AVector.from(cache.relatedOutputs.filter(_._2.pubScript == pubScript)))
-        .flatMap(identity)
-      (result0, result1)
+    getCachedOutBlocks(groupIndex).map { blockCaches =>
+      val usedUtxos = blockCaches.flatMap[TxOutputPoint] {
+        case cache: OutBlockCache =>
+          AVector.from(cache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
+        case _ => AVector.empty
+      }
+      val newUtxos = blockCaches.flatMap[(TxOutputPoint, TxOutput)] {
+        case cache: OutBlockCache =>
+          AVector.from(cache.relatedOutputs.view.filter(_._2.pubScript == pubScript))
+        case _ => AVector.empty
+      }
+      (usedUtxos, newUtxos)
     }
   }
 
@@ -409,47 +396,6 @@ object BlockFlowState {
     } else {
       InBlockCache(convertOutputs(block))
     }
-  }
-
-  class GroupCache(
-      val inblockcaches: ConcurrentHashMap[Hash, InBlockCache],
-      val outblockcaches: ConcurrentHashMap[Hash, OutBlockCache],
-      val inoutblockcaches: ConcurrentHashMap[Hash, InOutBlockCache],
-      val cachedHashes: ConcurrentQueue[Hash]
-  ) {
-    def getBlockCache(hash: Hash): BlockCache = {
-      assert(
-        inblockcaches.contains(hash) ||
-          outblockcaches.contains(hash) ||
-          inoutblockcaches.contains(hash))
-
-      if (inblockcaches.contains(hash)) {
-        inblockcaches.getUnsafe(hash)
-      } else if (outblockcaches.contains(hash)) {
-        outblockcaches.getUnsafe(hash)
-      } else {
-        inoutblockcaches.getUnsafe(hash)
-      }
-    }
-
-    def isUtxoAvailableIncache(utxo: TxOutputPoint): Boolean = {
-      inblockcaches.values.exists(_.outputs.contains(utxo)) ||
-      inoutblockcaches.values.exists(_.outputs.contains(utxo))
-    }
-
-    def isUtxoSpentIncache(utxo: TxOutputPoint): Boolean = {
-      outblockcaches.values.exists(_.inputs.contains(utxo)) ||
-      inoutblockcaches.values.exists(_.inputs.contains(utxo))
-    }
-  }
-
-  object GroupCache {
-    def empty: GroupCache = new GroupCache(
-      ConcurrentHashMap.empty,
-      ConcurrentHashMap.empty,
-      ConcurrentHashMap.empty,
-      ConcurrentQueue.empty
-    )
   }
 
   def updateStateForOutputs(
