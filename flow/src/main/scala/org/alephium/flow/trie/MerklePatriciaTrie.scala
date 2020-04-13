@@ -200,6 +200,9 @@ object MerklePatriciaTrie {
 
     create(storage, genesisNode)
   }
+
+  def apply(rootHash: Hash, storage: KeyValueStorage[Hash, Node]): MerklePatriciaTrie =
+    new MerklePatriciaTrie(rootHash, storage)
 }
 
 // TODO: batch mode

@@ -70,13 +70,13 @@ object BlockChain {
       storages: Storages
   )(implicit _config: PlatformConfig): BlockChain = {
     new BlockChain {
-      override implicit val config: PlatformConfig      = _config
-      override val blockStorage: BlockStorage           = storages.blockStorage
-      override val headerStorage: BlockHeaderStorage    = storages.headerStorage
-      override val blockStateStorage: BlockStateStorage = storages.blockStateStorage
-      override val heightIndexStorage                   = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB                               = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-      override val genesisHash: Hash                    = rootBlock.hash
+      override implicit val config    = _config
+      override val blockStorage       = storages.blockStorage
+      override val headerStorage      = storages.headerStorage
+      override val blockStateStorage  = storages.blockStateStorage
+      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash: Hash  = rootBlock.hash
 
       require(this.addGenesis(rootBlock).isRight)
     }

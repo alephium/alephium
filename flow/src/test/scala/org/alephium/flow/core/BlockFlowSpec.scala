@@ -176,7 +176,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
         blockFlow.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block12)
 
-        val blockAdded = blockFlow.getBestDeps(chainIndex.from).getChainHash(chainIndex.to)
+        val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
           blockAdded is block12.hash
           blockFlow.getPool(chainIndex).size is block11.transactions.length - 1

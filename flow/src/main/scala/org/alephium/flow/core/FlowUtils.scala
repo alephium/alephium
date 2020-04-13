@@ -73,7 +73,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
-      target <- singleChain.getHashTarget(bestDeps.getChainHash(chainIndex.to))
+      target <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
     } yield {
       val transactions = collectTransactions(chainIndex)
       BlockFlowTemplate(chainIndex, bestDeps.deps, target, transactions)
@@ -84,7 +84,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     assert(config.brokerInfo.contains(chainIndex.from))
     val singleChain  = getBlockChain(chainIndex)
     val bestDeps     = getBestDeps(chainIndex.from)
-    val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getChainHash(chainIndex.to)))
+    val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
     val transactions = collectTransactions(chainIndex)
     BlockFlowTemplate(chainIndex, bestDeps.deps, target, transactions)
   }
