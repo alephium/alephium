@@ -20,11 +20,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def add(block: Block, weight: BigInt): IOResult[Unit] = {
-    val parentHash = block.parentHash
     assume {
       val assertion = for {
         isNewIncluded    <- contains(block.hash)
-        isParentIncluded <- contains(parentHash)
+        isParentIncluded <- contains(block.parentHash)
       } yield !isNewIncluded && isParentIncluded
       assertion.getOrElse(false)
     }
@@ -44,7 +43,6 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
     blockStorage.put(block)
-    // TODO: handle transactions later
   }
 
   protected def persistBlockUnsafe(block: Block): Unit = {

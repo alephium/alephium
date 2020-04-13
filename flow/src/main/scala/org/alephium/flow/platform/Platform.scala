@@ -6,7 +6,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.util.{Env, Files}
 
 object Platform {
-  def getRootPath(env: Env): Path = {
+  def generateRootPath(env: Env): Path = {
     env match {
       case Env.Prod =>
         Files.homeDir.resolve(".alephium")

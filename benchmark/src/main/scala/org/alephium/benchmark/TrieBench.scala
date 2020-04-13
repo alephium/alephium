@@ -28,7 +28,7 @@ class TrieBench {
     RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
   }
   val db: KeyValueStorage[Hash, MerklePatriciaTrie.Node] =
-    RocksDBKeyValueStorage(dbStorage, ColumnFamily.All)
+    RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
   val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
   val genesisHash: Hash        = trie.rootHash
 

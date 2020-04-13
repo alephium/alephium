@@ -73,7 +73,7 @@ object BlockFlow {
 
     private def calGroupWeightUnsafe(hash: Hash): BigInt = {
       val header = getBlockHeaderUnsafe(hash)
-      if (header.isGenesis) 0
+      if (header.isGenesis) ALF.GenesisWeight
       else {
         header.outDeps.sumBy(getChainWeightUnsafe) + header.target
       }
