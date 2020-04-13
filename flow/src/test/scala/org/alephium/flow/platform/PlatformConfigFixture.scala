@@ -18,7 +18,7 @@ trait PlatformConfigFixture {
   val genesisBalance: BigInt = 100
 
   val env      = Env.resolve()
-  val rootPath = Platform.getRootPath(env)
+  val rootPath = Platform.generateRootPath(env)
 
   val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + Hash.random.toHexString)
 

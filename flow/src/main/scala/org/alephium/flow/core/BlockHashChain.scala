@@ -41,10 +41,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
 
   protected def addGenesis(hash: Hash): IOResult[Unit] = {
     assume(hash == genesisHash)
+    val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight)
     for {
-      _ <- blockStateStorage.put(
-        genesisHash,
-        BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight))
+      _ <- blockStateStorage.put(genesisHash, genesisState)
       _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight)
       _ <- addGenesisTip(genesisHash, ALF.GenesisTimestamp)
     } yield {
@@ -102,7 +101,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
     AVector.from(tips.keys)
   }
 
-  // TODO: optimize this, very inefficient
+  // TODO: remove this, very inefficient
   def getAllBlockHashes: IOResult[AVector[Hash]] = {
     getHashesAfter(genesisHash)
   }

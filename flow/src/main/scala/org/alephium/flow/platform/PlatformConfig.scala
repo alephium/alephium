@@ -29,7 +29,7 @@ object PlatformConfig {
   import Configs._
 
   def loadDefault(): PlatformConfig = {
-    PlatformConfig.load(Platform.getRootPath(Env.resolve()))
+    PlatformConfig.load(Platform.generateRootPath(Env.resolve()))
   }
 
   def load(rootPath: Path): PlatformConfig = {
@@ -95,11 +95,8 @@ object PlatformConfig {
       val maxMiningTarget: BigInt    = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
 
       val blockTargetTime: Duration  = Duration.from(consensusCfg.getDuration("blockTargetTime")).get
-      val blockConfirmNum: Int       = consensusCfg.getInt("blockConfirmNum")
+      val tipsPruneInterval: Int     = consensusCfg.getInt("tipsPruneInterval")
       val expectedTimeSpan: Duration = blockTargetTime
-
-      final val blockCacheSize
-        : Int = consensusCfg.getInt("blockCacheSizePerChain") * (2 * groups - 1)
 
       val medianTimeInterval    = 11
       val diffAdjustDownMax     = 16
@@ -154,7 +151,8 @@ object PlatformConfig {
       /* Genesis */
 
       /* IO */
-      val blockCacheCapacity: Int = 128 + 64
+      val blockCacheCapacityPerChain = consensusCfg.getInt("blockCacheCapacityPerChain")
+      val blockCacheCapacity: Int    = blockCacheCapacityPerChain * depsNum
       val storages = {
         val dbFolder = "db"
         val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"

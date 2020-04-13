@@ -74,7 +74,7 @@ trait BlockFlowState {
 
   // Cache latest blocks for assisting merkle trie
   private val groupCaches = AVector.fill(config.groupNumPerBroker) {
-    LruCache[Hash, BlockCache, IOError](config.blockCacheSize)
+    LruCache[Hash, BlockCache, IOError](config.blockCacheCapacity)
   }
 
   def getGroupCache(groupIndex: GroupIndex): LruCache[Hash, BlockCache, IOError] = {
@@ -289,11 +289,10 @@ trait BlockFlowState {
     val groupIndex = pubScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
 
-    val prefix = pubScript.shortKeyBytes
     for {
       bestTrie <- getBestTrie(groupIndex)
       persistedUtxos <- bestTrie
-        .getAll[TxOutputPoint, TxOutput](prefix)
+        .getAll[TxOutputPoint, TxOutput](pubScript.shortKeyBytes)
         .map(_.filter(_._2.pubScript == pubScript))
       pair <- getUtxosInCache(pubScript, groupIndex, persistedUtxos)
     } yield {

@@ -10,7 +10,7 @@ import org.alephium.mock.{MockBrokerHandler, MockMiner}
 
 object Boot
     extends Server(
-      new Mode.Local {
+      new Mode.Default {
         override def builders: Mode.Builder =
           new MockBrokerHandler.Builder with MockMiner.Builder
       }

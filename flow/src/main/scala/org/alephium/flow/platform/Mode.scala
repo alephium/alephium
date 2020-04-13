@@ -19,13 +19,7 @@ object Mode {
 
   def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
 
-  class Aws extends Mode {
-    final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
-
-    override val node: Node = Node.build(builders, "Root")
-  }
-
-  class Local extends Mode {
+  class Default extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
     override val node: Node = Node.build(builders, "Root")
