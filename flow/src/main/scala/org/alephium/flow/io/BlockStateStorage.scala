@@ -1,5 +1,6 @@
 package org.alephium.flow.io
 
+import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.io.RocksDBSource.ColumnFamily
@@ -20,4 +21,6 @@ class BlockStateStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockState](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[Hash, BlockState](storage, cf, writeOptions, readOptions) {
+  override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.blockStatePostfix
+}

@@ -98,13 +98,12 @@ object BlockHeaderChain {
       storages: Storages
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
     new BlockHeaderChain {
-      override implicit def config: PlatformConfig      = _config
-      override val headerStorage: BlockHeaderStorage    = storages.headerStorage
-      override val blockStateStorage: BlockStateStorage = storages.blockStateStorage
-      override val heightIndexStorage: HeightIndexStorage =
-        storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB: HashTreeTipsDB = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
-      override val genesisHash: Hash      = rootHeader.hash
+      override implicit val config    = _config
+      override val headerStorage      = storages.headerStorage
+      override val blockStateStorage  = storages.blockStateStorage
+      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash        = rootHeader.hash
 
       require(this.addGenesis(rootHeader).isRight)
     }

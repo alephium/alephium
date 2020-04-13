@@ -53,6 +53,14 @@ object ValidationStatus {
   private[validation] val validTxs: TxsValidationResult       = Right(())
   private[validation] val validTx: TxValidationResult         = Right(())
 
+  private[validation] def from[Invalid, T](
+      result: IOResult[T]): Either[Either[IOError, Invalid], T] = {
+    result match {
+      case Right(t)    => Right(t)
+      case Left(error) => Left(Left(error))
+    }
+  }
+
   private[validation] def convert[T](x: Either[Either[IOError, T], Unit], default: T): IOResult[T] =
     x match {
       case Left(Left(error)) => Left(error)
