@@ -63,9 +63,8 @@ class ValidationSpec extends AlephiumFlowSpec {
   it should "validate coinbase transaction" in {
     val block0 = ModelGen.blockGen
       .retryUntil { block =>
-        val txs = block.transactions
-        txs.nonEmpty && {
-          val unsigned = txs.head.unsigned
+        block.transactions.nonEmpty && {
+          val unsigned = block.coinbase.unsigned
           unsigned.inputs.nonEmpty && unsigned.outputs.length > 1
         }
       }

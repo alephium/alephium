@@ -395,7 +395,7 @@ object RPCServerSpec {
     val cliqueManagerProbe                              = TestProbe()
     val cliqueManager: ActorRefT[CliqueManager.Command] = ActorRefT(cliqueManagerProbe.ref)
 
-    val txHandlerRef = system.actorOf(AlephiumTestActors.identity(TxHandler.AddSucceeded))
+    val txHandlerRef = system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded))
     val txHandler    = ActorRefT[TxHandler.Command](txHandlerRef)
 
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),

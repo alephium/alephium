@@ -202,7 +202,7 @@ object BlockFlow {
               toTries.filter(tip => Utils.unsafe(chain.isBefore(groupDeps(l.value), tip)))
             if (validTries.isEmpty) deps :+ groupDeps(l.value)
             else {
-              val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: improve
+              val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: use better selection function
               deps :+ bestTry
             }
         }
