@@ -27,6 +27,14 @@ object BlockFlow {
     )
   }
 
+  def fromStorageUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+    new BlockFlowImpl(
+      BlockChainWithState.fromStorageUnsafe(storages),
+      BlockChain.fromStorageUnsafe(storages),
+      BlockHeaderChain.fromStorageUnsafe(storages)
+    )
+  }
+
   class BlockFlowImpl(
       val blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState,
       val blockchainBuilder: ChainIndex                                   => BlockChain,

@@ -49,12 +49,16 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  def addGenesis(header: BlockHeader): IOResult[Unit] = {
+  protected def addGenesis(header: BlockHeader): IOResult[Unit] = {
     assume(header.hash == genesisHash)
     for {
       _ <- addHeader(header)
       _ <- addGenesis(header.hash)
     } yield ()
+  }
+
+  override protected def loadFromStorage(): IOResult[Unit] = {
+    super.loadFromStorage()
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
@@ -89,13 +93,21 @@ object BlockHeaderChain {
   def fromGenesisUnsafe(storages: Storages)(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock.header, storages)
+    val initialize   = initializeGenesis(genesisBlock.header)(_)
+    createUnsafe(chainIndex, genesisBlock.header, storages, initialize)
+  }
+
+  def fromStorageUnsafe(storages: Storages)(chainIndex: ChainIndex)(
+      implicit config: PlatformConfig): BlockHeaderChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock.header, storages, initializeFromStorage)
   }
 
   def createUnsafe(
       chainIndex: ChainIndex,
       rootHeader: BlockHeader,
-      storages: Storages
+      storages: Storages,
+      initialize: BlockHeaderChain => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
     new BlockHeaderChain {
       override implicit val config    = _config
@@ -105,7 +117,15 @@ object BlockHeaderChain {
       override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootHeader.hash
 
-      require(this.addGenesis(rootHeader).isRight)
+      require(initialize(this).isRight)
     }
+  }
+
+  def initializeGenesis(genesisHeader: BlockHeader)(chain: BlockHeaderChain): IOResult[Unit] = {
+    chain.addGenesis(genesisHeader)
+  }
+
+  def initializeFromStorage(chain: BlockHeaderChain): IOResult[Unit] = {
+    chain.loadFromStorage()
   }
 }
