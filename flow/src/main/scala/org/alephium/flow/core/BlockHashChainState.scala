@@ -1,24 +1,28 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{HashTreeTipsDB, IOResult}
+import org.alephium.flow.io.{ChainStateStorage, IOResult}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 
-trait HashTreeTipsHolder {
+trait BlockHashChainState {
+  var numHashes: Int = 0
+
   protected val tips = ConcurrentHashMap.empty[Hash, TimeStamp]
 
   protected def config: ConsensusConfig
 
-  protected def tipsDB: HashTreeTipsDB
+  protected def chainStateStorage: ChainStateStorage
 
-  def addGenesisTip(newTip: Hash, timeStamp: TimeStamp): IOResult[Unit] = {
+  def setGenesisState(newTip: Hash, timeStamp: TimeStamp): IOResult[Unit] = {
+    numHashes += 1
     tips.add(newTip, timeStamp)
     pruneDueto(timeStamp)
     updateDB()
   }
 
-  def addNewTip(newTip: Hash, timeStamp: TimeStamp, parent: Hash): IOResult[Unit] = {
+  def updateState(newTip: Hash, timeStamp: TimeStamp, parent: Hash): IOResult[Unit] = {
+    numHashes += 1
     tips.add(newTip, timeStamp)
     tips.remove(parent)
     pruneDueto(timeStamp)
@@ -27,7 +31,8 @@ trait HashTreeTipsHolder {
 
   @inline
   private def updateDB(): IOResult[Unit] = {
-    tipsDB.updateTips(AVector.from(tips.keys))
+    val state = BlockHashChain.State(numHashes, AVector.from(tips.keys))
+    chainStateStorage.updateState(state)
   }
 
   @inline

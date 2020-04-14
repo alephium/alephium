@@ -102,7 +102,7 @@ object BlockHeaderChain {
       override val headerStorage      = storages.headerStorage
       override val blockStateStorage  = storages.blockStateStorage
       override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootHeader.hash
 
       require(this.addGenesis(rootHeader).isRight)
