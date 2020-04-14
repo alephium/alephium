@@ -50,7 +50,7 @@ object BlockChainWithState {
       override val blockStateStorage  = storages.blockStateStorage
       override val trieHashStorage    = storages.trieHashStorage
       override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootBlock.hash
 
       override def updateState(trie: MerklePatriciaTrie,

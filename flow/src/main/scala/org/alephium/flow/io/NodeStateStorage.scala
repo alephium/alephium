@@ -3,6 +3,7 @@ package org.alephium.flow.io
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
+import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -16,26 +17,26 @@ trait NodeStateStorage extends RawKeyValueStorage {
 
   private val tipsSerde: Serde[AVector[Hash]] = avectorSerde[Hash]
 
-  private val tipKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
-    ByteString(from.toByte, to.toByte, Storages.tipsPostfix)
+  private val chainStateKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
+    ByteString(from.toByte, to.toByte, Storages.chainStatePostfix)
   }
 
-  def hashTreeTipsDB(chainIndex: ChainIndex): HashTreeTipsDB = new HashTreeTipsDB {
-    private val tipKey = tipKeys(chainIndex.from.value)(chainIndex.to.value)
+  def chainStateStorage(chainIndex: ChainIndex): ChainStateStorage = new ChainStateStorage {
+    private val chainStateKey = chainStateKeys(chainIndex.from.value)(chainIndex.to.value)
 
-    override def updateTips(tips: AVector[Hash]): IOResult[Unit] = IOUtils.tryExecute {
-      putRawUnsafe(tipKey, serialize(tips)(tipsSerde))
+    override def updateState(state: BlockHashChain.State): IOResult[Unit] = IOUtils.tryExecute {
+      putRawUnsafe(chainStateKey, serialize(state))
     }
 
-    override def loadTips(): IOResult[AVector[Hash]] = IOUtils.tryExecute {
-      deserialize(getRawUnsafe(tipKey))(tipsSerde) match {
+    override def loadState(): IOResult[BlockHashChain.State] = IOUtils.tryExecute {
+      deserialize[BlockHashChain.State](getRawUnsafe(chainStateKey)) match {
         case Left(e)  => throw e
         case Right(v) => v
       }
     }
 
-    override def clearTips(): IOResult[Unit] = IOUtils.tryExecute {
-      deleteRawUnsafe(tipKey)
+    override def clearState(): IOResult[Unit] = IOUtils.tryExecute {
+      deleteRawUnsafe(chainStateKey)
     }
   }
 

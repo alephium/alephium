@@ -14,7 +14,7 @@ object Storages {
   val blockStatePostfix: Byte = 0
   val trieHashPostfix: Byte   = 1
   val heightPostfix: Byte     = 2
-  val tipsPostfix: Byte       = 3
+  val chainStatePostfix: Byte = 3
 
   trait Config {
     def blockCacheCapacity: Int

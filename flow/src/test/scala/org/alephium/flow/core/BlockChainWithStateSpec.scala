@@ -12,7 +12,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
-    val tipsDB   = storages.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+    val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))
 
     def myUpdateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
       import BlockFlowState._
