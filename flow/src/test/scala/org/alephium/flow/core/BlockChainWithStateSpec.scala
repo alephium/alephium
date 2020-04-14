@@ -28,7 +28,12 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     }
 
     def buildGenesis(): BlockChainWithState = {
-      BlockChainWithState.createUnsafe(ChainIndex.unsafe(0, 0), genesis, storages, myUpdateState)
+      BlockChainWithState.createUnsafe(
+        ChainIndex.unsafe(0, 0),
+        genesis,
+        storages,
+        myUpdateState,
+        BlockChainWithState.initializeGenesis(genesis, storages.trieStorage)(_))
     }
   }
 

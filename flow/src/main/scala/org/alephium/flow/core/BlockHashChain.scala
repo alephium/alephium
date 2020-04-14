@@ -45,6 +45,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield ()
   }
 
+  protected def loadFromStorage(): IOResult[Unit] = {
+    loadStateFromStorage()
+  }
+
   @inline
   private def updateHeightIndex(hash: Hash, height: Int): IOResult[Unit] = {
     heightIndexStorage.getOpt(height).flatMap {

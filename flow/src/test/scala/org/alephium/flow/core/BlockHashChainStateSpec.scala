@@ -6,7 +6,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.ChainStateStorage
+import org.alephium.flow.io.{ChainStateStorage, IOResult}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.ChainIndex
@@ -19,6 +19,8 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
       override def config: ConsensusConfig = Test.config
       override def chainStateStorage: ChainStateStorage =
         Test.config.storages.nodeStateStorage.chainStateStorage(dummyIndex)
+
+      override def getTimestamp(hash: Hash): IOResult[TimeStamp] = ???
 
       def state: BlockHashChain.State = chainStateStorage.loadState().right.value
 
