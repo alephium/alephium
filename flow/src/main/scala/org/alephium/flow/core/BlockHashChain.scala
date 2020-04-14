@@ -11,14 +11,12 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods
-trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with HashTreeTipsHolder {
+trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
   implicit def config: PlatformConfig
 
   def genesisHash: Hash
 
   def isGenesis(hash: Hash): Boolean = hash == genesisHash
-
-  @volatile var numHashes: Int = 0
 
   def blockStateStorage: BlockStateStorage
 
@@ -33,10 +31,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
     for {
       _ <- blockStateStorage.put(hash, BlockState(height, weight, chainWeight))
       _ <- updateHeightIndex(hash, height)
-      _ <- addNewTip(hash, timestamp, parentHash)
-    } yield {
-      numHashes += 1
-    }
+      _ <- updateState(hash, timestamp, parentHash)
+    } yield ()
   }
 
   protected def addGenesis(hash: Hash): IOResult[Unit] = {
@@ -45,10 +41,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with H
     for {
       _ <- blockStateStorage.put(genesisHash, genesisState)
       _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight)
-      _ <- addGenesisTip(genesisHash, ALF.GenesisTimestamp)
-    } yield {
-      numHashes += 1
-    }
+      _ <- setGenesisState(genesisHash, ALF.GenesisTimestamp)
+    } yield ()
   }
 
   @inline
@@ -241,4 +235,11 @@ object BlockHashChain {
   final case class ChainDiff(toRemove: AVector[Hash], toAdd: AVector[Hash])
 
   final case class Link(parentHash: Hash, hash: Hash)
+
+  final case class State(numHashes: Int, tips: AVector[Hash])
+
+  object State {
+    import org.alephium.serde._
+    implicit val serde: Serde[State] = Serde.forProduct2(State(_, _), t => (t.numHashes, t.tips))
+  }
 }
