@@ -18,7 +18,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
       val (_, storages) = StoragesFixture.buildStorages
-      BlockChain.createUnsafe(ChainIndex.unsafe(0, 0), genesisBlock, storages)
+      BlockChain.createUnsafe(ChainIndex.unsafe(0, 0),
+                              genesisBlock,
+                              storages,
+                              BlockChain.initializeGenesis(genesisBlock)(_))
     }
 
     def createBlockChain(blocks: AVector[Block]): BlockChain = {

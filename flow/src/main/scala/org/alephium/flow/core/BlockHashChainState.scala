@@ -14,11 +14,26 @@ trait BlockHashChainState {
 
   protected def chainStateStorage: ChainStateStorage
 
+  def getTimestamp(hash: Hash): IOResult[TimeStamp]
+
   def setGenesisState(newTip: Hash, timeStamp: TimeStamp): IOResult[Unit] = {
     numHashes += 1
     tips.add(newTip, timeStamp)
     pruneDueto(timeStamp)
     updateDB()
+  }
+
+  def loadStateFromStorage(): IOResult[Unit] = {
+    for {
+      state <- chainStateStorage.loadState()
+      pairs <- state.tips.mapE(tip => getTimestamp(tip).map(tip -> _))
+    } yield {
+      numHashes = state.numHashes
+      pairs.foreach {
+        case (tip, timestamp) =>
+          tips.add(tip, timestamp)
+      }
+    }
   }
 
   def updateState(newTip: Hash, timeStamp: TimeStamp, parent: Hash): IOResult[Unit] = {
