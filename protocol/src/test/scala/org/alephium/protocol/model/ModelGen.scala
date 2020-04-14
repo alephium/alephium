@@ -19,13 +19,13 @@ object ModelGen {
   }
 
   val txOutputGen: Gen[TxOutput] = for {
-    value <- Gen.choose(0, 5)
+    value <- Gen.choose(1, 5)
   } yield TxOutput.burn(value)
 
   val transactionGen: Gen[Transaction] = for {
-    inputNum  <- Gen.choose(0, 5)
+    inputNum  <- Gen.choose(1, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
-    outputNum <- Gen.choose(0, 5)
+    outputNum <- Gen.choose(1, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
   } yield Transaction.from(AVector.from(inputs), AVector.from(outputs), AVector.empty[Witness])
 

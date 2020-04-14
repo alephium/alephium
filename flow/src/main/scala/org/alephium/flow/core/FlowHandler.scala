@@ -143,7 +143,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
                   block: Block,
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
-    escapteIOError(blockFlow.contains(block)) { isIncluded =>
+    escapeIOError(blockFlow.contains(block)) { isIncluded =>
       if (!isIncluded) {
         blockFlow.add(block) match {
           case Left(error) => handleIOError(error)
@@ -164,14 +164,14 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def notify(block: Block): Unit = {
-    escapteIOError(blockFlow.getHeight(block)) { height =>
+    escapeIOError(blockFlow.getHeight(block)) { height =>
       eventBus ! BlockNotify(block.header, height)
     }
   }
 
   def handlePending(pending: PendingData): Unit = {
     val missings = pending.missingDeps
-    escapteIOError(IOUtils.tryExecute(missings.retain(!blockFlow.containsUnsafe(_)))) { _ =>
+    escapeIOError(IOUtils.tryExecute(missings.retain(!blockFlow.containsUnsafe(_)))) { _ =>
       if (missings.isEmpty) {
         feedback(pending)
       } else {
@@ -202,8 +202,8 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     val heights = for {
       i <- 0 until config.groups
       j <- 0 until config.groups
-      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight
-    } yield s"$i-$j:${height.getOrElse(-1)}"
+      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight.getOrElse(-1)
+    } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
     val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
     val timeSpan = {
@@ -223,7 +223,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     log.debug(s"IO failed in flow handler: ${error.toString}")
   }
 
-  def escapteIOError[T](result: IOResult[T])(f: T => Unit): Unit = {
+  def escapeIOError[T](result: IOResult[T])(f: T => Unit): Unit = {
     result match {
       case Right(t) => f(t)
       case Left(e)  => handleIOError(e)
