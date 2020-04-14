@@ -106,6 +106,6 @@ object ModelGen {
       ip1  <- Gen.choose(0, 255)
       ip2  <- Gen.choose(0, 255)
       ip3  <- Gen.choose(0, 255)
-      port <- Gen.choose(0, 65535)
+      port <- Gen.choose(0x401, 65535)
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
 }
