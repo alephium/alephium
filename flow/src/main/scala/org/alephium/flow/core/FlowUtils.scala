@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import com.typesafe.scalalogging.StrictLogging
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.io.IOResult
@@ -35,8 +36,8 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
       val index  = ChainIndex.unsafe(mainGroup, i)
       getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
     }
-    val toRemove = diffs.map(_.toAdd.flatMap(_.transactions))
-    val toAdd    = diffs.map(_.toRemove.flatMap(_.transactions.map((_, 1.0))))
+    val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
+    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase.map((_, 1.0))))
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
@@ -59,7 +60,9 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
 
   def updateBestDeps(): IOResult[Unit]
 
-  def calBestDepsUnsafe(): Unit
+  def updateBestDepsUnsafe(): Unit
+
+  def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
   private def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
     getPool(chainIndex).collectForBlock(chainIndex, config.txMaxNumberPerBlock)
@@ -70,7 +73,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
-      target <- singleChain.getHashTarget(bestDeps.getChainHash(chainIndex.to))
+      target <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
     } yield {
       val transactions = collectTransactions(chainIndex)
       BlockFlowTemplate(chainIndex, bestDeps.deps, target, transactions)
@@ -81,7 +84,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     assert(config.brokerInfo.contains(chainIndex.from))
     val singleChain  = getBlockChain(chainIndex)
     val bestDeps     = getBestDeps(chainIndex.from)
-    val target       = singleChain.getHashTargetUnsafe(bestDeps.getChainHash(chainIndex.to))
+    val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
     val transactions = collectTransactions(chainIndex)
     BlockFlowTemplate(chainIndex, bestDeps.deps, target, transactions)
   }

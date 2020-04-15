@@ -4,13 +4,21 @@ import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.{Hash, HashSerde}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
-import org.alephium.util.{AVector, DjbHash}
+import org.alephium.util.{AVector, Bits, DjbHash}
 
 final case class PubScript(instructions: AVector[Instruction]) extends HashSerde[PubScript] {
   override lazy val hash: Hash = _getHash
 
   lazy val shortKey: Int = DjbHash.intHash(hash.bytes)
+
+  def shortKeyBytes: ByteString = serialize(shortKey)
+
+  def groupIndex(implicit config: GroupConfig): GroupIndex = {
+    PubScript.groupIndex(shortKey)
+  }
 }
 
 object PubScript {
@@ -43,5 +51,10 @@ object PubScript {
   def p2sh(scriptRaw: ByteString): PubScript = {
     val scriptHash = Hash.hash(scriptRaw)
     PubScript(AVector[Instruction](OP_SCRIPTKECCAK256.from(scriptHash)))
+  }
+
+  def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
+    val hash = Bits.toPosInt(Bits.xorByte(shortKey))
+    GroupIndex.unsafe(hash % config.groups)
   }
 }

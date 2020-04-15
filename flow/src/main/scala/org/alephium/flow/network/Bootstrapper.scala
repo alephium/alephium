@@ -104,9 +104,11 @@ trait BootstrapperHandler extends BaseActor {
   val server: ActorRefT[TcpServer.Command]
   val discoveryServer: ActorRefT[DiscoveryServer.Command]
   val cliqueManager: ActorRefT[CliqueManager.Command]
+
   def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
       val cliqueInfo = intraCliqueInfo.cliqueInfo
+      server ! TcpServer.WorkFor(cliqueManager.ref)
       cliqueManager ! CliqueManager.Start(cliqueInfo)
       discoveryServer ! DiscoveryServer.SendCliqueInfo(cliqueInfo)
 
@@ -120,6 +122,6 @@ trait BootstrapperHandler extends BaseActor {
   def forwardConnection: Receive = {
     case c: Tcp.Connected =>
       log.debug(s"Forward connection to clique manager")
-      cliqueManager.forward(CliqueManager.SendTcpConnected(c))
+      cliqueManager.ref.forward(c) // cliqueManager receives connection from TcpServer too
   }
 }

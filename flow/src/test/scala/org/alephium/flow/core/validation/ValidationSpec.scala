@@ -25,7 +25,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   def check(res: BlockValidationResult, error: InvalidBlockStatus): Assertion = {
-    res.left.value.right.value is error
+    res.left.value isE error
   }
 
   it should "validate group for block" in {
@@ -63,9 +63,8 @@ class ValidationSpec extends AlephiumFlowSpec {
   it should "validate coinbase transaction" in {
     val block0 = ModelGen.blockGen
       .retryUntil { block =>
-        val txs = block.transactions
-        txs.nonEmpty && {
-          val unsigned = txs.head.unsigned
+        block.transactions.nonEmpty && {
+          val unsigned = block.coinbase.unsigned
           unsigned.inputs.nonEmpty && unsigned.outputs.length > 1
         }
       }
@@ -73,7 +72,7 @@ class ValidationSpec extends AlephiumFlowSpec {
       .get
     val (privateKey, publicKey) = ED25519.generatePriPub()
 
-    val coinbase0 = block0.transactions.head
+    val coinbase0 = block0.coinbase
     val input0    = coinbase0.unsigned.inputs
     val output0   = coinbase0.unsigned.outputs
     check(checkCoinbase(block0), InvalidCoinbase)

@@ -89,8 +89,10 @@ object Validation {
   private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
       implicit config: PlatformConfig): TxValidationResult = {
     val index = ChainIndex(tx.fromGroup, tx.toGroup)
-    val trie  = flow.getBestTrie(index)
-    checkNonCoinbaseTx(index, tx, trie)
+    for {
+      trie <- ValidationStatus.from(flow.getBestTrie(index))
+      _    <- checkNonCoinbaseTx(index, tx, trie)
+    } yield ()
   }
 
   /*
@@ -131,8 +133,11 @@ object Validation {
 
   private[validation] def checkDependencies(header: BlockHeader,
                                             flow: BlockFlow): HeaderValidationResult = {
-    val missings = header.blockDeps.filterNot(flow.contains)
-    if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
+    header.blockDeps.filterNotE(flow.contains) match {
+      case Left(error) => Left(Left(error))
+      case Right(missings) =>
+        if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
+    }
   }
 
   private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult = {
@@ -140,7 +145,7 @@ object Validation {
   }
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
-    val coinbase = block.transactions.last // Note: validateNonEmptyTransactions first pls!
+    val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witnesses.isEmpty)
       validBlock
@@ -160,10 +165,10 @@ object Validation {
     assert(index.relateTo(brokerInfo))
 
     if (brokerInfo.contains(index.from)) {
-      val trie = flow.getTrie(block)
       val result = for {
-        _ <- checkBlockDoubleSpending(block)
-        _ <- block.transactions.init.foreachE(checkBlockNonCoinbase(index, _, trie))
+        _    <- checkBlockDoubleSpending(block)
+        trie <- ValidationStatus.from(flow.getTrie(block))
+        _    <- block.nonCoinbase.foreachE(checkBlockNonCoinbase(index, _, trie))
       } yield ()
       convert(result)
     } else {
@@ -228,7 +233,7 @@ object Validation {
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
-    block.transactions.init.foreachE { tx =>
+    block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
         if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
         else {

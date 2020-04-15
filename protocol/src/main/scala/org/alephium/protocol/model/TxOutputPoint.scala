@@ -2,10 +2,11 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.script.PubScript
 import org.alephium.serde._
 
 final case class TxOutputPoint(shortKey: Int, txHash: Hash, outputIndex: Int) {
-  def fromGroup(implicit config: GroupConfig): GroupIndex = GroupIndex.fromShortKey(shortKey)
+  def fromGroup(implicit config: GroupConfig): GroupIndex = PubScript.groupIndex(shortKey)
 }
 
 object TxOutputPoint {

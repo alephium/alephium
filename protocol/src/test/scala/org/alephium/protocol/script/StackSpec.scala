@@ -16,22 +16,22 @@ class StackSpec extends AlephiumSpec {
 
     stack.push(1).isRight is true
     stack.size is 1
-    stack.peek(1).right.value is 1
+    stack.peek(1) isE 1
     stack.peek(0).left.value is StackOverflow
     stack.peek(2).left.value is StackUnderflow
     stack.push(2).isRight is true
-    stack.peek(1).right.value is 2
-    stack.peek(2).right.value is 1
+    stack.peek(1) isE 2
+    stack.peek(2) isE 1
     stack.peek(3).left.value is StackUnderflow
     stack.size is 2
     stack.push(3).isLeft is true
-    stack.peek(1).right.value is 2
-    stack.peek(2).right.value is 1
+    stack.peek(1) isE 2
+    stack.peek(2) isE 1
     stack.size is 2
 
     val n1 = stack.pop().right.value
     n1 is 2
-    stack.peek(1).right.value is 1
+    stack.peek(1) isE 1
     stack.size is 1
     val n2 = stack.pop().right.value
     n2 is 1
@@ -44,7 +44,7 @@ class StackSpec extends AlephiumSpec {
     val stack = Stack.unsafe(AVector(1, 2, 3), 3)
     stack.pop(4).left.value is StackUnderflow
     stack.size is 3
-    stack.pop(2).right.value is AVector(2, 3)
+    stack.pop(2) isE AVector(2, 3)
   }
 
   it should "swap/remove" in {
@@ -52,9 +52,9 @@ class StackSpec extends AlephiumSpec {
 
     val stack = Stack.empty[Int]
     def check(stack: Stack[Int], i1: Int, i2: Int, i3: Int): Assertion = {
-      stack.peek(1).right.value is i1
-      stack.peek(2).right.value is i2
-      stack.peek(3).right.value is i3
+      stack.peek(1) isE i1
+      stack.peek(2) isE i2
+      stack.peek(3) isE i3
     }
 
     stack.push(1)

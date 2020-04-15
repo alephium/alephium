@@ -20,7 +20,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.core.{AllHandlers, BlockFlow}
+import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockDeps
@@ -317,7 +317,7 @@ class RPCServerSpec
 
     def checkCallResult[T: Decoder](method: String, params: Option[Json] = None)(
         expected: T): Assertion =
-      checkCall(method, params)(json => json.result.as[T].right.value is expected)
+      checkCall(method, params)(json => json.result.as[T] isE expected)
 
     def checkFailCallResult(method: String, params: Option[Json] = None)(errorMessage: String) =
       rpcRequest(method, params.getOrElse(Json.obj()), 0) ~> server.httpRoute ~> check {
@@ -395,8 +395,11 @@ object RPCServerSpec {
     val cliqueManagerProbe                              = TestProbe()
     val cliqueManager: ActorRefT[CliqueManager.Command] = ActorRefT(cliqueManagerProbe.ref)
 
+    val txHandlerRef = system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded))
+    val txHandler    = ActorRefT[TxHandler.Command](txHandlerRef)
+
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),
-                                               txHandler      = ActorRefT(TestProbe().ref),
+                                               txHandler      = txHandler,
                                                blockHandlers  = Map.empty,
                                                headerHandlers = Map.empty)
 
@@ -410,12 +413,13 @@ object RPCServerSpec {
   class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef, dummyTx: Transaction)(
       implicit val config: PlatformConfig)
       extends BlockFlow {
-    override def getHeadersUnsafe(predicate: BlockHeader => Boolean): Seq[BlockHeader] = {
+    override def getAllHeaders(
+        predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
       blockFlowProbe ! predicate(blockHeader)
-      Seq(blockHeader)
+      Right(AVector(blockHeader))
     }
 
-    def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
+    override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
       Right((BigInt(0), 0))
 
     override def prepareUnsignedTx(
@@ -436,24 +440,25 @@ object RPCServerSpec {
       Right(Some(dummyTx))
     }
 
-    override def getHeight(hash: Hash): Int = {
-      1
-    }
+    def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState =
+      BlockChainWithState.fromGenesisUnsafe
+    def blockchainBuilder: ChainIndex => BlockChain =
+      BlockChain.fromGenesisUnsafe
+    def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
+      BlockHeaderChain.fromGenesisUnsafe
+
+    override def getHeight(hash: Hash): IOResult[Int]          = Right(1)
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps        = ???
     def getAllTips: AVector[Hash]                              = ???
-    def getBestTip: Hash                                       = ???
+    def getBestTipUnsafe: Hash                                 = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
             parentHash: Hash,
-            weight: Int): IOResult[Unit]                                 = ???
-    def add(header: BlockHeader, weight: Int): IOResult[Unit]            = ???
-    def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = ???
-    def add(block: Block, weight: Int): IOResult[Unit]                   = ???
-    def calBestDepsUnsafe(): Unit                                        = ???
-    def updateBestDeps(): IOResult[Unit]                                 = ???
-    def add(block: Block): IOResult[Unit]                                = ???
-    def add(header: BlockHeader): IOResult[Unit] =
-      ???
+            weight: Int): IOResult[Unit]         = ???
+    def updateBestDepsUnsafe(): Unit             = ???
+    def updateBestDeps(): IOResult[Unit]         = ???
+    def add(block: Block): IOResult[Unit]        = ???
+    def add(header: BlockHeader): IOResult[Unit] = ???
   }
 
   class ModeDummy(intraCliqueInfo: IntraCliqueInfo,
@@ -464,5 +469,4 @@ object RPCServerSpec {
       extends Mode {
     val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe, dummyTx)
   }
-
 }

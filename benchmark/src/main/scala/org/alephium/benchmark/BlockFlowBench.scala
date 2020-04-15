@@ -15,7 +15,7 @@ import org.alephium.protocol.model.GroupIndex
 class BlockFlowBench {
 
   implicit val config: PlatformConfig = PlatformConfig.loadDefault()
-  val blockFlow: BlockFlow            = BlockFlow.createUnsafe()(config)
+  val blockFlow: BlockFlow            = BlockFlow.fromGenesisUnsafe()(config)
 
   // TODO: benchmark blockheader verification
 

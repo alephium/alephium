@@ -8,7 +8,7 @@ import org.openjdk.jmh.annotations._
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
 
-import org.alephium.flow.io.{RocksDBColumn, RocksDBStorage}
+import org.alephium.flow.io.{RocksDBColumn, RocksDBSource}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 
@@ -17,7 +17,7 @@ import org.alephium.util.Files
 @State(Scope.Thread)
 // scalastyle:off
 class RocksDBBench {
-  import RocksDBStorage.{ColumnFamily, Compaction, Settings}
+  import RocksDBSource.{ColumnFamily, Compaction, Settings}
 
   {
     RocksDB.loadLibrary()
@@ -33,7 +33,7 @@ class RocksDBBench {
     // Insert N
     val keys = (0 to N).map { _ =>
       val bytes = Hash.random.bytes
-      db.put(bytes, bytes)
+      db.putRawUnsafe(bytes, bytes)
       bytes
     }
 
@@ -42,19 +42,19 @@ class RocksDBBench {
     // Query N / 2
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.getRaw(key).right.toOption.get
+      db.getRawUnsafe(key)
     }
 
     // Delete N / 2
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.delete(key)
+      db.deleteRawUnsafe(key)
     }
 
     // Query N / 2 (ignoring key which are not found)
     (0 to N / 2).foreach { _ =>
       val key = randomKey()
-      db.getRaw(key)
+      db.getRawUnsafe(key)
     }
   }
 
@@ -69,8 +69,8 @@ class RocksDBBench {
       files.foreach(_.delete)
     }
 
-    val storage: RocksDBStorage =
-      RocksDBStorage.openUnsafeWithOptions(path, databaseOptions, columnOptions)
+    val storage: RocksDBSource =
+      RocksDBSource.openUnsafeWithOptions(path, databaseOptions, columnOptions)
 
     RocksDBColumn(storage, ColumnFamily.All)
   }

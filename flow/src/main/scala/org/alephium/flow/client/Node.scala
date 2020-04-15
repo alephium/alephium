@@ -35,7 +35,7 @@ object Node {
     val config              = platformConfig
     val system: ActorSystem = ActorSystem(name, config.all)
 
-    val blockFlow: BlockFlow = BlockFlow.createUnsafe()
+    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe()
 
     val server: ActorRefT[TcpServer.Command] = ActorRefT
       .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")

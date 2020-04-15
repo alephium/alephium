@@ -3,7 +3,6 @@ package org.alephium.flow.network.bootstrap
 import akka.io.{IO, Tcp}
 import akka.testkit.{SocketUtil, TestProbe}
 import akka.util.ByteString
-import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
@@ -33,7 +32,7 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
 
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        PeerInfo._deserialize(data).right.value is ((PeerInfo.self, ByteString.empty))
+        PeerInfo._deserialize(data) isE (PeerInfo.self -> ByteString.empty)
     }
 
     val randomInfo = genIntraCliqueInfo

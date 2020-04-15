@@ -1,117 +1,61 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ColumnFamilyHandle, ReadOptions, WriteOptions}
-
-import org.alephium.serde._
+import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 object RocksDBColumn {
-  import RocksDBStorage.Settings
+  import RocksDBSource.Settings
 
-  def apply(storage: RocksDBStorage, cf: RocksDBStorage.ColumnFamily): RocksDBColumn =
+  def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
-            cf: RocksDBStorage.ColumnFamily,
+  def apply(storage: RocksDBSource,
+            cf: RocksDBSource.ColumnFamily,
             writeOptions: WriteOptions): RocksDBColumn =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBStorage,
-            cf: RocksDBStorage.ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions): RocksDBColumn =
-    new RocksDBColumn(storage, cf, writeOptions, readOptions)
+  def apply(storage: RocksDBSource,
+            cf: RocksDBSource.ColumnFamily,
+            _writeOptions: WriteOptions,
+            _readOptions: ReadOptions): RocksDBColumn =
+    new RocksDBColumn {
+      protected def db: RocksDB                = storage.db
+      protected def handle: ColumnFamilyHandle = storage.handle(cf)
+      protected def writeOptions: WriteOptions = _writeOptions
+      protected def readOptions: ReadOptions   = _readOptions
+    }
 }
 
-class RocksDBColumn(
-    storage: RocksDBStorage,
-    cf: RocksDBStorage.ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends KeyValueStorage {
-  import IOUtils.tryExecute
+trait RocksDBColumn extends RawKeyValueStorage {
+  protected def db: RocksDB
+  protected def handle: ColumnFamilyHandle
+  protected def writeOptions: WriteOptions
+  protected def readOptions: ReadOptions
 
-  val handle: ColumnFamilyHandle = storage.handle(cf)
-
-  def getRaw(key: ByteString): IOResult[ByteString] = tryExecute {
-    getRawUnsafe(key)
-  }
-
-  def getRawUnsafe(key: ByteString): ByteString = {
-    val result = storage.db.get(handle, readOptions, key.toArray)
+  override def getRawUnsafe(key: ByteString): ByteString = {
+    val result = db.get(handle, readOptions, key.toArray)
     if (result == null) throw IOError.RocksDB.keyNotFound.e
     else ByteString.fromArrayUnsafe(result)
   }
 
-  def get[V: Serde](key: ByteString): IOResult[V] = tryExecute {
-    getUnsafe[V](key)
-  }
-
-  def getUnsafe[V: Serde](key: ByteString): V = {
-    val data = getRawUnsafe(key)
-    deserialize[V](data) match {
-      case Left(e)  => throw e
-      case Right(v) => v
-    }
-  }
-
-  def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = tryExecute {
-    getOptRawUnsafe(key)
-  }
-
-  def getOptRawUnsafe(key: ByteString): Option[ByteString] = {
-    val result = storage.db.get(handle, key.toArray)
+  override def getOptRawUnsafe(key: ByteString): Option[ByteString] = {
+    val result = db.get(handle, key.toArray)
     if (result == null) None
     else {
       Some(ByteString.fromArrayUnsafe(result))
     }
   }
 
-  def getOpt[V: Serde](key: ByteString): IOResult[Option[V]] = tryExecute {
-    getOptUnsafe[V](key)
+  override def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
+    db.put(handle, writeOptions, key.toArray, value.toArray)
   }
 
-  def getOptUnsafe[V: Serde](key: ByteString): Option[V] = {
-    getOptRawUnsafe(key) map { data =>
-      deserialize[V](data) match {
-        case Left(e)  => throw e
-        case Right(v) => v
-      }
-    }
-  }
-
-  def exists(key: ByteString): IOResult[Boolean] = tryExecute {
-    existsUnsafe(key)
-  }
-
-  def existsUnsafe(key: ByteString): Boolean = {
-    val result = storage.db.get(handle, key.toArray)
+  override def existsRawUnsafe(key: ByteString): Boolean = {
+    val result = db.get(handle, key.toArray)
     result != null
   }
 
-  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = tryExecute {
-    putRawUnsafe(key, value)
-  }
-
-  def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
-    storage.db.put(handle, writeOptions, key.toArray, value.toArray)
-  }
-
-  def put[V: Serde](key: ByteString, value: V): IOResult[Unit] = {
-    putRaw(key, serialize(value))
-  }
-
-  def putUnsafe[V: Serde](key: ByteString, value: V): Unit = {
-    putRawUnsafe(key, serialize(value))
-  }
-
-  // TODO: should we check the existence of the key?
-  def delete(key: ByteString): IOResult[Unit] = tryExecute {
-    deleteUnsafe(key)
-  }
-
-  // TODO: should we check the existence of the key?
-  def deleteUnsafe(key: ByteString): Unit = {
-    storage.db.delete(handle, key.toArray)
+  override def deleteRawUnsafe(key: ByteString): Unit = {
+    db.delete(handle, key.toArray)
   }
 }
