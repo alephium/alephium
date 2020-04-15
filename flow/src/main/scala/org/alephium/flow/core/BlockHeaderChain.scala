@@ -1,77 +1,111 @@
 package org.alephium.flow.core
 
-import org.alephium.flow.io.{HeaderDB, IOResult}
+import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, BlockHeader}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex}
+import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
-  def headerDB: HeaderDB
+  def headerStorage: BlockHeaderStorage
 
   def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
-    headerDB.getHeader(hash)
+    headerStorage.get(hash)
   }
 
   def getBlockHeaderUnsafe(hash: Hash): BlockHeader = {
-    headerDB.getHeaderUnsafe(hash)
+    headerStorage.getUnsafe(hash)
   }
 
-  def add(blockHeader: BlockHeader, weight: Int): IOResult[Unit] = {
-    add(blockHeader, blockHeader.parentHash, weight)
+  def getParentHash(hash: Hash): IOResult[Hash] = {
+    getBlockHeader(hash).map(_.parentHash)
   }
 
-  def add(header: BlockHeader, parentHash: Hash, weight: Int): IOResult[Unit] = {
-    assert(!contains(header.hash) && contains(parentHash))
-    val parent = blockHashesTable(parentHash)
-    addHeader(header).map { _ =>
-      addHash(header.hash, parent, weight, header.timestamp)
+  def getTimestamp(hash: Hash): IOResult[TimeStamp] = {
+    getBlockHeader(hash).map(_.timestamp)
+  }
+
+  def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = {
+    assume(!header.isGenesis)
+    val parentHash = header.parentHash
+    assume {
+      val assertion = for {
+        bool1 <- contains(header.hash)
+        bool2 <- contains(parentHash)
+      } yield !bool1 && bool2
+      assertion.getOrElse(false)
     }
+
+    for {
+      parentState <- getState(parentHash)
+      _           <- addHeader(header)
+      _ <- addHash(header.hash,
+                   parentHash,
+                   parentState.height + 1,
+                   weight,
+                   parentState.chainWeight + header.target,
+                   header.timestamp)
+    } yield ()
+  }
+
+  def addGenesis(header: BlockHeader): IOResult[Unit] = {
+    assume(header.hash == genesisHash)
+    for {
+      _ <- addHeader(header)
+      _ <- addGenesis(header.hash)
+    } yield ()
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
-    headerDB.putHeader(header)
+    headerStorage.put(header)
   }
 
   protected def addHeaderUnsafe(header: BlockHeader): Unit = {
-    headerDB.putHeaderUnsafe(header)
+    headerStorage.putUnsafe(header)
   }
 
-  def getConfirmedHeader(height: Int): IOResult[Option[BlockHeader]] = {
-    getConfirmedHash(height) match {
-      case Some(hash) => headerDB.getHeader(hash).map(Some.apply)
-      case None       => Right(None)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] = {
+    getHeight(hash).flatMap {
+      case height if height > heightUntil =>
+        getBlockHeader(hash).flatMap { header =>
+          if (height > heightUntil + 1) chainBack(header.parentHash, heightUntil).map(_ :+ hash)
+          else Right(AVector(hash))
+        }
+      case _ => Right(AVector.empty)
     }
   }
 
-  def getHashTargetUnsafe(hash: Hash): BigInt = {
-    assert(contains(hash))
-    val header = getBlockHeaderUnsafe(hash)
-    calHashTarget(hash, header.target)
-  }
-
   def getHashTarget(hash: Hash): IOResult[BigInt] = {
-    assert(contains(hash))
-    getBlockHeader(hash).map(header => calHashTarget(hash, header.target))
+    for {
+      header    <- getBlockHeader(hash)
+      newTarget <- calHashTarget(hash, header.target)
+    } yield newTarget
   }
 }
 
 object BlockHeaderChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockHeaderChain =
-    createUnsafe(genesis.header, 0, 0)
+  def fromGenesisUnsafe(chainIndex: ChainIndex)(
+      implicit config: PlatformConfig): BlockHeaderChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock.header, config.storages)
+  }
 
-  private def createUnsafe(rootHeader: BlockHeader, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformConfig): BlockHeaderChain = {
-    val timestamp = rootHeader.timestamp
-    val rootNode  = BlockHashChain.Root(rootHeader.hash, initialHeight, initialWeight, timestamp)
-
+  def createUnsafe(
+      chainIndex: ChainIndex,
+      rootHeader: BlockHeader,
+      storages: Storages
+  )(implicit _config: PlatformConfig): BlockHeaderChain = {
     new BlockHeaderChain {
-      override val headerDB: HeaderDB                  = _config.headerDB
-      override implicit def config: PlatformConfig     = _config
-      override protected def root: BlockHashChain.Root = rootNode
+      override implicit val config    = _config
+      override val headerStorage      = storages.headerStorage
+      override val blockStateStorage  = storages.blockStateStorage
+      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash        = rootHeader.hash
 
-      this.addHeaderUnsafe(rootHeader)
-      this.addNode(rootNode)
+      require(this.addGenesis(rootHeader).isRight)
     }
   }
 }

@@ -32,7 +32,7 @@ class BootstrapperSpec extends AlephiumSpec {
 
     //CliqueManager is now responsible for new connection
     bootstrapper ! connected
-    cliqueManagerProbe.expectMsg(CliqueManager.SendTcpConnected(connected))
+    cliqueManagerProbe.expectMsg(connected)
 
     //Receiving IntraCliqueInfo
     bootstrapper ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)

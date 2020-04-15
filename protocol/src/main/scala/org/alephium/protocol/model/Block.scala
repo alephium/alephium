@@ -1,5 +1,6 @@
 package org.alephium.protocol.model
 
+import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
@@ -9,6 +10,10 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     extends HashSerde[Block]
     with FlowData {
   override def hash: Hash = header.hash
+
+  def coinbase: Transaction = transactions.last
+
+  def nonCoinbase: AVector[Transaction] = transactions.init
 
   override def timestamp: TimeStamp = header.timestamp
 
@@ -46,7 +51,7 @@ object Block {
   def genesis(transactions: AVector[Transaction], target: BigInt, nonce: BigInt): Block = {
     val txsHash = Hash.hash(transactions)
     val blockHeader =
-      BlockHeader(AVector.empty, txsHash, TimeStamp.unsafe(0), target, nonce)
+      BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
     Block(blockHeader, transactions)
   }
 }

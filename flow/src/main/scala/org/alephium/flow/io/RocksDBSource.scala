@@ -8,7 +8,7 @@ import org.rocksdb.util.SizeUnit
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-object RocksDBStorage {
+object RocksDBSource {
   import IOUtils.tryExecute
 
   {
@@ -19,10 +19,11 @@ object RocksDBStorage {
 
   object ColumnFamily {
 
-    case object All  extends ColumnFamily("all")
-    case object Trie extends ColumnFamily("trie")
+    case object All    extends ColumnFamily("all")
+    case object Header extends ColumnFamily("header")
+    case object Trie   extends ColumnFamily("trie")
 
-    val values: AVector[ColumnFamily] = AVector(All, Trie)
+    val values: AVector[ColumnFamily] = AVector(All, Header, Trie)
   }
 
   final case class Compaction(
@@ -107,18 +108,18 @@ object RocksDBStorage {
     }
   }
 
-  def open(path: Path, compaction: Compaction): IOResult[RocksDBStorage] = tryExecute {
+  def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] = tryExecute {
     openUnsafe(path, compaction)
   }
 
-  def openUnsafe(path: Path, compaction: Compaction): RocksDBStorage =
+  def openUnsafe(path: Path, compaction: Compaction): RocksDBSource =
     openUnsafeWithOptions(path,
                           Settings.databaseOptions(compaction),
                           Settings.columnOptions(compaction))
 
   def openUnsafeWithOptions(path: Path,
                             databaseOptions: DBOptions,
-                            columnOptions: ColumnFamilyOptions): RocksDBStorage = {
+                            columnOptions: ColumnFamilyOptions): RocksDBSource = {
     import scala.collection.JavaConverters._
 
     val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
@@ -132,24 +133,24 @@ object RocksDBStorage {
                    descriptors.toIterable.toList.asJava,
                    handles.asJava)
 
-    new RocksDBStorage(path, db, AVector.fromIterator(handles.toIterator))
+    new RocksDBSource(path, db, AVector.fromIterator(handles.toIterator))
   }
 
   def dESTROY(path: Path): IOResult[Unit] = tryExecute {
     RocksDB.destroyDB(path.toString, new Options())
   }
 
-  def dESTROY(db: RocksDBStorage): IOResult[Unit] = tryExecute {
+  def dESTROY(db: RocksDBSource): IOResult[Unit] = tryExecute {
     dESTROYUnsafe(db)
   }
 
-  def dESTROYUnsafe(db: RocksDBStorage): Unit = {
+  def dESTROYUnsafe(db: RocksDBSource): Unit = {
     RocksDB.destroyDB(db.path.toString, new Options())
   }
 }
 
-class RocksDBStorage(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
-  import RocksDBStorage._
+class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
+  import RocksDBSource._
   import IOUtils.tryExecute
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =

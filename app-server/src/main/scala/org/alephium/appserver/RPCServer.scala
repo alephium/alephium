@@ -15,6 +15,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signatur
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
@@ -68,12 +69,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   def doSendTransaction(req: Request): FutureTry[TransferResult] = {
     val txHandler = mode.node.allHandlers.txHandler
-    Future.successful(sendTransaction(txHandler, req))
+    sendTransaction(txHandler, req)
   }
 
   def doTransfer(req: Request): FutureTry[TransferResult] = {
     val txHandler = mode.node.allHandlers.txHandler
-    Future.successful(transfer(mode.node.blockFlow, txHandler, req))
+    transfer(mode.node.blockFlow, txHandler, req)
   }
 
   val httpRoute: Route = routeHttp(miner)
@@ -129,26 +130,43 @@ object RPCServer extends StrictLogging {
     }
   }
 
-  def withReqF[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(f: T => Try[R]): Try[R] = {
+  def withReqE[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(f: T => Try[R]): Try[R] = {
     req.paramsAs[T] match {
       case Right(query)  => f(query)
       case Left(failure) => Left(failure)
     }
   }
 
+  def withReqF[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(
+      f: T => FutureTry[R]): FutureTry[R] = {
+    req.paramsAs[T] match {
+      case Right(query)  => f(query)
+      case Left(failure) => Future.successful(Left(failure))
+    }
+  }
+
+  private def filterHeader(header: BlockHeader, query: FetchRequest): Boolean = {
+    header.timestamp >= query.fromTs && header.timestamp <= query.toTs
+  }
+
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
       implicit cfg: ConsensusConfig,
       fetchRequestDecoder: Decoder[FetchRequest]): Try[FetchResponse] = {
-    withReq[FetchRequest, FetchResponse](req) { query =>
-      val headers =
-        blockFlow.getHeadersUnsafe(header =>
-          header.timestamp >= query.fromTs && header.timestamp <= query.toTs)
-      FetchResponse(headers.map(wrapBlockHeader(blockFlow, _)))
+    withReqE[FetchRequest, FetchResponse](req) { query =>
+      val entriesEither = for {
+        headers <- blockFlow.getAllHeaders(filterHeader(_, query))
+        entries <- headers.mapE(wrapBlockHeader(blockFlow, _))
+      } yield entries
+
+      entriesEither match {
+        case Right(entries) => Right(FetchResponse(entries.toArray))
+        case Left(_)        => failedInIO[FetchResponse]
+      }
     }
   }
 
   def getBalance(blockFlow: BlockFlow, req: Request): Try[Balance] =
-    withReqF[GetBalance, Balance](req) { query =>
+    withReqE[GetBalance, Balance](req) { query =>
       for {
         address <- decodeAddress(query.address)
         _       <- checkGroup(blockFlow, address)
@@ -161,7 +179,7 @@ object RPCServer extends StrictLogging {
     }
 
   def getGroup(blockFlow: BlockFlow, req: Request): Try[Group] =
-    withReqF[GetGroup, Group](req) { query =>
+    withReqE[GetGroup, Group](req) { query =>
       for {
         address <- decodeAddress(query.address)
       } yield {
@@ -204,7 +222,7 @@ object RPCServer extends StrictLogging {
   }
 
   def createTransaction(blockFlow: BlockFlow, req: Request): Try[CreateTransactionResult] = {
-    withReqF[CreateTransaction, CreateTransactionResult](req) { query =>
+    withReqE[CreateTransaction, CreateTransactionResult](req) { query =>
       val resultEither = for {
         fromAddress <- decodePublicKey(query.fromAddress)
         _           <- checkGroup(blockFlow, fromAddress)
@@ -226,9 +244,11 @@ object RPCServer extends StrictLogging {
   }
 
   def sendTransaction(txHandler: ActorRefT[TxHandler.Command], req: Request)(
-      implicit config: GroupConfig): Try[TransferResult] = {
+      implicit config: GroupConfig,
+      askTimeout: Timeout,
+      executionContext: ExecutionContext): FutureTry[TransferResult] = {
     withReqF[SendTransaction, TransferResult](req) { query =>
-      for {
+      val txEither = for {
         txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
         unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
           Response.failed(serdeError.getMessage))
@@ -236,17 +256,21 @@ object RPCServer extends StrictLogging {
         publickey <- decodePublicKey(query.publicKey)
       } yield {
         val witness = Witness.build(PayTo.PKH, publickey, signature)
-        val tx      = Transaction.from(unsignedTx, AVector(witness))
-        txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
-        TransferResult(Hex.toHexString(tx.hash.bytes), tx.fromGroup.value, tx.toGroup.value)
+        Transaction.from(unsignedTx, AVector(witness))
+      }
+      txEither match {
+        case Right(tx)   => publishTx(txHandler, tx)
+        case Left(error) => Future.successful(Left(error))
       }
     }
   }
 
   def transfer(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command], req: Request)(
-      implicit config: GroupConfig): Try[TransferResult] = {
+      implicit config: GroupConfig,
+      askTimeout: Timeout,
+      executionContext: ExecutionContext): FutureTry[TransferResult] = {
     withReqF[Transfer, TransferResult](req) { query =>
-      val resultEither = for {
+      val txEither = for {
         fromAddress    <- decodePublicKey(query.fromAddress)
         _              <- checkGroup(blockFlow, fromAddress)
         toAddress      <- decodePublicKey(query.toAddress)
@@ -258,15 +282,24 @@ object RPCServer extends StrictLogging {
                                  query.toType,
                                  query.value,
                                  fromPrivateKey)
-      } yield {
-        // publish transaction
-        txHandler ! TxHandler.AddTx(tx, DataOrigin.Local)
-        TransferResult(Hex.toHexString(tx.hash.bytes), tx.fromGroup.value, tx.toGroup.value)
+      } yield tx
+      txEither match {
+        case Right(tx)   => publishTx(txHandler, tx)
+        case Left(error) => Future.successful(Left(error))
       }
-      resultEither match {
-        case Right(result) => Right(result)
-        case Left(error)   => Left(error)
-      }
+    }
+  }
+
+  private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: Transaction)(
+      implicit config: GroupConfig,
+      askTimeout: Timeout,
+      executionContext: ExecutionContext): FutureTry[TransferResult] = {
+    val message = TxHandler.AddTx(tx, DataOrigin.Local)
+    txHandler.ask(message).mapTo[TxHandler.Event].map {
+      case TxHandler.AddSucceeded =>
+        Right(TransferResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
+      case TxHandler.AddFailed =>
+        Left(Response.failed("Failed in adding transaction"))
     }
   }
 
@@ -299,14 +332,14 @@ object RPCServer extends StrictLogging {
 
   def checkGroup(blockFlow: BlockFlow, address: ED25519PublicKey): Try[Unit] = {
     val pubScript  = PubScript.build(PayTo.PKH, address)
-    val groupIndex = GroupIndex.from(pubScript)(blockFlow.config)
+    val groupIndex = pubScript.groupIndex(blockFlow.config)
     if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
     else Left(Response.failed(s"Address ${address.shortHex} belongs to other groups"))
   }
 
   def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
-      implicit config: ConsensusConfig): BlockEntry = {
-    BlockEntry.from(header, chain.getHeight(header))
+      implicit config: ConsensusConfig): IOResult[BlockEntry] = {
+    chain.getHeight(header).map(BlockEntry.from(header, _))
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))

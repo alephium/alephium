@@ -98,9 +98,10 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
       blockOpt match {
         case Some(block) =>
           val miningCount = getMiningCount(fromShift, to)
+          val txCount     = block.transactions.length
           log.debug(s"MiningCounts: $countsToString")
           log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, miningCount: $miningCount, target: ${block.header.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, miningCount: $miningCount, target: ${block.header.target}")
         case None =>
           setIdle(fromShift, to)
           startNewTasks()

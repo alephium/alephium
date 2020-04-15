@@ -43,8 +43,8 @@ alephium {
   consensus {
     numZerosAtLeastInHash = 12
     blockTargetTime = 4 minutes
-    blockConfirmNum = 100
-    blockCacheSizePerChain = 25
+    tipsPruneInterval = 100
+    blockCacheCapacityPerChain = 25
   }
 
   mining {
@@ -75,7 +75,7 @@ alephium {
   rpc {
     network.interface = "127.0.0.1"
     blockflowFetch.maxAge = 30 minutes
-    ask.timeout = 500 millis
+    ask.timeout = 5 seconds
   }
 
   bootstrap=""

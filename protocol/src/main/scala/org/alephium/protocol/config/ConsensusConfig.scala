@@ -8,5 +8,6 @@ trait ConsensusConfig extends GroupConfig {
   def maxMiningTarget: BigInt
 
   def blockTargetTime: Duration
-  def blockConfirmNum: Int
+  def tipsPruneInterval: Int
+  def tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
 }

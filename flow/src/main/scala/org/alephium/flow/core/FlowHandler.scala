@@ -5,6 +5,7 @@ import scala.collection.mutable
 import akka.actor.Props
 
 import org.alephium.flow.client.Miner
+import org.alephium.flow.io.{IOError, IOResult, IOUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
@@ -122,17 +123,19 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
                    header: BlockHeader,
                    broker: ActorRefT[ChainHandler.Event],
                    origin: DataOrigin): Unit = {
-    if (!blockFlow.contains(header)) {
-      blockFlow.add(header) match {
-        case Left(e) =>
-          // TODO: handle IOError
-          log.error(s"Failed in adding new header: ${e.toString}")
-        case Right(_) =>
-          sender() ! FlowHandler.HeaderAdded(header, broker, origin)
-          updateUponNewData(header.hash)
-          minerOpt.foreach(_ ! Miner.UpdateTemplate)
-          logInfo(header)
-      }
+    blockFlow.contains(header) match {
+      case Right(true) =>
+        log.debug(s"Blockheader ${header.shortHex} exists already")
+      case Right(false) =>
+        blockFlow.add(header) match {
+          case Left(error) => handleIOError(error)
+          case Right(_) =>
+            sender() ! FlowHandler.HeaderAdded(header, broker, origin)
+            updateUponNewData(header.hash)
+            minerOpt.foreach(_ ! Miner.UpdateTemplate)
+            logInfo(header)
+        }
+      case Left(error) => handleIOError(error)
     }
   }
 
@@ -140,33 +143,40 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
                   block: Block,
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
-    if (!blockFlow.contains(block)) {
-      blockFlow.add(block) match {
-        case Left(e) =>
-          // TODO: handle IOError
-          log.error(s"Failed in adding new block: ${e.toString}")
-        case Right(_) =>
-          sender() ! FlowHandler.BlockAdded(block, broker, origin)
-          updateUponNewData(block.hash)
-          origin match {
-            case DataOrigin.Local =>
-              minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
-            case _: DataOrigin.FromClique =>
-              minerOpt.foreach(_ ! Miner.UpdateTemplate)
-          }
-          eventBus ! BlockNotify(block.header, blockFlow.getHeight(block))
-          logInfo(block.header)
+    escapeIOError(blockFlow.contains(block)) { isIncluded =>
+      if (!isIncluded) {
+        blockFlow.add(block) match {
+          case Left(error) => handleIOError(error)
+          case Right(_) =>
+            sender() ! FlowHandler.BlockAdded(block, broker, origin)
+            updateUponNewData(block.hash)
+            origin match {
+              case DataOrigin.Local =>
+                minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
+              case _: DataOrigin.FromClique =>
+                minerOpt.foreach(_ ! Miner.UpdateTemplate)
+            }
+            logInfo(block.header)
+            notify(block)
+        }
       }
+    }
+  }
+
+  def notify(block: Block): Unit = {
+    escapeIOError(blockFlow.getHeight(block)) { height =>
+      eventBus ! BlockNotify(block.header, height)
     }
   }
 
   def handlePending(pending: PendingData): Unit = {
     val missings = pending.missingDeps
-    missings.retain(!blockFlow.contains(_)) // necessary to remove the new added dependencies
-    if (missings.isEmpty) {
-      feedback(pending)
-    } else {
-      addStatus(pending)
+    escapeIOError(IOUtils.tryExecute(missings.retain(!blockFlow.containsUnsafe(_)))) { _ =>
+      if (missings.isEmpty) {
+        feedback(pending)
+      } else {
+        addStatus(pending)
+      }
     }
   }
 
@@ -192,13 +202,12 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     val heights = for {
       i <- 0 until config.groups
       j <- 0 until config.groups
-      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight
+      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight.getOrElse(-1)
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
     val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
     val timeSpan = {
-      val parentHash = chain.getPredecessor(header.hash, chain.getHeight(header) - 1)
-      chain.getBlockHeader(parentHash) match {
+      chain.getBlockHeader(header.parentHash) match {
         case Left(_) => "???ms"
         case Right(parentHeader) =>
           val span = header.timestamp.millis - parentHeader.timestamp.millis
@@ -207,6 +216,18 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
     log.info(s"$index; total: $total; ${chain
       .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
+  }
+
+  // TODO: improve error handling
+  def handleIOError(error: IOError): Unit = {
+    log.debug(s"IO failed in flow handler: ${error.toString}")
+  }
+
+  def escapeIOError[T](result: IOResult[T])(f: T => Unit): Unit = {
+    result match {
+      case Right(t) => f(t)
+      case Left(e)  => handleIOError(e)
+    }
   }
 }
 

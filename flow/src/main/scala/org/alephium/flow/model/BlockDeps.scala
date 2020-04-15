@@ -11,7 +11,7 @@ import org.alephium.util.AVector
  * The last groups hashes are for the outcoming chains of a specific group
  */
 final case class BlockDeps(deps: AVector[Hash]) {
-  def getChainHash(to: GroupIndex)(implicit config: GroupConfig): Hash = {
+  def getOutDep(to: GroupIndex)(implicit config: GroupConfig): Hash = {
     deps.takeRight(config.groups)(to.value)
   }
 

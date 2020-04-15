@@ -4,8 +4,9 @@ import scala.collection.JavaConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, Keccak256}
-import org.alephium.flow.io.RocksDBStorage.Settings
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.script.PayTo
@@ -17,9 +18,9 @@ trait PlatformConfigFixture {
   val genesisBalance: BigInt = 100
 
   val env      = Env.resolve()
-  val rootPath = Platform.getRootPath(env)
+  val rootPath = Platform.generateRootPath(env)
 
-  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + Keccak256.random.toHexString)
+  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + Hash.random.toHexString)
 
   lazy val newConfig =
     ConfigFactory

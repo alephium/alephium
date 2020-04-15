@@ -19,19 +19,19 @@ object ModelGen {
   }
 
   val txOutputGen: Gen[TxOutput] = for {
-    value <- Gen.choose(0, 5)
+    value <- Gen.choose(1, 5)
   } yield TxOutput.burn(value)
 
   val transactionGen: Gen[Transaction] = for {
-    inputNum  <- Gen.choose(0, 5)
+    inputNum  <- Gen.choose(1, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
-    outputNum <- Gen.choose(0, 5)
+    outputNum <- Gen.choose(1, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
   } yield Transaction.from(AVector.from(inputs), AVector.from(outputs), AVector.empty[Witness])
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {
-      txNum <- Gen.choose(0, 5)
+      txNum <- Gen.choose(1, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(AVector(Hash.zero), AVector.from(txs), config.maxMiningTarget, 0)
 
@@ -106,6 +106,6 @@ object ModelGen {
       ip1  <- Gen.choose(0, 255)
       ip2  <- Gen.choose(0, 255)
       ip3  <- Gen.choose(0, 255)
-      port <- Gen.choose(0, 65535)
+      port <- Gen.choose(0x401, 65535)
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
 }

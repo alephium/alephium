@@ -1,70 +1,82 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.ChainDiff
-import org.alephium.flow.io.{Disk, IOResult}
+import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
-
-  def disk: Disk
+  def blockStorage: BlockStorage
 
   def getBlock(hash: Hash): IOResult[Block] = {
-    disk.getBlock(hash)
+    blockStorage.get(hash)
   }
 
   def getBlockUnsafe(hash: Hash): Block = {
-    disk.getBlockUnsafe(hash)
+    blockStorage.getUnsafe(hash)
   }
 
-  def add(block: Block, weight: Int): IOResult[Unit] = {
-    add(block, block.parentHash, weight)
-  }
+  def add(block: Block, weight: BigInt): IOResult[Unit] = {
+    assume {
+      val assertion = for {
+        isNewIncluded    <- contains(block.hash)
+        isParentIncluded <- contains(block.parentHash)
+      } yield !isNewIncluded && isParentIncluded
+      assertion.getOrElse(false)
+    }
 
-  def add(block: Block, parentHash: Hash, weight: Int): IOResult[Unit] = {
-    assert(!contains(block.hash) && contains(parentHash))
     for {
       _ <- persistBlock(block)
-      _ <- add(block.header, parentHash, weight)
+      _ <- add(block.header, weight)
+    } yield ()
+  }
+
+  def addGenesis(block: Block): IOResult[Unit] = {
+    for {
+      _ <- persistBlock(block)
+      _ <- addGenesis(block.header)
     } yield ()
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
-    disk.putBlock(block).right.map(_ => ())
-    // TODO: handle transactions later
+    blockStorage.put(block)
   }
 
   protected def persistBlockUnsafe(block: Block): Unit = {
-    disk.putBlockUnsafe(block)
+    blockStorage.putUnsafe(block)
     ()
   }
 
   def calBlockDiffUnsafe(newTip: Hash, oldTip: Hash): ChainDiff = {
-    val hashDiff = calHashDiff(newTip, oldTip)
+    val hashDiff = Utils.unsafe(calHashDiff(newTip, oldTip))
     ChainDiff(hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
   }
 }
 
 object BlockChain {
-  def fromGenesisUnsafe(genesis: Block)(implicit config: PlatformConfig): BlockChain =
-    createUnsafe(genesis, 0, 0)
+  def fromGenesisUnsafe(chainIndex: ChainIndex)(implicit config: PlatformConfig): BlockChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock, config.storages)
+  }
 
-  private def createUnsafe(rootBlock: Block, initialHeight: Int, initialWeight: Int)(
-      implicit _config: PlatformConfig): BlockChain = {
-    val timestamp = rootBlock.header.timestamp
-    val rootNode  = BlockHashChain.Root(rootBlock.hash, initialHeight, initialWeight, timestamp)
-
+  def createUnsafe(
+      chainIndex: ChainIndex,
+      rootBlock: Block,
+      storages: Storages
+  )(implicit _config: PlatformConfig): BlockChain = {
     new BlockChain {
-      override val disk                                = _config.disk
-      override val headerDB                            = _config.headerDB
-      override implicit val config: PlatformConfig     = _config
-      override protected def root: BlockHashChain.Root = rootNode
+      override implicit val config    = _config
+      override val blockStorage       = storages.blockStorage
+      override val headerStorage      = storages.headerStorage
+      override val blockStateStorage  = storages.blockStateStorage
+      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
+      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val genesisHash: Hash  = rootBlock.hash
 
-      this.persistBlockUnsafe(rootBlock)
-      this.addHeaderUnsafe(rootBlock.header)
-      this.addNode(rootNode)
+      require(this.addGenesis(rootBlock).isRight)
     }
   }
 
