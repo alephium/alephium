@@ -21,9 +21,13 @@ object Storages {
     def blockCacheCapacity: Int
   }
 
-  def createUnsafe(rootPath: Path, db: RocksDBSource, writeOptions: WriteOptions)(
-      implicit config: GroupConfig with Config): Storages = {
-    val blockStorage      = BlockStorage.createUnsafe(rootPath, config.blockCacheCapacity)
+  def createUnsafe(
+      rootPath: Path,
+      dbFolder: String,
+      blocksFolder: String,
+      writeOptions: WriteOptions)(implicit config: GroupConfig with Config): Storages = {
+    val blockStorage      = BlockStorage.createUnsafe(rootPath, blocksFolder, config.blockCacheCapacity)
+    val db                = createRocksDBUnsafe(rootPath, dbFolder)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
@@ -37,6 +41,11 @@ object Storages {
              trieHashStorage,
              blockStateStorage,
              nodeStateStorage)
+  }
+
+  private def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
+    val dbPath = rootPath.resolve(dbFolder)
+    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
   }
 }
 
