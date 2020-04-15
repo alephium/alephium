@@ -1,8 +1,10 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{IOResult, Storages}
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util.AVector
 
@@ -28,6 +30,9 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     }
 
     def buildGenesis(): BlockChainWithState = {
+      val dbFolder     = "db-" + Hash.random.toHexString
+      val blocksFolder = "blocks-" + Hash.random.toHexString
+      val storages     = Storages.createUnsafe(rootPath, dbFolder, blocksFolder, Settings.syncWrite)
       BlockChainWithState.createUnsafe(
         ChainIndex.unsafe(0, 0),
         genesis,

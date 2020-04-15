@@ -5,7 +5,6 @@ import scala.collection.JavaConverters._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.script.PayTo
@@ -19,12 +18,9 @@ trait PlatformConfigFixture {
   val env      = Env.resolve()
   val rootPath = Platform.generateRootPath(env)
 
-  val newPath = rootPath.resolveSibling(rootPath.getFileName + "-" + Hash.random.toHexString)
-
-  lazy val newConfig =
-    ConfigFactory
-      .parseMap(configValues.mapValues(ConfigValueFactory.fromAnyRef).asJava)
-      .withFallback(Configs.parseConfig(newPath))
+  lazy val newConfig = ConfigFactory
+    .parseMap(configValues.mapValues(ConfigValueFactory.fromAnyRef).asJava)
+    .withFallback(Configs.parseConfig(rootPath))
 
   lazy val groups0 = newConfig.getInt("alephium.groups")
 
@@ -38,5 +34,5 @@ trait PlatformConfigFixture {
     }
 
   implicit lazy val config =
-    PlatformConfig.build(newConfig, newPath, Some(genesisBalances.map(p => (p._2, p._3))))
+    PlatformConfig.build(newConfig, rootPath, Some(genesisBalances.map(p => (p._2, p._3))))
 }
