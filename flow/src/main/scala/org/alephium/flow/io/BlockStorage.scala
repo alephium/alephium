@@ -10,14 +10,16 @@ import org.alephium.util.LruCache
 object BlockStorage {
   import IOUtils._
 
-  def create(root: Path, cacheCapacity: Int): IOResult[BlockStorage] = tryExecute {
-    createUnsafe(root, cacheCapacity)
-  }
+  def create(root: Path, blocksFolder: String, cacheCapacity: Int): IOResult[BlockStorage] =
+    tryExecute {
+      createUnsafe(root, blocksFolder, cacheCapacity)
+    }
 
-  def createUnsafe(root: Path, cacheCapacity: Int): BlockStorage = {
+  def createUnsafe(root: Path, blocksFolder: String, cacheCapacity: Int): BlockStorage = {
     createDirUnsafe(root)
-    val storage = new BlockStorageInnerImpl(root)
-    createDirUnsafe(storage.folder)
+    val path = root.resolve(blocksFolder)
+    createDirUnsafe(path)
+    val storage = new BlockStorageInnerImpl(path)
     new BlockStorage(storage, cacheCapacity)
   }
 }

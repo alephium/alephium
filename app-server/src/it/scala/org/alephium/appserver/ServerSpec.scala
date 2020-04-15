@@ -154,8 +154,7 @@ class ServerSpec extends AlephiumSpec {
             ("alephium.broker.brokerId", brokerId)
           )
           override implicit lazy val config =
-            PlatformConfig.build(newConfig, newPath, None)
-
+            PlatformConfig.build(newConfig, rootPath, None)
           val node: Node = Node.build(builders, s"node-$brokerId", storages)(config)
 
           implicit val executionContext: ExecutionContext = node.system.dispatcher
