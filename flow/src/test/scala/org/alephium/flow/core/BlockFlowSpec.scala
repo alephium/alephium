@@ -171,6 +171,44 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     }
   }
 
+  it should "reload blockflow properly from storage" in {
+    val blockFlow0 = BlockFlow.fromGenesisUnsafe()
+
+    val newBlocks1 = for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield mine(blockFlow0, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    newBlocks1.foreach { block =>
+      val index = block.chainIndex
+      if (index.relateTo(GroupIndex.unsafe(0))) {
+        addAndCheck(blockFlow0, block, 1)
+      } else {
+        addAndCheck(blockFlow0, block.header, 1)
+      }
+    }
+    newBlocks1.map(_.hash).diff(blockFlow0.getAllTips.toArray).isEmpty is true
+
+    val blockFlow1 = BlockFlow.fromStorageUnsafe()
+    newBlocks1.map(_.hash).diff(blockFlow1.getAllTips.toArray).isEmpty is true
+
+    val newBlocks2 = for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield mine(blockFlow1, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    newBlocks2.foreach { block =>
+      val index = block.chainIndex
+      if (index.relateTo(GroupIndex.unsafe(0))) {
+        addAndCheck(blockFlow1, block, 4)
+        blockFlow1.getChainWeight(block.hash) isE config.maxMiningTarget * 2
+      } else {
+        addAndCheck(blockFlow1, block.header, 4)
+      }
+    }
+    checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
+    checkBalance(blockFlow1, 0, genesisBalance - 2)
+    newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
+  }
+
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)

@@ -11,10 +11,11 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 
 object Storages {
-  val blockStatePostfix: Byte = 0
-  val trieHashPostfix: Byte   = 1
-  val heightPostfix: Byte     = 2
-  val chainStatePostfix: Byte = 3
+  val isInitializedPostfix: Byte = 0
+  val blockStatePostfix: Byte    = 1
+  val trieHashPostfix: Byte      = 2
+  val heightPostfix: Byte        = 3
+  val chainStatePostfix: Byte    = 4
 
   trait Config {
     def blockCacheCapacity: Int
