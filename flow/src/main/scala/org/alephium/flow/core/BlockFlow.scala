@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import com.typesafe.scalalogging.StrictLogging
+
 import org.alephium.flow.Utils
 import org.alephium.flow.io.{IOResult, IOUtils, Storages}
 import org.alephium.flow.model.BlockDeps
@@ -16,10 +18,11 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
 }
 
-object BlockFlow {
+object BlockFlow extends StrictLogging {
   type TrieUpdater = (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie]
 
   def fromGenesisUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+    logger.info(s"Initialize storage for BlockFlow")
     new BlockFlowImpl(
       BlockChainWithState.fromGenesisUnsafe(storages),
       BlockChain.fromGenesisUnsafe(storages),
@@ -28,11 +31,14 @@ object BlockFlow {
   }
 
   def fromStorageUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
-    new BlockFlowImpl(
+    val blockflow = new BlockFlowImpl(
       BlockChainWithState.fromStorageUnsafe(storages),
       BlockChain.fromStorageUnsafe(storages),
       BlockHeaderChain.fromStorageUnsafe(storages)
     )
+    logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers")
+    blockflow.updateBestDepsUnsafe()
+    blockflow
   }
 
   class BlockFlowImpl(

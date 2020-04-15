@@ -36,7 +36,7 @@ object Node {
     val config              = platformConfig
     val system: ActorSystem = ActorSystem(name, config.all)
 
-    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
+    val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
     val server: ActorRefT[TcpServer.Command] = ActorRefT
       .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")
@@ -65,6 +65,18 @@ object Node {
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       Await.result(shutdown(), Utils.shutdownTimeout.asScala)
     }))
+  }
+
+  def buildBlockFlowUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+    val nodeStateStorage = storages.nodeStateStorage
+    val isInitialized    = Utils.unsafe(nodeStateStorage.isInitialized())
+    if (isInitialized) {
+      BlockFlow.fromStorageUnsafe(storages)
+    } else {
+      val blockflow = BlockFlow.fromGenesisUnsafe(storages)
+      Utils.unsafe(nodeStateStorage.setInitialized())
+      blockflow
+    }
   }
 
   sealed trait Command

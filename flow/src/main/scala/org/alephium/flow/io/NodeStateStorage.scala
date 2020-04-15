@@ -17,6 +17,16 @@ trait NodeStateStorage extends RawKeyValueStorage {
 
   private val tipsSerde: Serde[AVector[Hash]] = avectorSerde[Hash]
 
+  private val isInitializedKey = Hash.hash("isInitialized").bytes :+ Storages.isInitializedPostfix
+
+  def isInitialized(): IOResult[Boolean] = IOUtils.tryExecute {
+    existsRawUnsafe(isInitializedKey)
+  }
+
+  def setInitialized(): IOResult[Unit] = IOUtils.tryExecute {
+    putRawUnsafe(isInitializedKey, ByteString(1))
+  }
+
   private val chainStateKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
     ByteString(from.toByte, to.toByte, Storages.chainStatePostfix)
   }
