@@ -30,10 +30,11 @@ trait BlockChainWithState extends BlockChain {
 }
 
 object BlockChainWithState {
-  def fromGenesisUnsafe(chainIndex: ChainIndex, updateState: BlockFlow.TrieUpdater)(
-      implicit config: PlatformConfig): BlockChainWithState = {
+  def fromGenesisUnsafe(storages: Storages)(
+      chainIndex: ChainIndex,
+      updateState: BlockFlow.TrieUpdater)(implicit config: PlatformConfig): BlockChainWithState = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock, config.storages, updateState)
+    createUnsafe(chainIndex, genesisBlock, storages, updateState)
   }
 
   def createUnsafe(
