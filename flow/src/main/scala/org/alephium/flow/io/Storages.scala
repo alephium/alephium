@@ -22,14 +22,19 @@ object Storages {
 
   def createUnsafe(rootPath: Path, dbFolder: String, dbName: String, writeOptions: WriteOptions)(
       implicit config: GroupConfig with Config): Storages = {
-    val blockStorage      = BlockStorage.createUnsafe(rootPath, config.blockCacheCapacity)
-    val db                = createRocksDBUnsafe(rootPath, dbFolder, dbName)
-    val headerStorage     = BlockHeaderStorage(db, ColumnFamily.Header, writeOptions)
-    val blockStateStorage = BlockStateStorage(db, ColumnFamily.All, writeOptions)
-    val nodeStateStorage  = NodeStateStorage(db, ColumnFamily.All, writeOptions)
-    val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
-    val emptyTrie         = MerklePatriciaTrie.createStateTrie(trieStorage)
-    val trieHashStorage   = TrieHashStorage(trieStorage, db, ColumnFamily.All, writeOptions)
+    val blockStorage: BlockStorage = BlockStorage.createUnsafe(rootPath, config.blockCacheCapacity)
+    val db: RocksDBSource          = createRocksDBUnsafe(rootPath, dbFolder, dbName)
+    val headerStorage: BlockHeaderStorage =
+      BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
+    val blockStateStorage: BlockStateStorage =
+      BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
+    val nodeStateStorage: NodeStateStorage =
+      NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
+    val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node] =
+      RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
+    val emptyTrie: MerklePatriciaTrie = MerklePatriciaTrie.createStateTrie(trieStorage)
+    val trieHashStorage: TrieHashStorage =
+      TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
 
     Storages(headerStorage,
              blockStorage,
