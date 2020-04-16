@@ -3,6 +3,8 @@ package org.alephium.flow.platform
 import scala.concurrent.{ExecutionContext, Future}
 
 import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.flow.io.Storages
 import org.alephium.flow.network.clique.BrokerHandler
 
 // scalastyle:off magic.number
@@ -28,7 +30,12 @@ object Mode {
   class Default extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    override val node: Node = Node.build(builders, "Root")
+    val storages: Storages = {
+      val dbFolder = "db"
+      val dbName   = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
+      Storages.createUnsafe(config.rootPath, dbFolder, dbName, Settings.writeOptions)
+    }
+    override val node: Node = Node.build(builders, "Root", storages)
 
     implicit val executionContext: ExecutionContext = node.system.dispatcher
 

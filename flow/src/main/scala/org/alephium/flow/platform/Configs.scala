@@ -12,7 +12,8 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 trait Configs
-    extends Configs.PlatformGroupConfig
+    extends Configs.PlatformCommonConfig
+    with Configs.PlatformGroupConfig
     with Configs.PlatformCliqueConfig
     with Configs.PlatformConsensusConfig
     with Configs.PlatformDiscoveryConfig

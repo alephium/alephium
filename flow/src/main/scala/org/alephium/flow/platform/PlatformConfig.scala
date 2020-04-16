@@ -6,11 +6,8 @@ import java.nio.file.Path
 import scala.annotation.tailrec
 
 import com.typesafe.config.Config
-import org.rocksdb.WriteOptions
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
-import org.alephium.flow.io.RocksDBSource.Settings
-import org.alephium.flow.io.Storages
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.PayTo
@@ -33,17 +30,15 @@ object PlatformConfig {
   }
 
   def load(rootPath: Path): PlatformConfig = {
-    load(rootPath, Settings.writeOptions, None)
+    load(rootPath, None)
   }
 
   def load(rootPath: Path,
-           rdbWriteOptions: WriteOptions,
            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
-    build(parseConfig(rootPath), rootPath, rdbWriteOptions, genesisBalances)
+    build(parseConfig(rootPath), rootPath, genesisBalances)
 
   def build(config: Config,
             rootPath: Path,
-            rdbWriteOptions: WriteOptions,
             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig = {
     val alephCfg = config.getConfig("alephium")
     create(
@@ -56,7 +51,6 @@ object PlatformConfig {
       alephCfg.getConfig("mining"),
       alephCfg.getConfig("network"),
       alephCfg.getConfig("discovery"),
-      rdbWriteOptions,
       genesisBalances
     )
   }
@@ -71,7 +65,6 @@ object PlatformConfig {
              miningCfg: Config,
              networkCfg: Config,
              discoveryCfg: Config,
-             rdbWriteOptions: WriteOptions,
              genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
     new PlatformConfig {
       /* Common */
@@ -153,11 +146,6 @@ object PlatformConfig {
       /* IO */
       val blockCacheCapacityPerChain = consensusCfg.getInt("blockCacheCapacityPerChain")
       val blockCacheCapacity: Int    = blockCacheCapacityPerChain * depsNum
-      val storages = {
-        val dbFolder = "db"
-        val dbName   = s"${brokerInfo.id}-${publicAddress.getPort}"
-        Storages.createUnsafe(rootPath, dbFolder, dbName, rdbWriteOptions)(this)
-      }
       /* IO */
 
       /* Platform */
