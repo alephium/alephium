@@ -108,6 +108,16 @@ object RocksDBSource {
     }
   }
 
+  def createUnsafe(rootPath: Path, dbFolder: String, dbName: String): RocksDBSource = {
+    val path = {
+      val path = rootPath.resolve(dbFolder)
+      IOUtils.createDirUnsafe(path)
+      path
+    }
+    val dbPath = path.resolve(dbName)
+    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+  }
+
   def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] = tryExecute {
     openUnsafe(path, compaction)
   }
