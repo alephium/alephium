@@ -5,7 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.ws.TextMessage
-import akka.http.scaladsl.server.Directives.{complete, extractUpgradeToWebSocket, get, path}
+import akka.http.scaladsl.server.Directives.{complete, extractUpgradeToWebSocket, get, path, withRequestTimeout}
 import akka.http.scaladsl.server.Route
 import akka.stream.{CompletionStrategy, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -22,7 +22,7 @@ import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.rpc.{CirceUtils, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
-import org.alephium.util.{ActorRefT, EventBus}
+import org.alephium.util.{ActorRefT, EventBus, Duration}
 
 trait RPCServerAbstract extends StrictLogging {
   import RPCServerAbstract._
@@ -76,14 +76,16 @@ trait RPCServerAbstract extends StrictLogging {
 
   def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
     path("events") {
-      cors()(get {
-        extractUpgradeToWebSocket { upgrade =>
-          val (actor, source) = Websocket.actorRef
-          eventBus.tell(EventBus.Subscribe, actor)
-          val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
-          complete(response)
-        }
-      })
+      withRequestTimeout(Duration.ofMinutesUnsafe(5).asScala) {
+        cors()(get {
+          extractUpgradeToWebSocket { upgrade =>
+            val (actor, source) = Websocket.actorRef
+            eventBus.tell(EventBus.Subscribe, actor)
+            val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
+            complete(response)
+          }
+        })
+      }
     }
   }
 
