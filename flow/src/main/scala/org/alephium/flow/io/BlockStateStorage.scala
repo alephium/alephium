@@ -7,20 +7,23 @@ import org.alephium.flow.io.RocksDBSource.ColumnFamily
 import org.alephium.flow.model.BlockState
 import org.alephium.protocol.ALF.Hash
 
-object BlockStateStorage extends RocksDBKeyValueCompanion[BlockStateStorage] {
+trait BlockStateStorage extends KeyValueStorage[Hash, BlockState] {
+  override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.blockStatePostfix
+}
+
+object BlockStateRockDBStorage extends RocksDBKeyValueCompanion[BlockStateRockDBStorage] {
   def apply(storage: RocksDBSource,
             cf: ColumnFamily,
             writeOptions: WriteOptions,
-            readOptions: ReadOptions): BlockStateStorage = {
-    new BlockStateStorage(storage, cf, writeOptions, readOptions)
+            readOptions: ReadOptions): BlockStateRockDBStorage = {
+    new BlockStateRockDBStorage(storage, cf, writeOptions, readOptions)
   }
 }
 
-class BlockStateStorage(
+class BlockStateRockDBStorage(
     storage: RocksDBSource,
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockState](storage, cf, writeOptions, readOptions) {
-  override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.blockStatePostfix
-}
+) extends RocksDBKeyValueStorage[Hash, BlockState](storage, cf, writeOptions, readOptions)
+    with BlockStateStorage
