@@ -6,6 +6,7 @@ import akka.actor.{ActorSystem, Props, Terminated}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core._
+import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
@@ -30,12 +31,12 @@ trait Node {
 }
 
 object Node {
-  def build(builders: BrokerHandler.Builder, name: String)(
+  def build(builders: BrokerHandler.Builder, name: String, storages: Storages)(
       implicit platformConfig: PlatformConfig): Node = new Node {
     val config              = platformConfig
     val system: ActorSystem = ActorSystem(name, config.all)
 
-    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe()
+    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
     val server: ActorRefT[TcpServer.Command] = ActorRefT
       .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")
