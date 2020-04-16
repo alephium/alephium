@@ -1,5 +1,6 @@
 package org.alephium.appserver
 
+import scala.concurrent.Future
 import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
@@ -468,5 +469,10 @@ object RPCServerSpec {
                   dummyTx: Transaction)(implicit val config: PlatformConfig)
       extends Mode {
     val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe, dummyTx)
+
+    override def shutdown(): Future[Unit] =
+      for {
+        _ <- node.shutdown()
+      } yield ()
   }
 }
