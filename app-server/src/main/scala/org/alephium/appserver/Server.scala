@@ -25,6 +25,6 @@ class Server(val mode: Mode) extends StrictLogging {
   def stop(): Future[Unit] =
     for {
       _ <- rpcServer.stopServer()
-      _ <- mode.node.shutdown()
+      _ <- mode.shutdown()
     } yield ()
 }
