@@ -80,7 +80,7 @@ object BlockChain {
       storages: Storages,
       initialize: BlockChain => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockChain = {
-    new BlockChain {
+    val blockchain: BlockChain = new BlockChain {
       override implicit val config    = _config
       override val blockStorage       = storages.blockStorage
       override val headerStorage      = storages.headerStorage
@@ -88,9 +88,10 @@ object BlockChain {
       override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
       override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash: Hash  = rootBlock.hash
-
-      require(initialize(this).isRight)
     }
+
+    Utils.unsafe(initialize(blockchain))
+    blockchain
   }
 
   def initializeGenesis(genesisBlock: Block)(chain: BlockChain): IOResult[Unit] = {

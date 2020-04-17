@@ -1,5 +1,6 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
@@ -52,7 +53,7 @@ object BlockChainWithState {
       _updateState: BlockFlow.TrieUpdater,
       initialize: BlockChainWithState => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockChainWithState = {
-    new BlockChainWithState {
+    val blockchain = new BlockChainWithState {
       override implicit val config    = _config
       override val blockStorage       = storages.blockStorage
       override val headerStorage      = storages.headerStorage
@@ -65,9 +66,10 @@ object BlockChainWithState {
       override def updateState(trie: MerklePatriciaTrie,
                                block: Block): IOResult[MerklePatriciaTrie] =
         _updateState(trie, block)
-
-      require(initialize(this).isRight)
     }
+
+    Utils.unsafe(initialize(blockchain))
+    blockchain
   }
 
   def initializeGenesis(genesisBlock: Block, emptyTrie: MerklePatriciaTrie)(
