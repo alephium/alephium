@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.util.{ByteString, Timeout}
-import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 import io.circe.syntax._
 
@@ -108,7 +107,7 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     }
 }
 
-object RPCServer extends StrictLogging {
+object RPCServer extends {
   import RPCServerAbstract._
 
   def apply(mode: Mode, miner: ActorRefT[Miner.Command]): RPCServer = {
