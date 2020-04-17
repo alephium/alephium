@@ -20,6 +20,7 @@ trait TrieHashStorage extends KeyValueStorage[Hash, Hash] {
     put(hash, trie.rootHash)
   }
 }
+
 object TrieHashRockDBStorage {
   def apply(trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
             storage: RocksDBSource,

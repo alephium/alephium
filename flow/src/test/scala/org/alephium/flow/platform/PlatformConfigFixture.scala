@@ -5,7 +5,6 @@ import scala.collection.JavaConverters._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
@@ -39,8 +38,5 @@ trait PlatformConfigFixture {
     }
 
   implicit lazy val config =
-    PlatformConfig.build(newConfig,
-                         newPath,
-                         Settings.syncWrite,
-                         Some(genesisBalances.map(p => (p._2, p._3))))
+    PlatformConfig.build(newConfig, newPath, Some(genesisBalances.map(p => (p._2, p._3))))
 }
