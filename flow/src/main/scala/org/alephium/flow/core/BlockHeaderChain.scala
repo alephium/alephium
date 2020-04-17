@@ -1,5 +1,6 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
@@ -109,7 +110,7 @@ object BlockHeaderChain {
       storages: Storages,
       initialize: BlockHeaderChain => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
-    new BlockHeaderChain {
+    val headerchain = new BlockHeaderChain {
       override implicit val config    = _config
       override val headerStorage      = storages.headerStorage
       override val blockStateStorage  = storages.blockStateStorage
@@ -117,8 +118,10 @@ object BlockHeaderChain {
       override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootHeader.hash
 
-      require(initialize(this).isRight)
     }
+
+    Utils.unsafe(initialize(headerchain))
+    headerchain
   }
 
   def initializeGenesis(genesisHeader: BlockHeader)(chain: BlockHeaderChain): IOResult[Unit] = {
