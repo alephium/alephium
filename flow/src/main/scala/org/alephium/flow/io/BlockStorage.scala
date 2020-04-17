@@ -67,9 +67,7 @@ class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)(
 }
 
 trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource {
-  val root: Path
-  val keySerializer: Serializer[Hash]
-  val valueSerde: Serde[Block]
+  def root: Path
 }
 class BlockStorageInnerImpl(val root: Path)(implicit val keySerializer: Serializer[Hash],
                                             val valueSerde: Serde[Block])

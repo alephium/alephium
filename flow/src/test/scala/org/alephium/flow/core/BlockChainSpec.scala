@@ -1,25 +1,23 @@
 package org.alephium.flow.core
 
+import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.Keccak256
-import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.{IOError, Storages}
-import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.flow.io.{IOError, StoragesFixture}
+import org.alephium.flow.platform._
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
-import org.alephium.util.AVector
+import org.alephium.util._
 
-class BlockChainSpec extends AlephiumFlowSpec {
-  trait Fixture {
+class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
+  trait Fixture extends PlatformConfigFixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
-      val storages =
-        Storages.createUnsafe(rootPath, "db", Keccak256.random.toHexString, Settings.syncWrite)
+      val (_, storages) = StoragesFixture.buildStorages
       BlockChain.createUnsafe(ChainIndex.unsafe(0, 0), genesisBlock, storages)
     }
 

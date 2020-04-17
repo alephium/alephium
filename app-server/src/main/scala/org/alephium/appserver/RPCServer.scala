@@ -25,6 +25,7 @@ import org.alephium.protocol.script.{PayTo, PubScript, Witness}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, AVector, Duration, Hex}
+
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
     extends RPCServerAbstract {
   import RPCServer._
