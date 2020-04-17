@@ -11,7 +11,7 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
   it should "initialize FairMiner" in {
     val cliqueManager        = TestProbe("cliqueManager")
     val flowHandler          = TestProbe("flowHandler")
-    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe()
+    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
     val allHandlers: AllHandlers =
       AllHandlers.buildWithFlowHandler(system,
                                        ActorRefT(cliqueManager.ref),

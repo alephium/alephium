@@ -1,9 +1,7 @@
 package org.alephium.flow.core
 
-import org.alephium.crypto.Keccak256
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.{IOResult, Storages}
-import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.flow.io.IOResult
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util.AVector
@@ -13,8 +11,8 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = ModelGen.chainGen(4, genesis)
-    val heightDB = config.storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
-    val tipsDB   = config.storages.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
+    val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
+    val tipsDB   = storages.nodeStateStorage.hashTreeTipsDB(ChainIndex.unsafe(0, 0))
 
     def myUpdateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
       import BlockFlowState._
@@ -30,8 +28,6 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     }
 
     def buildGenesis(): BlockChainWithState = {
-      val storages =
-        Storages.createUnsafe(rootPath, "db", Keccak256.random.toHexString, Settings.syncWrite)
       BlockChainWithState.createUnsafe(ChainIndex.unsafe(0, 0), genesis, storages, myUpdateState)
     }
   }

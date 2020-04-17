@@ -32,9 +32,6 @@ trait AbstractKeyValueStorage[K, V] {
 
 trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyValueStorage {
 
-  implicit def keySerializer: Serializer[K]
-  implicit def valueSerde: Serde[V]
-
   protected def storageKey(key: K): ByteString = serialize(key)
 
   def get(key: K): IOResult[V] = IOUtils.tryExecute(getUnsafe(key))

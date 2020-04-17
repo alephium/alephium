@@ -1,6 +1,6 @@
 package org.alephium.appserver
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
@@ -23,7 +23,7 @@ import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
-import org.alephium.flow.io.IOResult
+import org.alephium.flow.io.{IOResult, Storages, StoragesFixture}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
@@ -186,7 +186,8 @@ class RPCServerSpec
                                    dummyNeighborCliques,
                                    dummmyBlockHeader,
                                    blockFlowProbe.ref,
-                                   dummyTx)
+                                   dummyTx,
+                                   storages)
 
     assertThrows[RuntimeException] {
       RPCServer(mode, ActorRefT(TestProbe().ref))
@@ -203,7 +204,7 @@ class RPCServerSpec
       RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
     implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
-    val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref, dummyTx)
+    val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref, dummyTx, storages)
     def blockflowFetch(params: String) = {
       RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).right.value, 0))
     }
@@ -260,8 +261,7 @@ class RPCServerSpec
     }
   }
 
-  trait Fixture extends InfoFixture with PlatformConfigFixture {
-
+  trait Fixture extends InfoFixture with PlatformConfigFixture with StoragesFixture {
     val now = TimeStamp.now()
     lazy val dummmyBlockHeader =
       ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
@@ -301,7 +301,8 @@ class RPCServerSpec
                                         dummyNeighborCliques,
                                         dummmyBlockHeader,
                                         blockFlowProbe.ref,
-                                        dummyTx)
+                                        dummyTx,
+                                        storages)
 
     lazy val server: RPCServer = RPCServer(mode, miner)
   }
@@ -379,10 +380,11 @@ object RPCServerSpec {
                   neighborCliques: NeighborCliques,
                   blockHeader: BlockHeader,
                   blockFlowProbe: ActorRef,
-                  dummyTx: Transaction)(implicit val config: PlatformConfig)
+                  dummyTx: Transaction,
+                  storages: Storages)(implicit val config: PlatformConfig)
       extends Node {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
-    val blockFlow: BlockFlow         = new BlockFlowDummy(blockHeader, blockFlowProbe, dummyTx)
+    val blockFlow: BlockFlow         = new BlockFlowDummy(blockHeader, blockFlowProbe, dummyTx, storages)
 
     val serverProbe                          = TestProbe()
     val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
@@ -411,8 +413,10 @@ object RPCServerSpec {
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
   }
 
-  class BlockFlowDummy(blockHeader: BlockHeader, blockFlowProbe: ActorRef, dummyTx: Transaction)(
-      implicit val config: PlatformConfig)
+  class BlockFlowDummy(blockHeader: BlockHeader,
+                       blockFlowProbe: ActorRef,
+                       dummyTx: Transaction,
+                       storages: Storages)(implicit val config: PlatformConfig)
       extends BlockFlow {
     override def getAllHeaders(
         predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
@@ -442,11 +446,11 @@ object RPCServerSpec {
     }
 
     def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState =
-      BlockChainWithState.fromGenesisUnsafe
+      BlockChainWithState.fromGenesisUnsafe(storages)
     def blockchainBuilder: ChainIndex => BlockChain =
-      BlockChain.fromGenesisUnsafe
+      BlockChain.fromGenesisUnsafe(storages)
     def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
-      BlockHeaderChain.fromGenesisUnsafe
+      BlockHeaderChain.fromGenesisUnsafe(storages)
 
     override def getHeight(hash: Hash): IOResult[Int]          = Right(1)
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
@@ -466,9 +470,17 @@ object RPCServerSpec {
                   neighborCliques: NeighborCliques,
                   blockHeader: BlockHeader,
                   blockFlowProbe: ActorRef,
-                  dummyTx: Transaction)(implicit val config: PlatformConfig)
+                  dummyTx: Transaction,
+                  storages: Storages)(implicit val config: PlatformConfig)
       extends Mode {
-    val node = new NodeDummy(intraCliqueInfo, neighborCliques, blockHeader, blockFlowProbe, dummyTx)
+    lazy val node = new NodeDummy(intraCliqueInfo,
+                                  neighborCliques,
+                                  blockHeader,
+                                  blockFlowProbe,
+                                  dummyTx,
+                                  storages)
+
+    implicit lazy val executionContext: ExecutionContext = node.system.dispatcher
 
     override def shutdown(): Future[Unit] =
       for {
