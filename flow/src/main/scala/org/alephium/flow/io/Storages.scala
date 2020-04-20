@@ -35,7 +35,8 @@ object Storages {
     val emptyTrie         = MerklePatriciaTrie.createStateTrie(trieStorage)
     val trieHashStorage   = TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
 
-    Storages(headerStorage,
+    Storages(db,
+             headerStorage,
              blockStorage,
              emptyTrie,
              trieHashStorage,
@@ -50,10 +51,15 @@ object Storages {
 }
 
 final case class Storages(
+    rocksDBSource: RocksDBSource,
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
     trieStorage: MerklePatriciaTrie,
     trieHashStorage: TrieHashStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage
-)
+) {
+  def close(): IOResult[Unit] = rocksDBSource.close()
+
+  def closeUnsafe(): Unit = rocksDBSource.closeUnsafe()
+}

@@ -1,6 +1,6 @@
 package org.alephium.flow
 
-import org.scalatest.BeforeAndAfter
+import org.scalatest.BeforeAndAfterAll
 
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
@@ -10,8 +10,8 @@ trait AlephiumFlowSpec
     extends AlephiumSpec
     with PlatformConfigFixture
     with StoragesFixture
-    with BeforeAndAfter {
-  after {
+    with BeforeAndAfterAll {
+  override def afterAll() {
     cleanStorages()
   }
 }
