@@ -23,12 +23,13 @@ object RocksDBKeyValueStorage {
     new RocksDBKeyValueStorage(storage, cf, writeOptions, readOptions)
 }
 
-class RocksDBKeyValueStorage[K: Serializer, V: Serde](
+class RocksDBKeyValueStorage[K, V](
     storage: RocksDBSource,
     cf: RocksDBSource.ColumnFamily,
     val writeOptions: WriteOptions,
     val readOptions: ReadOptions
-) extends KeyValueStorage[K, V]
+)(implicit val keySerializer: Serializer[K], val valueSerde: Serde[V])
+    extends KeyValueStorage[K, V]
     with RocksDBColumn {
   protected val db: RocksDB                = storage.db
   protected val handle: ColumnFamilyHandle = storage.handle(cf)

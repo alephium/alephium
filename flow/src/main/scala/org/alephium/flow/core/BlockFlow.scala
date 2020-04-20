@@ -1,7 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.Utils
-import org.alephium.flow.io.{IOResult, IOUtils}
+import org.alephium.flow.io.{IOResult, IOUtils, Storages}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
@@ -19,10 +19,12 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 object BlockFlow {
   type TrieUpdater = (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie]
 
-  def fromGenesisUnsafe()(implicit config: PlatformConfig): BlockFlow = {
-    new BlockFlowImpl(BlockChainWithState.fromGenesisUnsafe,
-                      BlockChain.fromGenesisUnsafe,
-                      BlockHeaderChain.fromGenesisUnsafe)
+  def fromGenesisUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+    new BlockFlowImpl(
+      BlockChainWithState.fromGenesisUnsafe(storages),
+      BlockChain.fromGenesisUnsafe(storages),
+      BlockHeaderChain.fromGenesisUnsafe(storages)
+    )
   }
 
   class BlockFlowImpl(

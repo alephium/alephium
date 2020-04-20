@@ -24,7 +24,7 @@ import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction, Unsign
 import org.alephium.protocol.script.{PayTo, PubScript, Witness}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
-import org.alephium.util.{ActorRefT, AVector, Hex}
+import org.alephium.util.{ActorRefT, AVector, Duration, Hex}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
     extends RPCServerAbstract {
@@ -36,6 +36,8 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   implicit val config: PlatformConfig             = mode.config
   implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
   implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
+
+  private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
   private implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
@@ -98,8 +100,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   def stopServer(): Future[Unit] =
     for {
-      httpStop <- httpBindingPromise.future.flatMap(_.unbind)
-      wsStop   <- wsBindingPromise.future.flatMap(_.unbind)
+      httpStop <- httpBindingPromise.future.flatMap(
+        _.terminate(hardDeadline = terminationHardDeadline))
+      wsStop <- wsBindingPromise.future.flatMap(_.terminate(hardDeadline = terminationHardDeadline))
     } yield {
       logger.info(s"http unbound with message $httpStop.")
       logger.info(s"ws unbound with message $wsStop.")

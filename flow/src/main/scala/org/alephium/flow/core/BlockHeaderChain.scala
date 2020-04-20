@@ -86,10 +86,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 }
 
 object BlockHeaderChain {
-  def fromGenesisUnsafe(chainIndex: ChainIndex)(
+  def fromGenesisUnsafe(storages: Storages)(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock.header, config.storages)
+    createUnsafe(chainIndex, genesisBlock.header, storages)
   }
 
   def createUnsafe(

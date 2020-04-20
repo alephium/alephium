@@ -13,7 +13,7 @@ import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, AVector}
 
 class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
-  val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe()
+  val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
   trait Fixture extends FairMinerState {
     override implicit def config: PlatformConfig = Spec.config

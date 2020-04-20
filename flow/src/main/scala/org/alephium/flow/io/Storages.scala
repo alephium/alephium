@@ -20,16 +20,15 @@ object Storages {
     def blockCacheCapacity: Int
   }
 
-  def createUnsafe(rootPath: Path, dbFolder: String, dbName: String, writeOptions: WriteOptions)(
+  def createUnsafe(rootPath: Path, db: RocksDBSource, writeOptions: WriteOptions)(
       implicit config: GroupConfig with Config): Storages = {
     val blockStorage      = BlockStorage.createUnsafe(rootPath, config.blockCacheCapacity)
-    val db                = createRocksDBUnsafe(rootPath, dbFolder, dbName)
-    val headerStorage     = BlockHeaderStorage(db, ColumnFamily.Header, writeOptions)
-    val blockStateStorage = BlockStateStorage(db, ColumnFamily.All, writeOptions)
-    val nodeStateStorage  = NodeStateStorage(db, ColumnFamily.All, writeOptions)
+    val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
+    val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
+    val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
     val emptyTrie         = MerklePatriciaTrie.createStateTrie(trieStorage)
-    val trieHashStorage   = TrieHashStorage(trieStorage, db, ColumnFamily.All, writeOptions)
+    val trieHashStorage   = TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
 
     Storages(headerStorage,
              blockStorage,
@@ -37,18 +36,6 @@ object Storages {
              trieHashStorage,
              blockStateStorage,
              nodeStateStorage)
-  }
-
-  private def createRocksDBUnsafe(rootPath: Path,
-                                  dbFolder: String,
-                                  dbName: String): RocksDBSource = {
-    val path = {
-      val path = rootPath.resolve(dbFolder)
-      IOUtils.createDirUnsafe(path)
-      path
-    }
-    val dbPath = path.resolve(dbName)
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
   }
 }
 
