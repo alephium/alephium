@@ -3,7 +3,7 @@ package org.alephium.flow.platform
 import scala.concurrent.{ExecutionContext, Future}
 
 import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.io.RocksDBSource
+import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.clique.BrokerHandler
 
@@ -30,13 +30,13 @@ object Mode {
   class Default extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()
 
-    private val db: RocksDBSource = {
-      val dbFolder = "db"
-      val dbName   = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
-      RocksDBSource.createUnsafe(config.rootPath, dbFolder, dbName)
+    private val storages: Storages = {
+      val postfix      = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
+      val dbFolder     = "db-" + postfix
+      val blocksFolder = "blocks-" + postfix
+
+      Storages.createUnsafe(config.rootPath, dbFolder, blocksFolder, Settings.writeOptions)
     }
-    private val storages: Storages =
-      Storages.createUnsafe(config.rootPath, db, RocksDBSource.Settings.writeOptions)
 
     override val node: Node = Node.build(builders, "Root", storages)
 
@@ -45,7 +45,7 @@ object Mode {
     override def shutdown(): Future[Unit] =
       for {
         _ <- node.shutdown()
-        _ <- Future.successful(db.close())
+        _ <- Future.successful(storages.close())
       } yield ()
   }
 }

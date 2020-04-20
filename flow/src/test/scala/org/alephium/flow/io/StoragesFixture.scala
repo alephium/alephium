@@ -5,20 +5,26 @@ import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 
 trait StoragesFixture {
-  def config: PlatformConfig
-  lazy val (db, storages) = StoragesFixture.buildStorages(config)
+  implicit def config: PlatformConfig
+  lazy val storages = StoragesFixture.buildStorages
 
-  def cleanStorages() = {
+  def cleanStorages(): Unit = {
     TestUtils.clear(storages.blockStorage.folder)
-    RocksDBSource.dESTROY(db)
+    storages.closeUnsafe()
+    RocksDBSource.dESTROYUnsafe(storages.rocksDBSource)
   }
 }
+
 object StoragesFixture {
-  def buildStorages(implicit config: PlatformConfig): (RocksDBSource, Storages) = {
-    val db: RocksDBSource =
-      RocksDBSource.createUnsafe(config.rootPath, "db", Hash.random.toHexString)
+  def buildStorages(implicit config: PlatformConfig): Storages = {
+    val postFix      = Hash.random.toHexString
+    val dbFolders    = s"db-$postFix"
+    val blocksFolder = s"blocks-$postFix"
     val storages: Storages =
-      Storages.createUnsafe(config.rootPath, db, RocksDBSource.Settings.syncWrite)(config)
-    (db, storages)
+      Storages.createUnsafe(config.rootPath,
+                            dbFolders,
+                            blocksFolder,
+                            RocksDBSource.Settings.syncWrite)
+    storages
   }
 }
