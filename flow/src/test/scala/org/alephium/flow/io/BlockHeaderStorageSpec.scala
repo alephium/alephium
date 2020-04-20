@@ -16,7 +16,7 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
     val dbPath = tmpdir.resolve(dbname)
 
     val dbStorage              = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-    val db: BlockHeaderStorage = BlockHeaderStorage(dbStorage, ColumnFamily.All)
+    val db: BlockHeaderStorage = BlockHeaderRockDBStorage(dbStorage, ColumnFamily.All)
 
     def generate(): BlockHeader = {
       val block = ModelGen.blockGen.sample.get

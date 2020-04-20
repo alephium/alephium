@@ -7,30 +7,9 @@ import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF.Hash
 
-object TrieHashStorage {
-  def apply(trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
-            storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions): TrieHashStorage = {
-    new TrieHashStorage(trieStorage, storage, cf, writeOptions, Settings.readOptions)
-  }
+trait TrieHashStorage extends KeyValueStorage[Hash, Hash] {
+  val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
 
-  def apply(trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
-            storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions): TrieHashStorage = {
-    new TrieHashStorage(trieStorage, storage, cf, writeOptions, readOptions)
-  }
-}
-
-class TrieHashStorage(
-    trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
-    storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, Hash](storage, cf, writeOptions, readOptions) {
   override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.trieHashPostfix
 
   def getTrie(hash: Hash): IOResult[MerklePatriciaTrie] = {
@@ -41,3 +20,29 @@ class TrieHashStorage(
     put(hash, trie.rootHash)
   }
 }
+
+object TrieHashRockDBStorage {
+  def apply(trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
+            storage: RocksDBSource,
+            cf: ColumnFamily,
+            writeOptions: WriteOptions): TrieHashRockDBStorage = {
+    new TrieHashRockDBStorage(trieStorage, storage, cf, writeOptions, Settings.readOptions)
+  }
+
+  def apply(trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
+            storage: RocksDBSource,
+            cf: ColumnFamily,
+            writeOptions: WriteOptions,
+            readOptions: ReadOptions): TrieHashRockDBStorage = {
+    new TrieHashRockDBStorage(trieStorage, storage, cf, writeOptions, readOptions)
+  }
+}
+
+class TrieHashRockDBStorage(
+    val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node],
+    storage: RocksDBSource,
+    cf: ColumnFamily,
+    writeOptions: WriteOptions,
+    readOptions: ReadOptions
+) extends RocksDBKeyValueStorage[Hash, Hash](storage, cf, writeOptions, readOptions)
+    with TrieHashStorage

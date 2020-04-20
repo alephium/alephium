@@ -3,7 +3,7 @@ package org.alephium.appserver
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
-import scala.concurrent.Promise
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 import akka.actor.Terminated
 import akka.http.scaladsl.Http
@@ -23,7 +23,8 @@ import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
-import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.flow.core.TestUtils
+import org.alephium.flow.io.{BlockHeaderRockDBStorage, RocksDBSource, StoragesFixture}
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -92,6 +93,9 @@ class ServerSpec extends AlephiumSpec {
 
     request[Balance](rpcPort, getBalance(publicKey)) is
       Balance(initialBalance.balance - (2 * transferAmount), 1)
+
+    server1.stop().futureValue is (())
+    server0.stop().futureValue is (())
   }
 
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
@@ -141,7 +145,7 @@ class ServerSpec extends AlephiumSpec {
 
     def bootNode(publicPort: Int, brokerId: Int): Server = {
       new Server(
-        new Mode with PlatformConfigFixture {
+        new Mode with PlatformConfigFixture with StoragesFixture {
           override val configValues = Map(
             ("alephium.network.masterAddress", s"localhost:$masterPort"),
             ("alephium.network.publicAddress", s"localhost:$publicPort"),
@@ -150,8 +154,20 @@ class ServerSpec extends AlephiumSpec {
             ("alephium.broker.brokerId", brokerId)
           )
           override implicit lazy val config =
-            PlatformConfig.build(newConfig, newPath, Settings.writeOptions, None)
-          val node: Node = Node.build(builders, s"node-$brokerId")(config)
+            PlatformConfig.build(newConfig, newPath, None)
+
+          val node: Node = Node.build(builders, s"node-$brokerId", storages)(config)
+
+          implicit val executionContext: ExecutionContext = node.system.dispatcher
+          override def shutdown(): Future[Unit] =
+            for {
+              _ <- node.shutdown()
+              _ <- Future.successful(db.close())
+              _ <- Future.successful(TestUtils.clear(storages.blockStorage.folder))
+              _ <- Future.successful(
+                RocksDBSource.dESTROY(
+                  storages.headerStorage.asInstanceOf[BlockHeaderRockDBStorage].storage))
+            } yield ()
         }
       )
     }

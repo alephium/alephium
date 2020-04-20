@@ -4,6 +4,7 @@ import java.nio.file.Path
 
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
+import org.alephium.serde.{Serde, Serializer}
 import org.alephium.util.LruCache
 
 object BlockStorage {
@@ -15,13 +16,15 @@ object BlockStorage {
 
   def createUnsafe(root: Path, cacheCapacity: Int): BlockStorage = {
     createDirUnsafe(root)
-    val storage = new BlockStorageInner(root)
+    val storage = new BlockStorageInnerImpl(root)
     createDirUnsafe(storage.folder)
     new BlockStorage(storage, cacheCapacity)
   }
 }
 
-class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)
+class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)(
+    implicit val keySerializer: Serializer[Hash],
+    val valueSerde: Serde[Block])
     extends AbstractKeyValueStorage[Hash, Block] {
   val folder: Path  = storage.folder
   private val cache = LruCache[Hash, Block, IOError](cacheCapacity)
@@ -63,6 +66,11 @@ class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)
   def clear(): IOResult[Unit] = storage.clear()
 }
 
-class BlockStorageInner(root: Path) extends KeyValueStorage[Hash, Block] with DiskSource {
+trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource {
+  def root: Path
+}
+class BlockStorageInnerImpl(val root: Path)(implicit val keySerializer: Serializer[Hash],
+                                            val valueSerde: Serde[Block])
+    extends BlockStorageInner {
   val folder: Path = root.resolve("blocks")
 }

@@ -10,34 +10,11 @@ import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-object NodeStateStorage {
-  def apply(storage: RocksDBSource, cf: ColumnFamily)(
-      implicit config: GroupConfig): NodeStateStorage =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+trait NodeStateStorage extends RawKeyValueStorage {
 
-  def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions)(
-      implicit config: GroupConfig): NodeStateStorage =
-    apply(storage, cf, writeOptions, Settings.readOptions)
-
-  def apply(storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions)(implicit config: GroupConfig): NodeStateStorage = {
-    new NodeStateStorage(storage, cf, writeOptions, readOptions)
-  }
+  def config: GroupConfig
 
   private val tipsSerde: Serde[AVector[Hash]] = avectorSerde[Hash]
-}
-
-class NodeStateStorage(val storage: RocksDBSource,
-                       val cf: ColumnFamily,
-                       val writeOptions: WriteOptions,
-                       val readOptions: ReadOptions)(implicit config: GroupConfig)
-    extends RocksDBColumn {
-  import NodeStateStorage.tipsSerde
-
-  protected val db: RocksDB                = storage.db
-  protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   private val tipKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
     ByteString(from.toByte, to.toByte, Storages.tipsPostfix)
@@ -61,6 +38,35 @@ class NodeStateStorage(val storage: RocksDBSource,
       deleteRawUnsafe(tipKey)
     }
   }
+
+  def heightIndexStorage(chainIndex: ChainIndex): HeightIndexStorage
+}
+
+object NodeStateRockDBStorage {
+  def apply(storage: RocksDBSource, cf: ColumnFamily)(
+      implicit config: GroupConfig): NodeStateRockDBStorage =
+    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+
+  def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions)(
+      implicit config: GroupConfig): NodeStateRockDBStorage =
+    apply(storage, cf, writeOptions, Settings.readOptions)
+
+  def apply(storage: RocksDBSource,
+            cf: ColumnFamily,
+            writeOptions: WriteOptions,
+            readOptions: ReadOptions)(implicit config: GroupConfig): NodeStateRockDBStorage = {
+    new NodeStateRockDBStorage(storage, cf, writeOptions, readOptions)
+  }
+}
+
+class NodeStateRockDBStorage(val storage: RocksDBSource,
+                             val cf: ColumnFamily,
+                             val writeOptions: WriteOptions,
+                             val readOptions: ReadOptions)(implicit val config: GroupConfig)
+    extends RocksDBColumn
+    with NodeStateStorage {
+  protected val db: RocksDB                = storage.db
+  protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   def heightIndexStorage(chainIndex: ChainIndex): HeightIndexStorage =
     new HeightIndexStorage(chainIndex, storage, cf, writeOptions, readOptions)
