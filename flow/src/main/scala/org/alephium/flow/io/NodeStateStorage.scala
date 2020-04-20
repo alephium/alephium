@@ -15,8 +15,6 @@ trait NodeStateStorage extends RawKeyValueStorage {
 
   def config: GroupConfig
 
-  private val tipsSerde: Serde[AVector[Hash]] = avectorSerde[Hash]
-
   private val isInitializedKey = Hash.hash("isInitialized").bytes :+ Storages.isInitializedPostfix
 
   def isInitialized(): IOResult[Boolean] = IOUtils.tryExecute {

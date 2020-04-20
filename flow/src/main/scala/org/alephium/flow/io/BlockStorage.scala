@@ -68,11 +68,9 @@ class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)(
   def clear(): IOResult[Unit] = storage.clear()
 }
 
-trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource {
-  def root: Path
-}
-class BlockStorageInnerImpl(val root: Path)(implicit val keySerializer: Serializer[Hash],
-                                            val valueSerde: Serde[Block])
-    extends BlockStorageInner {
-  val folder: Path = root.resolve("blocks")
-}
+trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource
+
+class BlockStorageInnerImpl(val folder: Path)(
+    implicit val keySerializer: Serializer[Hash],
+    val valueSerde: Serde[Block]
+) extends BlockStorageInner

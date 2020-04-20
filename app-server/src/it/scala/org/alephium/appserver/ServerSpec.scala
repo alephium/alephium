@@ -161,7 +161,7 @@ class ServerSpec extends AlephiumSpec {
           override def shutdown(): Future[Unit] =
             for {
               _ <- node.shutdown()
-              _ <- Future.successful(db.close())
+              _ <- Future.successful(storages.close())
               _ <- Future.successful(TestUtils.clear(storages.blockStorage.folder))
               _ <- Future.successful(
                 RocksDBSource.dESTROY(

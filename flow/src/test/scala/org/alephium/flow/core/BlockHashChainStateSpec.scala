@@ -18,7 +18,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
       private val dummyIndex               = ChainIndex.unsafe(0, 0)(config)
       override def config: ConsensusConfig = Test.config
       override def chainStateStorage: ChainStateStorage =
-        Test.config.storages.nodeStateStorage.chainStateStorage(dummyIndex)
+        Test.storages.nodeStateStorage.chainStateStorage(dummyIndex)
 
       override def getTimestamp(hash: Hash): IOResult[TimeStamp] = ???
 

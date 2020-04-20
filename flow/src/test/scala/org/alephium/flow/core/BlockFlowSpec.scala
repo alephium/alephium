@@ -172,7 +172,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
   }
 
   it should "reload blockflow properly from storage" in {
-    val blockFlow0 = BlockFlow.fromGenesisUnsafe()
+    val blockFlow0 = BlockFlow.fromGenesisUnsafe(storages)
 
     val newBlocks1 = for {
       i <- 0 to 1
@@ -188,7 +188,7 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     }
     newBlocks1.map(_.hash).diff(blockFlow0.getAllTips.toArray).isEmpty is true
 
-    val blockFlow1 = BlockFlow.fromStorageUnsafe()
+    val blockFlow1 = BlockFlow.fromStorageUnsafe(storages)
     newBlocks1.map(_.hash).diff(blockFlow1.getAllTips.toArray).isEmpty is true
 
     val newBlocks2 = for {
