@@ -54,6 +54,8 @@ class ServerSpec extends AlephiumSpec {
     val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
     Seq(server0.start, server1.start).foreach(_.futureValue is (()))
 
+    Thread.sleep(500)
+
     val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
     val group      = request[Group](rpcMasterPort, getGroup(publicKey))
     val index      = group.group / selfClique.groupNumPerBroker
@@ -93,8 +95,8 @@ class ServerSpec extends AlephiumSpec {
     request[Balance](rpcPort, getBalance(publicKey)) is
       Balance(initialBalance.balance - (2 * transferAmount), 1)
 
-    server1.stop().futureValue is (())
-    server0.stop().futureValue is (())
+    server1.stop()
+    server0.stop()
   }
 
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
