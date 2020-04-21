@@ -2,6 +2,7 @@ package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
 
+import scala.collection.mutable
 import scala.util.Random
 
 import akka.actor.Props
@@ -317,6 +318,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
         remoteCliqueId   = _remoteCliqueId
         remoteBrokerInfo = _remoteBrokerInfo
       }
+
+      override def handleSendBlocks(blocks: AVector[Block],
+                                    notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = ()
     })
     val syncHandler = syncHandlerRef.underlyingActor
   }
@@ -326,13 +330,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     syncHandler.uponHandshaked(this.remoteCliqueInfo.id, config.brokerInfo)
     syncHandler.isSyncing is true
 
-    val blocks0    = ModelGen.chainGen(config.numOfSyncBlocksLimit).sample.get
-    val blocksMsg0 = Message.serialize(SendBlocks(blocks0))
+    val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
+    val blocksMsg0 = Message.serialize(SyncResponse(AVector(block), AVector.empty))
     syncHandlerRef ! Tcp.Received(blocksMsg0)
     syncHandler.isSyncing is true
-    val blocksMsg1 = Message.serialize(SendBlocks(AVector.empty))
+    val blocksMsg1 = Message.serialize(SyncResponse(AVector.empty, AVector.empty))
     syncHandlerRef ! Tcp.Received(blocksMsg1)
-    syncHandlerRef ! FlowHandler.BlocksLocated(AVector.empty)
+    syncHandlerRef ! FlowHandler.SyncData(AVector.empty, AVector.empty)
     syncHandler.isSyncing is false
   }
 }

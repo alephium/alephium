@@ -6,11 +6,11 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.io.IOResult
-import org.alephium.flow.model.BlockDeps
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
+import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 
-trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
+trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
 
   val mempools = AVector.tabulate(config.groupNumPerBroker) { idx =>
     val group = GroupIndex.unsafe(brokerInfo.groupFrom + idx)
@@ -88,4 +88,10 @@ trait FlowUtils extends MultiChain with BlockFlowState with StrictLogging {
     val transactions = collectTransactions(chainIndex)
     BlockFlowTemplate(chainIndex, bestDeps.deps, target, transactions)
   }
+}
+
+trait SyncUtils {
+  def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo
+
+  def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo
 }
