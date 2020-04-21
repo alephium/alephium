@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io.{IOResult, IOUtils, Storages}
-import org.alephium.flow.model.BlockDeps
+import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.protocol.ALF
@@ -104,16 +104,35 @@ object BlockFlow extends StrictLogging {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
-    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = {
+    def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo = {
       val (low, high) = brokerInfo.calIntersection(config.brokerInfo)
-      assert(low < high)
+      assume(low < high)
 
-      var tips = AVector.empty[Hash]
-      for {
+      val blockTips = for {
         from <- low until high
         to   <- 0 until groups
-      } tips = tips ++ getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to)).getAllTips
-      tips
+      } yield getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to)).getAllTips
+
+      SyncInfo(blockTips.fold(AVector.empty[Hash])(_ ++ _), AVector.empty)
+    }
+
+    def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = {
+      var blockTips  = AVector.empty[Hash]
+      var headerTips = AVector.empty[Hash]
+
+      for {
+        from <- remoteBroker.groupFrom until remoteBroker.groupUntil
+        to   <- 0 until groups
+      } {
+        val chain = getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
+        if (config.brokerInfo.containsRaw(to)) {
+          blockTips = blockTips ++ chain.getAllTips
+        } else {
+          headerTips = headerTips ++ chain.getAllTips
+        }
+      }
+
+      SyncInfo(blockTips, headerTips)
     }
 
     // Rtips means tip representatives for all groups
