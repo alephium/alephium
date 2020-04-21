@@ -6,7 +6,7 @@ import akka.util.ByteString
 
 import org.alephium.util.Hex
 
-trait DiskSource extends RawKeyValueStorage {
+trait DiskSource extends RawKeyValueStorage with KeyValueSource {
   def folder: Path
 
   def getPath(key: ByteString): Path = {
@@ -43,7 +43,15 @@ trait DiskSource extends RawKeyValueStorage {
     if (Files.exists(path)) Files.delete(path)
   }
 
-  def clear(): IOResult[Unit] = IOUtils.tryExecute {
+  def close(): IOResult[Unit] = Right(())
+
+  def closeUnsafe(): Unit = ()
+
+  def dESTROY(): IOResult[Unit] = IOUtils.tryExecute {
+    dESTROYUnsafe()
+  }
+
+  def dESTROYUnsafe(): Unit = {
     IOUtils.clearUnsafe(folder)
   }
 }

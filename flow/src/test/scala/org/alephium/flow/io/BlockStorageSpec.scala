@@ -13,10 +13,10 @@ import org.alephium.util.{AlephiumSpec, Files => AFiles}
 class BlockStorageSpec extends AlephiumSpec {
   trait Fixture {
     val root    = AFiles.tmpDir.resolve(".alephium-test-diskspec")
-    val storage = BlockStorage.create(root, 10).right.value
+    val storage = BlockStorage.create(root, "blocks", 10).right.value
 
     def postTest(): Assertion = {
-      storage.clear().isRight is true
+      storage.source.dESTROY().isRight is true
       Files.exists(root) is true
       Files.exists(storage.folder) is false
     }
@@ -25,7 +25,7 @@ class BlockStorageSpec extends AlephiumSpec {
   it should "create related folders" in new Fixture {
     Files.exists(root) is true
     Files.exists(storage.folder) is true
-    BlockStorage.create(root, 10).isRight is true
+    BlockStorage.create(root, "blocks", 10).isRight is true
   }
 
   it should "save and read blocks" in new Fixture with ConsensusConfigFixture {
