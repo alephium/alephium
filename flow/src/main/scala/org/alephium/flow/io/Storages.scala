@@ -9,6 +9,7 @@ import org.alephium.flow.trie.MerklePatriciaTrie
 import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.util.AVector
 
 object Storages {
   val isInitializedPostfix: Byte = 0
@@ -35,7 +36,7 @@ object Storages {
     val emptyTrie         = MerklePatriciaTrie.createStateTrie(trieStorage)
     val trieHashStorage   = TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
 
-    Storages(db,
+    Storages(AVector(db, blockStorage.source),
              headerStorage,
              blockStorage,
              emptyTrie,
@@ -51,15 +52,19 @@ object Storages {
 }
 
 final case class Storages(
-    rocksDBSource: RocksDBSource,
+    sources: AVector[KeyValueSource],
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
     trieStorage: MerklePatriciaTrie,
     trieHashStorage: TrieHashStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage
-) {
-  def close(): IOResult[Unit] = rocksDBSource.close()
+) extends KeyValueSource {
+  def close(): IOResult[Unit] = sources.foreachE(_.close())
 
-  def closeUnsafe(): Unit = rocksDBSource.closeUnsafe()
+  def closeUnsafe(): Unit = sources.foreach(_.close())
+
+  def dESTROY(): IOResult[Unit] = sources.foreachE(_.dESTROY())
+
+  def dESTROYUnsafe(): Unit = sources.foreach(_.dESTROYUnsafe())
 }

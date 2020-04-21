@@ -23,8 +23,7 @@ import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.client.Node
-import org.alephium.flow.core.TestUtils
-import org.alephium.flow.io.{BlockHeaderRockDBStorage, RocksDBSource, StoragesFixture}
+import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -161,11 +160,7 @@ class ServerSpec extends AlephiumSpec {
           override def shutdown(): Future[Unit] =
             for {
               _ <- node.shutdown()
-              _ <- Future.successful(storages.close())
-              _ <- Future.successful(TestUtils.clear(storages.blockStorage.folder))
-              _ <- Future.successful(
-                RocksDBSource.dESTROY(
-                  storages.headerStorage.asInstanceOf[BlockHeaderRockDBStorage].storage))
+              _ <- Future.successful(storages.dESTROY())
             } yield ()
         }
       )

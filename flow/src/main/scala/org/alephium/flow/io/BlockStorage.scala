@@ -24,30 +24,31 @@ object BlockStorage {
   }
 }
 
-class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)(
+class BlockStorage(val source: BlockStorageInner, val cacheCapacity: Int)(
     implicit val keySerializer: Serializer[Hash],
     val valueSerde: Serde[Block])
     extends AbstractKeyValueStorage[Hash, Block] {
-  val folder: Path  = storage.folder
   private val cache = LruCache[Hash, Block, IOError](cacheCapacity)
 
+  def folder: Path = source.folder
+
   override def get(key: Hash): IOResult[Block] =
-    cache.get(key)(storage.get(key))
+    cache.get(key)(source.get(key))
 
   override def getUnsafe(key: Hash): Block =
-    cache.getUnsafe(key)(storage.getUnsafe(key))
+    cache.getUnsafe(key)(source.getUnsafe(key))
 
   override def getOpt(key: Hash): IOResult[Option[Block]] =
-    cache.getOpt(key)(storage.getOpt(key))
+    cache.getOpt(key)(source.getOpt(key))
 
   override def getOptUnsafe(key: Hash): Option[Block] =
-    cache.getOptUnsafe(key)(storage.getOptUnsafe(key))
+    cache.getOptUnsafe(key)(source.getOptUnsafe(key))
 
   override def put(key: Hash, value: Block): IOResult[Unit] =
-    storage.put(key, value).map(_ => cache.putInCache(key, value))
+    source.put(key, value).map(_ => cache.putInCache(key, value))
 
   override def putUnsafe(key: Hash, value: Block): Unit = {
-    storage.putUnsafe(key, value)
+    source.putUnsafe(key, value)
     cache.putInCache(key, value)
   }
 
@@ -56,16 +57,14 @@ class BlockStorage(val storage: BlockStorageInner, val cacheCapacity: Int)(
   def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
 
   override def exists(key: Hash): IOResult[Boolean] =
-    cache.exists(key)(storage.exists(key))
+    cache.exists(key)(source.exists(key))
 
   override def existsUnsafe(key: Hash): Boolean =
-    cache.existsUnsafe(key)(storage.existsUnsafe(key))
+    cache.existsUnsafe(key)(source.existsUnsafe(key))
 
   override def delete(key: Hash): IOResult[Unit] = ???
 
   override def deleteUnsafe(key: Hash): Unit = ???
-
-  def clear(): IOResult[Unit] = storage.clear()
 }
 
 trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource
