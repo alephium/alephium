@@ -7,7 +7,6 @@ import org.rocksdb.util.SizeUnit
 
 import org.alephium.util.AVector
 
-@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object RocksDBSource {
   import IOUtils.tryExecute
 
@@ -127,6 +126,7 @@ object RocksDBSource {
                           Settings.databaseOptions(compaction),
                           Settings.columnOptions(compaction))
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def openUnsafeWithOptions(path: Path,
                             databaseOptions: DBOptions,
                             columnOptions: ColumnFamilyOptions): RocksDBSource = {
@@ -137,29 +137,17 @@ object RocksDBSource {
       new ColumnFamilyDescriptor(name.getBytes, columnOptions)
     }
 
-    val db =
-      RocksDB.open(databaseOptions,
-                   path.toString,
-                   descriptors.toIterable.toList.asJava,
-                   handles.asJava)
+    val db = RocksDB.open(databaseOptions,
+                          path.toString,
+                          descriptors.toIterable.toList.asJava,
+                          handles.asJava)
 
     new RocksDBSource(path, db, AVector.fromIterator(handles.toIterator))
   }
-
-  def dESTROY(path: Path): IOResult[Unit] = tryExecute {
-    RocksDB.destroyDB(path.toString, new Options())
-  }
-
-  def dESTROY(db: RocksDBSource): IOResult[Unit] = tryExecute {
-    dESTROYUnsafe(db)
-  }
-
-  def dESTROYUnsafe(db: RocksDBSource): Unit = {
-    RocksDB.destroyDB(db.path.toString, new Options())
-  }
 }
 
-class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle]) {
+class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle])
+    extends KeyValueSource {
   import RocksDBSource._
   import IOUtils.tryExecute
 
@@ -170,5 +158,18 @@ class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFa
     db.close()
   }
 
-  def closeUnsafe(): Unit = db.close()
+  def closeUnsafe(): Unit = {
+    cfHandles.foreach(_.close())
+    db.close()
+  }
+
+  def dESTROY(): IOResult[Unit] = tryExecute {
+    dESTROYUnsafe()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def dESTROYUnsafe(): Unit = {
+    closeUnsafe()
+    RocksDB.destroyDB(path.toString, new Options())
+  }
 }

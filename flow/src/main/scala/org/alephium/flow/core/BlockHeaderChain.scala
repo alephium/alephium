@@ -1,5 +1,6 @@
 package org.alephium.flow.core
 
+import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
@@ -49,12 +50,16 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  def addGenesis(header: BlockHeader): IOResult[Unit] = {
+  protected def addGenesis(header: BlockHeader): IOResult[Unit] = {
     assume(header.hash == genesisHash)
     for {
       _ <- addHeader(header)
       _ <- addGenesis(header.hash)
     } yield ()
+  }
+
+  override protected def loadFromStorage(): IOResult[Unit] = {
+    super.loadFromStorage()
   }
 
   protected def addHeader(header: BlockHeader): IOResult[Unit] = {
@@ -89,23 +94,41 @@ object BlockHeaderChain {
   def fromGenesisUnsafe(storages: Storages)(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockHeaderChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock.header, storages)
+    val initialize   = initializeGenesis(genesisBlock.header)(_)
+    createUnsafe(chainIndex, genesisBlock.header, storages, initialize)
+  }
+
+  def fromStorageUnsafe(storages: Storages)(chainIndex: ChainIndex)(
+      implicit config: PlatformConfig): BlockHeaderChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock.header, storages, initializeFromStorage)
   }
 
   def createUnsafe(
       chainIndex: ChainIndex,
       rootHeader: BlockHeader,
-      storages: Storages
+      storages: Storages,
+      initialize: BlockHeaderChain => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockHeaderChain = {
-    new BlockHeaderChain {
+    val headerchain = new BlockHeaderChain {
       override implicit val config    = _config
       override val headerStorage      = storages.headerStorage
       override val blockStateStorage  = storages.blockStateStorage
       override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootHeader.hash
 
-      require(this.addGenesis(rootHeader).isRight)
     }
+
+    Utils.unsafe(initialize(headerchain))
+    headerchain
+  }
+
+  def initializeGenesis(genesisHeader: BlockHeader)(chain: BlockHeaderChain): IOResult[Unit] = {
+    chain.addGenesis(genesisHeader)
+  }
+
+  def initializeFromStorage(chain: BlockHeaderChain): IOResult[Unit] = {
+    chain.loadFromStorage()
   }
 }

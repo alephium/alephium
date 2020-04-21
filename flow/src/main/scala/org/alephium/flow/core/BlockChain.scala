@@ -34,11 +34,15 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     } yield ()
   }
 
-  def addGenesis(block: Block): IOResult[Unit] = {
+  protected def addGenesis(block: Block): IOResult[Unit] = {
     for {
       _ <- persistBlock(block)
       _ <- addGenesis(block.header)
     } yield ()
+  }
+
+  override protected def loadFromStorage(): IOResult[Unit] = {
+    super.loadFromStorage()
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
@@ -60,25 +64,42 @@ object BlockChain {
   def fromGenesisUnsafe(storages: Storages)(chainIndex: ChainIndex)(
       implicit config: PlatformConfig): BlockChain = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock, storages)
+    val initialize   = initializeGenesis(genesisBlock)(_)
+    createUnsafe(chainIndex, genesisBlock, storages, initialize)
+  }
+
+  def fromStorageUnsafe(storages: Storages)(chainIndex: ChainIndex)(
+      implicit config: PlatformConfig): BlockChain = {
+    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
+    createUnsafe(chainIndex, genesisBlock, storages, initializeFromStorage)
   }
 
   def createUnsafe(
       chainIndex: ChainIndex,
       rootBlock: Block,
-      storages: Storages
+      storages: Storages,
+      initialize: BlockChain => IOResult[Unit]
   )(implicit _config: PlatformConfig): BlockChain = {
-    new BlockChain {
+    val blockchain: BlockChain = new BlockChain {
       override implicit val config    = _config
       override val blockStorage       = storages.blockStorage
       override val headerStorage      = storages.headerStorage
       override val blockStateStorage  = storages.blockStateStorage
       override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val tipsDB             = storages.nodeStateStorage.hashTreeTipsDB(chainIndex)
+      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash: Hash  = rootBlock.hash
-
-      require(this.addGenesis(rootBlock).isRight)
     }
+
+    Utils.unsafe(initialize(blockchain))
+    blockchain
+  }
+
+  def initializeGenesis(genesisBlock: Block)(chain: BlockChain): IOResult[Unit] = {
+    chain.addGenesis(genesisBlock)
+  }
+
+  def initializeFromStorage(chain: BlockChain): IOResult[Unit] = {
+    chain.loadFromStorage()
   }
 
   final case class ChainDiff(toRemove: AVector[Block], toAdd: AVector[Block])

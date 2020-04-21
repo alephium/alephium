@@ -196,7 +196,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def logInfo(header: BlockHeader): Unit = {
-    val total = blockFlow.numHashes - config.chainNum // exclude genesis blocks
+    val total = blockFlow.numHashes
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
     val heights = for {
