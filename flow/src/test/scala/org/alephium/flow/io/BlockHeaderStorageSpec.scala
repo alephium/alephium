@@ -15,8 +15,8 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
     val dbname = "foo"
     val dbPath = tmpdir.resolve(dbname)
 
-    val dbStorage              = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-    val db: BlockHeaderStorage = BlockHeaderRockDBStorage(dbStorage, ColumnFamily.All)
+    val source        = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    val headerStorage = BlockHeaderRockDBStorage(source, ColumnFamily.All)
 
     def generate(): BlockHeader = {
       val block = ModelGen.blockGen.sample.get
@@ -24,8 +24,7 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
     }
 
     def postTest(): Assertion = {
-      dbStorage.close()
-      RocksDBSource.dESTROY(dbPath).isRight is true
+      source.dESTROY().isRight is true
     }
   }
 
@@ -36,18 +35,18 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
 
   it should "check existence" in new Fixture {
     val blockHeader = generate()
-    db.exists(blockHeader) isE false
-    db.put(blockHeader).isRight is true
-    db.exists(blockHeader) isE true
+    headerStorage.exists(blockHeader) isE false
+    headerStorage.put(blockHeader).isRight is true
+    headerStorage.exists(blockHeader) isE true
     postTest()
   }
 
   it should "delete entities" in new Fixture {
     val blockHeader = generate()
-    db.put(blockHeader).isRight is true
-    db.exists(blockHeader) isE true
-    db.delete(blockHeader).isRight is true
-    db.exists(blockHeader) isE false
+    headerStorage.put(blockHeader).isRight is true
+    headerStorage.exists(blockHeader) isE true
+    headerStorage.delete(blockHeader).isRight is true
+    headerStorage.exists(blockHeader) isE false
     postTest()
   }
 
@@ -55,12 +54,12 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
     forAll(ModelGen.blockGen) { block =>
       val header = block.header
       val hash   = block.hash
-      db.put(header).isRight is true
-      db.get(hash) isE header
-      db.getOpt(hash).right.value.get is header
-      db.delete(hash).isRight is true
-      db.get(hash).isLeft is true
-      db.getOpt(hash) isE None
+      headerStorage.put(header).isRight is true
+      headerStorage.get(hash) isE header
+      headerStorage.getOpt(hash).right.value.get is header
+      headerStorage.delete(hash).isRight is true
+      headerStorage.get(hash).isLeft is true
+      headerStorage.getOpt(hash) isE None
     }
     postTest()
   }

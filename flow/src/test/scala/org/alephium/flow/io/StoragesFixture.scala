@@ -1,6 +1,5 @@
 package org.alephium.flow.io
 
-import org.alephium.flow.core.TestUtils
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 
@@ -9,9 +8,7 @@ trait StoragesFixture {
   lazy val storages = StoragesFixture.buildStorages
 
   def cleanStorages(): Unit = {
-    TestUtils.clear(storages.blockStorage.folder)
-    storages.closeUnsafe()
-    RocksDBSource.dESTROYUnsafe(storages.rocksDBSource)
+    storages.dESTROYUnsafe()
   }
 }
 

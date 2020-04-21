@@ -111,8 +111,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     protected def postTest(): Assertion = {
-      storage.close()
-      RocksDBSource.dESTROY(dbPath).isRight is true
+      storage.dESTROY().isRight is true
     }
   }
 
