@@ -16,7 +16,7 @@ class BlockStorageSpec extends AlephiumSpec {
     val storage = BlockStorage.create(root, "blocks", 10).right.value
 
     def postTest(): Assertion = {
-      storage.clear().isRight is true
+      storage.source.dESTROY().isRight is true
       Files.exists(root) is true
       Files.exists(storage.folder) is false
     }
