@@ -24,7 +24,7 @@ import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.io.{IOResult, Storages, StoragesFixture}
-import org.alephium.flow.model.BlockDeps
+import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
@@ -452,11 +452,12 @@ object RPCServerSpec {
     def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
       BlockHeaderChain.fromGenesisUnsafe(storages)
 
-    override def getHeight(hash: Hash): IOResult[Int]          = Right(1)
-    def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = ???
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps        = ???
-    def getAllTips: AVector[Hash]                              = ???
-    def getBestTipUnsafe: Hash                                 = ???
+    override def getHeight(hash: Hash): IOResult[Int]              = Right(1)
+    def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo   = ???
+    def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = ???
+    def calBestDepsUnsafe(group: GroupIndex): BlockDeps            = ???
+    def getAllTips: AVector[Hash]                                  = ???
+    def getBestTipUnsafe: Hash                                     = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
             parentHash: Hash,
             weight: Int): IOResult[Unit]         = ???

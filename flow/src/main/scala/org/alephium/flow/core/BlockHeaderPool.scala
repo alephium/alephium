@@ -15,11 +15,10 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit]
 
-  // TODO: refactor this purely for syncing
-  def getHeaders(locators: AVector[Hash]): IOResult[AVector[BlockHeader]] = {
+  def getHeadersAfter(locator: Hash): IOResult[AVector[BlockHeader]] = {
     for {
-      validLocators <- locators.filterE(contains)
-      headers       <- validLocators.mapE(getBlockHeader)
+      hashes  <- getHashesAfter(locator)
+      headers <- hashes.mapE(getBlockHeader)
     } yield headers
   }
 

@@ -68,8 +68,8 @@ class BlockChainHandler(
       feedbackAndClear(broker, dataInvalid())
     } else {
       // TODO: DoS prevention
-      log.debug(
-        s"missing parent blocks, root hashes: ${Utils.showHashableI(blocks.roots.view.map(_.value))}")
+      val rootHashes = Utils.showHashIter(blocks.roots.view.map(_.value))
+      log.debug(s"missing parent blocks, root hashes: $rootHashes")
       val tips = headerChain.getAllTips
       sender() ! FetchSince(tips)
     }
