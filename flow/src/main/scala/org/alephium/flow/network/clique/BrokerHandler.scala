@@ -396,7 +396,7 @@ trait Sync extends P2PStage {
     }
   }
 
-  def handleSyncEvents: Receive = {
+  private def handleSyncEvents: Receive = {
     case FlowHandler.CurrentTips(tips) =>
       log.debug(s"ask blocks from these tips ${Utils.show(tips)}")
       sendPayload(GetBlocks(tips))
@@ -415,20 +415,18 @@ trait Sync extends P2PStage {
       log.debug(s"all the blocks sent for $chainIndex are added")
   }
 
-  def handleSyncPayload(payload: Payload): Unit = payload match {
+  private def handleSyncPayload(payload: Payload): Unit = payload match {
     case SendBlocks(blocks) =>
       if (blocks.nonEmpty) {
         handleSendBlocks(blocks, Some(blockNotifyList))
       }
       checkSelfSynced(blocks.length)
     case GetBlocks(locators)    => handleGetBlocks(locators)
-    case SendHeaders(headers)   => handleSendHeaders(headers)
-    case GetHeaders(locators)   => handleGetHeaders(locators)
     case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
     case Pong(nonce)            => handlePong(nonce)
     case x                      =>
       // TODO: take care of misbehavior
-      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      log.warning(s"Got unexpected payload type ${x.getClass.getSimpleName}")
   }
 }
 
@@ -458,7 +456,7 @@ trait Relay extends P2PStage {
     case Pong(nonce)            => handlePong(nonce)
     case x                      =>
       // TODO: take care of misbehavior
-      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      log.warning(s"Got unexpected payload type ${x.getClass.getSimpleName}")
   }
 }
 
