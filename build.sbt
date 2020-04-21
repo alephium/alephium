@@ -1,6 +1,6 @@
 import Dependencies._
 
-Global / cancelable := true // Allow cancelation of forked task without killing SBT
+Global / cancelable := true // Allow cancellation of forked task without killing SBT
 
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
@@ -29,7 +29,7 @@ def mainProject(id: String): Project =
 
 def project(path: String): Project = {
   baseProject(path)
-    .configs(IntegrationTest)
+    .configs(IntegrationTest extend Test)
     .settings(
       Defaults.itSettings,
       inConfig(IntegrationTest)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings),
