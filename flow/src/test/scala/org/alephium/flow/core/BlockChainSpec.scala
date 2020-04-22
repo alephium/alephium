@@ -230,6 +230,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHashesAfter(chain0.head.hash) isE chain0.tail.map(_.hash)
     chain.getHashesAfter(chain1.head.hash) isE chain1.tail.map(_.hash)
     chain.getHashesAfter(genesis.hash).right.value.toSet is allHashes
+
+    chain.getHashesAfter(ModelGen.blockGen.sample.get.hash) isE AVector.empty[Hash]
   }
 
   it should "test isBefore" in new ForkedFixture {
