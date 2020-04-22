@@ -1,6 +1,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.util.Random
 
 import akka.util.ByteString
 import org.scalacheck.Gen
@@ -10,12 +11,13 @@ import org.scalatest.EitherValues._
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.validation.Validation
-import org.alephium.protocol.ALF.Hash
+import org.alephium.flow.io.StoragesFixture
+import org.alephium.flow.platform.PlatformConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
-import org.alephium.util.{AVector, Hex}
+import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.util.AVector
 
-class BlockFlowSpec extends AlephiumFlowSpec {
+class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   it should "compute correct blockflow height" in {
     val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
@@ -54,6 +56,27 @@ class BlockFlowSpec extends AlephiumFlowSpec {
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
       checkBalance(blockFlow, 0, genesisBalance - 3)
     }
+  }
+
+  it should "compute cached blocks" in {
+    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+    val newBlocks = for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    newBlocks.foreach { block =>
+      val index = block.chainIndex
+      if (index.relateTo(GroupIndex.unsafe(0))) {
+        addAndCheck(blockFlow, block, 1)
+      } else {
+        addAndCheck(blockFlow, block.header, 1)
+      }
+    }
+
+    val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).right.value
+    cache0.length is 2
+    cache0.contains(newBlocks(0).hash) is false
+    cache0.contains(newBlocks(1).hash) is true
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
@@ -209,6 +232,52 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
   }
 
+  behavior of "Balance"
+
+  it should "transfer token for inside a same group" in {
+    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+    val testGroup = Random.nextInt(config.groupNumPerBroker) + config.brokerInfo.groupFrom
+    val block     = mine(blockFlow, ChainIndex.unsafe(testGroup, testGroup), onlyTxForIntra = true)
+    block.nonCoinbase.nonEmpty is true
+    addAndCheck(blockFlow, block, 1)
+
+    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    checkBalance(blockFlow, pubScript, 1)
+    checkBalance(blockFlow, testGroup, genesisBalance - 1)
+  }
+
+  it should "transfer token for inter-group transactions" in {
+    import config.brokerInfo
+
+    val anotherBroker = (brokerInfo.id + 1 + Random.nextInt(config.brokerNum - 1)) % config.brokerNum
+    val newConfigFixture = new PlatformConfigFixture {
+      override val configValues = Map(
+        ("alephium.broker.brokerId", anotherBroker)
+      )
+
+      override lazy val genesisBalances = Test.genesisBalances
+    }
+    Test.genesisBalance is newConfigFixture.genesisBalance
+
+    val anotherConfig   = newConfigFixture.config
+    val anotherStorages = StoragesFixture.buildStorages(anotherConfig)
+    config.genesisBlocks is anotherConfig.genesisBlocks
+    val blockFlow0 = BlockFlow.fromGenesisUnsafe(storages)(config)
+    val blockFlow1 = BlockFlow.fromGenesisUnsafe(anotherStorages)(anotherConfig)
+
+    val fromGroup = Random.nextInt(config.groupNumPerBroker) + brokerInfo.groupFrom
+    val toGroup   = Random.nextInt(config.groupNumPerBroker) + anotherConfig.brokerInfo.groupFrom
+    val block     = mine(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+    block.nonCoinbase.nonEmpty is true
+
+    addAndCheck(blockFlow0, block, 1)
+    checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
+
+    addAndCheck(blockFlow1, block, 1)
+    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    checkBalance(blockFlow1, pubScript, 1)
+  }
+
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)
@@ -265,21 +334,28 @@ class BlockFlowSpec extends AlephiumFlowSpec {
     blockFlow.getUtxos(PayTo.PKH, address).right.value.sumBy(_._2.value) is expected
   }
 
+  def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: BigInt): Assertion = {
+    blockFlow.getUtxos(pubScript).right.value.sumBy(_._2.value) is expected
+  }
+
   def show(blockFlow: BlockFlow): String = {
-    blockFlow.getAllTips
+    val tips = blockFlow.getAllTips
       .map { tip =>
         val weight = blockFlow.getWeightUnsafe(tip)
         val header = blockFlow.getBlockHeaderUnsafe(tip)
         val index  = header.chainIndex
-        val hash   = showHash(tip)
-        val deps   = header.blockDeps.map(showHash).mkString("-")
-        s"weight: $weight, from: ${index.from}, to: ${index.to} hash: $hash, deps: $deps"
+        val deps   = header.blockDeps.map(_.shortHex).mkString("-")
+        s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
       }
       .mkString("", "\n", "\n")
-  }
-
-  def showHash(hash: Hash): String = {
-    Hex.toHexString(hash.bytes).take(8)
+    val bestDeps = (config.brokerInfo.groupFrom until config.brokerInfo.groupUntil)
+      .map { group =>
+        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
+        val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
+        s"group $group, bestDeps: $bestDepsStr"
+      }
+      .mkString("", "\n", "\n")
+    tips ++ bestDeps
   }
 
   def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
