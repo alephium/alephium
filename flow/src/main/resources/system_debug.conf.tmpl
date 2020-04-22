@@ -37,6 +37,15 @@ akka {
     default-dispatcher.mailbox-requirement = "org.alephium.monitoring.MonitoringMailboxSemantics"
     mailbox.requirements { "org.alephium.monitoring.MonitoringMailboxSemantics" = monitoring-mailbox }
   }
+
+  http {
+    server {
+      websocket {
+        periodic-keep-alive-mode = pong
+        periodic-keep-alive-max-idle = 30 seconds
+      }
+    }
+  }
 }
 
 monitoring-mailbox {
