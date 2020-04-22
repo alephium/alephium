@@ -18,4 +18,8 @@ final case class BlockDeps(deps: AVector[Hash]) {
   def outDeps(implicit config: GroupConfig): AVector[Hash] = {
     deps.takeRight(config.groups)
   }
+
+  def inDeps(implicit config: GroupConfig): AVector[Hash] = {
+    deps.dropRight(config.groups)
+  }
 }
