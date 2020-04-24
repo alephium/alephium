@@ -3,6 +3,7 @@ package org.alephium.flow.core
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, TimeStamp}
@@ -87,6 +88,36 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       header    <- getBlockHeader(hash)
       newTarget <- calHashTarget(hash, header.target)
     } yield newTarget
+  }
+
+  def getHeightedBlockHeaders(fromTs: TimeStamp,
+                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
+    for {
+      height <- maxHeight
+      result <- searchByTimestampHeight(height, AVector.empty, fromTs, toTs)
+    } yield result
+
+  //TODO Make it tailrec
+  //TODO Use binary search with the height params to find quicklier all our blocks.
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def searchByTimestampHeight(height: Int,
+                                      prev: AVector[(BlockHeader, Int)],
+                                      fromTs: TimeStamp,
+                                      toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
+    getHashes(height).flatMap { hashes =>
+      hashes.mapE(getBlockHeader).flatMap { headers =>
+        val filteredHeader =
+          headers.filter(header => header.timestamp >= fromTs && header.timestamp <= toTs)
+        val searchLower = !headers.exists(_.timestamp < fromTs)
+        val tmpResult   = prev ++ (filteredHeader.map(_ -> height))
+
+        if (searchLower && height > ALF.GenesisHeight) {
+          searchByTimestampHeight(height - 1, tmpResult, fromTs, toTs)
+        } else {
+          Right(tmpResult)
+        }
+      }
+    }
   }
 }
 

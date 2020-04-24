@@ -147,18 +147,13 @@ object RPCServer extends {
     }
   }
 
-  private def filterHeader(header: BlockHeader, query: FetchRequest): Boolean = {
-    header.timestamp >= query.fromTs && header.timestamp <= query.toTs
-  }
-
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
       implicit cfg: ConsensusConfig,
       fetchRequestDecoder: Decoder[FetchRequest]): Try[FetchResponse] = {
     withReqE[FetchRequest, FetchResponse](req) { query =>
       val entriesEither = for {
-        headers <- blockFlow.getAllHeaders(filterHeader(_, query))
-        entries <- headers.mapE(wrapBlockHeader(blockFlow, _))
-      } yield entries
+        headers <- blockFlow.getHeightedBlockHeaders(query.fromTs, query.toTs)
+      } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
 
       entriesEither match {
         case Right(entries) => Right(FetchResponse(entries.toArray))

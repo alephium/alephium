@@ -50,6 +50,8 @@ class ServerSpec extends AlephiumSpec {
 
   it should "work with 2 nodes" in new Fixture("2-nodes") {
 
+    val fromTs = TimeStamp.now()
+
     val server0 = bootNode(publicPort = masterPort, brokerId = 0)
     val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
     Seq(server0.start, server1.start).foreach(_.futureValue is (()))
@@ -94,6 +96,11 @@ class ServerSpec extends AlephiumSpec {
 
     request[Balance](rpcPort, getBalance(publicKey)) is
       Balance(initialBalance.balance - (2 * transferAmount), 1)
+
+    val toTs = TimeStamp.now()
+
+    //TODO Find a better assertion
+    request[FetchResponse](rpcPort, blockflowFetch(fromTs, toTs)).blocks.size should be > 16
 
     server1.stop()
     server0.stop()
@@ -217,5 +224,8 @@ class ServerSpec extends AlephiumSpec {
 
     val startMining = jsonRpc("mining_start", "{}")
     val stopMining  = jsonRpc("mining_stop", "{}")
+
+    def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
+      jsonRpc("blockflow_fetch", s"""{"fromTs":${fromTs.millis},"toTs":${toTs.millis}}""")
   }
 }
