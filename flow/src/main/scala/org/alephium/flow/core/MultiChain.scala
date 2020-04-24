@@ -95,9 +95,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getChainWeightUnsafe(hash: Hash): BigInt =
     getHashChain(hash).getChainWeightUnsafe(hash)
 
-  def getAllBlockHashes: IOResult[AVector[Hash]] =
-    aggregateE(_.getAllBlockHashes)(_ ++ _)
-
   def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] =
     getHashChain(hash).getBlockHashSlice(hash)
 
@@ -140,11 +137,4 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   }
 
   def add(block: Block): IOResult[Unit]
-
-  def getAllHeaders(predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
-    for {
-      allHashes <- getAllBlockHashes
-      headers   <- allHashes.mapE(getBlockHeader)
-    } yield (headers.filter(predicate))
-  }
 }

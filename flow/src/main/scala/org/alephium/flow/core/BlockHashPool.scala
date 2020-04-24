@@ -48,8 +48,6 @@ trait BlockHashPool {
 
   def getAllTips: AVector[Hash]
 
-  def getAllBlockHashes: IOResult[AVector[Hash]]
-
   def show(hash: Hash): String = {
     val shortHash = hash.shortHex
     val weight    = getWeight(hash).getOrElse(BigInt(-1))
