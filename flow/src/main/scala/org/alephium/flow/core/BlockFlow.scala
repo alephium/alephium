@@ -97,11 +97,11 @@ object BlockFlow extends StrictLogging {
 
     def getBestTipUnsafe: Hash = {
       val ordering = Ordering.BigInt.on[Hash](getWeightUnsafe)
-      aggregate(_.getBestTipUnsafe)(ordering.max)
+      aggregateHash(_.getBestTipUnsafe)(ordering.max)
     }
 
     override def getAllTips: AVector[Hash] = {
-      aggregate(_.getAllTips)(_ ++ _)
+      aggregateHash(_.getAllTips)(_ ++ _)
     }
 
     def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash] = {
