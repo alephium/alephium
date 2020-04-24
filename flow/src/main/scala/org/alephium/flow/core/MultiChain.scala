@@ -25,10 +25,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
-  def maxWeight: IOResult[BigInt] = aggregateHashE(_.maxWeight)(_.max(_))
-
-  def maxHeight: IOResult[Int] = aggregateHashE(_.maxHeight)(math.max)
-
   /* BlockHash apis */
   def contains(hash: Hash): IOResult[Boolean] = {
     val index = ChainIndex.from(hash)
