@@ -8,10 +8,6 @@ import org.alephium.util.AVector
 trait BlockHashPool {
   def numHashes: Int
 
-  def maxWeight: IOResult[BigInt]
-
-  def maxHeight: IOResult[Int]
-
   def contains(hash: Hash): IOResult[Boolean]
 
   def containsUnsafe(hash: Hash): Boolean
