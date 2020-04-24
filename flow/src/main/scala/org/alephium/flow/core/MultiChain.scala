@@ -15,16 +15,19 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def groups: Int
 
-  protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
+  protected def aggregateHash[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
 
-  protected def aggregateE[T: ClassTag](f: BlockHashPool => IOResult[T])(
-      op: (T, T)                                         => T): IOResult[T]
+  protected def aggregateHashE[T: ClassTag](f: BlockHashPool => IOResult[T])(
+      op: (T, T)                                             => T): IOResult[T]
 
-  def numHashes: Int = aggregate(_.numHashes)(_ + _)
+  protected def aggregateHeaderE[T: ClassTag](f: BlockHeaderPool => IOResult[T])(
+      op: (T, T)                                                 => T): IOResult[T]
 
-  def maxWeight: IOResult[BigInt] = aggregateE(_.maxWeight)(_.max(_))
+  def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
-  def maxHeight: IOResult[Int] = aggregateE(_.maxHeight)(math.max)
+  def maxWeight: IOResult[BigInt] = aggregateHashE(_.maxWeight)(_.max(_))
+
+  def maxHeight: IOResult[Int] = aggregateHashE(_.maxHeight)(math.max)
 
   /* BlockHash apis */
   def contains(hash: Hash): IOResult[Boolean] = {
