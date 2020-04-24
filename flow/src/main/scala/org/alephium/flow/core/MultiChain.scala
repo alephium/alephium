@@ -7,7 +7,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
@@ -57,6 +57,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def isTip(hash: Hash): Boolean = {
     getHashChain(hash).isTip(hash)
   }
+
+  def getHeightedBlockHeaders(fromTs: TimeStamp,
+                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
+    aggregateHeaderE(_.getHeightedBlockHeaders(fromTs, toTs))(_ ++ _)
 
   def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] =
     getHashChain(locator).getHashesAfter(locator)
