@@ -418,10 +418,10 @@ object RPCServerSpec {
                        dummyTx: Transaction,
                        storages: Storages)(implicit val config: PlatformConfig)
       extends BlockFlow {
-    override def getAllHeaders(
-        predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
-      blockFlowProbe ! predicate(blockHeader)
-      Right(AVector(blockHeader))
+    override def getHeightedBlockHeaders(fromTs: TimeStamp,
+                                         toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
+      blockFlowProbe ! (blockHeader.timestamp >= fromTs && blockHeader.timestamp <= toTs)
+      Right(AVector((blockHeader, 1)))
     }
 
     override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =

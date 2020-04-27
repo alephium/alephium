@@ -8,10 +8,6 @@ import org.alephium.util.AVector
 trait BlockHashPool {
   def numHashes: Int
 
-  def maxWeight: IOResult[BigInt]
-
-  def maxHeight: IOResult[Int]
-
   def contains(hash: Hash): IOResult[Boolean]
 
   def containsUnsafe(hash: Hash): Boolean
@@ -47,8 +43,6 @@ trait BlockHashPool {
   def getBestTipUnsafe: Hash
 
   def getAllTips: AVector[Hash]
-
-  def getAllBlockHashes: IOResult[AVector[Hash]]
 
   def show(hash: Hash): String = {
     val shortHash = hash.shortHex
