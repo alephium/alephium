@@ -29,8 +29,9 @@ object CliqueManager {
                                chainIndex: ChainIndex,
                                origin: DataOrigin)
       extends Command
-  final case class SendAllHandlers(allHandlers: AllHandlers)             extends Command
-  final case class Connected(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
+  final case class SendAllHandlers(allHandlers: AllHandlers)           extends Command
+  final case class Syncing(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
+  final case class Synced(cliqueId: CliqueId, brokerInfo: BrokerInfo)  extends Command
 }
 
 class CliqueManager(
