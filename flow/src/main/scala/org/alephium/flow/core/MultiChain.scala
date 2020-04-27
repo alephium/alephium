@@ -7,7 +7,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
@@ -15,16 +15,15 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def groups: Int
 
-  protected def aggregate[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
+  protected def aggregateHash[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T
 
-  protected def aggregateE[T: ClassTag](f: BlockHashPool => IOResult[T])(
-      op: (T, T)                                         => T): IOResult[T]
+  protected def aggregateHashE[T: ClassTag](f: BlockHashPool => IOResult[T])(
+      op: (T, T)                                             => T): IOResult[T]
 
-  def numHashes: Int = aggregate(_.numHashes)(_ + _)
+  protected def aggregateHeaderE[T: ClassTag](f: BlockHeaderPool => IOResult[T])(
+      op: (T, T)                                                 => T): IOResult[T]
 
-  def maxWeight: IOResult[BigInt] = aggregateE(_.maxWeight)(_.max(_))
-
-  def maxHeight: IOResult[Int] = aggregateE(_.maxHeight)(math.max)
+  def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
   /* BlockHash apis */
   def contains(hash: Hash): IOResult[Boolean] = {
@@ -58,6 +57,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).isTip(hash)
   }
 
+  def getHeightedBlockHeaders(fromTs: TimeStamp,
+                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
+    aggregateHeaderE(_.getHeightedBlockHeaders(fromTs, toTs))(_ ++ _)
+
   def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] =
     getHashChain(locator).getHashesAfter(locator)
 
@@ -90,9 +93,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getChainWeightUnsafe(hash: Hash): BigInt =
     getHashChain(hash).getChainWeightUnsafe(hash)
-
-  def getAllBlockHashes: IOResult[AVector[Hash]] =
-    aggregateE(_.getAllBlockHashes)(_ ++ _)
 
   def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] =
     getHashChain(hash).getBlockHashSlice(hash)
@@ -136,11 +136,4 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   }
 
   def add(block: Block): IOResult[Unit]
-
-  def getAllHeaders(predicate: BlockHeader => Boolean): IOResult[AVector[BlockHeader]] = {
-    for {
-      allHashes <- getAllBlockHashes
-      headers   <- allHashes.mapE(getBlockHeader)
-    } yield (headers.filter(predicate))
-  }
 }

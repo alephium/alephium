@@ -12,15 +12,14 @@ import io.circe.syntax._
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
 import org.alephium.flow.client.Miner
-import org.alephium.flow.core.{BlockFlow, MultiChain, TxHandler}
+import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
-import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{BlockHeader, GroupIndex, Transaction, UnsignedTransaction}
+import org.alephium.protocol.model.{GroupIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.script.{PayTo, PubScript, Witness}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
@@ -147,18 +146,13 @@ object RPCServer extends {
     }
   }
 
-  private def filterHeader(header: BlockHeader, query: FetchRequest): Boolean = {
-    header.timestamp >= query.fromTs && header.timestamp <= query.toTs
-  }
-
   def blockflowFetch(blockFlow: BlockFlow, req: Request)(
       implicit cfg: ConsensusConfig,
       fetchRequestDecoder: Decoder[FetchRequest]): Try[FetchResponse] = {
     withReqE[FetchRequest, FetchResponse](req) { query =>
       val entriesEither = for {
-        headers <- blockFlow.getAllHeaders(filterHeader(_, query))
-        entries <- headers.mapE(wrapBlockHeader(blockFlow, _))
-      } yield entries
+        headers <- blockFlow.getHeightedBlockHeaders(query.fromTs, query.toTs)
+      } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
 
       entriesEither match {
         case Right(entries) => Right(FetchResponse(entries.toArray))
@@ -337,11 +331,6 @@ object RPCServer extends {
     val groupIndex = pubScript.groupIndex(blockFlow.config)
     if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
     else Left(Response.failed(s"Address ${address.shortHex} belongs to other groups"))
-  }
-
-  def wrapBlockHeader(chain: MultiChain, header: BlockHeader)(
-      implicit config: ConsensusConfig): IOResult[BlockEntry] = {
-    chain.getHeight(header).map(BlockEntry.from(header, _))
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))

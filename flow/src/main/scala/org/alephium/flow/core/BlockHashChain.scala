@@ -99,11 +99,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     AVector.from(tips.keys)
   }
 
-  // TODO: remove this, very inefficient
-  def getAllBlockHashes: IOResult[AVector[Hash]] = {
-    getHashesAfter(genesisHash)
-  }
-
   private def getLink(hash: Hash): IOResult[BlockHashChain.Link] = {
     getParentHash(hash).map(BlockHashChain.Link(_, hash))
   }
