@@ -29,7 +29,7 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 
-class ServerSpec extends AlephiumSpec {
+class ServerTest extends AlephiumSpec {
   it should "shutdown the node when Tcp port is used" in new Fixture("1-node") {
     val connection = TestProbe()
     IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
