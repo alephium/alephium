@@ -1,18 +1,11 @@
 package org.alephium.flow.core.validation
 
-import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.ED25519
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{
-  ModelGen,
-  Transaction,
-  TxOutput,
-  TxOutputPoint,
-  UnsignedTransaction
-}
+import org.alephium.protocol.model.{ModelGen, Transaction, TxOutput, TxOutputPoint}
 import org.alephium.protocol.script.{PayTo, Witness}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -94,9 +87,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val block3    = block0.copy(transactions = AVector(coinbase3))
     check(checkCoinbase(block3), InvalidCoinbase)
 
-    val unsignedTransaction =
-      UnsignedTransaction(emptyInputs, AVector(output0.head), ByteString.empty)
-    val coinbase4 = Transaction.from(unsignedTransaction, PayTo.PKH, publicKey, privateKey)
+    val coinbase4 = Transaction.from(emptyInputs, AVector(output0.head), testWitness)
     val block4    = block0.copy(transactions = AVector(coinbase4))
     check(checkCoinbase(block4), InvalidCoinbase)
 
