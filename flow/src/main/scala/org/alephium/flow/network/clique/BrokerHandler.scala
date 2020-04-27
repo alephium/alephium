@@ -14,7 +14,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin._
-import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -82,14 +82,11 @@ object BrokerHandler {
 }
 
 trait BrokerHandler extends HandShake with Relay with Sync {
-  def cliqueManager: ActorRefT[CliqueManager.Command]
-
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   override def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
     log.debug(s"Handshaked with remote $remote - $remoteCliqueId")
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
-    cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
 
     val isSameClique  = remoteCliqueId == selfCliqueInfo.id
@@ -379,7 +376,7 @@ trait Sync extends P2PStage {
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
     setSyncOn()
-    cliqueManager ! InterCliqueManager.Syncing(remoteCliqueId)
+    cliqueManager ! CliqueManager.Syncing(remoteCliqueId, remoteBrokerInfo)
   }
 
   def uponSynced(): Unit
@@ -402,7 +399,7 @@ trait Sync extends P2PStage {
 
   private def checkSynced(): Unit = {
     if (selfSynced && remoteSynced) {
-      cliqueManager ! InterCliqueManager.Synced(remoteCliqueId)
+      cliqueManager ! CliqueManager.Synced(remoteCliqueId, remoteBrokerInfo)
       setSyncOff()
       uponSynced()
     }

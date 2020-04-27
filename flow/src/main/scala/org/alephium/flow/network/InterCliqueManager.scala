@@ -18,9 +18,6 @@ object InterCliqueManager {
 
   sealed trait Command extends CliqueManager.Command
 
-  final case class Syncing(cliqueId: CliqueId) extends Command
-  final case class Synced(cliqueId: CliqueId)  extends Command
-
   final case class BrokerState(actor: ActorRef, isSynced: Boolean) {
     def setSyncing(): BrokerState = BrokerState(actor, isSynced = false)
 
@@ -64,8 +61,12 @@ class InterCliqueManager(
                                    ActorRefT[CliqueManager.Command](self))
       context.actorOf(props, name)
       ()
-    case CliqueManager.Connected(cliqueId, brokerInfo) =>
-      log.debug(s"Connected to: $cliqueId, $brokerInfo")
+    case CliqueManager.Syncing(cliqueId, broker) =>
+      log.debug(s"Start syncing with inter-clique node: $cliqueId, $broker")
+      setSyncing(cliqueId)
+    case CliqueManager.Synced(cliqueId, brokerInfo) =>
+      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
+      setSynced(cliqueId)
       if (config.brokerInfo.intersect(brokerInfo)) {
         addBroker(cliqueId, sender())
       } else {
@@ -93,12 +94,6 @@ class InterCliqueManager(
             brokerState.actor ! message.txMsg
           }
       }
-    case InterCliqueManager.Syncing(cliqueId) =>
-      log.debug(s"$cliqueId starts syncing")
-      setSyncing(cliqueId)
-    case InterCliqueManager.Synced(cliqueId) =>
-      log.debug(s"$cliqueId has synced")
-      setSynced(cliqueId)
   }
 
   def connect(cliqueInfo: CliqueInfo): Unit = {
