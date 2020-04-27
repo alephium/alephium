@@ -29,7 +29,7 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 
-class ServerSpec extends AlephiumSpec {
+class ServerTest extends AlephiumSpec {
   it should "shutdown the node when Tcp port is used" in new Fixture("1-node") {
     val connection = TestProbe()
     IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
@@ -109,9 +109,9 @@ class ServerSpec extends AlephiumSpec {
   class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
     implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
-    val publicKey  = "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77"
-    val privateKey = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
-    val tranferKey = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
+    val publicKey  = "9f93bf7f1211f510e3d9c4fc7fb933f94830ba83190da62dbfc9baa8b0d36276"
+    val privateKey = "a2e3e382cb262ee8af95069f6edfaa4685fc1294805336bafac206c1f115aa96"
+    val tranferKey = ED25519.generatePriPub()._2.toHexString
 
     val initialBalance = Balance(100, 1)
     val transferAmount = 10

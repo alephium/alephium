@@ -199,7 +199,9 @@ trait BlockFlowState {
     getBlockHeader(dep).map { header =>
       val from = header.chainIndex.from
       if (header.isGenesis) config.genesisBlocks(from.value)(currentGroup.value).hash
-      else header.uncleHash(currentGroup)
+      else {
+        if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
+      }
     }
   }
 
@@ -252,6 +254,24 @@ trait BlockFlowState {
     } yield blockCaches
   }
 
+  def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[Hash]] = {
+    val bestDeps     = getBestDeps(groupIndex)
+    val bestOutDeps  = bestDeps.outDeps
+    val bestIntraDep = bestOutDeps(groupIndex.value)
+    for {
+      newTips <- bestDeps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ bestOutDeps)
+      oldTips <- getInOutTips(bestIntraDep, groupIndex, inclusive = true)
+      diff    <- getTipsDiff(newTips, oldTips)
+    } yield diff
+  }
+
+  def getBlocksForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {
+    for {
+      diff        <- getHashesForUpdates(groupIndex)
+      blockCaches <- diff.mapE(getBlockCache(groupIndex, _))
+    } yield blockCaches
+  }
+
   // Note: update state only for intra group blocks
   def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
     if (block.header.isGenesis) {
@@ -273,26 +293,13 @@ trait BlockFlowState {
     } yield inputs
   }
 
-  def getCachedOutBlocks(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {
-    val bestDeps = getBestDeps(groupIndex)
-    val outDeps  = bestDeps.outDeps
-    val intraDep = outDeps(groupIndex.value)
-    val diffE = getBlockHeader(intraDep).flatMap { header =>
-      if (header.isGenesis) {
-        Right(AVector.empty)
-      } else {
-        val persistedOutDeps = header.outDeps.replace(groupIndex.value, intraDep)
-        EitherF.foldTry(outDeps.indices, AVector.empty[Hash]) { (acc, i) =>
-          getTipsDiff(outDeps(i), persistedOutDeps(i)).map(acc ++ _)
-        }
-      }
-    }
-    diffE.flatMap(_.mapE(getBlockCache(groupIndex, _)))
-  }
-
   def getUtxos(payTo: PayTo,
                address: ED25519PublicKey): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
-    val pubScript  = PubScript.build(payTo, address)
+    val pubScript = PubScript.build(payTo, address)
+    getUtxos(pubScript)
+  }
+
+  def getUtxos(pubScript: PubScript): IOResult[AVector[(TxOutputPoint, TxOutput)]] = {
     val groupIndex = pubScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
 
@@ -318,16 +325,12 @@ trait BlockFlowState {
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(TxOutputPoint, TxOutput)])
     : IOResult[(AVector[TxOutputPoint], AVector[(TxOutputPoint, TxOutput)])] = {
-    getCachedOutBlocks(groupIndex).map { blockCaches =>
-      val usedUtxos = blockCaches.flatMap[TxOutputPoint] {
-        case cache: OutBlockCache =>
-          AVector.from(cache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
-        case _ => AVector.empty
+    getBlocksForUpdates(groupIndex).map { blockCaches =>
+      val usedUtxos = blockCaches.flatMap[TxOutputPoint] { blockCache =>
+        AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
       }
-      val newUtxos = blockCaches.flatMap[(TxOutputPoint, TxOutput)] {
-        case cache: OutBlockCache =>
-          AVector.from(cache.relatedOutputs.view.filter(_._2.pubScript == pubScript))
-        case _ => AVector.empty
+      val newUtxos = blockCaches.flatMap[(TxOutputPoint, TxOutput)] { blockCache =>
+        AVector.from(blockCache.relatedOutputs.view.filter(_._2.pubScript == pubScript))
       }
       (usedUtxos, newUtxos)
     }
@@ -363,14 +366,23 @@ trait BlockFlowState {
 // scalastyle:on number.of.methods
 
 object BlockFlowState {
-  sealed trait BlockCache
-  final case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache
+  sealed trait BlockCache {
+    def inputs: Set[TxOutputPoint]
+    def relatedOutputs: Map[TxOutputPoint, TxOutput]
+  }
+
+  final case class InBlockCache(outputs: Map[TxOutputPoint, TxOutput]) extends BlockCache {
+    def inputs: Set[TxOutputPoint]                   = Set.empty
+    def relatedOutputs: Map[TxOutputPoint, TxOutput] = outputs
+  }
   final case class OutBlockCache(inputs: Set[TxOutputPoint],
                                  relatedOutputs: Map[TxOutputPoint, TxOutput])
       extends BlockCache
   final case class InOutBlockCache(outputs: Map[TxOutputPoint, TxOutput],
                                    inputs: Set[TxOutputPoint])
-      extends BlockCache // For blocks on intra-group chain
+      extends BlockCache { // For blocks on intra-group chain
+    def relatedOutputs: Map[TxOutputPoint, TxOutput] = outputs
+  }
 
   private def convertInputs(block: Block): Set[TxOutputPoint] = {
     block.transactions.flatMap(_.unsigned.inputs).toIterable.toSet

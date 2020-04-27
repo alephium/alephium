@@ -104,12 +104,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] = {
-    for {
-      height <- getHeight(locator)
-      hashes <- getHashes(height + 1)
-      links  <- hashes.mapE(getLink)
-      all    <- getHashesAfter(height + 1, links.filter(_.parentHash == locator).map(_.hash))
-    } yield all
+    contains(locator).flatMap {
+      case false => Right(AVector.empty)
+      case true =>
+        for {
+          height <- getHeight(locator)
+          hashes <- getHashes(height + 1)
+          links  <- hashes.mapE(getLink)
+          all    <- getHashesAfter(height + 1, links.filter(_.parentHash == locator).map(_.hash))
+        } yield all
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
