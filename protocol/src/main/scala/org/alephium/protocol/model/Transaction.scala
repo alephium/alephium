@@ -48,8 +48,9 @@ object Transaction {
            publicKey: ED25519PublicKey,
            privateKey: ED25519PrivateKey): Transaction = {
     // TODO: check the privateKey are valid to spend all the txinputs
-    val witness = Witness.build(payTo, unsigned, publicKey, privateKey)
-    Transaction(unsigned, AVector(witness))
+    val inputCnt = unsigned.inputs.length
+    val witness  = Witness.build(payTo, unsigned, publicKey, privateKey)
+    Transaction(unsigned, AVector.fill(inputCnt)(witness))
   }
 
   def from(unsigned: UnsignedTransaction, witnesses: AVector[Witness]): Transaction = {
