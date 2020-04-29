@@ -15,7 +15,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.{Bootstrapper, DiscoveryServer}
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
@@ -57,6 +57,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
       cliqueInfo =>
         Right(SelfClique.from(cliqueInfo))
     }
+
+  def doGetSelfCliqueSynced(req: Request): FutureTry[Boolean] =
+    mode.node.cliqueManager.ask(CliqueManager.IsSelfCliqueSynced).mapTo[Boolean].map(Right(_))
 
   def doGetBalance(req: Request): FutureTry[Balance] =
     Future.successful(getBalance(mode.node.blockFlow, req))

@@ -16,7 +16,7 @@ import akka.testkit.{SocketUtil, TestProbe}
 import io.circe.Decoder
 import io.circe.parser.parse
 import org.scalatest.EitherValues._
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.RPCModel._
@@ -53,10 +53,14 @@ class ServerTest extends AlephiumSpec {
     val fromTs = TimeStamp.now()
 
     val server0 = bootNode(publicPort = masterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
-    Seq(server0.start, server1.start).foreach(_.futureValue is (()))
+    server0.start.futureValue is (())
 
-    Thread.sleep(500)
+    request[Boolean](rpcMasterPort, getSelfCliqueSynced) is false
+
+    val server1 = bootNode(publicPort = peerPort, brokerId = 1)
+    server1.start.futureValue is (())
+
+    eventually(request[Boolean](rpcMasterPort, getSelfCliqueSynced) is true)
 
     val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
     val group      = request[Group](rpcMasterPort, getGroup(publicKey))
@@ -106,8 +110,11 @@ class ServerTest extends AlephiumSpec {
     server0.stop()
   }
 
-  class Fixture(name: String) extends AlephiumFlowActorSpec(name) with ScalaFutures {
-    implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
+  class Fixture(name: String)
+      extends AlephiumFlowActorSpec(name)
+      with ScalaFutures
+      with Eventually {
+    override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
     val publicKey  = "9f93bf7f1211f510e3d9c4fc7fb933f94830ba83190da62dbfc9baa8b0d36276"
     val privateKey = "a2e3e382cb262ee8af95069f6edfaa4685fc1294805336bafac206c1f115aa96"
@@ -196,6 +203,8 @@ class ServerTest extends AlephiumSpec {
       s"""{"jsonrpc":"2.0","id": 0,"method":"$method","params": $params}"""
 
     val getSelfClique = jsonRpc("self_clique", "{}")
+
+    val getSelfCliqueSynced = jsonRpc("self_clique_synced", "{}")
 
     def getGroup(address: String) = jsonRpc("get_group", s"""{"address":"$address"}""")
 
