@@ -6,7 +6,7 @@ import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.ActorRefT
 
-trait FairMinerState {
+trait MinerState {
   implicit def config: PlatformConfig
 
   def handlers: AllHandlers
