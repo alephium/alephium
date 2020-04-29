@@ -2,12 +2,11 @@ package org.alephium.flow.platform
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.client.Node
 import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.clique.BrokerHandler
 
-// scalastyle:off magic.number
 trait Mode {
   implicit def config: PlatformConfig
 
@@ -19,13 +18,12 @@ trait Mode {
 
   def shutdown(): Future[Unit]
 }
-// scalastyle:on magic.number
 
 object Mode {
 
-  type Builder = BrokerHandler.Builder with Miner.Builder
+  type Builder = BrokerHandler.Builder
 
-  def defaultBuilders: Builder = new BrokerHandler.Builder with Miner.Builder
+  def defaultBuilders: Builder = new BrokerHandler.Builder {}
 
   class Default extends Mode {
     final implicit val config: PlatformConfig = PlatformConfig.loadDefault()

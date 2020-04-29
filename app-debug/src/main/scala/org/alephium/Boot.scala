@@ -6,15 +6,12 @@ import scala.util.{Failure, Success}
 import org.alephium.appserver.Server
 import org.alephium.flow.Utils
 import org.alephium.flow.platform.Mode
-import org.alephium.mock.{MockBrokerHandler, MockMiner}
+import org.alephium.mock.MockBrokerHandler
 
 object Boot
-    extends Server(
-      new Mode.Default {
-        override def builders: Mode.Builder =
-          new MockBrokerHandler.Builder with MockMiner.Builder
-      }
-    )
+    extends Server(new Mode.Default {
+      override def builders: Mode.Builder = new MockBrokerHandler.Builder {}
+    })
     with App {
   start()
     .onComplete {

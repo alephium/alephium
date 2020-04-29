@@ -40,7 +40,11 @@ object FairMiner {
     Props(new FairMiner(addresses, blockFlow, allHandlers))
   }
 
-  sealed trait Command
+  trait Command
+  case object Start                                   extends Command
+  case object Stop                                    extends Command
+  case object UpdateTemplate                          extends Command
+  final case class MinedBlockAdded(index: ChainIndex) extends Command
   final case class MiningResult(blockOpt: Option[Block],
                                 chainIndex: ChainIndex,
                                 miningCount: BigInt)
@@ -74,16 +78,18 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
   def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
-    case Miner.Start =>
+    case FairMiner.Start =>
       log.info("Start mining")
-      handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
+      handlers.flowHandler ! FlowHandler.Register(ActorRefT[FairMiner.Command](self))
       updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
+    case _: FairMiner.Command =>
+      ()
   }
 
   def awaitStop: Receive = {
-    case Miner.Stop =>
+    case FairMiner.Stop =>
       log.info("Stop mining")
       handlers.flowHandler ! FlowHandler.UnRegister
       context become awaitStart
@@ -106,9 +112,9 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
           setIdle(fromShift, to)
           startNewTasks()
       }
-    case Miner.UpdateTemplate =>
+    case FairMiner.UpdateTemplate =>
       updateTasks()
-    case Miner.MinedBlockAdded(chainIndex) =>
+    case FairMiner.MinedBlockAdded(chainIndex) =>
       val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
       updateTasks()
