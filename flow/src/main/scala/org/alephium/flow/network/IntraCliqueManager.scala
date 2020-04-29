@@ -65,7 +65,9 @@ class IntraCliqueManager(
         context.actorOf(props, name)
         ()
       }
-    case CliqueManager.Connected(cliqueId, brokerInfo) =>
+    case CliqueManager.Syncing(cliqueId, broker) =>
+      log.debug(s"Start syncing with intra-clique node: $cliqueId, $broker")
+    case CliqueManager.Synced(cliqueId, brokerInfo) =>
       if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.id)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()

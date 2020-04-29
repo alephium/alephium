@@ -25,9 +25,11 @@ object FlowHandler {
       extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
-  final case class GetBlocks(locators: AVector[Hash])        extends Command
-  final case class GetHeaders(locators: AVector[Hash])       extends Command
-  final case class GetTips(broker: BrokerInfo)               extends Command
+  final case class GetBlocks(locators: AVector[Hash])                           extends Command
+  final case class GetHeaders(locators: AVector[Hash])                          extends Command
+  final case class GetSyncInfo(remoteBroker: BrokerInfo, isSameClique: Boolean) extends Command
+  final case class GetSyncData(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
+      extends Command
   final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
   final case class Register(miner: ActorRefT[Miner.Command]) extends Command
   case object UnRegister                                     extends Command
@@ -56,8 +58,10 @@ object FlowHandler {
                                      target: BigInt,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class CurrentTips(tips: AVector[Hash])      extends Event
-  final case class BlocksLocated(blocks: AVector[Block]) extends Event
+  final case class BlocksLocated(blocks: AVector[Block])                           extends Event
+  final case class SyncData(blocks: AVector[Block], headers: AVector[BlockHeader]) extends Event
+  final case class SyncInfo(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
+      extends Event
   final case class BlockAdded(block: Block,
                               broker: ActorRefT[ChainHandler.Event],
                               origin: DataOrigin)
@@ -82,9 +86,12 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   override def receive: Receive = handleWith(None)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive = {
+  def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive =
+    handleRelay(minerOpt) orElse handleSync
+
+  def handleRelay(minerOpt: Option[ActorRefT[Miner.Command]]): Receive = {
     case GetHeaders(locators) =>
-      blockFlow.getHeaders(locators) match {
+      locators.flatMapE(blockFlow.getHeadersAfter) match {
         case Left(error) =>
           log.warning(s"Failure while getting block headers: $error")
         case Right(headers) =>
@@ -103,9 +110,28 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     case AddBlock(block, broker, origin) =>
       handleBlock(minerOpt, block, broker, origin)
     case pending: PendingData => handlePending(pending)
-    case GetTips(brokerInfo)  => sender() ! CurrentTips(blockFlow.getOutBlockTips(brokerInfo))
     case Register(miner)      => context become handleWith(Some(miner))
     case UnRegister           => context become handleWith(None)
+  }
+
+  def handleSync: Receive = {
+    case GetSyncInfo(remoteBroker, isSameClique) =>
+      val info = if (isSameClique) {
+        blockFlow.getIntraCliqueSyncInfo(remoteBroker)
+      } else {
+        blockFlow.getInterCliqueSyncInfo(remoteBroker)
+      }
+      sender() ! SyncInfo(info.blockLocators, info.headerLocators)
+
+    case GetSyncData(blockLocators, headerLocators) =>
+      val result = for {
+        blocks  <- blockLocators.flatMapE(blockFlow.getBlocksAfter)
+        headers <- headerLocators.flatMapE(blockFlow.getHeadersAfter)
+      } yield SyncData(blocks, headers)
+      result match {
+        case Left(error)     => handleIOError(error)
+        case Right(syncData) => sender() ! syncData
+      }
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {

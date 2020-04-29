@@ -6,7 +6,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.actor.{ActorRef, Props, Timers}
+import akka.actor.{Props, Timers}
 import akka.io.Tcp
 import akka.util.ByteString
 
@@ -14,7 +14,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.DataOrigin._
-import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -82,24 +82,18 @@ object BrokerHandler {
 }
 
 trait BrokerHandler extends HandShake with Relay with Sync {
-  def cliqueManager: ActorRefT[CliqueManager.Command]
-
   def handleBrokerInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit
 
   override def uponHandshaked(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
     log.debug(s"Handshaked with remote $remote - $remoteCliqueId")
     handleBrokerInfo(remoteCliqueId, remoteBrokerInfo)
-    cliqueManager ! CliqueManager.Connected(remoteCliqueId, remoteBrokerInfo)
     startPingPong()
 
     val isSameClique  = remoteCliqueId == selfCliqueInfo.id
     val isIntersected = remoteBrokerInfo.intersect(config.brokerInfo)
-    if (!isSameClique && isIntersected) {
+    if ((!isSameClique && isIntersected) || (isSameClique && !isIntersected)) {
       log.info(s"Start syncing with ${remoteBrokerInfo.address}")
       startSync()
-    } else if (isSameClique && !isIntersected) {
-      log.debug(s"Start relaying with ${remoteBrokerInfo.address}")
-      startRelay()
     } else {
       log.warning(s"Invalid connection from $remoteCliqueId - $remoteBrokerInfo")
       stop()
@@ -262,7 +256,7 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
   }
 }
 
-trait MessageHandler extends BaseActor {
+trait MessageHandler extends ConnectionUtil {
   implicit def config: PlatformConfig
   def allHandlers: AllHandlers
   def remote: InetSocketAddress
@@ -282,14 +276,16 @@ trait MessageHandler extends BaseActor {
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def handleSendBlocks(blocks: AVector[Block],
                        notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = {
-    assert(blocks.nonEmpty)
-    log.debug(s"Received #${blocks.length} blocks ${Utils.showHashableV(blocks)}")
-    Validation.validateFlowDAG(blocks) match {
-      case Some(forests) =>
-        notifyListOpt.foreach(_ ++= forests.map(_.roots.head.value.chainIndex).toIterable)
-        forests.foreach(handleNewBlocks)
-      case None =>
-        log.warning(s"Received blocks that are not from subtrees of DAG")
+    log.debug(s"Received #${blocks.length} blocks ${Utils.showHash(blocks)}")
+    if (blocks.nonEmpty) {
+      Validation.validateFlowDAG(blocks) match {
+        case Some(forests) =>
+          notifyListOpt.foreach(_ ++= forests.map(_.roots.head.value.chainIndex).toIterable)
+          forests.foreach(handleNewBlocks)
+        case None =>
+          log.warning(s"Received blocks that are not from subtrees of DAG")
+          stop()
+      }
     }
   }
 
@@ -302,6 +298,7 @@ trait MessageHandler extends BaseActor {
       handler ! BlockChainHandler.AddBlocks(forest, origin)
     } else {
       log.warning(s"Received block for wrong chain $chainIndex from $remote")
+      stop()
     }
   }
 
@@ -311,7 +308,7 @@ trait MessageHandler extends BaseActor {
   }
 
   def handleSendHeaders(headers: AVector[BlockHeader]): Unit = {
-    log.debug(s"Received #${headers.length} block headers ${Utils.showHashableV(headers)}")
+    log.debug(s"Received #${headers.length} block headers ${Utils.showHash(headers)}")
     headers.foreach(handleNewHeader)
   }
 
@@ -322,6 +319,7 @@ trait MessageHandler extends BaseActor {
       handler ! HeaderChainHandler.addOneHeader(header, origin)
     } else {
       log.warning(s"Received header ${header.shortHex} for wrong chain from $remote")
+      stop()
     }
   }
 
@@ -333,6 +331,12 @@ trait MessageHandler extends BaseActor {
   def handleSendTxs(txs: AVector[Transaction]): Unit = {
     log.debug(s"SendTxs received: ${Utils.show(txs.map(_.hash))}")
     txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddTx(tx, origin))
+  }
+
+  def handleSyncRequest(blockLocators: AVector[Hash], headerLocators: AVector[Hash]): Unit = {
+    log.debug(
+      s"Sync Request received: blocks ${Utils.show(blockLocators)}, headers ${Utils.show(headerLocators)}")
+    allHandlers.flowHandler ! FlowHandler.GetSyncData(blockLocators, headerLocators)
   }
 }
 
@@ -355,7 +359,11 @@ trait P2PStage extends ConnectionReaderWriter with PingPong with MessageHandler 
 
 trait Sync extends P2PStage {
   def cliqueManager: ActorRefT[CliqueManager.Command]
-  def flowHandler: ActorRef = allHandlers.flowHandler.ref
+  def flowHandler: ActorRefT[FlowHandler.Command] = allHandlers.flowHandler
+  def remoteCliqueId: CliqueId
+  def selfCliqueInfo: CliqueInfo
+
+  private def isSameClique: Boolean = remoteCliqueId == selfCliqueInfo.id
 
   private var selfSynced   = false
   private var remoteSynced = false
@@ -364,26 +372,26 @@ trait Sync extends P2PStage {
 
   def startSync(): Unit = {
     assert(!selfSynced)
-    flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
+    flowHandler ! FlowHandler.GetSyncInfo(remoteBrokerInfo, isSameClique)
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
     setSyncOn()
-    cliqueManager ! InterCliqueManager.Syncing(remoteCliqueId)
+    cliqueManager ! CliqueManager.Syncing(remoteCliqueId, remoteBrokerInfo)
   }
 
   def uponSynced(): Unit
 
-  private def checkRemoteSynced(numNewBlocks: Int): Unit = {
+  private def checkRemoteSynced(numNewData: Int): Unit = {
     assert(!remoteSynced)
-    if (numNewBlocks == 0) {
+    if (numNewData == 0) {
       remoteSynced = true
     }
     checkSynced()
   }
 
-  private def checkSelfSynced(numNewBlocks: Int): Unit = {
+  private def checkSelfSynced(numNewData: Int): Unit = {
     assert(!selfSynced)
-    if (numNewBlocks == 0) {
+    if (numNewData == 0) {
       selfSynced = true
     }
     checkSynced()
@@ -391,44 +399,46 @@ trait Sync extends P2PStage {
 
   private def checkSynced(): Unit = {
     if (selfSynced && remoteSynced) {
-      cliqueManager ! InterCliqueManager.Synced(remoteCliqueId)
+      cliqueManager ! CliqueManager.Synced(remoteCliqueId, remoteBrokerInfo)
+      setSyncOff()
       uponSynced()
     }
   }
 
-  def handleSyncEvents: Receive = {
-    case FlowHandler.CurrentTips(tips) =>
-      log.debug(s"ask blocks from these tips ${Utils.show(tips)}")
-      sendPayload(GetBlocks(tips))
-    case FlowHandler.BlocksLocated(blocks) =>
-      log.debug(s"send blocks after remote's tips ${Utils.showHashableV(blocks)}")
-      sendPayload(SendBlocks(blocks))
-      checkRemoteSynced(blocks.length)
+  private def handleSyncEvents: Receive = {
+    case FlowHandler.SyncInfo(blockLocators, headerLocators) =>
+      log.debug(s"Ask data from these tips: blocks ${Utils
+        .show(blockLocators)}, headers ${Utils.show(headerLocators)}")
+      sendPayload(SyncRequest(blockLocators, headerLocators))
+    case FlowHandler.SyncData(blocks, headers) =>
+      log.debug(
+        s"Send sync data: blocks ${Utils.showHash(blocks)}, headers ${Utils.showHash(headers)}")
+      sendPayload(SyncResponse(blocks, headers)) // Note: send data even when both are empty
+      checkRemoteSynced(blocks.length + headers.length)
     case BlockChainHandler.BlocksAdded(chainIndex) =>
       assert(blockNotifyList.contains(chainIndex))
       log.debug(s"all the blocks sent for $chainIndex are added")
       blockNotifyList -= chainIndex
       if (blockNotifyList.isEmpty) {
-        allHandlers.flowHandler ! FlowHandler.GetTips(remoteBrokerInfo)
+        allHandlers.flowHandler ! FlowHandler.GetSyncInfo(remoteBrokerInfo, isSameClique)
       }
     case HeaderChainHandler.HeadersAdded(chainIndex) =>
       log.debug(s"all the blocks sent for $chainIndex are added")
   }
 
-  def handleSyncPayload(payload: Payload): Unit = payload match {
-    case SendBlocks(blocks) =>
-      if (blocks.nonEmpty) {
-        handleSendBlocks(blocks, Some(blockNotifyList))
-      }
-      checkSelfSynced(blocks.length)
-    case GetBlocks(locators)    => handleGetBlocks(locators)
-    case SendHeaders(headers)   => handleSendHeaders(headers)
-    case GetHeaders(locators)   => handleGetHeaders(locators)
+  private def handleSyncPayload(payload: Payload): Unit = payload match {
+    case SyncRequest(blockLocators, headerLocators) =>
+      handleSyncRequest(blockLocators, headerLocators)
+    case SyncResponse(blocks, headers) =>
+      handleSendBlocks(blocks, Some(blockNotifyList))
+      handleSendHeaders(headers)
+      checkSelfSynced(blocks.length + headers.length)
     case Ping(nonce, timestamp) => handlePing(nonce, timestamp)
     case Pong(nonce)            => handlePong(nonce)
     case x                      =>
       // TODO: take care of misbehavior
-      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      log.warning(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      stop()
   }
 }
 
@@ -436,7 +446,6 @@ trait Relay extends P2PStage {
   def startRelay(): Unit = {
     setPayloadHandler(handleRelayPayload)
     context become (handleReadWrite orElse handleRelayEvent orElse handleCommonEvents)
-    setSyncOff()
   }
 
   def handleRelayEvent: Receive = {
@@ -458,7 +467,8 @@ trait Relay extends P2PStage {
     case Pong(nonce)            => handlePong(nonce)
     case x                      =>
       // TODO: take care of misbehavior
-      log.debug(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      log.warning(s"Got unexpected payload type ${x.getClass.getSimpleName}")
+      stop()
   }
 }
 

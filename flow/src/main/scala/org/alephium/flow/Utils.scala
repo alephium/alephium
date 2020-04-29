@@ -13,11 +13,11 @@ object Utils {
     elems.map(_.shortHex).mkString("-")
   }
 
-  def showHashableV[T <: FlowData](elems: AVector[T]): String = {
-    showHashableI(elems.toIterable)
+  def showHash[T <: FlowData](elems: AVector[T]): String = {
+    showHashIter(elems.toIterable)
   }
 
-  def showHashableI[T <: FlowData](elems: Iterable[T]): String = {
+  def showHashIter[T <: FlowData](elems: Iterable[T]): String = {
     elems.view.map(_.shortHex).mkString("-")
   }
 

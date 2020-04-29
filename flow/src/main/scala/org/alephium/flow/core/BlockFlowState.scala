@@ -205,8 +205,6 @@ trait BlockFlowState {
     }
   }
 
-  def getOutBlockTips(brokerInfo: BrokerInfo): AVector[Hash]
-
   // if inclusive is true, the current header would be included
   def getInOutTips(header: BlockHeader,
                    currentGroup: GroupIndex,
