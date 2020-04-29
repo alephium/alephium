@@ -3,10 +3,10 @@ package org.alephium.flow.network
 import akka.actor.{ActorContext, ActorRef, Props}
 import akka.io.Tcp
 
-import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo}
+import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.CliqueInfo
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Bootstrapper {
   def props(
@@ -29,7 +29,14 @@ object Bootstrapper {
       cliqueCoordinatorBuilder: (ActorContext, ActorRef) => ActorRef,
       brokerBuilder: (ActorContext, ActorRef)            => ActorRef
   )(implicit config: PlatformConfig): Props = {
-    if (config.isCoordinator) {
+    if (config.brokerNum == 1) {
+      assume(config.groupNumPerBroker == config.groups)
+      val cliqueId        = CliqueId.unsafe(config.discoveryPublicKey.bytes)
+      val peerInfos       = AVector(PeerInfo.self)
+      val intraCliqueInfo = IntraCliqueInfo.unsafe(cliqueId, peerInfos, config.groupNumPerBroker)
+      Props(
+        new SingleNodeCliqueBootstrapper(server, discoveryServer, cliqueManager, intraCliqueInfo))
+    } else if (config.isCoordinator) {
       Props(
         new CliqueCoordinatorBootstrapper(server,
                                           discoveryServer,
@@ -84,7 +91,6 @@ class CliqueCoordinatorBootstrapper(val server: ActorRefT[TcpServer.Command],
       server ! TcpServer.WorkFor(cliqueManager.ref)
       context become (awaitInfo orElse forwardConnection)
   }
-
 }
 
 class BrokerBootstrapper(val server: ActorRefT[TcpServer.Command],
@@ -94,6 +100,18 @@ class BrokerBootstrapper(val server: ActorRefT[TcpServer.Command],
     extends BootstrapperHandler {
   log.debug("Start as Broker")
   brokerBuilder(context, self)
+
+  override def receive: Receive = awaitInfo
+}
+
+class SingleNodeCliqueBootstrapper(val server: ActorRefT[TcpServer.Command],
+                                   val discoveryServer: ActorRefT[DiscoveryServer.Command],
+                                   val cliqueManager: ActorRefT[CliqueManager.Command],
+                                   intraCliqueInfo: IntraCliqueInfo)
+    extends BootstrapperHandler {
+  log.debug("Start as single node clique bootstrapper")
+  self ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
+
   override def receive: Receive = awaitInfo
 }
 

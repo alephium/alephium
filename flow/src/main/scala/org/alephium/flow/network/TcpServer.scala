@@ -31,6 +31,7 @@ class TcpServer(port: Int) extends BaseActor {
       context.become(binding(bootstrapper))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def binding(bootstrapper: ActorRef): Receive = {
     case Tcp.Bound(localAddress) =>
       log.debug(s"Server bound to $localAddress")
@@ -40,6 +41,8 @@ class TcpServer(port: Int) extends BaseActor {
       val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
       nodeMonitor ! Node.Stop
       context stop self
+    case TcpServer.WorkFor(another) =>
+      context become binding(another)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
