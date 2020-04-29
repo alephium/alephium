@@ -7,7 +7,7 @@ import org.alephium.flow.core.{AllHandlers, BlockFlow, FlowHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.util.ActorRefT
 
-class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
+class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
   it should "initialize FairMiner" in {
     val cliqueManager        = TestProbe("cliqueManager")
     val flowHandler          = TestProbe("flowHandler")
@@ -18,9 +18,9 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
                                        blockFlow,
                                        ActorRefT(flowHandler.ref))
 
-    val miner = system.actorOf(FairMiner.props(blockFlow, allHandlers))
+    val miner = system.actorOf(Miner.props(blockFlow, allHandlers))
 
-    miner ! FairMiner.Start
+    miner ! Miner.Start
 
     cliqueManager.expectMsgType[CliqueManager.BroadCastBlock]
 
@@ -30,7 +30,7 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
     flowHandler.expectMsgType[FlowHandler.AddBlock]
     flowHandler.expectMsgType[FlowHandler.AddBlock]
 
-    miner ! FairMiner.Stop
+    miner ! Miner.Stop
 
     flowHandler.expectMsgType[FlowHandler.UnRegister.type]
   }

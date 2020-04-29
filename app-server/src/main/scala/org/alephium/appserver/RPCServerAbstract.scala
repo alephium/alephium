@@ -16,7 +16,7 @@ import io.circe.{Encoder, Json}
 import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.flow.client.FairMiner
+import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformConfig
@@ -43,10 +43,10 @@ trait RPCServerAbstract extends StrictLogging {
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
   def doSendTransaction(req: Request): FutureTry[TransferResult]
   def doTransfer(req: Request): FutureTry[TransferResult]
-  def doStartMining(miner: ActorRefT[FairMiner.Command]): FutureTry[Boolean] =
-    execute(miner ! FairMiner.Start)
-  def doStopMining(miner: ActorRefT[FairMiner.Command]): FutureTry[Boolean] =
-    execute(miner ! FairMiner.Stop)
+  def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
+    execute(miner ! Miner.Start)
+  def doStopMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
+    execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
 
@@ -59,7 +59,7 @@ trait RPCServerAbstract extends StrictLogging {
     }
   }
 
-  def handlerRPC(miner: ActorRefT[FairMiner.Command]): Handler = Map.apply(
+  def handlerRPC(miner: ActorRefT[Miner.Command]): Handler = Map.apply(
     "blockflow_fetch"    -> (req => wrap(req, doBlockflowFetch(req))),
     "get_balance"        -> (req => wrap(req, doGetBalance(req))),
     "get_group"          -> (req => wrap(req, doGetGroup(req))),
@@ -73,7 +73,7 @@ trait RPCServerAbstract extends StrictLogging {
     "transfer"           -> (req => wrap(req, doTransfer(req)))
   )
 
-  def routeHttp(miner: ActorRefT[FairMiner.Command]): Route =
+  def routeHttp(miner: ActorRefT[Miner.Command]): Route =
     cors()(JsonRPCHandler.routeHttp(handlerRPC(miner)))
 
   def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {

@@ -12,10 +12,10 @@ import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, AVector}
 
-class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
+class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
-  trait Fixture extends FairMinerState {
+  trait Fixture extends MinerState {
     override implicit def config: PlatformConfig = Spec.config
     val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe._1
     val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())

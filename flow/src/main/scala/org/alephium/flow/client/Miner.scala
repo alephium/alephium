@@ -17,7 +17,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.script.PayTo
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
-object FairMiner {
+object Miner {
   def props(node: Node)(implicit config: PlatformConfig): Props =
     props(node.blockFlow, node.allHandlers)
 
@@ -37,7 +37,7 @@ object FairMiner {
     addresses.foreachWithIndex { (address, i) =>
       require(GroupIndex.from(PayTo.PKH, address).value == i)
     }
-    Props(new FairMiner(addresses, blockFlow, allHandlers))
+    Props(new Miner(addresses, blockFlow, allHandlers))
   }
 
   trait Command
@@ -68,35 +68,34 @@ object FairMiner {
   }
 }
 
-class FairMiner(addresses: AVector[ED25519PublicKey],
-                blockFlow: BlockFlow,
-                allHandlers: AllHandlers)(implicit val config: PlatformConfig)
+class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+    implicit val config: PlatformConfig)
     extends BaseActor
-    with FairMinerState {
+    with MinerState {
   val handlers = allHandlers
 
   def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
-    case FairMiner.Start =>
+    case Miner.Start =>
       log.info("Start mining")
-      handlers.flowHandler ! FlowHandler.Register(ActorRefT[FairMiner.Command](self))
+      handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
       updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
-    case _: FairMiner.Command =>
+    case _: Miner.Command =>
       ()
   }
 
   def awaitStop: Receive = {
-    case FairMiner.Stop =>
+    case Miner.Stop =>
       log.info("Stop mining")
       handlers.flowHandler ! FlowHandler.UnRegister
       context become awaitStart
   }
 
   def handleMining: Receive = {
-    case FairMiner.MiningResult(blockOpt, chainIndex, miningCount) =>
+    case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       assert(config.brokerInfo.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
@@ -112,9 +111,9 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
           setIdle(fromShift, to)
           startNewTasks()
       }
-    case FairMiner.UpdateTemplate =>
+    case Miner.UpdateTemplate =>
       updateTasks()
-    case FairMiner.MinedBlockAdded(chainIndex) =>
+    case Miner.MinedBlockAdded(chainIndex) =>
       val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
       updateTasks()
@@ -139,13 +138,13 @@ class FairMiner(addresses: AVector[ED25519PublicKey],
                 blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
     val task = Future {
       val index = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
-      FairMiner.mine(index, template) match {
+      Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
           val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
           blockHandler ! handlerMessage
-          self ! FairMiner.MiningResult(Some(block), index, miningCount)
+          self ! Miner.MiningResult(Some(block), index, miningCount)
         case None =>
-          self ! FairMiner.MiningResult(None, index, config.nonceStep)
+          self ! Miner.MiningResult(None, index, config.nonceStep)
       }
     }(context.dispatcher)
     task.onComplete {
