@@ -67,4 +67,13 @@ akka {
       throughput = 1
     }
   }
+
+  http {
+    server {
+      websocket {
+        periodic-keep-alive-mode = pong
+        periodic-keep-alive-max-idle = 30 seconds
+      }
+    }
+  }
 }
