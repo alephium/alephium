@@ -43,8 +43,8 @@ class CliqueManager(
 
   type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
 
-  var allHandlers: AllHandlers = _
-  var selfCliqueSynced         = false
+  var allHandlers: AllHandlers  = _
+  var selfCliqueSynced: Boolean = false
 
   override def receive: Receive = awaitAllHandlers orElse isSelfCliqueSynced
 
