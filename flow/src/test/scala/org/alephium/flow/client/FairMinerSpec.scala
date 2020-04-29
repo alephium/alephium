@@ -20,7 +20,7 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
 
     val miner = system.actorOf(FairMiner.props(blockFlow, allHandlers))
 
-    miner ! Miner.Start
+    miner ! FairMiner.Start
 
     cliqueManager.expectMsgType[CliqueManager.BroadCastBlock]
 
@@ -30,7 +30,7 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
     flowHandler.expectMsgType[FlowHandler.AddBlock]
     flowHandler.expectMsgType[FlowHandler.AddBlock]
 
-    miner ! Miner.Stop
+    miner ! FairMiner.Stop
 
     flowHandler.expectMsgType[FlowHandler.UnRegister.type]
   }

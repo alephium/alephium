@@ -11,7 +11,7 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
-import org.alephium.flow.client.Miner
+import org.alephium.flow.client.FairMiner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
@@ -25,7 +25,7 @@ import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, AVector, Duration, Hex}
 
-class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
+class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[FairMiner.Command])
     extends RPCServerAbstract {
   import RPCServer._
   import RPCServerAbstract.FutureTry
@@ -115,7 +115,7 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 object RPCServer extends {
   import RPCServerAbstract._
 
-  def apply(mode: Mode, miner: ActorRefT[Miner.Command]): RPCServer = {
+  def apply(mode: Mode, miner: ActorRefT[FairMiner.Command]): RPCServer = {
     (for {
       rpcPort <- mode.config.rpcPort
       wsPort  <- mode.config.wsPort
