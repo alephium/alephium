@@ -1,6 +1,7 @@
 package org.alephium.flow.network
 
 import akka.actor.{ActorRef, Props}
+import akka.event.LoggingAdapter
 import akka.io.Tcp
 
 import org.alephium.flow.core.AllHandlers
@@ -61,17 +62,16 @@ class InterCliqueManager(
                                    ActorRefT[CliqueManager.Command](self))
       context.actorOf(props, name)
       ()
-    case CliqueManager.Syncing(cliqueId, broker) =>
-      log.debug(s"Start syncing with inter-clique node: $cliqueId, $broker")
-      setSyncing(cliqueId)
-    case CliqueManager.Synced(cliqueId, brokerInfo) =>
-      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
-      setSynced(cliqueId)
+    case CliqueManager.Syncing(cliqueId, brokerInfo) =>
+      log.debug(s"Start syncing with inter-clique node: $cliqueId, $brokerInfo")
       if (config.brokerInfo.intersect(brokerInfo)) {
         addBroker(cliqueId, sender())
       } else {
         context stop sender()
       }
+    case CliqueManager.Synced(cliqueId, brokerInfo) =>
+      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
+      setSynced(cliqueId)
   }
 
   def handleMessage: Receive = {
@@ -118,12 +118,17 @@ class InterCliqueManager(
 trait InterCliqueManagerState {
   import InterCliqueManager._
 
+  def log: LoggingAdapter
+
   // TODO: consider cliques with different brokerNum
   private val brokers = collection.mutable.HashMap.empty[CliqueId, BrokerState]
 
   def addBroker(cliqueId: CliqueId, broker: ActorRef): Unit = {
-    assert(!brokers.contains(cliqueId))
-    brokers += cliqueId -> BrokerState(broker, isSynced = false)
+    if (!brokers.contains(cliqueId)) {
+      brokers += cliqueId -> BrokerState(broker, isSynced = false)
+    } else {
+      log.warning(s"Ignore another connection from $cliqueId")
+    }
   }
 
   def containsBroker(clique: CliqueInfo): Boolean = {
@@ -134,15 +139,12 @@ trait InterCliqueManagerState {
     brokers.foreach(f)
   }
 
-  def setSyncing(cliqueId: CliqueId): Unit = {
-    assert(brokers.contains(cliqueId))
-    val current = brokers(cliqueId)
-    brokers(cliqueId) = current.setSyncing()
-  }
-
   def setSynced(cliqueId: CliqueId): Unit = {
-    assert(brokers.contains(cliqueId))
-    val current = brokers(cliqueId)
-    brokers(cliqueId) = current.setSynced()
+    if (brokers.contains(cliqueId)) {
+      val current = brokers(cliqueId)
+      brokers(cliqueId) = current.setSynced()
+    } else {
+      log.warning(s"Unexpected message Synced from $cliqueId")
+    }
   }
 }
