@@ -4,7 +4,7 @@ import scala.collection.mutable
 
 import akka.actor.Props
 
-import org.alephium.flow.client.FairMiner
+import org.alephium.flow.client.Miner
 import org.alephium.flow.io.{IOError, IOResult, IOUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
@@ -30,9 +30,9 @@ object FlowHandler {
   final case class GetSyncInfo(remoteBroker: BrokerInfo, isSameClique: Boolean) extends Command
   final case class GetSyncData(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
       extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)      extends Command
-  final case class Register(miner: ActorRefT[FairMiner.Command]) extends Command
-  case object UnRegister                                         extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
+  final case class Register(miner: ActorRefT[Miner.Command]) extends Command
+  case object UnRegister                                     extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Hash]
@@ -86,10 +86,10 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   override def receive: Receive = handleWith(None)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def handleWith(minerOpt: Option[ActorRefT[FairMiner.Command]]): Receive =
+  def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive =
     handleRelay(minerOpt) orElse handleSync
 
-  def handleRelay(minerOpt: Option[ActorRefT[FairMiner.Command]]): Receive = {
+  def handleRelay(minerOpt: Option[ActorRefT[Miner.Command]]): Receive = {
     case GetHeaders(locators) =>
       locators.flatMapE(blockFlow.getHeadersAfter) match {
         case Left(error) =>
@@ -145,7 +145,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
   }
 
-  def handleHeader(minerOpt: Option[ActorRefT[FairMiner.Command]],
+  def handleHeader(minerOpt: Option[ActorRefT[Miner.Command]],
                    header: BlockHeader,
                    broker: ActorRefT[ChainHandler.Event],
                    origin: DataOrigin): Unit = {
@@ -158,14 +158,14 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
           case Right(_) =>
             sender() ! FlowHandler.HeaderAdded(header, broker, origin)
             updateUponNewData(header.hash)
-            minerOpt.foreach(_ ! FairMiner.UpdateTemplate)
+            minerOpt.foreach(_ ! Miner.UpdateTemplate)
             logInfo(header)
         }
       case Left(error) => handleIOError(error)
     }
   }
 
-  def handleBlock(minerOpt: Option[ActorRefT[FairMiner.Command]],
+  def handleBlock(minerOpt: Option[ActorRefT[Miner.Command]],
                   block: Block,
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
@@ -178,9 +178,9 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
             updateUponNewData(block.hash)
             origin match {
               case DataOrigin.Local =>
-                minerOpt.foreach(_ ! FairMiner.MinedBlockAdded(block.chainIndex))
+                minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
               case _: DataOrigin.FromClique =>
-                minerOpt.foreach(_ ! FairMiner.UpdateTemplate)
+                minerOpt.foreach(_ ! Miner.UpdateTemplate)
             }
             logInfo(block.header)
             notify(block)
