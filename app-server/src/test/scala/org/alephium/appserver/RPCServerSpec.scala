@@ -20,7 +20,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.client.{FairMiner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.io.{IOResult, Storages, StoragesFixture}
@@ -57,12 +57,12 @@ class RPCServerSpec
 
   it should "call mining_start" in new RouteHTTP {
     checkCallResult("mining_start")(true)
-    minerProbe.expectMsg(Miner.Start)
+    minerProbe.expectMsg(FairMiner.Start)
   }
 
   it should "call mining_stop" in new RouteHTTP {
     checkCallResult("mining_stop")(true)
-    minerProbe.expectMsg(Miner.Stop)
+    minerProbe.expectMsg(FairMiner.Stop)
   }
 
   it should "call self_clique_synced" in new RouteHTTP {
@@ -299,7 +299,7 @@ class RPCServerSpec
 
   trait RPCServerFixture extends Fixture {
     val minerProbe = TestProbe()
-    val miner      = ActorRefT[Miner.Command](minerProbe.ref)
+    val miner      = ActorRefT[FairMiner.Command](minerProbe.ref)
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                         dummyNeighborCliques,
