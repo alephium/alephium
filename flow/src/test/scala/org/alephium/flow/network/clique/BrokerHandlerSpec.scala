@@ -2,12 +2,14 @@ package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
 
+import scala.collection.mutable
 import scala.util.Random
 
 import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
@@ -20,7 +22,6 @@ import org.alephium.serde.SerdeError
 import org.alephium.util.{ActorRefT, AVector}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spec =>
-
   behavior of "BrokerHandler"
 
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
@@ -317,22 +318,40 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
         remoteCliqueId   = _remoteCliqueId
         remoteBrokerInfo = _remoteBrokerInfo
       }
+
+      override def handleSendBlocks(blocks: AVector[Block],
+                                    notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = ()
     })
     val syncHandler = syncHandlerRef.underlyingActor
+
+    def testSync(remoteCliqueInfo: CliqueInfo, remoteBrokerInfo: BrokerInfo): Assertion = {
+      syncHandler.isSyncing is false
+      syncHandler.uponHandshaked(remoteCliqueInfo.id, remoteBrokerInfo)
+      syncHandler.isSyncing is true
+
+      val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
+      val blocksMsg0 = Message.serialize(SyncResponse(AVector(block), AVector.empty))
+      syncHandlerRef ! Tcp.Received(blocksMsg0)
+      syncHandler.isSyncing is true
+      val blocksMsg1 = Message.serialize(SyncResponse(AVector.empty, AVector.empty))
+      syncHandlerRef ! Tcp.Received(blocksMsg1)
+      syncHandlerRef ! FlowHandler.SyncData(AVector.empty, AVector.empty)
+      syncHandler.isSyncing is false
+    }
   }
 
-  it should "start syncing after handshaking" in new SyncFixture {
-    syncHandler.isSyncing is false
-    syncHandler.uponHandshaked(this.remoteCliqueInfo.id, config.brokerInfo)
-    syncHandler.isSyncing is true
+  it should "sync intra-clique node" in new SyncFixture {
+    val remoteCliqueInfoNew: CliqueInfo =
+      CliqueInfo.unsafe(this.selfCliqueInfo.id, AVector.empty, config.groupNumPerBroker)
+    val remoteBrokerInfoNew: BrokerInfo =
+      BrokerInfo.unsafe((config.brokerInfo.id + 1) % config.brokerNum,
+                        config.groupNumPerBroker,
+                        remote)
+    testSync(remoteCliqueInfoNew, remoteBrokerInfoNew)
+  }
 
-    val blocks0    = ModelGen.chainGen(config.numOfSyncBlocksLimit).sample.get
-    val blocksMsg0 = Message.serialize(SendBlocks(blocks0))
-    syncHandlerRef ! Tcp.Received(blocksMsg0)
-    syncHandler.isSyncing is true
-    val blocksMsg1 = Message.serialize(SendBlocks(AVector.empty))
-    syncHandlerRef ! Tcp.Received(blocksMsg1)
-    syncHandlerRef ! FlowHandler.BlocksLocated(AVector.empty)
-    syncHandler.isSyncing is false
+  it should "sync inter-clique node" in new SyncFixture {
+    remoteCliqueInfo.id isnot selfCliqueInfo.id
+    testSync(remoteCliqueInfo, config.brokerInfo)
   }
 }
