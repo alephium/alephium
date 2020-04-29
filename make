@@ -27,10 +27,10 @@ def rpc_call(args):
 
 def rpc_call_all(method, params):
     nodes = get_env_int('nodes')
-    batch = get_env_default_int('batch', 0)
+    deployedNodes = get_env_default_int('deployedNodes', 0)
 
     calls = []
-    for node in range(batch * nodes, (batch + 1) * nodes):
+    for node in range(deployedNodes, deployedNodes + nodes):
         port = (port_start + 1000) + node
         calls.append(('localhost', port, method, params))
 
@@ -102,11 +102,10 @@ class AlephiumMake(object):
         nodes = get_env_int('nodes')
         assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
-        batch = get_env_default_int('batch', 0)
-
         print("logs dir: " + tempdir + "/alephium")
 
-        for node in range(batch * nodes, (batch + 1) * nodes):
+        deployedNodes = get_env_default_int('deployedNodes', 0)
+        for node in range(deployedNodes, deployedNodes + nodes):
             port = 9973 + node
             rpcPort = port + 1000
             wsPort = port + 2000
