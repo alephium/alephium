@@ -295,9 +295,9 @@ object RPCServer extends {
       executionContext: ExecutionContext): FutureTry[TransferResult] = {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
-      case TxHandler.AddSucceeded =>
+      case _: TxHandler.AddSucceeded =>
         Right(TransferResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
-      case TxHandler.AddFailed =>
+      case _: TxHandler.AddFailed =>
         Left(Response.failed("Failed in adding transaction"))
     }
   }
