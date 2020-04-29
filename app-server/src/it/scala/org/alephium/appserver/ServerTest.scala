@@ -48,10 +48,13 @@ class ServerTest extends AlephiumSpec {
     server1.mode.node.system.whenTerminated.futureValue is a[Terminated]
   }
 
-  it should "work with 2 nodes" in new Fixture("2-nodes") {
+  it should "boot and sync single node clique" in new Fixture("1-node") {
+    val server = bootNode(publicPort = masterPort, brokerId = 0, brokerNum = 1)
+    server.start().futureValue is (())
+    eventually(request[Boolean](rpcMasterPort, getSelfCliqueSynced) is true)
+  }
 
-    val fromTs = TimeStamp.now()
-
+  it should "boot and sync two nodes clique" in new Fixture("2-nodes") {
     val server0 = bootNode(publicPort = masterPort, brokerId = 0)
     server0.start.futureValue is (())
 
@@ -61,6 +64,14 @@ class ServerTest extends AlephiumSpec {
     server1.start.futureValue is (())
 
     eventually(request[Boolean](rpcMasterPort, getSelfCliqueSynced) is true)
+  }
+
+  it should "work with 2 nodes" in new Fixture("2-nodes") {
+    val fromTs = TimeStamp.now()
+
+    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
     val group      = request[Group](rpcMasterPort, getGroup(publicKey))
@@ -88,8 +99,7 @@ class ServerTest extends AlephiumSpec {
       request[CreateTransactionResult](rpcPort,
                                        createTransaction(publicKey, tranferKey, transferAmount))
 
-    val tx2 =
-      request[TransferResult](rpcPort, sendTransaction(createTx))
+    val tx2 = request[TransferResult](rpcPort, sendTransaction(createTx))
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
@@ -158,7 +168,7 @@ class ServerTest extends AlephiumSpec {
       }
     }
 
-    def bootNode(publicPort: Int, brokerId: Int): Server = {
+    def bootNode(publicPort: Int, brokerId: Int, brokerNum: Int = 2): Server = {
       new Server(
         new Mode with PlatformConfigFixture with StoragesFixture {
           override val configValues = Map(
@@ -166,6 +176,7 @@ class ServerTest extends AlephiumSpec {
             ("alephium.network.publicAddress", s"localhost:$publicPort"),
             ("alephium.network.rpcPort", publicPort - 100),
             ("alephium.network.wsPort", publicPort - 200),
+            ("alephium.clique.brokerNum", brokerNum),
             ("alephium.broker.brokerId", brokerId)
           )
           override implicit lazy val config =
