@@ -37,6 +37,7 @@ trait RPCServerAbstract extends StrictLogging {
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse]
   def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques]
   def doGetSelfClique(req: Request): FutureTry[SelfClique]
+  def doGetSelfCliqueSynced(req: Request): FutureTry[Boolean]
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
@@ -68,6 +69,7 @@ trait RPCServerAbstract extends StrictLogging {
     "create_transaction" -> (req => wrap(req, doCreateTransaction(req))),
     "send_transaction"   -> (req => wrap(req, doSendTransaction(req))),
     "self_clique"        -> (req => wrap(req, doGetSelfClique(req))),
+    "self_clique_synced" -> (req => simpleWrap(req, doGetSelfCliqueSynced(req))),
     "transfer"           -> (req => wrap(req, doTransfer(req)))
   )
 
