@@ -21,7 +21,6 @@ object IntraCliqueManager {
 
   sealed trait Command    extends CliqueManager.Command
   final case object Ready extends Command
-
 }
 
 class IntraCliqueManager(
@@ -30,7 +29,6 @@ class IntraCliqueManager(
     allHandlers: AllHandlers,
     cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
     extends BaseActor {
-
   cliqueInfo.brokers.foreach { remoteBroker =>
     if (remoteBroker.id > config.brokerInfo.id) {
       val address = remoteBroker.address
@@ -43,6 +41,7 @@ class IntraCliqueManager(
       context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
     }
   }
+  checkAllSynced(Map.empty)
 
   override def receive: Receive = awaitBrokers(Map.empty)
 
@@ -72,15 +71,19 @@ class IntraCliqueManager(
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()
         val newBrokers = brokers + (brokerInfo.id -> (brokerInfo -> sender()))
-        if (newBrokers.size == cliqueInfo.peers.length - 1) {
-          log.debug("All Brokers connected")
-          cliqueManager ! IntraCliqueManager.Ready
-          context become handle(newBrokers)
-        } else {
-          context become awaitBrokers(newBrokers)
-        }
+        checkAllSynced(newBrokers)
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
+  }
+
+  def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRef)]): Unit = {
+    if (newBrokers.size == cliqueInfo.peers.length - 1) {
+      log.debug("All Brokers connected")
+      cliqueManager ! IntraCliqueManager.Ready
+      context become handle(newBrokers)
+    } else {
+      context become awaitBrokers(newBrokers)
+    }
   }
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {

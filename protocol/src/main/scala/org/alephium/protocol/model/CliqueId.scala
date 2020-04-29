@@ -12,17 +12,16 @@ class CliqueId private (val bytes: ByteString) extends RandomBytes {
   }
 }
 
-object CliqueId extends RandomBytes.Companion[CliqueId](new CliqueId(_), _.bytes) {
+object CliqueId
+    extends RandomBytes.Companion[CliqueId](bs => {
+      assume(bs.size == cliqueIdLength)
+      new CliqueId(bs)
+    }, _.bytes) {
   override def length: Int = cliqueIdLength
-
-  def fromBytesUnsafe(bytes: ByteString): CliqueId = {
-    assert(bytes.length == length)
-    new CliqueId(bytes)
-  }
 
   def fromStringUnsafe(s: String): CliqueId = {
     val bytes = ByteString.fromString(s)
-    fromBytesUnsafe(bytes)
+    unsafe(bytes)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.While"))
