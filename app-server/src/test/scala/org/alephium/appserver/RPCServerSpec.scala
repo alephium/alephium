@@ -65,6 +65,10 @@ class RPCServerSpec
     minerProbe.expectMsg(Miner.Stop)
   }
 
+  it should "call self_clique_synced" in new RouteHTTP {
+    checkCallResult("self_clique_synced")(true)
+  }
+
   it should "call blockflow_fetch" in new RouteHTTP {
     checkCallResult("blockflow_fetch", parse("""{"fromTs":1, "toTs":42}""").toOption)(
       dummyFetchResponse)
@@ -395,8 +399,13 @@ object RPCServerSpec {
     val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborCliques)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
-    val cliqueManagerProbe                              = TestProbe()
-    val cliqueManager: ActorRefT[CliqueManager.Command] = ActorRefT(cliqueManagerProbe.ref)
+    val selfCliqueSynced = true
+    val cliqueManager: ActorRefT[CliqueManager.Command] =
+      ActorRefT.build(system, Props(new BaseActor {
+        override def receive: Receive = {
+          case CliqueManager.IsSelfCliqueSynced => sender() ! selfCliqueSynced
+        }
+      }), "clique-manager")
 
     val txHandlerRef = system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded))
     val txHandler    = ActorRefT[TxHandler.Command](txHandlerRef)
