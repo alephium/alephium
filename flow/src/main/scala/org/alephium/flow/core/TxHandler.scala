@@ -7,6 +7,7 @@ import org.alephium.flow.core.validation.{InvalidTxStatus, TxValidation, ValidTx
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, Transaction}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
@@ -20,8 +21,8 @@ object TxHandler {
   final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
 
   sealed trait Event
-  final case object AddSucceeded extends Event
-  final case object AddFailed    extends Event
+  final case class AddSucceeded(hash: Hash) extends Event
+  final case class AddFailed(hash: Hash)    extends Event
 }
 
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Command])(
@@ -40,19 +41,19 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
       TxValidation.validateNonCoinbase(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
           log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
-          addFailed()
+          addFailed(tx)
         case Right(_: ValidTx.type) =>
           handleValidTx(chainIndex, tx, mempool, origin)
         case Right(unexpected) =>
           log.warning(s"Unexpected pattern matching $unexpected")
-          addFailed()
+          addFailed(tx)
         case Left(e) =>
           log.warning(s"IO failed in validating tx ${tx.shortHex} due to $e")
-          addFailed()
+          addFailed(tx)
       }
     } else {
       log.debug(s"tx ${tx.shortHex} is already included")
-      addFailed()
+      addFailed(tx)
     }
   }
 
@@ -64,14 +65,14 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
     log.info(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)))
     cliqueManager ! CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
-    addSucceeded()
+    addSucceeded(tx)
   }
 
-  def addSucceeded(): Unit = {
-    sender() ! TxHandler.AddSucceeded
+  def addSucceeded(tx: Transaction): Unit = {
+    sender() ! TxHandler.AddSucceeded(tx.hash)
   }
 
-  def addFailed(): Unit = {
-    sender() ! TxHandler.AddFailed
+  def addFailed(tx: Transaction): Unit = {
+    sender() ! TxHandler.AddFailed(tx.hash)
   }
 }

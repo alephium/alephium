@@ -13,7 +13,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils}
+import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message._
@@ -39,12 +39,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     val message = SendBlocks(AVector.empty)
     val data    = Message.serialize(message)
 
-    val connection     = TestProbe("connection")
-    val connectionT    = ActorRefT[Tcp.Command](connection.ref)
-    val blockHandlers  = TestUtils.createBlockHandlersProbe
-    val payloadHandler = TestProbe("payload-probe")
-    val cliqueManager  = TestProbe("clique-manager")
-    val cliqueManagerT = ActorRefT[CliqueManager.Command](cliqueManager.ref)
+    val connection               = TestProbe("connection")
+    val connectionT              = ActorRefT[Tcp.Command](connection.ref)
+    val (allHandlers, allProbes) = TestUtils.createBlockHandlersProbe
+    val payloadHandler           = TestProbe("payload-probe")
+    val cliqueManager            = TestProbe("clique-manager")
+    val cliqueManagerT           = ActorRefT[CliqueManager.Command](cliqueManager.ref)
   }
 
   it should "send hello to inbound connections" in new BaseFixture {
@@ -74,7 +74,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
         builder.createInboundBrokerHandler(selfCliqueInfo,
                                            remote,
                                            connectionT,
-                                           blockHandlers,
+                                           allHandlers,
                                            cliqueManagerT))
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
@@ -123,7 +123,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       builder.createOutboundBrokerHandler(selfCliqueInfo,
                                           remoteCliqueInfo.id,
                                           remoteBrokerInfo,
-                                          blockHandlers,
+                                          allHandlers,
                                           cliqueManagerT))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
@@ -163,12 +163,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
           self ! BrokerHandler.TcpAck // confirm that hello is sent out
         })
     }
-    val tcpHandler = system.actorOf(
-      builder.createInboundBrokerHandler(selfCliqueInfo,
-                                         remote,
-                                         connectionT,
-                                         blockHandlers,
-                                         cliqueManagerT))
+    val tcpHandler = system.actorOf(builder
+      .createInboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -239,39 +235,37 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     exception2 is a[SerdeError.WrongFormat]
   }
 
-  behavior of "ping/ping protocol"
-
-  trait PingPongFixture extends BaseFixture { obj =>
-
+  trait RelayFixture extends BaseFixture { obj =>
     val builder = new BrokerHandler.Builder {
       override def createInboundBrokerHandler(
           selfCliqueInfo: CliqueInfo,
           remote: InetSocketAddress,
           connection: ActorRefT[Tcp.Command],
-          blockHandlers: AllHandlers,
+          allHandlers: AllHandlers,
           cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
-        Props(new InboundBrokerHandler(selfCliqueInfo,
-                                       remote,
-                                       connection,
-                                       blockHandlers,
-                                       cliqueManager) {
-          startRelay()
+        Props(
+          new InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers, cliqueManager) {
+            override val allHandlers: AllHandlers = obj.allHandlers
 
-          self ! BrokerHandler.TcpAck
-        })
+            override def unhandled(message: Any): Unit = {
+              throw new RuntimeException(s"Test Failed: $message")
+            }
+
+            startRelay()
+
+            self ! BrokerHandler.TcpAck
+          })
     }
-    val tcpHandler = system.actorOf(
-      builder.createInboundBrokerHandler(selfCliqueInfo,
-                                         remote,
-                                         connectionT,
-                                         blockHandlers,
-                                         cliqueManagerT))
+    val tcpHandler = system.actorOf(builder
+      .createInboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT))
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
   }
 
-  it should "send ping after receiving SendPing" in new PingPongFixture {
+  behavior of "ping/ping protocol"
+
+  it should "send ping after receiving SendPing" in new RelayFixture {
     tcpHandler ! BrokerHandler.SendPing
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
@@ -280,7 +274,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     }
   }
 
-  it should "reply pong to ping" in new PingPongFixture {
+  it should "reply pong to ping" in new RelayFixture {
     val nonce    = Random.nextInt()
     val message1 = Ping(nonce, System.currentTimeMillis())
     val data1    = Message.serialize(message1)
@@ -288,13 +282,25 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     connection.expectMsg(BrokerHandler.envelope(Message(Pong(nonce))))
   }
 
-  it should "fail if receive a wrong ping" in new PingPongFixture {
+  it should "fail if receive a wrong ping" in new RelayFixture {
     watch(tcpHandler)
     val nonce    = Random.nextInt()
     val message1 = Pong(nonce)
     val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
     expectTerminated(tcpHandler)
+  }
+
+  behavior of "Relay protocol"
+
+  it should "send tx to txHandler" in new RelayFixture {
+    val tx     = ModelGen.transactionGen.sample.get
+    val sendTx = SendTxs(AVector(tx))
+    tcpHandler ! Tcp.Received(Message.serialize(sendTx))
+    allProbes.txHandler.expectMsgType[TxHandler.AddTx]
+
+    tcpHandler ! TxHandler.AddSucceeded(tx.hash)
+    tcpHandler ! TxHandler.AddFailed(tx.hash)
   }
 
   behavior of "Sync protocol"
@@ -308,8 +314,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       override def selfCliqueInfo: CliqueInfo                      = Base.selfCliqueInfo
       override def connection: ActorRefT[Tcp.Command]              = Base.connectionT
       override def cliqueManager: ActorRefT[CliqueManager.Command] = Base.cliqueManagerT
-      override def allHandlers: AllHandlers =
-        TestUtils.createBlockHandlersProbe(Spec.config, Spec.system)
+      override def allHandlers: AllHandlers                        = Base.allHandlers
 
       override def receive: Receive = { case _ => () }
 
