@@ -299,8 +299,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     tcpHandler ! Tcp.Received(Message.serialize(sendTx))
     allProbes.txHandler.expectMsgType[TxHandler.AddTx]
 
-    tcpHandler ! TxHandler.AddSucceeded
-    tcpHandler ! TxHandler.AddFailed
+    tcpHandler ! TxHandler.AddSucceeded(tx.hash)
+    tcpHandler ! TxHandler.AddFailed(tx.hash)
   }
 
   behavior of "Sync protocol"
