@@ -17,7 +17,7 @@ class FairMinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec 
 
   trait Fixture extends FairMinerState {
     override implicit def config: PlatformConfig = Spec.config
-    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe
+    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe._1
     val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
 
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {

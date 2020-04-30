@@ -11,18 +11,25 @@ import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, Files => AFiles}
 
 object TestUtils {
+  case class AllHandlerProbs(flowHandler: TestProbe,
+                             txHandler: TestProbe,
+                             blockHandlers: Map[ChainIndex, TestProbe],
+                             headerHandlers: Map[ChainIndex, TestProbe])
 
   def createBlockHandlersProbe(implicit config: PlatformConfig,
-                               system: ActorSystem): AllHandlers = {
-    val flowHandler = ActorRefT[FlowHandler.Command](TestProbe().ref)
-    val txHandler   = ActorRefT[TxHandler.Command](TestProbe().ref)
+                               system: ActorSystem): (AllHandlers, AllHandlerProbs) = {
+    val flowProbe   = TestProbe()
+    val flowHandler = ActorRefT[FlowHandler.Command](flowProbe.ref)
+    val txProbe     = TestProbe()
+    val txHandler   = ActorRefT[TxHandler.Command](txProbe.ref)
     val blockHandlers = (for {
       from <- 0 until config.groups
       to   <- 0 until config.groups
       chainIndex = ChainIndex.unsafe(from, to)
       if chainIndex.relateTo(config.brokerInfo)
     } yield {
-      chainIndex -> ActorRefT[BlockChainHandler.Command](TestProbe().ref)
+      val probe = TestProbe()
+      chainIndex -> (ActorRefT[BlockChainHandler.Command](probe.ref) -> probe)
     }).toMap
     val headerHandlers = (for {
       from <- 0 until config.groups
@@ -30,9 +37,18 @@ object TestUtils {
       chainIndex = ChainIndex.unsafe(from, to)
       if !chainIndex.relateTo(config.brokerInfo)
     } yield {
-      chainIndex -> ActorRefT[HeaderChainHandler.Command](TestProbe().ref)
+      val probe = TestProbe()
+      chainIndex -> (ActorRefT[HeaderChainHandler.Command](probe.ref) -> probe)
     }).toMap
-    AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
+    val allHandlers = AllHandlers(flowHandler,
+                                  txHandler,
+                                  blockHandlers.mapValues(_._1),
+                                  headerHandlers.mapValues(_._1))
+    val allProbes = AllHandlerProbs(flowProbe,
+                                    txProbe,
+                                    blockHandlers.mapValues(_._2),
+                                    headerHandlers.mapValues(_._2))
+    allHandlers -> allProbes
   }
 
   // remove all the content under the path; the path itself would be kept
