@@ -457,6 +457,8 @@ trait Relay extends P2PStage {
       sendPayload(GetBlocks(tips))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
+    case TxHandler.AddFailed(hash) =>
+      log.debug(s"Tx ${hash.shortHex} failed in adding")
   }
 
   def handleRelayPayload(payload: Payload): Unit = payload match {
