@@ -40,7 +40,7 @@ object Miner {
     Props(new Miner(addresses, blockFlow, allHandlers))
   }
 
-  trait Command
+  sealed trait Command
   case object Start                                   extends Command
   case object Stop                                    extends Command
   case object UpdateTemplate                          extends Command
