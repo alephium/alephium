@@ -3,11 +3,12 @@ package org.alephium.flow.client
 import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, BlockFlow, FlowHandler}
+import org.alephium.flow.core.{AllHandlers, BlockFlow, FlowHandler, TestUtils}
 import org.alephium.flow.network.CliqueManager
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.ActorRefT
 
-class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
+class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
   it should "initialize FairMiner" in {
     val cliqueManager        = TestProbe("cliqueManager")
     val flowHandler          = TestProbe("flowHandler")
@@ -18,7 +19,7 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
                                        blockFlow,
                                        ActorRefT(flowHandler.ref))
 
-    val miner = system.actorOf(FairMiner.props(blockFlow, allHandlers))
+    val miner = system.actorOf(Miner.props(blockFlow, allHandlers))
 
     miner ! Miner.Start
 
@@ -33,5 +34,13 @@ class FairMinerSpec extends AlephiumFlowActorSpec("FairMiner") {
     miner ! Miner.Stop
 
     flowHandler.expectMsgType[FlowHandler.UnRegister.type]
+  }
+
+  it should "ignore handled mining result when it's stopped" in {
+    val blockFlow        = BlockFlow.fromGenesisUnsafe(storages)
+    val (allHandlers, _) = TestUtils.createBlockHandlersProbe
+    val miner            = system.actorOf(Miner.props(blockFlow, allHandlers))
+
+    miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
   }
 }

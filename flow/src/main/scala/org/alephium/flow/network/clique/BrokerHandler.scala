@@ -450,11 +450,15 @@ trait Relay extends P2PStage {
 
   def handleRelayEvent: Receive = {
     case BlockChainHandler.BlocksAdded(chainIndex) =>
-      log.debug(s"all the blocks sent for $chainIndex are added")
+      log.debug(s"All the blocks sent for $chainIndex are added")
     case HeaderChainHandler.HeadersAdded(chainIndex) =>
-      log.debug(s"all the headers sent for $chainIndex are added")
+      log.debug(s"All the headers sent for $chainIndex are added")
     case BlockChainHandler.FetchSince(tips) =>
       sendPayload(GetBlocks(tips))
+    case TxHandler.AddSucceeded(hash) =>
+      log.debug(s"Tx ${hash.shortHex} was added successfully")
+    case TxHandler.AddFailed(hash) =>
+      log.debug(s"Tx ${hash.shortHex} failed in adding")
   }
 
   def handleRelayPayload(payload: Payload): Unit = payload match {
