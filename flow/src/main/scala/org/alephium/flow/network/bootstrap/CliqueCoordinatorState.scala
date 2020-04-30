@@ -43,7 +43,7 @@ trait CliqueCoordinatorState {
       if (i == config.brokerInfo.id) PeerInfo.self else brokerInfos(i).get
     }
     assume(infos.length * config.groupNumPerBroker == config.groups)
-    IntraCliqueInfo.unsafe(CliqueId.fromBytesUnsafe(config.discoveryPublicKey.bytes),
+    IntraCliqueInfo.unsafe(CliqueId.unsafe(config.discoveryPublicKey.bytes),
                            infos,
                            config.groupNumPerBroker)
   }
