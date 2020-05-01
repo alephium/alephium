@@ -29,11 +29,11 @@ class StackSpec extends AlephiumSpec {
     stack.peek(2) isE 1
     stack.size is 2
 
-    val n1 = stack.pop().right.value
+    val n1 = stack.pop().toOption.get
     n1 is 2
     stack.peek(1) isE 1
     stack.size is 1
-    val n2 = stack.pop().right.value
+    val n2 = stack.pop().toOption.get
     n2 is 1
     stack.peek(1).isLeft is true
     stack.size is 0

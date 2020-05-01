@@ -1,7 +1,6 @@
 package org.alephium.flow.io
 
 import org.scalatest.Assertion
-import org.scalatest.EitherValues._
 
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, ModelGen}
@@ -56,7 +55,7 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
       val hash   = block.hash
       headerStorage.put(header).isRight is true
       headerStorage.get(hash) isE header
-      headerStorage.getOpt(hash).right.value.get is header
+      headerStorage.getOpt(hash) isE Some(header)
       headerStorage.delete(hash).isRight is true
       headerStorage.get(hash).isLeft is true
       headerStorage.getOpt(hash) isE None

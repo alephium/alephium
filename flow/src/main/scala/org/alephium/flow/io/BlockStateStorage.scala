@@ -8,7 +8,8 @@ import org.alephium.flow.model.BlockState
 import org.alephium.protocol.ALF.Hash
 
 trait BlockStateStorage extends KeyValueStorage[Hash, BlockState] {
-  override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.blockStatePostfix
+  override def storageKey(key: Hash): ByteString =
+    key.bytes ++ ByteString(Storages.blockStatePostfix)
 }
 
 object BlockStateRockDBStorage extends RocksDBKeyValueCompanion[BlockStateRockDBStorage] {

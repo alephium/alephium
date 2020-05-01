@@ -3,7 +3,6 @@ package org.alephium.flow.trie
 import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
-import org.scalatest.EitherValues._
 
 import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.protocol.ALF.Hash
@@ -122,7 +121,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "be able to create a trie" in withTrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
-    fixture.trie.getOptRaw(genesisKey).right.value.nonEmpty is true
+    fixture.trie.getOptRaw(genesisKey).map(_.nonEmpty) isE true
   }
 
   it should "branch well" in withTrieFixture { fixture =>
@@ -133,12 +132,12 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie = trie.putRaw(key, value).right.value
+        trie = trie.putRaw(key, value).toOption.get
         Some(key)
       }
     }
 
-    val rootNode = trie.getNode(trie.rootHash).right.value
+    val rootNode = trie.getNode(trie.rootHash).toOption.get
     rootNode match {
       case BranchNode(path, children) =>
         children.foreach(_.nonEmpty is true)
@@ -148,17 +147,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      trie.getOptRaw(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).map(_.nonEmpty) isE true
     }
 
-    val allStored    = trie.getAllRaw(ByteString.empty).right.value
+    val allStored    = trie.getAllRaw(ByteString.empty).toOption.get
     val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
     val expectedKeys = (keys :+ genesisKey).toArray.sortBy(_.hashCode())
     allKeys is expectedKeys
 
     keys.foreach { key =>
-      trie = trie.removeRaw(key).right.value
-      trie.getOptRaw(key).right.value.isEmpty is true
+      trie = trie.removeRaw(key).toOption.get
+      trie.getOptRaw(key).map(_.isEmpty) isE true
     }
 
     trie.rootHash is genesisNode.hash
@@ -169,17 +168,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(100) { _ =>
       val (key, value) = fixture.generateKV()
-      trie = trie.putRaw(key, value).right.value
+      trie = trie.putRaw(key, value).toOption.get
       key
     }
 
     keys.map { key =>
-      trie.getOptRaw(key).right.value.nonEmpty is true
+      trie.getOptRaw(key).map(_.nonEmpty) isE true
     }
 
     keys.map { key =>
-      trie = trie.removeRaw(key).right.value
-      trie.getOptRaw(key).right.value.isEmpty is true
+      trie = trie.removeRaw(key).toOption.get
+      trie.getOptRaw(key).map(_.isEmpty) isE true
     }
 
     trie.rootHash is genesisNode.hash
@@ -193,7 +192,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     import org.alephium.util.Hex
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))
-      trie.getNode(hash).right.value match {
+      trie.getNode(hash).toOption.get match {
         case BranchNode(path, children) =>
           val nChild = children.map(_.fold(0)(_ => 1)).sum
           print(s"($shortHash, ${path.length} $nChild); ")

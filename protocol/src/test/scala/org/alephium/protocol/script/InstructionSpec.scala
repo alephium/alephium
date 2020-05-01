@@ -51,7 +51,7 @@ class InstructionSpec extends AlephiumSpec {
   it should "serde scripts" in {
     val script       = AVector[Instruction](OP_IF, OP_ELSE, OP_ENDIF)
     val serialized   = Instruction.serializeScript(script)
-    val deserialized = Instruction.deserializeScript(serialized).right.value
+    val deserialized = Instruction.deserializeScript(serialized).toOption.get
     deserialized is script
 
     Instruction.deserializeScript(ByteString(0xFF)).left.value is a[InvalidScript]
@@ -64,9 +64,9 @@ class InstructionSpec extends AlephiumSpec {
   }
 
   it should "test safeHead/safeTake" in {
-    Instruction.safeHead(ByteString(0)).right.value._1 is 0.toByte
+    Instruction.safeHead(ByteString(0)).toOption.get._1 is 0.toByte
     Instruction.safeHead(ByteString.empty).left.value is a[SerdeError.NotEnoughBytes]
-    Instruction.safeTake(ByteString(0), 1).right.value._1 is ByteString(0)
+    Instruction.safeTake(ByteString(0), 1).toOption.get._1 is ByteString(0)
     Instruction.safeTake(ByteString(0), 2).left.value is a[SerdeError.NotEnoughBytes]
   }
 
@@ -95,7 +95,7 @@ class InstructionSpec extends AlephiumSpec {
     state.instructionIndex is 1
     state.stack.isEmpty is false
 
-    val data0 = state.stack.pop().right.value
+    val data0 = state.stack.pop().toOption.get
     data0 is data
     state.stack.pop().isLeft is true
   }
@@ -144,7 +144,7 @@ class InstructionSpec extends AlephiumSpec {
     state.instructionIndex is 1
     state.stack.size is 2
 
-    val data1 = state.stack.pop().right.value
+    val data1 = state.stack.pop().toOption.get
     data1 is data
     state.stack.size is 1
   }
@@ -193,9 +193,9 @@ class InstructionSpec extends AlephiumSpec {
     state.instructionIndex is 1
     state.stack.size is 2
 
-    val data0 = state.stack.pop().right.value
+    val data0 = state.stack.pop().toOption.get
     data0 is data
-    val data1 = state.stack.pop().right.value
+    val data1 = state.stack.pop().toOption.get
     data1 is data ++ data
 
     OP_SWAP.deserialize(ByteString(0x1F)).left.value is a[SerdeError.Validation]
@@ -278,7 +278,7 @@ class InstructionSpec extends AlephiumSpec {
       state.instructionIndex is 1
       state.stack.size is 1
 
-      val data0 = state.stack.peek(1).right.value
+      val data0 = state.stack.peek(1).toOption.get
       validate(data0)
       data0 is toByteString(expected)
     }
@@ -548,7 +548,7 @@ class InstructionSpec extends AlephiumSpec {
     state.instructionIndex is 1
     state.stack.size is 1
 
-    val data0 = state.stack.pop().right.value
+    val data0 = state.stack.pop().toOption.get
     data0 is Keccak256.hash(data).bytes
     state.stack.isEmpty is true
   }

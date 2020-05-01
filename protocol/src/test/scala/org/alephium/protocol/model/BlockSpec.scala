@@ -1,7 +1,5 @@
 package org.alephium.protocol.model
 
-import org.scalatest.EitherValues._
-
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
@@ -13,7 +11,7 @@ class BlockSpec extends AlephiumSpec with ConsensusConfigFixture {
   it should "serde" in {
     forAll(ModelGen.blockGen) { block =>
       val bytes  = serialize[Block](block)
-      val output = deserialize[Block](bytes).right.value
+      val output = deserialize[Block](bytes).toOption.get
       output is block
     }
   }

@@ -158,7 +158,7 @@ object RPCServer extends {
       } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
 
       entriesEither match {
-        case Right(entries) => Right(FetchResponse(entries.toArray))
+        case Right(entries) => Right(FetchResponse(entries.toArray.toIndexedSeq))
         case Left(_)        => failedInIO[FetchResponse]
       }
     }

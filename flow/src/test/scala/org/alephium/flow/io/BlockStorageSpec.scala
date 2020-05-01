@@ -3,7 +3,6 @@ package org.alephium.flow.io
 import java.nio.file.Files
 
 import org.scalatest.Assertion
-import org.scalatest.EitherValues._
 
 import org.alephium.flow.core.TestUtils
 import org.alephium.protocol.config.ConsensusConfigFixture
@@ -13,7 +12,7 @@ import org.alephium.util.{AlephiumSpec, Files => AFiles}
 class BlockStorageSpec extends AlephiumSpec {
   trait Fixture {
     val root    = AFiles.tmpDir.resolve(".alephium-test-diskspec")
-    val storage = BlockStorage.create(root, "blocks", 10).right.value
+    val storage = BlockStorage.create(root, "blocks", 10).toOption.get
 
     def postTest(): Assertion = {
       storage.source.dESTROY().isRight is true

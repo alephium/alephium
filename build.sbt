@@ -95,7 +95,7 @@ lazy val protocol = project("protocol")
 val commonSettings = Seq(
   organization := "org.alephium",
   version := "0.3.0-SNAPSHOT",
-  scalaVersion := "2.12.10",
+  scalaVersion := "2.13.2",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
@@ -107,7 +107,6 @@ val commonSettings = Seq(
     "-unchecked",
     "-Xfatal-warnings",
     "-Xlint:adapted-args",
-    "-Xlint:by-name-right-associative",
     "-Xlint:constant",
     "-Xlint:delayedinit-select",
     "-Xlint:doc-detached",
@@ -122,15 +121,9 @@ val commonSettings = Seq(
     "-Xlint:private-shadow",
     "-Xlint:stars-align",
     "-Xlint:type-parameter-shadow",
-    "-Xlint:unsound-match",
-    "-Yno-adapted-args",
-    "-Ypartial-unification",
+    "-Xlint:nonlocal-return",
     "-Ywarn-dead-code",
     "-Ywarn-extra-implicit",
-    "-Ywarn-inaccessible",
-    "-Ywarn-infer-any",
-    "-Ywarn-nullary-override",
-    "-Ywarn-nullary-unit",
     "-Ywarn-numeric-widen",
     "-Ywarn-unused:implicits",
     "-Ywarn-unused:imports",
@@ -168,7 +161,8 @@ val wartsCompileExcludes = Seq(
   Wart.Return, // Covered by scalastyle
   Wart.Any,
   Wart.Throw,
-  Wart.Equals
+  Wart.Equals,
+  Wart.StringPlusAny
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(

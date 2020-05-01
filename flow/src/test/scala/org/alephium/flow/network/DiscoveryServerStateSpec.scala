@@ -9,7 +9,6 @@ import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
-import org.scalatest.EitherValues._
 
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
@@ -52,7 +51,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
           val message =
-            DiscoveryMessage.deserialize(CliqueId.generate, send.payload)(peerConfig).right.value
+            DiscoveryMessage.deserialize(CliqueId.generate, send.payload)(peerConfig).toOption.get
           message.payload is a[T]
       }
     }

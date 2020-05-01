@@ -48,7 +48,10 @@ object DiscoveryMessage {
 
   trait Payload
   object Payload {
-    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+    @SuppressWarnings(
+      Array("org.wartremover.warts.Product",
+            "org.wartremover.warts.Serializable",
+            "org.wartremover.warts.JavaSerializable"))
     def serialize(payload: Payload): ByteString = {
       val (code: Code[_], data) = payload match {
         case x: Ping      => (Ping, Ping.serialize(x))

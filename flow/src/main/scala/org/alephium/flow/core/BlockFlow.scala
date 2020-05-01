@@ -168,9 +168,7 @@ object BlockFlow extends StrictLogging {
       }
     }
 
-    private def isCompatibleUnsafe(rtips: IndexedSeq[Hash],
-                                   tip: Hash,
-                                   from: GroupIndex): Boolean = {
+    private def isCompatibleUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Boolean = {
       val newRtips = getRtipsUnsafe(tip, from)
       assert(rtips.length == newRtips.length)
       rtips.indices forall { k =>
