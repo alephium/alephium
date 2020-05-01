@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  lazy val akka    = "2.6.3"
+  lazy val akka    = "2.6.4"
   lazy val metrics = "4.0.6"
 }
 

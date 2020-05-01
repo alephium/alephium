@@ -15,7 +15,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.{SocketUtil, TestProbe}
 import io.circe.Decoder
 import io.circe.parser.parse
-import org.scalatest.EitherValues._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
@@ -152,7 +151,7 @@ class ServerTest extends AlephiumSpec {
         json    <- parse(Unmarshal(response.entity).to[String].futureValue)
         request <- json.as[JsonRPC.Response.Success]
         t       <- request.result.as[T]
-      } yield t).right.value
+      } yield t).toOption.get
     }
 
     @tailrec
@@ -160,9 +159,9 @@ class ServerTest extends AlephiumSpec {
       val timeout = Duration.ofMinutesUnsafe(2).asScala
       blockNotifyProbe.receiveOne(max = timeout) match {
         case TextMessage.Strict(text) =>
-          val json         = parse(text).right.value
-          val notification = json.as[NotificationUnsafe].right.value.asNotification.right.value
-          val blockEntry   = notification.params.as[BlockEntry].right.value
+          val json         = parse(text).toOption.get
+          val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
+          val blockEntry   = notification.params.as[BlockEntry].toOption.get
           if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) ()
           else awaitNewBlock(from, to)
       }

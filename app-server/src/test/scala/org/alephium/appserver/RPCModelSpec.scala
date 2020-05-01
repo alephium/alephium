@@ -37,8 +37,8 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
-    val json = parse(jsonRaw).right.value
-    json.as[A].right.value
+    val json = parse(jsonRaw).toOption.get
+    json.as[A].toOption.get
   }
 
   def checkData[T](data: T, jsonRaw: String)(implicit codec: Codec[T]): Assertion = {
@@ -47,7 +47,7 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   def parseFail[A](jsonRaw: String)(implicit A: Decoder[A]): String = {
-    parse(jsonRaw).right.value.as[A].left.value.message
+    parse(jsonRaw).toOption.get.as[A].left.value.message
   }
 
   it should "encode/decode TimeStamp" in {

@@ -64,7 +64,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getHeightUnsafe(block.hash) is (ALF.GenesisHeight + 1)
       chain.getHeight(block.hash) isE (ALF.GenesisHeight + 1)
 
-      val diff = chain.calHashDiff(block.hash, genesis.hash).right.value
+      val diff = chain.calHashDiff(block.hash, genesis.hash).toOption.get
       diff.toAdd is AVector(block.hash)
       diff.toRemove.isEmpty is true
     }
@@ -102,7 +102,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.maxHeight isE blocks.length
       chain.getAllTips is AVector(lastBlock.hash)
 
-      val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).right.value
+      val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).toOption.get
       diff.toRemove.isEmpty is true
       diff.toAdd is blocks.map(_.hash)
     }
@@ -146,11 +146,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         addBlocks(chain, shortChain)
         addBlocks(chain, longChain)
 
-        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash).right.value
+        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash).toOption.get
         diff0.toRemove is shortChain.map(_.hash).reverse
         diff0.toAdd is longChain.map(_.hash)
 
-        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash).right.value
+        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash).toOption.get
         diff1.toRemove is longChain.map(_.hash).reverse
         diff1.toAdd is shortChain.map(_.hash)
       }
@@ -229,7 +229,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val allHashes = (chain0 ++ chain1).map(_.hash).toSet
     chain.getHashesAfter(chain0.head.hash) isE chain0.tail.map(_.hash)
     chain.getHashesAfter(chain1.head.hash) isE chain1.tail.map(_.hash)
-    chain.getHashesAfter(genesis.hash).right.value.toSet is allHashes
+    chain.getHashesAfter(genesis.hash).toOption.get.toSet is allHashes
 
     chain.getHashesAfter(ModelGen.blockGen.sample.get.hash) isE AVector.empty[Hash]
   }

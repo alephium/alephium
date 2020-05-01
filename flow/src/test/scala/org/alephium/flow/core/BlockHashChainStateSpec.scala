@@ -3,7 +3,6 @@ package org.alephium.flow.core
 import scala.language.reflectiveCalls
 
 import org.scalatest.Assertion
-import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.{ChainStateStorage, IOResult}
@@ -22,7 +21,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
 
       override def getTimestamp(hash: Hash): IOResult[TimeStamp] = ???
 
-      def state: BlockHashChain.State = chainStateStorage.loadState().right.value
+      def state: BlockHashChain.State = chainStateStorage.loadState().toOption.get
 
       def allTipsInMem: ConcurrentHashMap[Hash, TimeStamp] = tips
 

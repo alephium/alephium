@@ -158,9 +158,9 @@ object MerklePatriciaTrie {
   }
 
   def bytes2Nibbles(bytes: ByteString): ByteString = {
-    bytes.flatMap { byte =>
+    ByteString(bytes.flatMap { byte =>
       ByteString(getHighNibble(byte), getLowNibble(byte))
-    }
+    })
   }
 
   def nibbles2Bytes(nibbles: ByteString): ByteString = {
@@ -321,7 +321,7 @@ final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage[Hash
       val onlyChildIndex = newChildren.indexWhere(_.nonEmpty)
       val onlyChildHash  = children(onlyChildIndex).get
       getNode(onlyChildHash) map { onlyChild =>
-        val newNode  = onlyChild.preExtend(branchNode.path :+ onlyChildIndex.toByte)
+        val newNode  = onlyChild.preExtend(branchNode.path ++ ByteString(onlyChildIndex.toByte))
         val toDelete = result.toDelete ++ AVector(onlyChildHash, branchHash)
         TrieUpdateActions(Some(newNode), toDelete, result.toAdd :+ newNode)
       }
@@ -453,8 +453,9 @@ final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage[Hash
             val nibble     = prefixRest.head
             assert(nibble >= 0 && nibble < 16)
             n.children(nibble.toInt) match {
-              case Some(child) => getAllRaw(prefixRest.tail, child, acc ++ n.path :+ nibble)
-              case None        => Right(AVector.empty)
+              case Some(child) =>
+                getAllRaw(prefixRest.tail, child, acc ++ n.path ++ ByteString(nibble))
+              case None => Right(AVector.empty)
             }
           } else Right(AVector.empty)
         }
@@ -480,7 +481,7 @@ final class MerklePatriciaTrie(val rootHash: Hash, storage: KeyValueStorage[Hash
                           acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
     node.children.flatMapWithIndexE { (childOpt, index) =>
       childOpt match {
-        case Some(child) => getAllRaw(child, acc ++ node.path :+ index.toByte)
+        case Some(child) => getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte))
         case None        => Right(AVector.empty)
       }
     }

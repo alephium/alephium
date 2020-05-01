@@ -1,6 +1,6 @@
 package org.alephium.flow.platform
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
@@ -19,7 +19,7 @@ trait PlatformConfigFixture {
   val rootPath = Platform.generateRootPath(env)
 
   lazy val newConfig = ConfigFactory
-    .parseMap(configValues.mapValues(ConfigValueFactory.fromAnyRef).asJava)
+    .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
     .withFallback(Configs.parseConfig(rootPath))
 
   lazy val groups0 = newConfig.getInt("alephium.groups")
