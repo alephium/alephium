@@ -2,8 +2,6 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
-import org.scalatest.EitherValues._
-
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.config.DiscoveryConfig
@@ -65,7 +63,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     }
     forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
-      val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).right.value
+      val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).toOption.get
       msg is value
     }
   }

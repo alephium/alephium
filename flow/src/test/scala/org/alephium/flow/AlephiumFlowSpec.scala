@@ -11,7 +11,7 @@ trait AlephiumFlowSpec
     with PlatformConfigFixture
     with StoragesFixture
     with BeforeAndAfterAll {
-  override def afterAll() {
+  override def afterAll() = {
     cleanStorages()
   }
 }

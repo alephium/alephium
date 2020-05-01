@@ -10,7 +10,7 @@ import org.alephium.protocol.ALF.Hash
 trait TrieHashStorage extends KeyValueStorage[Hash, Hash] {
   val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
 
-  override def storageKey(key: Hash): ByteString = key.bytes :+ Storages.trieHashPostfix
+  override def storageKey(key: Hash): ByteString = key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getTrie(hash: Hash): IOResult[MerklePatriciaTrie] = {
     get(hash).map(MerklePatriciaTrie(_, trieStorage))

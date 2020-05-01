@@ -42,12 +42,12 @@ object TestUtils {
     }).toMap
     val allHandlers = AllHandlers(flowHandler,
                                   txHandler,
-                                  blockHandlers.mapValues(_._1),
-                                  headerHandlers.mapValues(_._1))
+                                  blockHandlers.view.mapValues(_._1).toMap,
+                                  headerHandlers.view.mapValues(_._1).toMap)
     val allProbes = AllHandlerProbs(flowProbe,
                                     txProbe,
-                                    blockHandlers.mapValues(_._2),
-                                    headerHandlers.mapValues(_._2))
+                                    blockHandlers.view.mapValues(_._2).toMap,
+                                    headerHandlers.view.mapValues(_._2).toMap)
     allHandlers -> allProbes
   }
 

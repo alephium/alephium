@@ -210,7 +210,7 @@ class RPCServerSpec
 
     val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref, dummyTx, storages)
     def blockflowFetch(params: String) = {
-      RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).right.value, 0))
+      RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).toOption.get, 0))
     }
     val invalidParams = Response.Failure(Error.InvalidParams, Some(0L))
 
@@ -348,8 +348,8 @@ class RPCServerSpec
       mode.node.eventBus ! blockNotify
       val TextMessage.Strict(message) = client.expectMessage()
 
-      val json         = parse(message).right.value
-      val notification = json.as[NotificationUnsafe].right.value.asNotification.right.value
+      val json         = parse(message).toOption.get
+      val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
 
       notification.method is "block_notify"
     }

@@ -197,7 +197,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
 
   def handlePending(pending: PendingData): Unit = {
     val missings = pending.missingDeps
-    escapeIOError(IOUtils.tryExecute(missings.retain(!blockFlow.containsUnsafe(_)))) { _ =>
+    escapeIOError(IOUtils.tryExecute(missings.filterInPlace(!blockFlow.containsUnsafe(_)))) { _ =>
       if (missings.isEmpty) {
         feedback(pending)
       } else {
@@ -276,13 +276,13 @@ trait FlowHandlerState {
   }
 
   def updateStatus(hash: Hash): IndexedSeq[PendingData] = {
-    val toRemove: IndexedSeq[Int] = pendingStatus.collect {
+    val toRemove = pendingStatus.collect[Int] {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts
-    }(scala.collection.breakOut)
+    }
     val blocks = toRemove.map(pendingStatus(_))
     toRemove.foreach(pendingStatus.remove)
-    blocks
+    blocks.toIndexedSeq
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))

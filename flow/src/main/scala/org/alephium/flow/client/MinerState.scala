@@ -42,6 +42,7 @@ trait MinerState {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
     val minCount = miningCounts.map(_.min).min
     for {

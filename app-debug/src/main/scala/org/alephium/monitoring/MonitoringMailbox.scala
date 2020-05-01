@@ -36,7 +36,7 @@ object MonitoringMailbox {
     def hasMessages: Boolean  = !queue.isEmpty
 
     @SuppressWarnings(Array("org.wartremover.warts.While"))
-    def cleanUp(owner: ActorRef, deadLetters: MessageQueue) {
+    def cleanUp(owner: ActorRef, deadLetters: MessageQueue): Unit = {
       while (hasMessages) {
         deadLetters.enqueue(owner, dequeue())
       }

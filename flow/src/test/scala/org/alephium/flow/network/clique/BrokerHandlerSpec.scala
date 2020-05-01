@@ -79,7 +79,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserialize(write.data).right.value
+        val message = Message.deserialize(write.data).toOption.get
         message.payload match {
           case hello: Hello =>
             hello.version is 0
@@ -133,7 +133,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     outboundBrokerHandler ! Tcp.Received(Message.serialize(hello))
     connection.expectMsgPF() {
       case write: Tcp.Write =>
-        val message = Message.deserialize(write.data).right.value
+        val message = Message.deserialize(write.data).toOption.get
         message.payload match {
           case ack: HelloAck =>
             ack.cliqueId is selfCliqueInfo.id
@@ -212,12 +212,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
   }
 
   it should "deserialize two messages correctly" in new SerdeFixture {
-    val result = BrokerHandler.deserialize(bytes).right.value
+    val result = BrokerHandler.deserialize(bytes).toOption.get
     result._1 is AVector(message1, message2)
     result._2 is ByteString.empty
     for (n <- bytes.indices) {
       val input  = bytes.take(n)
-      val output = BrokerHandler.deserialize(input).right.value
+      val output = BrokerHandler.deserialize(input).toOption.get
       if (n < bytes1.length) {
         output._1 is AVector.empty[Message]
         output._2 is input
@@ -269,7 +269,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
     tcpHandler ! BrokerHandler.SendPing
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        val message = Message.deserialize(data).right.value
+        val message = Message.deserialize(data).toOption.get
         message.payload is a[Ping]
     }
   }

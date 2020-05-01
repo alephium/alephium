@@ -94,8 +94,8 @@ object PlatformConfig {
       val medianTimeInterval    = 11
       val diffAdjustDownMax     = 16
       val diffAdjustUpMax       = 8
-      val timeSpanMin: Duration = (expectedTimeSpan * (100l - diffAdjustDownMax)).get divUnsafe 100l
-      val timeSpanMax: Duration = (expectedTimeSpan * (100l + diffAdjustUpMax)).get divUnsafe 100l
+      val timeSpanMin: Duration = (expectedTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
+      val timeSpanMax: Duration = (expectedTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
       /* Consensus */
 
       /* Script */
@@ -166,7 +166,7 @@ object PlatformConfig {
   }
 
   def loadBlockFlow(cfg: Config)(implicit config: ConsensusConfig): AVector[AVector[Block]] = {
-    import collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     val entries  = cfg.getStringList("genesis").asScala
     val balances = entries.map(splitBalance)
     loadBlockFlow(AVector.from(balances))

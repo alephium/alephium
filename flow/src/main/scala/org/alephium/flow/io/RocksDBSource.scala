@@ -90,7 +90,7 @@ object RocksDBSource {
 
     def columnOptionsForBudget(compaction: Compaction,
                                memoryBudgetPerCol: Long): ColumnFamilyOptions = {
-      import scala.collection.JavaConverters._
+      import scala.jdk.CollectionConverters._
 
       (new ColumnFamilyOptions)
         .setLevelCompactionDynamicLevelBytes(true)
@@ -130,7 +130,7 @@ object RocksDBSource {
   def openUnsafeWithOptions(path: Path,
                             databaseOptions: DBOptions,
                             columnOptions: ColumnFamilyOptions): RocksDBSource = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
     val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
@@ -142,7 +142,7 @@ object RocksDBSource {
                           descriptors.toIterable.toList.asJava,
                           handles.asJava)
 
-    new RocksDBSource(path, db, AVector.fromIterator(handles.toIterator))
+    new RocksDBSource(path, db, AVector.from(handles))
   }
 }
 

@@ -75,7 +75,8 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    implicit val keccak256Ord: Ordering[Hash]      = Ordering.Iterable[Byte].on[Hash](_.bytes)
+    import scala.math.Ordering.Implicits.seqOrdering
+    implicit val keccak256Ord: Ordering[Hash]      = Ordering.by[Hash, Seq[Byte]](_.bytes.toSeq)
     implicit val pairOrd: Ordering[(Double, Hash)] = Ordering.Tuple2[Double, Hash]
     Ordering.by(p => (-p.weight, p.id))
   }

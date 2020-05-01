@@ -12,7 +12,10 @@ import org.alephium.util.AVector
 sealed trait Payload
 
 object Payload {
-  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  @SuppressWarnings(
+    Array("org.wartremover.warts.Product",
+          "org.wartremover.warts.Serializable",
+          "org.wartremover.warts.JavaSerializable"))
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello        => (Hello, Hello.serialize(x))
