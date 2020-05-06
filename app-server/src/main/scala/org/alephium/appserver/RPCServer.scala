@@ -11,6 +11,7 @@ import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
+import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -25,16 +26,17 @@ import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, AVector, Duration, Hex}
 
-class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])
-    extends RPCServerAbstract {
+class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
+    implicit val system: ActorSystem,
+    val config: PlatformConfig,
+    val executionContext: ExecutionContext)
+    extends RPCServerAbstract
+    with Stoppable {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
-  implicit val system: ActorSystem                = mode.node.system
-  implicit val executionContext: ExecutionContext = system.dispatcher
-  implicit val config: PlatformConfig             = mode.config
-  implicit val rpcConfig: RPCConfig               = RPCConfig.load(config.aleph)
-  implicit val askTimeout: Timeout                = Timeout(rpcConfig.askTimeout.asScala)
+  implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
+  implicit val askTimeout: Timeout  = Timeout(rpcConfig.askTimeout.asScala)
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
@@ -83,10 +85,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   val httpRoute: Route = routeHttp(miner)
   val wsRoute: Route   = routeWs(mode.node.eventBus)
 
+  private var started: Boolean                                = false
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
   private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
 
   def runServer(): Future[Unit] = {
+    started = true
     for {
       httpBinding <- Http()
         .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
@@ -100,22 +104,30 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     }
   }
 
-  def stopServer(): Future[Unit] =
-    for {
-      httpStop <- httpBindingPromise.future.flatMap(
-        _.terminate(hardDeadline = terminationHardDeadline))
-      wsStop <- wsBindingPromise.future.flatMap(_.terminate(hardDeadline = terminationHardDeadline))
-    } yield {
-      logger.info(s"http unbound with message $httpStop.")
-      logger.info(s"ws unbound with message $wsStop.")
-      ()
+  def stop(): Future[Unit] =
+    if (started) {
+      for {
+        httpStop <- httpBindingPromise.future.flatMap(
+          _.terminate(hardDeadline = terminationHardDeadline))
+        wsStop <- wsBindingPromise.future.flatMap(
+          _.terminate(hardDeadline = terminationHardDeadline))
+      } yield {
+        logger.info(s"http unbound with message $httpStop.")
+        logger.info(s"ws unbound with message $wsStop.")
+        ()
+      }
+    } else {
+      Future.successful(())
     }
 }
 
 object RPCServer extends {
   import RPCServerAbstract._
 
-  def apply(mode: Mode, miner: ActorRefT[Miner.Command]): RPCServer = {
+  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(
+      implicit system: ActorSystem,
+      config: PlatformConfig,
+      executionContext: ExecutionContext): RPCServer = {
     (for {
       rpcPort <- mode.config.rpcPort
       wsPort  <- mode.config.wsPort

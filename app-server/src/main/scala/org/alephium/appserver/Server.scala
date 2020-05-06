@@ -2,29 +2,44 @@ package org.alephium.appserver
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import com.typesafe.scalalogging.StrictLogging
+import akka.actor.ActorSystem
 
+import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner
-import org.alephium.flow.platform.Mode
+import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.util.ActorRefT
 
-class Server(val mode: Mode) extends StrictLogging {
+trait Server extends Stoppable {
 
-  implicit val executionContext: ExecutionContext = mode.node.system.dispatcher
+  implicit def config: PlatformConfig
+  implicit def system: ActorSystem
+  implicit def executionContext: ExecutionContext
 
-  private val miner: ActorRefT[Miner.Command] = {
-    val props =
-      Miner.props(mode.node)(mode.config).withDispatcher("akka.actor.mining-dispatcher")
-    ActorRefT.build(mode.node.system, props, s"FairMiner")
-  }
+  def mode: Mode
+  def rpcServer: RPCServer
+  def miner: ActorRefT[Miner.Command]
 
-  val rpcServer: RPCServer = RPCServer(mode, miner)
-
-  def start(): Future[Unit] = rpcServer.runServer()
+  def start(): Future[Unit] = rpcServer.runServer
 
   def stop(): Future[Unit] =
     for {
-      _ <- rpcServer.stopServer()
-      _ <- mode.shutdown()
-    } yield ()
+      _ <- rpcServer.stop()
+      _ <- mode.stop()
+    } yield (())
+}
+
+class ServerImpl(implicit val config: PlatformConfig,
+                 val system: ActorSystem,
+                 val executionContext: ExecutionContext)
+    extends Server {
+
+  val mode: Mode = new Mode.Default()
+
+  lazy val miner: ActorRefT[Miner.Command] = {
+    val props =
+      Miner.props(mode.node)(config).withDispatcher("akka.actor.mining-dispatcher")
+    ActorRefT.build(system, props, s"FairMiner")
+  }
+
+  lazy val rpcServer: RPCServer = RPCServer(mode, miner)
 }

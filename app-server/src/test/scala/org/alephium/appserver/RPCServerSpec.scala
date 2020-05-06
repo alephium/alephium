@@ -177,7 +177,7 @@ class RPCServerSpec
 
   it should "run/stop the server" in new RouteHTTP {
     server.runServer().futureValue is (())
-    server.stopServer().futureValue is (())
+    server.stop().futureValue is (())
   }
 
   it should "make sure rps and ws port are provided" in new Fixture {
@@ -482,7 +482,9 @@ object RPCServerSpec {
                   blockHeader: BlockHeader,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
-                  storages: Storages)(implicit val config: PlatformConfig)
+                  storages: Storages)(implicit val system: ActorSystem,
+                                      val config: PlatformConfig,
+                                      val executionContext: ExecutionContext)
       extends Mode {
     lazy val node = new NodeDummy(intraCliqueInfo,
                                   neighborCliques,
@@ -491,11 +493,9 @@ object RPCServerSpec {
                                   dummyTx,
                                   storages)
 
-    implicit lazy val executionContext: ExecutionContext = node.system.dispatcher
-
-    override def shutdown(): Future[Unit] =
+    override def stop(): Future[Unit] =
       for {
-        _ <- node.shutdown()
+        _ <- node.stop()
       } yield ()
   }
 }

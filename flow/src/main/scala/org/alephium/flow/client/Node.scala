@@ -1,10 +1,11 @@
 package org.alephium.flow.client
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
-import akka.actor.{ActorSystem, Props, Terminated}
+import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
+import akka.util.Timeout
 
-import org.alephium.flow.Utils
+import org.alephium.flow.{Stoppable, Utils}
 import org.alephium.flow.core._
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
@@ -12,7 +13,7 @@ import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus}
 
-trait Node {
+trait Node extends Stoppable {
   implicit def config: PlatformConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
@@ -24,17 +25,18 @@ trait Node {
   def allHandlers: AllHandlers
   def monitor: ActorRefT[Node.Command]
 
-  def shutdown(): Future[Unit] = {
-    monitor ! Node.Stop
-    system.whenTerminated.map(_ => ())(system.dispatcher)
-  }
+  def stop(): Future[Unit] =
+    monitor
+      .ask(Node.Stop)(Timeout(Utils.shutdownTimeout.asScala))
+      .mapTo[Unit]
 }
 
 object Node {
-  def build(builders: BrokerHandler.Builder, name: String, storages: Storages)(
-      implicit platformConfig: PlatformConfig): Node = new Node {
-    val config              = platformConfig
-    val system: ActorSystem = ActorSystem(name, config.all)
+  def build(builders: BrokerHandler.Builder, storages: Storages)(
+      implicit actorSystem: ActorSystem,
+      platformConfig: PlatformConfig): Node = new Node {
+    val config          = platformConfig
+    implicit val system = actorSystem
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -61,10 +63,6 @@ object Node {
 
     val monitor: ActorRefT[Node.Command] =
       ActorRefT.build(system, Monitor.props(this), "NodeMonitor")
-
-    Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      Await.result(shutdown(), Utils.shutdownTimeout.asScala)
-    }))
   }
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
@@ -80,8 +78,7 @@ object Node {
   }
 
   sealed trait Command
-  case object Stop    extends Command
-  case object TimeOut extends Command
+  case object Stop extends Command
 
   object Monitor {
     def props(node: Node): Props = Props(new Monitor(node))
@@ -99,31 +96,25 @@ object Node {
     override def receive: Receive = {
       case Stop =>
         log.info("Stopping the node")
-        scheduleOnce(self, TimeOut, Utils.shutdownTimeout)
-        terminate(orderedActors)
+        terminate(orderedActors, sender())
     }
 
-    def terminate(actors: Seq[ActorRefT[_]]): Unit = {
+    def terminate(actors: Seq[ActorRefT[_]], answerTo: ActorRef): Unit = {
       actors match {
         case Nil =>
-          log.debug("Terminate the actor system")
-          context.system.terminate()
-          ()
+          log.debug("All actors terminated")
+          answerTo ! ()
         case toTerminate :: rest =>
           log.debug(s"Terminate ${toTerminate.ref.path.toStringWithoutAddress}")
           context watch toTerminate.ref
           context stop toTerminate.ref
-          context become handle(toTerminate, rest)
+          context become handle(toTerminate, rest, answerTo)
       }
     }
 
-    def handle(toTerminate: ActorRefT[_], rest: Seq[ActorRefT[_]]): Receive = {
+    def handle(toTerminate: ActorRefT[_], rest: Seq[ActorRefT[_]], answerTo: ActorRef): Receive = {
       case Terminated(actor) if actor == toTerminate.ref =>
-        terminate(rest)
-      case TimeOut =>
-        log.warning("Termination timeouts, let's shutdown immediately")
-        context.system.terminate()
-        ()
+        terminate(rest, answerTo)
     }
   }
 }

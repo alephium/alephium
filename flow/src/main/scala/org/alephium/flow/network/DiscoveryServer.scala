@@ -5,8 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
-import org.alephium.flow.Utils
-import org.alephium.flow.client.Node
+import org.alephium.flow.{TaskTrigger, Utils}
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
@@ -87,8 +86,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
-      val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
-      nodeMonitor ! Node.Stop
+      val globalStopper = context.actorSelection(Utils.globalStopper)
+      globalStopper ! TaskTrigger.Trigger
       context stop self
   }
 
@@ -115,6 +114,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       scan()
       if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
       else scheduleOnce(self, Scan, config.scanFrequency)
+      ()
     case GetSelfClique =>
       sender() ! selfCliqueInfo
     case GetNeighborCliques =>
