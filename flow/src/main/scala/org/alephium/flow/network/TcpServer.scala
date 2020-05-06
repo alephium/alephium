@@ -5,8 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 
-import org.alephium.flow.Utils
-import org.alephium.flow.client.Node
+import org.alephium.flow.{TaskTrigger, Utils}
 import org.alephium.util.BaseActor
 
 object TcpServer {
@@ -38,8 +37,8 @@ class TcpServer(port: Int) extends BaseActor {
       context.become(workFor(bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
-      val nodeMonitor = context.actorSelection(Utils.nodeMonitorPath)
-      nodeMonitor ! Node.Stop
+      val globalStopper = context.actorSelection(Utils.globalStopper)
+      globalStopper ! TaskTrigger.Trigger
       context stop self
     case TcpServer.WorkFor(another) =>
       context become binding(another)

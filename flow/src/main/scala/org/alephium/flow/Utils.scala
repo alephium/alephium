@@ -6,7 +6,7 @@ import org.alephium.serde.RandomBytes
 import org.alephium.util.{AVector, Duration}
 
 object Utils {
-  val nodeMonitorPath: String   = "/user/NodeMonitor"
+  val globalStopper: String     = "/user/GlobalStopper"
   val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
 
   def show[T <: RandomBytes](elems: AVector[T]): String = {

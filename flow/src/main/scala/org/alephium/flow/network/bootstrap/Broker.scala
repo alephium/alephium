@@ -51,6 +51,7 @@ class Broker(masterAddress: InetSocketAddress,
       val current = TimeStamp.now()
       if (current isBefore until) {
         scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(1))
+        ()
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}")
         context stop self
