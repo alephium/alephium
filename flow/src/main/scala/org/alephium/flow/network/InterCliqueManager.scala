@@ -49,6 +49,7 @@ class InterCliqueManager(
           scheduleOnce(discoveryServer.ref,
                        DiscoveryServer.GetNeighborCliques,
                        Duration.ofSecondsUnsafe(2))
+          ()
         }
       }
   }

@@ -3,9 +3,9 @@ package org.alephium.appserver
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
-import akka.actor.Terminated
+import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest}
 import akka.http.scaladsl.model.ws._
@@ -20,8 +20,8 @@ import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
-import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.client.Node
+import org.alephium.flow.{TaskTrigger, Utils}
+import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
 import org.alephium.rpc.model.JsonRPC
@@ -34,7 +34,7 @@ class ServerTest extends AlephiumSpec {
     IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
 
     val server = bootNode(publicPort = masterPort, brokerId = 0)
-    server.mode.node.system.whenTerminated.futureValue is a[Terminated]
+    server.system.whenTerminated.futureValue is a[Terminated]
   }
 
   it should "shutdown the clique when one node of the clique is down" in new Fixture("2-nodes") {
@@ -44,7 +44,7 @@ class ServerTest extends AlephiumSpec {
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     server0.stop().futureValue is (())
-    server1.mode.node.system.whenTerminated.futureValue is a[Terminated]
+    server1.system.whenTerminated.futureValue is a[Terminated]
   }
 
   it should "boot and sync single node clique" in new Fixture("1-node") {
@@ -119,10 +119,7 @@ class ServerTest extends AlephiumSpec {
     server0.stop()
   }
 
-  class Fixture(name: String)
-      extends AlephiumFlowActorSpec(name)
-      with ScalaFutures
-      with Eventually {
+  class Fixture(name: String) extends AlephiumActorSpec(name) with ScalaFutures with Eventually {
     override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
     val publicKey  = "9f93bf7f1211f510e3d9c4fc7fb933f94830ba83190da62dbfc9baa8b0d36276"
@@ -167,29 +164,56 @@ class ServerTest extends AlephiumSpec {
       }
     }
 
-    def bootNode(publicPort: Int, brokerId: Int, brokerNum: Int = 2): Server = {
-      new Server(
-        new Mode with PlatformConfigFixture with StoragesFixture {
-          override val configValues = Map(
-            ("alephium.network.masterAddress", s"localhost:$masterPort"),
-            ("alephium.network.publicAddress", s"localhost:$publicPort"),
-            ("alephium.network.rpcPort", publicPort - 100),
-            ("alephium.network.wsPort", publicPort - 200),
-            ("alephium.clique.brokerNum", brokerNum),
-            ("alephium.broker.brokerId", brokerId)
-          )
-          override implicit lazy val config =
-            PlatformConfig.build(newConfig, rootPath, None)
-          val node: Node = Node.build(builders, s"node-$brokerId", storages)(config)
+    def buildConfig(publicPort: Int, brokerId: Int, brokerNum: Int = 2) = {
+      new PlatformConfigFixture {
+        override val configValues = Map(
+          ("alephium.network.masterAddress", s"localhost:$masterPort"),
+          ("alephium.network.publicAddress", s"localhost:$publicPort"),
+          ("alephium.network.rpcPort", publicPort - 100),
+          ("alephium.network.wsPort", publicPort - 200),
+          ("alephium.clique.brokerNum", brokerNum),
+          ("alephium.broker.brokerId", brokerId)
+        )
+        override implicit lazy val config =
+          PlatformConfig.build(newConfig, rootPath, None)
+      }
+    }
 
-          implicit val executionContext: ExecutionContext = node.system.dispatcher
-          override def shutdown(): Future[Unit] =
-            for {
-              _ <- node.shutdown()
-              _ <- Future.successful(storages.dESTROY())
-            } yield ()
+    def bootNode(publicPort: Int, brokerId: Int, brokerNum: Int = 2): Server = {
+      val platformConfig = buildConfig(publicPort, brokerId, brokerNum)
+
+      val server: Server = new Server {
+        implicit val system: ActorSystem =
+          ActorSystem(s"$name-${scala.util.Random.nextInt}", platformConfig.config.all)
+        implicit val executionContext = system.dispatcher
+        implicit val config           = platformConfig.config
+
+        override val mode: Mode = new ModeTest
+        lazy val miner: ActorRefT[Miner.Command] = {
+          val props =
+            Miner.props(mode.node)(config).withDispatcher("akka.actor.mining-dispatcher")
+          ActorRefT.build(system, props, s"FairMiner")
         }
+
+        lazy val rpcServer: RPCServer = RPCServer(mode, miner)
+      }
+
+      implicit val executionContext = server.system.dispatcher
+      ActorRefT.build(
+        server.system,
+        TaskTrigger.props(
+          Await.result(
+            for {
+              _ <- server.stop()
+              _ <- server.system.terminate()
+            } yield (()),
+            Utils.shutdownTimeout.asScala
+          )
+        ),
+        "GlobalStopper"
       )
+
+      server
     }
 
     def startWS(port: Int): Promise[Option[Message]] = {
@@ -247,4 +271,21 @@ class ServerTest extends AlephiumSpec {
     def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
       jsonRpc("blockflow_fetch", s"""{"fromTs":${fromTs.millis},"toTs":${toTs.millis}}""")
   }
+
+  class ModeTest(implicit val system: ActorSystem,
+                 val config: PlatformConfig,
+                 val executionContext: ExecutionContext)
+      extends Mode
+      with StoragesFixture {
+
+    override val node: Node = Node.build(Mode.defaultBuilders, storages)
+
+    override def stop(): Future[Unit] =
+      for {
+        _ <- node.stop()
+        _ <- Future.successful(storages.close())
+        _ <- Future.successful(storages.dESTROYUnsafe())
+      } yield (())
+  }
+
 }
