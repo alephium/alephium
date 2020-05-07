@@ -370,7 +370,8 @@ object RPCServerSpec {
 
   class DiscoveryServerDummy(neighborCliques: NeighborCliques) extends BaseActor {
     def receive: Receive = {
-      case DiscoveryServer.GetNeighborCliques => sender() ! neighborCliques
+      case DiscoveryServer.GetNeighborCliques =>
+        sender() ! DiscoveryServer.NeighborCliques(neighborCliques.cliques)
     }
   }
 
