@@ -49,10 +49,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     Future.successful(blockflowFetch(mode.node.blockFlow, req))
 
   def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
-    mode.node.discoveryServer.ask(DiscoveryServer.GetNeighborCliques).mapTo[NeighborCliques].map {
-      neighborCliques =>
-        Right(NeighborCliques(neighborCliques.cliques))
-    }
+    mode.node.discoveryServer
+      .ask(DiscoveryServer.GetNeighborCliques)
+      .mapTo[DiscoveryServer.NeighborCliques]
+      .map { neighborCliques =>
+        Right(NeighborCliques(neighborCliques.peers))
+      }
 
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
     mode.node.boostraper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
