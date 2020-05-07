@@ -27,7 +27,9 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 
-trait TestFixture
+class TestFixture(val name: String) extends TestFixtureLike
+
+trait TestFixtureLike
     extends AlephiumActorSpecLike
     with AlephiumFlowSpec
     with ScalaFutures
@@ -103,16 +105,16 @@ trait TestFixture
 
   def bootClique(nbOfNodes: Int, bootstrap: Option[InetSocketAddress] = None): Seq[Server] = {
     val masterPort = generatePort
-    val masterServer: Server = bootNode(publicPort = masterPort,
-                                        masterPort = masterPort,
-                                        brokerId   = 0,
-                                        bootstrap  = bootstrap)
 
-    val servers: Seq[Server] = (1 until nbOfNodes).toSeq.map { brokerId =>
-      bootNode(publicPort = generatePort, masterPort = masterPort, brokerId = brokerId)
+    val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
+      val publicPort = if (brokerId equals 0) masterPort else generatePort
+      bootNode(publicPort = publicPort,
+               masterPort = masterPort,
+               brokerId   = brokerId,
+               bootstrap  = bootstrap)
     }
 
-    servers.prepended(masterServer)
+    servers
   }
 
   def bootNode(publicPort: Int,
