@@ -31,16 +31,16 @@ import org.alephium.util._
 class ServerTest extends AlephiumSpec {
   it should "shutdown the node when Tcp port is used" in new Fixture("1-node") {
     val connection = TestProbe()
-    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(masterPort))
+    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(defaultMasterPort))
 
-    val server = bootNode(publicPort = masterPort, brokerId = 0)
+    val server = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server.system.whenTerminated.futureValue is a[Terminated]
   }
 
   it should "shutdown the clique when one node of the clique is down" in new Fixture("2-nodes") {
 
-    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     server0.stop().futureValue is (())
@@ -48,72 +48,72 @@ class ServerTest extends AlephiumSpec {
   }
 
   it should "boot and sync single node clique" in new Fixture("1-node") {
-    val server = bootNode(publicPort = masterPort, brokerId = 0, brokerNum = 1)
+    val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
     server.start().futureValue is (())
-    eventually(request[Boolean](rpcMasterPort, getSelfCliqueSynced) is true)
+    eventually(request[Boolean](getSelfCliqueSynced) is true)
   }
 
   it should "boot and sync two nodes clique" in new Fixture("2-nodes") {
-    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server0.start.futureValue is (())
 
-    request[Boolean](rpcMasterPort, getSelfCliqueSynced) is false
+    request[Boolean](getSelfCliqueSynced) is false
 
-    val server1 = bootNode(publicPort = peerPort, brokerId = 1)
+    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     server1.start.futureValue is (())
 
-    eventually(request[Boolean](rpcMasterPort, getSelfCliqueSynced) is true)
+    eventually(request[Boolean](getSelfCliqueSynced) is true)
   }
 
   it should "work with 2 nodes" in new Fixture("2-nodes") {
     val fromTs = TimeStamp.now()
 
-    val server0 = bootNode(publicPort = masterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = peerPort, brokerId   = 1)
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
-    val selfClique = request[SelfClique](rpcMasterPort, getSelfClique)
-    val group      = request[Group](rpcMasterPort, getGroup(publicKey))
+    val selfClique = request[SelfClique](getSelfClique)
+    val group      = request[Group](getGroup(publicKey))
     val index      = group.group / selfClique.groupNumPerBroker
     val rpcPort    = selfClique.peers(index).rpcPort.get
 
-    request[Balance](rpcPort, getBalance(publicKey)) is initialBalance
+    request[Balance](getBalance(publicKey), rpcPort) is initialBalance
 
-    startWS(wsMasterPort)
+    startWS(defaultWsMasterPort)
 
     val tx =
-      request[TransferResult](rpcPort, transfer(publicKey, tranferKey, privateKey, transferAmount))
+      request[TransferResult](transfer(publicKey, tranferKey, privateKey, transferAmount), rpcPort)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](peer.rpcPort.get, startMining) is true
+      request[Boolean](startMining, peer.rpcPort.get) is true
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
     awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
-    request[Balance](rpcPort, getBalance(publicKey)) is
+    request[Balance](getBalance(publicKey), rpcPort) is
       Balance(initialBalance.balance - transferAmount, 1)
 
     val createTx =
-      request[CreateTransactionResult](rpcPort,
-                                       createTransaction(publicKey, tranferKey, transferAmount))
+      request[CreateTransactionResult](createTransaction(publicKey, tranferKey, transferAmount),
+                                       rpcPort)
 
-    val tx2 = request[TransferResult](rpcPort, sendTransaction(createTx))
+    val tx2 = request[TransferResult](sendTransaction(createTx), rpcPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](peer.rpcPort.get, stopMining) is true
+      request[Boolean](stopMining, peer.rpcPort.get) is true
     }
 
-    request[Balance](rpcPort, getBalance(publicKey)) is
+    request[Balance](getBalance(publicKey), rpcPort) is
       Balance(initialBalance.balance - (2 * transferAmount), 1)
 
     val toTs = TimeStamp.now()
 
     //TODO Find a better assertion
-    request[FetchResponse](rpcPort, blockflowFetch(fromTs, toTs)).blocks.size should be > 16
+    request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort).blocks.size should be > 16
 
     server1.stop()
     server0.stop()
@@ -129,14 +129,18 @@ class ServerTest extends AlephiumSpec {
     val initialBalance = Balance(100, 1)
     val transferAmount = 10
 
-    val masterPort    = SocketUtil.temporaryLocalPort(SocketUtil.Both)
-    val rpcMasterPort = masterPort - 100
-    val wsMasterPort  = masterPort - 200
-    def peerPort      = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+    val defaultMasterPort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+
+    val defaultRpcMasterPort = rpcPort(defaultMasterPort)
+    val defaultWsMasterPort  = defaultMasterPort - 200
+
+    def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+
+    def rpcPort(port: Int) = port - 100
 
     val blockNotifyProbe = TestProbe()
 
-    def request[T: Decoder](port: Int, content: String): T = {
+    def request[T: Decoder](content: String, port: Int = defaultRpcMasterPort): T = {
       val httpRequest =
         HttpRequest(HttpMethods.POST,
                     uri    = s"http://localhost:${port}",
@@ -167,19 +171,25 @@ class ServerTest extends AlephiumSpec {
     def buildConfig(publicPort: Int, brokerId: Int, brokerNum: Int = 2) = {
       new PlatformConfigFixture {
         override val configValues = Map(
-          ("alephium.network.masterAddress", s"localhost:$masterPort"),
+          ("alephium.network.masterAddress", s"localhost:${masterPort}"),
           ("alephium.network.publicAddress", s"localhost:$publicPort"),
           ("alephium.network.rpcPort", publicPort - 100),
           ("alephium.network.wsPort", publicPort - 200),
           ("alephium.clique.brokerNum", brokerNum),
           ("alephium.broker.brokerId", brokerId)
-        )
+        ) ++ bootstrap
+          .map(address => Map("alephium.bootstrap" -> s"localhost:${address.getPort}"))
+          .getOrElse(Map.empty)
         override implicit lazy val config =
           PlatformConfig.build(newConfig, rootPath, None)
       }
     }
 
-    def bootNode(publicPort: Int, brokerId: Int, brokerNum: Int = 2): Server = {
+    def bootNode(publicPort: Int,
+                 brokerId: Int,
+                 brokerNum: Int                       = 2,
+                 masterPort: Int                      = defaultMasterPort,
+                 bootstrap: Option[InetSocketAddress] = None): Server = {
       val platformConfig = buildConfig(publicPort, brokerId, brokerNum)
 
       val server: Server = new Server {
