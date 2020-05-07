@@ -38,6 +38,7 @@ trait RPCServerAbstract extends StrictLogging {
   def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques]
   def doGetSelfClique(req: Request): FutureTry[SelfClique]
   def doGetSelfCliqueSynced(req: Request): FutureTry[Boolean]
+  def doGetInterCliquePeerInfo(req: Request): FutureTry[Seq[InterCliquePeerInfo]]
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
@@ -60,17 +61,18 @@ trait RPCServerAbstract extends StrictLogging {
   }
 
   def handlerRPC(miner: ActorRefT[Miner.Command]): Handler = Map.apply(
-    "blockflow_fetch"    -> (req => wrap(req, doBlockflowFetch(req))),
-    "get_balance"        -> (req => wrap(req, doGetBalance(req))),
-    "get_group"          -> (req => wrap(req, doGetGroup(req))),
-    "mining_start"       -> (req => simpleWrap(req, doStartMining(miner))),
-    "mining_stop"        -> (req => simpleWrap(req, doStopMining(miner))),
-    "neighbor_cliques"   -> (req => wrap(req, doGetNeighborCliques(req))),
-    "create_transaction" -> (req => wrap(req, doCreateTransaction(req))),
-    "send_transaction"   -> (req => wrap(req, doSendTransaction(req))),
-    "self_clique"        -> (req => wrap(req, doGetSelfClique(req))),
-    "self_clique_synced" -> (req => simpleWrap(req, doGetSelfCliqueSynced(req))),
-    "transfer"           -> (req => wrap(req, doTransfer(req)))
+    "blockflow_fetch"            -> (req => wrap(req, doBlockflowFetch(req))),
+    "get_balance"                -> (req => wrap(req, doGetBalance(req))),
+    "get_group"                  -> (req => wrap(req, doGetGroup(req))),
+    "get_inter_clique_peer_info" -> (req => simpleWrap(req, doGetInterCliquePeerInfo(req))),
+    "mining_start"               -> (req => simpleWrap(req, doStartMining(miner))),
+    "mining_stop"                -> (req => simpleWrap(req, doStopMining(miner))),
+    "neighbor_cliques"           -> (req => wrap(req, doGetNeighborCliques(req))),
+    "create_transaction"         -> (req => wrap(req, doCreateTransaction(req))),
+    "send_transaction"           -> (req => wrap(req, doSendTransaction(req))),
+    "self_clique"                -> (req => wrap(req, doGetSelfClique(req))),
+    "self_clique_synced"         -> (req => simpleWrap(req, doGetSelfCliqueSynced(req))),
+    "transfer"                   -> (req => wrap(req, doTransfer(req)))
   )
 
   def routeHttp(miner: ActorRefT[Miner.Command]): Route =

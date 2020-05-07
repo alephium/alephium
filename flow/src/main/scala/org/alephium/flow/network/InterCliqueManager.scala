@@ -1,5 +1,7 @@
 package org.alephium.flow.network
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
@@ -17,7 +19,10 @@ object InterCliqueManager {
       discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 
-  sealed trait Command extends CliqueManager.Command
+  sealed trait Command              extends CliqueManager.Command
+  final case object GetSyncStatuses extends Command
+
+  final case class SyncStatus(cliqueId: CliqueId, address: InetSocketAddress, isSynced: Boolean)
 
   final case class BrokerState(info: BrokerInfo, actor: ActorRef, isSynced: Boolean) {
     def setSynced(): BrokerState = BrokerState(info, actor, isSynced = true)
@@ -34,6 +39,7 @@ class InterCliqueManager(
     discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig)
     extends BaseActor
     with InterCliqueManagerState {
+  import InterCliqueManager._
   discoveryServer ! DiscoveryServer.GetNeighborCliques
 
   override def receive: Receive = handleMessage orElse handleConnection orElse awaitNeighborCliques
@@ -95,6 +101,12 @@ class InterCliqueManager(
           brokerState.actor ! message.txMsg
         }
       }
+
+    case GetSyncStatuses =>
+      val syncStatuses: Seq[SyncStatus] = mapBrokers { (cliqueId, brokerState) =>
+        SyncStatus(cliqueId, brokerState.info.address, brokerState.isSynced)
+      }
+      sender() ! syncStatuses
   }
 
   def connect(cliqueInfo: CliqueInfo): Unit = {
@@ -139,6 +151,12 @@ trait InterCliqueManagerState {
 
   def iterBrokers(f: (CliqueId, BrokerState) => Unit): Unit = {
     brokers.foreach {
+      case ((cliqueId, _), state) => f(cliqueId, state)
+    }
+  }
+
+  def mapBrokers[A](f: (CliqueId, BrokerState) => A): Seq[A] = {
+    brokers.toSeq.map {
       case ((cliqueId, _), state) => f(cliqueId, state)
     }
   }
