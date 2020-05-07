@@ -3,18 +3,20 @@ import sbt._
 object Version {
   lazy val akka    = "2.6.4"
   lazy val metrics = "4.0.6"
+  lazy val common = "0.3.0-SNAPSHOT"
+  lazy val blockflow = common
 }
 
 object Dependencies {
-  lazy val `alephium-crypto` = "org.alephium" %% "crypto" % "latest.integration"
-  lazy val `alephium-rpc`    = "org.alephium" %% "rpc"    % "latest.integration"
-  lazy val `alephium-serde`  = "org.alephium" %% "serde"  % "latest.integration"
-  lazy val `alephium-util`   = "org.alephium" %% "util"   % "latest.integration"
+  lazy val `alephium-crypto` = "org.alephium" %% "crypto" % Version.common
+  lazy val `alephium-rpc`    = "org.alephium" %% "rpc"    % Version.common
+  lazy val `alephium-serde`  = "org.alephium" %% "serde"  % Version.common
+  lazy val `alephium-util`   = "org.alephium" %% "util"   % Version.common
 
   lazy val akka           = "com.typesafe.akka" %% "akka-actor"          % Version.akka
   lazy val akkatest       = "com.typesafe.akka" %% "akka-testkit"        % Version.akka % Test
   lazy val akkahttptest   = "com.typesafe.akka" %% "akka-http-testkit"   % "10.1.11" % Test
-  lazy val akkahttpcors   = "ch.megard"         %% "akka-http-cors"      % "0.4.2"
+  lazy val akkahttpcors   = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
   lazy val akkastreamtest = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
 
   lazy val logback         = "ch.qos.logback"             % "logback-classic"  % "1.2.3"
