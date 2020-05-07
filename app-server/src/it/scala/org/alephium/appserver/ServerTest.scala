@@ -65,6 +65,27 @@ class ServerTest extends AlephiumSpec {
     eventually(request[Boolean](getSelfCliqueSynced) is true)
   }
 
+  it should "boot and sync two cliques" in new Fixture("2-cliques-of-2-nodses") {
+    val clique1           = bootClique(nbOfNodes = 2)
+    val masterPortClique1 = clique1.head.config.masterAddress.getPort
+
+    val clique2 =
+      bootClique(nbOfNodes = 2,
+                 bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
+    val masterPortClique2 = clique2.head.config.masterAddress.getPort
+
+    clique1.foreach(_.start)
+    clique2.foreach(_.start)
+
+    val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
+
+    eventually(
+      request[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo, rpcPort(masterPortClique2)) is Seq(
+        InterCliquePeerInfo(selfClique1.cliqueId,
+                            new InetSocketAddress("localhost", masterPortClique1),
+                            true)))
+  }
+
   it should "work with 2 nodes" in new Fixture("2-nodes") {
     val fromTs = TimeStamp.now()
 
@@ -185,6 +206,20 @@ class ServerTest extends AlephiumSpec {
       }
     }
 
+    def bootClique(nbOfNodes: Int, bootstrap: Option[InetSocketAddress] = None): Seq[Server] = {
+      val masterPort = generatePort
+      val masterServer: Server = bootNode(publicPort = masterPort,
+                                          masterPort = masterPort,
+                                          brokerId   = 0,
+                                          bootstrap  = bootstrap)
+
+      val servers: Seq[Server] = (1 until nbOfNodes).toSeq.map { brokerId =>
+        bootNode(publicPort = generatePort, masterPort = masterPort, brokerId = brokerId)
+      }
+
+      servers.prepended(masterServer)
+    }
+
     def bootNode(publicPort: Int,
                  brokerId: Int,
                  brokerNum: Int                       = 2,
@@ -249,6 +284,10 @@ class ServerTest extends AlephiumSpec {
     val getSelfClique = jsonRpc("self_clique", "{}")
 
     val getSelfCliqueSynced = jsonRpc("self_clique_synced", "{}")
+
+    val getInterCliquePeerInfo = jsonRpc("get_inter_clique_peer_info", "{}")
+
+    val getNeighborCliques = jsonRpc("neighbor_cliques", "{}")
 
     def getGroup(address: String) = jsonRpc("get_group", s"""{"address":"$address"}""")
 
