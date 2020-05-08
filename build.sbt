@@ -94,7 +94,7 @@ lazy val protocol = project("protocol")
 
 val commonSettings = Seq(
   organization := "org.alephium",
-  version := Version.blockflow,
+  version := "0.1.0",
   scalaVersion := "2.13.2",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(

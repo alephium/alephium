@@ -3,8 +3,7 @@ import sbt._
 object Version {
   lazy val akka    = "2.6.4"
   lazy val metrics = "4.0.6"
-  lazy val common = "0.3.0-SNAPSHOT"
-  lazy val blockflow = common
+  lazy val common = "0.1.0"
 }
 
 object Dependencies {
