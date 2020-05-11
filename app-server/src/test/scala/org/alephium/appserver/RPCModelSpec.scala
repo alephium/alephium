@@ -93,10 +93,11 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode SelfClique" in {
+    val cliqueId    = CliqueId.generate
     val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), Some(9000), Some(9001))
-    val selfClique  = SelfClique(AVector(peerAddress), 1)
+    val selfClique  = SelfClique(cliqueId, AVector(peerAddress), 1)
     val jsonRaw =
-      s"""{"peers":[{"address":"127.0.0.1","rpcPort":9000,"wsPort":9001}],"groupNumPerBroker":1}"""
+      s"""{"cliqueId":"${cliqueId.toHexString}","peers":[{"address":"127.0.0.1","rpcPort":9000,"wsPort":9001}],"groupNumPerBroker":1}"""
     checkData(selfClique, jsonRaw)
   }
 
