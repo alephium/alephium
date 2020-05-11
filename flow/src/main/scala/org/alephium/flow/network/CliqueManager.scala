@@ -90,6 +90,10 @@ class CliqueManager(
       }
     case message: CliqueManager.BroadCastTx =>
       interCliqueManager ! message
+
+    case message @ InterCliqueManager.GetSyncStatuses =>
+      interCliqueManager.forward(message)
+
     case c: Tcp.Connected =>
       interCliqueManager.forward(c)
   }
