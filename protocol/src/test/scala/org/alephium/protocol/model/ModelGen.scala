@@ -4,30 +4,32 @@ import java.net.InetSocketAddress
 
 import org.scalacheck.Gen
 
+import org.alephium.crypto.ED25519Signature
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
-import org.alephium.protocol.script.Witness
-import org.alephium.util.AVector
+import org.alephium.protocol.script.PubScript
+import org.alephium.util.{AVector, U64}
 
-// TODO: rename as GenFixture
 object ModelGen {
-  val txInputGen: Gen[TxOutputPoint] = for {
+  val txInputGen: Gen[TxInput] = for {
     shortKey <- Gen.choose(0, 5)
-    index    <- Gen.choose(0, 5)
   } yield {
-    TxOutputPoint(shortKey, Hash.random, index)
+    val outputRef = TxOutputRef(None, shortKey, Hash.random)
+    TxInput(outputRef, AVector.empty)
   }
 
   val txOutputGen: Gen[TxOutput] = for {
-    value <- Gen.choose(1, 5)
-  } yield TxOutput.burn(value)
+    value <- Gen.choose[Long](1, 5)
+  } yield AlfOutput.build(U64.unsafe(value), PubScript(AVector.empty))
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(1, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(1, 5)
     outputs   <- Gen.listOfN(outputNum, txOutputGen)
-  } yield Transaction.from(AVector.from(inputs), AVector.from(outputs), AVector.empty[Witness])
+  } yield {
+    Transaction.from(AVector.from(inputs), AVector.from(outputs), AVector.empty[ED25519Signature])
+  }
 
   def blockGen(implicit config: ConsensusConfig): Gen[Block] =
     for {

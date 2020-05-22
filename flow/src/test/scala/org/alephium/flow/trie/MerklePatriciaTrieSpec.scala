@@ -26,7 +26,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   }
 
   it should "convert" in {
-    forAll(bytesGen) { bytes =>
+    forAll { bytes: AVector[Byte] =>
       val bs = ByteString.fromArrayUnsafe(bytes.toArray)
       nibbles2Bytes(bytes2Nibbles(bs)) is bs
     }

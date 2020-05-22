@@ -13,12 +13,16 @@ import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo, UnsignedT
 import org.alephium.protocol.script.PayTo
 import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex, TimeStamp}
+import org.alephium.util.{AVector, Hex, TimeStamp, U64}
 
 sealed trait RPCModel
 
 // scalastyle:off number.of.methods
 object RPCModel {
+  implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.value)
+  implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
+  implicit val u64Codec: Codec[U64]     = Codec.from(u64Decoder, u64Encoder)
+
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
       Decoder.decodeLong.ensure(_ >= 0, s"expect positive timestamp").map(TimeStamp.unsafe)
@@ -120,10 +124,10 @@ object RPCModel {
     implicit val codec: Codec[GetGroup] = deriveCodec[GetGroup]
   }
 
-  final case class Balance(balance: BigInt, utxoNum: Int) extends RPCModel
+  final case class Balance(balance: U64, utxoNum: Int) extends RPCModel
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
-    def apply(balance_utxoNum: (BigInt, Int)): Balance = {
+    def apply(balance_utxoNum: (U64, Int)): Balance = {
       Balance(balance_utxoNum._1, balance_utxoNum._2)
     }
   }
@@ -137,7 +141,7 @@ object RPCModel {
                                      fromType: PayTo,
                                      toAddress: String,
                                      toType: PayTo,
-                                     value: BigInt)
+                                     value: U64)
       extends RPCModel
   object CreateTransaction {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
@@ -152,8 +156,7 @@ object RPCModel {
                               Hex.toHexString(unsignedTx.hash.bytes))
   }
 
-  final case class SendTransaction(tx: String, signature: String, publicKey: String)
-      extends RPCModel
+  final case class SendTransaction(tx: String, signature: String) extends RPCModel
   object SendTransaction {
     implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }
@@ -162,7 +165,7 @@ object RPCModel {
                             fromType: PayTo,
                             toAddress: String,
                             toType: PayTo,
-                            value: BigInt,
+                            value: U64,
                             fromPrivateKey: String)
       extends RPCModel
   object Transfer {

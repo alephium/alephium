@@ -21,10 +21,10 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{GroupIndex, Transaction, UnsignedTransaction}
-import org.alephium.protocol.script.{PayTo, PubScript, Witness}
+import org.alephium.protocol.script.{PayTo, PubScript}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
-import org.alephium.util.{ActorRefT, AVector, Duration, Hex}
+import org.alephium.util.{ActorRefT, AVector, Duration, Hex, U64}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
     implicit val system: ActorSystem,
@@ -274,10 +274,8 @@ object RPCServer extends {
         unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
           Response.failed(serdeError.getMessage))
         signature <- decodeSignature(query.signature)
-        publickey <- decodePublicKey(query.publicKey)
       } yield {
-        val witness = Witness.build(PayTo.PKH, publickey, signature)
-        Transaction.from(unsignedTx, AVector(witness))
+        Transaction.from(unsignedTx, AVector.fill(unsignedTx.inputs.length)(signature))
       }
       txEither match {
         case Right(tx)   => publishTx(txHandler, tx)
@@ -329,7 +327,7 @@ object RPCServer extends {
                          fromPayTo: PayTo,
                          toAddress: ED25519PublicKey,
                          toPayTo: PayTo,
-                         value: BigInt,
+                         value: U64,
                          fromPrivateKey: ED25519PrivateKey): Try[Transaction] = {
     blockFlow.prepareTx(fromAddress, fromPayTo, toAddress, toPayTo, value, fromPrivateKey) match {
       case Right(Some(transaction)) => Right(transaction)
@@ -343,7 +341,7 @@ object RPCServer extends {
                                  fromPayTo: PayTo,
                                  toAddress: ED25519PublicKey,
                                  toPayTo: PayTo,
-                                 value: BigInt): Try[UnsignedTransaction] = {
+                                 value: U64): Try[UnsignedTransaction] = {
     blockFlow.prepareUnsignedTx(fromAddress, fromPayTo, toAddress, toPayTo, value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(None)                      => Left(Response.failed("Not enough balance"))

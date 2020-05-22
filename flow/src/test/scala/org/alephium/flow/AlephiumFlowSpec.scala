@@ -10,8 +10,9 @@ trait AlephiumFlowSpec
     extends AlephiumSpec
     with PlatformConfigFixture
     with StoragesFixture
-    with BeforeAndAfterAll {
-  override def afterAll() = {
+    with BeforeAndAfterAll
+    with U64Helpers {
+  override def afterAll(): Unit = {
     cleanStorages()
   }
 }

@@ -9,7 +9,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.script.{PubScript, Script, Witness}
-import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
+import org.alephium.util.{AVector, EitherF, Forest, TimeStamp, U64}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
@@ -147,7 +147,7 @@ object Validation {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witnesses.isEmpty)
+    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 0 && coinbase.generatedOutputs.length == 1 && coinbase.signatures.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -212,12 +212,9 @@ object Validation {
   }
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
-    if (!tx.unsigned.outputs.forall(_.value >= 0)) {
-      invalidTx(NegativeOutputValue)
-    } else if (!(tx.unsigned.outputs.sumBy(_.value) < ALF.MaxALFValue)) {
-      invalidTx(OutputValueOverFlow)
-    } else {
-      validTx
+    tx.alfAmoutInOutputs match {
+      case Some(sum) if sum < ALF.MaxALFValue => invalidTx(OutputValueOverFlow)
+      case _                                  => validTx
     }
   }
 
@@ -232,12 +229,12 @@ object Validation {
   }
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
-    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
+        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
         else {
-          utxoUsed += input
+          utxoUsed += input.outputRef
           validTx
         }
       }
@@ -245,11 +242,11 @@ object Validation {
   }
 
   private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult = {
-    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     tx.unsigned.inputs.foreachE { input =>
-      if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
+      if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
       else {
-        utxoUsed += input
+        utxoUsed += input.outputRef
         validTx
       }
     }
@@ -258,7 +255,7 @@ object Validation {
   private[validation] def checkSpending(tx: Transaction, trie: MerklePatriciaTrie)(
       implicit config: ScriptConfig): TxValidationResult = {
     val query = tx.unsigned.inputs.mapE { input =>
-      trie.get[TxOutputPoint, TxOutput](input)
+      trie.get[TxOutputRef, TxOutput](input.outputRef)
     }
     query match {
       case Right(preOutputs)                 => checkSpending(tx, preOutputs)
@@ -277,18 +274,23 @@ object Validation {
 
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
-    val inputSum  = preOutputs.sumBy(_.value)
-    val outputSum = tx.unsigned.outputs.sumBy(_.value)
-    if (outputSum <= inputSum) validTx else invalidTx(InvalidBalance)
+    val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.alfAmount)
+    tx.alfAmoutInOutputs match {
+      case Some(outputSum) if outputSum <= inputSum => validTx
+      case _                                        => invalidTx(InvalidBalance)
+    }
   }
 
+  // TODO: signatures might not be 1-to-1 mapped to inputs
   private[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput])(
       implicit config: ScriptConfig): TxValidationResult = {
     assume(tx.unsigned.inputs.length == preOutputs.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
-      val witness = tx.witnesses(idx)
-      val output  = preOutputs(idx)
-      checkWitness(tx.hash, output.pubScript, witness)
+      val unlockScript = tx.unsigned.inputs(idx).unlockScript
+      val signature    = tx.signatures(idx)
+      val witness      = Witness(unlockScript, AVector(signature))
+      val output       = preOutputs(idx)
+      checkWitness(tx.hash, output.lockupScript, witness)
     }
   }
 
