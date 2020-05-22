@@ -20,6 +20,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -40,7 +41,8 @@ class RPCServerSpec
     extends AlephiumSpec
     with ScalatestRouteTest
     with EitherValues
-    with ScalaFutures {
+    with ScalaFutures
+    with U64Helpers {
   import RPCServerSpec._
 
   behavior of "http"
@@ -435,15 +437,15 @@ object RPCServerSpec {
       Right(AVector((blockHeader, 1)))
     }
 
-    override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
-      Right((BigInt(0), 0))
+    override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(U64, Int)] =
+      Right((U64.Zero, 0))
 
     override def prepareUnsignedTx(
         from: ED25519PublicKey,
         fromPayTo: PayTo,
         to: ED25519PublicKey,
         toPayTo: PayTo,
-        value: BigInt
+        value: U64
     ): IOResult[Option[UnsignedTransaction]] =
       Right(Some(dummyTx.unsigned))
 
@@ -451,7 +453,7 @@ object RPCServerSpec {
                            fromPayTo: PayTo,
                            to: ED25519PublicKey,
                            toPayTo: PayTo,
-                           value: BigInt,
+                           value: U64,
                            fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }

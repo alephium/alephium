@@ -34,12 +34,12 @@ object PlatformConfig {
   }
 
   def load(rootPath: Path,
-           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
+           genesisBalances: Option[AVector[(ED25519PublicKey, U64)]]): PlatformConfig =
     build(parseConfig(rootPath), rootPath, genesisBalances)
 
   def build(config: Config,
             rootPath: Path,
-            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig = {
+            genesisBalances: Option[AVector[(ED25519PublicKey, U64)]]): PlatformConfig = {
     val alephCfg = config.getConfig("alephium")
     create(
       rootPath,
@@ -65,7 +65,7 @@ object PlatformConfig {
              miningCfg: Config,
              networkCfg: Config,
              discoveryCfg: Config,
-             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
+             genesisBalances: Option[AVector[(ED25519PublicKey, U64)]]): PlatformConfig =
     new PlatformConfig {
       /* Common */
       val all      = allCfg
@@ -155,13 +155,17 @@ object PlatformConfig {
     }
   // scalastyle:off method.length parameter.number
 
-  private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
+  private def splitBalance(raw: String): (ED25519PublicKey, U64) = {
     val List(left, right) = raw.split(":").toList
     val publicKeyOpt      = Hex.from(left).flatMap(ED25519PublicKey.from)
     require(publicKeyOpt.nonEmpty, "Invalid public key")
 
     val publicKey = publicKeyOpt.get
-    val balance   = BigInt(right)
+    val balance = {
+      val parsed = BigInt(right)
+      require(parsed >= 0 && parsed <= Long.MaxValue)
+      U64.unsafe(parsed.longValue)
+    }
     (publicKey, balance)
   }
 
@@ -172,7 +176,7 @@ object PlatformConfig {
     loadBlockFlow(AVector.from(balances))
   }
 
-  def loadBlockFlow(balances: AVector[(ED25519PublicKey, BigInt)])(
+  def loadBlockFlow(balances: AVector[(ED25519PublicKey, U64)])(
       implicit config: ConsensusConfig): AVector[AVector[Block]] = {
     AVector.tabulate(config.groups, config.groups) {
       case (from, to) =>

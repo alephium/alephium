@@ -13,8 +13,8 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PayTo, PubScript}
-import org.alephium.util.AVector
+import org.alephium.protocol.script.{PayTo, PriScript, PubScript}
+import org.alephium.util.{AVector, U64}
 
 class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   it should "compute correct blockflow height" in {
@@ -240,7 +240,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
-    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.lockupScript
     checkBalance(blockFlow, pubScript, 1)
     checkBalance(blockFlow, testGroup, genesisBalance - 1)
   }
@@ -273,7 +273,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
 
     addAndCheck(blockFlow1, block, 1)
-    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.lockupScript
     checkBalance(blockFlow1, pubScript, 1)
   }
 
@@ -286,12 +286,13 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
         val balances                   = blockFlow.getUtxos(PayTo.PKH, publicKey).toOption.get
-        val total                      = balances.sumBy(_._2.value)
+        val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.alfAmount)
         val (_, toPublicKey)           = chainIndex.to.generateKey(PayTo.PKH)
-        val inputs                     = balances.map(_._1)
-        val outputs = AVector(TxOutput.build(PayTo.PKH, 1, toPublicKey),
-                              TxOutput.build(PayTo.PKH, total - 1, publicKey))
-        val transferTx = Transaction.from(PayTo.PKH, inputs, outputs, publicKey, privateKey)
+        val unlockScript               = PriScript.build(PayTo.PKH, publicKey)
+        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
+        val outputs = AVector[TxOutput](AlfOutput.build(PayTo.PKH, 1, toPublicKey),
+                                        AlfOutput.build(PayTo.PKH, total - 1, publicKey))
+        val transferTx = Transaction.from(inputs, outputs, privateKey)
         AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
     }
@@ -328,13 +329,17 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     blockFlow.getWeight(header) isE config.maxMiningTarget * weightFactor
   }
 
-  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {
+  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
     val address = genesisBalances(groupIndex)._2
-    blockFlow.getUtxos(PayTo.PKH, address).toOption.get.sumBy(_._2.value) is expected
+    blockFlow
+      .getUtxos(PayTo.PKH, address)
+      .toOption
+      .get
+      .sumBy(_._2.alfAmount.value) is expected.value
   }
 
-  def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: BigInt): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.value) is expected
+  def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: U64): Assertion = {
+    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.alfAmount.value) is expected.value
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -357,16 +362,16 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     tips ++ bestDeps
   }
 
-  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
+  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): U64 = {
     val groupIndex = GroupIndex.from(PayTo.PKH, address)
     config.brokerInfo.contains(groupIndex) is true
     val query = blockFlow.getUtxos(PayTo.PKH, address)
-    query.toOption.get.sumBy(_._2.value)
+    query.toOption.get.sumBy(_._2.alfAmount.value)
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
     def show(txOutput: TxOutput): String = {
-      s"${txOutput.shortKey}:${txOutput.value}"
+      s"${txOutput.scriptHint}:${txOutput.alfAmount}"
     }
 
     val address   = genesisBalances(config.brokerInfo.id)._2
