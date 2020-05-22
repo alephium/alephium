@@ -8,12 +8,12 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.script.PayTo
-import org.alephium.util.{AVector, Env}
+import org.alephium.util.{AVector, Env, U64}
 
 trait PlatformConfigFixture {
   val configValues: Map[String, Any] = Map.empty
 
-  val genesisBalance: BigInt = 100
+  val genesisBalance: U64 = U64.unsafe(100)
 
   val env      = Env.resolve()
   val rootPath = Platform.generateRootPath(env)
@@ -27,7 +27,7 @@ trait PlatformConfigFixture {
   lazy val groupConfig = new GroupConfig { override def groups: Int = groups0 }
 
   lazy val genesisBalances =
-    AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, BigInt)](groups0) { i =>
+    AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, U64)](groups0) { i =>
       val groupIndex              = GroupIndex.unsafe(i)(groupConfig)
       val (privateKey, publicKey) = groupIndex.generateKey(PayTo.PKH)(groupConfig)
       (privateKey, publicKey, genesisBalance)

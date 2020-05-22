@@ -5,9 +5,9 @@ import akka.util.ByteString
 import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{TxOutput, TxOutputPoint}
+import org.alephium.protocol.model.{AlfOutput, TxOutput, TxOutputRef}
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits}
+import org.alephium.util.{AVector, Bits, U64}
 
 object MerklePatriciaTrie {
   /* branch [encodedPath, v0, ..., v15]
@@ -182,7 +182,7 @@ object MerklePatriciaTrie {
     val genesisKey = Hash.zero.bytes
     val genesisNode = {
       val genesisPath   = Node.SerdeNode.decodeNibbles(genesisKey, genesisKey.length * 2)
-      val genesisOutput = TxOutput.burn(0)
+      val genesisOutput = TxOutputRef(None, 0, Hash.zero)
       LeafNode(genesisPath, serialize(genesisOutput))
     }
 
@@ -190,9 +190,9 @@ object MerklePatriciaTrie {
   }
 
   def createStateTrie(storage: KeyValueStorage[Hash, Node]): MerklePatriciaTrie = {
-    val genesisOutputPoint = TxOutputPoint(0, Hash.zero, 0)
-    val genesisOutput      = TxOutput.burn(0)
-    val genesisKey         = serialize(genesisOutputPoint)
+    val genesisOutputRef        = TxOutputRef(tokenIdOpt = None, 0, Hash.zero)
+    val genesisOutput: TxOutput = AlfOutput.burn(U64.Zero)
+    val genesisKey              = serialize(genesisOutputRef)
     val genesisNode = {
       val genesisPath = bytes2Nibbles(genesisKey)
       LeafNode(genesisPath, serialize(genesisOutput))

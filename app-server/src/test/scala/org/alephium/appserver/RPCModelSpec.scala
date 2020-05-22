@@ -10,12 +10,13 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
 import org.alephium.crypto.ED25519PublicKey
+import org.alephium.flow.U64Helpers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.script.PayTo
 import org.alephium.rpc.CirceUtils
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp}
 
-class RPCModelSpec extends AlephiumSpec with EitherValues {
+class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
     CirceUtils.print(t.asJson)
   }
@@ -164,9 +165,9 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode SendTransaction" in {
-    val transfer = SendTransaction("tx", "signature", "publicKey")
+    val transfer = SendTransaction("tx", "signature")
     val jsonRaw =
-      """{"tx":"tx","signature":"signature","publicKey":"publicKey"}"""
+      """{"tx":"tx","signature":"signature"}"""
     checkData(transfer, jsonRaw)
   }
 
