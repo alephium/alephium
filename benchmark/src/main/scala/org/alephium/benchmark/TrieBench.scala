@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 
@@ -27,10 +28,9 @@ class TrieBench {
 
     RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
   }
-  val db: KeyValueStorage[Hash, MerklePatriciaTrie.Node] =
-    RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
-  val trie: MerklePatriciaTrie = MerklePatriciaTrie.createEmptyTrie(db)
-  val genesisHash: Hash        = trie.rootHash
+  val db: KeyValueStorage[Hash, Node]      = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
+  val trie: MerklePatriciaTrie[Hash, Hash] = MerklePatriciaTrie.build(db, Hash.zero, Hash.zero)
+  val genesisHash: Hash                    = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {

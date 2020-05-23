@@ -14,7 +14,7 @@ object ModelGen {
   val txInputGen: Gen[TxInput] = for {
     shortKey <- Gen.choose(0, 5)
   } yield {
-    val outputRef = TxOutputRef(None, shortKey, Hash.random)
+    val outputRef = AlfOutputRef(shortKey, Hash.random)
     TxInput(outputRef, AVector.empty)
   }
 

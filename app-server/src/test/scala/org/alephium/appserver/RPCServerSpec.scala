@@ -281,7 +281,7 @@ class RPCServerSpec
     val dummyToAddres             = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
     val dummyPrivateKey           = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
     val dummyTx = ModelGen.transactionGen
-      .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.outputs.nonEmpty)
+      .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
       .sample
       .get
     val dummySignature = ED25519.sign(dummyTx.unsigned.hash.bytes,
