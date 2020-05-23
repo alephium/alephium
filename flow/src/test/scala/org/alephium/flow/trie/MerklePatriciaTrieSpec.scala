@@ -1,5 +1,7 @@
 package org.alephium.flow.trie
 
+import scala.annotation.tailrec
+
 import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
@@ -84,10 +86,11 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   behavior of "Merkle Patricia Trie"
 
-  val genesisKey = Hash.zero.bytes
+  val genesisKey   = Hash.zero
+  val genesisValue = Hash.zero
   val genesisNode = {
-    val genesisPath = bytes2Nibbles(genesisKey)
-    LeafNode(genesisPath, ByteString.empty)
+    val genesisPath = bytes2Nibbles(genesisKey.bytes)
+    LeafNode(genesisPath, genesisValue.bytes)
   }
 
   trait TrieFixture {
@@ -101,7 +104,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
       RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
 
     val db   = RocksDBKeyValueStorage[Hash, MerklePatriciaTrie.Node](storage, ColumnFamily.Trie)
-    var trie = MerklePatriciaTrie.create(db, genesisNode)
+    var trie = MerklePatriciaTrie.build[Hash, Hash](db, genesisKey, genesisValue)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Hash.random.bytes
@@ -121,7 +124,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "be able to create a trie" in withTrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
-    fixture.trie.getOptRaw(genesisKey).map(_.nonEmpty) isE true
+    fixture.trie.getOpt(genesisKey).map(_.nonEmpty) isE true
   }
 
   it should "branch well" in withTrieFixture { fixture =>
@@ -152,7 +155,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     val allStored    = trie.getAllRaw(ByteString.empty).toOption.get
     val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
-    val expectedKeys = (keys :+ genesisKey).toArray.sortBy(_.hashCode())
+    val expectedKeys = (keys :+ genesisKey.bytes).toArray.sortBy(_.hashCode())
     allKeys is expectedKeys
 
     keys.foreach { key =>
@@ -183,12 +186,17 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     trie.rootHash is genesisNode.hash
   }
+}
 
-  def show(trie: MerklePatriciaTrie): Unit = {
+object MerklePatriciaTrieSpec {
+  import MerklePatriciaTrie._
+
+  def show[K: Serde, V: Serde](trie: MerklePatriciaTrie[K, V]): Unit = {
     show(trie, Seq(trie.rootHash))
   }
 
-  def show(trie: MerklePatriciaTrie, hashes: Seq[Hash]): Unit = {
+  @tailrec
+  def show[K: Serde, V: Serde](trie: MerklePatriciaTrie[K, V], hashes: Seq[Hash]): Unit = {
     import org.alephium.util.Hex
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))
@@ -197,8 +205,9 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
           val nChild = children.map(_.fold(0)(_ => 1)).sum
           print(s"($shortHash, ${path.length} $nChild); ")
           children.toArray.toSeq.flatten
-        case LeafNode(path, _) =>
-          print(s"($shortHash, ${path.length} leaf)")
+        case LeafNode(path, data) =>
+          val value = deserialize[V](data).toOption.get
+          print(s"($shortHash, #${path.length}, $value)")
           Seq.empty
       }
     }
