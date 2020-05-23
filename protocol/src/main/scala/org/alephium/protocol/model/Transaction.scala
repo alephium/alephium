@@ -26,14 +26,25 @@ final case class Transaction(unsigned: UnsignedTransaction,
     unsigned.inputs.head.fromGroup
   }
   def toGroup(implicit config: GroupConfig): GroupIndex = {
-    assume(unsigned.outputs.nonEmpty)
-    unsigned.outputs.head.toGroup
+    assume(unsigned.fixedOutputs.nonEmpty)
+    unsigned.fixedOutputs.head.toGroup
   }
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
-  def alfAmoutInOutputs: Option[U64] = {
+  def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
+
+  def getOutput(index: Int): TxOutput = {
+    assume(index >= 0 && index < outputsLength)
+    if (index < unsigned.fixedOutputs.length) {
+      unsigned.fixedOutputs(index)
+    } else {
+      generatedOutputs(index - unsigned.fixedOutputs.length)
+    }
+  }
+
+  def alfAmountInOutputs: Option[U64] = {
     val sum1Opt =
-      unsigned.outputs
+      unsigned.fixedOutputs
         .foldE(U64.Zero)((sum, output) => sum.add(output.alfAmount).toRight(()))
         .toOption
     val sum2Opt =
@@ -110,7 +121,7 @@ object Transaction {
         AlfOutput.build(value, pkScript)
     }
     val unsigned =
-      UnsignedTransaction(script = None, inputs = AVector.empty, outputs = AVector.empty)
+      UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = AVector.empty)
     Transaction(unsigned, generatedOutputs = outputs, signatures = AVector.empty)
   }
 

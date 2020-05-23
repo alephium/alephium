@@ -8,14 +8,14 @@ import org.alephium.util.{AVector, U64}
 
 final case class UnsignedTransaction(script: Option[Script],
                                      inputs: AVector[TxInput],
-                                     outputs: AVector[TxOutput])
+                                     fixedOutputs: AVector[TxOutput])
     extends HashSerde[UnsignedTransaction] {
   override lazy val hash: Hash = _getHash
 }
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
-    Serde.forProduct3(UnsignedTransaction(_, _, _), t => (t.script, t.inputs, t.outputs))
+    Serde.forProduct3(UnsignedTransaction(_, _, _), t => (t.script, t.inputs, t.fixedOutputs))
 
   def transferAlf(inputs: AVector[TxOutputRef],
                   inputSum: U64,

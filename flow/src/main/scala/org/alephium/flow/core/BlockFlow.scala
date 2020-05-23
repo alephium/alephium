@@ -6,7 +6,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.{IOResult, IOUtils, Storages}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
@@ -19,7 +19,7 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 }
 
 object BlockFlow extends StrictLogging {
-  type TrieUpdater = (MerklePatriciaTrie, Block) => IOResult[MerklePatriciaTrie]
+  type TrieUpdater = (WorldState, Block) => IOResult[WorldState]
 
   def fromGenesisUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
     logger.info(s"Initialize storage for BlockFlow")

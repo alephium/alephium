@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.{IOResult, Storages}
 import org.alephium.flow.io.RocksDBSource.Settings
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util.AVector
@@ -16,16 +16,16 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
     val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))
 
-    def myUpdateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
+    def myUpdateState(worldState: WorldState, block: Block): IOResult[WorldState] = {
       import BlockFlowState._
       val cache = convertBlock(block, block.chainIndex.from)
       cache match {
         case InBlockCache(outputs) =>
-          updateStateForOutputs(trie, outputs)
+          updateStateForOutputs(worldState, outputs)
         case OutBlockCache(_, _) =>
-          Right(trie)
+          Right(worldState)
         case InOutBlockCache(outputs, _) =>
-          updateStateForOutputs(trie, outputs)
+          updateStateForOutputs(worldState, outputs)
       }
     }
 
@@ -38,7 +38,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
         genesis,
         storages,
         myUpdateState,
-        BlockChainWithState.initializeGenesis(genesis, storages.trieStorage)(_))
+        BlockChainWithState.initializeGenesis(genesis, storages.emptyWorldState)(_))
     }
   }
 

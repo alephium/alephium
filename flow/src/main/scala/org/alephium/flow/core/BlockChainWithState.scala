@@ -3,22 +3,22 @@ package org.alephium.flow.core
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex}
 
 trait BlockChainWithState extends BlockChain {
   def trieHashStorage: TrieHashStorage
 
-  def getTrie(hash: Hash): IOResult[MerklePatriciaTrie] = {
+  def getTrie(hash: Hash): IOResult[WorldState] = {
     trieHashStorage.getTrie(hash)
   }
 
-  protected def addTrie(hash: Hash, trie: MerklePatriciaTrie): IOResult[Unit] = {
-    trieHashStorage.putTrie(hash, trie)
+  protected def addTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
+    trieHashStorage.putTrie(hash, worldState)
   }
 
-  def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie]
+  def updateState(worldState: WorldState, block: Block): IOResult[WorldState]
 
   override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     for {
@@ -35,7 +35,7 @@ object BlockChainWithState {
       chainIndex: ChainIndex,
       updateState: BlockFlow.TrieUpdater)(implicit config: PlatformConfig): BlockChainWithState = {
     val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val initialize   = initializeGenesis(genesisBlock, storages.trieStorage)(_)
+    val initialize   = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
     createUnsafe(chainIndex, genesisBlock, storages, updateState, initialize)
   }
 
@@ -63,20 +63,19 @@ object BlockChainWithState {
       override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
       override val genesisHash        = rootBlock.hash
 
-      override def updateState(trie: MerklePatriciaTrie,
-                               block: Block): IOResult[MerklePatriciaTrie] =
-        _updateState(trie, block)
+      override def updateState(worldState: WorldState, block: Block): IOResult[WorldState] =
+        _updateState(worldState, block)
     }
 
     Utils.unsafe(initialize(blockchain))
     blockchain
   }
 
-  def initializeGenesis(genesisBlock: Block, emptyTrie: MerklePatriciaTrie)(
+  def initializeGenesis(genesisBlock: Block, emptyWorldState: WorldState)(
       chain: BlockChainWithState): IOResult[Unit] = {
     for {
       _       <- chain.addGenesis(genesisBlock)
-      newTrie <- chain.updateState(emptyTrie, genesisBlock)
+      newTrie <- chain.updateState(emptyWorldState, genesisBlock)
       _       <- chain.addTrie(genesisBlock.hash, newTrie)
     } yield ()
   }

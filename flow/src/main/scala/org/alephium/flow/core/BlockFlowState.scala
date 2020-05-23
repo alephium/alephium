@@ -6,7 +6,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -148,13 +148,13 @@ trait BlockFlowState {
     blockHeaderChains(from.value)(to.value)
   }
 
-  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): IOResult[MerklePatriciaTrie] = {
+  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): IOResult[WorldState] = {
     assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getTrie(hash)
   }
 
-  def getTrie(block: Block): IOResult[MerklePatriciaTrie] = {
+  def getTrie(block: Block): IOResult[WorldState] = {
     val header = block.header
     getTrie(header.blockDeps, header.chainIndex.from)
   }
@@ -164,11 +164,11 @@ trait BlockFlowState {
     bestDeps(groupShift)
   }
 
-  def getBestTrie(chainIndex: ChainIndex): IOResult[MerklePatriciaTrie] = {
+  def getBestTrie(chainIndex: ChainIndex): IOResult[WorldState] = {
     getBestTrie(chainIndex.from)
   }
 
-  def getBestTrie(groupIndex: GroupIndex): IOResult[MerklePatriciaTrie] = {
+  def getBestTrie(groupIndex: GroupIndex): IOResult[WorldState] = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getTrie(deps.deps, groupIndex)
@@ -271,15 +271,15 @@ trait BlockFlowState {
   }
 
   // Note: update state only for intra group blocks
-  def updateState(trie: MerklePatriciaTrie, block: Block): IOResult[MerklePatriciaTrie] = {
+  def updateState(worldState: WorldState, block: Block): IOResult[WorldState] = {
     if (block.header.isGenesis) {
       val chainIndex = block.chainIndex
       assert(chainIndex.isIntraGroup)
       val cache = BlockFlowState.convertBlock(block, chainIndex.from)
-      BlockFlowState.updateState(trie, cache)
+      BlockFlowState.updateState(worldState, cache)
     } else {
       getBlocksForUpdates(block).flatMap { blockcaches =>
-        blockcaches.foldE(trie)(BlockFlowState.updateState)
+        blockcaches.foldE(worldState)(BlockFlowState.updateState)
       }
     }
   }
@@ -287,7 +287,7 @@ trait BlockFlowState {
   def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
     for {
       trie   <- getBestTrie(chainIndex)
-      inputs <- tx.unsigned.inputs.mapE(input => trie.get[TxOutputRef, TxOutput](input.outputRef))
+      inputs <- tx.unsigned.inputs.mapE(input => trie.get(input.outputRef))
     } yield inputs
   }
 
@@ -303,9 +303,12 @@ trait BlockFlowState {
 
     for {
       bestTrie <- getBestTrie(groupIndex)
-      persistedUtxos <- bestTrie
-        .getAll[TxOutputRef, TxOutput](pubScript.shortKeyBytes)
-        .map(_.filter(_._2.lockupScript == pubScript))
+      persistedUtxos <- bestTrie.alfOutputState
+        .getAll(pubScript.shortKeyBytes)
+        .map(_.filter(_._2.lockupScript == pubScript).map {
+          case (outputRef, output) =>
+            Tuple2.apply[TxOutputRef, TxOutput](outputRef, output) // TODO: improve this by making AVector covariant
+        })
       pair <- getUtxosInCache(pubScript, groupIndex, persistedUtxos)
     } yield {
       val (usedUtxos, newUtxos) = pair
@@ -388,8 +391,9 @@ object BlockFlowState {
 
   private def convertOutputs(block: Block): Map[TxOutputRef, TxOutput] = {
     val outputs = block.transactions.flatMap { transaction =>
-      transaction.unsigned.outputs.mapWithIndex { (output, i) =>
-        val outputRef = TxOutputRef.unsafe(transaction, i)
+      AVector.tabulate(transaction.outputsLength) { index =>
+        val output    = transaction.getOutput(index)
+        val outputRef = TxOutputRef.unsafe(transaction, index)
         (outputRef, output)
       }
     }
@@ -414,33 +418,30 @@ object BlockFlowState {
     }
   }
 
-  def updateStateForOutputs(
-      trie: MerklePatriciaTrie,
-      outputs: Iterable[(TxOutputRef, TxOutput)]): IOResult[MerklePatriciaTrie] = {
-    EitherF.foldTry(outputs, trie) {
-      case (trie0, (outputRef, output)) =>
-        trie0.put(outputRef, output)
+  def updateStateForOutputs(worldState: WorldState,
+                            outputs: Iterable[(TxOutputRef, TxOutput)]): IOResult[WorldState] = {
+    EitherF.foldTry(outputs, worldState) {
+      case (worldState, (outputRef, output)) => worldState.put(outputRef, output)
     }
   }
 
-  def updateStateForInputs(trie: MerklePatriciaTrie,
-                           inputs: Iterable[TxOutputRef]): IOResult[MerklePatriciaTrie] = {
-    EitherF.foldTry(inputs, trie)(_.remove(_))
+  def updateStateForInputs(worldState: WorldState,
+                           inputs: Iterable[TxOutputRef]): IOResult[WorldState] = {
+    EitherF.foldTry(inputs, worldState)(_.remove(_))
   }
 
-  def updateState(trie: MerklePatriciaTrie,
-                  blockCache: BlockCache): IOResult[MerklePatriciaTrie] = {
+  def updateState(worldState: WorldState, blockCache: BlockCache): IOResult[WorldState] = {
     blockCache match {
       case InBlockCache(outputs) =>
-        updateStateForOutputs(trie, outputs)
+        updateStateForOutputs(worldState, outputs)
       case OutBlockCache(inputs, relatedOutputs) =>
         for {
-          trie0 <- updateStateForInputs(trie, inputs)
+          trie0 <- updateStateForInputs(worldState, inputs)
           trie1 <- updateStateForOutputs(trie0, relatedOutputs)
         } yield trie1
       case InOutBlockCache(outputs, inputs) =>
         for {
-          trie0 <- updateStateForOutputs(trie, outputs)
+          trie0 <- updateStateForOutputs(worldState, outputs)
           trie1 <- updateStateForInputs(trie0, inputs)
         } yield trie1
     }

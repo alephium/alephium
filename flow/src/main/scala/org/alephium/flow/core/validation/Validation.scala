@@ -3,7 +3,7 @@ package org.alephium.flow.core.validation
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
@@ -147,7 +147,7 @@ object Validation {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 0 && coinbase.generatedOutputs.length == 1 && coinbase.signatures.isEmpty)
+    if (unsigned.inputs.isEmpty && unsigned.fixedOutputs.isEmpty && coinbase.generatedOutputs.length == 1 && coinbase.signatures.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -178,33 +178,33 @@ object Validation {
 
   private[validation] def checkBlockNonCoinbase(index: ChainIndex,
                                                 tx: Transaction,
-                                                trie: MerklePatriciaTrie)(
+                                                worldState: WorldState)(
       implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
       _ <- checkChainIndex(index, tx)
-      _ <- checkSpending(tx, trie)
+      _ <- checkSpending(tx, worldState)
     } yield ()
   }
 
   private[validation] def checkNonCoinbaseTx(index: ChainIndex,
                                              tx: Transaction,
-                                             trie: MerklePatriciaTrie)(
+                                             worldState: WorldState)(
       implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
       _ <- checkChainIndex(index, tx)
       _ <- checkTxDoubleSpending(tx)
-      _ <- checkSpending(tx, trie)
+      _ <- checkSpending(tx, worldState)
     } yield ()
   }
 
   private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult = {
     if (tx.unsigned.inputs.isEmpty) {
       invalidTx(EmptyInputs)
-    } else if (tx.unsigned.outputs.isEmpty) {
+    } else if (tx.outputsLength == 0) {
       invalidTx(EmptyOutputs)
     } else {
       validTx
@@ -212,7 +212,7 @@ object Validation {
   }
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
-    tx.alfAmoutInOutputs match {
+    tx.alfAmountInOutputs match {
       case Some(sum) if sum < ALF.MaxALFValue => invalidTx(OutputValueOverFlow)
       case _                                  => validTx
     }
@@ -221,10 +221,11 @@ object Validation {
   private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult = {
     val fromOk = tx.unsigned.inputs.forall(_.fromGroup == index.from)
-    val toOk = tx.unsigned.outputs.forall { output =>
+    val toOk = (0 until tx.outputsLength).forall { i =>
+      val output = tx.getOutput(i)
       output.toGroup == index.from || output.toGroup == index.to
     }
-    val existed = tx.unsigned.outputs.exists(_.toGroup == index.to)
+    val existed = tx.unsigned.fixedOutputs.exists(_.toGroup == index.to)
     if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
   }
 
@@ -252,10 +253,10 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction, trie: MerklePatriciaTrie)(
+  private[validation] def checkSpending(tx: Transaction, worldState: WorldState)(
       implicit config: ScriptConfig): TxValidationResult = {
     val query = tx.unsigned.inputs.mapE { input =>
-      trie.get[TxOutputRef, TxOutput](input.outputRef)
+      worldState.get(input.outputRef)
     }
     query match {
       case Right(preOutputs)                 => checkSpending(tx, preOutputs)
@@ -275,7 +276,7 @@ object Validation {
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
     val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.alfAmount)
-    tx.alfAmoutInOutputs match {
+    tx.alfAmountInOutputs match {
       case Some(outputSum) if outputSum <= inputSum => validTx
       case _                                        => invalidTx(InvalidBalance)
     }

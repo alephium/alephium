@@ -25,18 +25,29 @@ sealed trait TxOutput {
   def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
-final case class AlfOutput(val amount: U64,
-                           val data: ByteString,
-                           val createdHeight: U64,
-                           val lockupHeight: Option[U64],
-                           val lockupScript: PubScript)
+object TxOutput {
+  private val serdeEither = eitherSerde[AlfOutput, TokenOutput](AlfOutput.serde, TokenOutput.serde)
+  implicit val serde: Serde[TxOutput] = serdeEither.xmap({
+    case Left(output)  => output
+    case Right(output) => output
+  }, {
+    case output: AlfOutput   => Left(output)
+    case output: TokenOutput => Right(output)
+  })
+}
+
+final case class AlfOutput(amount: U64,
+                           data: ByteString,
+                           createdHeight: U64,
+                           lockupHeight: Option[U64],
+                           lockupScript: PubScript)
     extends TxOutput {
   override def tokenIdOpt: Option[TokenId] = None
   override def alfAmount: U64              = amount
 }
 
 object AlfOutput {
-  val serde: Serde[AlfOutput] = Serde.forProduct5(
+  implicit val serde: Serde[AlfOutput] = Serde.forProduct5(
     AlfOutput.apply,
     t => (t.amount, t.data, t.createdHeight, t.lockupHeight, t.lockupScript))
 
@@ -54,24 +65,24 @@ object AlfOutput {
   }
 
   // TODO: use proper op_code when it's ready
-  def burn(amount: U64): TxOutput = {
+  def burn(amount: U64): AlfOutput = {
     build(amount, PubScript.empty)
   }
 }
 
-final case class TokenOutput(val tokenId: TokenId,
-                             val amount: U64,
-                             val alfAmount: U64,
-                             val data: ByteString,
-                             val createdHeight: U64,
-                             val lockupHeight: Option[U64],
-                             val lockupScript: PubScript)
+final case class TokenOutput(tokenId: TokenId,
+                             amount: U64,
+                             alfAmount: U64,
+                             data: ByteString,
+                             createdHeight: U64,
+                             lockupHeight: Option[U64],
+                             lockupScript: PubScript)
     extends TxOutput {
   override def tokenIdOpt: Option[TokenId] = Some(tokenId)
 }
 
 object TokenOutput {
-  val serde: Serde[TokenOutput] = Serde.forProduct7(
+  implicit val serde: Serde[TokenOutput] = Serde.forProduct7(
     TokenOutput.apply,
     t =>
       (t.tokenId, t.amount, t.alfAmount, t.data, t.createdHeight, t.lockupHeight, t.lockupScript))
@@ -95,18 +106,7 @@ object TokenOutput {
   }
 
   // TODO: use proper op_code when it's ready
-  def burn(amount: U64): TxOutput = {
+  def burn(amount: U64): TokenOutput = {
     build(ALF.Hash.zero, amount, U64.Zero, PubScript.empty)
   }
-}
-
-object TxOutput {
-  private val serdeEither = eitherSerde[AlfOutput, TokenOutput](AlfOutput.serde, TokenOutput.serde)
-  implicit val serde: Serde[TxOutput] = serdeEither.xmap({
-    case Left(output)  => output
-    case Right(output) => output
-  }, {
-    case output: AlfOutput   => Left(output)
-    case output: TokenOutput => Right(output)
-  })
 }
