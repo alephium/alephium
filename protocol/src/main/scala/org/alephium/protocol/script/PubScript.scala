@@ -7,7 +7,7 @@ import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits, DjbHash}
+import org.alephium.util.{AVector, Bytes, DjbHash}
 
 final case class PubScript(instructions: AVector[Instruction]) extends HashSerde[PubScript] {
   override lazy val hash: Hash = _getHash
@@ -54,7 +54,7 @@ object PubScript {
   }
 
   def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
-    val hash = Bits.toPosInt(Bits.xorByte(shortKey))
+    val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))
     GroupIndex.unsafe(hash % config.groups)
   }
 }
