@@ -6,7 +6,7 @@ import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits}
+import org.alephium.util.{AVector, Bytes}
 
 object MerklePatriciaTrie {
   /* branch [encodedPath, v0, ..., v15]
@@ -149,7 +149,7 @@ object MerklePatriciaTrie {
 
   def getNibble(nibbles: ByteString, index: Int): Int = {
     assume(index >= 0 && index < nibbles.length)
-    Bits.toPosInt(nibbles(index))
+    Bytes.toPosInt(nibbles(index))
   }
 
   def toNibbles[K: Serde](key: K): ByteString = {

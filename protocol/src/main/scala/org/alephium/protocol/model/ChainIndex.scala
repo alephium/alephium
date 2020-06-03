@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.RandomBytes
-import org.alephium.util.Bits
+import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
   def relateTo(brokerInfo: BrokerInfo): Boolean = {
@@ -55,8 +55,8 @@ object ChainIndex {
     val bytes = randomBytes.bytes
     assume(bytes.length >= 2)
 
-    val beforeLast = Bits.toPosInt(bytes(bytes.length - 2))
-    val last       = Bits.toPosInt(bytes.last)
+    val beforeLast = Bytes.toPosInt(bytes(bytes.length - 2))
+    val last       = Bytes.toPosInt(bytes.last)
     val bigIndex   = beforeLast << 8 | last
     assert(bigIndex >= 0)
 

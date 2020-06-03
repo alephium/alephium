@@ -19,7 +19,7 @@ sealed trait RPCModel
 
 // scalastyle:off number.of.methods
 object RPCModel {
-  implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.value)
+  implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
   implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
   implicit val u64Codec: Codec[U64]     = Codec.from(u64Decoder, u64Encoder)
 

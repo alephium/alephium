@@ -7,7 +7,7 @@ import akka.util.ByteString
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature, Keccak256}
 import org.alephium.macros.EnumerationMacros
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits, EitherF}
+import org.alephium.util.{AVector, Bytes, EitherF}
 
 //scalastyle:off magic.number
 
@@ -37,10 +37,10 @@ object Instruction {
     register(index, index, obj)
 
   def register(index: Byte, obj: InstructionCompanion): Unit =
-    register(Bits.toPosInt(index), obj)
+    register(Bytes.toPosInt(index), obj)
 
   def getRegistered(byte: Byte): Option[InstructionCompanion] = {
-    val index = Bits.toPosInt(byte)
+    val index = Bytes.toPosInt(byte)
     codeRegistry(index)
   }
 
@@ -197,11 +197,11 @@ object OP_PUSH extends InstructionCompanion with Registrable {
     Instruction.safeHead(input).flatMap {
       case (code, rest) =>
         code match {
-          case n if n >= 0x00 && n <= 0x06 => safeDeserialize(rest, 1 << Bits.toPosInt(n))
+          case n if n >= 0x00 && n <= 0x06 => safeDeserialize(rest, 1 << Bytes.toPosInt(n))
           case 0x07 =>
             Instruction.safeHead(rest).flatMap {
               case (_length, newRest) =>
-                val length = Bits.toPosInt(_length)
+                val length = Bytes.toPosInt(_length)
                 if (validateSize(length)) safeDeserialize(newRest, length)
                 else Left(SerdeError.validation(s"OP_PUSH - invalid bytes length $length"))
             }
@@ -251,7 +251,7 @@ object OP_DUP extends InstructionCompanion with Registrable {
           case n if n >= 0x10 && n < 0x1F => Right((unsafe(n - 0x0F), rest))
           case 0x1F =>
             Instruction.safeHead(rest).map {
-              case (index, newRest) => (unsafe(Bits.toPosInt(index)), newRest)
+              case (index, newRest) => (unsafe(Bytes.toPosInt(index)), newRest)
             }
           case _ => Left(SerdeError.validation(s"OP_DUP - invalid code"))
         }
@@ -295,7 +295,7 @@ object OP_SWAP extends InstructionCompanion with Registrable {
           case n if 0x20 <= n && n < 0x2F => Right((unsafe(n - 0x1E), rest))
           case 0x2F =>
             Instruction.safeHead(rest).map {
-              case (index, newRest) => (unsafe(Bits.toPosInt(index)), newRest)
+              case (index, newRest) => (unsafe(Bytes.toPosInt(index)), newRest)
             }
           case _ => Left(SerdeError.validation(s"OP_SWAP - invalid code"))
         }
@@ -339,7 +339,7 @@ case object OP_POP extends InstructionCompanion with Registrable {
           case n if 0x30 <= n && n < 0x3F => Right((unsafe(n - 0x2F), rest))
           case 0x3F =>
             Instruction.safeHead(rest).map {
-              case (index, newRest) => (unsafe(Bits.toPosInt(index)), newRest)
+              case (index, newRest) => (unsafe(Bytes.toPosInt(index)), newRest)
             }
           case _ => Left(SerdeError.validation(s"OP_POP - invalid code"))
         }
@@ -568,7 +568,7 @@ case object OP_CHECKSIGVERIFY extends SimpleInstruction with Registrable {
 case object OP_CHECKMULTISIGVERIFY extends SimpleInstruction with Registrable {
   private def validate(nRaw: ByteString): RunResult[Int] = {
     if (nRaw.length == 1) {
-      val n = Bits.toPosInt(nRaw(0))
+      val n = Bytes.toPosInt(nRaw(0))
       if (n > 0) Right(n) else Left(InvalidParameters)
     } else Left(InvalidParameters)
   }
