@@ -335,11 +335,11 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       .getUtxos(PayTo.PKH, address)
       .toOption
       .get
-      .sumBy(_._2.alfAmount.value) is expected.value
+      .sumBy(_._2.alfAmount.v) is expected.v
   }
 
   def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: U64): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.alfAmount.value) is expected.value
+    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.alfAmount.v) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -366,7 +366,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val groupIndex = GroupIndex.from(PayTo.PKH, address)
     config.brokerInfo.contains(groupIndex) is true
     val query = blockFlow.getUtxos(PayTo.PKH, address)
-    query.toOption.get.sumBy(_._2.alfAmount.value)
+    query.toOption.get.sumBy(_._2.alfAmount.v)
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {

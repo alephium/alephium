@@ -5,7 +5,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.{PubScript, Script}
 import org.alephium.serde._
-import org.alephium.util.Bits
+import org.alephium.util.Bytes
 
 final case class TxInput(outputRef: TxOutputRef, unlockScript: Script) {
   def fromGroup(implicit config: GroupConfig): GroupIndex =
@@ -44,7 +44,7 @@ object TxOutputRef {
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
     val output     = transaction.getOutput(outputIndex)
-    val outputHash = Hash.hash(transaction.hash.bytes ++ Bits.toBytes(outputIndex))
+    val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
     output match {
       case o: AlfOutput   => AlfOutputRef(o.scriptHint, outputHash)
       case o: TokenOutput => TokenOutputRef(o.tokenId, o.scriptHint, outputHash)
