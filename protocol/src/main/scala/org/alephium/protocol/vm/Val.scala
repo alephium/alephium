@@ -1,6 +1,8 @@
 package org.alephium.protocol.vm
 
+import org.alephium.serde._
 import org.alephium.util
+import org.alephium.util.{AVector, Bytes}
 
 trait Val extends Any {
   def tpe: Val.Type
@@ -9,7 +11,17 @@ trait Val extends Any {
 // scalastyle:off number.of.methods
 object Val {
   trait Type {
+    def id: scala.Byte
     def default: Val
+  }
+  object Type {
+    implicit val serde: Serde[Type] =
+      byteSerde.xfmap(byte => {
+        types.get(Bytes.toPosInt(byte)).toRight(SerdeError.validation(s"Invalid Val Type"))
+      }, _.id)
+
+    val types: AVector[Type] = AVector[Type](Bool, Byte, I32, U32, I64, U64, I256, U256, Bool) ++
+      AVector[Type](ByteVec, I32Vec, U32Vec, I64Vec, U64Vec, I256Vec, U256Vec)
   }
 
   // TODO: optimize using value class
@@ -32,52 +44,68 @@ object Val {
   case class U256Vec(a: Array[U256]) extends AnyVal with Val { def tpe: Val.Type = U256Vec }
 
   object Bool extends Type {
-    override def default: Bool = Bool(false)
+    override val id: scala.Byte = 0.toByte
+    override def default: Bool  = Bool(false)
   }
   object Byte extends Type {
-    override def default: Byte = Byte(0.toByte)
+    override val id: scala.Byte = 1.toByte
+    override def default: Byte  = Byte(0.toByte)
   }
   object I32 extends Type {
-    override def default: I32 = I32(util.I32.Zero)
+    override val id: scala.Byte = 2.toByte
+    override def default: I32   = I32(util.I32.Zero)
   }
   object U32 extends Type {
-    override def default: U32 = U32(util.U32.Zero)
+    override val id: scala.Byte = 3.toByte
+    override def default: U32   = U32(util.U32.Zero)
   }
   object I64 extends Type {
-    override def default: I64 = I64(util.I64.Zero)
+    override val id: scala.Byte = 4.toByte
+    override def default: I64   = I64(util.I64.Zero)
   }
   object U64 extends Type {
-    override def default: U64 = U64(util.U64.Zero)
+    override val id: scala.Byte = 5.toByte
+    override def default: U64   = U64(util.U64.Zero)
   }
   object I256 extends Type {
-    override def default: I256 = I256(util.I256.Zero)
+    override val id: scala.Byte = 6.toByte
+    override def default: I256  = I256(util.I256.Zero)
   }
   object U256 extends Type {
-    override def default: U256 = U256(util.U256.Zero)
+    override val id: scala.Byte = 7.toByte
+    override def default: U256  = U256(util.U256.Zero)
   }
 
   object BoolVec extends Type {
+    override val id: scala.Byte   = 8.toByte
     override def default: BoolVec = BoolVec(Array.empty)
   }
   object ByteVec extends Type {
+    override val id: scala.Byte   = 9.toByte
     override def default: ByteVec = ByteVec(Array.empty)
   }
   object I32Vec extends Type {
+    override val id: scala.Byte  = 10.toByte
     override def default: I32Vec = I32Vec(Array.empty)
   }
   object U32Vec extends Type {
+    override val id: scala.Byte  = 11.toByte
     override def default: U32Vec = U32Vec(Array.empty)
   }
   object I64Vec extends Type {
+    override val id: scala.Byte  = 12.toByte
     override def default: I64Vec = I64Vec(Array.empty)
   }
   object U64Vec extends Type {
+    override val id: scala.Byte  = 13.toByte
     override def default: U64Vec = U64Vec(Array.empty)
   }
   object I256Vec extends Type {
+    override val id: scala.Byte   = 14.toByte
     override def default: I256Vec = I256Vec(Array.empty)
   }
   object U256Vec extends Type {
+    override val id: scala.Byte   = 15.toByte
     override def default: U256Vec = U256Vec(Array.empty)
   }
 }

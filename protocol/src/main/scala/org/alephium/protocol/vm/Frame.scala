@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm
 
-import org.alephium.util.ArrayF
+import org.alephium.util.Collection
 
 class Frame[Ctx <: Context](var pc: Int,
                             obj: ContractObj[Ctx],
@@ -16,11 +16,11 @@ class Frame[Ctx <: Context](var pc: Int,
   def pop(): ExeResult[Val] = opStack.pop()
 
   def getLocal(index: Int): ExeResult[Val] = {
-    if (ArrayF.checkIndex(locals, index)) Right(locals(index)) else Left(InvalidLocalIndex)
+    if (Collection.checkIndex(locals, index)) Right(locals(index)) else Left(InvalidLocalIndex)
   }
 
   def setLocal(index: Int, v: Val): ExeResult[Unit] = {
-    if (!ArrayF.checkIndex(locals, index)) {
+    if (!Collection.checkIndex(locals, index)) {
       Left(InvalidLocalIndex)
     } else if (locals(index).tpe != v.tpe) {
       Left(InvalidLocalType)
@@ -31,12 +31,12 @@ class Frame[Ctx <: Context](var pc: Int,
 
   def getField(index: Int): ExeResult[Val] = {
     val fields = obj.fields
-    if (ArrayF.checkIndex(fields, index)) Right(fields(index)) else Left(InvalidFieldIndex)
+    if (Collection.checkIndex(fields, index)) Right(fields(index)) else Left(InvalidFieldIndex)
   }
 
   def setField(index: Int, v: Val): ExeResult[Unit] = {
     val fields = obj.fields
-    if (!ArrayF.checkIndex(fields, index)) {
+    if (!Collection.checkIndex(fields, index)) {
       Left(InvalidFieldIndex)
     } else if (fields(index).tpe != v.tpe) {
       Left(InvalidFieldType)

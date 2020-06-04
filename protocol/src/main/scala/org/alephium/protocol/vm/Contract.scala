@@ -1,6 +1,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALF
+import org.alephium.serde._
 import org.alephium.util.AVector
 
 trait ContractAddress
@@ -10,12 +11,19 @@ case class Method[Ctx <: Context](
     instrs: AVector[Instr[Ctx]]
 )
 
-trait Contract[Ctx <: Context] {
+object Method {
+  implicit val statelessSerde: Serde[Method[StatelessContext]] =
+    Serde.forProduct2(Method[StatelessContext], t => (t.localsType, t.instrs))
+  implicit val statefulSerde: Serde[Method[StatefulContext]] =
+    Serde.forProduct2(Method[StatefulContext], t => (t.localsType, t.instrs))
+}
+
+sealed trait Contract[Ctx <: Context] {
   def fields: AVector[Val.Type]
   def methods: AVector[Method[Ctx]]
 }
 
-trait Script[Ctx <: Context] extends Contract[Ctx] {
+sealed trait Script[Ctx <: Context] extends Contract[Ctx] {
   def toObject: ScriptObj[Ctx]
 
   def startFrame: Frame[Ctx] = {
@@ -33,6 +41,11 @@ case class StatelessScript(
   }
 }
 
+object StatelessScript {
+  implicit val serde: Serde[StatelessScript] =
+    Serde.forProduct2(StatelessScript.apply, t => (t.fields, t.methods))
+}
+
 case class StatefulScript(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
@@ -42,10 +55,20 @@ case class StatefulScript(
   }
 }
 
+object StatefulScript {
+  implicit val serde: Serde[StatefulScript] =
+    Serde.forProduct2(StatefulScript.apply, t => (t.fields, t.methods))
+}
+
 case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext]
+
+object StatefulContract {
+  implicit val serde: Serde[StatefulContract] =
+    Serde.forProduct2(StatefulContract.apply, t => (t.fields, t.methods))
+}
 
 trait ContractObj[Ctx <: Context] {
   def code: Contract[Ctx]
