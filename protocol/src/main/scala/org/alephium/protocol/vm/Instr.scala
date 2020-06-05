@@ -74,6 +74,8 @@ trait StatefulInstr  extends Instr[StatefulContext]
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
+
+  def parse[C <: Ctx](params: Seq[String]): Either[String, Instr[C]]
 }
 
 sealed trait InstrCompanion1 extends InstrCompanion[StatelessContext] {
@@ -89,6 +91,17 @@ sealed trait InstrCompanion1 extends InstrCompanion[StatelessContext] {
       .map(byte => (from(byte), input.tail))
       .toRight(SerdeError.notEnoughBytes(1, 0))
   }
+
+  override def parse[C <: StatelessContext](params: Seq[String]): Either[String, Instr[C]] = {
+    if (params.length != 1) Left(s"Just one params is required")
+    else {
+      try {
+        Right(from(params(0).toByte))
+      } catch {
+        case _: NumberFormatException => Left(s"Invalid int ${params(0)}")
+      }
+    }
+  }
 }
 
 trait SimpleInstr extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
@@ -99,6 +112,10 @@ trait SimpleInstr extends InstrCompanion[StatelessContext] with Instr[StatelessC
   override def deserialize[C <: StatelessContext](
       input: ByteString): SerdeResult[(Instr[C], ByteString)] =
     Right((this, input))
+
+  override def parse[C <: StatelessContext](params: Seq[String]): Either[String, Instr[C]] = {
+    if (params.isEmpty) Right(this) else Left(s"Unnecessary params for ${this.toString}")
+  }
 }
 
 trait OperandStackInstr extends StatelessInstr
