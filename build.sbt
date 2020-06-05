@@ -88,7 +88,8 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       `alephium-crypto`,
       `alephium-serde`,
-      `alephium-util` % "it,test" classifier "tests"
+      `alephium-util` % "it,test" classifier "tests",
+      fastparse
     )
   )
 
