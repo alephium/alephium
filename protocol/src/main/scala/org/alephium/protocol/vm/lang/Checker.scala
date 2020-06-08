@@ -13,8 +13,15 @@ object Checker {
   }
 
   case class VarInfo(tpe: Val.Type, isMutable: Boolean)
-  case class Ctx(varTable: mutable.HashMap[String, VarInfo], var scope: String) {
-    def setScope(name: String): Unit = scope = name
+  case class Ctx(varTable: mutable.HashMap[String, VarInfo],
+                 var scope: String,
+                 funcIdents: mutable.ArrayBuffer[Ast.Ident]) {
+    def setScope(ident: Ast.Ident): Unit = {
+      if (funcIdents.contains(ident)) throw Error(s"functions have the same name: $ident")
+
+      funcIdents.append(ident)
+      scope = ident.name
+    }
 
     def addVariable(ident: Ast.Ident, tpe: Seq[Val.Type], isMutable: Boolean): Unit = {
       addVariable(ident, expectOneType(ident, tpe), isMutable)
@@ -60,6 +67,6 @@ object Checker {
     }
   }
   object Ctx {
-    def empty: Ctx = Ctx(mutable.HashMap.empty, "")
+    def empty: Ctx = Ctx(mutable.HashMap.empty, "", mutable.ArrayBuffer.empty)
   }
 }
