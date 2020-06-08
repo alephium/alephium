@@ -39,10 +39,10 @@ object Ast {
   }
 
   sealed trait Statement {
-    def checkType(ctx: Checker.Ctx): Unit
+    def check(ctx: Checker.Ctx): Unit
   }
   case class VarDef(isMutable: Boolean, variable: Ident, value: Expr) extends Statement {
-    override def checkType(ctx: Checker.Ctx): Unit =
+    override def check(ctx: Checker.Ctx): Unit =
       ctx.addVariable(variable, value.getType(ctx: Checker.Ctx), isMutable)
   }
   case class FuncDef(name: Ident,
@@ -51,27 +51,27 @@ object Ast {
                      body: Seq[Statement],
                      rStmt: Return)
       extends Statement {
-    override def checkType(ctx: Checker.Ctx): Unit = {
+    override def check(ctx: Checker.Ctx): Unit = {
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
-      body.foreach(_.checkType(ctx))
+      body.foreach(_.check(ctx))
       val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
       if (!returnTypes.equals(rtypes))
         throw Checker.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
     }
   }
   case class Assign(target: Ident, rhs: Expr) extends Statement {
-    override def checkType(ctx: Checker.Ctx): Unit = {
-      ctx.check(target, rhs.getType(ctx: Checker.Ctx))
+    override def check(ctx: Checker.Ctx): Unit = {
+      ctx.checkAssign(target, rhs.getType(ctx: Checker.Ctx))
     }
   }
 
   case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
     def check(): Unit = {
       val ctx = Checker.Ctx.empty
-      assigns.foreach(_.checkType(ctx))
+      assigns.foreach(_.check(ctx))
       funcs.foreach { func =>
         val localCtx = ctx.branch()
-        func.checkType(localCtx)
+        func.check(localCtx)
       }
     }
   }
