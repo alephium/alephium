@@ -22,6 +22,8 @@ object Parser {
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
   def expr[_: P]: P[Ast.Expr]           = P(binop | call | parenExpr | const | variable)
 
+  def ret[_: P]: P[Ast.Return] = P("return" ~/ expr.rep(0, ",")).map(Ast.Return)
+
   def varDef[_: P]: P[Ast.VarDef] = P(("val" | "var").! ~/ Lexer.ident ~ "=" ~ expr).map {
     case ("val", ident, expr) =>
       Ast.VarDef(Ast.Variable(ident, None, isMutableOpt = Some(false)), expr)
@@ -31,18 +33,18 @@ object Parser {
       throw new RuntimeException("Dead branch")
   }
   def assign[_: P]: P[Ast.Assign] = P(variable ~ "=" ~ expr).map(Ast.Assign.tupled)
-  def ret[_: P]: P[Ast.Return]    = P("return" ~/ expr.rep(0, ",")).map(Ast.Return)
 
   def argument[_: P]: P[Ast.Variable] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
     case (ident, tpe) => Ast.Variable(ident, Some(tpe), Some(false))
   }
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P("fn" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~ funcBody)
+    P(
+      "fn" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~
+        "{" ~ statement.rep ~ ret ~ "}")
       .map(Ast.FuncDef.tupled)
-  def funcBody[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
 
-  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | ret | func)
+  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | func)
 
   def contract[_: P]: P[Ast.Contract] = P(Start ~ varDef.rep ~ func.rep(1)).map(Ast.Contract.tupled)
 }

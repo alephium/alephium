@@ -4,6 +4,7 @@ import org.alephium.protocol.vm.Val
 
 object Ast {
   case class Ident(name: String)
+  case class Return(exprs: Seq[Expr])
 
   sealed trait Operator
   case object Add extends Operator
@@ -52,17 +53,21 @@ object Ast {
   case class VarDef(variable: Variable, value: Expr) extends Statement {
     override def inferType(): Unit = variable.setType(value.tpe)
   }
-  case class FuncDef(name: Ident, args: Seq[Variable], rtypes: Seq[Val.Type], body: Seq[Statement])
+  case class FuncDef(name: Ident,
+                     args: Seq[Variable],
+                     rtypes: Seq[Val.Type],
+                     body: Seq[Statement],
+                     rStmt: Return)
       extends Statement {
     override def inferType(): Unit = {
       body.foreach(_.inferType())
+      val returnTypes = rStmt.exprs.map(_.tpe)
+      if (!returnTypes.equals(args))
+        throw Validator.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
     }
   }
   case class Assign(target: Variable, rhs: Expr) extends Statement {
     override def inferType(): Unit = target.setType(rhs.tpe)
-  }
-  case class Return(vals: Seq[Expr]) extends Statement {
-    override def inferType(): Unit = ()
   }
 
   case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
