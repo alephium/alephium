@@ -35,13 +35,14 @@ object Checker {
 
     def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
 
-    def check(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {
-      check(ident, expectOneType(ident, tpe))
+    def checkAssign(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {
+      checkAssign(ident, expectOneType(ident, tpe))
     }
 
-    def check(ident: Ast.Ident, tpe: Val.Type): Unit = {
-      val varType = getVariable(ident).tpe
-      if (varType != tpe) throw Error(s"Type $tpe is invalid for $ident ($varType)")
+    def checkAssign(ident: Ast.Ident, tpe: Val.Type): Unit = {
+      val varInfo = getVariable(ident)
+      if (varInfo.tpe != tpe) throw Error(s"Type $tpe is invalid for $ident (${varInfo.tpe})")
+      if (!varInfo.isMutable) throw Error(s"Assign value to immutable variable $ident")
     }
   }
   object Ctx {
