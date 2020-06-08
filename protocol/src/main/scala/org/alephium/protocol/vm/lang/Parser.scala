@@ -37,7 +37,7 @@ object Parser {
   def argument[_: P]: P[Ast.Argument] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
     case (ident, tpe) => Ast.Argument(ident, tpe)
   }
-  def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep ~ ")")
+  def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
     P(
       "fn" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~

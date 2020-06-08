@@ -41,9 +41,9 @@ object Ast {
   sealed trait Statement {
     def check(ctx: Checker.Ctx): Unit
   }
-  case class VarDef(isMutable: Boolean, variable: Ident, value: Expr) extends Statement {
+  case class VarDef(isMutable: Boolean, ident: Ident, value: Expr) extends Statement {
     override def check(ctx: Checker.Ctx): Unit =
-      ctx.addVariable(variable, value.getType(ctx: Checker.Ctx), isMutable)
+      ctx.addVariable(ident, value.getType(ctx: Checker.Ctx), isMutable)
   }
   case class FuncDef(name: Ident,
                      args: Seq[Argument],
