@@ -42,15 +42,15 @@ class ParserSpec extends AlephiumSpec {
          |var x = 1u
          |var y = 2u
          |
-         |fn add(a: U64, b: U64) -> (U64) {
+         |fn add0(a: U64, b: U64) -> (U64) {
          |  return (a + b)
          |}
          |
-         |fn add() -> (U64) {
+         |fn add1() -> (U64) {
          |  return (x + y)
          |}
          |
-         |fn add(d: U64) -> () {
+         |fn add2(d: U64) -> () {
          |  var z = d
          |  x = x + z
          |  y = y + z

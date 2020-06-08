@@ -45,7 +45,7 @@ object Ast {
     override def check(ctx: Checker.Ctx): Unit =
       ctx.addVariable(ident, value.getType(ctx: Checker.Ctx), isMutable)
   }
-  case class FuncDef(name: Ident,
+  case class FuncDef(ident: Ident,
                      args: Seq[Argument],
                      rtypes: Seq[Val.Type],
                      body: Seq[Statement],
@@ -70,8 +70,8 @@ object Ast {
       val ctx = Checker.Ctx.empty
       assigns.foreach(_.check(ctx))
       funcs.foreach { func =>
-        val localCtx = ctx.branch()
-        func.check(localCtx)
+        ctx.setScope(func.ident.name)
+        func.check(ctx)
       }
     }
   }
