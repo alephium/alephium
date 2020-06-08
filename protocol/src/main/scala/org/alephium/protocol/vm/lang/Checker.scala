@@ -13,23 +13,37 @@ object Checker {
   }
 
   case class VarInfo(tpe: Val.Type, isMutable: Boolean)
-  case class Ctx(varTable: mutable.HashMap[String, VarInfo]) {
-    def branch(): Ctx = Ctx(varTable.clone())
+  case class Ctx(varTable: mutable.HashMap[String, VarInfo], var scope: String) {
+    def setScope(name: String): Unit = scope = name
 
     def addVariable(ident: Ast.Ident, tpe: Seq[Val.Type], isMutable: Boolean): Unit = {
       addVariable(ident, expectOneType(ident, tpe), isMutable)
     }
 
+    private def scopedName(name: String): String = {
+      if (scope == "") name else s"$scope.$name"
+    }
+
     def addVariable(ident: Ast.Ident, tpe: Val.Type, isMutable: Boolean): Unit = {
-      val name = ident.name
-      if (varTable.contains(name)) throw Error(s"Variables have the same name $name")
-      else varTable(name) = VarInfo(tpe, isMutable)
+      val name  = ident.name
+      val sname = scopedName(name)
+      if (varTable.contains(name)) {
+        throw Error(s"Global variable has the same name as local variable: $name")
+      } else if (varTable.contains(sname)) {
+        throw Error(s"Local variables have the same name: $name")
+      } else varTable(sname) = VarInfo(tpe, isMutable)
     }
 
     def getVariable(ident: Ast.Ident): VarInfo = {
-      varTable.get(ident.name) match {
+      val name  = ident.name
+      val sname = scopedName(ident.name)
+      varTable.get(sname) match {
         case Some(varInfo) => varInfo
-        case None          => throw Error(s"Variable $ident does not exist")
+        case None =>
+          varTable.get(name) match {
+            case Some(varInfo) => varInfo
+            case None          => throw Error(s"Variable $sname does not exist")
+          }
       }
     }
 
@@ -46,6 +60,6 @@ object Checker {
     }
   }
   object Ctx {
-    def empty: Ctx = Ctx(mutable.HashMap.empty)
+    def empty: Ctx = Ctx(mutable.HashMap.empty, "")
   }
 }
