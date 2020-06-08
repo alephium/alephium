@@ -23,11 +23,14 @@ class ParserSpec extends AlephiumSpec {
       ParenExpr(Binop(Add, Variable(Ident("x"), None, None), Variable(Ident("y"), None, None)))
   }
 
+  it should "parse return" in {
+    fastparse.parse("return x, y", Parser.ret(_)).isSuccess is true
+    fastparse.parse("return x + y", Parser.ret(_)).isSuccess is true
+    fastparse.parse("return (x + y)", Parser.ret(_)).isSuccess is true
+  }
+
   it should "parse statements" in {
     fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
-    fastparse.parse("return x, y", Parser.statement(_)).isSuccess is true
-    fastparse.parse("return x + y", Parser.statement(_)).isSuccess is true
-    fastparse.parse("return (x + y)", Parser.statement(_)).isSuccess is true
     fastparse
       .parse("fn add(x: U64, y: U64) -> (U64) { return x + y }", Parser.statement(_))
       .isSuccess is true
