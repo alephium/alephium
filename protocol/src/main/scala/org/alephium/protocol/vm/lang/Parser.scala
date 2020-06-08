@@ -10,7 +10,7 @@ object Parser {
   }
 
   def const[_: P]: P[Ast.Const]       = P(Lexer.typedNum).map(Ast.Const)
-  def variable[_: P]: P[Ast.Variable] = P(Lexer.ident).map(Ast.Variable(_, None, None))
+  def variable[_: P]: P[Ast.Variable] = P(Lexer.ident).map(Ast.Variable)
   def call[_: P]: P[Ast.Call]         = P(Lexer.ident ~ "(" ~ expr.rep(0, ",") ~ ")").map(Ast.Call.tupled)
 
   def binopPrefix[_: P]: P[Ast.Expr]               = P(const | variable | parenExpr)
@@ -26,16 +26,16 @@ object Parser {
 
   def varDef[_: P]: P[Ast.VarDef] = P(("val" | "var").! ~/ Lexer.ident ~ "=" ~ expr).map {
     case ("val", ident, expr) =>
-      Ast.VarDef(Ast.Variable(ident, None, isMutableOpt = Some(false)), expr)
+      Ast.VarDef(isMutable = false, ident, expr)
     case ("var", ident, expr) =>
-      Ast.VarDef(Ast.Variable(ident, None, isMutableOpt = Some(true)), expr)
+      Ast.VarDef(isMutable = true, ident, expr)
     case (_, _, _) =>
       throw new RuntimeException("Dead branch")
   }
-  def assign[_: P]: P[Ast.Assign] = P(variable ~ "=" ~ expr).map(Ast.Assign.tupled)
+  def assign[_: P]: P[Ast.Assign] = P(Lexer.ident ~ "=" ~ expr).map(Ast.Assign.tupled)
 
-  def argument[_: P]: P[Ast.Variable] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
-    case (ident, tpe) => Ast.Variable(ident, Some(tpe), Some(false))
+  def argument[_: P]: P[Ast.Argument] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
+    case (ident, tpe) => Ast.Argument(ident, tpe)
   }
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep ~ ")")
   def func[_: P]: P[Ast.FuncDef] =

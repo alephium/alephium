@@ -4,6 +4,7 @@ import org.alephium.protocol.vm.Val
 
 object Ast {
   case class Ident(name: String)
+  case class Argument(ident: Ident, tpe: Val.Type)
   case class Return(exprs: Seq[Expr])
 
   sealed trait Operator
@@ -14,66 +15,64 @@ object Ast {
   case object Mod extends Operator
 
   sealed trait Expr {
-    def tpe: Val.Type
+    def getType(ctx: Checker.Ctx): Seq[Val.Type]
   }
   case class Const(v: Val) extends Expr {
-    override def tpe: Val.Type = v.tpe
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(v.tpe)
   }
-  case class Variable(id: Ident, var tpeOpt: Option[Val.Type], var isMutableOpt: Option[Boolean])
-      extends Expr {
-    override def tpe: Val.Type = tpeOpt match {
-      case Some(t) => t
-      case None    => throw Validator.Error(s"Unknown type for variable $id")
-    }
-
-    def setType(tpe: Val.Type): Unit = tpeOpt match {
-      case Some(t) =>
-        if (tpe != t) throw Validator.Error(s"Conflict types for $id: old $t, new $tpe")
-      case None => tpeOpt = Some(tpe)
-    }
+  case class Variable(id: Ident) extends Expr {
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
   }
   case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
-    override def tpe: Val.Type = {
-      val leftType  = left.tpe
-      val rightType = right.tpe
-      if (leftType == rightType) leftType
-      else throw Validator.Error(s"Type error for $op, left: $leftType, right: $rightType")
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = {
+      val leftType  = left.getType(ctx: Checker.Ctx)
+      val rightType = right.getType(ctx: Checker.Ctx)
+      if (leftType.length == 1 && leftType == rightType) leftType
+      else throw Checker.Error(s"Type error for $op, left: $leftType, right: $rightType")
     }
   }
   case class Call(id: Ident, args: Seq[Expr]) extends Expr {
-    override def tpe: Val.Type = ???
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = ???
   }
   case class ParenExpr(expr: Expr) extends Expr {
-    override def tpe: Val.Type = expr.tpe
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = expr.getType(ctx: Checker.Ctx)
   }
 
   sealed trait Statement {
-    def inferType(): Unit
+    def checkType(ctx: Checker.Ctx): Unit
   }
-  case class VarDef(variable: Variable, value: Expr) extends Statement {
-    override def inferType(): Unit = variable.setType(value.tpe)
+  case class VarDef(isMutable: Boolean, variable: Ident, value: Expr) extends Statement {
+    override def checkType(ctx: Checker.Ctx): Unit =
+      ctx.addVariable(variable, value.getType(ctx: Checker.Ctx), isMutable)
   }
   case class FuncDef(name: Ident,
-                     args: Seq[Variable],
+                     args: Seq[Argument],
                      rtypes: Seq[Val.Type],
                      body: Seq[Statement],
                      rStmt: Return)
       extends Statement {
-    override def inferType(): Unit = {
-      body.foreach(_.inferType())
-      val returnTypes = rStmt.exprs.map(_.tpe)
-      if (!returnTypes.equals(args))
-        throw Validator.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
+    override def checkType(ctx: Checker.Ctx): Unit = {
+      args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
+      body.foreach(_.checkType(ctx))
+      val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
+      if (!returnTypes.equals(rtypes))
+        throw Checker.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
     }
   }
-  case class Assign(target: Variable, rhs: Expr) extends Statement {
-    override def inferType(): Unit = target.setType(rhs.tpe)
+  case class Assign(target: Ident, rhs: Expr) extends Statement {
+    override def checkType(ctx: Checker.Ctx): Unit = {
+      ctx.check(target, rhs.getType(ctx: Checker.Ctx))
+    }
   }
 
   case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
-    def inferType(): Unit = {
-      assigns.foreach(_.inferType())
-      funcs.foreach(_.inferType())
+    def check(): Unit = {
+      val ctx = Checker.Ctx.empty
+      assigns.foreach(_.checkType(ctx))
+      funcs.foreach { func =>
+        val localCtx = ctx.branch()
+        func.checkType(localCtx)
+      }
     }
   }
 }

@@ -10,7 +10,7 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
-      Ast.Variable(Ast.Ident("x"), Some(Val.U64), Some(false))
+      Ast.Argument(Ast.Ident("x"), Val.U64)
     fastparse
       .parse("fn add(x: U64, y: U64) -> (U64) { return x }\n", Parser.statement(_))
       .isSuccess is true
@@ -18,9 +18,9 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse exprs" in {
     fastparse.parse("x + y", Parser.expr(_)).get.value is
-      Binop(Add, Variable(Ident("x"), None, None), Variable(Ident("y"), None, None))
+      Binop(Add, Variable(Ident("x")), Variable(Ident("y")))
     fastparse.parse("(x + y)", Parser.expr(_)).get.value is
-      ParenExpr(Binop(Add, Variable(Ident("x"), None, None), Variable(Ident("y"), None, None)))
+      ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
   }
 
   it should "parse return" in {
@@ -42,8 +42,8 @@ class ParserSpec extends AlephiumSpec {
          |var x = 1u
          |var y = 2u
          |
-         |fn add(x: U64, y: U64) -> (U64) {
-         |  return (x + y)
+         |fn add(a: U64, b: U64) -> (U64) {
+         |  return (a + b)
          |}
          |
          |fn add() -> (U64) {
@@ -58,6 +58,9 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     fastparse.parse(contract, Parser.contract(_)).isSuccess is true
+
+    val ast = fastparse.parse(contract, Parser.contract(_)).get.value
+    ast.check()
   }
 
   it should "parse UniSwap" in {
