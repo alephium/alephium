@@ -71,6 +71,7 @@ class ParserSpec extends AlephiumSpec {
               b: String,
               bType: String,
               rType: String,
+              fname: String,
               validity: Boolean = false) = {
       val contract = s"""
          |$xMut x = $xVal
@@ -78,20 +79,25 @@ class ParserSpec extends AlephiumSpec {
          |  x = a + b
          |  return (a - b)
          |}
+         |
+         |fn $fname() -> () {
+         |  return
+         |}
          |""".stripMargin
       val ast      = fastparse.parse(contract, Parser.contract(_)).get.value
       if (validity) ast.check() else assertThrows[Checker.Error](ast.check())
     }
 
-    check("var", "100u", "a", "U64", "b", "U64", "U64", true)
-    check("val", "100u", "a", "U64", "b", "U64", "U64")
-    check("var", "100i", "a", "U64", "b", "U64", "U64")
-    check("var", "100u", "x", "U64", "b", "U64", "U64")
-    check("var", "100u", "a", "U64", "x", "U64", "U64")
-    check("var", "100u", "a", "I64", "b", "U64", "U64")
-    check("var", "100u", "a", "U64", "b", "I64", "U64")
-    check("var", "100u", "a", "U64", "b", "U64", "I64")
-    check("var", "100u", "a", "U64", "b", "U64", "U64, U64")
+    check("var", "100u", "a", "U64", "b", "U64", "U64", "foo", true)
+    check("val", "100u", "a", "U64", "b", "U64", "U64", "foo")
+    check("var", "100i", "a", "U64", "b", "U64", "U64", "foo")
+    check("var", "100u", "x", "U64", "b", "U64", "U64", "foo")
+    check("var", "100u", "a", "U64", "x", "U64", "U64", "foo")
+    check("var", "100u", "a", "I64", "b", "U64", "U64", "foo")
+    check("var", "100u", "a", "U64", "b", "I64", "U64", "foo")
+    check("var", "100u", "a", "U64", "b", "U64", "I64", "foo")
+    check("var", "100u", "a", "U64", "b", "U64", "U64, U64", "foo")
+    check("var", "100u", "a", "U64", "b", "U64", "U64", "add")
   }
 
   it should "parse UniSwap" in {
