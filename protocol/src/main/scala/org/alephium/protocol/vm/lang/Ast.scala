@@ -4,7 +4,6 @@ import org.alephium.protocol.vm.Val
 
 object Ast {
   case class Ident(name: String)
-  case class Argument(id: Ident, tpe: Val.Type)
 
   sealed trait Operator
   case object Add extends Operator
@@ -50,12 +49,14 @@ object Ast {
   sealed trait Statement {
     def inferType(): Unit
   }
-  case class FuncDef(name: Ident, args: Seq[Argument], rtypes: Seq[Val.Type], body: Seq[Statement])
-      extends Statement {
-    override def inferType(): Unit = ???
-  }
   case class VarDef(variable: Variable, value: Expr) extends Statement {
     override def inferType(): Unit = variable.setType(value.tpe)
+  }
+  case class FuncDef(name: Ident, args: Seq[Variable], rtypes: Seq[Val.Type], body: Seq[Statement])
+      extends Statement {
+    override def inferType(): Unit = {
+      body.foreach(_.inferType())
+    }
   }
   case class Assign(target: Variable, rhs: Expr) extends Statement {
     override def inferType(): Unit = target.setType(rhs.tpe)
@@ -64,5 +65,10 @@ object Ast {
     override def inferType(): Unit = ()
   }
 
-  case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef])
+  case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
+    def inferType(): Unit = {
+      assigns.foreach(_.inferType())
+      funcs.foreach(_.inferType())
+    }
+  }
 }
