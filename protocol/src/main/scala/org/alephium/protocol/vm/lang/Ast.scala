@@ -52,6 +52,7 @@ object Ast {
                      rStmt: Return)
       extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
+      ctx.setScope(ident)
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
       body.foreach(_.check(ctx))
       val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
@@ -70,7 +71,6 @@ object Ast {
       val ctx = Checker.Ctx.empty
       assigns.foreach(_.check(ctx))
       funcs.foreach { func =>
-        ctx.setScope(func.ident.name)
         func.check(ctx)
       }
     }
