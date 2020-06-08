@@ -33,11 +33,12 @@ object Parser {
   def assign[_: P]: P[Ast.Assign] = P(variable ~ "=" ~ expr).map(Ast.Assign.tupled)
   def ret[_: P]: P[Ast.Return]    = P("return" ~/ expr.rep(0, ",")).map(Ast.Return)
 
-  def argument[_: P]: P[Ast.Argument] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map(Ast.Argument.tupled)
-  def returnType[_: P]: P[Seq[Val.Type]] =
-    P((":" ~ Lexer.tpe.rep).?).map(_.fold(Seq.empty[Val.Type])(identity))
+  def argument[_: P]: P[Ast.Variable] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
+    case (ident, tpe) => Ast.Variable(ident, Some(tpe), Some(false))
+  }
+  def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P("def" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~ funcBody)
+    P("fn" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~ funcBody)
       .map(Ast.FuncDef.tupled)
   def funcBody[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
 
