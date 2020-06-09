@@ -4,9 +4,9 @@ import org.alephium.protocol.vm._
 import org.alephium.util.AVector
 
 object Ast {
-  case class Ident(name: String)
-  case class Argument(ident: Ident, tpe: Val.Type)
-  case class Return(exprs: Seq[Expr]) {
+  final case class Ident(name: String)
+  final case class Argument(ident: Ident, tpe: Val.Type)
+  final case class Return(exprs: Seq[Expr]) {
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
       exprs.flatMap(_.toIR(ctx)) :+ U64Return
   }
@@ -34,7 +34,7 @@ object Ast {
     def getType(ctx: Checker.Ctx): Seq[Val.Type]
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]]
   }
-  case class Const(v: Val) extends Expr {
+  final case class Const(v: Val) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(v.tpe)
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
@@ -44,7 +44,7 @@ object Ast {
       }
     }
   }
-  case class Variable(id: Ident) extends Expr {
+  final case class Variable(id: Ident) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
@@ -53,7 +53,7 @@ object Ast {
       else Seq(LoadLocal(varInfo.index.toByte))
     }
   }
-  case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
+  final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = {
       val leftType  = left.getType(ctx: Checker.Ctx)
       val rightType = right.getType(ctx: Checker.Ctx)
@@ -65,12 +65,12 @@ object Ast {
       left.toIR(ctx) ++ right.toIR(ctx) ++ op.toIR
     }
   }
-  case class Call(id: Ident, args: Seq[Expr]) extends Expr {
+  final case class Call(id: Ident, args: Seq[Expr]) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = ???
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = ???
   }
-  case class ParenExpr(expr: Expr) extends Expr {
+  final case class ParenExpr(expr: Expr) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = expr.getType(ctx: Checker.Ctx)
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = expr.toIR(ctx)
@@ -80,7 +80,7 @@ object Ast {
     def check(ctx: Checker.Ctx): Unit
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]]
   }
-  case class VarDef(isMutable: Boolean, ident: Ident, value: Expr) extends Statement {
+  final case class VarDef(isMutable: Boolean, ident: Ident, value: Expr) extends Statement {
     override def check(ctx: Checker.Ctx): Unit =
       ctx.addVariable(ident, value.getType(ctx: Checker.Ctx), isMutable)
 
@@ -88,11 +88,11 @@ object Ast {
       value.toIR(ctx) :+ ctx.toIR(ident)
     }
   }
-  case class FuncDef(ident: Ident,
-                     args: Seq[Argument],
-                     rtypes: Seq[Val.Type],
-                     body: Seq[Statement],
-                     rStmt: Return)
+  final case class FuncDef(ident: Ident,
+                           args: Seq[Argument],
+                           rtypes: Seq[Val.Type],
+                           body: Seq[Statement],
+                           rStmt: Return)
       extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
       ctx.setScope(ident)
@@ -114,7 +114,7 @@ object Ast {
       Method[StatelessContext](AVector.from(localsType), AVector.from(instrs))
     }
   }
-  case class Assign(target: Ident, rhs: Expr) extends Statement {
+  final case class Assign(target: Ident, rhs: Expr) extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
       ctx.checkAssign(target, rhs.getType(ctx: Checker.Ctx))
     }
@@ -124,7 +124,7 @@ object Ast {
     }
   }
 
-  case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
+  final case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
     def check(): Checker.Ctx = {
       val ctx = Checker.Ctx.empty
       assigns.foreach(_.check(ctx))

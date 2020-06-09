@@ -32,7 +32,7 @@ sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
   }
 }
 
-case class StatelessScript(
+final case class StatelessScript(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatelessContext]]
 ) extends Script[StatelessContext] {
@@ -46,7 +46,7 @@ object StatelessScript {
     Serde.forProduct2(StatelessScript.apply, t => (t.fields, t.methods))
 }
 
-case class StatefulScript(
+final case class StatefulScript(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Script[StatefulContext] {
@@ -60,7 +60,7 @@ object StatefulScript {
     Serde.forProduct2(StatefulScript.apply, t => (t.fields, t.methods))
 }
 
-case class StatefulContract(
+final case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext]
@@ -77,14 +77,14 @@ trait ContractObj[Ctx <: Context] {
 
 trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx]
 
-case class StatelessScriptObject(code: StatelessScript, fields: Array[Val])
+final case class StatelessScriptObject(code: StatelessScript, fields: Array[Val])
     extends ScriptObj[StatelessContext]
 
-case class StatefulScriptObject(code: StatefulScript, fields: Array[Val])
+final case class StatefulScriptObject(code: StatefulScript, fields: Array[Val])
     extends ScriptObj[StatefulContext]
 
-case class StatefulContractObject(code: StatefulContract,
-                                  fields: Array[Val],
-                                  address: ContractAddress,
-                                  codeHash: ALF.Hash)
+final case class StatefulContractObject(code: StatefulContract,
+                                        fields: Array[Val],
+                                        address: ContractAddress,
+                                        codeHash: ALF.Hash)
     extends ContractObj[StatefulContext]
