@@ -4,7 +4,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
-import org.alephium.serde.{Serde, SerdeError, SerdeResult}
+import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
 
@@ -59,6 +59,7 @@ object Instr {
                 U64Const0, U64Const1, U64Const2, U64Const3, U64Const4, U64Const5,
     I256ConstN1, I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5,
                  U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
+    U64Const,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     U64Add, U64Sub, U64Mul, U64Div, U64Mod,
@@ -74,37 +75,24 @@ trait StatefulInstr  extends Instr[StatefulContext]
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
-
-  def parse[C <: Ctx](params: Seq[String]): Either[String, Instr[C]]
 }
 
-sealed trait InstrCompanion1 extends InstrCompanion[StatelessContext] {
+sealed abstract class InstrCompanion1[T: Serde] extends InstrCompanion[StatelessContext] {
   lazy val code: Byte = Instr.toCode(this).toByte
 
-  def apply(index: Int): Instr[StatelessContext]
+  def apply(t: T): Instr[StatelessContext]
 
-  @inline def from[C <: StatelessContext](byte: Byte): Instr[C] = apply(Bytes.toPosInt(byte))
+  @inline def from[C <: StatelessContext](t: T): Instr[C] = apply(t)
 
   override def deserialize[C <: StatelessContext](
       input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
-    input.headOption
-      .map(byte => (from(byte), input.tail))
-      .toRight(SerdeError.notEnoughBytes(1, 0))
-  }
-
-  override def parse[C <: StatelessContext](params: Seq[String]): Either[String, Instr[C]] = {
-    if (params.length != 1) Left(s"Just one params is required")
-    else {
-      try {
-        Right(from(params(0).toByte))
-      } catch {
-        case _: NumberFormatException => Left(s"Invalid int ${params(0)}")
-      }
+    serdeImpl[T]._deserialize(input).map {
+      case (t, rest) => (from(t), rest)
     }
   }
 }
 
-trait SimpleInstr extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
+trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
   lazy val code: Byte = Instr.toCode(this).toByte
 
   override def serialize(): ByteString = ByteString(code)
@@ -112,15 +100,11 @@ trait SimpleInstr extends InstrCompanion[StatelessContext] with Instr[StatelessC
   override def deserialize[C <: StatelessContext](
       input: ByteString): SerdeResult[(Instr[C], ByteString)] =
     Right((this, input))
-
-  override def parse[C <: StatelessContext](params: Seq[String]): Either[String, Instr[C]] = {
-    if (params.isEmpty) Right(this) else Left(s"Unnecessary params for ${this.toString}")
-  }
 }
 
 trait OperandStackInstr extends StatelessInstr
 
-trait ConstInstr extends OperandStackInstr with SimpleInstr {
+trait ConstInstr extends OperandStackInstr with InstrCompanion0 {
   def const: Val
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -176,49 +160,59 @@ object U256Const3 extends ConstInstr { val const: Val = Val.U256(util.U256.unsaf
 object U256Const4 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
-// Note: 0 <= index <= 0xFF
-case class LoadLocal(index: Int) extends OperandStackInstr {
-  override def serialize(): ByteString = ByteString(LoadLocal.code, index.toByte)
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      v <- frame.getLocal(index)
-      _ <- frame.push(v)
-    } yield ()
-  }
-}
-object LoadLocal extends InstrCompanion1
-case class StoreLocal(index: Int) extends OperandStackInstr {
-  override def serialize(): ByteString = ByteString(StoreLocal.code, index.toByte)
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      v <- frame.pop()
-      _ <- frame.setLocal(index, v)
-    } yield ()
-  }
-}
-object StoreLocal extends InstrCompanion1
-case class LoadField(index: Int) extends OperandStackInstr {
-  override def serialize(): ByteString = ByteString(LoadField.code, index.toByte)
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      v <- frame.getField(index)
-      _ <- frame.push(v)
-    } yield ()
-  }
-}
-object LoadField extends InstrCompanion1
-case class StoreField(index: Int) extends OperandStackInstr {
-  override def serialize(): ByteString = ByteString(StoreField.code, index.toByte)
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      v <- frame.pop()
-      _ <- frame.setField(index, v)
-    } yield ()
-  }
-}
-object StoreField extends InstrCompanion1
+case class U64Const(n: Val.U64) extends OperandStackInstr {
+  override def serialize(): ByteString =
+    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
 
-trait PureStackInstr extends OperandStackInstr with SimpleInstr
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.push(n)
+  }
+}
+object U64Const extends InstrCompanion1[Val.U64]
+
+// Note: 0 <= index <= 0xFF
+case class LoadLocal(index: Byte) extends OperandStackInstr {
+  override def serialize(): ByteString = ByteString(LoadLocal.code, index)
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.getLocal(Bytes.toPosInt(index))
+      _ <- frame.push(v)
+    } yield ()
+  }
+}
+object LoadLocal extends InstrCompanion1[Byte]
+case class StoreLocal(index: Byte) extends OperandStackInstr {
+  override def serialize(): ByteString = ByteString(StoreLocal.code, index)
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.pop()
+      _ <- frame.setLocal(Bytes.toPosInt(index), v)
+    } yield ()
+  }
+}
+object StoreLocal extends InstrCompanion1[Byte]
+case class LoadField(index: Byte) extends OperandStackInstr {
+  override def serialize(): ByteString = ByteString(LoadField.code, index)
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.getField(Bytes.toPosInt(index))
+      _ <- frame.push(v)
+    } yield ()
+  }
+}
+object LoadField extends InstrCompanion1[Byte]
+case class StoreField(index: Byte) extends OperandStackInstr {
+  override def serialize(): ByteString = ByteString(StoreField.code, index)
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.pop()
+      _ <- frame.setField(Bytes.toPosInt(index), v)
+    } yield ()
+  }
+}
+object StoreField extends InstrCompanion1[Byte]
+
+trait PureStackInstr extends OperandStackInstr with InstrCompanion0
 
 case object Pop extends PureStackInstr {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -246,7 +240,7 @@ object Swap extends PureStackInstr {
   }
 }
 
-trait ArithmeticInstr extends SimpleInstr
+trait ArithmeticInstr extends InstrCompanion0
 
 trait BinaryArithmeticInstr extends ArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val]
@@ -324,6 +318,16 @@ trait DoWhile      extends ControlInstr
 trait InvokeInstr     extends StatelessInstr
 trait InvokeInternal  extends InvokeInstr
 trait InvokerExternal extends InvokeInstr
+
+trait ReturnInstr extends StatelessInstr
+case object U64Return extends ReturnInstr with InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pop().map { value =>
+      frame.returnTo(value)
+      frame.complete()
+    }
+  }
+}
 
 trait CryptoInstr   extends StatelessInstr
 trait HashAlg       extends CryptoInstr

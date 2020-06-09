@@ -6,7 +6,7 @@ import org.alephium.util.AVector
 
 trait ContractAddress
 
-case class Method[Ctx <: Context](
+final case class Method[Ctx <: Context](
     localsType: AVector[Val.Type],
     instrs: AVector[Instr[Ctx]]
 )
@@ -23,12 +23,12 @@ sealed trait Contract[Ctx <: Context] {
   def methods: AVector[Method[Ctx]]
 }
 
-sealed trait Script[Ctx <: Context] extends Contract[Ctx] {
-  def toObject: ScriptObj[Ctx]
+sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
+  def toObject(fields: AVector[Val]): ScriptObj[Ctx]
 
-  def startFrame: Frame[Ctx] = {
-    val obj = this.toObject
-    Frame.build(obj)
+  def startFrame(initVals: AVector[Val], args: AVector[Val], returnTo: Val => Unit): Frame[Ctx] = {
+    val obj = this.toObject(initVals)
+    Frame.build(obj, args: AVector[Val], returnTo)
   }
 }
 
@@ -36,8 +36,8 @@ case class StatelessScript(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatelessContext]]
 ) extends Script[StatelessContext] {
-  override def toObject: ScriptObj[StatelessContext] = {
-    StatelessScriptObject(this, fields.mapToArray(_.default))
+  override def toObject(fields: AVector[Val]): ScriptObj[StatelessContext] = {
+    StatelessScriptObject(this, fields.toArray)
   }
 }
 
@@ -50,8 +50,8 @@ case class StatefulScript(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Script[StatefulContext] {
-  override def toObject: ScriptObj[StatefulContext] = {
-    StatefulScriptObject(this, fields.mapToArray(_.default))
+  override def toObject(fields: AVector[Val]): ScriptObj[StatefulContext] = {
+    StatefulScriptObject(this, fields.toArray)
   }
 }
 

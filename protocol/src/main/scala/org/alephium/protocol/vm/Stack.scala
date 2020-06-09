@@ -30,10 +30,17 @@ object Stack {
 }
 
 // Note: current place at underlying is empty
-class Stack[@sp T: ClassTag] private (underlying: Array[T], var currentIndex: Int) {
+class Stack[@sp T: ClassTag] private (val
+                                      underlying: Array[T],
+                                      var currentIndex: Int) {
   def isEmpty: Boolean = currentIndex == 0
 
   def size: Int = currentIndex
+
+  def topUnsafe: T = {
+    assume(currentIndex >= 1)
+    underlying(currentIndex - 1)
+  }
 
   def push(elem: T): ExeResult[Unit] = {
     if (currentIndex < underlying.length) {

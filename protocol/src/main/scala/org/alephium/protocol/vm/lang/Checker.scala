@@ -2,7 +2,8 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
-import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Ast.Ident
 
 object Checker {
   case class Error(message: String) extends Exception(message)
@@ -12,15 +13,17 @@ object Checker {
     else throw Error(s"Try to set types $tpe for varialbe $ident")
   }
 
-  case class VarInfo(tpe: Val.Type, isMutable: Boolean)
+  case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Int)
   case class Ctx(varTable: mutable.HashMap[String, VarInfo],
                  var scope: String,
+                 var varIndex: Int,
                  funcIdents: mutable.ArrayBuffer[Ast.Ident]) {
     def setScope(ident: Ast.Ident): Unit = {
       if (funcIdents.contains(ident)) throw Error(s"functions have the same name: $ident")
 
       funcIdents.append(ident)
-      scope = ident.name
+      scope    = ident.name
+      varIndex = 0
     }
 
     def addVariable(ident: Ast.Ident, tpe: Seq[Val.Type], isMutable: Boolean): Unit = {
@@ -38,7 +41,10 @@ object Checker {
         throw Error(s"Global variable has the same name as local variable: $name")
       } else if (varTable.contains(sname)) {
         throw Error(s"Local variables have the same name: $name")
-      } else varTable(sname) = VarInfo(tpe, isMutable)
+      } else {
+        varTable(sname) = VarInfo(tpe, isMutable, varIndex)
+        varIndex += 1
+      }
     }
 
     def getVariable(ident: Ast.Ident): VarInfo = {
@@ -54,6 +60,18 @@ object Checker {
       }
     }
 
+    def getLocalVars(func: Ident): Seq[VarInfo] = {
+      varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
+    }
+
+    def toIR(ident: Ident): Instr[StatelessContext] = {
+      val varInfo = getVariable(ident)
+      if (isField(ident)) StoreField(varInfo.index.toByte)
+      else StoreLocal(varInfo.index.toByte)
+    }
+
+    def isField(ident: Ident): Boolean = varTable.contains(ident.name)
+
     def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
 
     def checkAssign(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {
@@ -67,6 +85,6 @@ object Checker {
     }
   }
   object Ctx {
-    def empty: Ctx = Ctx(mutable.HashMap.empty, "", mutable.ArrayBuffer.empty)
+    def empty: Ctx = Ctx(mutable.HashMap.empty, "", 0, mutable.ArrayBuffer.empty)
   }
 }
