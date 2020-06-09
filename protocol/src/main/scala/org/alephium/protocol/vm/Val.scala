@@ -25,23 +25,23 @@ object Val {
   }
 
   // TODO: optimize using value class
-  case class Bool(v: Boolean)    extends Val { def tpe: Val.Type = Bool }
-  case class Byte(v: scala.Byte) extends Val { def tpe: Val.Type = Byte }
-  case class I32(v: util.I32)    extends Val { def tpe: Val.Type = I32 }
-  case class U32(v: util.U32)    extends Val { def tpe: Val.Type = U32 }
-  case class I64(v: util.I64)    extends Val { def tpe: Val.Type = I64 }
-  case class U64(v: util.U64)    extends Val { def tpe: Val.Type = U64 }
-  case class I256(v: util.I256)  extends Val { def tpe: Val.Type = I256 }
-  case class U256(v: util.U256)  extends Val { def tpe: Val.Type = U256 }
+  final case class Bool(v: Boolean)    extends Val { def tpe: Val.Type = Bool }
+  final case class Byte(v: scala.Byte) extends Val { def tpe: Val.Type = Byte }
+  final case class I32(v: util.I32)    extends Val { def tpe: Val.Type = I32 }
+  final case class U32(v: util.U32)    extends Val { def tpe: Val.Type = U32 }
+  final case class I64(v: util.I64)    extends Val { def tpe: Val.Type = I64 }
+  final case class U64(v: util.U64)    extends Val { def tpe: Val.Type = U64 }
+  final case class I256(v: util.I256)  extends Val { def tpe: Val.Type = I256 }
+  final case class U256(v: util.U256)  extends Val { def tpe: Val.Type = U256 }
 
-  case class BoolVec(a: Array[Bool]) extends AnyVal with Val { def tpe: Val.Type = BoolVec }
-  case class ByteVec(a: Array[Byte]) extends AnyVal with Val { def tpe: Val.Type = ByteVec }
-  case class I32Vec(a: Array[I32])   extends AnyVal with Val { def tpe: Val.Type = I32Vec }
-  case class U32Vec(a: Array[U32])   extends AnyVal with Val { def tpe: Val.Type = U32Vec }
-  case class I64Vec(a: Array[I64])   extends AnyVal with Val { def tpe: Val.Type = I64Vec }
-  case class U64Vec(a: Array[U64])   extends AnyVal with Val { def tpe: Val.Type = U64Vec }
-  case class I256Vec(a: Array[I256]) extends AnyVal with Val { def tpe: Val.Type = I256Vec }
-  case class U256Vec(a: Array[U256]) extends AnyVal with Val { def tpe: Val.Type = U256Vec }
+  final case class BoolVec(a: Array[Bool]) extends AnyVal with Val { def tpe: Val.Type = BoolVec }
+  final case class ByteVec(a: Array[Byte]) extends AnyVal with Val { def tpe: Val.Type = ByteVec }
+  final case class I32Vec(a: Array[I32])   extends AnyVal with Val { def tpe: Val.Type = I32Vec }
+  final case class U32Vec(a: Array[U32])   extends AnyVal with Val { def tpe: Val.Type = U32Vec }
+  final case class I64Vec(a: Array[I64])   extends AnyVal with Val { def tpe: Val.Type = I64Vec }
+  final case class U64Vec(a: Array[U64])   extends AnyVal with Val { def tpe: Val.Type = U64Vec }
+  final case class I256Vec(a: Array[I256]) extends AnyVal with Val { def tpe: Val.Type = I256Vec }
+  final case class U256Vec(a: Array[U256]) extends AnyVal with Val { def tpe: Val.Type = U256Vec }
 
   object Bool extends Type {
     override val id: scala.Byte = 0.toByte
