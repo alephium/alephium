@@ -160,7 +160,7 @@ object U256Const3 extends ConstInstr { val const: Val = Val.U256(util.U256.unsaf
 object U256Const4 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
-case class U64Const(n: Val.U64) extends OperandStackInstr {
+final case class U64Const(n: Val.U64) extends OperandStackInstr {
   override def serialize(): ByteString =
     ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
 
@@ -171,7 +171,7 @@ case class U64Const(n: Val.U64) extends OperandStackInstr {
 object U64Const extends InstrCompanion1[Val.U64]
 
 // Note: 0 <= index <= 0xFF
-case class LoadLocal(index: Byte) extends OperandStackInstr {
+final case class LoadLocal(index: Byte) extends OperandStackInstr {
   override def serialize(): ByteString = ByteString(LoadLocal.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -181,7 +181,7 @@ case class LoadLocal(index: Byte) extends OperandStackInstr {
   }
 }
 object LoadLocal extends InstrCompanion1[Byte]
-case class StoreLocal(index: Byte) extends OperandStackInstr {
+final case class StoreLocal(index: Byte) extends OperandStackInstr {
   override def serialize(): ByteString = ByteString(StoreLocal.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -191,7 +191,7 @@ case class StoreLocal(index: Byte) extends OperandStackInstr {
   }
 }
 object StoreLocal extends InstrCompanion1[Byte]
-case class LoadField(index: Byte) extends OperandStackInstr {
+final case class LoadField(index: Byte) extends OperandStackInstr {
   override def serialize(): ByteString = ByteString(LoadField.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -201,7 +201,7 @@ case class LoadField(index: Byte) extends OperandStackInstr {
   }
 }
 object LoadField extends InstrCompanion1[Byte]
-case class StoreField(index: Byte) extends OperandStackInstr {
+final case class StoreField(index: Byte) extends OperandStackInstr {
   override def serialize(): ByteString = ByteString(StoreField.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {

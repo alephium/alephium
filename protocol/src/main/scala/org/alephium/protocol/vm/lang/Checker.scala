@@ -6,18 +6,18 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.Ident
 
 object Checker {
-  case class Error(message: String) extends Exception(message)
+  final case class Error(message: String) extends Exception(message)
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Val.Type]): Val.Type = {
     if (tpe.length == 1) tpe(0)
     else throw Error(s"Try to set types $tpe for varialbe $ident")
   }
 
-  case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Int)
-  case class Ctx(varTable: mutable.HashMap[String, VarInfo],
-                 var scope: String,
-                 var varIndex: Int,
-                 funcIdents: mutable.ArrayBuffer[Ast.Ident]) {
+  final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Int)
+  final case class Ctx(varTable: mutable.HashMap[String, VarInfo],
+                       var scope: String,
+                       var varIndex: Int,
+                       funcIdents: mutable.ArrayBuffer[Ast.Ident]) {
     def setScope(ident: Ast.Ident): Unit = {
       if (funcIdents.contains(ident)) throw Error(s"functions have the same name: $ident")
 

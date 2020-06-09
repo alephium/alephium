@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 
 import org.alephium.util.AVector
 
-case class Runtime[Ctx <: Context](stack: Stack[Frame[Ctx]], var returnTo: Option[Val] = None)
+final case class Runtime[Ctx <: Context](stack: Stack[Frame[Ctx]], var returnTo: Option[Val] = None)
 
 trait VM[Ctx <: Context] {
   def execute(script: Script[Ctx], fields: AVector[Val], args: AVector[Val]): ExeResult[Val] = {
