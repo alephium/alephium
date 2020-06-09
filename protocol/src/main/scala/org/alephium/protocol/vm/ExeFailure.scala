@@ -20,3 +20,4 @@ case object InvalidLocalIndex                     extends ExeFailure
 case object InvalidLocalType                      extends ExeFailure
 case object InvalidFieldIndex                     extends ExeFailure
 case object InvalidFieldType                      extends ExeFailure
+case object NoReturnVal                           extends ExeFailure
