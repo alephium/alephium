@@ -1,7 +1,7 @@
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.Val
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.vm.{StatelessVM, Val}
+import org.alephium.util.{AVector, AlephiumSpec, U64}
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
@@ -121,5 +121,21 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     contract.nonEmpty is true
+  }
+
+  it should "generate IR code" in {
+    val input =
+      s"""
+         |var x = 0u
+         |
+         |fn add(a: U64) -> (U64) {
+         |  return x + a
+         |}
+         |""".stripMargin
+    val ast      = fastparse.parse(input, Parser.contract(_)).get.value
+    val ctx      = ast.check()
+    val contract = ast.toIR(ctx)
+    StatelessVM.execute(contract, AVector(Val.U64(U64.One)), AVector(Val.U64(U64.Two))) isE Val.U64(
+      U64.unsafe(3))
   }
 }

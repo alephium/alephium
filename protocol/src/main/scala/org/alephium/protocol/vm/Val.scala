@@ -60,12 +60,14 @@ object Val {
     override def default: U32   = U32(util.U32.Zero)
   }
   object I64 extends Type {
-    override val id: scala.Byte = 4.toByte
-    override def default: I64   = I64(util.I64.Zero)
+    implicit val serde: Serde[I64] = i64Serde.xmap(I64(_), _.v)
+    override val id: scala.Byte    = 4.toByte
+    override def default: I64      = I64(util.I64.Zero)
   }
   object U64 extends Type {
-    override val id: scala.Byte = 5.toByte
-    override def default: U64   = U64(util.U64.Zero)
+    implicit val serde: Serde[U64] = u64Serde.xmap(U64(_), _.v)
+    override val id: scala.Byte    = 5.toByte
+    override def default: U64      = U64(util.U64.Zero)
   }
   object I256 extends Type {
     override val id: scala.Byte = 6.toByte
