@@ -21,6 +21,16 @@ class ParserSpec extends AlephiumSpec {
       Binop(Add, Variable(Ident("x")), Variable(Ident("y")))
     fastparse.parse("(x + y)", Parser.expr(_)).get.value is
       ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+    fastparse.parse("(x + y) + (x + y)", Parser.expr(_)).get.value is
+      Binop(Add,
+            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
+            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+    fastparse.parse("foo(x + y) + bar(x + y)", Parser.expr(_)).get.value is
+      Binop(
+        Add,
+        Call(Ident("foo"), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
+        Call(Ident("bar"), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+      )
   }
 
   it should "parse return" in {
@@ -130,13 +140,17 @@ class ParserSpec extends AlephiumSpec {
          |var x = 0u
          |
          |fn add(a: U64) -> (U64) {
-         |  return x + a
+         |  return square(x) + square(a)
+         |}
+         |
+         |fn square(n: U64) -> (U64) {
+         |  return n * n
          |}
          |""".stripMargin
     val ast      = fastparse.parse(input, Parser.contract(_)).get.value
     val ctx      = ast.check()
     val contract = ast.toIR(ctx)
     StatelessVM.execute(contract, AVector(Val.U64(U64.One)), AVector(Val.U64(U64.Two))) isE Val.U64(
-      U64.unsafe(3))
+      U64.unsafe(5))
   }
 }

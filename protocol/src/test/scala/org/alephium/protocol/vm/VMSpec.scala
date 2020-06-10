@@ -15,6 +15,16 @@ class VMSpec extends AlephiumSpec {
                         AVector(Val.U64(U64.Two))) isE Val.U64(U64.unsafe(8))
   }
 
+  it should "call method" in {
+    val method0 = Method[StatelessContext](localsType = AVector(Val.U64),
+                                           instrs = AVector(LoadLocal(0), CallLocal(1), U64Return))
+    val method1 = Method[StatelessContext](localsType = AVector(Val.U64),
+                                           instrs =
+                                             AVector(LoadLocal(0), U64Const1, U64Add, U64Return))
+    val script = StatelessScript(AVector.empty, methods = AVector(method0, method1))
+    StatelessVM.execute(script, AVector.empty, AVector(Val.U64(U64.Two))) isE Val.U64(U64.unsafe(3))
+  }
+
   it should "serde instructions" in {
     Instr.statelessInstrs.foreach {
       case instrCompanion: InstrCompanion0 =>
