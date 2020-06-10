@@ -66,9 +66,18 @@ object Ast {
     }
   }
   final case class Call(id: Ident, args: Seq[Expr]) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = ???
+    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = {
+      val funcInfo = ctx.getFunc(id)
+      if (funcInfo.argsType != args.flatMap(_.getType(ctx))) {
+        throw Checker.Error(s"Invalid parameters for $id")
+      } else {
+        funcInfo.returnType
+      }
+    }
 
-    override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.toIR(ctx)) :+ CallLocal(ctx.getFunc(id).index)
+    }
   }
   final case class ParenExpr(expr: Expr) extends Expr {
     override def getType(ctx: Checker.Ctx): Seq[Val.Type] = expr.getType(ctx: Checker.Ctx)
@@ -95,7 +104,7 @@ object Ast {
                            rStmt: Return)
       extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
-      ctx.setFuncScope(ident, args.map(_.tpe), rtypes)
+      ctx.setFuncScope(ident)
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
       body.foreach(_.check(ctx))
       val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
@@ -108,6 +117,7 @@ object Ast {
     }
 
     def toMethod(ctx: Checker.Ctx): Method[StatelessContext] = {
+      ctx.setFuncScope(ident)
       val localVars  = ctx.getLocalVars(ident)
       val localsType = localVars.map(_.tpe)
       val instrs     = body.flatMap(_.toIR(ctx)) ++ rStmt.toIR(ctx)
@@ -127,6 +137,7 @@ object Ast {
   final case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
     def check(): Checker.Ctx = {
       val ctx = Checker.Ctx.empty
+      ctx.addFuncDefs(funcs)
       assigns.foreach(_.check(ctx))
       funcs.foreach { func =>
         func.check(ctx)
