@@ -12,7 +12,7 @@ import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
-  final case class HashState(parentOpt: Option[Hash], timestamp: TimeStamp, height: Int)
+  case class HashState(parentOpt: Option[Hash], timestamp: TimeStamp, height: Int)
 
   trait Fixture extends ChainDifficultyAdjustment {
     implicit val config: PlatformConfig = Test.config
