@@ -41,6 +41,7 @@ class ParserSpec extends AlephiumSpec {
       s"""
          |var x = 1u
          |var y = 2u
+         |let c = 100u
          |
          |fn add0(a: U64, b: U64) -> (U64) {
          |  return (a + b)
@@ -89,7 +90,7 @@ class ParserSpec extends AlephiumSpec {
     }
 
     check("var", "100u", "a", "U64", "b", "U64", "U64", "foo", true)
-    check("val", "100u", "a", "U64", "b", "U64", "U64", "foo")
+    check("let", "100u", "a", "U64", "b", "U64", "U64", "foo")
     check("var", "100i", "a", "U64", "b", "U64", "U64", "foo")
     check("var", "100u", "x", "U64", "b", "U64", "U64", "foo")
     check("var", "100u", "a", "U64", "x", "U64", "U64", "foo")
