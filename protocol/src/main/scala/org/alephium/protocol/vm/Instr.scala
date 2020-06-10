@@ -63,6 +63,7 @@ object Instr {
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     U64Add, U64Sub, U64Mul, U64Div, U64Mod,
+    CallLocal,
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs
   // format: on
@@ -315,17 +316,27 @@ trait If           extends ControlInstr
 trait IfElse       extends ControlInstr
 trait DoWhile      extends ControlInstr
 
-trait InvokeInstr     extends StatelessInstr
-trait InvokeInternal  extends InvokeInstr
-trait InvokerExternal extends InvokeInstr
+trait CallInstr extends StatelessInstr
+case class CallLocal(index: Byte) extends CallInstr {
+  override def serialize(): ByteString = ByteString(CallLocal.code, index)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      newFrame <- frame.methodFrame(Bytes.toPosInt(index))
+      _        <- newFrame.execute()
+    } yield ()
+  }
+}
+object CallLocal   extends InstrCompanion1[Byte]
+trait CallExternal extends CallInstr
 
 trait ReturnInstr extends StatelessInstr
 case object U64Return extends ReturnInstr with InstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pop().map { value =>
-      frame.returnTo(value)
-      frame.complete()
-    }
+    for {
+      value <- frame.pop()
+      _     <- frame.returnTo(value)
+    } yield frame.complete()
   }
 }
 

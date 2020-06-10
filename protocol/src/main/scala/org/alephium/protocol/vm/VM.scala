@@ -11,7 +11,7 @@ trait VM[Ctx <: Context] {
     val stack = Stack.ofCapacity[Frame[Ctx]](stackMaxSize)
     val rt    = Runtime[Ctx](stack)
 
-    stack.push(script.startFrame(fields, args, value => rt.returnTo = Some(value)))
+    stack.push(script.startFrame(fields, args, value => Right(rt.returnTo = Some(value))))
     execute(stack).flatMap(_ => rt.returnTo.toRight(NoReturnVal))
   }
 

@@ -13,7 +13,7 @@ object Parser {
   def variable[_: P]: P[Ast.Variable] = P(Lexer.ident).map(Ast.Variable)
   def call[_: P]: P[Ast.Call]         = P(Lexer.ident ~ "(" ~ expr.rep(0, ",") ~ ")").map(Ast.Call.tupled)
 
-  def binopPrefix[_: P]: P[Ast.Expr]               = P(const | variable | parenExpr)
+  def binopPrefix[_: P]: P[Ast.Expr]               = P(const | call | variable | parenExpr)
   def binopTerm[_: P]: P[(Ast.Operator, Ast.Expr)] = P(Lexer.operator ~ expr)
   def binop[_: P]: P[Ast.Binop] = P(binopPrefix ~ binopTerm).map {
     case (left, (op, right)) => Ast.Binop(op, left, right)
