@@ -24,8 +24,8 @@ object Parser {
 
   def ret[_: P]: P[Ast.Return] = P("return" ~/ expr.rep(0, ",")).map(Ast.Return)
 
-  def varDef[_: P]: P[Ast.VarDef] = P(("val" | "var").! ~/ Lexer.ident ~ "=" ~ expr).map {
-    case ("val", ident, expr) =>
+  def varDef[_: P]: P[Ast.VarDef] = P(("let" | "var").! ~/ Lexer.ident ~ "=" ~ expr).map {
+    case ("let", ident, expr) =>
       Ast.VarDef(isMutable = false, ident, expr)
     case ("var", ident, expr) =>
       Ast.VarDef(isMutable = true, ident, expr)
