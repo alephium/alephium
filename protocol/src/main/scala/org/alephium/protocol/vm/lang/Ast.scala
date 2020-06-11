@@ -5,7 +5,7 @@ import org.alephium.util.AVector
 
 object Ast {
   final case class Ident(name: String)
-  final case class Argument(ident: Ident, tpe: Val.Type)
+  final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
   final case class Return(exprs: Seq[Expr]) {
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
       exprs.flatMap(_.toIR(ctx)) :+ U64Return
@@ -141,20 +141,18 @@ object Ast {
     }
   }
 
-  final case class Contract(assigns: Seq[VarDef], funcs: Seq[FuncDef]) {
+  final case class Contract(ident: Ident, fields: Seq[Argument], funcs: Seq[FuncDef]) {
     def check(): Checker.Ctx = {
       val ctx = Checker.Ctx.empty
+      fields.foreach(field => ctx.addVariable(field.ident, field.tpe, field.isMutable))
       ctx.addFuncDefs(funcs)
-      assigns.foreach(_.check(ctx))
-      funcs.foreach { func =>
-        func.check(ctx)
-      }
+      funcs.foreach(_.check(ctx))
       ctx
     }
 
     def toIR(ctx: Checker.Ctx): StatelessScript = {
-      val fieldsTypes = AVector.from(assigns.map(assign => ctx.getType(assign.ident)))
-      val methods     = AVector.from(funcs.map(func     => func.toMethod(ctx)))
+      val fieldsTypes = AVector.from(fields.map(assign => ctx.getType(assign.ident)))
+      val methods     = AVector.from(funcs.map(func    => func.toMethod(ctx)))
       StatelessScript(fieldsTypes, methods)
     }
   }
