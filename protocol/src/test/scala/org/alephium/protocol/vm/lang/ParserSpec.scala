@@ -10,7 +10,9 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Val.U64)
+      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = false)
+    fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
   }
 
   it should "parse exprs" in {
@@ -51,23 +53,22 @@ class ParserSpec extends AlephiumSpec {
   it should "parse contracts" in {
     val contract =
       s"""
-         |var x = 1u
-         |var y = 2u
-         |let c = 100u
+         |contract Foo(mut x: U64, mut y: U64, c: U64) {
          |
-         |fn add0(a: U64, b: U64) -> (U64) {
-         |  return (a + b)
-         |}
+         |  fn add0(a: U64, b: U64) -> (U64) {
+         |    return (a + b)
+         |  }
          |
-         |fn add1() -> (U64) {
-         |  return (x + y)
-         |}
+         |  fn add1() -> (U64) {
+         |    return (x + y)
+         |  }
          |
-         |fn add2(d: U64) -> () {
-         |  var z = d
-         |  x = x + z
-         |  y = y + z
-         |  return
+         |  fn add2(d: U64) -> () {
+         |    var z = d
+         |    x = x + z
+         |    y = y + z
+         |    return
+         |  }
          |}
          |""".stripMargin
     fastparse.parse(contract, Parser.contract(_)).isSuccess is true
@@ -78,7 +79,6 @@ class ParserSpec extends AlephiumSpec {
 
   it should "infer types" in {
     def check(xMut: String,
-              xVal: String,
               a: String,
               aType: String,
               b: String,
@@ -86,31 +86,32 @@ class ParserSpec extends AlephiumSpec {
               rType: String,
               fname: String,
               validity: Boolean = false) = {
-      val contract = s"""
-         |$xMut x = $xVal
-         |fn add($a: $aType, $b: $bType) -> ($rType) {
-         |  x = a + b
-         |  return (a - b)
-         |}
+      val contract =
+        s"""
+         |contract Foo($xMut x: U64) {
+         |  fn add($a: $aType, $b: $bType) -> ($rType) {
+         |    x = a + b
+         |    return (a - b)
+         |  }
          |
-         |fn $fname() -> () {
-         |  return
+         |  fn $fname() -> () {
+         |    return
+         |  }
          |}
          |""".stripMargin
-      val ast      = fastparse.parse(contract, Parser.contract(_)).get.value
+      val ast = fastparse.parse(contract, Parser.contract(_)).get.value
       if (validity) ast.check() else assertThrows[Checker.Error](ast.check())
     }
 
-    check("var", "100u", "a", "U64", "b", "U64", "U64", "foo", true)
-    check("let", "100u", "a", "U64", "b", "U64", "U64", "foo")
-    check("var", "100i", "a", "U64", "b", "U64", "U64", "foo")
-    check("var", "100u", "x", "U64", "b", "U64", "U64", "foo")
-    check("var", "100u", "a", "U64", "x", "U64", "U64", "foo")
-    check("var", "100u", "a", "I64", "b", "U64", "U64", "foo")
-    check("var", "100u", "a", "U64", "b", "I64", "U64", "foo")
-    check("var", "100u", "a", "U64", "b", "U64", "I64", "foo")
-    check("var", "100u", "a", "U64", "b", "U64", "U64, U64", "foo")
-    check("var", "100u", "a", "U64", "b", "U64", "U64", "add")
+    check("mut", "a", "U64", "b", "U64", "U64", "foo", true)
+    check("", "a", "U64", "b", "U64", "U64", "foo")
+    check("mut", "x", "U64", "b", "U64", "U64", "foo")
+    check("mut", "a", "U64", "x", "U64", "U64", "foo")
+    check("mut", "a", "I64", "b", "U64", "U64", "foo")
+    check("mut", "a", "U64", "b", "I64", "U64", "foo")
+    check("mut", "a", "U64", "b", "U64", "I64", "foo")
+    check("mut", "a", "U64", "b", "U64", "U64, U64", "foo")
+    check("mut", "a", "U64", "b", "U64", "U64", "add")
   }
 
   it should "parse UniSwap" in {
@@ -139,14 +140,15 @@ class ParserSpec extends AlephiumSpec {
   it should "generate IR code" in {
     val input =
       s"""
-         |var x = 0u
+         |contract Foo(x: U64) {
          |
-         |fn add(a: U64) -> (U64) {
-         |  return square(x) + square(a)
-         |}
+         |  fn add(a: U64) -> (U64) {
+         |    return square(x) + square(a)
+         |  }
          |
-         |fn square(n: U64) -> (U64) {
-         |  return n * n
+         |  fn square(n: U64) -> (U64) {
+         |    return n * n
+         |  }
          |}
          |""".stripMargin
     val ast      = fastparse.parse(input, Parser.contract(_)).get.value

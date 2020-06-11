@@ -35,18 +35,18 @@ object Parser {
   }
   def assign[_: P]: P[Ast.Assign] = P(Lexer.ident ~ "=" ~ expr).map(Ast.Assign.tupled)
 
-  def argument[_: P]: P[Ast.Argument] = P(Lexer.ident ~ ":" ~ Lexer.tpe).map {
-    case (ident, tpe) => Ast.Argument(ident, tpe)
+  def argument[_: P]: P[Ast.Argument] = P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.tpe).map {
+    case (isMutable, ident, tpe) => Ast.Argument(ident, tpe, isMutable)
   }
+  def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P(
-      "fn" ~/ Lexer.ident ~ "(" ~ argument.rep(0, ",") ~ ")" ~ returnType ~
-        "{" ~ statement.rep ~ ret ~ "}")
+    P("fn" ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ ret ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
 
   def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall)
 
-  def contract[_: P]: P[Ast.Contract] = P(Start ~ varDef.rep ~ func.rep(1)).map(Ast.Contract.tupled)
+  def contract[_: P]: P[Ast.Contract] =
+    P(Start ~ "contract" ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}").map(Ast.Contract.tupled)
 }
