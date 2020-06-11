@@ -28,6 +28,7 @@ object Lexer {
 
   def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
   def bool[_: P]: P[Unit]               = P(keyword("true") | keyword("false"))
+  def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
 
   def lineComment[_: P]: P[Unit] = {
     def noEndChar1 = P(CharsWhile(c => c != '\n' && c != '\r'))
@@ -59,6 +60,6 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("let", "var", "fn", "return", "if", "else", "for", "=", ":", "+", "-", "*", "/", "%", "true", "false")
+    Set("contract", "let", "mut", "var", "fn", "return", "if", "else", "for", "=", ":", "+", "-", "*", "/", "%", "true", "false")
   // format: on
 }
