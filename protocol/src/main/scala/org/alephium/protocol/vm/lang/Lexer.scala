@@ -30,11 +30,8 @@ object Lexer {
   def bool[_: P]: P[Unit]               = P(keyword("true") | keyword("false"))
   def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
 
-  def lineComment[_: P]: P[Unit] = {
-    def noEndChar1 = P(CharsWhile(c => c != '\n' && c != '\r'))
-    def noEndChar2 = P(!newline ~ AnyChar)
-    P("//" ~ (noEndChar1 | noEndChar2).rep ~ &(newline | End))
-  }
+  def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
+  def emptyChars[_: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
   def hexNum[_: P]: P[BigInteger] = P("0x" ~ CharsWhileIn("0-9A-F")).!.map(new BigInteger(_, 16))
   def decNum[_: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
