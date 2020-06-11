@@ -34,11 +34,12 @@ sealed trait Contract[Ctx <: Context] {
 sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
   def toObject(fields: AVector[Val]): ScriptObj[Ctx]
 
-  def startFrame(initVals: AVector[Val],
+  def startFrame(ctx: Ctx,
+                 initVals: AVector[Val],
                  args: AVector[Val],
                  returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
     val obj = this.toObject(initVals)
-    Frame.build(obj, args: AVector[Val], returnTo)
+    Frame.build(ctx, obj, args: AVector[Val], returnTo)
   }
 }
 

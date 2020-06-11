@@ -4,6 +4,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
+import org.alephium.crypto.{ED25519, ED25519PublicKey, Keccak256}
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -53,8 +54,6 @@ object Instr {
   // format: off
   val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
     BoolConstTrue, BoolConstFalse,
-    I32ConstN1, I32Const0, I32Const1, I32Const2, I32Const3, I32Const4, I32Const5,
-                U32Const0, U32Const1, U32Const2, U32Const3, U32Const4, U32Const5,
     I64ConstN1, I64Const0, I64Const1, I64Const2, I64Const3, I64Const4, I64Const5,
                 U64Const0, U64Const1, U64Const2, U64Const3, U64Const4, U64Const5,
     I256ConstN1, I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5,
@@ -115,21 +114,6 @@ trait ConstInstr extends OperandStackInstr with InstrCompanion0 {
 
 object BoolConstTrue  extends ConstInstr { val const: Val = Val.Bool(true) }
 object BoolConstFalse extends ConstInstr { val const: Val = Val.Bool(false) }
-
-object I32ConstN1 extends ConstInstr { val const: Val = Val.I32(util.I32.NegOne) }
-object I32Const0  extends ConstInstr { val const: Val = Val.I32(util.I32.Zero) }
-object I32Const1  extends ConstInstr { val const: Val = Val.I32(util.I32.One) }
-object I32Const2  extends ConstInstr { val const: Val = Val.I32(util.I32.Two) }
-object I32Const3  extends ConstInstr { val const: Val = Val.I32(util.I32.unsafe(3)) }
-object I32Const4  extends ConstInstr { val const: Val = Val.I32(util.I32.unsafe(4)) }
-object I32Const5  extends ConstInstr { val const: Val = Val.I32(util.I32.unsafe(5)) }
-
-object U32Const0 extends ConstInstr { val const: Val = Val.U32(util.U32.Zero) }
-object U32Const1 extends ConstInstr { val const: Val = Val.U32(util.U32.One) }
-object U32Const2 extends ConstInstr { val const: Val = Val.U32(util.U32.Two) }
-object U32Const3 extends ConstInstr { val const: Val = Val.U32(util.U32.unsafe(3)) }
-object U32Const4 extends ConstInstr { val const: Val = Val.U32(util.U32.unsafe(4)) }
-object U32Const5 extends ConstInstr { val const: Val = Val.U32(util.U32.unsafe(5)) }
 
 object I64ConstN1 extends ConstInstr { val const: Val = Val.I64(util.I64.NegOne) }
 object I64Const0  extends ConstInstr { val const: Val = Val.I64(util.I64.Zero) }
@@ -344,6 +328,34 @@ trait CryptoInstr   extends StatelessInstr
 trait HashAlg       extends CryptoInstr
 trait Signature     extends CryptoInstr
 trait EllipticCurve extends CryptoInstr
+
+case object Keccak256Hash extends HashAlg with InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.popT[Val.ByteVec]()
+      _ <- {
+        val bs   = ByteString.fromArrayUnsafe(value.a.map(_.v))
+        val hash = Keccak256.hash(bs)
+        frame.push(Val.Byte32.from(hash))
+      }
+    } yield ()
+  }
+}
+
+case object CheckSignature extends Signature with InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val rawData    = frame.ctx.txHash.bytes
+    val signatures = frame.ctx.signatures
+    for {
+      rawPublicKey <- frame.popT[Val.Byte32]()
+      signature    <- signatures.pop()
+      _ <- {
+        val publicKey = ED25519PublicKey.unsafe(rawPublicKey.v.bytes)
+        if (ED25519.verify(rawData, signature, publicKey)) Right(()) else Left(VerificationFailed)
+      }
+    } yield ()
+  }
+}
 
 trait ContextInstr    extends StatelessInstr
 trait BlockInfo       extends ContextInstr
