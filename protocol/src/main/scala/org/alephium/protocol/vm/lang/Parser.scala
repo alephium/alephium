@@ -6,7 +6,7 @@ import org.alephium.protocol.vm.Val
 
 object Parser {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] =>
-    P(MultiLineWhitespace.whitespace(ctx) | Lexer.lineComment)
+    Lexer.emptyChars(ctx)
   }
 
   def const[_: P]: P[Ast.Const]                    = P(Lexer.typedNum).map(Ast.Const)

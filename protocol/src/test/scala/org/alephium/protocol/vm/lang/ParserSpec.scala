@@ -13,6 +13,7 @@ class ParserSpec extends AlephiumSpec {
       Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = false)
     fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
+    fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
   }
 
   it should "parse exprs" in {
@@ -53,8 +54,9 @@ class ParserSpec extends AlephiumSpec {
   it should "parse contracts" in {
     val contract =
       s"""
+         |// comment
          |contract Foo(mut x: U64, mut y: U64, c: U64) {
-         |
+         |  // comment
          |  fn add0(a: U64, b: U64) -> (U64) {
          |    return (a + b)
          |  }
@@ -65,12 +67,13 @@ class ParserSpec extends AlephiumSpec {
          |
          |  fn add2(d: U64) -> () {
          |    var z = d
-         |    x = x + z
-         |    y = y + z
+         |    x = x + z // comment
+         |    y = y + z // comment
          |    return
          |  }
          |}
          |""".stripMargin
+    println(fastparse.parse(contract, Parser.contract(_)))
     fastparse.parse(contract, Parser.contract(_)).isSuccess is true
 
     val ast = fastparse.parse(contract, Parser.contract(_)).get.value
