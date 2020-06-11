@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.{StatelessVM, Val}
+import org.alephium.protocol.vm.{StatelessContext, StatelessVM, Val}
 import org.alephium.util.{AVector, AlephiumSpec, U64}
 
 class ParserSpec extends AlephiumSpec {
@@ -139,7 +139,10 @@ class ParserSpec extends AlephiumSpec {
     val ast      = fastparse.parse(input, Parser.contract(_)).get.value
     val ctx      = ast.check()
     val contract = ast.toIR(ctx)
-    StatelessVM.execute(contract, AVector(Val.U64(U64.One)), AVector(Val.U64(U64.Two))) isE Val.U64(
-      U64.unsafe(5))
+    StatelessVM.execute(StatelessContext.test,
+                        contract,
+                        AVector(Val.U64(U64.One)),
+                        AVector(Val.U64(U64.Two))) isE
+      Val.U64(U64.unsafe(5))
   }
 }
