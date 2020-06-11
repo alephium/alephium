@@ -11,9 +11,6 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Val.U64)
-    fastparse
-      .parse("fn add(x: U64, y: U64) -> (U64) { return x }\n", Parser.statement(_))
-      .isSuccess is true
   }
 
   it should "parse exprs" in {
@@ -40,9 +37,14 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse statements" in {
+    fastparse.parse("let x = 1", Parser.statement(_)).isSuccess is true
     fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
+    fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
+  }
+
+  it should "parse functions" in {
     fastparse
-      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }", Parser.statement(_))
+      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }", Parser.func(_))
       .isSuccess is true
   }
 

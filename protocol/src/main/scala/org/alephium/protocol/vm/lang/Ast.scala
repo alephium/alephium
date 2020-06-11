@@ -101,19 +101,14 @@ object Ast {
                            args: Seq[Argument],
                            rtypes: Seq[Val.Type],
                            body: Seq[Statement],
-                           rStmt: Return)
-      extends Statement {
-    override def check(ctx: Checker.Ctx): Unit = {
+                           rStmt: Return) {
+    def check(ctx: Checker.Ctx): Unit = {
       ctx.setFuncScope(ident)
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
       body.foreach(_.check(ctx))
       val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
       if (!returnTypes.equals(rtypes))
         throw Checker.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
-    }
-
-    override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
-      ???
     }
 
     def toMethod(ctx: Checker.Ctx): Method[StatelessContext] = {
@@ -131,6 +126,18 @@ object Ast {
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
       rhs.toIR(ctx) :+ ctx.toIR(target)
+    }
+  }
+  final case class FuncCall(id: Ident, args: Seq[Expr]) extends Statement {
+    override def check(ctx: Checker.Ctx): Unit = {
+      val argsType = args.flatMap(_.getType(ctx))
+      if (ctx.getFunc(id).argsType != argsType) {
+        throw Checker.Error(s"Invalid parameters when calling function $id")
+      }
+    }
+
+    override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.toIR(ctx)) :+ CallLocal(ctx.getFunc(id).index)
     }
   }
 
