@@ -14,11 +14,16 @@ object Parser {
   def callAbs[_: P]: P[(Ast.Ident, Seq[Ast.Expr])] = P(Lexer.ident ~ "(" ~ expr.rep(0, ",") ~ ")")
   def call[_: P]: P[Ast.Call]                      = callAbs.map(Ast.Call.tupled)
 
-  def binopPrefix[_: P]: P[Ast.Expr]               = P(const | call | variable | parenExpr)
-  def binopTerm[_: P]: P[(Ast.Operator, Ast.Expr)] = P(Lexer.operator ~ expr)
-  def binop[_: P]: P[Ast.Binop] = P(binopPrefix ~ binopTerm).map {
-    case (left, (op, right)) => Ast.Binop(op, left, right)
-  }
+  def Chain[_: P](p: => P[Ast.Expr], op: => P[Ast.Operator]): P[Ast.Expr] =
+    P(p ~ (op ~ p).rep).map {
+      case (lhs, rhs) =>
+        rhs.foldLeft(lhs) {
+          case (acc, (op, right)) => Ast.Binop(op, acc, right)
+        }
+    }
+  def binop[_: P]: P[Ast.Expr]  = P(Chain(binop1, Lexer.opAdd | Lexer.opSub))
+  def binop1[_: P]: P[Ast.Expr] = P(Chain(binop2, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
+  def binop2[_: P]: P[Ast.Expr] = P(const | call | variable | parenExpr)
 
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
   def expr[_: P]: P[Ast.Expr]           = P(binop | call | parenExpr | const | variable)

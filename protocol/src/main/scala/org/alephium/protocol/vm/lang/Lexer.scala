@@ -47,13 +47,11 @@ object Lexer {
     case (n, _)   => Val.U64(U64.from(n).get)
   }
 
-  def operator[_: P]: P[Ast.Operator] = P("+" | "-" | "*" | "/").!.map {
-    case "+" => Ast.Add
-    case "-" => Ast.Sub
-    case "*" => Ast.Mul
-    case "/" => Ast.Div
-    case "%" => Ast.Mod
-  }
+  def opAdd[_: P]: P[Ast.Operator] = P("+").map(_ => Ast.Add)
+  def opSub[_: P]: P[Ast.Operator] = P("-").map(_ => Ast.Sub)
+  def opMul[_: P]: P[Ast.Operator] = P("*").map(_ => Ast.Mul)
+  def opDiv[_: P]: P[Ast.Operator] = P("/").map(_ => Ast.Div)
+  def opMod[_: P]: P[Ast.Operator] = P("%").map(_ => Ast.Mod)
 
   // format: off
   def keywordSet: Set[String] =

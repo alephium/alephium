@@ -25,6 +25,11 @@ class ParserSpec extends AlephiumSpec {
       Binop(Add,
             ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
             ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+    fastparse.parse("x + y * z + u", Parser.expr(_)).get.value is
+      Binop(
+        Add,
+        Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
+        Variable(Ident("u")))
     fastparse.parse("foo(x + y) + bar(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
