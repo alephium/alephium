@@ -23,16 +23,10 @@ object Parser {
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
   def expr[_: P]: P[Ast.Expr]           = P(binop | call | parenExpr | const | variable)
 
-  def ret[_: P]: P[Ast.Return] = P("return" ~/ expr.rep(0, ",")).map(Ast.Return)
+  def ret[_: P]: P[Ast.Return] = P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.Return)
 
-  def varDef[_: P]: P[Ast.VarDef] = P(("let" | "var").! ~/ Lexer.ident ~ "=" ~ expr).map {
-    case ("let", ident, expr) =>
-      Ast.VarDef(isMutable = false, ident, expr)
-    case ("var", ident, expr) =>
-      Ast.VarDef(isMutable = true, ident, expr)
-    case (_, _, _) =>
-      throw new RuntimeException("Dead branch")
-  }
+  def varDef[_: P]: P[Ast.VarDef] =
+    P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map(Ast.VarDef.tupled)
   def assign[_: P]: P[Ast.Assign] = P(Lexer.ident ~ "=" ~ expr).map(Ast.Assign.tupled)
 
   def argument[_: P]: P[Ast.Argument] = P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.tpe).map {
@@ -41,12 +35,13 @@ object Parser {
   def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P("fn" ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ ret ~ "}")
+    P(Lexer.keyword("fn") ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ ret ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
 
   def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall)
 
   def contract[_: P]: P[Ast.Contract] =
-    P(Start ~ "contract" ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}").map(Ast.Contract.tupled)
+    P(Start ~ Lexer.keyword("contract") ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}")
+      .map(Ast.Contract.tupled)
 }
