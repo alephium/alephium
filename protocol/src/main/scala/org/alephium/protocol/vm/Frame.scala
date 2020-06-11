@@ -7,7 +7,8 @@ class Frame[Ctx <: Context](var pc: Int,
                             val opStack: Stack[Val],
                             method: Method[Ctx],
                             locals: Array[Val],
-                            val returnTo: Val => ExeResult[Unit]) {
+                            val returnTo: Val => ExeResult[Unit],
+                            val ctx: Ctx) {
   def currentInstr: Option[Instr[Ctx]] = method.instrs.get(pc)
 
   def advancePC(): Unit = pc += 1
@@ -66,7 +67,7 @@ class Frame[Ctx <: Context](var pc: Int,
       method <- getMethod(index)
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.build(obj, method, args, opStack.push)
+    } yield Frame.build(ctx, obj, method, args, opStack.push)
   }
 
   def execute(): ExeResult[Unit] = {
@@ -82,25 +83,28 @@ class Frame[Ctx <: Context](var pc: Int,
 }
 
 object Frame {
-  def build[Ctx <: Context](obj: ScriptObj[Ctx],
+  def build[Ctx <: Context](ctx: Ctx,
+                            obj: ScriptObj[Ctx],
                             args: AVector[Val],
                             returnTo: Val => ExeResult[Unit]): Frame[Ctx] =
-    build(obj, 0, args: AVector[Val], returnTo)
+    build(ctx, obj, 0, args: AVector[Val], returnTo)
 
-  def build[Ctx <: Context](obj: ContractObj[Ctx],
+  def build[Ctx <: Context](ctx: Ctx,
+                            obj: ContractObj[Ctx],
                             methodIndex: Int,
                             args: AVector[Val],
                             returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
     val method = obj.code.methods(methodIndex)
-    build(obj, method, args, returnTo)
+    build(ctx, obj, method, args, returnTo)
   }
 
-  def build[Ctx <: Context](obj: ContractObj[Ctx],
+  def build[Ctx <: Context](ctx: Ctx,
+                            obj: ContractObj[Ctx],
                             method: Method[Ctx],
                             args: AVector[Val],
                             returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new Frame[Ctx](0, obj, Stack.ofCapacity(stackMaxSize), method, locals, returnTo)
+    new Frame[Ctx](0, obj, Stack.ofCapacity(stackMaxSize), method, locals, returnTo, ctx)
   }
 }
