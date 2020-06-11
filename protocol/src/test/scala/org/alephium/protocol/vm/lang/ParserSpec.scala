@@ -66,14 +66,14 @@ class ParserSpec extends AlephiumSpec {
          |  }
          |
          |  fn add2(d: U64) -> () {
-         |    var z = d
+         |    let mut z = 0u
+         |    z = d
          |    x = x + z // comment
          |    y = y + z // comment
          |    return
          |  }
          |}
          |""".stripMargin
-    println(fastparse.parse(contract, Parser.contract(_)))
     fastparse.parse(contract, Parser.contract(_)).isSuccess is true
 
     val ast = fastparse.parse(contract, Parser.contract(_)).get.value
