@@ -17,6 +17,9 @@ object Lexer {
 
   def ident[_: P]: P[Ast.Ident] =
     P(letter ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
+  def callId[_: P]: P[Ast.CallId] = P(ident ~ "!".?.!).map {
+    case (id, postfix) => Ast.CallId(id.name, postfix.nonEmpty)
+  }
 
   private[lang] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)

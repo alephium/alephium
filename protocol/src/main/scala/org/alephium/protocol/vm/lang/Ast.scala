@@ -5,37 +5,91 @@ import org.alephium.util.AVector
 
 object Ast {
   final case class Ident(name: String)
+  final case class CallId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
   final case class Return(exprs: Seq[Expr]) {
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
-      exprs.flatMap(_.toIR(ctx)) :+ U64Return
+      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(U64Return))
   }
 
   sealed trait Operator {
-    def toIR: Seq[Instr[StatelessContext]]
+    def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
+      if (argsType.length != 2 || argsType(0) != argsType(1) || !Val.Type.isNumeric(argsType(0))) {
+        throw Checker.Error(s"Invalid param types $argsType for $this")
+      } else Seq(argsType(0))
+    }
+    def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
   }
   case object Add extends Operator {
-    override def toIR: Seq[Instr[StatelessContext]] = Seq(U64Add)
+    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Val.I64  => Seq(I64Add)
+        case Val.U64  => Seq(U64Add)
+        case Val.I256 => Seq(I256Add)
+        case Val.U256 => Seq(U256Add)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
   }
   case object Sub extends Operator {
-    override def toIR: Seq[Instr[StatelessContext]] = Seq(U64Sub)
+    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Val.I64  => Seq(I64Sub)
+        case Val.U64  => Seq(U64Sub)
+        case Val.I256 => Seq(I256Sub)
+        case Val.U256 => Seq(U256Sub)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
   }
   case object Mul extends Operator {
-    override def toIR: Seq[Instr[StatelessContext]] = Seq(U64Mul)
+    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Val.I64  => Seq(I64Mul)
+        case Val.U64  => Seq(U64Mul)
+        case Val.I256 => Seq(I256Mul)
+        case Val.U256 => Seq(U256Mul)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
   }
   case object Div extends Operator {
-    override def toIR: Seq[Instr[StatelessContext]] = Seq(U64Div)
+    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Val.I64  => Seq(I64Div)
+        case Val.U64  => Seq(U64Div)
+        case Val.I256 => Seq(I256Div)
+        case Val.U256 => Seq(U256Div)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
   }
   case object Mod extends Operator {
-    override def toIR: Seq[Instr[StatelessContext]] = Seq(U64Mod)
+    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Val.I64  => Seq(I64Mod)
+        case Val.U64  => Seq(U64Mod)
+        case Val.I256 => Seq(I256Mod)
+        case Val.U256 => Seq(U256Mod)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
   }
 
   sealed trait Expr {
-    def getType(ctx: Checker.Ctx): Seq[Val.Type]
+    var tpe: Option[Seq[Val.Type]] = None
+    protected def _getType(ctx: Checker.Ctx): Seq[Val.Type]
+    def getType(ctx: Checker.Ctx): Seq[Val.Type] = tpe match {
+      case Some(ts) => ts
+      case None =>
+        val t = _getType(ctx)
+        tpe = Some(t)
+        t
+    }
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]]
   }
   final case class Const(v: Val) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(v.tpe)
+    override def _getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(v.tpe)
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
       v match {
@@ -45,42 +99,35 @@ object Ast {
     }
   }
   final case class Variable(id: Ident) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
+    override def _getType(ctx: Checker.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
       val varInfo = ctx.getVariable(id)
-      if (ctx.isField(id)) Seq(LoadField(varInfo.index.toByte))
-      else Seq(LoadLocal(varInfo.index.toByte))
+      if (ctx.isField(id)) Seq(LoadField(varInfo.index))
+      else Seq(LoadLocal(varInfo.index))
     }
   }
   final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = {
-      val leftType  = left.getType(ctx: Checker.Ctx)
-      val rightType = right.getType(ctx: Checker.Ctx)
-      if (leftType.length == 1 && leftType == rightType) leftType
-      else throw Checker.Error(s"Type error for $op, left: $leftType, right: $rightType")
+    override def _getType(ctx: Checker.Ctx): Seq[Val.Type] = {
+      op.getReturnType(left.getType(ctx) ++ right.getType(ctx))
     }
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
-      left.toIR(ctx) ++ right.toIR(ctx) ++ op.toIR
+      left.toIR(ctx) ++ right.toIR(ctx) ++ op.toIR(left.getType(ctx) ++ right.getType(ctx))
     }
   }
-  final case class Call(id: Ident, args: Seq[Expr]) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = {
+  final case class Call(id: CallId, args: Seq[Expr]) extends Expr {
+    override def _getType(ctx: Checker.Ctx): Seq[Val.Type] = {
       val funcInfo = ctx.getFunc(id)
-      if (funcInfo.argsType != args.flatMap(_.getType(ctx))) {
-        throw Checker.Error(s"Invalid parameters for $id")
-      } else {
-        funcInfo.returnType
-      }
+      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
-      args.flatMap(_.toIR(ctx)) :+ CallLocal(ctx.getFunc(id).index)
+      args.flatMap(_.toIR(ctx)) ++ ctx.getFunc(id).toIR(args.flatMap(_.getType(ctx)))
     }
   }
   final case class ParenExpr(expr: Expr) extends Expr {
-    override def getType(ctx: Checker.Ctx): Seq[Val.Type] = expr.getType(ctx: Checker.Ctx)
+    override def _getType(ctx: Checker.Ctx): Seq[Val.Type] = expr.getType(ctx: Checker.Ctx)
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = expr.toIR(ctx)
   }
@@ -128,16 +175,18 @@ object Ast {
       rhs.toIR(ctx) :+ ctx.toIR(target)
     }
   }
-  final case class FuncCall(id: Ident, args: Seq[Expr]) extends Statement {
+  final case class FuncCall(id: CallId, args: Seq[Expr]) extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
-      val argsType = args.flatMap(_.getType(ctx))
-      if (ctx.getFunc(id).argsType != argsType) {
-        throw Checker.Error(s"Invalid parameters when calling function $id")
-      }
+      val funcInfo = ctx.getFunc(id)
+      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+      ()
     }
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
-      args.flatMap(_.toIR(ctx)) :+ CallLocal(ctx.getFunc(id).index)
+      val func       = ctx.getFunc(id)
+      val argsType   = args.flatMap(_.getType(ctx))
+      val returnType = func.getReturnType(argsType)
+      args.flatMap(_.toIR(ctx)) ++ func.toIR(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
 

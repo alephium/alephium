@@ -1,18 +1,20 @@
 package org.alephium.protocol.vm
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.alephium.crypto
 import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{AVector, Bytes}
 
-trait Val extends Any {
+sealed trait Val extends Any {
   def tpe: Val.Type
 }
 
 // scalastyle:off number.of.methods
 object Val {
-  trait Type {
+  sealed trait Type {
     def id: scala.Byte
     def default: Val
   }
@@ -22,8 +24,10 @@ object Val {
         types.get(Bytes.toPosInt(byte)).toRight(SerdeError.validation(s"Invalid Val Type"))
       }, _.id)
 
-    val types: AVector[Type] = AVector[Type](Bool, Byte, I64, U64, I256, U256, Bool, Byte32) ++
-      AVector[Type](ByteVec, I64Vec, U64Vec, I256Vec, U256Vec, Byte32Vec)
+    val types: AVector[Type] = AVector[Type](Bool, Byte, I64, U64, I256, U256, Byte32) ++
+      AVector[Type](BoolVec, ByteVec, I64Vec, U64Vec, I256Vec, U256Vec, Byte32Vec)
+
+    def isNumeric(tpe: Type): Boolean = (tpe.id >= 2 && tpe.id <= 5)
   }
 
   // TODO: optimize using value class
@@ -35,13 +39,25 @@ object Val {
   final case class U256(v: util.U256)       extends Val { def tpe: Val.Type = U256 }
   final case class Byte32(v: crypto.Byte32) extends Val { def tpe: Val.Type = Byte32 }
 
-  final case class BoolVec(a: Array[Bool]) extends AnyVal with Val { def tpe: Val.Type = BoolVec }
-  final case class ByteVec(a: Array[Byte]) extends AnyVal with Val { def tpe: Val.Type = ByteVec }
-  final case class I64Vec(a: Array[I64])   extends AnyVal with Val { def tpe: Val.Type = I64Vec }
-  final case class U64Vec(a: Array[U64])   extends AnyVal with Val { def tpe: Val.Type = U64Vec }
-  final case class I256Vec(a: Array[I256]) extends AnyVal with Val { def tpe: Val.Type = I256Vec }
-  final case class U256Vec(a: Array[U256]) extends AnyVal with Val { def tpe: Val.Type = U256Vec }
-  final case class Byte32Vec(a: Array[Byte32]) extends AnyVal with Val {
+  final case class BoolVec(a: ArrayBuffer[Bool]) extends AnyVal with Val {
+    def tpe: Val.Type = BoolVec
+  }
+  final case class ByteVec(a: ArrayBuffer[Byte]) extends AnyVal with Val {
+    def tpe: Val.Type = ByteVec
+  }
+  final case class I64Vec(a: ArrayBuffer[I64]) extends AnyVal with Val {
+    def tpe: Val.Type = I64Vec
+  }
+  final case class U64Vec(a: ArrayBuffer[U64]) extends AnyVal with Val {
+    def tpe: Val.Type = U64Vec
+  }
+  final case class I256Vec(a: ArrayBuffer[I256]) extends AnyVal with Val {
+    def tpe: Val.Type = I256Vec
+  }
+  final case class U256Vec(a: ArrayBuffer[U256]) extends AnyVal with Val {
+    def tpe: Val.Type = U256Vec
+  }
+  final case class Byte32Vec(a: ArrayBuffer[Byte32]) extends AnyVal with Val {
     def tpe: Val.Type = Byte32Vec
   }
 
@@ -80,31 +96,31 @@ object Val {
 
   object BoolVec extends Type {
     override val id: scala.Byte   = 7.toByte
-    override def default: BoolVec = BoolVec(Array.empty)
+    override def default: BoolVec = BoolVec(ArrayBuffer.empty)
   }
   object ByteVec extends Type {
     override val id: scala.Byte   = 8.toByte
-    override def default: ByteVec = ByteVec(Array.empty)
+    override def default: ByteVec = ByteVec(ArrayBuffer.empty)
   }
   object I64Vec extends Type {
     override val id: scala.Byte  = 9.toByte
-    override def default: I64Vec = I64Vec(Array.empty)
+    override def default: I64Vec = I64Vec(ArrayBuffer.empty)
   }
   object U64Vec extends Type {
     override val id: scala.Byte  = 10.toByte
-    override def default: U64Vec = U64Vec(Array.empty)
+    override def default: U64Vec = U64Vec(ArrayBuffer.empty)
   }
   object I256Vec extends Type {
     override val id: scala.Byte   = 11.toByte
-    override def default: I256Vec = I256Vec(Array.empty)
+    override def default: I256Vec = I256Vec(ArrayBuffer.empty)
   }
   object U256Vec extends Type {
     override val id: scala.Byte   = 12.toByte
-    override def default: U256Vec = U256Vec(Array.empty)
+    override def default: U256Vec = U256Vec(ArrayBuffer.empty)
   }
   object Byte32Vec extends Type {
     override val id: scala.Byte     = 13.toByte
-    override def default: Byte32Vec = Byte32Vec(Array.empty)
+    override def default: Byte32Vec = Byte32Vec(ArrayBuffer.empty)
   }
 }
 // scalastyle:on number.of.methods
