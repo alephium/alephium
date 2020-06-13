@@ -3,9 +3,14 @@ package org.alephium.protocol.vm.lang
 import scala.collection.mutable
 
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Ast.Ident
 
 object Checker {
+  trait FuncInfo {
+    def name: String
+    def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
+    def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
+  }
+
   final case class Error(message: String) extends Exception(message)
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Val.Type]): Val.Type = {
@@ -14,12 +19,25 @@ object Checker {
   }
 
   final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Byte)
-  final case class FuncInfo(argsType: Seq[Val.Type], returnType: Seq[Val.Type], index: Byte)
+  class SimpleFunc(val name: String,
+                   argsType: Seq[Val.Type],
+                   returnType: Seq[Val.Type],
+                   index: Byte)
+      extends FuncInfo {
+    override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
+      if (inputType == argsType) returnType
+      else throw Error(s"Invalid args type $inputType for builtin func $name")
+    }
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      Seq(CallLocal(index))
+    }
+  }
 
   final case class Ctx(varTable: mutable.HashMap[String, VarInfo],
                        var scope: String,
                        var varIndex: Int,
-                       funcIdents: mutable.HashMap[String, FuncInfo]) {
+                       funcIdents: mutable.HashMap[String, SimpleFunc]) {
     def setFuncScope(ident: Ast.Ident): Unit = {
       scope    = ident.name
       varIndex = 0
@@ -51,27 +69,23 @@ object Checker {
     def getVariable(ident: Ast.Ident): VarInfo = {
       val name  = ident.name
       val sname = scopedName(ident.name)
-      varTable.get(sname) match {
-        case Some(varInfo) => varInfo
-        case None =>
-          varTable.get(name) match {
-            case Some(varInfo) => varInfo
-            case None          => throw Error(s"Variable $sname does not exist")
-          }
-      }
+      varTable.getOrElse(
+        sname,
+        varTable.getOrElse(name, throw Error(s"Variable $sname does not exist"))
+      )
     }
 
-    def getLocalVars(func: Ident): Seq[VarInfo] = {
+    def getLocalVars(func: Ast.Ident): Seq[VarInfo] = {
       varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
     }
 
-    def toIR(ident: Ident): Instr[StatelessContext] = {
+    def toIR(ident: Ast.Ident): Instr[StatelessContext] = {
       val varInfo = getVariable(ident)
       if (isField(ident)) StoreField(varInfo.index.toByte)
       else StoreLocal(varInfo.index.toByte)
     }
 
-    def isField(ident: Ident): Boolean = varTable.contains(ident.name)
+    def isField(ident: Ast.Ident): Boolean = varTable.contains(ident.name)
 
     def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
 
@@ -87,15 +101,22 @@ object Checker {
       if (funcIdents.contains(name)) {
         throw Error(s"Functions have the same name $name")
       } else {
-        funcIdents(name) = FuncInfo(func.args.map(_.tpe), func.rtypes, index)
+        funcIdents(name) = new SimpleFunc(name, func.args.map(_.tpe), func.rtypes, index)
       }
     }
 
-    def getFunc(ident: Ident): FuncInfo = {
-      funcIdents.get(ident.name) match {
-        case Some(func) => func
-        case None       => throw Error(s"Function $ident does not exist")
-      }
+    def getFunc(call: Ast.CallId): FuncInfo = {
+      if (call.isBuiltIn) getBuiltInFunc(call)
+      else getNewFunc(call)
+    }
+
+    private def getBuiltInFunc(call: Ast.CallId): FuncInfo = {
+      BuiltIn.funcs
+        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
+    }
+
+    private def getNewFunc(call: Ast.CallId): FuncInfo = {
+      funcIdents.getOrElse(call.name, throw Error(s"Function ${call.name} does not exist"))
     }
 
     def checkAssign(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {

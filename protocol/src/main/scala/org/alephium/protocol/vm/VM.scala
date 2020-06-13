@@ -10,12 +10,12 @@ trait VM[Ctx <: Context] {
   def execute(ctx: Ctx,
               script: Script[Ctx],
               fields: AVector[Val],
-              args: AVector[Val]): ExeResult[Val] = {
+              args: AVector[Val]): ExeResult[Seq[Val]] = {
     val stack = Stack.ofCapacity[Frame[Ctx]](stackMaxSize)
     val rt    = Runtime[Ctx](stack)
 
     stack.push(script.startFrame(ctx, fields, args, value => Right(rt.returnTo = Some(value))))
-    execute(stack).flatMap(_ => rt.returnTo.toRight(NoReturnVal))
+    execute(stack).map(_ => rt.returnTo.toSeq)
   }
 
   @tailrec
