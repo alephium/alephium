@@ -1,6 +1,9 @@
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.{StatelessContext, StatelessVM, Val}
+import org.alephium.crypto.ED25519
+import org.alephium.protocol.{ALF, vm}
+import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
+import org.alephium.serde._
 import org.alephium.util.{AVector, AlephiumSpec, U64}
 
 class ParserSpec extends AlephiumSpec {
@@ -14,6 +17,8 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
+    fastparse.parse("add", Lexer.callId(_)).get.value is Ast.CallId("add", false)
+    fastparse.parse("add!", Lexer.callId(_)).get.value is Ast.CallId("add", true)
   }
 
   it should "parse exprs" in {
@@ -33,8 +38,8 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("foo(x + y) + bar(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
-        Call(Ident("foo"), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
-        Call(Ident("bar"), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        Call(CallId("foo", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
+        Call(CallId("bar", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
   }
 
@@ -139,10 +144,40 @@ class ParserSpec extends AlephiumSpec {
     val ast      = fastparse.parse(input, Parser.contract(_)).get.value
     val ctx      = ast.check()
     val contract = ast.toIR(ctx)
+
+    deserialize[StatelessScript](serialize(contract)) isE contract
     StatelessVM.execute(StatelessContext.test,
                         contract,
                         AVector(Val.U64(U64.One)),
                         AVector(Val.U64(U64.Two))) isE
-      Val.U64(U64.unsafe(5))
+      Seq(Val.U64(U64.unsafe(5)))
+  }
+
+  it should "verify signature" in {
+    val input =
+      s"""
+         |contract P2PKH(hash: Byte32) {
+         |  fn verify(pk: Byte32) -> () {
+         |    checkEq!(hash, keccak256!(pk))
+         |    checkSignature!(pk)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val ast      = fastparse.parse(input, Parser.contract(_)).get.value
+    val ctx      = ast.check()
+    val contract = ast.toIR(ctx)
+
+    deserialize[StatelessScript](serialize(contract)) isE contract
+
+    val (priKey, pubKey) = ED25519.generatePriPub()
+    val pubKeyHash       = ALF.Hash.hash(pubKey.bytes)
+    val signature        = ED25519.sign(ALF.Hash.zero.bytes, priKey)
+    StatelessVM.execute(
+      StatelessContext(ALF.Hash.zero, vm.Stack.unsafe(AVector(signature), 1)),
+      contract,
+      AVector(Val.Byte32(pubKeyHash.toByte32)),
+      AVector(Val.Byte32(pubKey.toByte32))
+    ) isE Seq.empty[Val]
   }
 }

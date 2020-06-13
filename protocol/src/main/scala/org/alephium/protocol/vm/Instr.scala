@@ -62,7 +62,10 @@ object Instr {
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     U64Add, U64Sub, U64Mul, U64Div, U64Mod,
-    CallLocal,
+    CallLocal, U64Return,
+    CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
+    CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
+    Keccak256Byte32, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs
   // format: on
@@ -244,15 +247,65 @@ object BinaryArithmeticInstr {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
   }
 
+  @inline def i64SafeOp(
+      instr: ArithmeticInstr,
+      op: (util.I64, util.I64) => Option[util.I64]
+  )(x: Val, y: Val): ExeResult[Val.I64] =
+    (x, y) match {
+      case (a: Val.I64, b: Val.I64) =>
+        op(a.v, b.v).map(Val.I64.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
+      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
   @inline def u64SafeOp(
       instr: ArithmeticInstr,
       op: (util.U64, util.U64) => Option[util.U64]
-  )(x: Val, y: Val): ExeResult[Val] =
+  )(x: Val, y: Val): ExeResult[Val.U64] =
     (x, y) match {
       case (a: Val.U64, b: Val.U64) =>
         op(a.v, b.v).map(Val.U64.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
       case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
     }
+
+  @inline def i256SafeOp(
+      instr: ArithmeticInstr,
+      op: (util.I256, util.I256) => Option[util.I256]
+  )(x: Val, y: Val): ExeResult[Val.I256] =
+    (x, y) match {
+      case (a: Val.I256, b: Val.I256) =>
+        op(a.v, b.v).map(Val.I256.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
+      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
+  @inline def u256SafeOp(
+      instr: ArithmeticInstr,
+      op: (util.U256, util.U256) => Option[util.U256]
+  )(x: Val, y: Val): ExeResult[Val.U256] =
+    (x, y) match {
+      case (a: Val.U256, b: Val.U256) =>
+        op(a.v, b.v).map(Val.U256.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
+      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+}
+object I64Add extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64SafeOp(this, _.add(_))(x, y)
+}
+object I64Sub extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64SafeOp(this, _.sub(_))(x, y)
+}
+object I64Mul extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64SafeOp(this, _.mul(_))(x, y)
+}
+object I64Div extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64SafeOp(this, _.div(_))(x, y)
+}
+object I64Mod extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64SafeOp(this, _.mod(_))(x, y)
 }
 object U64Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
@@ -273,6 +326,46 @@ object U64Div extends BinaryArithmeticInstr {
 object U64Mod extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u64SafeOp(this, _.mod(_))(x, y)
+}
+object I256Add extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.add(_))(x, y)
+}
+object I256Sub extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.sub(_))(x, y)
+}
+object I256Mul extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.mul(_))(x, y)
+}
+object I256Div extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.div(_))(x, y)
+}
+object I256Mod extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.mod(_))(x, y)
+}
+object U256Add extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
+}
+object U256Sub extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.sub(_))(x, y)
+}
+object U256Mul extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.mul(_))(x, y)
+}
+object U256Div extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.div(_))(x, y)
+}
+object U256Mod extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
 }
 //object U64Neg extends ArithmeticInstr
 
@@ -329,17 +422,57 @@ trait HashAlg       extends CryptoInstr
 trait Signature     extends CryptoInstr
 trait EllipticCurve extends CryptoInstr
 
-case object Keccak256Hash extends HashAlg with InstrCompanion0 {
+trait CheckEqT[T] extends CryptoInstr with InstrCompanion0 {
+  def check(x: T, y: T): ExeResult[Unit] = {
+    if (x == y) Right(()) else Left(EqualityFailed)
+  }
+
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      value <- frame.popT[Val.ByteVec]()
+      x <- frame.popT[T]()
+      y <- frame.popT[T]()
+      _ <- check(x, y)
+    } yield ()
+  }
+}
+
+case object CheckEqBool      extends CheckEqT[Val.Bool]
+case object CheckEqByte      extends CheckEqT[Val.Byte]
+case object CheckEqI64       extends CheckEqT[Val.I64]
+case object CheckEqU64       extends CheckEqT[Val.U64]
+case object CheckEqI256      extends CheckEqT[Val.I256]
+case object CheckEqU256      extends CheckEqT[Val.U256]
+case object CheckEqByte32    extends CheckEqT[Val.Byte32]
+case object CheckEqBoolVec   extends CheckEqT[Val.BoolVec]
+case object CheckEqByteVec   extends CheckEqT[Val.ByteVec]
+case object CheckEqI64Vec    extends CheckEqT[Val.I64Vec]
+case object CheckEqU64Vec    extends CheckEqT[Val.U64Vec]
+case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
+case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
+case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
+
+abstract class Keccak256T[T] extends HashAlg with InstrCompanion0 {
+  def convert(t: T): ByteString
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.popT[T]()
       _ <- {
-        val bs   = ByteString.fromArrayUnsafe(value.a.map(_.v))
+        val bs   = convert(value)
         val hash = Keccak256.hash(bs)
         frame.push(Val.Byte32.from(hash))
       }
     } yield ()
   }
+}
+
+case object Keccak256Byte32 extends Keccak256T[Val.Byte32] {
+  override def convert(t: Val.Byte32): ByteString = t.v.bytes
+}
+
+case object Keccak256ByteVec extends Keccak256T[Val.ByteVec] {
+  override def convert(t: Val.ByteVec): ByteString =
+    ByteString.fromArrayUnsafe(Array.from(t.a.view.map(_.v)))
 }
 
 case object CheckSignature extends Signature with InstrCompanion0 {
