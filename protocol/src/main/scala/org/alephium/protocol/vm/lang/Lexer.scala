@@ -30,7 +30,6 @@ object Lexer {
     P(ident).filter(id => types.contains(id.name)).map(id => types.apply(id.name))
 
   def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
-  def bool[_: P]: P[Unit]               = P(keyword("true") | keyword("false"))
   def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
 
   def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
@@ -50,6 +49,11 @@ object Lexer {
     case (n, _)   => Val.U64(U64.from(n).get)
   }
 
+  def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
+    case "true" => Val.Bool(true)
+    case _      => Val.Bool(false)
+  }
+
   def opAdd[_: P]: P[Ast.Operator] = P("+").map(_ => Ast.Add)
   def opSub[_: P]: P[Ast.Operator] = P("-").map(_ => Ast.Sub)
   def opMul[_: P]: P[Ast.Operator] = P("*").map(_ => Ast.Mul)
@@ -58,6 +62,6 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("contract", "let", "mut", "fn", "return")
+    Set("contract", "let", "mut", "fn", "return", "true", "false")
   // format: on
 }

@@ -1,5 +1,6 @@
 package org.alephium.protocol.vm
 
+import scala.annotation.switch
 import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
@@ -54,11 +55,11 @@ object Instr {
   // format: off
   val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
     BoolConstTrue, BoolConstFalse,
-    I64ConstN1, I64Const0, I64Const1, I64Const2, I64Const3, I64Const4, I64Const5,
-                U64Const0, U64Const1, U64Const2, U64Const3, U64Const4, U64Const5,
-    I256ConstN1, I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5,
-                 U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
-    U64Const,
+    I64Const0, I64Const1, I64Const2, I64Const3, I64Const4, I64Const5, I64ConstN1,
+    U64Const0, U64Const1, U64Const2, U64Const3, U64Const4, U64Const5,
+    I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
+    U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
+    I64Const, U64Const, I256Const, U256Const,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     U64Add, U64Sub, U64Mul, U64Div, U64Mod,
@@ -107,7 +108,72 @@ trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[Statel
 
 trait OperandStackInstr extends StatelessInstr
 
-trait ConstInstr extends OperandStackInstr with InstrCompanion0 {
+trait ConstInstr extends OperandStackInstr
+object ConstInstr {
+  def i64(v: Val.I64): ConstInstr = {
+    // TODO: use @switch annotation
+    (v.v.v) match {
+      case -1 => I64ConstN1
+      case 0  => I64Const0
+      case 1  => I64Const1
+      case 2  => I64Const2
+      case 3  => I64Const3
+      case 4  => I64Const4
+      case 5  => I64Const5
+      case _  => I64Const(v)
+    }
+  }
+
+  def u64(v: Val.U64): ConstInstr = {
+    // TODO: use @switch annotation
+    (v.v.v) match {
+      case 0 => U64Const0
+      case 1 => U64Const1
+      case 2 => U64Const2
+      case 3 => U64Const3
+      case 4 => U64Const4
+      case 5 => U64Const5
+      case _ => U64Const(v)
+    }
+  }
+
+  def i256(v: Val.I256): ConstInstr = {
+    val bi = v.v.v
+    if (bi.bitLength() <= 8) {
+      (bi.intValue(): @switch) match {
+        case -1 => I256ConstN1
+        case 0  => I256Const0
+        case 1  => I256Const1
+        case 2  => I256Const2
+        case 3  => I256Const3
+        case 4  => I256Const4
+        case 5  => I256Const5
+        case _  => I256Const(v)
+      }
+    } else {
+      I256Const(v)
+    }
+  }
+
+  def u256(v: Val.U256): ConstInstr = {
+    val bi = v.v.v
+    if (bi.bitLength() <= 8) {
+      (bi.intValue(): @switch) match {
+        case 0 => U256Const0
+        case 1 => U256Const1
+        case 2 => U256Const2
+        case 3 => U256Const3
+        case 4 => U256Const4
+        case 5 => U256Const5
+        case _ => U256Const(v)
+      }
+    } else {
+      U256Const(v)
+    }
+  }
+}
+
+trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
   def const: Val
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -115,48 +181,67 @@ trait ConstInstr extends OperandStackInstr with InstrCompanion0 {
   }
 }
 
-object BoolConstTrue  extends ConstInstr { val const: Val = Val.Bool(true) }
-object BoolConstFalse extends ConstInstr { val const: Val = Val.Bool(false) }
-
-object I64ConstN1 extends ConstInstr { val const: Val = Val.I64(util.I64.NegOne) }
-object I64Const0  extends ConstInstr { val const: Val = Val.I64(util.I64.Zero) }
-object I64Const1  extends ConstInstr { val const: Val = Val.I64(util.I64.One) }
-object I64Const2  extends ConstInstr { val const: Val = Val.I64(util.I64.Two) }
-object I64Const3  extends ConstInstr { val const: Val = Val.I64(util.I64.unsafe(3)) }
-object I64Const4  extends ConstInstr { val const: Val = Val.I64(util.I64.unsafe(4)) }
-object I64Const5  extends ConstInstr { val const: Val = Val.I64(util.I64.unsafe(5)) }
-
-object U64Const0 extends ConstInstr { val const: Val = Val.U64(util.U64.Zero) }
-object U64Const1 extends ConstInstr { val const: Val = Val.U64(util.U64.One) }
-object U64Const2 extends ConstInstr { val const: Val = Val.U64(util.U64.Two) }
-object U64Const3 extends ConstInstr { val const: Val = Val.U64(util.U64.unsafe(3)) }
-object U64Const4 extends ConstInstr { val const: Val = Val.U64(util.U64.unsafe(4)) }
-object U64Const5 extends ConstInstr { val const: Val = Val.U64(util.U64.unsafe(5)) }
-
-object I256ConstN1 extends ConstInstr { val const: Val = Val.I256(util.I256.NegOne) }
-object I256Const0  extends ConstInstr { val const: Val = Val.I256(util.I256.Zero) }
-object I256Const1  extends ConstInstr { val const: Val = Val.I256(util.I256.One) }
-object I256Const2  extends ConstInstr { val const: Val = Val.I256(util.I256.Two) }
-object I256Const3  extends ConstInstr { val const: Val = Val.I256(util.I256.from(3L)) }
-object I256Const4  extends ConstInstr { val const: Val = Val.I256(util.I256.from(4L)) }
-object I256Const5  extends ConstInstr { val const: Val = Val.I256(util.I256.from(5L)) }
-
-object U256Const0 extends ConstInstr { val const: Val = Val.U256(util.U256.Zero) }
-object U256Const1 extends ConstInstr { val const: Val = Val.U256(util.U256.One) }
-object U256Const2 extends ConstInstr { val const: Val = Val.U256(util.U256.Two) }
-object U256Const3 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(3L)) }
-object U256Const4 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(4L)) }
-object U256Const5 extends ConstInstr { val const: Val = Val.U256(util.U256.unsafe(5L)) }
-
-final case class U64Const(n: Val.U64) extends OperandStackInstr {
-  override def serialize(): ByteString =
-    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
+abstract class ConstInstr1[T <: Val] extends ConstInstr {
+  def n: T
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.push(n)
   }
 }
+
+object BoolConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true) }
+object BoolConstFalse extends ConstInstr0 { val const: Val = Val.Bool(false) }
+
+object I64ConstN1 extends ConstInstr0 { val const: Val = Val.I64(util.I64.NegOne) }
+object I64Const0  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Zero) }
+object I64Const1  extends ConstInstr0 { val const: Val = Val.I64(util.I64.One) }
+object I64Const2  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Two) }
+object I64Const3  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(3)) }
+object I64Const4  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(4)) }
+object I64Const5  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(5)) }
+
+object U64Const0 extends ConstInstr0 { val const: Val = Val.U64(util.U64.Zero) }
+object U64Const1 extends ConstInstr0 { val const: Val = Val.U64(util.U64.One) }
+object U64Const2 extends ConstInstr0 { val const: Val = Val.U64(util.U64.Two) }
+object U64Const3 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(3)) }
+object U64Const4 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(4)) }
+object U64Const5 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(5)) }
+
+object I256ConstN1 extends ConstInstr0 { val const: Val = Val.I256(util.I256.NegOne) }
+object I256Const0  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Zero) }
+object I256Const1  extends ConstInstr0 { val const: Val = Val.I256(util.I256.One) }
+object I256Const2  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Two) }
+object I256Const3  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(3L)) }
+object I256Const4  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(4L)) }
+object I256Const5  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(5L)) }
+
+object U256Const0 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Zero) }
+object U256Const1 extends ConstInstr0 { val const: Val = Val.U256(util.U256.One) }
+object U256Const2 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Two) }
+object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(3L)) }
+object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
+object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
+
+final case class I64Const(n: Val.I64) extends ConstInstr1[Val.I64] {
+  override def serialize(): ByteString =
+    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(n.v)
+}
+object I64Const extends InstrCompanion1[Val.I64]
+final case class U64Const(n: Val.U64) extends ConstInstr1[Val.U64] {
+  override def serialize(): ByteString =
+    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
+}
 object U64Const extends InstrCompanion1[Val.U64]
+final case class I256Const(n: Val.I256) extends ConstInstr1[Val.I256] {
+  override def serialize(): ByteString =
+    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(n.v)
+}
+object I256Const extends InstrCompanion1[Val.I256]
+final case class U256Const(n: Val.U256) extends ConstInstr1[Val.U256] {
+  override def serialize(): ByteString =
+    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(n.v)
+}
+object U256Const extends InstrCompanion1[Val.U256]
 
 // Note: 0 <= index <= 0xFF
 final case class LoadLocal(index: Byte) extends OperandStackInstr {

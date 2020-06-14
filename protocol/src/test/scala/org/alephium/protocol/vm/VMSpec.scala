@@ -13,7 +13,7 @@ class VMSpec extends AlephiumSpec {
     StatelessVM.execute(StatelessContext.test,
                         script,
                         AVector(Val.U64(U64.Zero), Val.U64(U64.One)),
-                        AVector(Val.U64(U64.Two))) isE Val.U64(U64.unsafe(8))
+                        AVector(Val.U64(U64.Two))) isE Seq(Val.U64(U64.unsafe(8)))
   }
 
   it should "call method" in {
@@ -24,7 +24,7 @@ class VMSpec extends AlephiumSpec {
                                              AVector(LoadLocal(0), U64Const1, U64Add, U64Return))
     val script = StatelessScript(AVector.empty, methods = AVector(method0, method1))
     StatelessVM.execute(StatelessContext.test, script, AVector.empty, AVector(Val.U64(U64.Two))) isE
-      Val.U64(U64.unsafe(3))
+      Seq(Val.U64(U64.unsafe(3)))
   }
 
   it should "serde instructions" in {

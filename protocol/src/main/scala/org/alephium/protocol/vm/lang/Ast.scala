@@ -93,8 +93,20 @@ object Ast {
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
       v match {
-        case n: Val.U64 => Seq(U64Const(n))
-        case _          => ???
+        case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
+        case _: Val.Byte      => ???
+        case u: Val.I64       => Seq(ConstInstr.i64(u))
+        case u: Val.U64       => Seq(ConstInstr.u64(u))
+        case u: Val.I256      => Seq(ConstInstr.i256(u))
+        case u: Val.U256      => Seq(ConstInstr.u256(u))
+        case _: Val.Byte32    => ???
+        case _: Val.BoolVec   => ???
+        case _: Val.ByteVec   => ???
+        case _: Val.I64Vec    => ???
+        case _: Val.U64Vec    => ???
+        case _: Val.I256Vec   => ???
+        case _: Val.U256Vec   => ???
+        case _: Val.Byte32Vec => ???
       }
     }
   }

@@ -1,5 +1,7 @@
 package org.alephium.protocol.vm.lang
 
+import org.scalatest.Assertion
+
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.{ALF, vm}
 import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
@@ -52,6 +54,7 @@ class ParserSpec extends AlephiumSpec {
   it should "parse statements" in {
     fastparse.parse("let x = 1", Parser.statement(_)).isSuccess is true
     fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
+    fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
   }
 
@@ -179,5 +182,49 @@ class ParserSpec extends AlephiumSpec {
       AVector(Val.Byte32(pubKeyHash.toByte32)),
       AVector(Val.Byte32(pubKey.toByte32))
     ) isE Seq.empty[Val]
+  }
+
+  it should "test the following typical examples" in {
+    def test(input: String, args: AVector[Val]): Assertion = {
+      val ast      = fastparse.parse(input, Parser.contract(_)).get.value
+      val ctx      = ast.check()
+      val contract = ast.toIR(ctx)
+
+      deserialize[StatelessScript](serialize(contract)) isE contract
+      StatelessVM.execute(StatelessContext.test, contract, AVector.empty, args) isE Seq.empty[Val]
+    }
+
+    test(
+      s"""
+         |contract Main() {
+         |
+         |  fn main() -> () {
+         |    let an_i64 = 5i // Suffix annotation
+         |    let an_u64 = 5u
+         |    let an_i256 = 5I
+         |    let an_u256 = 5U
+         |
+         |    // Or a default will be used.
+         |    let default_integer = 7   // `U64`
+         |
+         |    // A mutable variable's value can be changed.
+         |    let mut another_i64 = 5i
+         |    let mut another_u64 = 5u
+         |    let mut another_i256 = 5I
+         |    let mut another_u256 = 5U
+         |    another_i64 = 6i
+         |    another_u64 = 6u
+         |    another_i256 = 6I
+         |    another_u256 = 6U
+         |
+         |    let mut bool = true
+         |    bool = false
+         |
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty
+    )
   }
 }
