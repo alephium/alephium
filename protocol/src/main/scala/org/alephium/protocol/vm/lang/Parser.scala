@@ -9,7 +9,7 @@ object Parser {
     Lexer.emptyChars(ctx)
   }
 
-  def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum).map(Ast.Const)
+  def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum | Lexer.bool).map(Ast.Const)
   def variable[_: P]: P[Ast.Variable]               = P(Lexer.ident).map(Ast.Variable)
   def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
   def call[_: P]: P[Ast.Call]                       = callAbs.map(Ast.Call.tupled)
