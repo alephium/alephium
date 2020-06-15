@@ -63,6 +63,7 @@ object Instr {
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     U64Add, U64Sub, U64Mul, U64Div, U64Mod,
+    Offset, IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     CallLocal, U64Return,
     CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
@@ -320,10 +321,10 @@ trait BinaryArithmeticInstr extends ArithmeticInstr {
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      x   <- frame.pop()
-      y   <- frame.pop()
-      out <- op(x, y)
-      _   <- frame.push(out)
+      value2 <- frame.pop()
+      value1 <- frame.pop()
+      out    <- op(value1, value2)
+      _      <- frame.push(out)
     } yield ()
   }
 }
@@ -477,6 +478,67 @@ trait ControlInstr extends StatelessInstr
 trait If           extends ControlInstr
 trait IfElse       extends ControlInstr
 trait DoWhile      extends ControlInstr
+
+case class Offset(offset: Byte) extends ControlInstr {
+  override def serialize(): ByteString = ByteString(Offset.code, offset)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.offsetPC(Bytes.toPosInt(offset))
+  }
+}
+object Offset extends InstrCompanion1[Byte]
+
+trait BranchInstr[T] extends ControlInstr {
+  def code: Byte
+  def offset: Byte
+  def condition(value1: T, value2: T): Boolean
+
+  override def serialize(): ByteString = ByteString(code, offset)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value2 <- frame.popT[T]()
+      value1 <- frame.popT[T]()
+      _      <- if (condition(value1, value2)) frame.offsetPC(Bytes.toPosInt(offset)) else Right(())
+    } yield ()
+  }
+}
+case class IfEqU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfEqU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v == value2.v
+}
+object IfEqU64 extends InstrCompanion1[Byte]
+case class IfNeU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfNeU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v != value2.v
+}
+object IfNeU64 extends InstrCompanion1[Byte]
+case class IfLtU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfLtU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v < value2.v
+}
+object IfLtU64 extends InstrCompanion1[Byte]
+case class IfLeU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfLeU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v <= value2.v
+}
+object IfLeU64 extends InstrCompanion1[Byte]
+case class IfGtU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfGtU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v > value2.v
+}
+object IfGtU64 extends InstrCompanion1[Byte]
+case class IfGeU64(offset: Byte) extends BranchInstr[Val.U64] {
+  override def code: Byte = IfGeU64.code
+
+  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v >= value2.v
+}
+object IfGeU64 extends InstrCompanion1[Byte]
 
 trait CallInstr extends StatelessInstr
 case class CallLocal(index: Byte) extends CallInstr {
