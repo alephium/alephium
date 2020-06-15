@@ -26,6 +26,8 @@ class ParserSpec extends AlephiumSpec {
   it should "parse exprs" in {
     fastparse.parse("x + y", Parser.expr(_)).get.value is
       Binop(Add, Variable(Ident("x")), Variable(Ident("y")))
+    fastparse.parse("x >= y", Parser.expr(_)).get.value is
+      Binop(Ge, Variable(Ident("x")), Variable(Ident("y")))
     fastparse.parse("(x + y)", Parser.expr(_)).get.value is
       ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
     fastparse.parse("(x + y) + (x + y)", Parser.expr(_)).get.value is
@@ -56,6 +58,9 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
     fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
+    fastparse
+      .parse("if (x >= 1) { y = y + x } else { y = 0 }", Parser.statement(_))
+      .isSuccess is true
   }
 
   it should "parse functions" in {
@@ -185,13 +190,13 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test the following typical examples" in {
-    def test(input: String, args: AVector[Val]): Assertion = {
+    def test(input: String, args: AVector[Val], output: Seq[Val] = Seq.empty): Assertion = {
       val ast      = fastparse.parse(input, Parser.contract(_)).get.value
       val ctx      = ast.check()
       val contract = ast.toIR(ctx)
 
       deserialize[StatelessScript](serialize(contract)) isE contract
-      StatelessVM.execute(StatelessContext.test, contract, AVector.empty, args) isE Seq.empty[Val]
+      StatelessVM.execute(StatelessContext.test, contract, AVector.empty, args) isE output
     }
 
     test(
@@ -225,6 +230,23 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin,
       AVector.empty
+    )
+
+    test(
+      s"""
+         |contract Fibonacci() {
+         |  fn f(n: U64) -> (U64) {
+         |    if (n < 2) {
+         |      return n
+         |    }
+         |    else {
+         |      return f(n-1) + f(n-2)
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      AVector(Val.U64(U64.unsafe(10))),
+      Seq(Val.U64(U64.unsafe(55)))
     )
   }
 }

@@ -7,74 +7,6 @@ object Ast {
   final case class Ident(name: String)
   final case class CallId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
-  final case class Return(exprs: Seq[Expr]) {
-    def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
-      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(U64Return))
-  }
-
-  sealed trait Operator {
-    def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
-      if (argsType.length != 2 || argsType(0) != argsType(1) || !Val.Type.isNumeric(argsType(0))) {
-        throw Checker.Error(s"Invalid param types $argsType for $this")
-      } else Seq(argsType(0))
-    }
-    def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
-  }
-  case object Add extends Operator {
-    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-      argsType(0) match {
-        case Val.I64  => Seq(I64Add)
-        case Val.U64  => Seq(U64Add)
-        case Val.I256 => Seq(I256Add)
-        case Val.U256 => Seq(U256Add)
-        case _        => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  case object Sub extends Operator {
-    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-      argsType(0) match {
-        case Val.I64  => Seq(I64Sub)
-        case Val.U64  => Seq(U64Sub)
-        case Val.I256 => Seq(I256Sub)
-        case Val.U256 => Seq(U256Sub)
-        case _        => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  case object Mul extends Operator {
-    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-      argsType(0) match {
-        case Val.I64  => Seq(I64Mul)
-        case Val.U64  => Seq(U64Mul)
-        case Val.I256 => Seq(I256Mul)
-        case Val.U256 => Seq(U256Mul)
-        case _        => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  case object Div extends Operator {
-    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-      argsType(0) match {
-        case Val.I64  => Seq(I64Div)
-        case Val.U64  => Seq(U64Div)
-        case Val.I256 => Seq(I256Div)
-        case Val.U256 => Seq(U256Div)
-        case _        => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  case object Mod extends Operator {
-    override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-      argsType(0) match {
-        case Val.I64  => Seq(I64Mod)
-        case Val.U64  => Seq(U64Mod)
-        case Val.I256 => Seq(I256Mod)
-        case Val.U256 => Seq(U256Mod)
-        case _        => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
 
   sealed trait Expr {
     var tpe: Option[Seq[Val.Type]] = None
@@ -159,22 +91,18 @@ object Ast {
   final case class FuncDef(ident: Ident,
                            args: Seq[Argument],
                            rtypes: Seq[Val.Type],
-                           body: Seq[Statement],
-                           rStmt: Return) {
+                           body: Seq[Statement]) {
     def check(ctx: Checker.Ctx): Unit = {
       ctx.setFuncScope(ident)
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
       body.foreach(_.check(ctx))
-      val returnTypes = rStmt.exprs.flatMap(_.getType(ctx: Checker.Ctx))
-      if (!returnTypes.equals(rtypes))
-        throw Checker.Error(s"Invalid return types: expected $rtypes, got $returnTypes")
     }
 
     def toMethod(ctx: Checker.Ctx): Method[StatelessContext] = {
       ctx.setFuncScope(ident)
       val localVars  = ctx.getLocalVars(ident)
       val localsType = localVars.map(_.tpe)
-      val instrs     = body.flatMap(_.toIR(ctx)) ++ rStmt.toIR(ctx)
+      val instrs     = body.flatMap(_.toIR(ctx))
       Method[StatelessContext](AVector.from(localsType), AVector.from(instrs))
     }
   }
@@ -200,6 +128,49 @@ object Ast {
       val returnType = func.getReturnType(argsType)
       args.flatMap(_.toIR(ctx)) ++ func.toIR(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
+  }
+  final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
+      extends Statement {
+    override def check(ctx: Checker.Ctx): Unit = {
+      if (condition.getType(ctx) != Seq(Val.Bool)) {
+        throw Checker.Error(s"Invalid type of condition expr $condition")
+      } else {
+        ifBranch.foreach(_.check(ctx))
+        elseBranch.foreach(_.check(ctx))
+      }
+    }
+
+    override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
+      val elseIRs = elseBranch.flatMap(_.toIR(ctx))
+      val ifIRs   = ifBranch.flatMap(_.toIR(ctx)) :+ Offset(elseIRs.length.toByte)
+      if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
+        // TODO: support long branches
+        throw Checker.Error(s"Too many instrs for if-else branches")
+      }
+      val opIR = condition match {
+        case Binop(Eq, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfNeU64(ifIRs.length.toByte)
+        case Binop(Ne, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfEqU64(ifIRs.length.toByte)
+        case Binop(Lt, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfGeU64(ifIRs.length.toByte)
+        case Binop(Le, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfGtU64(ifIRs.length.toByte)
+        case Binop(Gt, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfLeU64(ifIRs.length.toByte)
+        case Binop(Ge, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) :+ IfLtU64(ifIRs.length.toByte)
+        case _ => ???
+      }
+      opIR ++ ifIRs ++ elseIRs
+    }
+  }
+  final case class Return(exprs: Seq[Expr]) extends Statement {
+    override def check(ctx: Checker.Ctx): Unit = {
+      ctx.checkReturn(exprs.flatMap(_.getType(ctx)))
+    }
+    def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
+      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(U64Return))
   }
 
   final case class Contract(ident: Ident, fields: Seq[Argument], funcs: Seq[FuncDef]) {

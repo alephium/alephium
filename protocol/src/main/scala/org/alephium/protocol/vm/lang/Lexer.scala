@@ -8,6 +8,7 @@ import fastparse.NoWhitespace._
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{I256, I64, U256, U64}
 
+// scalastyle:off number.of.methods
 object Lexer {
   def lowercase[_: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[_: P]: P[Unit] = P(CharIn("A-Z"))
@@ -54,14 +55,20 @@ object Lexer {
     case _      => Val.Bool(false)
   }
 
-  def opAdd[_: P]: P[Ast.Operator] = P("+").map(_ => Ast.Add)
-  def opSub[_: P]: P[Ast.Operator] = P("-").map(_ => Ast.Sub)
-  def opMul[_: P]: P[Ast.Operator] = P("*").map(_ => Ast.Mul)
-  def opDiv[_: P]: P[Ast.Operator] = P("/").map(_ => Ast.Div)
-  def opMod[_: P]: P[Ast.Operator] = P("%").map(_ => Ast.Mod)
+  def opAdd[_: P]: P[Operator] = P("+").map(_  => Add)
+  def opSub[_: P]: P[Operator] = P("-").map(_  => Sub)
+  def opMul[_: P]: P[Operator] = P("*").map(_  => Mul)
+  def opDiv[_: P]: P[Operator] = P("/").map(_  => Div)
+  def opMod[_: P]: P[Operator] = P("%").map(_  => Mod)
+  def opEq[_: P]: P[Operator]  = P("==").map(_ => Eq)
+  def opNe[_: P]: P[Operator]  = P("!=").map(_ => Ne)
+  def opLt[_: P]: P[Operator]  = P("<").map(_  => Lt)
+  def opLe[_: P]: P[Operator]  = P("<=").map(_ => Le)
+  def opGt[_: P]: P[Operator]  = P(">").map(_  => Gt)
+  def opGe[_: P]: P[Operator]  = P(">=").map(_ => Ge)
 
   // format: off
   def keywordSet: Set[String] =
-    Set("contract", "let", "mut", "fn", "return", "true", "false")
+    Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else")
   // format: on
 }

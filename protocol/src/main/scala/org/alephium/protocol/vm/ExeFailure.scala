@@ -26,3 +26,4 @@ case class InvalidMethodIndex(index: Int)                extends ExeFailure
 case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InvalidMethodParamsType                      extends ExeFailure
 case object EqualityFailed                               extends ExeFailure
+case object InvalidInstrOffset                           extends ExeFailure

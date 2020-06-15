@@ -14,14 +14,18 @@ object Parser {
   def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
   def call[_: P]: P[Ast.Call]                       = callAbs.map(Ast.Call.tupled)
 
-  def Chain[_: P](p: => P[Ast.Expr], op: => P[Ast.Operator]): P[Ast.Expr] =
+  def Chain[_: P](p: => P[Ast.Expr], op: => P[Operator]): P[Ast.Expr] =
     P(p ~ (op ~ p).rep).map {
       case (lhs, rhs) =>
         rhs.foldLeft(lhs) {
           case (acc, (op, right)) => Ast.Binop(op, acc, right)
         }
     }
-  def binop[_: P]: P[Ast.Expr]  = P(Chain(binop1, Lexer.opAdd | Lexer.opSub))
+  def binop[_: P]: P[Ast.Expr] =
+    P(
+      Chain(
+        binop1,
+        Lexer.opAdd | Lexer.opSub | Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt))
   def binop1[_: P]: P[Ast.Expr] = P(Chain(binop2, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
   def binop2[_: P]: P[Ast.Expr] = P(const | call | variable | parenExpr)
 
@@ -40,11 +44,17 @@ object Parser {
   def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P(Lexer.keyword("fn") ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ ret ~ "}")
+    P(Lexer.keyword("fn") ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
 
-  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall)
+  def condition[_: P]: P[Ast.Expr]        = P("(" ~ expr ~ ")")
+  def branch[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
+  def ifelse[_: P]: P[Ast.IfElse] =
+    P(Lexer.keyword("if") ~/ condition ~ branch ~ Lexer.keyword("else") ~/ branch)
+      .map(Ast.IfElse.tupled)
+
+  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | ret)
 
   def contract[_: P]: P[Ast.Contract] =
     P(Start ~ Lexer.keyword("contract") ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}")

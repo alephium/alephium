@@ -13,6 +13,14 @@ class Frame[Ctx <: Context](var pc: Int,
 
   def advancePC(): Unit = pc += 1
 
+  def offsetPC(offset: Int): ExeResult[Unit] = {
+    val newPC = pc + offset
+    if (newPC >= 0 && newPC < method.instrs.length) {
+      pc = newPC
+      Right(())
+    } else Left(InvalidInstrOffset)
+  }
+
   def complete(): Unit = pc = method.instrs.length
 
   def isComplete: Boolean = pc == method.instrs.length
@@ -73,6 +81,7 @@ class Frame[Ctx <: Context](var pc: Int,
   def execute(): ExeResult[Unit] = {
     currentInstr match {
       case Some(instr) =>
+        println(s"$instr; ${opStack.underlying.take(3).mkString(",")}; ${locals.mkString(",")}")
         instr.runWith(this).flatMap { _ =>
           advancePC()
           execute()
