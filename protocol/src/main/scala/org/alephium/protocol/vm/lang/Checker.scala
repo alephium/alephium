@@ -21,7 +21,7 @@ object Checker {
   final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Byte)
   class SimpleFunc(val name: String,
                    argsType: Seq[Val.Type],
-                   returnType: Seq[Val.Type],
+                   val returnType: Seq[Val.Type],
                    index: Byte)
       extends FuncInfo {
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
@@ -127,6 +127,12 @@ object Checker {
       val varInfo = getVariable(ident)
       if (varInfo.tpe != tpe) throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe}")
       if (!varInfo.isMutable) throw Error(s"Assign value to immutable variable $ident")
+    }
+
+    def checkReturn(returnType: Seq[Val.Type]): Unit = {
+      val rtype = funcIdents(scope).returnType
+      if (returnType != rtype)
+        throw Checker.Error(s"Invalid return types: expected $rtype, got $returnType")
     }
   }
   object Ctx {
