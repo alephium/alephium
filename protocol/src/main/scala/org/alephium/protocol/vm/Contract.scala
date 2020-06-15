@@ -8,6 +8,7 @@ trait ContractAddress
 
 final case class Method[Ctx <: Context](
     localsType: AVector[Val.Type],
+    returnType: AVector[Val.Type],
     instrs: AVector[Instr[Ctx]]
 ) {
   def check(args: AVector[Val]): ExeResult[Unit] = {
@@ -21,9 +22,9 @@ final case class Method[Ctx <: Context](
 
 object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct2(Method[StatelessContext], t => (t.localsType, t.instrs))
+    Serde.forProduct3(Method[StatelessContext], t => (t.localsType, t.returnType, t.instrs))
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct2(Method[StatefulContext], t => (t.localsType, t.instrs))
+    Serde.forProduct3(Method[StatefulContext], t => (t.localsType, t.returnType, t.instrs))
 }
 
 sealed trait Contract[Ctx <: Context] {
@@ -37,7 +38,7 @@ sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
   def startFrame(ctx: Ctx,
                  initVals: AVector[Val],
                  args: AVector[Val],
-                 returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val obj = this.toObject(initVals)
     Frame.build(ctx, obj, args: AVector[Val], returnTo)
   }

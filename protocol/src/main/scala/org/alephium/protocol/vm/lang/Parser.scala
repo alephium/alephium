@@ -32,7 +32,8 @@ object Parser {
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
   def expr[_: P]: P[Ast.Expr]           = P(binop | call | parenExpr | const | variable)
 
-  def ret[_: P]: P[Ast.Return] = P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.Return)
+  def ret[_: P]: P[Ast.ReturnStmt] =
+    P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt)
 
   def varDef[_: P]: P[Ast.VarDef] =
     P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map(Ast.VarDef.tupled)

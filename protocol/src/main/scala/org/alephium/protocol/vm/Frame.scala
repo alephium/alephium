@@ -5,9 +5,9 @@ import org.alephium.util.{AVector, Collection}
 class Frame[Ctx <: Context](var pc: Int,
                             obj: ContractObj[Ctx],
                             val opStack: Stack[Val],
-                            method: Method[Ctx],
+                            val method: Method[Ctx],
                             locals: Array[Val],
-                            val returnTo: Val => ExeResult[Unit],
+                            val returnTo: AVector[Val] => ExeResult[Unit],
                             val ctx: Ctx) {
   def currentInstr: Option[Instr[Ctx]] = method.instrs.get(pc)
 
@@ -81,7 +81,6 @@ class Frame[Ctx <: Context](var pc: Int,
   def execute(): ExeResult[Unit] = {
     currentInstr match {
       case Some(instr) =>
-        println(s"$instr; ${opStack.underlying.take(3).mkString(",")}; ${locals.mkString(",")}")
         instr.runWith(this).flatMap { _ =>
           advancePC()
           execute()
@@ -95,14 +94,14 @@ object Frame {
   def build[Ctx <: Context](ctx: Ctx,
                             obj: ScriptObj[Ctx],
                             args: AVector[Val],
-                            returnTo: Val => ExeResult[Unit]): Frame[Ctx] =
+                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] =
     build(ctx, obj, 0, args: AVector[Val], returnTo)
 
   def build[Ctx <: Context](ctx: Ctx,
                             obj: ContractObj[Ctx],
                             methodIndex: Int,
                             args: AVector[Val],
-                            returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
+                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val method = obj.code.methods(methodIndex)
     build(ctx, obj, method, args, returnTo)
   }
@@ -111,7 +110,7 @@ object Frame {
                             obj: ContractObj[Ctx],
                             method: Method[Ctx],
                             args: AVector[Val],
-                            returnTo: Val => ExeResult[Unit]): Frame[Ctx] = {
+                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
     new Frame[Ctx](0, obj, Stack.ofCapacity(stackMaxSize), method, locals, returnTo, ctx)
