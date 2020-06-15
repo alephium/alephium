@@ -503,6 +503,42 @@ trait BranchInstr[T] extends ControlInstr {
     } yield ()
   }
 }
+case class IfEqI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfEqI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v == value2.v
+}
+object IfEqI64 extends InstrCompanion1[Byte]
+case class IfNeI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfNeI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v != value2.v
+}
+object IfNeI64 extends InstrCompanion1[Byte]
+case class IfLtI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfLtI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v < value2.v
+}
+object IfLtI64 extends InstrCompanion1[Byte]
+case class IfLeI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfLeI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v <= value2.v
+}
+object IfLeI64 extends InstrCompanion1[Byte]
+case class IfGtI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfGtI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v > value2.v
+}
+object IfGtI64 extends InstrCompanion1[Byte]
+case class IfGeI64(offset: Byte) extends BranchInstr[Val.I64] {
+  override def code: Byte = IfGeI64.code
+
+  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v >= value2.v
+}
+object IfGeI64 extends InstrCompanion1[Byte]
 case class IfEqU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfEqU64.code
 
