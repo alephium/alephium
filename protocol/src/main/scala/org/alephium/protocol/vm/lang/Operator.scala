@@ -76,34 +76,126 @@ sealed trait TestOperator extends Operator {
       throw Checker.Error(s"Invalid param types $argsType for $this")
     } else Seq(Val.Bool)
   }
+
+  def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]]
 }
 case object Eq extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(EqI64)
+      case Val.U64  => Seq(EqU64)
+      case Val.I256 => Seq(EqI256)
+      case Val.U256 => Seq(EqU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfNeI64(offset))
+      case Val.U64  => Seq(IfNeU64(offset))
+      case Val.I256 => Seq(IfNeI256(offset))
+      case Val.U256 => Seq(IfNeU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
 case object Ne extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(NeI64)
+      case Val.U64  => Seq(NeU64)
+      case Val.I256 => Seq(NeI256)
+      case Val.U256 => Seq(NeU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfEqI64(offset))
+      case Val.U64  => Seq(IfEqU64(offset))
+      case Val.I256 => Seq(IfEqI256(offset))
+      case Val.U256 => Seq(IfEqU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
 case object Lt extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(LtI64)
+      case Val.U64  => Seq(LtU64)
+      case Val.I256 => Seq(LtI256)
+      case Val.U256 => Seq(LtU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfGeI64(offset))
+      case Val.U64  => Seq(IfGeU64(offset))
+      case Val.I256 => Seq(IfGeI256(offset))
+      case Val.U256 => Seq(IfGeU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
 case object Le extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(LeI64)
+      case Val.U64  => Seq(LeU64)
+      case Val.I256 => Seq(LeI256)
+      case Val.U256 => Seq(LeU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfGtI64(offset))
+      case Val.U64  => Seq(IfGtU64(offset))
+      case Val.I256 => Seq(IfGtI256(offset))
+      case Val.U256 => Seq(IfGtU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
 case object Gt extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(GtI64)
+      case Val.U64  => Seq(GtU64)
+      case Val.I256 => Seq(GtI256)
+      case Val.U256 => Seq(GtU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfLeI64(offset))
+      case Val.U64  => Seq(IfLeU64(offset))
+      case Val.I256 => Seq(IfLeI256(offset))
+      case Val.U256 => Seq(IfLeU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
 case object Ge extends TestOperator {
   override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
-    ???
+    argsType(0) match {
+      case Val.I64  => Seq(GeI64)
+      case Val.U64  => Seq(GeU64)
+      case Val.I256 => Seq(GeI256)
+      case Val.U256 => Seq(GeU256)
+      case _        => throw new RuntimeException("Dead branch")
+    }
+  }
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] = {
+    left(0) match {
+      case Val.I64  => Seq(IfLtI64(offset))
+      case Val.U64  => Seq(IfLtU64(offset))
+      case Val.I256 => Seq(IfLtI256(offset))
+      case Val.U256 => Seq(IfLtU256(offset))
+      case _        => throw new RuntimeException("Dead branch")
+    }
   }
 }
