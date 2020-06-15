@@ -103,7 +103,7 @@ object Ast {
       val localVars  = ctx.getLocalVars(ident)
       val localsType = localVars.map(_.tpe)
       val instrs     = body.flatMap(_.toIR(ctx))
-      Method[StatelessContext](AVector.from(localsType), AVector.from(instrs))
+      Method[StatelessContext](AVector.from(localsType), AVector.from(rtypes), AVector.from(instrs))
     }
   }
   final case class Assign(target: Ident, rhs: Expr) extends Statement {
@@ -148,29 +148,19 @@ object Ast {
         throw Checker.Error(s"Too many instrs for if-else branches")
       }
       val opIR = condition match {
-        case Binop(Eq, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfNeU64(ifIRs.length.toByte)
-        case Binop(Ne, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfEqU64(ifIRs.length.toByte)
-        case Binop(Lt, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfGeU64(ifIRs.length.toByte)
-        case Binop(Le, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfGtU64(ifIRs.length.toByte)
-        case Binop(Gt, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfLeU64(ifIRs.length.toByte)
-        case Binop(Ge, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) :+ IfLtU64(ifIRs.length.toByte)
+        case Binop(op: TestOperator, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), ifIRs.length.toByte)
         case _ => ???
       }
       opIR ++ ifIRs ++ elseIRs
     }
   }
-  final case class Return(exprs: Seq[Expr]) extends Statement {
+  final case class ReturnStmt(exprs: Seq[Expr]) extends Statement {
     override def check(ctx: Checker.Ctx): Unit = {
       ctx.checkReturn(exprs.flatMap(_.getType(ctx)))
     }
     def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] =
-      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(U64Return))
+      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
   }
 
   final case class Contract(ident: Ident, fields: Seq[Argument], funcs: Seq[FuncDef]) {

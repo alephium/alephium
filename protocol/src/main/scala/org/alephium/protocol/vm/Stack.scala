@@ -52,6 +52,14 @@ class Stack[@sp T: ClassTag] private (val
     }
   }
 
+  def push(elems: AVector[T]): ExeResult[Unit] = {
+    if (size + elems.length <= underlying.length) {
+      elems.foreachWithIndex((elem, index) => underlying(currentIndex + index) = elem)
+      currentIndex += elems.length
+      Right(())
+    } else Left(StackOverflow)
+  }
+
   def pop(): ExeResult[T] = {
     val elemIndex = currentIndex - 1
     if (elemIndex >= 0) {

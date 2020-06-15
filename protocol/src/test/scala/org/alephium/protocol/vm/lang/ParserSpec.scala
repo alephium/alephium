@@ -6,7 +6,7 @@ import org.alephium.crypto.ED25519
 import org.alephium.protocol.{ALF, vm}
 import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
 import org.alephium.serde._
-import org.alephium.util.{AVector, AlephiumSpec, U64}
+import org.alephium.util.{AVector, AlephiumSpec, I256, I64, U256, U64}
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
@@ -158,7 +158,7 @@ class ParserSpec extends AlephiumSpec {
                         contract,
                         AVector(Val.U64(U64.One)),
                         AVector(Val.U64(U64.Two))) isE
-      Seq(Val.U64(U64.unsafe(5)))
+      AVector[Val](Val.U64(U64.unsafe(5)))
   }
 
   it should "verify signature" in {
@@ -186,11 +186,11 @@ class ParserSpec extends AlephiumSpec {
       contract,
       AVector(Val.Byte32(pubKeyHash.toByte32)),
       AVector(Val.Byte32(pubKey.toByte32))
-    ) isE Seq.empty[Val]
+    ) isE AVector.empty[Val]
   }
 
   it should "test the following typical examples" in {
-    def test(input: String, args: AVector[Val], output: Seq[Val] = Seq.empty): Assertion = {
+    def test(input: String, args: AVector[Val], output: AVector[Val] = AVector.empty): Assertion = {
       val ast      = fastparse.parse(input, Parser.contract(_)).get.value
       val ctx      = ast.check()
       val contract = ast.toIR(ctx)
@@ -235,6 +235,23 @@ class ParserSpec extends AlephiumSpec {
     test(
       s"""
          |contract Fibonacci() {
+         |  fn f(n: I64) -> (I64) {
+         |    if (n < 2i) {
+         |      return n
+         |    }
+         |    else {
+         |      return f(n-1i) + f(n-2i)
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      AVector(Val.I64(I64.unsafe(10))),
+      AVector[Val](Val.I64(I64.unsafe(55)))
+    )
+
+    test(
+      s"""
+         |contract Fibonacci() {
          |  fn f(n: U64) -> (U64) {
          |    if (n < 2) {
          |      return n
@@ -246,7 +263,76 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin,
       AVector(Val.U64(U64.unsafe(10))),
-      Seq(Val.U64(U64.unsafe(55)))
+      AVector[Val](Val.U64(U64.unsafe(55)))
+    )
+
+    test(
+      s"""
+         |contract Fibonacci() {
+         |  fn f(n: I256) -> (I256) {
+         |    if (n < 2I) {
+         |      return n
+         |    }
+         |    else {
+         |      return f(n-1I) + f(n-2I)
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      AVector(Val.I256(I256.from(10))),
+      AVector[Val](Val.I256(I256.from(55)))
+    )
+
+    test(
+      s"""
+         |contract Fibonacci() {
+         |  fn f(n: U256) -> (U256) {
+         |    if (n < 2U) {
+         |      return n
+         |    }
+         |    else {
+         |      return f(n-1U) + f(n-2U)
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      AVector(Val.U256(U256.unsafe(10))),
+      AVector[Val](Val.U256(U256.unsafe(55)))
+    )
+
+    test(
+      s"""
+         |contract Test() {
+         |  fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
+         |    let b0 = 1 == 1
+         |    let b1 = 1 == 2
+         |    let b2 = 1 != 2
+         |    let b3 = 1 != 1
+         |    let b4 = 1 < 2
+         |    let b5 = 1 < 0
+         |    let b6 = 1 <= 2
+         |    let b7 = 1 <= 1
+         |    let b8 = 1 > 0
+         |    let b9 = 1 > 2
+         |    let b10 = 1 >= 0
+         |    let b11 = 1 >= 1
+         |    return b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector[Val](Val.True,
+                   Val.False,
+                   Val.True,
+                   Val.False,
+                   Val.True,
+                   Val.False,
+                   Val.True,
+                   Val.True,
+                   Val.True,
+                   Val.False,
+                   Val.True,
+                   Val.True)
     )
   }
 }

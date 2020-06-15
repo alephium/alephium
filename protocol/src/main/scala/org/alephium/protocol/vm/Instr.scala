@@ -62,9 +62,16 @@ object Instr {
     I64Const, U64Const, I256Const, U256Const,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
-    U64Add, U64Sub, U64Mul, U64Div, U64Mod,
-    Offset, IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
-    CallLocal, U64Return,
+    I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
+    U64Add,  U64Sub,  U64Mul,  U64Div,  U64Mod,  EqU64,  NeU64,  LtU64,  LeU64,  GtU64,  GeU64,
+    I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
+    U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
+    Offset,
+    IfEqI64, IfNeI64, IfLtI64, IfLeI64, IfGtI64, IfGeI64,
+    IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
+    IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
+    IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
+    CallLocal, Return,
     CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
     Keccak256Byte32, Keccak256ByteVec, CheckSignature
@@ -372,6 +379,42 @@ object BinaryArithmeticInstr {
         op(a.v, b.v).map(Val.U256.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
       case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
     }
+
+  @inline def i64Comp(
+      instr: ArithmeticInstr,
+      op: (util.I64, util.I64) => Boolean
+  )(x: Val, y: Val): ExeResult[Val.Bool] =
+    (x, y) match {
+      case (a: Val.I64, b: Val.I64) => Right(Val.Bool(op(a.v, b.v)))
+      case _                        => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
+  @inline def u64Comp(
+      instr: ArithmeticInstr,
+      op: (util.U64, util.U64) => Boolean
+  )(x: Val, y: Val): ExeResult[Val.Bool] =
+    (x, y) match {
+      case (a: Val.U64, b: Val.U64) => Right(Val.Bool(op(a.v, b.v)))
+      case _                        => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
+  @inline def i256Comp(
+      instr: ArithmeticInstr,
+      op: (util.I256, util.I256) => Boolean
+  )(x: Val, y: Val): ExeResult[Val.Bool] =
+    (x, y) match {
+      case (a: Val.I256, b: Val.I256) => Right(Val.Bool(op(a.v, b.v)))
+      case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
+  @inline def u256Comp(
+      instr: ArithmeticInstr,
+      op: (util.U256, util.U256) => Boolean
+  )(x: Val, y: Val): ExeResult[Val.Bool] =
+    (x, y) match {
+      case (a: Val.U256, b: Val.U256) => Right(Val.Bool(op(a.v, b.v)))
+      case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
+    }
 }
 object I64Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
@@ -393,6 +436,30 @@ object I64Mod extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i64SafeOp(this, _.mod(_))(x, y)
 }
+object EqI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.==(_))(x, y)
+}
+object NeI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.!=(_))(x, y)
+}
+object LtI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.<(_))(x, y)
+}
+object LeI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.<=(_))(x, y)
+}
+object GtI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.>(_))(x, y)
+}
+object GeI64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i64Comp(this, _.>=(_))(x, y)
+}
 object U64Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u64SafeOp(this, _.add(_))(x, y)
@@ -412,6 +479,30 @@ object U64Div extends BinaryArithmeticInstr {
 object U64Mod extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u64SafeOp(this, _.mod(_))(x, y)
+}
+object EqU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.==(_))(x, y)
+}
+object NeU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.!=(_))(x, y)
+}
+object LtU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.<(_))(x, y)
+}
+object LeU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.<=(_))(x, y)
+}
+object GtU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.>(_))(x, y)
+}
+object GeU64 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u64Comp(this, _.>=(_))(x, y)
 }
 object I256Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
@@ -433,6 +524,30 @@ object I256Mod extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mod(_))(x, y)
 }
+object EqI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.==(_))(x, y)
+}
+object NeI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.!=(_))(x, y)
+}
+object LtI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.<(_))(x, y)
+}
+object LeI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.<=(_))(x, y)
+}
+object GtI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.>(_))(x, y)
+}
+object GeI256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(this, _.>=(_))(x, y)
+}
 object U256Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
@@ -452,6 +567,30 @@ object U256Div extends BinaryArithmeticInstr {
 object U256Mod extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
+}
+object EqU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.==(_))(x, y)
+}
+object NeU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.!=(_))(x, y)
+}
+object LtU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.<(_))(x, y)
+}
+object LeU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.<=(_))(x, y)
+}
+object GtU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.>(_))(x, y)
+}
+object GeU256 extends BinaryArithmeticInstr {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
 }
 //object U64Neg extends ArithmeticInstr
 
@@ -575,6 +714,78 @@ case class IfGeU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v >= value2.v
 }
 object IfGeU64 extends InstrCompanion1[Byte]
+case class IfEqI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfEqI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v == value2.v
+}
+object IfEqI256 extends InstrCompanion1[Byte]
+case class IfNeI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfNeI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v != value2.v
+}
+object IfNeI256 extends InstrCompanion1[Byte]
+case class IfLtI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfLtI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v < value2.v
+}
+object IfLtI256 extends InstrCompanion1[Byte]
+case class IfLeI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfLeI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v <= value2.v
+}
+object IfLeI256 extends InstrCompanion1[Byte]
+case class IfGtI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfGtI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v > value2.v
+}
+object IfGtI256 extends InstrCompanion1[Byte]
+case class IfGeI256(offset: Byte) extends BranchInstr[Val.I256] {
+  override def code: Byte = IfGeI256.code
+
+  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v >= value2.v
+}
+object IfGeI256 extends InstrCompanion1[Byte]
+case class IfEqU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfEqU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v == value2.v
+}
+object IfEqU256 extends InstrCompanion1[Byte]
+case class IfNeU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfNeU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v != value2.v
+}
+object IfNeU256 extends InstrCompanion1[Byte]
+case class IfLtU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfLtU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v < value2.v
+}
+object IfLtU256 extends InstrCompanion1[Byte]
+case class IfLeU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfLeU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v <= value2.v
+}
+object IfLeU256 extends InstrCompanion1[Byte]
+case class IfGtU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfGtU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v > value2.v
+}
+object IfGtU256 extends InstrCompanion1[Byte]
+case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
+  override def code: Byte = IfGeU256.code
+
+  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v >= value2.v
+}
+object IfGeU256 extends InstrCompanion1[Byte]
 
 trait CallInstr extends StatelessInstr
 case class CallLocal(index: Byte) extends CallInstr {
@@ -591,10 +802,13 @@ object CallLocal   extends InstrCompanion1[Byte]
 trait CallExternal extends CallInstr
 
 trait ReturnInstr extends StatelessInstr
-case object U64Return extends ReturnInstr with InstrCompanion0 {
+case object Return extends ReturnInstr with InstrCompanion0 {
+
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val returnType = frame.method.returnType
     for {
-      value <- frame.pop()
+      value <- frame.opStack.pop(returnType.length)
+      _     <- if (value.map(_.tpe) == returnType) Right(()) else Left(InvalidReturnType)
       _     <- frame.returnTo(value)
     } yield frame.complete()
   }
