@@ -4,7 +4,7 @@ import scala.collection.mutable
 
 import org.alephium.protocol.vm._
 
-object Checker {
+object Compiler {
   trait FuncInfo {
     def name: String
     def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
@@ -132,7 +132,7 @@ object Checker {
     def checkReturn(returnType: Seq[Val.Type]): Unit = {
       val rtype = funcIdents(scope).returnType
       if (returnType != rtype)
-        throw Checker.Error(s"Invalid return types: expected $rtype, got $returnType")
+        throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
     }
   }
   object Ctx {
