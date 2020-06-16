@@ -1,7 +1,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Checker.{Error, FuncInfo}
+import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 
 object BuiltIn {
   case class SimpleBuiltIn(name: String,
