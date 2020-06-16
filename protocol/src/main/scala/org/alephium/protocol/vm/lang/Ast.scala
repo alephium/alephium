@@ -94,7 +94,7 @@ object Ast {
                            body: Seq[Statement]) {
     def check(ctx: Checker.Ctx): Unit = {
       ctx.setFuncScope(ident)
-      args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, isMutable = false))
+      args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, arg.isMutable))
       body.foreach(_.check(ctx))
     }
 
@@ -141,8 +141,9 @@ object Ast {
     }
 
     override def toIR(ctx: Checker.Ctx): Seq[Instr[StatelessContext]] = {
-      val elseIRs = elseBranch.flatMap(_.toIR(ctx))
-      val ifIRs   = ifBranch.flatMap(_.toIR(ctx)) :+ Offset(elseIRs.length.toByte)
+      val elseIRs  = elseBranch.flatMap(_.toIR(ctx))
+      val offsetIR = if (elseIRs.nonEmpty) Seq(Offset(elseIRs.length.toByte)) else Seq.empty
+      val ifIRs    = ifBranch.flatMap(_.toIR(ctx)) ++ offsetIR
       if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
         // TODO: support long branches
         throw Checker.Error(s"Too many instrs for if-else branches")

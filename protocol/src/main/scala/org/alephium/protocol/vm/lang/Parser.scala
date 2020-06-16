@@ -51,9 +51,10 @@ object Parser {
 
   def condition[_: P]: P[Ast.Expr]        = P("(" ~ expr ~ ")")
   def branch[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
+  def elseBranch[_: P]: P[Seq[Ast.Statement]] =
+    P((Lexer.keyword("else") ~/ branch).?).map(_.fold(Seq.empty[Ast.Statement])(identity))
   def ifelse[_: P]: P[Ast.IfElse] =
-    P(Lexer.keyword("if") ~/ condition ~ branch ~ Lexer.keyword("else") ~/ branch)
-      .map(Ast.IfElse.tupled)
+    P(Lexer.keyword("if") ~/ condition ~ branch ~ elseBranch).map(Ast.IfElse.tupled)
 
   def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | ret)
 

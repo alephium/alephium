@@ -334,5 +334,20 @@ class ParserSpec extends AlephiumSpec {
                    Val.True,
                    Val.True)
     )
+
+    test(
+      s"""
+         |contract Fibonacci() {
+         |  fn f(mut n: U64) -> (U64) {
+         |    if (n < 2) {
+         |      n = n + 1
+         |    }
+         |    return n
+         |  }
+         |}
+         |""".stripMargin,
+      AVector(Val.U64(U64.unsafe(2))),
+      AVector[Val](Val.U64(U64.unsafe(2)))
+    )
   }
 }
