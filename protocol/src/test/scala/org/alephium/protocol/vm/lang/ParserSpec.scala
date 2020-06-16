@@ -121,7 +121,7 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin
       val ast = fastparse.parse(contract, Parser.contract(_)).get.value
-      if (validity) ast.check() else assertThrows[Checker.Error](ast.check())
+      if (validity) ast.check() else assertThrows[Compiler.Error](ast.check())
     }
 
     check("mut", "a", "U64", "b", "U64", "U64", "foo", true)

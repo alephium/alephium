@@ -10,7 +10,7 @@ sealed trait Operator {
 sealed trait ArithOperator extends Operator {
   def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !Val.Type.isNumeric(argsType(0))) {
-      throw Checker.Error(s"Invalid param types $argsType for $this")
+      throw Compiler.Error(s"Invalid param types $argsType for $this")
     } else Seq(argsType(0))
   }
 }
@@ -73,7 +73,7 @@ case object Mod extends ArithOperator {
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !Val.Type.isNumeric(argsType(0))) {
-      throw Checker.Error(s"Invalid param types $argsType for $this")
+      throw Compiler.Error(s"Invalid param types $argsType for $this")
     } else Seq(Val.Bool)
   }
 
