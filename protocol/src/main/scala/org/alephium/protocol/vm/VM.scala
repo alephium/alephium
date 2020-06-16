@@ -12,7 +12,7 @@ trait VM[Ctx <: Context] {
               script: Script[Ctx],
               fields: AVector[Val],
               args: AVector[Val]): ExeResult[AVector[Val]] = {
-    val stack = Stack.ofCapacity[Frame[Ctx]](stackMaxSize)
+    val stack = Stack.ofCapacity[Frame[Ctx]](frameStackMaxSize)
     val rt    = Runtime[Ctx](stack)
 
     stack.push(script.startFrame(ctx, fields, args, value => Right(rt.returnTo = value)))
