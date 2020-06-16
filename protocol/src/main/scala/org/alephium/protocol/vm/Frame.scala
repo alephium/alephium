@@ -113,6 +113,6 @@ object Frame {
                             returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new Frame[Ctx](0, obj, Stack.ofCapacity(stackMaxSize), method, locals, returnTo, ctx)
+    new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
   }
 }
