@@ -39,6 +39,8 @@ class ParserSpec extends AlephiumSpec {
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u")))
+    fastparse.parse("foo(x)", Parser.expr(_)).get.value is
+      Call(CallId("foo", false), List(Variable(Ident("x"))))
     fastparse.parse("foo(x + y) + bar(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
@@ -337,7 +339,7 @@ class ParserSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |contract Foo() {
          |  fn f(mut n: U64) -> (U64) {
          |    if (n < 2) {
          |      n = n + 1

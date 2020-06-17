@@ -66,7 +66,7 @@ object Instr {
     U64Add,  U64Sub,  U64Mul,  U64Div,  U64Mod,  EqU64,  NeU64,  LtU64,  LeU64,  GtU64,  GeU64,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
-    Offset,
+    Offset, IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
     IfEqI64, IfNeI64, IfLtI64, IfLeI64, IfGtI64, IfGeI64,
     IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
@@ -592,7 +592,33 @@ object GeU256 extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
 }
-//object U64Neg extends ArithmeticInstr
+
+case object NotBool extends InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      bool <- frame.popT[Val.Bool]()
+      _    <- frame.push(bool.not)
+    } yield ()
+  }
+}
+case object AndBool extends InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      bool2 <- frame.popT[Val.Bool]()
+      bool1 <- frame.popT[Val.Bool]()
+      _     <- frame.push(bool1.and(bool2))
+    } yield ()
+  }
+}
+case object OrBool extends InstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      bool2 <- frame.popT[Val.Bool]()
+      bool1 <- frame.popT[Val.Bool]()
+      _     <- frame.push(bool1.or(bool2))
+    } yield ()
+  }
+}
 
 trait ConversionInstr extends StatelessInstr
 trait ToI32           extends ConversionInstr
@@ -627,6 +653,33 @@ case class Offset(offset: Byte) extends ControlInstr {
 }
 object Offset extends InstrCompanion1[Byte]
 
+trait IfJumpInstr extends ControlInstr {
+  def code: Byte
+  def offset: Byte
+  def condition(value: Val.Bool): Boolean
+
+  override def serialize(): ByteString = ByteString(code, offset)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.popT[Val.Bool]()
+      _     <- if (condition(value)) frame.offsetPC(Bytes.toPosInt(offset)) else Right(())
+    } yield ()
+  }
+}
+case class IfTrue(offset: Byte) extends IfJumpInstr {
+  override def code: Byte = IfTrue.code
+
+  override def condition(value: Val.Bool): Boolean = value.v
+}
+case object IfTrue extends InstrCompanion1[Byte]
+case class IfFalse(offset: Byte) extends IfJumpInstr {
+  override def code: Byte = IfFalse.code
+
+  override def condition(value: Val.Bool): Boolean = !value.v
+}
+case object IfFalse extends InstrCompanion1[Byte]
+
 trait BranchInstr[T] extends ControlInstr {
   def code: Byte
   def offset: Byte
@@ -642,6 +695,30 @@ trait BranchInstr[T] extends ControlInstr {
     } yield ()
   }
 }
+case class IfAnd(offset: Byte) extends BranchInstr[Val.Bool] {
+  override def code: Byte = IfAnd.code
+
+  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v && value2.v
+}
+case object IfAnd extends InstrCompanion1[Byte]
+case class IfOr(offset: Byte) extends BranchInstr[Val.Bool] {
+  override def code: Byte = IfOr.code
+
+  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v || value2.v
+}
+case object IfOr extends InstrCompanion1[Byte]
+case class IfNotAnd(offset: Byte) extends BranchInstr[Val.Bool] {
+  override def code: Byte = IfNotAnd.code
+
+  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v && value2.v)
+}
+case object IfNotAnd extends InstrCompanion1[Byte]
+case class IfNotOr(offset: Byte) extends BranchInstr[Val.Bool] {
+  override def code: Byte = IfNotOr.code
+
+  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v || value2.v)
+}
+case object IfNotOr extends InstrCompanion1[Byte]
 case class IfEqI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfEqI64.code
 

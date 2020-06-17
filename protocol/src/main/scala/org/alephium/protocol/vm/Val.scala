@@ -31,7 +31,12 @@ object Val {
   }
 
   // TODO: optimize using value class
-  final case class Bool(v: Boolean)         extends Val { def tpe: Val.Type = Bool }
+  final case class Bool(v: Boolean) extends Val {
+    def tpe: Val.Type                  = Bool
+    def not: Val.Bool                  = Bool(!v)
+    def and(other: Val.Bool): Val.Bool = Val.Bool(v && other.v)
+    def or(other: Val.Bool): Val.Bool  = Val.Bool(v || other.v)
+  }
   final case class Byte(v: scala.Byte)      extends Val { def tpe: Val.Type = Byte }
   final case class I64(v: util.I64)         extends Val { def tpe: Val.Type = I64 }
   final case class U64(v: util.U64)         extends Val { def tpe: Val.Type = U64 }
