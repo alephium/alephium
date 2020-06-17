@@ -51,6 +51,15 @@ object Ast {
       else Seq(LoadLocal(varInfo.index))
     }
   }
+  final case class UnaryOp(op: Operator, expr: Expr) extends Expr {
+    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+      op.getReturnType(expr.getType(ctx))
+    }
+
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      expr.toIR(ctx) ++ op.toIR(expr.getType(ctx))
+    }
+  }
   final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
       op.getReturnType(left.getType(ctx) ++ right.getType(ctx))
@@ -140,6 +149,19 @@ object Ast {
       }
     }
 
+    @inline private def getOpIR(condition: Expr,
+                                ctx: Compiler.Ctx,
+                                ifIRsLen: Byte): Seq[Instr[StatelessContext]] = {
+      condition match {
+        case Binop(op: TestOperator, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), ifIRsLen)
+        case UnaryOp(op: LogicalOperator, expr) =>
+          expr.toIR(ctx) ++ op.toBranchIR(expr.getType(ctx), ifIRsLen)
+        case _ =>
+          condition.toIR(ctx) :+ IfFalse(ifIRsLen)
+      }
+    }
+
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       val elseIRs  = elseBranch.flatMap(_.toIR(ctx))
       val offsetIR = if (elseIRs.nonEmpty) Seq(Offset(elseIRs.length.toByte)) else Seq.empty
@@ -148,11 +170,7 @@ object Ast {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
-      val opIR = condition match {
-        case Binop(op: TestOperator, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), ifIRs.length.toByte)
-        case _ => ???
-      }
+      val opIR = getOpIR(condition, ctx, ifIRs.length.toByte)
       opIR ++ ifIRs ++ elseIRs
     }
   }
