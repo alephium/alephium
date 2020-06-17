@@ -12,6 +12,10 @@ class ParserSpec extends AlephiumSpec {
   import Ast._
 
   it should "parse lexer" in {
+    fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
+    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
+    fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
+    fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
@@ -41,11 +45,13 @@ class ParserSpec extends AlephiumSpec {
         Variable(Ident("u")))
     fastparse.parse("foo(x)", Parser.expr(_)).get.value is
       Call(CallId("foo", false), List(Variable(Ident("x"))))
-    fastparse.parse("foo(x + y) + bar(x + y)", Parser.expr(_)).get.value is
+    fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
+      Call(CallId("foo", true), List(Variable(Ident("x"))))
+    fastparse.parse("foo(x + y) + bar!(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
         Call(CallId("foo", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
-        Call(CallId("bar", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        Call(CallId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
   }
 
@@ -137,7 +143,21 @@ class ParserSpec extends AlephiumSpec {
     check("mut", "a", "U64", "b", "U64", "U64", "add")
   }
 
-  it should "generate IR code" in {
+  trait Fixture {
+    def test(input: String,
+             args: AVector[Val],
+             output: AVector[Val] = AVector.empty,
+             fields: AVector[Val] = AVector.empty): Assertion = {
+      val ast      = fastparse.parse(input, Parser.contract(_)).get.value
+      val ctx      = ast.check()
+      val contract = ast.toIR(ctx)
+
+      deserialize[StatelessScript](serialize(contract)) isE contract
+      StatelessVM.execute(StatelessContext.test, contract, fields, args) isE output
+    }
+  }
+
+  it should "generate IR code" in new Fixture {
     val input =
       s"""
          |contract Foo(x: U64) {
@@ -151,16 +171,11 @@ class ParserSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val ast      = fastparse.parse(input, Parser.contract(_)).get.value
-    val ctx      = ast.check()
-    val contract = ast.toIR(ctx)
 
-    deserialize[StatelessScript](serialize(contract)) isE contract
-    StatelessVM.execute(StatelessContext.test,
-                        contract,
-                        AVector(Val.U64(U64.One)),
-                        AVector(Val.U64(U64.Two))) isE
-      AVector[Val](Val.U64(U64.unsafe(5)))
+    test(input,
+         AVector(Val.U64(U64.Two)),
+         AVector(Val.U64(U64.unsafe(5))),
+         AVector(Val.U64(U64.One)))
   }
 
   it should "verify signature" in {
@@ -191,16 +206,24 @@ class ParserSpec extends AlephiumSpec {
     ) isE AVector.empty[Val]
   }
 
-  it should "test the following typical examples" in {
-    def test(input: String, args: AVector[Val], output: AVector[Val] = AVector.empty): Assertion = {
-      val ast      = fastparse.parse(input, Parser.contract(_)).get.value
-      val ctx      = ast.check()
-      val contract = ast.toIR(ctx)
+  it should "converse values" in new Fixture {
+    test(
+      s"""
+         |contract Conversion() {
+         |  fn main() -> () {
+         |    let mut x = 5u
+         |    x = u64!(5i)
+         |    x = u64!(5I)
+         |    x = u64!(5U)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty
+    )
+  }
 
-      deserialize[StatelessScript](serialize(contract)) isE contract
-      StatelessVM.execute(StatelessContext.test, contract, AVector.empty, args) isE output
-    }
-
+  it should "test the following typical examples" in new Fixture {
     test(
       s"""
          |contract Main() {
@@ -247,8 +270,8 @@ class ParserSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin,
-      AVector(Val.I64(I64.unsafe(10))),
-      AVector[Val](Val.I64(I64.unsafe(55)))
+      AVector(Val.I64(I64.from(10))),
+      AVector[Val](Val.I64(I64.from(55)))
     )
 
     test(

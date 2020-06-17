@@ -66,6 +66,11 @@ object Instr {
     U64Add,  U64Sub,  U64Mul,  U64Div,  U64Mod,  EqU64,  NeU64,  LtU64,  LeU64,  GtU64,  GeU64,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
+                ByteToI64, ByteToU64, ByteToI256, ByteToU256,
+    I64ToByte,             I64ToU64,  I64ToI256,  I64ToU256,
+    U64ToByte,  U64ToI64,             U64ToI256,  U64ToU256,
+    I256ToByte, I256ToI64, I256ToU64,             I256ToU256,
+    U256ToByte, U256ToI64, U256ToU64, U256ToI256,
     Offset, IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
     IfEqI64, IfNeI64, IfLtI64, IfLeI64, IfGtI64, IfGeI64,
     IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
@@ -204,9 +209,9 @@ object I64ConstN1 extends ConstInstr0 { val const: Val = Val.I64(util.I64.NegOne
 object I64Const0  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Zero) }
 object I64Const1  extends ConstInstr0 { val const: Val = Val.I64(util.I64.One) }
 object I64Const2  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Two) }
-object I64Const3  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(3)) }
-object I64Const4  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(4)) }
-object I64Const5  extends ConstInstr0 { val const: Val = Val.I64(util.I64.unsafe(5)) }
+object I64Const3  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(3)) }
+object I64Const4  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(4)) }
+object I64Const5  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(5)) }
 
 object U64Const0 extends ConstInstr0 { val const: Val = Val.U64(util.U64.Zero) }
 object U64Const1 extends ConstInstr0 { val const: Val = Val.U64(util.U64.One) }
@@ -620,13 +625,126 @@ case object OrBool extends InstrCompanion0 {
   }
 }
 
-trait ConversionInstr extends StatelessInstr
-trait ToI32           extends ConversionInstr
-trait ToU32           extends ConversionInstr
-trait ToI64           extends ConversionInstr
-trait ToU64           extends ConversionInstr
-trait ToI256          extends ConversionInstr
-trait ToU256          extends ConversionInstr
+trait ConversionInstr[R <: Val, U <: Val] extends InstrCompanion0 {
+  def converse(from: R): ExeResult[U]
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popT[R]()
+      to   <- converse(from)
+      _    <- frame.push(to)
+    } yield ()
+  }
+}
+
+case object ByteToI64 extends ConversionInstr[Val.Byte, Val.I64] {
+  override def converse(from: Val.Byte): ExeResult[Val.I64] = {
+    Right(Val.I64(util.I64.from(from.v & 0xFFL)))
+  }
+}
+case object ByteToU64 extends ConversionInstr[Val.Byte, Val.U64] {
+  override def converse(from: Val.Byte): ExeResult[Val.U64] = {
+    Right(Val.U64(util.U64.unsafe(from.v & 0xFFL)))
+  }
+}
+case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] {
+  override def converse(from: Val.Byte): ExeResult[Val.I256] = {
+    Right(Val.I256(util.I256.from(from.v & 0xFFL)))
+  }
+}
+case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] {
+  override def converse(from: Val.Byte): ExeResult[Val.U256] = {
+    Right(Val.U256(util.U256.unsafe(from.v & 0xFFL)))
+  }
+}
+
+case object I64ToByte extends ConversionInstr[Val.I64, Val.Byte] {
+  override def converse(from: Val.I64): ExeResult[Val.Byte] = {
+    val underlying = from.v.v
+    if (underlying >= 0 && underlying < 0x100) Right(Val.Byte(underlying.toByte)) // unsigned Byte
+    else Left(InvalidConversion(from, Val.Byte))
+  }
+}
+case object I64ToU64 extends ConversionInstr[Val.I64, Val.U64] {
+  override def converse(from: Val.I64): ExeResult[Val.U64] = {
+    util.U64.fromI64(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
+  }
+}
+case object I64ToI256 extends ConversionInstr[Val.I64, Val.I256] {
+  override def converse(from: Val.I64): ExeResult[Val.I256] = {
+    Right(Val.I256(util.I256.fromI64(from.v)))
+  }
+}
+case object I64ToU256 extends ConversionInstr[Val.I64, Val.U256] {
+  override def converse(from: Val.I64): ExeResult[Val.U256] = {
+    util.U256.fromI64(from.v).map(Val.U256.apply).toRight(InvalidConversion(from, Val.U256))
+  }
+}
+
+case object U64ToByte extends ConversionInstr[Val.U64, Val.Byte] {
+  override def converse(from: Val.U64): ExeResult[Val.Byte] = {
+    val underlying = from.v.v
+    if (underlying < 0x100) Right(Val.Byte(underlying.toByte)) // unsigned Byte
+    else Left(InvalidConversion(from, Val.Byte))
+  }
+}
+case object U64ToI64 extends ConversionInstr[Val.U64, Val.I64] {
+  override def converse(from: Val.U64): ExeResult[Val.I64] = {
+    util.I64.fromU64(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
+  }
+}
+case object U64ToI256 extends ConversionInstr[Val.U64, Val.I256] {
+  override def converse(from: Val.U64): ExeResult[Val.I256] = {
+    Right(Val.I256(util.I256.fromU64(from.v)))
+  }
+}
+case object U64ToU256 extends ConversionInstr[Val.U64, Val.U256] {
+  override def converse(from: Val.U64): ExeResult[Val.U256] = {
+    Right(Val.U256(util.U256.fromU64(from.v)))
+  }
+}
+
+case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] {
+  override def converse(from: Val.I256): ExeResult[Val.Byte] = {
+    I256ToI64.converse(from).flatMap(I64ToByte.converse) // TODO: optimize this
+  }
+}
+case object I256ToI64 extends ConversionInstr[Val.I256, Val.I64] {
+  override def converse(from: Val.I256): ExeResult[Val.I64] = {
+    util.I64.fromI256(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
+  }
+}
+case object I256ToU64 extends ConversionInstr[Val.I256, Val.U64] {
+  override def converse(from: Val.I256): ExeResult[Val.U64] = {
+    util.U64.fromI256(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
+  }
+}
+case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] {
+  override def converse(from: Val.I256): ExeResult[Val.U256] = {
+    util.U256.fromI256(from.v).map(Val.U256.apply).toRight(InvalidConversion(from, Val.U256))
+  }
+}
+
+case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] {
+  override def converse(from: Val.U256): ExeResult[Val.Byte] = {
+    U256ToU64.converse(from).flatMap(U64ToByte.converse)
+  }
+}
+case object U256ToI64 extends ConversionInstr[Val.U256, Val.I64] {
+  override def converse(from: Val.U256): ExeResult[Val.I64] = {
+    util.I64.fromU256(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
+  }
+}
+case object U256ToU64 extends ConversionInstr[Val.U256, Val.U64] {
+  override def converse(from: Val.U256): ExeResult[Val.U64] = {
+    util.U64.fromU256(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
+  }
+}
+case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] {
+  override def converse(from: Val.U256): ExeResult[Val.I256] = {
+    util.I256.fromU256(from.v).map(Val.I256.apply).toRight(InvalidConversion(from, Val.I256))
+  }
+}
 
 trait ObjectInstr   extends StatelessInstr
 trait NewBooleanVec extends ObjectInstr

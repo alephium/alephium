@@ -43,12 +43,22 @@ object Lexer {
     case ("-", i) => i.negate()
     case (_, i)   => i
   }
-  def typedNum[_: P]: P[Val] = P(num ~ ("i" | "u" | "I" | "U").?.!).map {
-    case (n, "i") => Val.I64(I64.from(n).get)
-    case (n, "I") => Val.I256(I256.from(n).get)
-    case (n, "U") => Val.U256(U256.from(n).get)
-    case (n, _)   => Val.U64(U64.from(n).get)
-  }
+  def typedNum[_: P]: P[Val] =
+    P(num ~ ("i" | "u" | "I" | "U" | "b").?.!)
+      .filter {
+        case (n, "i") => I64.validate(n)
+        case (n, "I") => I256.validate(n)
+        case (n, "U") => U256.validate(n)
+        case (n, "b") => n.signum() >= 0 && n.bitLength() <= 8 // unsigned Byte
+        case (n, _)   => U64.validate(n)
+      }
+      .map {
+        case (n, "i") => Val.I64(I64.from(n).get)
+        case (n, "I") => Val.I256(I256.from(n).get)
+        case (n, "U") => Val.U256(U256.from(n).get)
+        case (n, "b") => Val.Byte(n.byteValue())
+        case (n, _)   => Val.U64(U64.from(n).get)
+      }
 
   def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
     case "true" => Val.Bool(true)
