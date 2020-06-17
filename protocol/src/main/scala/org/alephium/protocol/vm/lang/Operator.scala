@@ -199,3 +199,36 @@ case object Ge extends TestOperator {
     }
   }
 }
+
+trait LogicalOperator extends TestOperator
+case object Not extends LogicalOperator {
+  override def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
+    if (argsType.length != 1 || argsType(0) != Val.Bool) {
+      throw Compiler.Error(s"Invalid param types $argsType for $this")
+    } else Seq(Val.Bool)
+  }
+
+  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
+
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
+    Seq(IfTrue(offset))
+}
+trait BinaryLogicalOperator extends LogicalOperator {
+  override def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
+    if (argsType.length != 2 || argsType(0) != Val.Bool || argsType(1) != Val.Bool) {
+      throw Compiler.Error(s"Invalid param types $argsType for $this")
+    } else Seq(Val.Bool)
+  }
+}
+case object And extends BinaryLogicalOperator {
+  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
+
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
+    Seq(IfNotAnd(offset))
+}
+case object Or extends BinaryLogicalOperator {
+  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
+
+  override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
+    Seq(IfNotOr(offset))
+}

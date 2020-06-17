@@ -55,17 +55,20 @@ object Lexer {
     case _      => Val.Bool(false)
   }
 
-  def opAdd[_: P]: P[Operator] = P("+").map(_  => Add)
-  def opSub[_: P]: P[Operator] = P("-").map(_  => Sub)
-  def opMul[_: P]: P[Operator] = P("*").map(_  => Mul)
-  def opDiv[_: P]: P[Operator] = P("/").map(_  => Div)
-  def opMod[_: P]: P[Operator] = P("%").map(_  => Mod)
-  def opEq[_: P]: P[Operator]  = P("==").map(_ => Eq)
-  def opNe[_: P]: P[Operator]  = P("!=").map(_ => Ne)
-  def opLt[_: P]: P[Operator]  = P("<").map(_  => Lt)
-  def opLe[_: P]: P[Operator]  = P("<=").map(_ => Le)
-  def opGt[_: P]: P[Operator]  = P(">").map(_  => Gt)
-  def opGe[_: P]: P[Operator]  = P(">=").map(_ => Ge)
+  def opAdd[_: P]: P[Operator]        = P("+").map(_  => Add)
+  def opSub[_: P]: P[Operator]        = P("-").map(_  => Sub)
+  def opMul[_: P]: P[Operator]        = P("*").map(_  => Mul)
+  def opDiv[_: P]: P[Operator]        = P("/").map(_  => Div)
+  def opMod[_: P]: P[Operator]        = P("%").map(_  => Mod)
+  def opEq[_: P]: P[TestOperator]     = P("==").map(_ => Eq)
+  def opNe[_: P]: P[TestOperator]     = P("!=").map(_ => Ne)
+  def opLt[_: P]: P[TestOperator]     = P("<").map(_  => Lt)
+  def opLe[_: P]: P[TestOperator]     = P("<=").map(_ => Le)
+  def opGt[_: P]: P[TestOperator]     = P(">").map(_  => Gt)
+  def opGe[_: P]: P[TestOperator]     = P(">=").map(_ => Ge)
+  def opAnd[_: P]: P[LogicalOperator] = P("&&").map(_ => And)
+  def opOr[_: P]: P[LogicalOperator]  = P("||").map(_ => Or)
+  def opNot[_: P]: P[LogicalOperator] = P("!").map(_  => Not)
 
   // format: off
   def keywordSet: Set[String] =

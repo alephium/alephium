@@ -4,6 +4,7 @@ import fastparse._
 
 import org.alephium.protocol.vm.Val
 
+// scalastyle:off number.of.methods
 object Parser {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] =>
     Lexer.emptyChars(ctx)
@@ -14,23 +15,25 @@ object Parser {
   def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
   def call[_: P]: P[Ast.Call]                       = callAbs.map(Ast.Call.tupled)
 
-  def Chain[_: P](p: => P[Ast.Expr], op: => P[Operator]): P[Ast.Expr] =
+  def chain[_: P](p: => P[Ast.Expr], op: => P[Operator]): P[Ast.Expr] =
     P(p ~ (op ~ p).rep).map {
       case (lhs, rhs) =>
         rhs.foldLeft(lhs) {
           case (acc, (op, right)) => Ast.Binop(op, acc, right)
         }
     }
-  def binop[_: P]: P[Ast.Expr] =
-    P(
-      Chain(
-        binop1,
-        Lexer.opAdd | Lexer.opSub | Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt))
-  def binop1[_: P]: P[Ast.Expr] = P(Chain(binop2, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
-  def binop2[_: P]: P[Ast.Expr] = P(const | call | variable | parenExpr)
+
+  def expr[_: P]: P[Ast.Expr]    = P(chain(andExpr, Lexer.opOr))
+  def andExpr[_: P]: P[Ast.Expr] = P(chain(eqExpr, Lexer.opAdd))
+  def eqExpr[_: P]: P[Ast.Expr]  = P(chain(relationExpr, Lexer.opEq | Lexer.opNe))
+  def relationExpr[_: P]: P[Ast.Expr] =
+    P(chain(arithExpr0, P(Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)))
+  def arithExpr0[_: P]: P[Ast.Expr] = P(chain(arithExpr1, Lexer.opAdd | Lexer.opSub))
+  def arithExpr1[_: P]: P[Ast.Expr] = P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
+  def unaryExpr[_: P]: P[Ast.Expr]  = P(atom | (Lexer.opNot ~ unaryExpr).map(Ast.UnaryOp.tupled))
+  def atom[_: P]: P[Ast.Expr]       = P(const | call | variable | parenExpr)
 
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
-  def expr[_: P]: P[Ast.Expr]           = P(binop | call | parenExpr | const | variable)
 
   def ret[_: P]: P[Ast.ReturnStmt] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt)
