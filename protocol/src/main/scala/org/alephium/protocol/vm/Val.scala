@@ -37,6 +37,7 @@ object Val {
     def and(other: Val.Bool): Val.Bool = Val.Bool(v && other.v)
     def or(other: Val.Bool): Val.Bool  = Val.Bool(v || other.v)
   }
+  // Byte are unsigned ints from [0, 0xFF]
   final case class Byte(v: scala.Byte)      extends Val { def tpe: Val.Type = Byte }
   final case class I64(v: util.I64)         extends Val { def tpe: Val.Type = I64 }
   final case class U64(v: util.U64)         extends Val { def tpe: Val.Type = U64 }

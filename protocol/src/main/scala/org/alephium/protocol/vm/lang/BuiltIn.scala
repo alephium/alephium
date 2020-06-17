@@ -2,6 +2,7 @@ package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
+import org.alephium.util.AVector
 
 object BuiltIn {
   case class SimpleBuiltIn(name: String,
@@ -47,9 +48,97 @@ object BuiltIn {
   val keccak256      = SimpleBuiltIn("keccak256", Seq(Val.Byte32), Seq(Val.Byte32), Keccak256Byte32)
   val checkSignature = SimpleBuiltIn("checkSignature", Seq(Val.Byte32), Seq(), CheckSignature)
 
+  abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
+    import ConversionBuiltIn.validTypes
+
+    def toType: Val.Type
+
+    def validate(tpe: Val.Type): Boolean = validTypes.contains(tpe) && (tpe != toType)
+
+    override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
+      if (inputType.length != 1 || !validate(inputType(0))) {
+        throw Error(s"Invalid args type $inputType for builtin func $name")
+      } else Seq(toType)
+    }
+  }
+  object ConversionBuiltIn {
+    val validTypes = AVector[Val.Type](Val.Byte, Val.I64, Val.U64, Val.I256, Val.U256)
+  }
+
+  val toByte = new ConversionBuiltIn("byte") {
+    override def toType: Val.Type = Val.Byte
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Val.I64  => Seq(I64ToByte)
+        case Val.U64  => Seq(U64ToByte)
+        case Val.I256 => Seq(I256ToByte)
+        case Val.U256 => Seq(U256ToByte)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+  val toI64 = new ConversionBuiltIn("i64") {
+    override def toType: Val.Type = Val.I64
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Val.Byte => Seq(ByteToI64)
+        case Val.U64  => Seq(U64ToI64)
+        case Val.I256 => Seq(I256ToI64)
+        case Val.U256 => Seq(U256ToI64)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+  val toU64 = new ConversionBuiltIn("u64") {
+    override def toType: Val.Type = Val.U64
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Val.Byte => Seq(ByteToU64)
+        case Val.I64  => Seq(I64ToU64)
+        case Val.I256 => Seq(I256ToU64)
+        case Val.U256 => Seq(U256ToU64)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+  val toI256 = new ConversionBuiltIn("i256") {
+    override def toType: Val.Type = Val.I256
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Val.Byte => Seq(ByteToI256)
+        case Val.I64  => Seq(I64ToI256)
+        case Val.U64  => Seq(U64ToI256)
+        case Val.U256 => Seq(U256ToI256)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+  val toU256 = new ConversionBuiltIn("u256") {
+    override def toType: Val.Type = Val.U256
+
+    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Val.Byte => Seq(ByteToU256)
+        case Val.I64  => Seq(I64ToU256)
+        case Val.U64  => Seq(U64ToU256)
+        case Val.I256 => Seq(I256ToU256)
+        case _        => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+
   val funcs: Map[String, FuncInfo] = Seq(
-    BuiltIn.keccak256,
-    BuiltIn.checkEq,
-    BuiltIn.checkSignature,
+    keccak256,
+    checkEq,
+    checkSignature,
+    toByte,
+    toI64,
+    toU64,
+    toI256,
+    toU256
   ).map(f => f.name -> f).toMap
 }
