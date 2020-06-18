@@ -43,6 +43,18 @@ class CompilerSpec extends AlephiumSpec {
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u")))
+    fastparse.parse("x < y <= y < z", Parser.expr(_)).get.value is
+      Binop(
+        And,
+        Binop(
+          And,
+          Binop(Lt, Variable(Ident("x")), Variable(Ident("y"))),
+          Binop(Le, Variable(Ident("y")), Variable(Ident("y")))
+        ),
+        Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
+      )
+    fastparse.parse("x && y || z", Parser.expr(_)).get.value is
+      Binop(Or, Binop(And, Variable(Ident("x")), Variable(Ident("y"))), Variable(Ident("z")))
     fastparse.parse("foo(x)", Parser.expr(_)).get.value is
       Call(CallId("foo", false), List(Variable(Ident("x"))))
     fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
@@ -406,5 +418,21 @@ class CompilerSpec extends AlephiumSpec {
       AVector(Val.U64(U64.MaxValue divUnsafe U64.unsafe(10)),
               Val.U64(U64.MaxValue divUnsafe U64.unsafe(100)))
     )
+  }
+
+  it should "test operator precedence" in new Fixture {
+    val contract =
+      s"""
+         |contract Operator() {
+         |  fn main() -> (U64, Bool, Bool) {
+         |    let x = 1 + 2 * 3 - 2 / 2
+         |    let y = 1 < 2 <= 2 < 3
+         |    let z = !false && false || false
+         |
+         |    return x, y, z
+         |  }
+         |}
+         |""".stripMargin
+    test(contract, AVector.empty, AVector(Val.U64(U64.unsafe(6)), Val.True, Val.False))
   }
 }
