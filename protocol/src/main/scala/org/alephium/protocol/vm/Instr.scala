@@ -66,6 +66,7 @@ object Instr {
     U64Add,  U64Sub,  U64Mul,  U64Div,  U64Mod,  EqU64,  NeU64,  LtU64,  LeU64,  GtU64,  GeU64,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
+    NotBool, AndBool, OrBool,
                 ByteToI64, ByteToU64, ByteToI256, ByteToU256,
     I64ToByte,             I64ToU64,  I64ToI256,  I64ToU256,
     U64ToByte,  U64ToI64,             U64ToI256,  U64ToU256,

@@ -22,12 +22,29 @@ object Parser {
           case (acc, (op, right)) => Ast.Binop(op, acc, right)
         }
     }
+  def chainBool[_: P](p: => P[Ast.Expr], op: => P[TestOperator]): P[Ast.Expr] =
+    P(p ~ (op ~ p).rep).map {
+      case (lhs, rhs) =>
+        if (rhs.length == 0) {
+          lhs
+        } else {
+          val (op, right) = rhs(0)
+          val acc         = Ast.Binop(op, lhs, right)
+          rhs.tail
+            .foldLeft((acc, right)) {
+              case ((acc, last), (op, right)) =>
+                (Ast.Binop(And, acc, Ast.Binop(op, last, right)), right)
+            }
+            ._1
+        }
+    }
 
-  def expr[_: P]: P[Ast.Expr]    = P(chain(andExpr, Lexer.opOr))
-  def andExpr[_: P]: P[Ast.Expr] = P(chain(eqExpr, Lexer.opAdd))
-  def eqExpr[_: P]: P[Ast.Expr]  = P(chain(relationExpr, Lexer.opEq | Lexer.opNe))
-  def relationExpr[_: P]: P[Ast.Expr] =
-    P(chain(arithExpr0, P(Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)))
+  // Optimize chained comparisions
+  def expr[_: P]: P[Ast.Expr]         = P(chainBool(andExpr, Lexer.opOr))
+  def andExpr[_: P]: P[Ast.Expr]      = P(chainBool(relationExpr, Lexer.opAnd))
+  def relationExpr[_: P]: P[Ast.Expr] = P(chainBool(arithExpr0, comparision))
+  def comparision[_: P]: P[TestOperator] =
+    P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
   def arithExpr0[_: P]: P[Ast.Expr] = P(chain(arithExpr1, Lexer.opAdd | Lexer.opSub))
   def arithExpr1[_: P]: P[Ast.Expr] = P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
   def unaryExpr[_: P]: P[Ast.Expr]  = P(atom | (Lexer.opNot ~ unaryExpr).map(Ast.UnaryOp.tupled))
