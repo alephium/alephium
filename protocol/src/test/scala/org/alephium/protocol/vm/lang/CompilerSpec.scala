@@ -8,7 +8,7 @@ import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM,
 import org.alephium.serde._
 import org.alephium.util.{AVector, AlephiumSpec, I256, I64, U256, U64}
 
-class ParserSpec extends AlephiumSpec {
+class CompilerSpec extends AlephiumSpec {
   import Ast._
 
   it should "parse lexer" in {
@@ -373,6 +373,38 @@ class ParserSpec extends AlephiumSpec {
          |""".stripMargin,
       AVector(Val.U64(U64.unsafe(2))),
       AVector[Val](Val.U64(U64.unsafe(2)))
+    )
+  }
+
+  it should "execute quasi uniswap" in new Fixture {
+    val contract =
+      s"""
+         |contract Uniswap(
+         |  mut alfReserve: U64,
+         |  mut btcReserve: U64
+         |) {
+         |  fn exchange(alfAmount: U64) -> (U64) {
+         |    let tokenAmount = u64!(u256!(btcReserve) * u256!(alfAmount) / u256!(alfReserve + alfAmount))
+         |    alfReserve = alfReserve + alfAmount
+         |    btcReserve = btcReserve - tokenAmount
+         |    return tokenAmount
+         |  }
+         |}
+         |""".stripMargin
+
+    test(
+      contract,
+      AVector(Val.U64(U64.unsafe(1000))),
+      AVector(Val.U64(U64.unsafe(99))),
+      AVector(Val.U64(U64.unsafe(1000000)), Val.U64(U64.unsafe(100000)))
+    )
+
+    test(
+      contract,
+      AVector(Val.U64(U64.unsafe(1000))),
+      AVector(Val.U64(U64.unsafe(99))),
+      AVector(Val.U64(U64.MaxValue divUnsafe U64.unsafe(10)),
+              Val.U64(U64.MaxValue divUnsafe U64.unsafe(100)))
     )
   }
 }
