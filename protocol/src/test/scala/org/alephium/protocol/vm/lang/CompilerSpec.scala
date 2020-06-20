@@ -79,7 +79,7 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
     fastparse
-      .parse("if (x >= 1) { y = y + x } else { y = 0 }", Parser.statement(_))
+      .parse("if x >= 1 { y = y + x } else { y = 0 }", Parser.statement(_))
       .isSuccess is true
   }
 
@@ -273,7 +273,7 @@ class CompilerSpec extends AlephiumSpec {
       s"""
          |contract Fibonacci() {
          |  fn f(n: I64) -> (I64) {
-         |    if (n < 2i) {
+         |    if n < 2i {
          |      return n
          |    }
          |    else {
@@ -290,7 +290,7 @@ class CompilerSpec extends AlephiumSpec {
       s"""
          |contract Fibonacci() {
          |  fn f(n: U64) -> (U64) {
-         |    if (n < 2) {
+         |    if n < 2 {
          |      return n
          |    }
          |    else {
@@ -307,7 +307,7 @@ class CompilerSpec extends AlephiumSpec {
       s"""
          |contract Fibonacci() {
          |  fn f(n: I256) -> (I256) {
-         |    if (n < 2I) {
+         |    if n < 2I {
          |      return n
          |    }
          |    else {
@@ -324,10 +324,9 @@ class CompilerSpec extends AlephiumSpec {
       s"""
          |contract Fibonacci() {
          |  fn f(n: U256) -> (U256) {
-         |    if (n < 2U) {
+         |    if n < 2U {
          |      return n
-         |    }
-         |    else {
+         |    } else {
          |      return f(n-1U) + f(n-2U)
          |    }
          |  }
@@ -376,7 +375,7 @@ class CompilerSpec extends AlephiumSpec {
       s"""
          |contract Foo() {
          |  fn f(mut n: U64) -> (U64) {
-         |    if (n < 2) {
+         |    if n < 2 {
          |      n = n + 1
          |    }
          |    return n
