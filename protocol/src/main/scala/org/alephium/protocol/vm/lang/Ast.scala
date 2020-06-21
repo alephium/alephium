@@ -89,6 +89,20 @@ object Ast {
     def check(ctx: Compiler.Ctx): Unit
     def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
   }
+  object Statement {
+    @inline def getCondIR(condition: Expr,
+                          ctx: Compiler.Ctx,
+                          offset: Byte): Seq[Instr[StatelessContext]] = {
+      condition match {
+        case Binop(op: TestOperator, left, right) =>
+          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), offset)
+        case UnaryOp(op: LogicalOperator, expr) =>
+          expr.toIR(ctx) ++ op.toBranchIR(expr.getType(ctx), offset)
+        case _ =>
+          condition.toIR(ctx) :+ IfFalse(offset)
+      }
+    }
+  }
   final case class VarDef(isMutable: Boolean, ident: Ident, value: Expr) extends Statement {
     override def check(ctx: Compiler.Ctx): Unit =
       ctx.addVariable(ident, value.getType(ctx: Compiler.Ctx), isMutable)
@@ -149,29 +163,36 @@ object Ast {
       }
     }
 
-    @inline private def getOpIR(condition: Expr,
-                                ctx: Compiler.Ctx,
-                                ifIRsLen: Byte): Seq[Instr[StatelessContext]] = {
-      condition match {
-        case Binop(op: TestOperator, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), ifIRsLen)
-        case UnaryOp(op: LogicalOperator, expr) =>
-          expr.toIR(ctx) ++ op.toBranchIR(expr.getType(ctx), ifIRsLen)
-        case _ =>
-          condition.toIR(ctx) :+ IfFalse(ifIRsLen)
-      }
-    }
-
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       val elseIRs  = elseBranch.flatMap(_.toIR(ctx))
-      val offsetIR = if (elseIRs.nonEmpty) Seq(Offset(elseIRs.length.toByte)) else Seq.empty
+      val offsetIR = if (elseIRs.nonEmpty) Seq(Forward(elseIRs.length.toByte)) else Seq.empty
       val ifIRs    = ifBranch.flatMap(_.toIR(ctx)) ++ offsetIR
       if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
-      val opIR = getOpIR(condition, ctx, ifIRs.length.toByte)
-      opIR ++ ifIRs ++ elseIRs
+      val condIR = Statement.getCondIR(condition, ctx, ifIRs.length.toByte)
+      condIR ++ ifIRs ++ elseIRs
+    }
+  }
+  final case class While(condition: Expr, body: Seq[Statement]) extends Statement {
+    override def check(ctx: Compiler.Ctx): Unit = {
+      if (condition.getType(ctx) != Seq(Val.Bool)) {
+        throw Compiler.Error(s"Invalid type of condition expr $condition")
+      } else {
+        body.foreach(_.check(ctx))
+      }
+    }
+
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      val bodyIR   = body.flatMap(_.toIR(ctx))
+      val condIR   = Statement.getCondIR(condition, ctx, (bodyIR.length + 1).toByte)
+      val whileLen = condIR.length + bodyIR.length + 1
+      if (whileLen > 0xFF) {
+        // TODO: support long branches
+        throw Compiler.Error(s"Too many instrs for if-else branches")
+      }
+      condIR ++ bodyIR :+ Backward(whileLen.toByte)
     }
   }
   final case class ReturnStmt(exprs: Seq[Expr]) extends Statement {

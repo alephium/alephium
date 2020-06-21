@@ -82,6 +82,6 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else")
+    Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
   // format: on
 }

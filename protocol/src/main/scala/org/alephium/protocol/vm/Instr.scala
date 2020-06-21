@@ -72,7 +72,8 @@ object Instr {
     U64ToByte,  U64ToI64,             U64ToI256,  U64ToU256,
     I256ToByte, I256ToI64, I256ToU64,             I256ToU256,
     U256ToByte, U256ToI64, U256ToU64, U256ToI256,
-    Offset, IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
+    Forward, Backward,
+    IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
     IfEqI64, IfNeI64, IfLtI64, IfLeI64, IfGtI64, IfGeI64,
     IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
@@ -763,14 +764,22 @@ trait If           extends ControlInstr
 trait IfElse       extends ControlInstr
 trait DoWhile      extends ControlInstr
 
-case class Offset(offset: Byte) extends ControlInstr {
-  override def serialize(): ByteString = ByteString(Offset.code, offset)
+case class Forward(offset: Byte) extends ControlInstr {
+  override def serialize(): ByteString = ByteString(Forward.code, offset)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.offsetPC(Bytes.toPosInt(offset))
   }
 }
-object Offset extends InstrCompanion1[Byte]
+object Forward extends InstrCompanion1[Byte]
+case class Backward(offset: Byte) extends ControlInstr {
+  override def serialize(): ByteString = ByteString(Backward.code, offset)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.offsetPC(-Bytes.toPosInt(offset))
+  }
+}
+object Backward extends InstrCompanion1[Byte]
 
 trait IfJumpInstr extends ControlInstr {
   def code: Byte
