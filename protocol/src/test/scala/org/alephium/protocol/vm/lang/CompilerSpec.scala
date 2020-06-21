@@ -235,6 +235,26 @@ class CompilerSpec extends AlephiumSpec {
     )
   }
 
+  it should "test while" in new Fixture {
+    test(
+      s"""
+         |contract While() {
+         |  fn main() -> (U64) {
+         |    let mut x = 5
+         |    let mut done = false
+         |    while !done {
+         |      x = x + x - 3
+         |      if x % 5 == 0 { done = true }
+         |    }
+         |    return x
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector(Val.U64(U64.unsafe(35)))
+    )
+  }
+
   it should "test the following typical examples" in new Fixture {
     test(
       s"""

@@ -69,13 +69,16 @@ object Parser {
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
 
-  def branch[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
+  def body[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
   def elseBranch[_: P]: P[Seq[Ast.Statement]] =
-    P((Lexer.keyword("else") ~/ branch).?).map(_.fold(Seq.empty[Ast.Statement])(identity))
+    P((Lexer.keyword("else") ~/ body).?).map(_.fold(Seq.empty[Ast.Statement])(identity))
   def ifelse[_: P]: P[Ast.IfElse] =
-    P(Lexer.keyword("if") ~/ expr ~ branch ~ elseBranch).map(Ast.IfElse.tupled)
+    P(Lexer.keyword("if") ~/ expr ~ body ~ elseBranch).map(Ast.IfElse.tupled)
 
-  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | ret)
+  def whileStmt[_: P]: P[Ast.While] =
+    P(Lexer.keyword("while") ~/ expr ~ body).map(Ast.While.tupled)
+
+  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | whileStmt | ret)
 
   def contract[_: P]: P[Ast.Contract] =
     P(Start ~ Lexer.keyword("contract") ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}")
