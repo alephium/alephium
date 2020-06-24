@@ -1,12 +1,11 @@
 package org.alephium.flow.core.validation
 
-import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{Block, ModelGen, Transaction, TxInput, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ValidationSpec extends AlephiumFlowSpec {
@@ -63,7 +62,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val emptyOutputs    = AVector.empty[TxOutput]
     val emptySignatures = AVector.empty[ED25519Signature]
 
-    val coinbase1     = Transaction.coinbase(publicKey, ByteString.empty)
+    val coinbase1     = Transaction.coinbase(publicKey, 0)
     val testSignature = AVector(ED25519.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
     check(checkCoinbase(block1))
