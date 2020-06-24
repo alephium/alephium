@@ -278,7 +278,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val height           = blockFlow.getBestHeight(chainIndex).toOption.get
+    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)
     val coinbaseTx       = Transaction.coinbase(toPublicKey, height)
     val transactions = {

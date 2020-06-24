@@ -45,19 +45,32 @@ object Lexer {
   }
   def typedNum[_: P]: P[Val] =
     P(num ~ ("i" | "u" | "I" | "U" | "b").?.!)
-      .filter {
-        case (n, "i") => I64.validate(n)
-        case (n, "I") => I256.validate(n)
-        case (n, "U") => U256.validate(n)
-        case (n, "b") => n.signum() >= 0 && n.bitLength() <= 8 // unsigned Byte
-        case (n, _)   => U64.validate(n)
-      }
       .map {
-        case (n, "i") => Val.I64(I64.from(n).get)
-        case (n, "I") => Val.I256(I256.from(n).get)
-        case (n, "U") => Val.U256(U256.from(n).get)
-        case (n, "b") => Val.Byte(n.byteValue())
-        case (n, _)   => Val.U64(U64.from(n).get)
+        case (n, "i") =>
+          I64.from(n) match {
+            case Some(value) => Val.I64(value)
+            case None        => throw Compiler.Error(s"Invalid I64 value: $n")
+          }
+        case (n, "I") =>
+          I256.from(n) match {
+            case Some(value) => Val.I256(value)
+            case None        => throw Compiler.Error(s"Invalid I256 value: $n")
+          }
+        case (n, "U") =>
+          U256.from(n) match {
+            case Some(value) => Val.U256(value)
+            case None        => throw Compiler.Error(s"Invalid U256 value: $n")
+          }
+        case (n, "b") =>
+          U64.from(n).filter(u => u.v < 0x100) match {
+            case Some(value) => Val.Byte(value.v.toByte)
+            case None        => throw Compiler.Error(s"Invalid Byte value: $n")
+          }
+        case (n, _) =>
+          U64.from(n) match {
+            case Some(value) => Val.U64(value)
+            case None        => throw Compiler.Error(s"Invalid U64 value: $n")
+          }
       }
 
   def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {

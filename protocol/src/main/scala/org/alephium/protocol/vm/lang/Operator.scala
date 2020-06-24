@@ -200,7 +200,7 @@ case object Ge extends TestOperator {
   }
 }
 
-trait LogicalOperator extends TestOperator
+sealed trait LogicalOperator extends TestOperator
 case object Not extends LogicalOperator {
   override def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
     if (argsType.length != 1 || argsType(0) != Val.Bool) {
@@ -213,7 +213,7 @@ case object Not extends LogicalOperator {
   override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
     Seq(IfTrue(offset))
 }
-trait BinaryLogicalOperator extends LogicalOperator {
+sealed trait BinaryLogicalOperator extends LogicalOperator {
   override def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type] = {
     if (argsType.length != 2 || argsType(0) != Val.Bool || argsType(1) != Val.Bool) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
