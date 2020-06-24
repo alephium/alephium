@@ -1,5 +1,7 @@
 package org.alephium.protocol.vm
 
+import scala.annotation.tailrec
+
 import org.alephium.util.{AVector, Collection}
 
 class Frame[Ctx <: Context](var pc: Int,
@@ -29,6 +31,7 @@ class Frame[Ctx <: Context](var pc: Int,
 
   def pop(): ExeResult[Val] = opStack.pop()
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popT[T](): ExeResult[T] = pop().flatMap { elem =>
     try Right(elem.asInstanceOf[T])
     catch {
@@ -78,12 +81,16 @@ class Frame[Ctx <: Context](var pc: Int,
     } yield Frame.build(ctx, obj, method, args, opStack.push)
   }
 
-  def execute(): ExeResult[Unit] = {
+  @tailrec
+  final def execute(): ExeResult[Unit] = {
     currentInstr match {
       case Some(instr) =>
-        instr.runWith(this).flatMap { _ =>
-          advancePC()
-          execute()
+        // No flatMap for tailrec
+        instr.runWith(this) match {
+          case Right(_) =>
+            advancePC()
+            execute()
+          case Left(e) => Left(e)
         }
       case None => Right(())
     }

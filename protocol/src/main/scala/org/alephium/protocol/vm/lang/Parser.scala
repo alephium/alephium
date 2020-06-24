@@ -5,6 +5,10 @@ import fastparse._
 import org.alephium.protocol.vm.Val
 
 // scalastyle:off number.of.methods
+@SuppressWarnings(
+  Array("org.wartremover.warts.JavaSerializable",
+        "org.wartremover.warts.Product",
+        "org.wartremover.warts.Serializable"))
 object Parser {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] =>
     Lexer.emptyChars(ctx)
@@ -22,10 +26,11 @@ object Parser {
           case (acc, (op, right)) => Ast.Binop(op, acc, right)
         }
     }
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def chainBool[_: P](p: => P[Ast.Expr], op: => P[TestOperator]): P[Ast.Expr] =
     P(p ~ (op ~ p).rep).map {
       case (lhs, rhs) =>
-        if (rhs.length == 0) {
+        if (rhs.isEmpty) {
           lhs
         } else {
           val (op, right) = rhs(0)
@@ -47,7 +52,7 @@ object Parser {
     P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
   def arithExpr0[_: P]: P[Ast.Expr] = P(chain(arithExpr1, Lexer.opAdd | Lexer.opSub))
   def arithExpr1[_: P]: P[Ast.Expr] = P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
-  def unaryExpr[_: P]: P[Ast.Expr]  = P(atom | (Lexer.opNot ~ unaryExpr).map(Ast.UnaryOp.tupled))
+  def unaryExpr[_: P]: P[Ast.Expr]  = P(atom | (Lexer.opNot ~ atom).map(Ast.UnaryOp.tupled))
   def atom[_: P]: P[Ast.Expr]       = P(const | call | variable | parenExpr)
 
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)

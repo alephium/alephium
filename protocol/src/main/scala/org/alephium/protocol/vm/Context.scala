@@ -13,8 +13,12 @@ trait Context {
   def signatures: Stack[ED25519Signature]
 }
 
-case class StatelessContext(txHash: Hash, signatures: Stack[ED25519Signature]) extends Context
+class StatelessContext(val txHash: Hash, val signatures: Stack[ED25519Signature]) extends Context
+
 object StatelessContext {
+  def apply(txHash: Hash, signatures: Stack[ED25519Signature]): StatelessContext =
+    new StatelessContext(txHash, signatures)
+
   val test: StatelessContext = StatelessContext(Hash.zero, Stack.ofCapacity(0))
 }
 

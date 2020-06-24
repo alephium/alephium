@@ -1,9 +1,9 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.script.{PayTo, PubScript}
-import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 

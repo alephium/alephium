@@ -159,7 +159,7 @@ object Val {
     override def toString: String = "Byte32Vec"
   }
 
-  val True  = Bool(true)
-  val False = Bool(false)
+  val True: Bool  = Bool(true)
+  val False: Bool = Bool(false)
 }
 // scalastyle:on number.of.methods
