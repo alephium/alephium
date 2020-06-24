@@ -14,13 +14,13 @@ object ModelGen {
   val txInputGen: Gen[TxInput] = for {
     shortKey <- Gen.choose(0, 5)
   } yield {
-    val outputRef = AlfOutputRef(shortKey, Hash.random)
+    val outputRef = TxOutputRef(shortKey, Hash.random)
     TxInput(outputRef, AVector.empty)
   }
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose[Long](1, 5)
-  } yield AlfOutput.build(U64.unsafe(value), PubScript(AVector.empty))
+  } yield TxOutput.build(U64.unsafe(value), 0, PubScript(AVector.empty))
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(1, 5)
