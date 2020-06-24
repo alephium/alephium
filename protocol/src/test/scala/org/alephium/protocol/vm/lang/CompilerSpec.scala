@@ -3,11 +3,12 @@ package org.alephium.protocol.vm.lang
 import org.scalatest.Assertion
 
 import org.alephium.crypto.ED25519
-import org.alephium.protocol.{ALF, vm}
+import org.alephium.protocol.{vm, ALF}
 import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
 import org.alephium.serde._
-import org.alephium.util.{AVector, AlephiumSpec, I256, I64, U256, U64}
+import org.alephium.util._
 
+// scalastyle:off no.equal
 class CompilerSpec extends AlephiumSpec {
   import Ast._
 

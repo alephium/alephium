@@ -10,6 +10,8 @@ import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
 
+// scalastyle:off file.size.limit number.of.types
+
 sealed trait Instr[-Ctx <: Context] {
   def serialize(): ByteString
 
@@ -20,6 +22,7 @@ object Instr {
   implicit val statelessSerde: Serde[Instr[StatelessContext]] = new Serde[Instr[StatelessContext]] {
     override def serialize(input: Instr[StatelessContext]): ByteString = input.serialize()
 
+    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     override def _deserialize(
         input: ByteString): SerdeResult[(Instr[StatelessContext], ByteString)] = {
       for {
@@ -89,8 +92,8 @@ object Instr {
   val toCode: Map[InstrCompanion[StatefulContext], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-trait StatelessInstr extends Instr[StatelessContext]
-trait StatefulInstr  extends Instr[StatefulContext]
+sealed trait StatelessInstr extends Instr[StatelessContext]
+sealed trait StatefulInstr  extends Instr[StatefulContext]
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
@@ -111,7 +114,7 @@ sealed abstract class InstrCompanion1[T: Serde] extends InstrCompanion[Stateless
   }
 }
 
-trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
+sealed trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
   lazy val code: Byte = Instr.toCode(this).toByte
 
   override def serialize(): ByteString = ByteString(code)
@@ -121,9 +124,9 @@ trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[Statel
     Right((this, input))
 }
 
-trait OperandStackInstr extends StatelessInstr
+sealed trait OperandStackInstr extends StatelessInstr
 
-trait ConstInstr extends OperandStackInstr
+sealed trait ConstInstr extends OperandStackInstr
 object ConstInstr {
   def i64(v: Val.I64): ConstInstr = {
     // TODO: use @switch annotation
@@ -188,7 +191,7 @@ object ConstInstr {
   }
 }
 
-trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
+sealed trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
   def const: Val
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -196,7 +199,7 @@ trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
   }
 }
 
-abstract class ConstInstr1[T <: Val] extends ConstInstr {
+sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
   def n: T
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -300,7 +303,7 @@ final case class StoreField(index: Byte) extends OperandStackInstr {
 }
 object StoreField extends InstrCompanion1[Byte]
 
-trait PureStackInstr extends OperandStackInstr with InstrCompanion0
+sealed trait PureStackInstr extends OperandStackInstr with InstrCompanion0
 
 case object Pop extends PureStackInstr {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -328,9 +331,9 @@ object Swap extends PureStackInstr {
   }
 }
 
-trait ArithmeticInstr extends InstrCompanion0
+sealed trait ArithmeticInstr extends InstrCompanion0
 
-trait BinaryArithmeticInstr extends ArithmeticInstr {
+sealed trait BinaryArithmeticInstr extends ArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val]
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -627,7 +630,7 @@ case object OrBool extends InstrCompanion0 {
   }
 }
 
-trait ConversionInstr[R <: Val, U <: Val] extends InstrCompanion0 {
+sealed trait ConversionInstr[R <: Val, U <: Val] extends InstrCompanion0 {
   def converse(from: R): ExeResult[U]
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -748,23 +751,23 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] {
   }
 }
 
-trait ObjectInstr   extends StatelessInstr
-trait NewBooleanVec extends ObjectInstr
-trait NewByteVec    extends ObjectInstr
-trait NewI32Vec     extends ObjectInstr
-trait NewU32Vec     extends ObjectInstr
-trait NewI64Vec     extends ObjectInstr
-trait NewU64Vec     extends ObjectInstr
-trait NewI256Vec    extends ObjectInstr
-trait NewU256Vec    extends ObjectInstr
-trait NewByte256Vec extends ObjectInstr
+sealed trait ObjectInstr   extends StatelessInstr
+sealed trait NewBooleanVec extends ObjectInstr
+sealed trait NewByteVec    extends ObjectInstr
+sealed trait NewI32Vec     extends ObjectInstr
+sealed trait NewU32Vec     extends ObjectInstr
+sealed trait NewI64Vec     extends ObjectInstr
+sealed trait NewU64Vec     extends ObjectInstr
+sealed trait NewI256Vec    extends ObjectInstr
+sealed trait NewU256Vec    extends ObjectInstr
+sealed trait NewByte256Vec extends ObjectInstr
 
-trait ControlInstr extends StatelessInstr
-trait If           extends ControlInstr
-trait IfElse       extends ControlInstr
-trait DoWhile      extends ControlInstr
+sealed trait ControlInstr extends StatelessInstr
+sealed trait If           extends ControlInstr
+sealed trait IfElse       extends ControlInstr
+sealed trait DoWhile      extends ControlInstr
 
-case class Forward(offset: Byte) extends ControlInstr {
+final case class Forward(offset: Byte) extends ControlInstr {
   override def serialize(): ByteString = ByteString(Forward.code, offset)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -772,7 +775,7 @@ case class Forward(offset: Byte) extends ControlInstr {
   }
 }
 object Forward extends InstrCompanion1[Byte]
-case class Backward(offset: Byte) extends ControlInstr {
+final case class Backward(offset: Byte) extends ControlInstr {
   override def serialize(): ByteString = ByteString(Backward.code, offset)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -781,7 +784,7 @@ case class Backward(offset: Byte) extends ControlInstr {
 }
 object Backward extends InstrCompanion1[Byte]
 
-trait IfJumpInstr extends ControlInstr {
+sealed trait IfJumpInstr extends ControlInstr {
   def code: Byte
   def offset: Byte
   def condition(value: Val.Bool): Boolean
@@ -795,20 +798,20 @@ trait IfJumpInstr extends ControlInstr {
     } yield ()
   }
 }
-case class IfTrue(offset: Byte) extends IfJumpInstr {
+final case class IfTrue(offset: Byte) extends IfJumpInstr {
   override def code: Byte = IfTrue.code
 
   override def condition(value: Val.Bool): Boolean = value.v
 }
 case object IfTrue extends InstrCompanion1[Byte]
-case class IfFalse(offset: Byte) extends IfJumpInstr {
+final case class IfFalse(offset: Byte) extends IfJumpInstr {
   override def code: Byte = IfFalse.code
 
   override def condition(value: Val.Bool): Boolean = !value.v
 }
 case object IfFalse extends InstrCompanion1[Byte]
 
-trait BranchInstr[T] extends ControlInstr {
+sealed trait BranchInstr[T] extends ControlInstr {
   def code: Byte
   def offset: Byte
   def condition(value1: T, value2: T): Boolean
@@ -823,177 +826,177 @@ trait BranchInstr[T] extends ControlInstr {
     } yield ()
   }
 }
-case class IfAnd(offset: Byte) extends BranchInstr[Val.Bool] {
+final case class IfAnd(offset: Byte) extends BranchInstr[Val.Bool] {
   override def code: Byte = IfAnd.code
 
   override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v && value2.v
 }
 case object IfAnd extends InstrCompanion1[Byte]
-case class IfOr(offset: Byte) extends BranchInstr[Val.Bool] {
+final case class IfOr(offset: Byte) extends BranchInstr[Val.Bool] {
   override def code: Byte = IfOr.code
 
   override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v || value2.v
 }
 case object IfOr extends InstrCompanion1[Byte]
-case class IfNotAnd(offset: Byte) extends BranchInstr[Val.Bool] {
+final case class IfNotAnd(offset: Byte) extends BranchInstr[Val.Bool] {
   override def code: Byte = IfNotAnd.code
 
   override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v && value2.v)
 }
 case object IfNotAnd extends InstrCompanion1[Byte]
-case class IfNotOr(offset: Byte) extends BranchInstr[Val.Bool] {
+final case class IfNotOr(offset: Byte) extends BranchInstr[Val.Bool] {
   override def code: Byte = IfNotOr.code
 
   override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v || value2.v)
 }
 case object IfNotOr extends InstrCompanion1[Byte]
-case class IfEqI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfEqI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfEqI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v == value2.v
 }
 object IfEqI64 extends InstrCompanion1[Byte]
-case class IfNeI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfNeI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfNeI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v != value2.v
 }
 object IfNeI64 extends InstrCompanion1[Byte]
-case class IfLtI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfLtI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfLtI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v < value2.v
 }
 object IfLtI64 extends InstrCompanion1[Byte]
-case class IfLeI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfLeI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfLeI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v <= value2.v
 }
 object IfLeI64 extends InstrCompanion1[Byte]
-case class IfGtI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfGtI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfGtI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v > value2.v
 }
 object IfGtI64 extends InstrCompanion1[Byte]
-case class IfGeI64(offset: Byte) extends BranchInstr[Val.I64] {
+final case class IfGeI64(offset: Byte) extends BranchInstr[Val.I64] {
   override def code: Byte = IfGeI64.code
 
   override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v >= value2.v
 }
 object IfGeI64 extends InstrCompanion1[Byte]
-case class IfEqU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfEqU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfEqU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v == value2.v
 }
 object IfEqU64 extends InstrCompanion1[Byte]
-case class IfNeU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfNeU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfNeU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v != value2.v
 }
 object IfNeU64 extends InstrCompanion1[Byte]
-case class IfLtU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfLtU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfLtU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v < value2.v
 }
 object IfLtU64 extends InstrCompanion1[Byte]
-case class IfLeU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfLeU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfLeU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v <= value2.v
 }
 object IfLeU64 extends InstrCompanion1[Byte]
-case class IfGtU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfGtU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfGtU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v > value2.v
 }
 object IfGtU64 extends InstrCompanion1[Byte]
-case class IfGeU64(offset: Byte) extends BranchInstr[Val.U64] {
+final case class IfGeU64(offset: Byte) extends BranchInstr[Val.U64] {
   override def code: Byte = IfGeU64.code
 
   override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v >= value2.v
 }
 object IfGeU64 extends InstrCompanion1[Byte]
-case class IfEqI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfEqI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfEqI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v == value2.v
 }
 object IfEqI256 extends InstrCompanion1[Byte]
-case class IfNeI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfNeI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfNeI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v != value2.v
 }
 object IfNeI256 extends InstrCompanion1[Byte]
-case class IfLtI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfLtI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfLtI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v < value2.v
 }
 object IfLtI256 extends InstrCompanion1[Byte]
-case class IfLeI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfLeI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfLeI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v <= value2.v
 }
 object IfLeI256 extends InstrCompanion1[Byte]
-case class IfGtI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfGtI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfGtI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v > value2.v
 }
 object IfGtI256 extends InstrCompanion1[Byte]
-case class IfGeI256(offset: Byte) extends BranchInstr[Val.I256] {
+final case class IfGeI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfGeI256.code
 
   override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v >= value2.v
 }
 object IfGeI256 extends InstrCompanion1[Byte]
-case class IfEqU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfEqU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfEqU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v == value2.v
 }
 object IfEqU256 extends InstrCompanion1[Byte]
-case class IfNeU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfNeU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfNeU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v != value2.v
 }
 object IfNeU256 extends InstrCompanion1[Byte]
-case class IfLtU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfLtU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfLtU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v < value2.v
 }
 object IfLtU256 extends InstrCompanion1[Byte]
-case class IfLeU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfLeU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfLeU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v <= value2.v
 }
 object IfLeU256 extends InstrCompanion1[Byte]
-case class IfGtU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfGtU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfGtU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v > value2.v
 }
 object IfGtU256 extends InstrCompanion1[Byte]
-case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
+final case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
   override def code: Byte = IfGeU256.code
 
   override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v >= value2.v
 }
 object IfGeU256 extends InstrCompanion1[Byte]
 
-trait CallInstr extends StatelessInstr
-case class CallLocal(index: Byte) extends CallInstr {
+sealed trait CallInstr extends StatelessInstr
+final case class CallLocal(index: Byte) extends CallInstr {
   override def serialize(): ByteString = ByteString(CallLocal.code, index)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1003,10 +1006,10 @@ case class CallLocal(index: Byte) extends CallInstr {
     } yield ()
   }
 }
-object CallLocal   extends InstrCompanion1[Byte]
-trait CallExternal extends CallInstr
+object CallLocal          extends InstrCompanion1[Byte]
+sealed trait CallExternal extends CallInstr
 
-trait ReturnInstr extends StatelessInstr
+sealed trait ReturnInstr extends StatelessInstr
 case object Return extends ReturnInstr with InstrCompanion0 {
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1019,12 +1022,12 @@ case object Return extends ReturnInstr with InstrCompanion0 {
   }
 }
 
-trait CryptoInstr   extends StatelessInstr
-trait HashAlg       extends CryptoInstr
-trait Signature     extends CryptoInstr
-trait EllipticCurve extends CryptoInstr
+sealed trait CryptoInstr   extends StatelessInstr
+sealed trait HashAlg       extends CryptoInstr
+sealed trait Signature     extends CryptoInstr
+sealed trait EllipticCurve extends CryptoInstr
 
-trait CheckEqT[T] extends CryptoInstr with InstrCompanion0 {
+sealed trait CheckEqT[T] extends CryptoInstr with InstrCompanion0 {
   def check(x: T, y: T): ExeResult[Unit] = {
     if (x == y) Right(()) else Left(EqualityFailed)
   }
@@ -1053,7 +1056,7 @@ case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
 case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
 
-abstract class Keccak256T[T] extends HashAlg with InstrCompanion0 {
+sealed abstract class Keccak256T[T] extends HashAlg with InstrCompanion0 {
   def convert(t: T): ByteString
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1092,10 +1095,10 @@ case object CheckSignature extends Signature with InstrCompanion0 {
   }
 }
 
-trait ContextInstr    extends StatelessInstr
-trait BlockInfo       extends ContextInstr
-trait TransactionInfo extends ContextInstr
-trait InputInfo       extends ContextInstr
-trait OutputInfo      extends ContextInstr
+//trait ContextInstr    extends StatelessInstr
+//trait BlockInfo       extends ContextInstr
+//trait TransactionInfo extends ContextInstr
+//trait InputInfo       extends ContextInstr
+//trait OutputInfo      extends ContextInstr
 
-trait ContractInfo extends StatefulInstr
+//trait ContractInfo extends StatefulInstr

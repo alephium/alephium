@@ -5,10 +5,10 @@ import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
 object BuiltIn {
-  case class SimpleBuiltIn(name: String,
-                           argsType: Seq[Val.Type],
-                           returnType: Seq[Val.Type],
-                           instr: Instr[StatelessContext])
+  final case class SimpleBuiltIn(name: String,
+                                 argsType: Seq[Val.Type],
+                                 returnType: Seq[Val.Type],
+                                 instr: Instr[StatelessContext])
       extends FuncInfo {
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
       if (inputType == argsType) returnType
@@ -19,7 +19,7 @@ object BuiltIn {
   }
   abstract class GenericBuiltIn(val name: String) extends FuncInfo
 
-  val checkEq = new GenericBuiltIn("checkEq") {
+  val checkEq: GenericBuiltIn = new GenericBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
       if (!(inputType.length == 2) || inputType(0) != inputType(1))
         throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -45,8 +45,10 @@ object BuiltIn {
     }
   }
 
-  val keccak256      = SimpleBuiltIn("keccak256", Seq(Val.Byte32), Seq(Val.Byte32), Keccak256Byte32)
-  val checkSignature = SimpleBuiltIn("checkSignature", Seq(Val.Byte32), Seq(), CheckSignature)
+  val keccak256: SimpleBuiltIn =
+    SimpleBuiltIn("keccak256", Seq(Val.Byte32), Seq(Val.Byte32), Keccak256Byte32)
+  val checkSignature: SimpleBuiltIn =
+    SimpleBuiltIn("checkSignature", Seq(Val.Byte32), Seq(), CheckSignature)
 
   abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
     import ConversionBuiltIn.validTypes
@@ -62,10 +64,10 @@ object BuiltIn {
     }
   }
   object ConversionBuiltIn {
-    val validTypes = AVector[Val.Type](Val.Byte, Val.I64, Val.U64, Val.I256, Val.U256)
+    val validTypes: AVector[Val.Type] = AVector(Val.Byte, Val.I64, Val.U64, Val.I256, Val.U256)
   }
 
-  val toByte = new ConversionBuiltIn("byte") {
+  val toByte: ConversionBuiltIn = new ConversionBuiltIn("byte") {
     override def toType: Val.Type = Val.Byte
 
     override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
@@ -78,7 +80,7 @@ object BuiltIn {
       }
     }
   }
-  val toI64 = new ConversionBuiltIn("i64") {
+  val toI64: ConversionBuiltIn = new ConversionBuiltIn("i64") {
     override def toType: Val.Type = Val.I64
 
     override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
@@ -91,7 +93,7 @@ object BuiltIn {
       }
     }
   }
-  val toU64 = new ConversionBuiltIn("u64") {
+  val toU64: ConversionBuiltIn = new ConversionBuiltIn("u64") {
     override def toType: Val.Type = Val.U64
 
     override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
@@ -104,7 +106,7 @@ object BuiltIn {
       }
     }
   }
-  val toI256 = new ConversionBuiltIn("i256") {
+  val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
     override def toType: Val.Type = Val.I256
 
     override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
@@ -117,7 +119,7 @@ object BuiltIn {
       }
     }
   }
-  val toU256 = new ConversionBuiltIn("u256") {
+  val toU256: ConversionBuiltIn = new ConversionBuiltIn("u256") {
     override def toType: Val.Type = Val.U256
 
     override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {

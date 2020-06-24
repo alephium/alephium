@@ -163,7 +163,8 @@ val wartsCompileExcludes = Seq(
   Wart.Any,
   Wart.Throw,
   Wart.Equals,
-  Wart.StringPlusAny
+  Wart.StringPlusAny,
+  Wart.While
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(

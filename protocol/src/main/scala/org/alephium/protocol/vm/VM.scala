@@ -4,8 +4,12 @@ import scala.annotation.tailrec
 
 import org.alephium.util.AVector
 
-final case class Runtime[Ctx <: Context](stack: Stack[Frame[Ctx]],
-                                         var returnTo: AVector[Val] = AVector.ofSize(0))
+class Runtime[Ctx <: Context](val stack: Stack[Frame[Ctx]], var returnTo: AVector[Val])
+
+object Runtime {
+  def apply[Ctx <: Context](stack: Stack[Frame[Ctx]]): Runtime[Ctx] =
+    new Runtime(stack, AVector.ofSize(0))
+}
 
 trait VM[Ctx <: Context] {
   def execute(ctx: Ctx,
