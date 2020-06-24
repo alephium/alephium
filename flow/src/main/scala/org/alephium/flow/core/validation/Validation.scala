@@ -275,7 +275,7 @@ object Validation {
 
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
-    val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.alfAmount)
+    val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
     tx.alfAmountInOutputs match {
       case Some(outputSum) if outputSum <= inputSum => validTx
       case _                                        => invalidTx(InvalidBalance)

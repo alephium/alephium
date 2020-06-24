@@ -5,7 +5,6 @@ import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
 import akka.actor.Props
-import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, FlowHandler}
@@ -121,15 +120,17 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
       startNewTasks()
   }
 
-  private def coinbase(to: Int): Transaction = {
-    Transaction.coinbase(addresses(to), ByteString.fromInts(Random.nextInt()))
+  private def coinbase(to: Int, height: Int): Transaction = {
+    Transaction.coinbase(addresses(to), height)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assume(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
     val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    BlockTemplate(flowTemplate.deps, flowTemplate.target, flowTemplate.transactions :+ coinbase(to))
+    BlockTemplate(flowTemplate.deps,
+                  flowTemplate.target,
+                  flowTemplate.transactions :+ coinbase(to, flowTemplate.height))
   }
 
   def startTask(fromShift: Int,

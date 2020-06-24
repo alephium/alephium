@@ -10,7 +10,7 @@ import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.protocol.script.{PayTo, PriScript, PubScript}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -168,6 +168,11 @@ trait BlockFlowState {
     getBestTrie(chainIndex.from)
   }
 
+  def getBestHeight(chainIndex: ChainIndex): IOResult[Int] = {
+    val bestParent = getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
+    getHashChain(chainIndex.from, chainIndex.to).getHeight(bestParent)
+  }
+
   def getBestTrie(groupIndex: GroupIndex): IOResult[WorldState] = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
@@ -291,12 +296,6 @@ trait BlockFlowState {
     } yield inputs
   }
 
-  def getUtxos(payTo: PayTo,
-               address: ED25519PublicKey): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
-    val pubScript = PubScript.build(payTo, address)
-    getUtxos(pubScript)
-  }
-
   def getUtxos(pubScript: PubScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
     val groupIndex = pubScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
@@ -317,8 +316,9 @@ trait BlockFlowState {
   }
 
   def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(U64, Int)] = {
-    getUtxos(payTo, address).map { utxos =>
-      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.alfAmount)
+    val pubScript = PubScript.build(payTo, address)
+    getUtxos(pubScript).map { utxos =>
+      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
       (balance, utxos.length)
     }
   }
@@ -343,12 +343,24 @@ trait BlockFlowState {
                         to: ED25519PublicKey,
                         toPayTo: PayTo,
                         value: U64): IOResult[Option[UnsignedTransaction]] = {
-    getUtxos(fromPayTo, from).map { utxos =>
-      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.alfAmount)
+    val fromScript    = PubScript.build(fromPayTo, from)
+    val fromPriScript = PriScript.build(fromPayTo, from)
+    val toScript      = PubScript.build(toPayTo, to)
+    for {
+      utxos  <- getUtxos(fromScript)
+      height <- getBestHeight(ChainIndex(fromScript.groupIndex, toScript.groupIndex))
+    } yield {
+      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
       if (balance >= value) {
         Some(
           UnsignedTransaction
-            .transferAlf(utxos.map(_._1), balance, from, fromPayTo, to, toPayTo, value))
+            .transferAlf(utxos.map(_._1),
+                         balance,
+                         fromScript,
+                         fromPriScript,
+                         toScript,
+                         value,
+                         height))
       } else {
         None
       }

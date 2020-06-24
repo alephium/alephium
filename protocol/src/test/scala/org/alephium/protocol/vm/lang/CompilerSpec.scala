@@ -295,8 +295,7 @@ class CompilerSpec extends AlephiumSpec {
          |  fn f(n: I64) -> (I64) {
          |    if n < 2i {
          |      return n
-         |    }
-         |    else {
+         |    } else {
          |      return f(n-1i) + f(n-2i)
          |    }
          |  }
@@ -312,8 +311,7 @@ class CompilerSpec extends AlephiumSpec {
          |  fn f(n: U64) -> (U64) {
          |    if n < 2 {
          |      return n
-         |    }
-         |    else {
+         |    } else {
          |      return f(n-1) + f(n-2)
          |    }
          |  }
@@ -329,8 +327,7 @@ class CompilerSpec extends AlephiumSpec {
          |  fn f(n: I256) -> (I256) {
          |    if n < 2I {
          |      return n
-         |    }
-         |    else {
+         |    } else {
          |      return f(n-1I) + f(n-2I)
          |    }
          |  }

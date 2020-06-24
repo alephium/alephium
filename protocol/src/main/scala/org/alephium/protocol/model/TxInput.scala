@@ -24,53 +24,22 @@ object TxInput {
     Serde.forProduct2(TxInput.apply, ti => (ti.outputRef, ti.unlockScript))
 }
 
-trait TxOutputRef {
-  def tokenIdOpt: Option[TokenId]
-  def scriptHint: Int
-  def key: ALF.Hash
+final case class TxOutputRef(scriptHint: Int, key: ALF.Hash) {
+  def tokenIdOpt: Option[TokenId] = None
 
   def fromGroup(implicit config: GroupConfig): GroupIndex =
     PubScript.groupIndex(scriptHint)
 }
 
 object TxOutputRef {
-  implicit val serde: Serde[TxOutputRef] = eitherSerde[AlfOutputRef, TokenOutputRef].xmap({
-    case Left(ref)  => ref
-    case Right(ref) => ref
-  }, {
-    case output: AlfOutputRef   => Left(output)
-    case output: TokenOutputRef => Right(output)
-  })
+  implicit val serde: Serde[TxOutputRef] =
+    Serde.forProduct2(TxOutputRef.apply, t => (t.scriptHint, t.key))
+
+  def empty: TxOutputRef = TxOutputRef(0, ALF.Hash.zero)
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
     val output     = transaction.getOutput(outputIndex)
     val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
-    output match {
-      case o: AlfOutput   => AlfOutputRef(o.scriptHint, outputHash)
-      case o: TokenOutput => TokenOutputRef(o.tokenId, o.scriptHint, outputHash)
-    }
+    TxOutputRef(output.scriptHint, outputHash)
   }
-}
-
-final case class AlfOutputRef(scriptHint: Int, key: ALF.Hash) extends TxOutputRef {
-  def tokenIdOpt: Option[TokenId] = None
-}
-
-object AlfOutputRef {
-  implicit val serde: Serde[AlfOutputRef] =
-    Serde.forProduct2(AlfOutputRef.apply, t => (t.scriptHint, t.key))
-
-  def empty: AlfOutputRef = AlfOutputRef(0, ALF.Hash.zero)
-}
-
-final case class TokenOutputRef(tokenId: TokenId, scriptHint: Int, key: ALF.Hash)
-    extends TxOutputRef {
-  def tokenIdOpt: Option[TokenId] = Some(tokenId)
-}
-
-object TokenOutputRef {
-  implicit val serde: Serde[TokenOutputRef] =
-    Serde.forProduct3(TokenOutputRef.apply, t => (t.tokenId, t.scriptHint, t.key))
-
-  def empty: TokenOutputRef = TokenOutputRef(ALF.Hash.zero, 0, ALF.Hash.zero)
 }

@@ -1,8 +1,7 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.{Hash, HashSerde}
-import org.alephium.protocol.script.{PayTo, PriScript, PubScript, Script}
+import org.alephium.protocol.script.{Instruction, PubScript, Script}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -19,23 +18,20 @@ object UnsignedTransaction {
 
   def transferAlf(inputs: AVector[TxOutputRef],
                   inputSum: U64,
-                  from: ED25519PublicKey,
-                  fromPayTo: PayTo,
-                  to: ED25519PublicKey,
-                  toPayTo: PayTo,
-                  amount: U64): UnsignedTransaction = {
+                  fromPubScript: PubScript,
+                  fromPriScript: AVector[Instruction],
+                  toPubScript: PubScript,
+                  amount: U64,
+                  height: Int): UnsignedTransaction = {
     assume(inputSum >= amount)
     val remainder = inputSum.subUnsafe(amount)
 
-    val fromPubScript = PubScript.build(fromPayTo, from)
-    val toPubScript   = PubScript.build(toPayTo, to)
-    val toOutput      = AlfOutput.build(amount, toPubScript)
-    val fromOutput    = AlfOutput.build(remainder, fromPubScript)
-    val unlockScript  = PriScript.build(fromPayTo, from)
+    val toOutput   = TxOutput.build(amount, height, toPubScript)
+    val fromOutput = TxOutput.build(remainder, height, fromPubScript)
 
     val outputs =
       if (remainder > U64.Zero) AVector[TxOutput](toOutput, fromOutput)
       else AVector[TxOutput](toOutput)
-    UnsignedTransaction(None, inputs.map(TxInput(_, unlockScript)), outputs)
+    UnsignedTransaction(None, inputs.map(TxInput(_, fromPriScript)), outputs)
   }
 }

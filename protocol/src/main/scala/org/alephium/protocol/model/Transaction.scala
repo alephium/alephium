@@ -1,7 +1,5 @@
 package org.alephium.protocol.model
 
-import akka.util.ByteString
-
 import org.alephium.crypto._
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
@@ -45,11 +43,11 @@ final case class Transaction(unsigned: UnsignedTransaction,
   def alfAmountInOutputs: Option[U64] = {
     val sum1Opt =
       unsigned.fixedOutputs
-        .foldE(U64.Zero)((sum, output) => sum.add(output.alfAmount).toRight(()))
+        .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))
         .toOption
     val sum2Opt =
       generatedOutputs
-        .foldE(U64.Zero)((sum, output) => sum.add(output.alfAmount).toRight(()))
+        .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))
         .toOption
     for {
       sum1 <- sum1Opt
@@ -107,9 +105,9 @@ object Transaction {
     Transaction(unsigned, AVector.empty, signatures)
   }
 
-  def coinbase(publicKey: ED25519PublicKey, data: ByteString): Transaction = {
+  def coinbase(publicKey: ED25519PublicKey, height: Int): Transaction = {
     val pkScript = PubScript.build(PayTo.PKH, publicKey)
-    val txOutput = AlfOutput.build(ALF.CoinBaseValue, pkScript, data)
+    val txOutput = TxOutput.build(ALF.CoinBaseValue, height, pkScript)
     val unsigned = UnsignedTransaction(script = None, AVector.empty, AVector.empty)
     Transaction(unsigned, generatedOutputs = AVector(txOutput), signatures = AVector.empty)
   }
@@ -118,25 +116,10 @@ object Transaction {
     val outputs = balances.map[TxOutput] {
       case (publicKey, value) =>
         val pkScript = PubScript.build(PayTo.PKH, publicKey)
-        AlfOutput.build(value, pkScript)
+        TxOutput.genesis(value, pkScript)
     }
     val unsigned =
       UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = AVector.empty)
     Transaction(unsigned, generatedOutputs = outputs, signatures = AVector.empty)
-  }
-
-  def transferAlf(inputs: AVector[TxOutputRef],
-                  inputSum: U64,
-                  from: ED25519PublicKey,
-                  fromPayTo: PayTo,
-                  to: ED25519PublicKey,
-                  toPayTo: PayTo,
-                  value: U64,
-                  privateKey: ED25519PrivateKey): Transaction = {
-    val unsigned =
-      UnsignedTransaction.transferAlf(inputs, inputSum, from, fromPayTo, to, toPayTo, value)
-
-    val signature = ED25519.sign(unsigned.hash.bytes, privateKey)
-    Transaction(unsigned, generatedOutputs = AVector.empty, AVector.fill(inputs.length)(signature))
   }
 }

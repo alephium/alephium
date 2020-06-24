@@ -6,58 +6,37 @@ import org.alephium.protocol.model._
 import org.alephium.serde.Serde
 import org.alephium.util.U64
 
-final case class WorldState(alfOutputState: MerklePatriciaTrie[AlfOutputRef, AlfOutput],
-                            tokenOutputState: MerklePatriciaTrie[TokenOutputRef, TokenOutput]) {
+final case class WorldState(alfOutputState: MerklePatriciaTrie[TxOutputRef, TxOutput]) {
   def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
-    outputRef match {
-      case alfOutputRef: AlfOutputRef =>
-        alfOutputState.get(alfOutputRef)
-      case tokenOutputRef: TokenOutputRef =>
-        tokenOutputState.get(tokenOutputRef)
-    }
+    alfOutputState.get(outputRef)
   }
 
   def put(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
-    (outputRef, output) match {
-      case (alfOutputRef: AlfOutputRef, alfOutput: AlfOutput) =>
-        alfOutputState.put(alfOutputRef, alfOutput).map(WorldState(_, tokenOutputState))
-      case (tokenOutputRef: TokenOutputRef, tokenOutput: TokenOutput) =>
-        tokenOutputState.put(tokenOutputRef, tokenOutput).map(WorldState(alfOutputState, _))
-      case _ => throw new IllegalArgumentException("Different types of outputRef and output")
-    }
+    alfOutputState.put(outputRef, output).map(WorldState(_))
   }
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
-    outputRef match {
-      case alfOutputRef: AlfOutputRef =>
-        alfOutputState.remove(alfOutputRef).map(WorldState(_, tokenOutputState))
-      case tokenOutputRef: TokenOutputRef =>
-        tokenOutputState.remove(tokenOutputRef).map(WorldState(alfOutputState, _))
-    }
+    alfOutputState.remove(outputRef).map(WorldState(_))
   }
 
-  def toHashes: WorldState.Hashes =
-    WorldState.Hashes(alfOutputState.rootHash, tokenOutputState.rootHash)
+  def toHashes: WorldState.Hashes = WorldState.Hashes(alfOutputState.rootHash)
 }
 
 object WorldState {
   def empty(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-    val emptyAlfTrie =
-      MerklePatriciaTrie.build(storage, AlfOutputRef.empty, AlfOutput.burn(U64.Zero))
-    val emptyTokenTrie =
-      MerklePatriciaTrie.build(storage, TokenOutputRef.empty, TokenOutput.burn(U64.Zero))
-    WorldState(emptyAlfTrie, emptyTokenTrie)
+    val emptyTxTrie =
+      MerklePatriciaTrie.build(storage, TxOutputRef.empty, TxOutput.burn(U64.Zero))
+    WorldState(emptyTxTrie)
   }
 
-  final case class Hashes(alfStateHash: ALF.Hash, tokenStateHash: ALF.Hash) {
+  final case class Hashes(alfStateHash: ALF.Hash) {
     def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-      val alfState   = MerklePatriciaTrie[AlfOutputRef, AlfOutput](alfStateHash, storage)
-      val tokenState = MerklePatriciaTrie[TokenOutputRef, TokenOutput](tokenStateHash, storage)
-      WorldState(alfState, tokenState)
+      val alfState = MerklePatriciaTrie[TxOutputRef, TxOutput](alfStateHash, storage)
+      WorldState(alfState)
     }
   }
   object Hashes {
     implicit val serde: Serde[Hashes] =
-      Serde.forProduct2(Hashes.apply, t => (t.alfStateHash, t.tokenStateHash))
+      Serde.forProduct1(Hashes.apply, t => t.alfStateHash)
   }
 }
