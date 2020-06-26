@@ -1,5 +1,6 @@
 package org.alephium.flow.core.validation
 
+import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
@@ -8,7 +9,7 @@ import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PubScript, Script, Witness}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AVector, EitherF, Forest, TimeStamp, U64}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
@@ -253,8 +254,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction, worldState: WorldState)(
-      implicit config: ScriptConfig): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction,
+                                        worldState: WorldState): TxValidationResult = {
     val query = tx.unsigned.inputs.mapE { input =>
       worldState.get(input.outputRef)
     }
@@ -265,8 +266,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction, preOutputs: AVector[TxOutput])(
-      implicit config: ScriptConfig): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction,
+                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
     for {
       _ <- checkBalance(tx, preOutputs)
       _ <- checkWitnesses(tx, preOutputs)
@@ -283,24 +284,33 @@ object Validation {
   }
 
   // TODO: signatures might not be 1-to-1 mapped to inputs
-  private[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput])(
-      implicit config: ScriptConfig): TxValidationResult = {
+  private[validation] def checkWitnesses(tx: Transaction,
+                                         preOutputs: AVector[TxOutput]): TxValidationResult = {
     assume(tx.unsigned.inputs.length == preOutputs.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val unlockScript = tx.unsigned.inputs(idx).unlockScript
       val signature    = tx.signatures(idx)
-      val witness      = Witness(unlockScript, AVector(signature))
       val output       = preOutputs(idx)
-      checkWitness(tx.hash, output.lockupScript, witness)
+      (output.lockupScript, unlockScript) match {
+        case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
+          checkP2pkh(tx, lock, unlock, signature)
+        case (_: LockupScript.P2SH, _: UnlockScript.P2SH) => ???
+        case (_: LockupScript.P2S, _: UnlockScript.P2S)   => ???
+        case _ =>
+          invalidTx(InvalidUnlockScriptType)
+      }
     }
   }
 
-  private[validation] def checkWitness(hash: Hash, pubScript: PubScript, witness: Witness)(
-      implicit config: ScriptConfig): TxValidationResult = {
-    Script.run(hash.bytes, pubScript, witness) match {
-      case Left(error) => invalidTx(InvalidWitness(error))
-      case Right(_)    => validTx
-    }
+  private[validation] def checkP2pkh(tx: Transaction,
+                                     lock: LockupScript.P2PKH,
+                                     unlock: UnlockScript.P2PKH,
+                                     signature: ED25519Signature): TxValidationResult = {
+    if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
+      invalidTx(InvalidPublicKeyHash)
+    } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+      invalidTx((InvalidSignature))
+    } else validTx
   }
 
   /*

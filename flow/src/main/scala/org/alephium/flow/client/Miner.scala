@@ -13,7 +13,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Miner {
@@ -24,7 +24,7 @@ object Miner {
       implicit config: PlatformConfig): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex.unsafe(i)
-      val (_, publicKey) = index.generateKey(PayTo.PKH)
+      val (_, publicKey) = index.generateKey
       publicKey
     }
     props(addresses, blockFlow, allHandlers)
@@ -33,8 +33,9 @@ object Miner {
   def props(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit config: PlatformConfig): Props = {
     require(addresses.length == config.groups)
-    addresses.foreachWithIndex { (address, i) =>
-      require(GroupIndex.from(PayTo.PKH, address).value == i)
+    addresses.foreachWithIndex { (publicKey, i) =>
+      val lockupScript = LockupScript.p2pkh(publicKey)
+      require(lockupScript.groupIndex.value == i)
     }
     Props(new Miner(addresses, blockFlow, allHandlers))
   }

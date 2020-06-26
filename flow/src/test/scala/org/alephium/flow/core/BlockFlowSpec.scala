@@ -12,7 +12,7 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PayTo, PriScript, PubScript}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AVector, U64}
 
 class BlockFlowSpec extends AlephiumFlowSpec { Test =>
@@ -279,20 +279,21 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
-    val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)
+    val (_, toPublicKey) = chainIndex.to.generateKey
     val coinbaseTx       = Transaction.coinbase(toPublicKey, height)
     val transactions = {
       if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val fromPubScript              = PubScript.build(PayTo.PKH, publicKey)
-        val balances                   = blockFlow.getUtxos(fromPubScript).toOption.get
+        val fromLockupScript           = LockupScript.p2pkh(publicKey)
+        val unlockScript               = UnlockScript.p2pkh(publicKey)
+        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
         val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.amount)
-        val (_, toPublicKey)           = chainIndex.to.generateKey(PayTo.PKH)
-        val unlockScript               = PriScript.build(PayTo.PKH, publicKey)
+        val (_, toPublicKey)           = chainIndex.to.generateKey
+        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
         val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-        val outputs = AVector[TxOutput](TxOutput.build(PayTo.PKH, 1, toPublicKey, height),
-                                        TxOutput.build(PayTo.PKH, total - 1, publicKey, height))
+        val outputs = AVector[TxOutput](TxOutput.build(1, height, toLockupScript),
+                                        TxOutput.build(total - 1, height, fromLockupScript))
         val transferTx = Transaction.from(inputs, outputs, privateKey)
         AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
@@ -332,7 +333,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
     val address   = genesisBalances(groupIndex)._2
-    val pubScript = PubScript.build(PayTo.PKH, address)
+    val pubScript = LockupScript.p2pkh(address)
     blockFlow
       .getUtxos(pubScript)
       .toOption
@@ -340,7 +341,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       .sumBy(_._2.amount.v) is expected.v
   }
 
-  def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: U64): Assertion = {
+  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
     blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
   }
 
@@ -365,10 +366,9 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   }
 
   def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): U64 = {
-    val groupIndex = GroupIndex.from(PayTo.PKH, address)
-    config.brokerInfo.contains(groupIndex) is true
-    val pubScript = PubScript.build(PayTo.PKH, address)
-    val query     = blockFlow.getUtxos(pubScript)
+    val lockupScript = LockupScript.p2pkh(address)
+    config.brokerInfo.contains(lockupScript.groupIndex) is true
+    val query = blockFlow.getUtxos(lockupScript)
     query.toOption.get.sumBy(_._2.amount.v)
   }
 
@@ -378,7 +378,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     }
 
     val address   = genesisBalances(config.brokerInfo.id)._2
-    val pubScript = PubScript.build(PayTo.PKH, address)
+    val pubScript = LockupScript.p2pkh(address)
     val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
