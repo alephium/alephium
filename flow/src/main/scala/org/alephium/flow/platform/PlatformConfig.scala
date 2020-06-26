@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 import org.alephium.crypto.{ED25519, ED25519PublicKey}
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 trait PlatformConfig extends Configs with PlatformIO {
@@ -181,7 +181,7 @@ object PlatformConfig {
     AVector.tabulate(config.groups, config.groups) {
       case (from, to) =>
         val transactions = if (from == to) {
-          val balancesOI  = balances.filter(p => GroupIndex.from(PayTo.PKH, p._1).value == from)
+          val balancesOI  = balances.filter(p => LockupScript.p2pkh(p._1).groupIndex.value == from)
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]

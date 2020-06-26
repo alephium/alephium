@@ -20,8 +20,9 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{GroupIndex, Transaction, UnsignedTransaction}
-import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.protocol.model.{Transaction, UnsignedTransaction}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, AVector, Duration, Hex, U64}
@@ -82,14 +83,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult] =
     Future.successful(createTransaction(mode.node.blockFlow, req))
 
-  def doSendTransaction(req: Request): FutureTry[TransferResult] = {
+  def doSendTransaction(req: Request): FutureTry[TxResult] = {
     val txHandler = mode.node.allHandlers.txHandler
     sendTransaction(txHandler, req)
-  }
-
-  def doTransfer(req: Request): FutureTry[TransferResult] = {
-    val txHandler = mode.node.allHandlers.txHandler
-    transfer(mode.node.blockFlow, txHandler, req)
   }
 
   val httpRoute: Route = routeHttp(miner)
@@ -189,10 +185,9 @@ object RPCServer extends {
   def getBalance(blockFlow: BlockFlow, req: Request): Try[Balance] =
     withReqE[GetBalance, Balance](req) { query =>
       for {
-        address <- decodeAddress(query.address)
-        _       <- checkGroup(blockFlow, address)
+        _ <- checkGroup(blockFlow, query.address)
         balance <- blockFlow
-          .getBalance(query.`type`, address)
+          .getBalance(query.address)
           .map(Balance(_))
           .left
           .flatMap(_ => failedInIO)
@@ -200,13 +195,9 @@ object RPCServer extends {
     }
 
   def getGroup(blockFlow: BlockFlow, req: Request): Try[Group] =
-    withReqE[GetGroup, Group](req) { query =>
-      for {
-        address <- decodeAddress(query.address)
-      } yield {
-        val groupIndex = GroupIndex.from(PayTo.PKH, address)(blockFlow.config)
-        Group(groupIndex.value)
-      }
+    withReq[GetGroup, Group](req) { query =>
+      val groupIndex = query.address.groupIndex(blockFlow.config)
+      Group(groupIndex.value)
     }
 
   def decodeAddress(raw: String): Try[ED25519PublicKey] = {
@@ -220,9 +211,6 @@ object RPCServer extends {
       case None          => Left(Response.failed("Failed in decoding address"))
     }
   }
-
-  def decodePublicKey(raw: String): Try[ED25519PublicKey] =
-    decodeRandomBytes(raw, ED25519PublicKey.from, "public key")
 
   def decodePrivateKey(raw: String): Try[ED25519PrivateKey] =
     decodeRandomBytes(raw, ED25519PrivateKey.from, "private key")
@@ -245,15 +233,8 @@ object RPCServer extends {
   def createTransaction(blockFlow: BlockFlow, req: Request): Try[CreateTransactionResult] = {
     withReqE[CreateTransaction, CreateTransactionResult](req) { query =>
       val resultEither = for {
-        fromAddress <- decodePublicKey(query.fromAddress)
-        _           <- checkGroup(blockFlow, fromAddress)
-        toAddress   <- decodePublicKey(query.toAddress)
-        unsignedTx <- prepareUnsignedTransaction(blockFlow,
-                                                 fromAddress,
-                                                 query.fromType,
-                                                 toAddress,
-                                                 query.toType,
-                                                 query.value)
+        _          <- checkGroup(blockFlow, query.fromKey)
+        unsignedTx <- prepareUnsignedTransaction(blockFlow, query.fromKey, query.toKey, query.value)
       } yield {
         CreateTransactionResult.from(unsignedTx)
       }
@@ -267,8 +248,8 @@ object RPCServer extends {
   def sendTransaction(txHandler: ActorRefT[TxHandler.Command], req: Request)(
       implicit config: GroupConfig,
       askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TransferResult] = {
-    withReqF[SendTransaction, TransferResult](req) { query =>
+      executionContext: ExecutionContext): FutureTry[TxResult] = {
+    withReqF[SendTransaction, TxResult](req) { query =>
       val txEither = for {
         txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
         unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
@@ -284,52 +265,28 @@ object RPCServer extends {
     }
   }
 
-  def transfer(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command], req: Request)(
-      implicit config: GroupConfig,
-      askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TransferResult] = {
-    withReqF[Transfer, TransferResult](req) { query =>
-      val txEither = for {
-        fromAddress    <- decodePublicKey(query.fromAddress)
-        _              <- checkGroup(blockFlow, fromAddress)
-        toAddress      <- decodePublicKey(query.toAddress)
-        fromPrivateKey <- decodePrivateKey(query.fromPrivateKey)
-        tx <- prepareTransaction(blockFlow,
-                                 fromAddress,
-                                 query.fromType,
-                                 toAddress,
-                                 query.toType,
-                                 query.value,
-                                 fromPrivateKey)
-      } yield tx
-      txEither match {
-        case Right(tx)   => publishTx(txHandler, tx)
-        case Left(error) => Future.successful(Left(error))
-      }
-    }
-  }
-
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: Transaction)(
       implicit config: GroupConfig,
       askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TransferResult] = {
+      executionContext: ExecutionContext): FutureTry[TxResult] = {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
-        Right(TransferResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
+        Right(TxResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
         Left(Response.failed("Failed in adding transaction"))
     }
   }
 
   def prepareTransaction(blockFlow: BlockFlow,
-                         fromAddress: ED25519PublicKey,
-                         fromPayTo: PayTo,
-                         toAddress: ED25519PublicKey,
-                         toPayTo: PayTo,
+                         fromKey: ED25519PublicKey,
+                         toKey: ED25519PublicKey,
                          value: U64,
                          fromPrivateKey: ED25519PrivateKey): Try[Transaction] = {
-    blockFlow.prepareTx(fromAddress, fromPayTo, toAddress, toPayTo, value, fromPrivateKey) match {
+    val fromLockupScript = LockupScript.p2pkh(fromKey)
+    val fromUnlockScript = UnlockScript.p2pkh(toKey)
+    val toLockupScript   = LockupScript.p2pkh(toKey)
+    blockFlow.prepareTx(fromLockupScript, fromUnlockScript, toLockupScript, value, fromPrivateKey) match {
       case Right(Some(transaction)) => Right(transaction)
       case Right(None)              => Left(Response.failed("Not enough balance"))
       case Left(_)                  => failedInIO
@@ -337,23 +294,30 @@ object RPCServer extends {
   }
 
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
-                                 fromAddress: ED25519PublicKey,
-                                 fromPayTo: PayTo,
-                                 toAddress: ED25519PublicKey,
-                                 toPayTo: PayTo,
+                                 fromKey: ED25519PublicKey,
+                                 toKey: ED25519PublicKey,
                                  value: U64): Try[UnsignedTransaction] = {
-    blockFlow.prepareUnsignedTx(fromAddress, fromPayTo, toAddress, toPayTo, value) match {
+    val fromLockupScript = LockupScript.p2pkh(fromKey)
+    val fromUnlockScript = UnlockScript.p2pkh(toKey)
+    val toLockupScript   = LockupScript.p2pkh(toKey)
+    blockFlow.prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(None)                      => Left(Response.failed("Not enough balance"))
       case Left(_)                          => failedInIO
     }
   }
 
-  def checkGroup(blockFlow: BlockFlow, address: ED25519PublicKey): Try[Unit] = {
-    val pubScript  = PubScript.build(PayTo.PKH, address)
-    val groupIndex = pubScript.groupIndex(blockFlow.config)
+  def checkGroup(blockFlow: BlockFlow, publicKey: ED25519PublicKey): Try[Unit] = {
+    checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
+  }
+
+  def checkGroup(blockFlow: BlockFlow, address: Address): Try[Unit] = {
+    val groupIndex = address.groupIndex(blockFlow.config)
     if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
-    else Left(Response.failed(s"Address ${address.shortHex} belongs to other groups"))
+    else {
+      val addressStr = CirceUtils.print(address.asJson)
+      Left(Response.failed(s"Address $addressStr belongs to other groups"))
+    }
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))

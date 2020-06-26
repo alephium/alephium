@@ -2,18 +2,20 @@ package org.alephium.appserver
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo, UnsignedTransaction}
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils._
-import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex, TimeStamp, U64}
+import org.alephium.serde.{deserialize, serialize, RandomBytes}
+import org.alephium.util.{AVector, Base58, Hex, TimeStamp, U64}
 
 sealed trait RPCModel
 
@@ -22,6 +24,34 @@ object RPCModel {
   implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
   implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
   implicit val u64Codec: Codec[U64]     = Codec.from(u64Decoder, u64Encoder)
+
+  def bytesEncoder[T <: RandomBytes]: Encoder[T] = Encoder.encodeString.contramap[T](_.toHexString)
+  def bytesDecoder[T](from: ByteString => Option[T]): Decoder[T] =
+    Decoder.decodeString.emap { input =>
+      val keyOpt = for {
+        bs  <- Hex.from(input)
+        key <- from(bs)
+      } yield key
+      keyOpt.toRight(s"Unable to decode key from $input")
+    }
+  implicit val publicKeyEncoder: Encoder[ED25519PublicKey]   = bytesEncoder
+  implicit val publicKeyDecoder: Decoder[ED25519PublicKey]   = bytesDecoder(ED25519PublicKey.from)
+  implicit val privateKeyEncoder: Encoder[ED25519PrivateKey] = bytesEncoder
+  implicit val privateKeyDecoder: Decoder[ED25519PrivateKey] = bytesDecoder(ED25519PrivateKey.from)
+  implicit val signatureEncoder: Encoder[ED25519Signature]   = bytesEncoder
+  implicit val signatureDecoder: Decoder[ED25519Signature]   = bytesDecoder(ED25519Signature.from)
+
+  type Address = LockupScript
+  implicit val addressEncoder: Encoder[Address] =
+    Encoder.encodeString.contramap[LockupScript](script => Base58.encode(serialize(script)))
+  implicit val addressDecoder: Decoder[Address] =
+    Decoder.decodeString.emap { input =>
+      val addressOpt = for {
+        bs      <- Base58.decode(input)
+        address <- deserialize[LockupScript](bs).toOption
+      } yield address
+      addressOpt.toRight(s"Unable to decode address from $input")
+    }
 
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
@@ -114,12 +144,12 @@ object RPCModel {
     implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 
-  final case class GetBalance(address: String, `type`: PayTo) extends RPCModel
+  final case class GetBalance(address: Address) extends RPCModel
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
   }
 
-  final case class GetGroup(address: String) extends RPCModel
+  final case class GetGroup(address: Address) extends RPCModel
   object GetGroup {
     implicit val codec: Codec[GetGroup] = deriveCodec[GetGroup]
   }
@@ -137,12 +167,14 @@ object RPCModel {
     implicit val codec: Codec[Group] = deriveCodec[Group]
   }
 
-  final case class CreateTransaction(fromAddress: String,
-                                     fromType: PayTo,
-                                     toAddress: String,
-                                     toType: PayTo,
-                                     value: U64)
-      extends RPCModel
+  final case class CreateTransaction(
+      fromKey: ED25519PublicKey,
+      toKey: ED25519PublicKey,
+      value: U64
+  ) extends RPCModel {
+    def fromAddress: Address = LockupScript.p2pkh(fromKey)
+    def toAddress: Address   = LockupScript.p2pkh(toKey)
+  }
   object CreateTransaction {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
   }
@@ -161,29 +193,10 @@ object RPCModel {
     implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }
 
-  final case class Transfer(fromAddress: String,
-                            fromType: PayTo,
-                            toAddress: String,
-                            toType: PayTo,
-                            value: U64,
-                            fromPrivateKey: String)
-      extends RPCModel
-  object Transfer {
-    implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
+  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int) extends RPCModel
+  object TxResult {
+    implicit val codec: Codec[TxResult] = deriveCodec[TxResult]
   }
-
-  final case class TransferResult(txId: String, fromGroup: Int, toGroup: Int) extends RPCModel
-  object TransferResult {
-    implicit val codec: Codec[TransferResult] = deriveCodec[TransferResult]
-  }
-
-  private val payToDecoder: Decoder[PayTo] = Decoder[String].emap {
-    case "pkh" => Right(PayTo.PKH)
-    case "sh"  => Right(PayTo.SH)
-    case other => Left(s"Invalid: $other")
-  }
-  private val payToEncoder: Encoder[PayTo] = Encoder[String].contramap(_.toString)
-  implicit val payToCodec: Codec[PayTo]    = Codec.from(payToDecoder, payToEncoder)
 
   final case class InterCliquePeerInfo(cliqueId: CliqueId,
                                        address: InetSocketAddress,

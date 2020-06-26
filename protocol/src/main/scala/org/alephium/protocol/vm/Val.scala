@@ -2,11 +2,13 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
+import akka.util.ByteString
+
 import org.alephium.crypto
 import org.alephium.protocol.ALF.Hash
-import org.alephium.serde._
+import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
 import org.alephium.util
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.util._
 
 sealed trait Val extends Any {
   def tpe: Val.Type
@@ -14,6 +16,57 @@ sealed trait Val extends Any {
 
 // scalastyle:off number.of.methods
 object Val {
+  implicit val byte32Serde: Serde[ArrayBuffer[crypto.Byte32]] = arrayBufferSerde[crypto.Byte32]
+
+  implicit val serde: Serde[Val] = new Serde[Val] {
+    override def serialize(input: Val): ByteString = {
+      val content = input match {
+        case Bool(v)      => encode(v)
+        case Byte(v)      => encode(v)
+        case I64(v)       => encode(v)
+        case U64(v)       => encode(v)
+        case I256(v)      => encode(v)
+        case U256(v)      => encode(v)
+        case Byte32(v)    => encode(v)
+        case BoolVec(a)   => encode(a)
+        case ByteVec(a)   => encode(a)
+        case I64Vec(a)    => encode(a)
+        case U64Vec(a)    => encode(a)
+        case I256Vec(a)   => encode(a)
+        case U256Vec(a)   => encode(a)
+        case Byte32Vec(a) => encode(a)
+      }
+      ByteString(input.tpe.id) ++ content
+    }
+
+    override def _deserialize(input: ByteString): SerdeResult[(Val, ByteString)] = {
+      byteSerde._deserialize(input).flatMap {
+        case (code, content) if code >= 0 && code < Type.types.length =>
+          _deserialize(Type.types(code.toInt), content)
+        case (code, _) => Left(SerdeError.wrongFormat(s"Invalid type id: $code"))
+      }
+    }
+
+    private def _deserialize(tpe: Type, content: ByteString): SerdeResult[(Val, ByteString)] =
+      tpe match {
+        case Bool    => decode[Boolean](content).map(t                 => Bool(t._1)    -> t._2)
+        case Byte    => decode[scala.Byte](content).map(t              => Byte(t._1)    -> t._2)
+        case I64     => decode[util.I64](content).map(t                => I64(t._1)     -> t._2)
+        case U64     => decode[util.U64](content).map(t                => U64(t._1)     -> t._2)
+        case I256    => decode[util.I256](content).map(t               => I256(t._1)    -> t._2)
+        case U256    => decode[util.U256](content).map(t               => U256(t._1)    -> t._2)
+        case Byte32  => decode[crypto.Byte32](content).map(t           => Byte32(t._1)  -> t._2)
+        case BoolVec => decode[ArrayBuffer[Boolean]](content).map(t    => BoolVec(t._1) -> t._2)
+        case ByteVec => decode[ArrayBuffer[scala.Byte]](content).map(t => ByteVec(t._1) -> t._2)
+        case I64Vec  => decode[ArrayBuffer[util.I64]](content).map(t   => I64Vec(t._1)  -> t._2)
+        case U64Vec  => decode[ArrayBuffer[util.U64]](content).map(t   => U64Vec(t._1)  -> t._2)
+        case I256Vec => decode[ArrayBuffer[util.I256]](content).map(t  => I256Vec(t._1) -> t._2)
+        case U256Vec => decode[ArrayBuffer[util.U256]](content).map(t  => U256Vec(t._1) -> t._2)
+        case Byte32Vec =>
+          decode[ArrayBuffer[crypto.Byte32]](content).map(t => Byte32Vec(t._1) -> t._2)
+      }
+  }
+
   sealed trait Type {
     def id: scala.Byte
     def default: Val
@@ -45,25 +98,25 @@ object Val {
   final case class U256(v: util.U256)       extends Val { def tpe: Val.Type = U256 }
   final case class Byte32(v: crypto.Byte32) extends Val { def tpe: Val.Type = Byte32 }
 
-  final case class BoolVec(a: ArrayBuffer[Bool]) extends AnyVal with Val {
+  final case class BoolVec(a: ArrayBuffer[Boolean]) extends AnyVal with Val {
     def tpe: Val.Type = BoolVec
   }
-  final case class ByteVec(a: ArrayBuffer[Byte]) extends AnyVal with Val {
+  final case class ByteVec(a: ArrayBuffer[scala.Byte]) extends AnyVal with Val {
     def tpe: Val.Type = ByteVec
   }
-  final case class I64Vec(a: ArrayBuffer[I64]) extends AnyVal with Val {
+  final case class I64Vec(a: ArrayBuffer[util.I64]) extends AnyVal with Val {
     def tpe: Val.Type = I64Vec
   }
-  final case class U64Vec(a: ArrayBuffer[U64]) extends AnyVal with Val {
+  final case class U64Vec(a: ArrayBuffer[util.U64]) extends AnyVal with Val {
     def tpe: Val.Type = U64Vec
   }
-  final case class I256Vec(a: ArrayBuffer[I256]) extends AnyVal with Val {
+  final case class I256Vec(a: ArrayBuffer[util.I256]) extends AnyVal with Val {
     def tpe: Val.Type = I256Vec
   }
-  final case class U256Vec(a: ArrayBuffer[U256]) extends AnyVal with Val {
+  final case class U256Vec(a: ArrayBuffer[util.U256]) extends AnyVal with Val {
     def tpe: Val.Type = U256Vec
   }
-  final case class Byte32Vec(a: ArrayBuffer[Byte32]) extends AnyVal with Val {
+  final case class Byte32Vec(a: ArrayBuffer[crypto.Byte32]) extends AnyVal with Val {
     def tpe: Val.Type = Byte32Vec
   }
 

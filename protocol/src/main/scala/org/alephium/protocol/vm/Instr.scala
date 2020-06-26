@@ -1077,7 +1077,7 @@ case object Keccak256Byte32 extends Keccak256T[Val.Byte32] {
 
 case object Keccak256ByteVec extends Keccak256T[Val.ByteVec] {
   override def convert(t: Val.ByteVec): ByteString =
-    ByteString.fromArrayUnsafe(Array.from(t.a.view.map(_.v)))
+    ByteString.fromArrayUnsafe(t.a.toArray)
 }
 
 case object CheckSignature extends Signature with InstrCompanion0 {

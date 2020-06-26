@@ -21,7 +21,7 @@ class MiningTest extends AlephiumSpec {
     startWS(defaultWsMasterPort)
 
     val tx =
-      request[TransferResult](transfer(publicKey, tranferKey, privateKey, transferAmount), rpcPort)
+      request[TxResult](transfer(publicKey, tranferKey, privateKey, transferAmount), rpcPort)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](startMining, peer.rpcPort.get) is true
@@ -37,7 +37,7 @@ class MiningTest extends AlephiumSpec {
       request[CreateTransactionResult](createTransaction(publicKey, tranferKey, transferAmount),
                                        rpcPort)
 
-    val tx2 = request[TransferResult](sendTransaction(createTx), rpcPort)
+    val tx2 = request[TxResult](sendTransaction(createTx), rpcPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)

@@ -7,7 +7,6 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
-import org.alephium.protocol.script.PayTo
 import org.alephium.util.{AVector, Env, U64}
 
 trait PlatformConfigFixture {
@@ -29,7 +28,7 @@ trait PlatformConfigFixture {
   lazy val genesisBalances =
     AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, U64)](groups0) { i =>
       val groupIndex              = GroupIndex.unsafe(i)(groupConfig)
-      val (privateKey, publicKey) = groupIndex.generateKey(PayTo.PKH)(groupConfig)
+      val (privateKey, publicKey) = groupIndex.generateKey(groupConfig)
       (privateKey, publicKey, genesisBalance)
     }
 
