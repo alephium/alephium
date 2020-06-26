@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import org.alephium.crypto._
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U64}
 
@@ -106,7 +106,7 @@ object Transaction {
   }
 
   def coinbase(publicKey: ED25519PublicKey, height: Int): Transaction = {
-    val pkScript = PubScript.build(PayTo.PKH, publicKey)
+    val pkScript = LockupScript.p2pkh(publicKey)
     val txOutput = TxOutput.build(ALF.CoinBaseValue, height, pkScript)
     val unsigned = UnsignedTransaction(script = None, AVector.empty, AVector.empty)
     Transaction(unsigned, generatedOutputs = AVector(txOutput), signatures = AVector.empty)
@@ -115,8 +115,8 @@ object Transaction {
   def genesis(balances: AVector[(ED25519PublicKey, U64)]): Transaction = {
     val outputs = balances.map[TxOutput] {
       case (publicKey, value) =>
-        val pkScript = PubScript.build(PayTo.PKH, publicKey)
-        TxOutput.genesis(value, pkScript)
+        val lockupScript = LockupScript.p2pkh(publicKey)
+        TxOutput.genesis(value, lockupScript)
     }
     val unsigned =
       UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = AVector.empty)

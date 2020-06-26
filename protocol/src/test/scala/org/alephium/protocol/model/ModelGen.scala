@@ -4,10 +4,10 @@ import java.net.InetSocketAddress
 
 import org.scalacheck.Gen
 
-import org.alephium.crypto.ED25519Signature
+import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
-import org.alephium.protocol.script.PubScript
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AVector, U64}
 
 object ModelGen {
@@ -15,12 +15,12 @@ object ModelGen {
     shortKey <- Gen.choose(0, 5)
   } yield {
     val outputRef = TxOutputRef(shortKey, Hash.random)
-    TxInput(outputRef, AVector.empty)
+    TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
   }
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose[Long](1, 5)
-  } yield TxOutput.build(U64.unsafe(value), 0, PubScript(AVector.empty))
+  } yield TxOutput.build(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(1, 5)

@@ -3,17 +3,17 @@ package org.alephium.protocol.model
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.script.{PubScript, Script}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
-final case class TxInput(outputRef: TxOutputRef, unlockScript: Script) {
+final case class TxInput(outputRef: TxOutputRef, unlockScript: UnlockScript) {
   def fromGroup(implicit config: GroupConfig): GroupIndex =
-    PubScript.groupIndex(outputRef.scriptHint)
+    LockupScript.groupIndex(outputRef.scriptHint)
 }
 
 object TxInput {
-  def unsafe(transaction: Transaction, outputIndex: Int, unlockScript: Script): TxInput = {
+  def unsafe(transaction: Transaction, outputIndex: Int, unlockScript: UnlockScript): TxInput = {
     assume(outputIndex >= 0 && outputIndex < transaction.outputsLength)
     val outputRef = TxOutputRef.unsafe(transaction, outputIndex)
     TxInput(outputRef, unlockScript)
@@ -28,7 +28,7 @@ final case class TxOutputRef(scriptHint: Int, key: ALF.Hash) {
   def tokenIdOpt: Option[TokenId] = None
 
   def fromGroup(implicit config: GroupConfig): GroupIndex =
-    PubScript.groupIndex(scriptHint)
+    LockupScript.groupIndex(scriptHint)
 }
 
 object TxOutputRef {

@@ -2,7 +2,7 @@ package org.alephium.flow.core.validation
 
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.script.RunFailure
+import org.alephium.protocol.vm.ExeFailure
 import org.alephium.util.AVector
 
 sealed trait ValidationStatus
@@ -89,4 +89,7 @@ final case object DoubleSpent                      extends InvalidTxStatus
 final case object NonExistInput                    extends InvalidTxStatus
 final case object InvalidBalance                   extends InvalidTxStatus
 final case object InvalidWitnessLength             extends InvalidTxStatus
-final case class InvalidWitness(error: RunFailure) extends InvalidTxStatus
+final case class InvalidWitness(error: ExeFailure) extends InvalidTxStatus
+final case object InvalidPublicKeyHash             extends InvalidTxStatus
+final case object InvalidSignature                 extends InvalidTxStatus
+final case object InvalidUnlockScriptType          extends InvalidTxStatus

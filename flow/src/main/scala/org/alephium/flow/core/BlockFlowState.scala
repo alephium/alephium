@@ -2,7 +2,7 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.ED25519PrivateKey
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
@@ -10,7 +10,7 @@ import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PayTo, PriScript, PubScript}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -296,34 +296,33 @@ trait BlockFlowState {
     } yield inputs
   }
 
-  def getUtxos(pubScript: PubScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
-    val groupIndex = pubScript.groupIndex
+  def getUtxos(lockupScript: LockupScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
+    val groupIndex = lockupScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
 
     for {
       bestTrie <- getBestTrie(groupIndex)
       persistedUtxos <- bestTrie.alfOutputState
-        .getAll(pubScript.shortKeyBytes)
-        .map(_.filter(_._2.lockupScript == pubScript).map {
+        .getAll(lockupScript.shortKeyBytes)
+        .map(_.filter(_._2.lockupScript == lockupScript).map {
           case (outputRef, output) =>
             Tuple2.apply[TxOutputRef, TxOutput](outputRef, output) // TODO: improve this by making AVector covariant
         })
-      pair <- getUtxosInCache(pubScript, groupIndex, persistedUtxos)
+      pair <- getUtxosInCache(lockupScript, groupIndex, persistedUtxos)
     } yield {
       val (usedUtxos, newUtxos) = pair
       persistedUtxos.filter(p => !usedUtxos.contains(p._1)) ++ newUtxos
     }
   }
 
-  def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(U64, Int)] = {
-    val pubScript = PubScript.build(payTo, address)
-    getUtxos(pubScript).map { utxos =>
+  def getBalance(lockupScript: LockupScript): IOResult[(U64, Int)] = {
+    getUtxos(lockupScript).map { utxos =>
       val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
       (balance, utxos.length)
     }
   }
 
-  def getUtxosInCache(pubScript: PubScript,
+  def getUtxosInCache(lockupScript: LockupScript,
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(TxOutputRef, TxOutput)])
     : IOResult[(AVector[TxOutputRef], AVector[(TxOutputRef, TxOutput)])] = {
@@ -332,23 +331,19 @@ trait BlockFlowState {
         AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
       }
       val newUtxos = blockCaches.flatMap[(TxOutputRef, TxOutput)] { blockCache =>
-        AVector.from(blockCache.relatedOutputs.view.filter(_._2.lockupScript == pubScript))
+        AVector.from(blockCache.relatedOutputs.view.filter(_._2.lockupScript == lockupScript))
       }
       (usedUtxos, newUtxos)
     }
   }
 
-  def prepareUnsignedTx(from: ED25519PublicKey,
-                        fromPayTo: PayTo,
-                        to: ED25519PublicKey,
-                        toPayTo: PayTo,
+  def prepareUnsignedTx(fromLockupScript: LockupScript,
+                        fromUnlockScript: UnlockScript,
+                        toLockupScript: LockupScript,
                         value: U64): IOResult[Option[UnsignedTransaction]] = {
-    val fromScript    = PubScript.build(fromPayTo, from)
-    val fromPriScript = PriScript.build(fromPayTo, from)
-    val toScript      = PubScript.build(toPayTo, to)
     for {
-      utxos  <- getUtxos(fromScript)
-      height <- getBestHeight(ChainIndex(fromScript.groupIndex, toScript.groupIndex))
+      utxos  <- getUtxos(fromLockupScript)
+      height <- getBestHeight(ChainIndex(fromLockupScript.groupIndex, toLockupScript.groupIndex))
     } yield {
       val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
       if (balance >= value) {
@@ -356,9 +351,9 @@ trait BlockFlowState {
           UnsignedTransaction
             .transferAlf(utxos.map(_._1),
                          balance,
-                         fromScript,
-                         fromPriScript,
-                         toScript,
+                         fromLockupScript,
+                         fromUnlockScript,
+                         toLockupScript,
                          value,
                          height))
       } else {
@@ -367,14 +362,14 @@ trait BlockFlowState {
     }
   }
 
-  def prepareTx(from: ED25519PublicKey,
-                fromPayTo: PayTo,
-                to: ED25519PublicKey,
-                toPayTo: PayTo,
+  def prepareTx(fromLockupScript: LockupScript,
+                fromUnlockScript: UnlockScript,
+                toLockupScript: LockupScript,
                 value: U64,
                 fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
-    prepareUnsignedTx(from, fromPayTo, to, toPayTo, value).map(_.map { unsigned =>
-      Transaction.from(unsigned, fromPrivateKey)
+    prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value).map(_.map {
+      unsigned =>
+        Transaction.from(unsigned, fromPrivateKey)
     })
 }
 // scalastyle:on number.of.methods

@@ -23,6 +23,7 @@ object Ast {
   final case class Const(v: Val) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = Seq(v.tpe)
 
+    // TODO: support constants for all values
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       v match {
         case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
