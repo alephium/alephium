@@ -5,12 +5,12 @@ import scala.concurrent._
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import io.circe._
 import io.circe.syntax._
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
@@ -212,24 +212,6 @@ object RPCServer extends {
     }
   }
 
-  def decodePrivateKey(raw: String): Try[ED25519PrivateKey] =
-    decodeRandomBytes(raw, ED25519PrivateKey.from, "private key")
-
-  def decodeSignature(raw: String): Try[ED25519Signature] =
-    decodeRandomBytes(raw, ED25519Signature.from, "signature")
-
-  def decodeRandomBytes[T](raw: String, from: ByteString => Option[T], name: String): Try[T] = {
-    val addressOpt = for {
-      bytes   <- Hex.from(raw)
-      address <- from(bytes)
-    } yield address
-
-    addressOpt match {
-      case Some(address) => Right(address)
-      case None          => Left(Response.failed(s"Failed in decoding $name"))
-    }
-  }
-
   def createTransaction(blockFlow: BlockFlow, req: Request): Try[CreateTransactionResult] = {
     withReqE[CreateTransaction, CreateTransactionResult](req) { query =>
       val resultEither = for {
@@ -254,9 +236,8 @@ object RPCServer extends {
         txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
         unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
           Response.failed(serdeError.getMessage))
-        signature <- decodeSignature(query.signature)
       } yield {
-        Transaction.from(unsignedTx, AVector.fill(unsignedTx.inputs.length)(signature))
+        Transaction.from(unsignedTx, AVector.fill(unsignedTx.inputs.length)(query.signature))
       }
       txEither match {
         case Right(tx)   => publishTx(txHandler, tx)
