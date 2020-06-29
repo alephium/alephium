@@ -7,7 +7,7 @@ import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
-import org.alephium.util.{Bytes, DjbHash}
+import org.alephium.util.{Base58, Bytes, DjbHash}
 
 sealed trait LockupScript extends HashSerde[LockupScript] {
   override lazy val hash: Hash = _getHash
@@ -19,6 +19,8 @@ sealed trait LockupScript extends HashSerde[LockupScript] {
   def groupIndex(implicit config: GroupConfig): GroupIndex = {
     LockupScript.groupIndex(shortKey)
   }
+
+  def toBase58: String = Base58.encode(serialize(this))
 }
 
 object LockupScript {
@@ -43,6 +45,10 @@ object LockupScript {
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
       }
     }
+  }
+
+  def fromBase58(input: String): Option[LockupScript] = {
+    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
   }
 
   def p2pkh(key: ED25519PublicKey): P2PKH = p2pkh(Hash.hash(key.bytes))

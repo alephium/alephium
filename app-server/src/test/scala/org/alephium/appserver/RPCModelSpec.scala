@@ -152,11 +152,12 @@ class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   }
 
   it should "encode/decode CreateTransaction" in {
-    val fromKey  = ED25519PublicKey.generate
-    val toKey    = ED25519PublicKey.generate
-    val transfer = CreateTransaction(fromKey, toKey, 1)
+    val fromKey   = ED25519PublicKey.generate
+    val toKey     = ED25519PublicKey.generate
+    val toAddress = LockupScript.p2pkh(toKey)
+    val transfer  = CreateTransaction(fromKey, toAddress, 1)
     val jsonRaw =
-      s"""{"fromKey":"${fromKey.toHexString}","toKey":"${toKey.toHexString}","value":1}"""
+      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
     checkData(transfer, jsonRaw)
   }
 

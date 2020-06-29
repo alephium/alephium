@@ -112,10 +112,9 @@ object Transaction {
     Transaction(unsigned, generatedOutputs = AVector(txOutput), signatures = AVector.empty)
   }
 
-  def genesis(balances: AVector[(ED25519PublicKey, U64)]): Transaction = {
+  def genesis(balances: AVector[(LockupScript, U64)]): Transaction = {
     val outputs = balances.map[TxOutput] {
-      case (publicKey, value) =>
-        val lockupScript = LockupScript.p2pkh(publicKey)
+      case (lockupScript, value) =>
         TxOutput.genesis(value, lockupScript)
     }
     val unsigned =

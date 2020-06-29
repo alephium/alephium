@@ -112,7 +112,7 @@ class RPCServerSpec
   it should "call create_transaction" in new RouteHTTP {
     checkCallResult(
       "create_transaction",
-      parse(s"""{"fromKey":"$dummyKey","toKey":"$dummyToKey","value":1}""").toOption
+      parse(s"""{"fromKey":"$dummyKey","toAddress":"$dummyToAddres","value":1}""").toOption
     )(dummyCreateTransactionResult)
   }
 

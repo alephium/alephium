@@ -23,6 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -36,9 +37,15 @@ trait TestFixtureLike
     with Eventually {
   override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
-  val publicKey  = "9f93bf7f1211f510e3d9c4fc7fb933f94830ba83190da62dbfc9baa8b0d36276"
-  val privateKey = "a2e3e382cb262ee8af95069f6edfaa4685fc1294805336bafac206c1f115aa96"
-  val tranferKey = ED25519.generatePriPub()._2.toHexString
+  def generateAccount: (String, String, String) = {
+    val (priKey, pubKey) = ED25519.generatePriPub()
+    (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+  }
+
+  val address                 = "1Dx7Y4RxkCvoYvhQpMnRZi2yJnSbUeoVZY5R1vSYWSk9p"
+  val publicKey               = "9b85fef33febd483e055b01af0671714b56c6f3b6f45612589c2d6ae5337fb6d"
+  val privateKey              = "9167a5de4cfd4cd36a5ab065e21b2659f34cfd3503fde883b0fa5556d03cb64f"
+  val (transferAddress, _, _) = generateAccount
 
   val initialBalance = Balance(100, 1)
   val transferAmount = 10
@@ -67,6 +74,17 @@ trait TestFixtureLike
       request <- json.as[JsonRPC.Response.Success]
       t       <- request.result.as[T]
     } yield t).toOption.get
+  }
+
+  def transfer(fromPubKey: String,
+               toAddress: String,
+               amount: Int,
+               privateKey: String,
+               rpcPort: Int): TxResult = {
+    val createTx   = createTransaction(fromPubKey, toAddress, amount)
+    val unsignedTx = request[CreateTransactionResult](createTx, rpcPort)
+    val sendTx     = sendTransaction(unsignedTx, privateKey)
+    request[TxResult](sendTx, rpcPort)
   }
 
   @tailrec
@@ -189,24 +207,19 @@ trait TestFixtureLike
   def getGroup(address: String) = jsonRpc("get_group", s"""{"address":"$address"}""")
 
   def getBalance(address: String) =
-    jsonRpc("get_balance", s"""{"address":"${address}","type":"pkh"}""")
+    jsonRpc("get_balance", s"""{"address":"$address"}""")
 
-  def transfer(from: String, to: String, fromPrivate: String, amount: Int) = jsonRpc(
-    "transfer",
-    s"""{"fromAddress":"$from","fromType":"pkh","toAddress":"$to","toType":"pkh","value":$amount,"fromPrivateKey":"$fromPrivate"}"""
-  )
-
-  def createTransaction(from: String, to: String, amount: Int) = jsonRpc(
+  def createTransaction(fromPubKey: String, toAddress: String, amount: Int) = jsonRpc(
     "create_transaction",
-    s"""{"fromAddress":"$from","fromType":"pkh","toAddress":"$to","toType":"pkh","value":$amount}"""
+    s"""{"fromKey":"$fromPubKey","toAddress":"$toAddress","value":$amount}"""
   )
 
-  def sendTransaction(createTransactionResult: CreateTransactionResult) = {
+  def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
     val signature: ED25519Signature = ED25519.sign(Hex.unsafe(createTransactionResult.hash),
                                                    ED25519PrivateKey.unsafe(Hex.unsafe(privateKey)))
     jsonRpc(
       "send_transaction",
-      s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}","publicKey":"$publicKey"}"""
+      s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""
     )
   }
 
