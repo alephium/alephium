@@ -31,11 +31,11 @@ object UnlockScript {
     }
   }
 
-  def p2pkh(publicKey: ED25519PublicKey): P2PKH                 = new P2PKH(publicKey)
-  def p2sh(script: StatelessScript, params: AVector[Val]): P2SH = new P2SH(script, params)
-  def p2s(params: AVector[Val]): P2S                            = new P2S(params)
+  def p2pkh(publicKey: ED25519PublicKey): P2PKH                 = P2PKH(publicKey)
+  def p2sh(script: StatelessScript, params: AVector[Val]): P2SH = P2SH(script, params)
+  def p2s(params: AVector[Val]): P2S                            = P2S(params)
 
-  final case class P2PKH(val publicKey: ED25519PublicKey)                      extends UnlockScript
-  final case class P2SH(val script: StatelessScript, val params: AVector[Val]) extends UnlockScript
-  final case class P2S(val params: AVector[Val])                               extends UnlockScript
+  final case class P2PKH(publicKey: ED25519PublicKey)                      extends UnlockScript
+  final case class P2SH(script: StatelessScript, val params: AVector[Val]) extends UnlockScript
+  final case class P2S(params: AVector[Val])                               extends UnlockScript
 }

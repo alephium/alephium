@@ -1,5 +1,7 @@
 package org.alephium.protocol.vm
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.alephium.crypto.ED25519Signature
 import org.alephium.protocol.ALF.Hash
 
@@ -16,6 +18,11 @@ trait Context {
 class StatelessContext(val txHash: Hash, val signatures: Stack[ED25519Signature]) extends Context
 
 object StatelessContext {
+  def apply(txHash: Hash, signature: ED25519Signature): StatelessContext = {
+    val stack = Stack.unsafe[ED25519Signature](ArrayBuffer(signature), 1)
+    apply(txHash, stack)
+  }
+
   def apply(txHash: Hash, signatures: Stack[ED25519Signature]): StatelessContext =
     new StatelessContext(txHash, signatures)
 
