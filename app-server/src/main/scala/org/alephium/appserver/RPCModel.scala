@@ -43,7 +43,7 @@ object RPCModel {
 
   type Address = LockupScript
   implicit val addressEncoder: Encoder[Address] =
-    Encoder.encodeString.contramap[LockupScript](script => Base58.encode(serialize(script)))
+    Encoder.encodeString.contramap[LockupScript](_.toBase58)
   implicit val addressDecoder: Decoder[Address] =
     Decoder.decodeString.emap { input =>
       val addressOpt = for {
@@ -169,11 +169,10 @@ object RPCModel {
 
   final case class CreateTransaction(
       fromKey: ED25519PublicKey,
-      toKey: ED25519PublicKey,
+      toAddress: Address,
       value: U64
   ) extends RPCModel {
     def fromAddress: Address = LockupScript.p2pkh(fromKey)
-    def toAddress: Address   = LockupScript.p2pkh(toKey)
   }
   object CreateTransaction {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
