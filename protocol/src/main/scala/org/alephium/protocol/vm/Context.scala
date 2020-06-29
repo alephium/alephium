@@ -26,7 +26,7 @@ object StatelessContext {
   def apply(txHash: Hash, signatures: Stack[ED25519Signature]): StatelessContext =
     new StatelessContext(txHash, signatures)
 
-  val test: StatelessContext = StatelessContext(Hash.zero, Stack.ofCapacity(0))
+  val test: StatelessContext = StatelessContext(Hash.zero, Stack.ofCapacity[ED25519Signature](0))
 }
 
 trait StatefulContext extends StatelessContext {
