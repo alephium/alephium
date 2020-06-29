@@ -9,13 +9,13 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
 import org.alephium.flow.U64Helpers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Base58, Duration, Hex, TimeStamp}
+import org.alephium.util._
 
 class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
@@ -167,9 +167,10 @@ class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   }
 
   it should "encode/decode SendTransaction" in {
-    val transfer = SendTransaction("tx", "signature")
+    val signature = ED25519Signature.generate
+    val transfer  = SendTransaction("tx", signature)
     val jsonRaw =
-      """{"tx":"tx","signature":"signature"}"""
+      s"""{"tx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
   }
 }

@@ -7,6 +7,7 @@ import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 
@@ -68,13 +69,19 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     getPool(chainIndex).collectForBlock(chainIndex, config.txMaxNumberPerBlock)
   }
 
+  // Reduce height by 3 to make tx valid with high probability in case of forks
+  def reduceHeight(height: Int): Int = {
+    val newHeight = height - 3
+    if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
+  }
+
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
     assert(config.brokerInfo.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
       target <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
-      height <- getBestHeight(chainIndex)
+      height <- getBestHeight(chainIndex).map(reduceHeight)
     } yield {
       val transactions = collectTransactions(chainIndex)
       BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, transactions)
@@ -86,7 +93,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     val singleChain  = getBlockChain(chainIndex)
     val bestDeps     = getBestDeps(chainIndex.from)
     val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
-    val height       = Utils.unsafe(getBestHeight(chainIndex))
+    val height       = Utils.unsafe(getBestHeight(chainIndex).map(reduceHeight))
     val transactions = collectTransactions(chainIndex)
     BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, transactions)
   }

@@ -163,8 +163,7 @@ object PlatformConfig {
     val publicKey = publicKeyOpt.get
     val balance = {
       val parsed = BigInt(right)
-      require(parsed >= 0 && parsed <= Long.MaxValue)
-      U64.unsafe(parsed.longValue)
+      U64.from(parsed.underlying()).get
     }
     (publicKey, balance)
   }

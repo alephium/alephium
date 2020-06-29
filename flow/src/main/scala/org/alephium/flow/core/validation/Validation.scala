@@ -215,8 +215,8 @@ object Validation {
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
     tx.alfAmountInOutputs match {
-      case Some(sum) if sum < ALF.MaxALFValue => invalidTx(OutputValueOverFlow)
-      case _                                  => validTx
+      case Some(sum) if sum < ALF.MaxALFValue => validTx
+      case _                                  => invalidTx(OutputValueOverFlow)
     }
   }
 
