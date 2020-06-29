@@ -9,7 +9,8 @@ import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm._
+import org.alephium.serde._
 import org.alephium.util.{AVector, EitherF, Forest, TimeStamp, U64}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
@@ -294,8 +295,10 @@ object Validation {
       (output.lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
           checkP2pkh(tx, lock, unlock, signature)
-        case (_: LockupScript.P2SH, _: UnlockScript.P2SH) => ???
-        case (_: LockupScript.P2S, _: UnlockScript.P2S)   => ???
+        case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
+          checkP2SH(tx, lock, unlock, signature)
+        case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
+          checkP2S(tx, lock, unlock, signature)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -309,8 +312,37 @@ object Validation {
     if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
       invalidTx(InvalidPublicKeyHash)
     } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
-      invalidTx((InvalidSignature))
+      invalidTx(InvalidSignature)
     } else validTx
+  }
+
+  private[validation] def checkP2SH(tx: Transaction,
+                                    lock: LockupScript.P2SH,
+                                    unlock: UnlockScript.P2SH,
+                                    signature: ED25519Signature): TxValidationResult = {
+    if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
+      invalidTx(InvalidScriptHash)
+    } else {
+      checkScript(tx, unlock.script, unlock.params, signature)
+    }
+  }
+
+  private[validation] def checkP2S(tx: Transaction,
+                                   lock: LockupScript.P2S,
+                                   unlock: UnlockScript.P2S,
+                                   signature: ED25519Signature): TxValidationResult = {
+    checkScript(tx, lock.script, unlock.params, signature)
+  }
+
+  private[validation] def checkScript(tx: Transaction,
+                                      script: StatelessScript,
+                                      params: AVector[Val],
+                                      signature: ED25519Signature): TxValidationResult = {
+    val context = StatelessContext(tx.hash, signature)
+    StatelessVM.execute(context, script, AVector.empty, params) match {
+      case Right(_) => validTx // TODO: handle returns
+      case Left(e)  => invalidTx(InvalidUnlockScript(e))
+    }
   }
 
   /*

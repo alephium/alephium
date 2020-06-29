@@ -50,9 +50,9 @@ object LockupScript {
   def p2sh(scriptHash: Hash): P2SH        = new P2SH(scriptHash)
   def p2s(script: StatelessScript): P2S   = new P2S(script)
 
-  final case class P2PKH(val pkHash: Hash)          extends LockupScript
-  final case class P2SH(val scriptHash: Hash)       extends LockupScript
-  final case class P2S(val script: StatelessScript) extends LockupScript
+  final case class P2PKH(pkHash: Hash)          extends LockupScript
+  final case class P2SH(scriptHash: Hash)       extends LockupScript
+  final case class P2S(script: StatelessScript) extends LockupScript
 
   def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
     val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))

@@ -21,7 +21,12 @@ object Stack {
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
     val underlying = ArrayBuffer.from(elems.toIterable)
-    new Stack(underlying, elems.length, elems.length)
+    new Stack(underlying, maxSize, elems.length)
+  }
+
+  def unsafe[T: ClassTag](elems: ArrayBuffer[T], maxSize: Int): Stack[T] = {
+    assume(elems.length <= maxSize)
+    new Stack(elems, maxSize, elems.length)
   }
 }
 
