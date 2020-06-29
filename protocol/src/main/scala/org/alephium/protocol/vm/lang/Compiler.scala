@@ -2,9 +2,24 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
+import fastparse.Parsed
+
 import org.alephium.protocol.vm._
 
 object Compiler {
+  def compile(input: String): Either[Error, StatelessScript] =
+    try {
+      fastparse.parse(input, Parser.contract(_)) match {
+        case Parsed.Success(ast, _) =>
+          val ctx = ast.check()
+          Right(ast.toIR(ctx))
+        case failure: Parsed.Failure =>
+          Left(Error.parse(failure))
+      }
+    } catch {
+      case e: Error => Left(e)
+    }
+
   trait FuncInfo {
     def name: String
     def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
@@ -12,6 +27,9 @@ object Compiler {
   }
 
   final case class Error(message: String) extends Exception(message)
+  object Error {
+    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: $failure")
+  }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Val.Type]): Val.Type = {
     if (tpe.length == 1) tpe(0)

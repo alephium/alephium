@@ -161,9 +161,7 @@ class CompilerSpec extends AlephiumSpec {
              args: AVector[Val],
              output: AVector[Val] = AVector.empty,
              fields: AVector[Val] = AVector.empty): Assertion = {
-      val ast      = fastparse.parse(input, Parser.contract(_)).get.value
-      val ctx      = ast.check()
-      val contract = ast.toIR(ctx)
+      val contract = Compiler.compile(input).toOption.get
 
       deserialize[StatelessScript](serialize(contract)) isE contract
       StatelessVM.execute(StatelessContext.test, contract, fields, args) isE output
@@ -202,9 +200,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val ast      = fastparse.parse(input, Parser.contract(_)).get.value
-    val ctx      = ast.check()
-    val contract = ast.toIR(ctx)
+    val contract = Compiler.compile(input).toOption.get
 
     deserialize[StatelessScript](serialize(contract)) isE contract
 
