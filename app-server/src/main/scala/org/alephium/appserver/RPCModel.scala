@@ -188,7 +188,7 @@ object RPCModel {
                               Hex.toHexString(unsignedTx.hash.bytes))
   }
 
-  final case class SendTransaction(tx: String, signature: String) extends RPCModel
+  final case class SendTransaction(tx: String, signature: ED25519Signature) extends RPCModel
   object SendTransaction {
     implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }
