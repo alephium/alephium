@@ -215,8 +215,11 @@ object RPCServer extends {
   def createTransaction(blockFlow: BlockFlow, req: Request): Try[CreateTransactionResult] = {
     withReqE[CreateTransaction, CreateTransactionResult](req) { query =>
       val resultEither = for {
-        _          <- checkGroup(blockFlow, query.fromKey)
-        unsignedTx <- prepareUnsignedTransaction(blockFlow, query.fromKey, query.toKey, query.value)
+        _ <- checkGroup(blockFlow, query.fromKey)
+        unsignedTx <- prepareUnsignedTransaction(blockFlow,
+                                                 query.fromKey,
+                                                 query.toAddress,
+                                                 query.value)
       } yield {
         CreateTransactionResult.from(unsignedTx)
       }
@@ -276,11 +279,10 @@ object RPCServer extends {
 
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
                                  fromKey: ED25519PublicKey,
-                                 toKey: ED25519PublicKey,
+                                 toLockupScript: LockupScript,
                                  value: U64): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(toKey)
-    val toLockupScript   = LockupScript.p2pkh(toKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     blockFlow.prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(None)                      => Left(Response.failed("Not enough balance"))

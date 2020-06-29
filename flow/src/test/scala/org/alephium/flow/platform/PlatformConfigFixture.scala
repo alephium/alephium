@@ -7,6 +7,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Env, U64}
 
 trait PlatformConfigFixture {
@@ -33,5 +34,7 @@ trait PlatformConfigFixture {
     }
 
   implicit lazy val config =
-    PlatformConfig.build(newConfig, rootPath, Some(genesisBalances.map(p => (p._2, p._3))))
+    PlatformConfig.build(newConfig,
+                         rootPath,
+                         Some(genesisBalances.map(p => (LockupScript.p2pkh(p._2), p._3))))
 }
