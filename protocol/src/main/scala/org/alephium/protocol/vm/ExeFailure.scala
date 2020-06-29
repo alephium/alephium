@@ -14,7 +14,6 @@ final case class ArithmeticError(message: String)              extends ExeFailur
 case object TooManyElses                                       extends ExeFailure
 case object IncompleteIfScript                                 extends ExeFailure
 final case class InvalidScript(message: String)                extends ExeFailure
-case object InvalidScriptHash                                  extends ExeFailure
 case object InvalidParameters                                  extends ExeFailure
 case object InvalidLocalIndex                                  extends ExeFailure
 case object InvalidLocalType                                   extends ExeFailure

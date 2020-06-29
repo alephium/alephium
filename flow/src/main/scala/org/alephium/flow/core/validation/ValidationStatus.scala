@@ -80,16 +80,17 @@ sealed trait TxStatus        extends ValidationStatus
 sealed trait InvalidTxStatus extends TxStatus
 final case object ValidTx    extends TxStatus with ValidStatus
 
-final case object EmptyInputs                      extends InvalidTxStatus
-final case object EmptyOutputs                     extends InvalidTxStatus
-final case object NegativeOutputValue              extends InvalidTxStatus
-final case object OutputValueOverFlow              extends InvalidTxStatus
-final case object InvalidChainIndex                extends InvalidTxStatus
-final case object DoubleSpent                      extends InvalidTxStatus
-final case object NonExistInput                    extends InvalidTxStatus
-final case object InvalidBalance                   extends InvalidTxStatus
-final case object InvalidWitnessLength             extends InvalidTxStatus
-final case class InvalidWitness(error: ExeFailure) extends InvalidTxStatus
-final case object InvalidPublicKeyHash             extends InvalidTxStatus
-final case object InvalidSignature                 extends InvalidTxStatus
-final case object InvalidUnlockScriptType          extends InvalidTxStatus
+final case object EmptyInputs                           extends InvalidTxStatus
+final case object EmptyOutputs                          extends InvalidTxStatus
+final case object NegativeOutputValue                   extends InvalidTxStatus
+final case object OutputValueOverFlow                   extends InvalidTxStatus
+final case object InvalidChainIndex                     extends InvalidTxStatus
+final case object DoubleSpent                           extends InvalidTxStatus
+final case object NonExistInput                         extends InvalidTxStatus
+final case object InvalidBalance                        extends InvalidTxStatus
+final case object InvalidWitnessLength                  extends InvalidTxStatus
+final case class InvalidUnlockScript(error: ExeFailure) extends InvalidTxStatus
+final case object InvalidPublicKeyHash                  extends InvalidTxStatus
+final case object InvalidScriptHash                     extends InvalidTxStatus
+final case object InvalidSignature                      extends InvalidTxStatus
+final case object InvalidUnlockScriptType               extends InvalidTxStatus
