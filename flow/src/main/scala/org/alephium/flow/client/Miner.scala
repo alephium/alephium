@@ -12,6 +12,7 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
@@ -122,7 +123,8 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
   }
 
   private def coinbase(to: Int, height: Int): Transaction = {
-    Transaction.coinbase(addresses(to), height)
+    val minerMessage = Hash.generate.bytes
+    Transaction.coinbase(addresses(to), height, minerMessage)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {

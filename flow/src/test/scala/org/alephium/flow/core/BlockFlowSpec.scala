@@ -11,6 +11,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AVector, U64}
@@ -280,7 +281,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
-    val coinbaseTx       = Transaction.coinbase(toPublicKey, height)
+    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
     val transactions = {
       if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from

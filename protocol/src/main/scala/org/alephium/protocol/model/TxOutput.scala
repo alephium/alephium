@@ -1,5 +1,7 @@
 package org.alephium.protocol.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
@@ -9,7 +11,8 @@ import org.alephium.util.{AVector, U64}
 final case class TxOutput(amount: U64,
                           tokens: AVector[(TokenId, U64)],
                           createdHeight: Int,
-                          lockupScript: LockupScript) {
+                          lockupScript: LockupScript,
+                          additionalData: ByteString) {
   def scriptHint: Int = lockupScript.shortKey
 
   def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
@@ -18,10 +21,11 @@ final case class TxOutput(amount: U64,
 object TxOutput {
   private implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
   implicit val serde: Serde[TxOutput] =
-    Serde.forProduct4(TxOutput.apply, t => (t.amount, t.tokens, t.createdHeight, t.lockupScript))
+    Serde.forProduct5(TxOutput.apply,
+                      t => (t.amount, t.tokens, t.createdHeight, t.lockupScript, t.additionalData))
 
   def build(amount: U64, createdHeight: Int, lockupScript: LockupScript): TxOutput = {
-    TxOutput(amount, AVector.empty, createdHeight, lockupScript)
+    TxOutput(amount, AVector.empty, createdHeight, lockupScript, ByteString.empty)
   }
 
   def genesis(amount: U64, lockupScript: LockupScript): TxOutput = {
