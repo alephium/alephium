@@ -110,8 +110,8 @@ object Transaction {
   def coinbase(publicKey: ED25519PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
     val txOutput = TxOutput(ALF.CoinBaseValue, tokens = AVector.empty, height, pkScript, data)
-    val unsigned = UnsignedTransaction(script = None, AVector.empty, AVector.empty)
-    Transaction(unsigned, generatedOutputs = AVector(txOutput), signatures = AVector.empty)
+    val unsigned = UnsignedTransaction(script = None, AVector.empty, AVector(txOutput))
+    Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }
 
   def genesis(balances: AVector[(LockupScript, U64)]): Transaction = {
@@ -120,7 +120,7 @@ object Transaction {
         TxOutput.genesis(value, lockupScript)
     }
     val unsigned =
-      UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = AVector.empty)
-    Transaction(unsigned, generatedOutputs = outputs, signatures = AVector.empty)
+      UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = outputs)
+    Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }
 }
