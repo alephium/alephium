@@ -94,7 +94,7 @@ class ValidationSpec extends AlephiumFlowSpec {
 
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
-    check(checkCoinbase(block8))
+    check(checkCoinbase(block8), InvalidCoinbase)
   }
 
   // TODO: Add more mocking test
