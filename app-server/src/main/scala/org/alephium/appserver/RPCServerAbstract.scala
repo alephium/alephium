@@ -41,6 +41,9 @@ trait RPCServerAbstract extends StrictLogging {
   def doGetInterCliquePeerInfo(req: Request): FutureTry[Seq[InterCliquePeerInfo]]
   def doGetBalance(req: Request): FutureTry[Balance]
   def doGetGroup(req: Request): FutureTry[Group]
+  def doGetHashesAtHeight(req: Request): FutureTry[HashesAtHeight]
+  def doGetChainInfo(req: Request): FutureTry[ChainInfo]
+  def doGetBlock(req: Request): FutureTry[BlockEntry]
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
   def doSendTransaction(req: Request): FutureTry[TxResult]
   def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
@@ -63,6 +66,9 @@ trait RPCServerAbstract extends StrictLogging {
     "blockflow_fetch"            -> (req => wrap(req, doBlockflowFetch(req))),
     "get_balance"                -> (req => wrap(req, doGetBalance(req))),
     "get_group"                  -> (req => wrap(req, doGetGroup(req))),
+    "get_hashes_at_height"       -> (req => wrap(req, doGetHashesAtHeight(req))),
+    "get_chain_info"             -> (req => wrap(req, doGetChainInfo(req))),
+    "get_block"                  -> (req => wrap(req, doGetBlock(req))),
     "get_inter_clique_peer_info" -> (req => simpleWrap(req, doGetInterCliquePeerInfo(req))),
     "mining_start"               -> (req => simpleWrap(req, doStartMining(miner))),
     "mining_stop"                -> (req => simpleWrap(req, doStopMining(miner))),

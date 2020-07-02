@@ -54,7 +54,7 @@ class RPCServerSpec
 
     val result = RPCServer.blockNotifyEncode(blockNotify)
 
-    show(result) is """{"hash":"62c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["de098c4d"]}"""
+    show(result) is """{"hash":"9d131ee1587f668cebefa70937dd8a1b374463131b23411d9cf02d8462c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d"]}"""
   }
 
   it should "call mining_start" in new RouteHTTP {
@@ -99,6 +99,30 @@ class RPCServerSpec
 
   it should "call get_group" in new RouteHTTP {
     checkCallResult("get_group", parse(s"""{"address":"$dummyKeyAddress"}""").toOption)(dummyGroup)
+  }
+
+  it should "call get_hashes_at_height" in new RouteHTTP {
+    checkCallResult(
+      "get_hashes_at_height",
+      parse(s"""{"fromGroup":"1","toGroup":"1","height":1}""").toOption)(dummyHashesAtHeight)
+  }
+
+  it should "call get_chain_info" in new RouteHTTP {
+    checkCallResult("get_chain_info", parse(s"""{"fromGroup":"1","toGroup":"1"}""").toOption)(
+      dummyChainInfo)
+  }
+
+  it should "call get_block" in new RouteHTTP {
+    val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
+    if (config.brokerInfo.contains(chainIndex.from) || config.brokerInfo.contains(chainIndex.to)) {
+      checkCallResult(
+        "get_block",
+        parse(s"""{"hash":"${dummyBlockHeader.hash.toHexString}"}""").toOption)(dummyBlockEntry)
+    } else {
+      checkFailCallResult(
+        "get_block",
+        parse(s"""{"hash":"${dummyBlockHeader.hash.toHexString}"}""").toOption)("Server error")
+    }
   }
 
   it should "call send_transaction" in new RouteHTTP {
@@ -154,7 +178,7 @@ class RPCServerSpec
 
     val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                    dummyNeighborCliques,
-                                   dummmyBlockHeader,
+                                   dummyBlock,
                                    blockFlowProbe.ref,
                                    dummyTx,
                                    storages)
@@ -174,7 +198,7 @@ class RPCServerSpec
       RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
     implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
-    val blockFlow = new BlockFlowDummy(dummmyBlockHeader, blockFlowProbe.ref, dummyTx, storages)
+    val blockFlow = new BlockFlowDummy(dummyBlock, blockFlowProbe.ref, dummyTx, storages)
     def blockflowFetch(params: String) = {
       RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).toOption.get, 0))
     }
@@ -233,11 +257,14 @@ class RPCServerSpec
 
   trait Fixture extends InfoFixture with PlatformConfigFixture with StoragesFixture {
     val now = TimeStamp.now()
-    lazy val dummmyBlockHeader =
+
+    lazy val dummyBlockHeader =
       ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
-    lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummmyBlockHeader, 1)))
+    lazy val dummyBlock           = ModelGen.blockGen.sample.get.copy(header = dummyBlockHeader)
+    lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
     lazy val dummyIntraCliqueInfo = genIntraCliqueInfo(config)
     lazy val dummySelfClique      = SelfClique.from(dummyIntraCliqueInfo)
+    lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
     val dummyNeighborCliques      = NeighborCliques(AVector.empty)
     val dummyBalance              = Balance(0, 0)
     val dummyGroup                = Group(0)
@@ -246,6 +273,8 @@ class RPCServerSpec
     val dummyToKey                = "3ec4489e0988fbe5ea1becd0804335cd78ae285883f4028009b0e69d0574cda9"
     val dummyToAddres             = "19kCCFBGJV76XjyzszeMGTbnDVkAYwhHtZGKEvc1JdJEG"
     val dummyPrivateKey           = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
+    val dummyHashesAtHeight       = HashesAtHeight(Seq.empty)
+    val dummyChainInfo            = ChainInfo(0)
     val dummyTx = ModelGen.transactionGen
       .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
       .sample
@@ -271,7 +300,7 @@ class RPCServerSpec
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                         dummyNeighborCliques,
-                                        dummmyBlockHeader,
+                                        dummyBlock,
                                         blockFlowProbe.ref,
                                         dummyTx,
                                         storages)
@@ -351,13 +380,13 @@ object RPCServerSpec {
 
   class NodeDummy(intraCliqueInfo: IntraCliqueInfo,
                   neighborCliques: NeighborCliques,
-                  blockHeader: BlockHeader,
+                  block: Block,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
                   storages: Storages)(implicit val config: PlatformConfig)
       extends Node {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
-    val blockFlow: BlockFlow         = new BlockFlowDummy(blockHeader, blockFlowProbe, dummyTx, storages)
+    val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
     val serverProbe                          = TestProbe()
     val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
@@ -392,15 +421,15 @@ object RPCServerSpec {
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
   }
 
-  class BlockFlowDummy(blockHeader: BlockHeader,
+  class BlockFlowDummy(block: Block,
                        blockFlowProbe: ActorRef,
                        dummyTx: Transaction,
                        storages: Storages)(implicit val config: PlatformConfig)
       extends BlockFlow {
     override def getHeightedBlockHeaders(fromTs: TimeStamp,
                                          toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
-      blockFlowProbe ! (blockHeader.timestamp >= fromTs && blockHeader.timestamp <= toTs)
-      Right(AVector((blockHeader, 1)))
+      blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
+      Right(AVector((block.header, 1)))
     }
 
     override def getBalance(address: Address): IOResult[(U64, Int)] = Right((U64.Zero, 0))
@@ -427,6 +456,9 @@ object RPCServerSpec {
       BlockHeaderChain.fromGenesisUnsafe(storages)
 
     override def getHeight(hash: Hash): IOResult[Int]              = Right(1)
+    override def getBlockHeader(hash: Hash): IOResult[BlockHeader] = Right(block.header)
+    override def getBlock(hash: Hash): IOResult[Block]             = Right(block)
+
     def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo   = ???
     def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = ???
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps            = ???
@@ -443,19 +475,15 @@ object RPCServerSpec {
 
   class ModeDummy(intraCliqueInfo: IntraCliqueInfo,
                   neighborCliques: NeighborCliques,
-                  blockHeader: BlockHeader,
+                  block: Block,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
                   storages: Storages)(implicit val system: ActorSystem,
                                       val config: PlatformConfig,
                                       val executionContext: ExecutionContext)
       extends Mode {
-    lazy val node = new NodeDummy(intraCliqueInfo,
-                                  neighborCliques,
-                                  blockHeader,
-                                  blockFlowProbe,
-                                  dummyTx,
-                                  storages)
+    lazy val node =
+      new NodeDummy(intraCliqueInfo, neighborCliques, block, blockFlowProbe, dummyTx, storages)
 
     override def stop(): Future[Unit] =
       for {
