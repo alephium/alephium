@@ -240,7 +240,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
-    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
+    val pubScript =
+      block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
     checkBalance(blockFlow, pubScript, 1)
     checkBalance(blockFlow, testGroup, genesisBalance - 1)
   }
@@ -273,7 +274,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
 
     addAndCheck(blockFlow1, block, 1)
-    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
+    val pubScript =
+      block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
     checkBalance(blockFlow1, pubScript, 1)
   }
 
@@ -293,8 +295,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         val (_, toPublicKey)           = chainIndex.to.generateKey
         val toLockupScript             = LockupScript.p2pkh(toPublicKey)
         val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-        val outputs = AVector[TxOutput](TxOutput.build(1, height, toLockupScript),
-                                        TxOutput.build(total - 1, height, fromLockupScript))
+        val outputs = AVector[TxOutput](TxOutput.asset(1, height, toLockupScript),
+                                        TxOutput.asset(total - 1, height, fromLockupScript))
         val transferTx = Transaction.from(inputs, outputs, privateKey)
         AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
