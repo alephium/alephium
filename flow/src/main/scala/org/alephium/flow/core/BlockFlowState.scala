@@ -302,7 +302,7 @@ trait BlockFlowState {
 
     for {
       bestTrie <- getBestTrie(groupIndex)
-      persistedUtxos <- bestTrie.alfOutputState
+      persistedUtxos <- bestTrie.outputState
         .getAll(lockupScript.shortKeyBytes)
         .map(_.filter(_._2.lockupScript == lockupScript).map {
           case (outputRef, output) =>

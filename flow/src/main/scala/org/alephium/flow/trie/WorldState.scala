@@ -6,20 +6,20 @@ import org.alephium.protocol.model._
 import org.alephium.serde.Serde
 import org.alephium.util.U64
 
-final case class WorldState(alfOutputState: MerklePatriciaTrie[TxOutputRef, TxOutput]) {
+final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput]) {
   def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
-    alfOutputState.get(outputRef)
+    outputState.get(outputRef)
   }
 
   def put(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
-    alfOutputState.put(outputRef, output).map(WorldState(_))
+    outputState.put(outputRef, output).map(WorldState(_))
   }
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
-    alfOutputState.remove(outputRef).map(WorldState(_))
+    outputState.remove(outputRef).map(WorldState(_))
   }
 
-  def toHashes: WorldState.Hashes = WorldState.Hashes(alfOutputState.rootHash)
+  def toHashes: WorldState.Hashes = WorldState.Hashes(outputState.rootHash)
 }
 
 object WorldState {
