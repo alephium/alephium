@@ -118,6 +118,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def add(header: BlockHeader): IOResult[Unit]
 
+  def getHashes(chainIndex: ChainIndex, height: Int): IOResult[AVector[Hash]] =
+    getHeaderChain(chainIndex).getHashes(height)
+
+  def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
+    getHeaderChain(chainIndex).maxHeight
+
   /* BlockChain apis */
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain

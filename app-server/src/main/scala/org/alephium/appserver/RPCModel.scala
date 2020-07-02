@@ -11,7 +11,7 @@ import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHeader, CliqueId, CliqueInfo, UnsignedTransaction}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
@@ -20,6 +20,7 @@ import org.alephium.util.{AVector, Base58, Hex, TimeStamp, U64}
 sealed trait RPCModel
 
 // scalastyle:off number.of.methods
+// scalastyle:off number.of.types
 object RPCModel {
   implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
   implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
@@ -53,6 +54,11 @@ object RPCModel {
       addressOpt.toRight(s"Unable to decode address from $input")
     }
 
+  trait PerChain {
+    val fromGroup: Int
+    val toGroup: Int
+  }
+
   object TimeStampCodec {
     implicit val decoderTS: Decoder[TimeStamp] =
       Decoder.decodeLong.ensure(_ >= 0, s"expect positive timestamp").map(TimeStamp.unsafe)
@@ -85,13 +91,54 @@ object RPCModel {
     implicit val codec: Codec[FetchResponse] = deriveCodec[FetchResponse]
   }
 
+  final case class OutputRef(scriptHint: Int, key: String)
+  object OutputRef {
+    def from(outputRef: TxOutputRef): OutputRef =
+      OutputRef(
+        outputRef.scriptHint,
+        outputRef.key.toHexString
+      )
+    implicit val codec: Codec[OutputRef] = deriveCodec[OutputRef]
+  }
+
+  final case class Input(outputRef: OutputRef, unlockScript: ByteString)
+  object Input {
+
+    def from(input: TxInput): Input =
+      Input(OutputRef.from(input.outputRef), serialize(input.unlockScript))
+
+    implicit val codec: Codec[Input] = deriveCodec[Input]
+  }
+
+  final case class Output(amount: Long, createdHeight: Int, address: Address)
+  object Output {
+    def from(output: TxOutput): Output =
+      Output(output.amount.v.longValue, output.createdHeight, output.lockupScript)
+    implicit val codec: Codec[Output] = deriveCodec[Output]
+  }
+
+  final case class Tx(
+      hash: String,
+      inputs: AVector[Input],
+      outputs: AVector[Output]
+  )
+  object Tx {
+    def from(tx: Transaction): Tx = Tx(
+      tx.hash.toHexString,
+      tx.unsigned.inputs.map(Input.from),
+      tx.unsigned.fixedOutputs.map(Output.from) ++ tx.generatedOutputs.map(Output.from)
+    )
+    implicit val codec: Codec[Tx] = deriveCodec[Tx]
+  }
+
   final case class BlockEntry(
       hash: String,
       timestamp: TimeStamp,
       chainFrom: Int,
       chainTo: Int,
       height: Int,
-      deps: AVector[String]
+      deps: AVector[String],
+      transactions: Option[AVector[Tx]]
   ) extends RPCModel
   object BlockEntry {
     import TimeStampCodec._
@@ -99,14 +146,18 @@ object RPCModel {
 
     def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): BlockEntry = {
       BlockEntry(
-        hash      = header.shortHex,
-        timestamp = header.timestamp,
-        chainFrom = header.chainIndex.from.value,
-        chainTo   = header.chainIndex.to.value,
-        height    = height,
-        deps      = header.blockDeps.map(_.shortHex)
+        hash         = header.hash.toHexString,
+        timestamp    = header.timestamp,
+        chainFrom    = header.chainIndex.from.value,
+        chainTo      = header.chainIndex.to.value,
+        height       = height,
+        deps         = header.blockDeps.map(_.toHexString),
+        transactions = None
       )
     }
+
+    def from(block: Block, height: Int)(implicit config: GroupConfig): BlockEntry =
+      from(block.header, height).copy(transactions = Some(block.transactions.map(Tx.from)))
 
     def from(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
       from(blockNotify.header, blockNotify.height)
@@ -209,6 +260,33 @@ object RPCModel {
 
     implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
       deriveCodec[InterCliquePeerInfo]
+  }
+
+  final case class GetHashesAtHeight(val fromGroup: Int, val toGroup: Int, height: Int)
+      extends RPCModel
+      with PerChain
+  object GetHashesAtHeight {
+    implicit val codec: Codec[GetHashesAtHeight] = deriveCodec[GetHashesAtHeight]
+  }
+
+  final case class HashesAtHeight(headers: Seq[String]) extends RPCModel
+  object HashesAtHeight {
+    implicit val codec: Codec[HashesAtHeight] = deriveCodec[HashesAtHeight]
+  }
+
+  final case class GetChainInfo(val fromGroup: Int, val toGroup: Int) extends RPCModel with PerChain
+  object GetChainInfo {
+    implicit val codec: Codec[GetChainInfo] = deriveCodec[GetChainInfo]
+  }
+
+  final case class ChainInfo(currentHeight: Int) extends RPCModel
+  object ChainInfo {
+    implicit val codec: Codec[ChainInfo] = deriveCodec[ChainInfo]
+  }
+
+  final case class GetBlock(hash: String) extends RPCModel
+  object GetBlock {
+    implicit val codec: Codec[GetBlock] = deriveCodec[GetBlock]
   }
 
   object CliqueIdCodec {
