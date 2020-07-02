@@ -5,7 +5,7 @@ import scala.concurrent._
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import io.circe._
 import io.circe.syntax._
 
@@ -19,8 +19,9 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{Transaction, UnsignedTransaction}
+import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
@@ -79,6 +80,15 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   def doGetGroup(req: Request): FutureTry[Group] =
     Future.successful(getGroup(mode.node.blockFlow, req))
+
+  def doGetHashesAtHeight(req: Request): FutureTry[HashesAtHeight] =
+    Future.successful(getHashesAtHeight(mode.node.blockFlow, req))
+
+  def doGetChainInfo(req: Request): FutureTry[ChainInfo] =
+    Future.successful(getChainInfo(mode.node.blockFlow, req))
+
+  def doGetBlock(req: Request): FutureTry[BlockEntry] =
+    Future.successful(getBlock(mode.node.blockFlow, req))
 
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult] =
     Future.successful(createTransaction(mode.node.blockFlow, req))
@@ -159,6 +169,18 @@ object RPCServer extends {
     }
   }
 
+  def perChainReqE[T <: RPCModel with PerChain: Decoder, R <: RPCModel](req: Request)(
+      f: (ChainIndex, T) => Try[R])(implicit config: GroupConfig): Try[R] = {
+    req.paramsAs[T] match {
+      case Right(query) =>
+        ChainIndex
+          .from(query.fromGroup, query.toGroup)
+          .toRight(Response.failed("Invalid chain index"))
+          .flatMap(f(_, query))
+      case Left(failure) => Left(failure)
+    }
+  }
+
   def withReqF[T <: RPCModel: Decoder, R <: RPCModel](req: Request)(
       f: T => FutureTry[R]): FutureTry[R] = {
     req.paramsAs[T] match {
@@ -200,6 +222,47 @@ object RPCServer extends {
       Group(groupIndex.value)
     }
 
+  def getHashesAtHeight(blockFlow: BlockFlow, req: Request)(
+      implicit cfg: ConsensusConfig,
+      getHashAtHeightDecoder: Decoder[GetHashesAtHeight]): Try[HashesAtHeight] =
+    perChainReqE[GetHashesAtHeight, HashesAtHeight](req) { (chainIndex, query) =>
+      for {
+        hashes <- blockFlow
+          .getHashes(chainIndex, query.height)
+          .left
+          .map(_ => Response.failed("Failed in IO"))
+      } yield HashesAtHeight(hashes.map(_.toHexString).toArray.toIndexedSeq)
+    }
+
+  def getChainInfo(blockFlow: BlockFlow, req: Request)(
+      implicit cfg: ConsensusConfig,
+      decoder: Decoder[GetChainInfo]): Try[ChainInfo] =
+    perChainReqE[GetChainInfo, ChainInfo](req) { (chainIndex, _) =>
+      for {
+        maxHeight <- blockFlow
+          .getMaxHeight(chainIndex)
+          .left
+          .map(_ => Response.failed("Failed in IO"))
+      } yield ChainInfo(maxHeight)
+    }
+
+  def getBlock(blockFlow: BlockFlow, req: Request)(implicit cfg: ConsensusConfig,
+                                                   decoder: Decoder[GetBlock]): Try[BlockEntry] =
+    withReqE[GetBlock, BlockEntry](req) { query =>
+      for {
+        hash <- decodeHash(query.hash)
+        _    <- checkChainIndex(blockFlow, hash)
+        block <- blockFlow
+          .getBlock(hash)
+          .left
+          .map(_ => Response.failed(s"Fail fetching block with header ${hash.toHexString}"))
+        height <- blockFlow
+          .getHeight(block.header)
+          .left
+          .map(_ => Response.failed("Failed in IO"))
+      } yield BlockEntry.from(block, height)
+    }
+
   def decodeAddress(raw: String): Try[ED25519PublicKey] = {
     val addressOpt = for {
       bytes   <- Hex.from(raw)
@@ -209,6 +272,27 @@ object RPCServer extends {
     addressOpt match {
       case Some(address) => Right(address)
       case None          => Left(Response.failed("Failed in decoding address"))
+    }
+  }
+
+  def decodePublicKey(raw: String): Try[ED25519PublicKey] =
+    decodeRandomBytes(raw, ED25519PublicKey.from, "public key")
+
+  def decodePrivateKey(raw: String): Try[ED25519PrivateKey] =
+    decodeRandomBytes(raw, ED25519PrivateKey.from, "private key")
+
+  def decodeHash(raw: String): Try[Hash] =
+    decodeRandomBytes(raw, Hash.from, "hash")
+
+  def decodeRandomBytes[T](raw: String, from: ByteString => Option[T], name: String): Try[T] = {
+    val addressOpt = for {
+      bytes   <- Hex.from(raw)
+      address <- from(bytes)
+    } yield address
+
+    addressOpt match {
+      case Some(address) => Right(address)
+      case None          => Left(Response.failed(s"Failed in decoding $name"))
     }
   }
 
@@ -301,6 +385,14 @@ object RPCServer extends {
       val addressStr = CirceUtils.print(address.asJson)
       Left(Response.failed(s"Address $addressStr belongs to other groups"))
     }
+  }
+
+  def checkChainIndex(blockFlow: BlockFlow, hash: Hash)(
+      implicit groupConfig: GroupConfig): Try[Unit] = {
+    val chainIndex = ChainIndex.from(hash)
+    if (blockFlow.config.brokerInfo.contains(chainIndex.from) || blockFlow.config.brokerInfo
+          .contains(chainIndex.to)) Right(())
+    else Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
   }
 
   def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))

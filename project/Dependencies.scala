@@ -17,6 +17,7 @@ object Dependencies {
   lazy val akkahttptest   = "com.typesafe.akka" %% "akka-http-testkit"   % "10.1.11" % Test
   lazy val akkahttpcors   = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
   lazy val akkastreamtest = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
+  lazy val akkaslf4j      = "com.typesafe.akka" %% "akka-slf4j"          % Version.akka
 
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.2.2"
   lazy val logback         = "ch.qos.logback"             % "logback-classic"  % "1.2.3"

@@ -76,6 +76,7 @@ lazy val flow = project("flow")
       `alephium-serde`,
       `alephium-util` % "it,test" classifier "tests",
       akka,
+      akkaslf4j,
       logback,
       rocksdb,
       `scala-logging`
