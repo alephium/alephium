@@ -220,14 +220,19 @@ object Validation {
     }
   }
 
+  private def getToGroup(output: TxOutput, default: GroupIndex)(
+      implicit config: GroupConfig): GroupIndex = output match {
+    case assetOutput: AssetOutput => assetOutput.toGroup
+    case _: ContractOutput        => default
+  }
+
   private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult = {
-    val fromOk = tx.unsigned.inputs.forall(_.fromGroup == index.from)
-    val toOk = (0 until tx.outputsLength).forall { i =>
-      val output = tx.getOutput(i)
-      output.toGroup == index.from || output.toGroup == index.to
-    }
-    val existed = tx.unsigned.fixedOutputs.exists(_.toGroup == index.to)
+    val fromOk    = tx.unsigned.inputs.forall(_.fromGroup == index.from)
+    val fromGroup = tx.fromGroup
+    val toGroups  = (0 until tx.outputsLength).map(i => getToGroup(tx.getOutput(i), fromGroup))
+    val toOk      = toGroups.forall(groupIndex => groupIndex == index.from || groupIndex == index.to)
+    val existed   = toGroups.view.take(tx.unsigned.fixedOutputs.length).contains(index.to)
     if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
   }
 
@@ -291,17 +296,28 @@ object Validation {
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val unlockScript = tx.unsigned.inputs(idx).unlockScript
       val signature    = tx.signatures(idx)
-      val output       = preOutputs(idx)
-      (output.lockupScript, unlockScript) match {
-        case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-          checkP2pkh(tx, lock, unlock, signature)
-        case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-          checkP2SH(tx, lock, unlock, signature)
-        case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
-          checkP2S(tx, lock, unlock, signature)
-        case _ =>
-          invalidTx(InvalidUnlockScriptType)
+      preOutputs(idx) match {
+        case assetOutput: AssetOutput =>
+          checkLockupScript(tx, assetOutput.lockupScript, unlockScript, signature)
+        case _: ContractOutput =>
+          ???
       }
+    }
+  }
+
+  private[validation] def checkLockupScript(tx: Transaction,
+                                            lockupScript: LockupScript,
+                                            unlockScript: UnlockScript,
+                                            signature: ED25519Signature): TxValidationResult = {
+    (lockupScript, unlockScript) match {
+      case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
+        checkP2pkh(tx, lock, unlock, signature)
+      case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
+        checkP2SH(tx, lock, unlock, signature)
+      case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
+        checkP2S(tx, lock, unlock, signature)
+      case _ =>
+        invalidTx(InvalidUnlockScriptType)
     }
   }
 

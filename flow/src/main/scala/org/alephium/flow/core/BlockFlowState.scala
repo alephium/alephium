@@ -296,6 +296,11 @@ trait BlockFlowState {
     } yield inputs
   }
 
+  private def lockedBy(output: TxOutput, lockupScript: LockupScript): Boolean = output match {
+    case o: AssetOutput => o.lockupScript == lockupScript
+    case _              => false
+  }
+
   def getUtxos(lockupScript: LockupScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
     val groupIndex = lockupScript.groupIndex
     assert(config.brokerInfo.contains(groupIndex))
@@ -304,7 +309,7 @@ trait BlockFlowState {
       bestTrie <- getBestTrie(groupIndex)
       persistedUtxos <- bestTrie.outputState
         .getAll(lockupScript.shortKeyBytes)
-        .map(_.filter(_._2.lockupScript == lockupScript).map {
+        .map(_.filter(p => lockedBy(p._2, lockupScript)).map {
           case (outputRef, output) =>
             Tuple2.apply[TxOutputRef, TxOutput](outputRef, output) // TODO: improve this by making AVector covariant
         })
@@ -331,7 +336,7 @@ trait BlockFlowState {
         AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
       }
       val newUtxos = blockCaches.flatMap[(TxOutputRef, TxOutput)] { blockCache =>
-        AVector.from(blockCache.relatedOutputs.view.filter(_._2.lockupScript == lockupScript))
+        AVector.from(blockCache.relatedOutputs.view.filter(p => lockedBy(p._2, lockupScript)))
       }
       (usedUtxos, newUtxos)
     }

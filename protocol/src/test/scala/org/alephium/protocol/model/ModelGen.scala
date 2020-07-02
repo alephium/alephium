@@ -20,7 +20,7 @@ object ModelGen {
 
   val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose[Long](1, 5)
-  } yield TxOutput.build(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
+  } yield TxOutput.asset(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
 
   val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(1, 5)

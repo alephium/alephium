@@ -27,7 +27,10 @@ final case class Transaction(unsigned: UnsignedTransaction,
   }
   def toGroup(implicit config: GroupConfig): GroupIndex = {
     assume(unsigned.fixedOutputs.nonEmpty)
-    unsigned.fixedOutputs.head.toGroup
+    unsigned.fixedOutputs.head match {
+      case output: AssetOutput => output.toGroup
+      case _: ContractOutput   => fromGroup
+    }
   }
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
@@ -67,7 +70,7 @@ object Transaction {
            outputs: AVector[TxOutput],
            generatedOutputs: AVector[TxOutput],
            privateKey: ED25519PrivateKey): Transaction = {
-    from(UnsignedTransaction(script = None, inputs, outputs), generatedOutputs, privateKey)
+    from(UnsignedTransaction(inputs, outputs), generatedOutputs, privateKey)
   }
 
   def from(inputs: AVector[TxInput],
@@ -79,16 +82,14 @@ object Transaction {
   def from(inputs: AVector[TxInput],
            outputs: AVector[TxOutput],
            signatures: AVector[ED25519Signature]): Transaction = {
-    Transaction(UnsignedTransaction(script = None, inputs, outputs),
-                generatedOutputs = AVector.empty,
-                signatures)
+    Transaction(UnsignedTransaction(inputs, outputs), generatedOutputs = AVector.empty, signatures)
   }
 
   def from(inputs: AVector[TxInput],
            outputs: AVector[TxOutput],
            generatedOutputs: AVector[TxOutput],
            signatures: AVector[ED25519Signature]): Transaction = {
-    Transaction(UnsignedTransaction(script = None, inputs, outputs), generatedOutputs, signatures)
+    Transaction(UnsignedTransaction(inputs, outputs), generatedOutputs, signatures)
   }
 
   def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
@@ -109,8 +110,8 @@ object Transaction {
 
   def coinbase(publicKey: ED25519PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val txOutput = TxOutput(ALF.CoinBaseValue, tokens = AVector.empty, height, pkScript, data)
-    val unsigned = UnsignedTransaction(script = None, AVector.empty, AVector(txOutput))
+    val txOutput = AssetOutput(ALF.CoinBaseValue, tokens = AVector.empty, height, pkScript, data)
+    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }
 
@@ -119,8 +120,7 @@ object Transaction {
       case (lockupScript, value) =>
         TxOutput.genesis(value, lockupScript)
     }
-    val unsigned =
-      UnsignedTransaction(script = None, inputs = AVector.empty, fixedOutputs = outputs)
+    val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }
 }
