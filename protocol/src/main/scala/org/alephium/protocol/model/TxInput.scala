@@ -7,7 +7,10 @@ import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
-final case class TxInput(outputRef: TxOutputRef, unlockScript: UnlockScript) {
+final case class TxInput(outputRef: TxOutputRef, unlockScript: UnlockScript)
+    extends ALF.HashSerde[TxInput] {
+  def hash: Hash = _getHash
+
   def fromGroup(implicit config: GroupConfig): GroupIndex =
     LockupScript.groupIndex(outputRef.scriptHint)
 }

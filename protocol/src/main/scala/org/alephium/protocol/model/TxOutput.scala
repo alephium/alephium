@@ -25,11 +25,11 @@ object TxOutput {
     }
   )
 
-  def asset(amount: U64, createdHeight: Int, lockupScript: LockupScript): TxOutput = {
+  def asset(amount: U64, createdHeight: Int, lockupScript: LockupScript): AssetOutput = {
     AssetOutput(amount, AVector.empty, createdHeight, lockupScript, ByteString.empty)
   }
 
-  def genesis(amount: U64, lockupScript: LockupScript): TxOutput = {
+  def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
     asset(amount, ALF.GenesisHeight, lockupScript)
   }
 
