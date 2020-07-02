@@ -6,8 +6,10 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Duration, TimeStamp}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, Duration, TimeStamp, U64}
 
 class ValidationSpec extends AlephiumFlowSpec {
   import Validation._
@@ -18,6 +20,14 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   def check(res: BlockValidationResult, error: InvalidBlockStatus): Assertion = {
+    res.left.value isE error
+  }
+
+  def checkTx(res: TxValidationResult): Assertion = {
+    res.isRight is true
+  }
+
+  def checkTx(res: TxValidationResult, error: InvalidTxStatus): Assertion = {
     res.left.value isE error
   }
 
@@ -95,6 +105,86 @@ class ValidationSpec extends AlephiumFlowSpec {
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
     check(checkCoinbase(block8), InvalidCoinbase)
+  }
+
+  def genAlfOutput(amount: U64): AssetOutput = {
+    TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
+  }
+
+  it should "test ALF balance overflow" in {
+    val preOutput = genAlfOutput(U64.MaxValue)
+    val output1   = genAlfOutput(U64.MaxValue)
+    val output2   = genAlfOutput(U64.Zero)
+    val output3   = genAlfOutput(U64.One)
+    val input     = ModelGen.txInputGen.sample.get
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    checkTx(checkBalance(tx0, AVector(preOutput)))
+    checkTx(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
+  }
+
+  it should "validate ALF balances" in {
+    val sum       = U64.MaxValue.subUnsafe(U64.Two)
+    val preOutput = genAlfOutput(sum)
+    val output1   = genAlfOutput(sum.subOneUnsafe())
+    val output2   = genAlfOutput(U64.One)
+    val output3   = genAlfOutput(U64.Two)
+    val input     = ModelGen.txInputGen.sample.get
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    checkTx(checkBalance(tx0, AVector(preOutput)))
+    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidBalance)
+  }
+
+  def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
+    AssetOutput(U64.Zero,
+                AVector(tokenId -> amount),
+                0,
+                LockupScript.p2pkh(ALF.Hash.zero),
+                ByteString.empty)
+  }
+
+  it should "test token balance overflow" in {
+    val input     = ModelGen.txInputGen.sample.get
+    val tokenId   = ALF.Hash.generate
+    val preOutput = genTokenOutput(tokenId, U64.MaxValue)
+    val output1   = genTokenOutput(tokenId, U64.MaxValue)
+    val output2   = genTokenOutput(tokenId, U64.Zero)
+    val output3   = genTokenOutput(tokenId, U64.One)
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    checkTx(checkBalance(tx0, AVector(preOutput)))
+    checkTx(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
+  }
+
+  it should "validate token balances" in {
+    val input     = ModelGen.txInputGen.sample.get
+    val tokenId   = ALF.Hash.generate
+    val sum       = U64.MaxValue.subUnsafe(U64.Two)
+    val preOutput = genTokenOutput(tokenId, sum)
+    val output1   = genTokenOutput(tokenId, sum.subOneUnsafe())
+    val output2   = genTokenOutput(tokenId, U64.One)
+    val output3   = genTokenOutput(tokenId, U64.Two)
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    checkTx(checkBalance(tx0, AVector(preOutput)))
+    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidBalance)
+  }
+
+  it should "create new token" in {
+    val input   = ModelGen.txInputGen.sample.get
+    val tokenId = input.hash
+    val output  = genTokenOutput(tokenId, U64.MaxValue)
+    val tx      = Transaction.from(AVector(input), AVector(output), signatures = AVector.empty)
+    checkTx(checkBalance(tx, AVector.empty))
   }
 
   // TODO: Add more mocking test

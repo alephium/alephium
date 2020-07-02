@@ -1,5 +1,7 @@
 package org.alephium.flow.core.validation
 
+import scala.collection.mutable
+
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
@@ -216,7 +218,7 @@ object Validation {
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
     tx.alfAmountInOutputs match {
       case Some(sum) if sum < ALF.MaxALFValue => validTx
-      case _                                  => invalidTx(OutputValueOverFlow)
+      case _                                  => invalidTx(BalanceOverFlow)
     }
   }
 
@@ -282,12 +284,55 @@ object Validation {
 
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
+    for {
+      _ <- checkAlfBalance(tx, preOutputs)
+      _ <- checkTokenBalance(tx, preOutputs)
+    } yield ()
+  }
+
+  private[validation] def checkAlfBalance(tx: Transaction,
+                                          preOutputs: AVector[TxOutput]): TxValidationResult = {
     val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
     tx.alfAmountInOutputs match {
       case Some(outputSum) if outputSum <= inputSum => validTx
-      case _                                        => invalidTx(InvalidBalance)
+      case Some(_)                                  => invalidTx(InvalidBalance)
+      case None                                     => invalidTx(BalanceOverFlow)
     }
   }
+
+  private[validation] def checkTokenBalance(tx: Transaction,
+                                            preOutputs: AVector[TxOutput]): TxValidationResult = {
+    for {
+      inputBalances  <- computeTokenBalances(preOutputs)
+      outputBalances <- computeTokenBalances(tx.unsigned.fixedOutputs ++ tx.generatedOutputs)
+      _ <- {
+        val ok = outputBalances.forall {
+          case (tokenId, balance) =>
+            (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance) || tokenId == tx.unsigned.inputs.head.hash
+        }
+        if (ok) validTx else invalidTx(InvalidBalance)
+      }
+    } yield ()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private[validation] def computeTokenBalances(
+      outputs: AVector[TxOutput]): Either[TxValidationError, mutable.Map[TokenId, U64]] =
+    try {
+      val balances = mutable.Map.empty[TokenId, U64]
+      outputs.foreach {
+        case output: AssetOutput =>
+          output.tokens.foreach {
+            case (tokenId, amount) =>
+              val total = balances.getOrElse(tokenId, U64.Zero)
+              balances.put(tokenId, total.add(amount).get)
+          }
+        case _ => ()
+      }
+      Right(balances)
+    } catch {
+      case _: NoSuchElementException => Left(Right(BalanceOverFlow))
+    }
 
   // TODO: signatures might not be 1-to-1 mapped to inputs
   private[validation] def checkWitnesses(tx: Transaction,
