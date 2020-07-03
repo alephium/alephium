@@ -3,40 +3,45 @@ package org.alephium.flow.trie
 import org.alephium.flow.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.StatefulContract
 import org.alephium.serde.Serde
 import org.alephium.util.U64
 
-final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput]) {
+final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
+                            contractState: MerklePatriciaTrie[ALF.Hash, StatefulContract]) {
   def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
     outputState.get(outputRef)
   }
 
   def put(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
-    outputState.put(outputRef, output).map(WorldState(_))
+    outputState.put(outputRef, output).map(WorldState(_, contractState))
   }
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
-    outputState.remove(outputRef).map(WorldState(_))
+    outputState.remove(outputRef).map(WorldState(_, contractState))
   }
 
-  def toHashes: WorldState.Hashes = WorldState.Hashes(outputState.rootHash)
+  def toHashes: WorldState.Hashes = WorldState.Hashes(outputState.rootHash, contractState.rootHash)
 }
 
 object WorldState {
   def empty(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-    val emptyTxTrie =
+    val emptyOutputTrie =
       MerklePatriciaTrie.build(storage, TxOutputRef.empty, TxOutput.burn(U64.Zero))
-    WorldState(emptyTxTrie)
+    val emptyContractTrie =
+      MerklePatriciaTrie.build(storage, ALF.Hash.zero, StatefulContract.failure)
+    WorldState(emptyOutputTrie, emptyContractTrie)
   }
 
-  final case class Hashes(alfStateHash: ALF.Hash) {
+  final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
     def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-      val alfState = MerklePatriciaTrie[TxOutputRef, TxOutput](alfStateHash, storage)
-      WorldState(alfState)
+      val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
+      val contractState = MerklePatriciaTrie[ALF.Hash, StatefulContract](contractStateHash, storage)
+      WorldState(outputState, contractState)
     }
   }
   object Hashes {
     implicit val serde: Serde[Hashes] =
-      Serde.forProduct1(Hashes.apply, t => t.alfStateHash)
+      Serde.forProduct2(Hashes.apply, t => t.outputStateHash -> t.contractStateHash)
   }
 }

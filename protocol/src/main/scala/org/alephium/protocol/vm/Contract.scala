@@ -80,6 +80,11 @@ final case class StatefulContract(
 object StatefulContract {
   implicit val serde: Serde[StatefulContract] =
     Serde.forProduct2(StatefulContract.apply, t => (t.fields, t.methods))
+
+  // This is only used for initialize merkle tree of contract codes
+  val failure: StatefulContract = StatefulContract(
+    AVector.empty,
+    AVector(Method[StatefulContext](AVector.empty, AVector.empty, AVector(Pop))))
 }
 
 trait ContractObj[Ctx <: Context] {
