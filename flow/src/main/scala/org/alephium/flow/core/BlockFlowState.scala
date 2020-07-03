@@ -1,5 +1,6 @@
 package org.alephium.flow.core
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.crypto.ED25519PrivateKey
@@ -10,7 +11,7 @@ import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -392,7 +393,9 @@ object BlockFlowState {
   final case class OutBlockCache(inputs: Set[TxOutputRef],
                                  relatedOutputs: Map[TxOutputRef, TxOutput])
       extends BlockCache
-  final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput], inputs: Set[TxOutputRef])
+  final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput],
+                                   contracts: Map[Hash, StatefulContract],
+                                   inputs: Set[TxOutputRef])
       extends BlockCache { // For blocks on intra-group chain
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
   }
@@ -401,20 +404,34 @@ object BlockFlowState {
     block.transactions.flatMap(_.unsigned.inputs.map(_.outputRef)).toSet
   }
 
-  private def convertOutputs(block: Block): Map[TxOutputRef, TxOutput] = {
-    val outputs = block.transactions.flatMap { transaction =>
+  private def convertOutputs(
+      block: Block): (Map[TxOutputRef, TxOutput], Map[Hash, StatefulContract]) = {
+    val outputs   = mutable.Map.empty[TxOutputRef, TxOutput]
+    val contracts = mutable.Map.empty[Hash, StatefulContract]
+    block.transactions.foreach { transaction =>
+      (0 until transaction.outputsLength).foreach { index =>
+        val output    = transaction.getOutput(index)
+        val outputRef = TxOutputRef.unsafe(transaction, index)
+        outputs.update(outputRef, output)
+        output match {
+          case _: ContractOutput =>
+            contracts.update(outputRef.key, transaction.unsigned.contracts(contracts.size))
+          case _ => ()
+        }
+      }
       AVector.tabulate(transaction.outputsLength) { index =>
         val output    = transaction.getOutput(index)
         val outputRef = TxOutputRef.unsafe(transaction, index)
         (outputRef, output)
       }
     }
-    outputs.toIterable.toMap
+    outputs.toMap -> contracts.toMap
   }
 
+  // This is only used for out blocks for a specific group
   private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
       implicit config: GroupConfig): Map[TxOutputRef, TxOutput] = {
-    convertOutputs(block).filter(_._1.fromGroup == groupIndex)
+    convertOutputs(block)._1.filter(_._1.fromGroup == groupIndex)
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
@@ -422,11 +439,12 @@ object BlockFlowState {
     val index = block.chainIndex
     assert(index.relateTo(groupIndex))
     if (index.isIntraGroup) {
-      InOutBlockCache(convertOutputs(block), convertInputs(block))
+      val (outputs, contracts) = convertOutputs(block)
+      InOutBlockCache(outputs, contracts, convertInputs(block))
     } else if (index.from == groupIndex) {
       OutBlockCache(convertInputs(block), convertRelatedOutputs(block, groupIndex))
     } else {
-      InBlockCache(convertOutputs(block))
+      InBlockCache(convertOutputs(block)._1) // there should be no [[ContractOutput]]
     }
   }
 
@@ -437,9 +455,22 @@ object BlockFlowState {
     }
   }
 
+  def updateStateForContracts(
+      worldState: WorldState,
+      contracts: Iterable[(Hash, StatefulContract)]): IOResult[WorldState] = {
+    EitherF.foldTry(contracts, worldState) {
+      case (worldState, (key, contract)) => worldState.put(key, contract)
+    }
+  }
+
   def updateStateForInputs(worldState: WorldState,
                            inputs: Iterable[TxOutputRef]): IOResult[WorldState] = {
-    EitherF.foldTry(inputs, worldState)(_.remove(_))
+    EitherF.foldTry(inputs, worldState) {
+      case (worldState, outputRef) =>
+        if (outputRef.isContractRef) {
+          worldState.remove(outputRef).flatMap(_.remove(outputRef.key))
+        } else worldState.remove(outputRef)
+    }
   }
 
   def updateState(worldState: WorldState, blockCache: BlockCache): IOResult[WorldState] = {
@@ -451,11 +482,12 @@ object BlockFlowState {
           trie0 <- updateStateForInputs(worldState, inputs)
           trie1 <- updateStateForOutputs(trie0, relatedOutputs)
         } yield trie1
-      case InOutBlockCache(outputs, inputs) =>
+      case InOutBlockCache(outputs, contracts, inputs) =>
         for {
           trie0 <- updateStateForOutputs(worldState, outputs)
-          trie1 <- updateStateForInputs(trie0, inputs)
-        } yield trie1
+          trie1 <- updateStateForContracts(trie0, contracts)
+          trie2 <- updateStateForInputs(trie1, inputs)
+        } yield trie2
     }
   }
 }
