@@ -17,8 +17,16 @@ final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutpu
     outputState.put(outputRef, output).map(WorldState(_, contractState))
   }
 
+  def put(key: ALF.Hash, contract: StatefulContract): IOResult[WorldState] = {
+    contractState.put(key, contract).map(WorldState(outputState, _))
+  }
+
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
     outputState.remove(outputRef).map(WorldState(_, contractState))
+  }
+
+  def remove(key: ALF.Hash): IOResult[WorldState] = {
+    contractState.remove(key).map(WorldState(outputState, _))
   }
 
   def toHashes: WorldState.Hashes = WorldState.Hashes(outputState.rootHash, contractState.rootHash)

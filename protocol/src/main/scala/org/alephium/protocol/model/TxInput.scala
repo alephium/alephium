@@ -27,8 +27,15 @@ object TxInput {
     Serde.forProduct2(TxInput.apply, ti => (ti.outputRef, ti.unlockScript))
 }
 
+/**
+  *
+  * @param scriptHint short index of [[LockupScript]] for quick outputs query
+  *                   0 is reserved for contract outputs
+  * @param key hash of the hash of transaction and index of the [[AssetOutput]];
+  *            or hash of the first signature for [[ContractOutput]]
+  */
 final case class TxOutputRef(scriptHint: Int, key: ALF.Hash) {
-  def tokenIdOpt: Option[TokenId] = None
+  def isContractRef: Boolean = scriptHint == 0
 
   def fromGroup(implicit config: GroupConfig): GroupIndex =
     LockupScript.groupIndex(scriptHint)
@@ -38,11 +45,19 @@ object TxOutputRef {
   implicit val serde: Serde[TxOutputRef] =
     Serde.forProduct2(TxOutputRef.apply, t => (t.scriptHint, t.key))
 
+  // Only use this to initialize Merkle tree of ouptuts
   def empty: TxOutputRef = TxOutputRef(0, ALF.Hash.zero)
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
-    val output     = transaction.getOutput(outputIndex)
-    val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
-    TxOutputRef(output.scriptHint, outputHash)
+    transaction.getOutput(outputIndex) match {
+      case output: AssetOutput =>
+        val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
+        assume(output.scriptHint != 0)
+        TxOutputRef(output.scriptHint, outputHash)
+      case output: ContractOutput =>
+        // TODO: check non-empty signature in validation
+        val outputHash = Hash.hash(transaction.signatures.head.bytes ++ Bytes.toBytes(outputIndex))
+        TxOutputRef(output.scriptHint, outputHash)
+    }
   }
 }

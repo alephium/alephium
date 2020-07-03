@@ -24,7 +24,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
           updateStateForOutputs(worldState, outputs)
         case OutBlockCache(_, _) =>
           Right(worldState)
-        case InOutBlockCache(outputs, _) =>
+        case InOutBlockCache(outputs, _, _) =>
           updateStateForOutputs(worldState, outputs)
       }
     }
