@@ -7,6 +7,7 @@ import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
 import org.alephium.util.AVector

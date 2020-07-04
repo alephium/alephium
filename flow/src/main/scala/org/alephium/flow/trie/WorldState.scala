@@ -1,14 +1,16 @@
 package org.alephium.flow.trie
 
-import org.alephium.flow.io.{IOResult, KeyValueStorage}
+import org.alephium.flow.io.KeyValueStorage
 import org.alephium.protocol.ALF
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.StatelessScript
-import org.alephium.serde.Serde
+import org.alephium.protocol.vm.{StatelessScript, WorldStateT}
 import org.alephium.util.U64
 
 final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
-                            contractState: MerklePatriciaTrie[ALF.Hash, StatelessScript]) {
+                            contractState: MerklePatriciaTrie[ALF.Hash, StatelessScript])
+    extends WorldStateT {
+
   def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
     outputState.get(outputRef)
   }
@@ -29,7 +31,8 @@ final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutpu
     contractState.remove(key).map(WorldState(outputState, _))
   }
 
-  def toHashes: WorldState.Hashes = WorldState.Hashes(outputState.rootHash, contractState.rootHash)
+  def toHashes: WorldStateT.Hashes =
+    WorldStateT.Hashes(outputState.rootHash, contractState.rootHash)
 }
 
 object WorldState {
@@ -41,15 +44,11 @@ object WorldState {
     WorldState(emptyOutputTrie, emptyContractTrie)
   }
 
-  final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
-    def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-      val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
-      val contractState = MerklePatriciaTrie[ALF.Hash, StatelessScript](contractStateHash, storage)
-      WorldState(outputState, contractState)
-    }
-  }
-  object Hashes {
-    implicit val serde: Serde[Hashes] =
-      Serde.forProduct2(Hashes.apply, t => t.outputStateHash -> t.contractStateHash)
+  def from(hashes: WorldStateT.Hashes,
+           storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
+    val outputState = MerklePatriciaTrie[TxOutputRef, TxOutput](hashes.outputStateHash, storage)
+    val contractState =
+      MerklePatriciaTrie[ALF.Hash, StatelessScript](hashes.contractStateHash, storage)
+    WorldState(outputState, contractState)
   }
 }

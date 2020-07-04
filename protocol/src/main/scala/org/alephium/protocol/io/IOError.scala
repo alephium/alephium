@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.protocol.io
 
 import org.rocksdb.RocksDBException
 

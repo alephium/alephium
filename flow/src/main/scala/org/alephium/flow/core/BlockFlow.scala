@@ -3,12 +3,13 @@ package org.alephium.flow.core
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.io.{IOResult, IOUtils, Storages}
+import org.alephium.flow.io.{IOUtils, Storages}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 

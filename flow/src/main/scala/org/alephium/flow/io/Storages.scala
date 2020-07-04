@@ -9,6 +9,7 @@ import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.io.IOResult
 import org.alephium.util.AVector
 
 object Storages {

@@ -6,14 +6,16 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.flow.trie.{MerklePatriciaTrie, WorldState}
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
+import org.alephium.protocol.vm.WorldStateT
 
-trait TrieHashStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
+trait TrieHashStorage extends KeyValueStorage[Hash, WorldStateT.Hashes] {
   val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
 
   override def storageKey(key: Hash): ByteString = key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getTrie(hash: Hash): IOResult[WorldState] = {
-    get(hash).map(_.toWorldState(trieStorage))
+    get(hash).map(WorldState.from(_, trieStorage))
   }
 
   def putTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
@@ -44,5 +46,5 @@ class TrieHashRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, WorldState.Hashes](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[Hash, WorldStateT.Hashes](storage, cf, writeOptions, readOptions)
     with TrieHashStorage

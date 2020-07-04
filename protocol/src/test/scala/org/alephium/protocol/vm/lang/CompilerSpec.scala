@@ -4,7 +4,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.{vm, ALF}
-import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
+import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val, WorldStateT}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -164,7 +164,7 @@ class CompilerSpec extends AlephiumSpec {
       val contract = Compiler.compile(input).toOption.get
 
       deserialize[StatelessScript](serialize(contract)) isE contract
-      StatelessVM.execute(StatelessContext.test, contract, fields, args) isE output
+      StatelessVM.execute(StatelessContext.mock, contract, fields, args) isE output
     }
   }
 
@@ -208,7 +208,7 @@ class CompilerSpec extends AlephiumSpec {
     val pubKeyHash       = ALF.Hash.hash(pubKey.bytes)
     val signature        = ED25519.sign(ALF.Hash.zero.bytes, priKey)
     StatelessVM.execute(
-      StatelessContext(ALF.Hash.zero, vm.Stack.unsafe(AVector(signature), 1)),
+      StatelessContext(ALF.Hash.zero, vm.Stack.unsafe(AVector(signature), 1), WorldStateT.mock),
       contract,
       AVector(Val.Byte32(pubKeyHash.toByte32)),
       AVector(Val.Byte32(pubKey.toByte32))

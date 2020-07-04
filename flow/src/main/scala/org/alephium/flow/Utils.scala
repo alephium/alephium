@@ -1,6 +1,6 @@
 package org.alephium.flow
 
-import org.alephium.flow.io.IOResult
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.FlowData
 import org.alephium.serde.RandomBytes
 import org.alephium.util.{AVector, Duration}

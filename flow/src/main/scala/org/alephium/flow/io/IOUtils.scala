@@ -5,10 +5,11 @@ import java.nio.file.{Files, Path}
 
 import org.rocksdb.RocksDBException
 
+import org.alephium.protocol.io.IOResult
 import org.alephium.serde.SerdeError
 
 object IOUtils {
-  import IOError._
+  import org.alephium.protocol.io.IOError._
 
   def createDirUnsafe(path: Path): Unit = {
     if (!Files.exists(path)) {

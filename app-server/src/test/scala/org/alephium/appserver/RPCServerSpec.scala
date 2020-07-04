@@ -24,12 +24,13 @@ import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
-import org.alephium.flow.io.{IOResult, Storages, StoragesFixture}
+import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils
