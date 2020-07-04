@@ -56,6 +56,10 @@ final case class StatelessScript(
 object StatelessScript {
   implicit val serde: Serde[StatelessScript] =
     Serde.forProduct2(StatelessScript.apply, t => (t.fields, t.methods))
+
+  val failure: StatelessScript = StatelessScript(
+    AVector.empty,
+    AVector(Method[StatelessContext](AVector.empty, AVector.empty, AVector(Pop))))
 }
 
 final case class StatefulScript(
