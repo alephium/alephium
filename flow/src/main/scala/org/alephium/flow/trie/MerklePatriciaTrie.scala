@@ -2,9 +2,10 @@ package org.alephium.flow.trie
 
 import akka.util.ByteString
 
-import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.flow.io.KeyValueStorage
 import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 

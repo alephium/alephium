@@ -5,9 +5,9 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
-import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.protocol.ALF
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 

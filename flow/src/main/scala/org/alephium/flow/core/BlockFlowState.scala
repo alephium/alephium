@@ -4,12 +4,12 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.crypto.ED25519PrivateKey
-import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
 import org.alephium.util._

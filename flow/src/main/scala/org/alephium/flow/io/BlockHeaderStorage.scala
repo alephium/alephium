@@ -4,6 +4,7 @@ import RocksDBSource.ColumnFamily
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.BlockHeader
 
 trait BlockHeaderStorage extends KeyValueStorage[Hash, BlockHeader] {

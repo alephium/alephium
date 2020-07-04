@@ -5,9 +5,9 @@ import scala.collection.mutable
 import org.scalatest.Assertion
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, TimeStamp}
 

@@ -3,6 +3,7 @@ package org.alephium.flow.io
 import java.nio.file.Path
 
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.model.Block
 import org.alephium.serde.{Serde, Serializer}
 import org.alephium.util.LruCache

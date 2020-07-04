@@ -5,6 +5,7 @@ import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.{Block, ChainIndex}
 
 trait BlockChainWithState extends BlockChain {

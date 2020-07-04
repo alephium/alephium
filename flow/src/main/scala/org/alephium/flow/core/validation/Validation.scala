@@ -4,12 +4,12 @@ import scala.collection.mutable
 
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core._
-import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
+import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.serde._
@@ -399,7 +399,7 @@ object Validation {
                                       script: StatelessScript,
                                       params: AVector[Val],
                                       signature: ED25519Signature): TxValidationResult = {
-    val context = StatelessContext(tx.hash, signature)
+    val context = StatelessContext(tx.hash, signature, WorldStateT.mock)
     StatelessVM.execute(context, script, AVector.empty, params) match {
       case Right(_) => validTx // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))

@@ -129,7 +129,6 @@ lazy val flow = project("flow")
       akka,
       `akka-slf4j`,
       logback,
-      rocksdb,
       `scala-logging`
     )
   )
@@ -139,6 +138,7 @@ lazy val protocol = project("protocol")
   .dependsOn(crypto, serde, util % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
+      rocksdb,
       fastparse
     )
   )
