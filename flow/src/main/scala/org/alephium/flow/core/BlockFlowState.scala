@@ -11,7 +11,7 @@ import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -394,7 +394,7 @@ object BlockFlowState {
                                  relatedOutputs: Map[TxOutputRef, TxOutput])
       extends BlockCache
   final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput],
-                                   contracts: Map[Hash, StatefulContract],
+                                   contracts: Map[Hash, StatelessScript],
                                    inputs: Set[TxOutputRef])
       extends BlockCache { // For blocks on intra-group chain
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
@@ -405,9 +405,9 @@ object BlockFlowState {
   }
 
   private def convertOutputs(
-      block: Block): (Map[TxOutputRef, TxOutput], Map[Hash, StatefulContract]) = {
+      block: Block): (Map[TxOutputRef, TxOutput], Map[Hash, StatelessScript]) = {
     val outputs   = mutable.Map.empty[TxOutputRef, TxOutput]
-    val contracts = mutable.Map.empty[Hash, StatefulContract]
+    val contracts = mutable.Map.empty[Hash, StatelessScript]
     block.transactions.foreach { transaction =>
       (0 until transaction.outputsLength).foreach { index =>
         val output    = transaction.getOutput(index)
@@ -457,7 +457,7 @@ object BlockFlowState {
 
   def updateStateForContracts(
       worldState: WorldState,
-      contracts: Iterable[(Hash, StatefulContract)]): IOResult[WorldState] = {
+      contracts: Iterable[(Hash, StatelessScript)]): IOResult[WorldState] = {
     EitherF.foldTry(contracts, worldState) {
       case (worldState, (key, contract)) => worldState.put(key, contract)
     }

@@ -1,14 +1,14 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.ALF.{Hash, HashSerde}
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
-final case class UnsignedTransaction(script: Option[StatefulScript],
+final case class UnsignedTransaction(script: Option[StatelessScript],
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[TxOutput],
-                                     contracts: AVector[StatefulContract])
+                                     contracts: AVector[StatelessScript])
     extends HashSerde[UnsignedTransaction] {
   override lazy val hash: Hash = _getHash
 }
