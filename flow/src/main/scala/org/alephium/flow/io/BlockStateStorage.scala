@@ -6,6 +6,7 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.flow.io.RocksDBSource.ColumnFamily
 import org.alephium.flow.model.BlockState
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.util.KeyValueStorage
 
 trait BlockStateStorage extends KeyValueStorage[Hash, BlockState] {
   override def storageKey(key: Hash): ByteString =

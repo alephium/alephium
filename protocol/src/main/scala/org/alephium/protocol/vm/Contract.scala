@@ -92,6 +92,7 @@ object StatefulContract {
 }
 
 trait ContractObj[Ctx <: Context] {
+  def addressOpt: Option[ALF.Hash] = None
   def code: Contract[Ctx]
   def fields: Array[Val]
 }

@@ -69,6 +69,13 @@ class Frame[Ctx <: Context](var pc: Int,
     }
   }
 
+  def updateState(): ExeResult[Unit] = {
+    obj.addressOpt match {
+      case Some(address) => ctx.updateState(address, AVector.from(obj.fields))
+      case None          => Right(())
+    }
+  }
+
   private def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     obj.code.methods.get(index).toRight(InvalidMethodIndex(index))
   }

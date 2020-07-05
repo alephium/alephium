@@ -8,6 +8,7 @@ import org.scalatest.Assertion
 
 import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.util.MerklePatriciaTrie
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Files}
 

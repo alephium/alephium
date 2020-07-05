@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.protocol.util
 
 import java.io.IOException
 import java.nio.file.{Files, Path}

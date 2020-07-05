@@ -4,7 +4,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, Val}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -56,7 +56,7 @@ object AssetOutput {
                       t => (t.amount, t.tokens, t.createdHeight, t.lockupScript, t.additionalData))
 }
 
-final case class ContractOutput(amount: U64, createdHeight: Int, state: ByteString)
+final case class ContractOutput(amount: U64, createdHeight: Int, state: AVector[Val])
     extends TxOutput {
   def scriptHint: Int = 0
 }

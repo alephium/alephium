@@ -1,5 +1,7 @@
 package org.alephium.protocol.vm
 
+import org.alephium.protocol.io.IOError
+
 trait ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 case object VerificationFailed                                 extends ExeFailure
@@ -28,3 +30,4 @@ case object EqualityFailed                                     extends ExeFailur
 case object InvalidInstrOffset                                 extends ExeFailure
 case object InvalidReturnType                                  extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
+final case class IOErrorUpdateState(error: IOError)            extends ExeFailure

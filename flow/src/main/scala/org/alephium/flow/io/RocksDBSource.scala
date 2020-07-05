@@ -6,10 +6,11 @@ import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
 import org.alephium.protocol.io.IOResult
+import org.alephium.protocol.util.IOUtils
 import org.alephium.util.AVector
 
 object RocksDBSource {
-  import IOUtils.tryExecute
+  import org.alephium.protocol.util.IOUtils.tryExecute
 
   {
     RocksDB.loadLibrary()

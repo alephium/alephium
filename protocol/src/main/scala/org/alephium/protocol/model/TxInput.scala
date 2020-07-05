@@ -48,6 +48,8 @@ object TxOutputRef {
   // Only use this to initialize Merkle tree of ouptuts
   def empty: TxOutputRef = TxOutputRef(0, ALF.Hash.zero)
 
+  def contract(key: Hash): TxOutputRef = TxOutputRef(0, key)
+
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
     transaction.getOutput(outputIndex) match {
       case output: AssetOutput =>
