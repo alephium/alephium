@@ -346,8 +346,18 @@ object Validation {
         case assetOutput: AssetOutput =>
           checkLockupScript(tx, assetOutput.lockupScript, unlockScript, signature, worldState)
         case _: ContractOutput =>
-          ???
+          checkContractOutput(tx, idx, worldState)
       }
+    }
+  }
+
+  private[validation] def checkContractOutput(tx: Transaction,
+                                              index: Int,
+                                              worldState: WorldState): TxValidationResult = {
+    val outputRef = TxOutputRef.unsafe(tx, index)
+    worldState.exist(outputRef.key) match {
+      case Right(exist) => if (exist) invalidTx(CreateContractWithOldId) else validTx
+      case Left(error)  => invalidTx(WorldStateIOError(error))
     }
   }
 

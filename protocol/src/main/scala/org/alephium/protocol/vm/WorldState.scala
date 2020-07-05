@@ -21,6 +21,10 @@ final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutpu
     contractState.put(key, contract).map(WorldState(outputState, _))
   }
 
+  def exist(contractKey: ALF.Hash): IOResult[Boolean] = {
+    contractState.getOpt(contractKey).map(_.nonEmpty)
+  }
+
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
     outputState.remove(outputRef).map(WorldState(_, contractState))
   }
