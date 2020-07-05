@@ -94,3 +94,5 @@ final case object InvalidScriptHash                     extends InvalidTxStatus
 final case object InvalidSignature                      extends InvalidTxStatus
 final case object InvalidUnlockScriptType               extends InvalidTxStatus
 final case class InvalidUnlockScript(error: ExeFailure) extends InvalidTxStatus
+final case object CreateContractWithOldId               extends InvalidTxStatus
+final case class WorldStateIOError(error: IOError)      extends InvalidTxStatus
