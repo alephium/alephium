@@ -5,6 +5,7 @@ import org.alephium.protocol.ALF
 import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{StatelessScript, WorldStateT}
+import org.alephium.serde.Serde
 import org.alephium.util.U64
 
 final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
@@ -31,8 +32,8 @@ final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutpu
     contractState.remove(key).map(WorldState(outputState, _))
   }
 
-  def toHashes: WorldStateT.Hashes =
-    WorldStateT.Hashes(outputState.rootHash, contractState.rootHash)
+  def toHashes: WorldState.Hashes =
+    WorldState.Hashes(outputState.rootHash, contractState.rootHash)
 }
 
 object WorldState {
@@ -44,11 +45,15 @@ object WorldState {
     WorldState(emptyOutputTrie, emptyContractTrie)
   }
 
-  def from(hashes: WorldStateT.Hashes,
-           storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
-    val outputState = MerklePatriciaTrie[TxOutputRef, TxOutput](hashes.outputStateHash, storage)
-    val contractState =
-      MerklePatriciaTrie[ALF.Hash, StatelessScript](hashes.contractStateHash, storage)
-    WorldState(outputState, contractState)
+  final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
+    def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
+      val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
+      val contractState = MerklePatriciaTrie[ALF.Hash, StatelessScript](contractStateHash, storage)
+      WorldState(outputState, contractState)
+    }
+  }
+  object Hashes {
+    implicit val serde: Serde[Hashes] =
+      Serde.forProduct2(Hashes.apply, t => t.outputStateHash -> t.contractStateHash)
   }
 }
