@@ -6,7 +6,6 @@ import org.alephium.crypto.ED25519Signature
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.{TxOutput, TxOutputRef}
-import org.alephium.serde.Serde
 
 trait ChainEnv
 trait BlockEnv
@@ -23,24 +22,15 @@ trait WorldStateT {
   def remove(outputRef: TxOutputRef): IOResult[WorldStateT]
 
   def remove(key: Hash): IOResult[WorldStateT]
-
-  def toHashes: WorldStateT.Hashes
 }
 
 object WorldStateT {
-  final case class Hashes(outputStateHash: Hash, contractStateHash: Hash)
-  object Hashes {
-    implicit val serde: Serde[Hashes] =
-      Serde.forProduct2(Hashes.apply, t => t.outputStateHash -> t.contractStateHash)
-  }
-
   val mock: WorldStateT = new WorldStateT {
     override def get(outputRef: TxOutputRef): IOResult[TxOutput]                      = ???
     override def put(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldStateT] = ???
     override def put(key: Hash, contract: StatelessScript): IOResult[WorldStateT]     = ???
     override def remove(outputRef: TxOutputRef): IOResult[WorldStateT]                = ???
     override def remove(key: Hash): IOResult[WorldStateT]                             = ???
-    override def toHashes: Hashes                                                     = ???
   }
 }
 
