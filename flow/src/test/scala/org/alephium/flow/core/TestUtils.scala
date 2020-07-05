@@ -5,9 +5,9 @@ import java.nio.file.Path
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 
-import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.util.IOUtils
 import org.alephium.util.{ActorRefT, Files => AFiles}
 
 object TestUtils {

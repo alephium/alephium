@@ -1,17 +1,14 @@
-package org.alephium.flow.trie
+package org.alephium.protocol.vm
 
-import org.alephium.flow.io.KeyValueStorage
 import org.alephium.protocol.ALF
 import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{StatelessScript, WorldStateT}
+import org.alephium.protocol.util.{KeyValueStorage, MerklePatriciaTrie}
 import org.alephium.serde.Serde
-import org.alephium.util.U64
+import org.alephium.util.{AVector, U64}
 
 final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
-                            contractState: MerklePatriciaTrie[ALF.Hash, StatelessScript])
-    extends WorldStateT {
-
+                            contractState: MerklePatriciaTrie[ALF.Hash, StatelessScript]) {
   def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
     outputState.get(outputRef)
   }
@@ -32,6 +29,16 @@ final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutpu
     contractState.remove(key).map(WorldState(outputState, _))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def update(key: ALF.Hash, state: AVector[Val]): IOResult[WorldState] = {
+    val outputRef = TxOutputRef.contract(key)
+    for {
+      output <- get(outputRef)
+      newOutput = output.asInstanceOf[ContractOutput].copy(state = state)
+      worldState <- put(outputRef, newOutput)
+    } yield worldState
+  }
+
   def toHashes: WorldState.Hashes =
     WorldState.Hashes(outputState.rootHash, contractState.rootHash)
 }
@@ -43,6 +50,14 @@ object WorldState {
     val emptyContractTrie =
       MerklePatriciaTrie.build(storage, ALF.Hash.zero, StatelessScript.failure)
     WorldState(emptyOutputTrie, emptyContractTrie)
+  }
+
+  val mock: WorldState = {
+    val outputState: MerklePatriciaTrie[TxOutputRef, TxOutput] =
+      MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
+    val contractState: MerklePatriciaTrie[ALF.Hash, StatelessScript] =
+      MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
+    WorldState(outputState, contractState)
   }
 
   final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {

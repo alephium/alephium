@@ -1,9 +1,7 @@
-package org.alephium.flow.trie
+package org.alephium.protocol.util
 
 import akka.util.ByteString
 
-import org.alephium.flow.io.KeyValueStorage
-import org.alephium.flow.trie.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.serde._
@@ -189,9 +187,11 @@ object MerklePatriciaTrie {
 }
 
 // TODO: batch mode
-final class MerklePatriciaTrie[K: Serde, V: Serde](val rootHash: Hash,
-                                                   storage: KeyValueStorage[Hash, Node]) {
-  import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
+final class MerklePatriciaTrie[K: Serde, V: Serde](
+    val rootHash: Hash,
+    storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
+) {
+  import MerklePatriciaTrie._
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie[K, V]] = {
     result.toAdd

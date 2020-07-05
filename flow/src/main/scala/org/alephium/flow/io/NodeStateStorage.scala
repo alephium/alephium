@@ -9,6 +9,7 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.util.{IOUtils, RawKeyValueStorage}
 import org.alephium.serde._
 import org.alephium.util.AVector
 

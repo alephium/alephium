@@ -3,10 +3,10 @@ package org.alephium.flow.core
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.io.Storages
-import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec {
