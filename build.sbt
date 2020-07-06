@@ -20,7 +20,17 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(app, `app-debug`, `app-server`, benchmark, flow, protocol)
+  .aggregate(macros,
+             util,
+             serde,
+             crypto,
+             rpc,
+             app,
+             `app-debug`,
+             `app-server`,
+             benchmark,
+             flow,
+             protocol)
 
 def mainProject(id: String): Project =
   project(id)
@@ -42,6 +52,51 @@ def project(path: String): Project = {
     )
 }
 
+lazy val macros = project("macros")
+  .settings(
+    libraryDependencies += `scala-reflect`(scalaVersion.value),
+    wartremoverErrors in (Compile, compile) := Warts.allBut(
+      wartsCompileExcludes :+ Wart.AsInstanceOf: _*)
+  )
+
+lazy val util = project("util")
+  .dependsOn(macros)
+  .settings(
+    scalacOptions -= "-Xlint:nonlocal-return",
+    publishArtifact in Test := true,
+    libraryDependencies ++= Seq(
+      akka,
+      `akka-slf4j`,
+      bcprov,
+      `scala-reflect`(scalaVersion.value)
+    )
+  )
+
+lazy val serde = project("serde")
+  .settings(
+    Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+  )
+  .dependsOn(util % "test->test;compile->compile")
+
+lazy val crypto = project("crypto")
+  .dependsOn(util % "test->test;compile->compile", serde)
+
+lazy val rpc = project("rpc")
+  .settings(
+    libraryDependencies ++= Seq(
+      `akka-http`,
+      `akka-http-circe`,
+      `akka-stream`,
+      `circe-parser`,
+      `circe-generic`,
+      `scala-logging`,
+      `akka-test`,
+      akkahttptest
+    )
+  )
+  .dependsOn(util % "test->test;compile->compile")
+
 lazy val app = mainProject("app")
 
 lazy val `app-debug` = mainProject("app-debug")
@@ -54,11 +109,9 @@ lazy val `app-debug` = mainProject("app-debug")
   )
 
 lazy val `app-server` = project("app-server")
-  .dependsOn(flow, flow % "it,test->test")
+  .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
-      `alephium-rpc`,
-      `alephium-util` % "it,test" classifier "tests",
       akkahttpcors,
       akkahttptest,
       akkastreamtest
@@ -70,13 +123,11 @@ lazy val benchmark = mainProject("benchmark")
   .settings(scalacOptions += "-Xdisable-assertions")
 
 lazy val flow = project("flow")
+  .dependsOn(crypto, serde, util % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
-      `alephium-crypto`,
-      `alephium-serde`,
-      `alephium-util` % "it,test" classifier "tests",
       akka,
-      akkaslf4j,
+      `akka-slf4j`,
       logback,
       rocksdb,
       `scala-logging`
@@ -85,11 +136,9 @@ lazy val flow = project("flow")
   .dependsOn(protocol % "test->test;compile->compile")
 
 lazy val protocol = project("protocol")
+  .dependsOn(crypto, serde, util % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
-      `alephium-crypto`,
-      `alephium-serde`,
-      `alephium-util` % "it,test" classifier "tests",
       fastparse
     )
   )
@@ -145,7 +194,7 @@ val commonSettings = Seq(
   IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",
   run / javaOptions += "-Xmx4g",
   libraryDependencies ++= Seq(
-    akkatest,
+    `akka-test`,
     scalacheck,
     scalatest,
     scalatestplus,
