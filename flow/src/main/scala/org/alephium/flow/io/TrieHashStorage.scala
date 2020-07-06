@@ -4,20 +4,20 @@ import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.{MerklePatriciaTrie, WorldState}
 import org.alephium.protocol.ALF.Hash
 
-trait TrieHashStorage extends KeyValueStorage[Hash, Hash] {
+trait TrieHashStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
 
   override def storageKey(key: Hash): ByteString = key.bytes ++ ByteString(Storages.trieHashPostfix)
 
-  def getTrie(hash: Hash): IOResult[MerklePatriciaTrie] = {
-    get(hash).map(MerklePatriciaTrie(_, trieStorage))
+  def getTrie(hash: Hash): IOResult[WorldState] = {
+    get(hash).map(_.toWorldState(trieStorage))
   }
 
-  def putTrie(hash: Hash, trie: MerklePatriciaTrie): IOResult[Unit] = {
-    put(hash, trie.rootHash)
+  def putTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
+    put(hash, worldState.toHashes)
   }
 }
 
@@ -44,5 +44,5 @@ class TrieHashRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, Hash](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[Hash, WorldState.Hashes](storage, cf, writeOptions, readOptions)
     with TrieHashStorage

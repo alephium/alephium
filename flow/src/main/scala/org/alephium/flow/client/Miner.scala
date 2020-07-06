@@ -5,7 +5,6 @@ import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
 import akka.actor.Props
-import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, FlowHandler}
@@ -13,8 +12,9 @@ import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Miner {
@@ -25,7 +25,7 @@ object Miner {
       implicit config: PlatformConfig): Props = {
     val addresses = AVector.tabulate(config.groups) { i =>
       val index          = GroupIndex.unsafe(i)
-      val (_, publicKey) = index.generateKey(PayTo.PKH)
+      val (_, publicKey) = index.generateKey
       publicKey
     }
     props(addresses, blockFlow, allHandlers)
@@ -34,8 +34,9 @@ object Miner {
   def props(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit config: PlatformConfig): Props = {
     require(addresses.length == config.groups)
-    addresses.foreachWithIndex { (address, i) =>
-      require(GroupIndex.from(PayTo.PKH, address).value == i)
+    addresses.foreachWithIndex { (publicKey, i) =>
+      val lockupScript = LockupScript.p2pkh(publicKey)
+      require(lockupScript.groupIndex.value == i)
     }
     Props(new Miner(addresses, blockFlow, allHandlers))
   }
@@ -121,15 +122,18 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
       startNewTasks()
   }
 
-  private def coinbase(to: Int): Transaction = {
-    Transaction.coinbase(addresses(to), ByteString.fromInts(Random.nextInt()))
+  private def coinbase(to: Int, height: Int): Transaction = {
+    val minerMessage = Hash.generate.bytes
+    Transaction.coinbase(addresses(to), height, minerMessage)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assume(0 <= fromShift && fromShift < config.groupNumPerBroker && 0 <= to && to < config.groups)
     val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    BlockTemplate(flowTemplate.deps, flowTemplate.target, flowTemplate.transactions :+ coinbase(to))
+    BlockTemplate(flowTemplate.deps,
+                  flowTemplate.target,
+                  flowTemplate.transactions :+ coinbase(to, flowTemplate.height))
   }
 
   def startTask(fromShift: Int,

@@ -1,38 +1,37 @@
 package org.alephium.protocol.model
 
-import akka.util.ByteString
-
-import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.{Hash, HashSerde}
-import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U64}
 
-final case class UnsignedTransaction(inputs: AVector[TxOutputPoint],
-                                     outputs: AVector[TxOutput],
-                                     data: ByteString)
+final case class UnsignedTransaction(script: Option[StatefulScript],
+                                     inputs: AVector[TxInput],
+                                     fixedOutputs: AVector[TxOutput])
     extends HashSerde[UnsignedTransaction] {
-  override val hash: Hash = _getHash
-
+  override lazy val hash: Hash = _getHash
 }
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
-    Serde.forProduct3(UnsignedTransaction(_, _, _), t => (t.inputs, t.outputs, t.data))
+    Serde.forProduct3(UnsignedTransaction(_, _, _), t => (t.script, t.inputs, t.fixedOutputs))
 
-  def simpleTransfer(inputs: AVector[TxOutputPoint],
-                     inputSum: BigInt,
-                     from: ED25519PublicKey,
-                     fromPayTo: PayTo,
-                     to: ED25519PublicKey,
-                     toPayTo: PayTo,
-                     value: BigInt): UnsignedTransaction = {
-    assume(inputSum >= value)
-    val fromPubScript = PubScript.build(fromPayTo, from)
-    val toPubScript   = PubScript.build(toPayTo, to)
-    val toOutput      = TxOutput(value, toPubScript)
-    val fromOutput    = TxOutput(inputSum - value, fromPubScript)
-    val outputs       = if (inputSum - value > 0) AVector(toOutput, fromOutput) else AVector(toOutput)
-    UnsignedTransaction(inputs, outputs, ByteString.empty)
+  def transferAlf(inputs: AVector[TxOutputRef],
+                  inputSum: U64,
+                  fromLockupScript: LockupScript,
+                  fromUnlockScript: UnlockScript,
+                  toLockupScript: LockupScript,
+                  amount: U64,
+                  height: Int): UnsignedTransaction = {
+    assume(inputSum >= amount)
+    val remainder = inputSum.subUnsafe(amount)
+
+    val toOutput   = TxOutput.build(amount, height, toLockupScript)
+    val fromOutput = TxOutput.build(remainder, height, fromLockupScript)
+
+    val outputs =
+      if (remainder > U64.Zero) AVector[TxOutput](toOutput, fromOutput)
+      else AVector[TxOutput](toOutput)
+    UnsignedTransaction(None, inputs.map(TxInput(_, fromUnlockScript)), outputs)
   }
 }

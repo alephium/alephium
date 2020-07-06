@@ -12,16 +12,15 @@ class MiningTest extends AlephiumSpec {
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](getSelfClique)
-    val group      = request[Group](getGroup(publicKey))
+    val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker
     val rpcPort    = selfClique.peers(index).rpcPort.get
 
-    request[Balance](getBalance(publicKey), rpcPort) is initialBalance
+    request[Balance](getBalance(address), rpcPort) is initialBalance
 
     startWS(defaultWsMasterPort)
 
-    val tx =
-      request[TransferResult](transfer(publicKey, tranferKey, privateKey, transferAmount), rpcPort)
+    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
 
     selfClique.peers.foreach { peer =>
       request[Boolean](startMining, peer.rpcPort.get) is true
@@ -30,14 +29,15 @@ class MiningTest extends AlephiumSpec {
     awaitNewBlock(tx.fromGroup, tx.toGroup)
     awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
-    request[Balance](getBalance(publicKey), rpcPort) is
+    request[Balance](getBalance(address), rpcPort) is
       Balance(initialBalance.balance - transferAmount, 1)
 
     val createTx =
-      request[CreateTransactionResult](createTransaction(publicKey, tranferKey, transferAmount),
-                                       rpcPort)
+      request[CreateTransactionResult](
+        createTransaction(publicKey, transferAddress, transferAmount),
+        rpcPort)
 
-    val tx2 = request[TransferResult](sendTransaction(createTx), rpcPort)
+    val tx2 = request[TxResult](sendTransaction(createTx, privateKey), rpcPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
@@ -46,7 +46,7 @@ class MiningTest extends AlephiumSpec {
       request[Boolean](stopMining, peer.rpcPort.get) is true
     }
 
-    request[Balance](getBalance(publicKey), rpcPort) is
+    request[Balance](getBalance(address), rpcPort) is
       Balance(initialBalance.balance - (2 * transferAmount), 1)
 
     val toTs = TimeStamp.now()

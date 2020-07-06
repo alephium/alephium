@@ -88,7 +88,8 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       `alephium-crypto`,
       `alephium-serde`,
-      `alephium-util` % "it,test" classifier "tests"
+      `alephium-util` % "it,test" classifier "tests",
+      fastparse
     )
   )
 
@@ -162,7 +163,8 @@ val wartsCompileExcludes = Seq(
   Wart.Any,
   Wart.Throw,
   Wart.Equals,
-  Wart.StringPlusAny
+  Wart.StringPlusAny,
+  Wart.While
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(

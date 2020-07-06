@@ -102,11 +102,17 @@
         </parameters>
         <customMessage><![CDATA[println|noSpaces are disabled]]></customMessage>
     </check>
-    <check customId="scalatest-matcher" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+    <check customId="no.should" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
         <parameters>
-            <parameter name="regex"><![CDATA[shouldBe|shouldEqual|==]]></parameter>
+            <parameter name="regex"><![CDATA[shouldBe|shouldEqual]]></parameter>
         </parameters>
-        <customMessage><![CDATA[Use is instead of shouldBe|shouldEqual|==]]></customMessage>
+        <customMessage><![CDATA[Use is instead of shouldBe|shouldEqual]]></customMessage>
+    </check>
+    <check customId="no.equal" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+        <parameters>
+            <parameter name="regex"><![CDATA[==]]></parameter>
+        </parameters>
+        <customMessage><![CDATA[Use is instead of ==]]></customMessage>
     </check>
     <check level="error" class="org.scalastyle.scalariform.ImportOrderChecker" enabled="true">
         <parameters>

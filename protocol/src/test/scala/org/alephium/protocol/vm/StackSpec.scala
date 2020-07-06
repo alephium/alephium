@@ -1,16 +1,13 @@
-package org.alephium.protocol.script
+package org.alephium.protocol.vm
 
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.protocol.config.ScriptConfig
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class StackSpec extends AlephiumSpec {
   it should "push/pop/peek" in {
-    implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 2 }
-
-    val stack = Stack.empty[Int]
+    val stack = Stack.ofCapacity[Int](2)
     stack.isEmpty is true
     stack.pop().isLeft is true
 
@@ -48,9 +45,7 @@ class StackSpec extends AlephiumSpec {
   }
 
   it should "swap/remove" in {
-    implicit val config: ScriptConfig = new ScriptConfig { override def maxStackSize: Int = 3 }
-
-    val stack = Stack.empty[Int]
+    val stack = Stack.ofCapacity[Int](3)
     def check(stack: Stack[Int], i1: Int, i2: Int, i3: Int): Assertion = {
       stack.peek(1) isE i1
       stack.peek(2) isE i2

@@ -9,13 +9,15 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
+import org.alephium.flow.U64Helpers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp}
+import org.alephium.serde.serialize
+import org.alephium.util._
 
-class RPCModelSpec extends AlephiumSpec with EitherValues {
+class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
     CirceUtils.print(t.asJson)
   }
@@ -34,6 +36,10 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   def generateKeyHash(): String = {
     val address = ED25519PublicKey.generate
     Hex.toHexString(address.bytes)
+  }
+
+  def generateP2pkh(): Address = {
+    LockupScript.p2pkh(ED25519PublicKey.generate)
   }
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
@@ -112,16 +118,18 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode GetBalance" in {
-    val addressHex = generateKeyHash
-    val request    = GetBalance(addressHex, PayTo.PKH)
-    val jsonRaw    = s"""{"address":"$addressHex","type":"${PayTo.PKH}"}"""
+    val address    = generateP2pkh()
+    val addressStr = Base58.encode(serialize(address))
+    val request    = GetBalance(address)
+    val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
   }
 
   it should "encode/decode GetGroup" in {
-    val addressHex = generateKeyHash
-    val request    = GetGroup(addressHex)
-    val jsonRaw    = s"""{"address":"$addressHex"}"""
+    val address    = generateP2pkh()
+    val addressStr = Base58.encode(serialize(address))
+    val request    = GetGroup(address)
+    val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
   }
 
@@ -137,23 +145,19 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
     checkData(response, jsonRaw)
   }
 
-  it should "encode/decode Transfer" in {
-    val transfer = Transfer("from", PayTo.PKH, "to", PayTo.PKH, 1, "key")
-    val jsonRaw =
-      """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1,"fromPrivateKey":"key"}"""
-    checkData(transfer, jsonRaw)
-  }
-
-  it should "encode/decode TransferResult" in {
-    val result  = TransferResult("txId", 0, 1)
+  it should "encode/decode TxResult" in {
+    val result  = TxResult("txId", 0, 1)
     val jsonRaw = """{"txId":"txId","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
 
   it should "encode/decode CreateTransaction" in {
-    val transfer = CreateTransaction("from", PayTo.PKH, "to", PayTo.PKH, 1)
+    val fromKey   = ED25519PublicKey.generate
+    val toKey     = ED25519PublicKey.generate
+    val toAddress = LockupScript.p2pkh(toKey)
+    val transfer  = CreateTransaction(fromKey, toAddress, 1)
     val jsonRaw =
-      """{"fromAddress":"from","fromType":"pkh","toAddress":"to","toType":"pkh","value":1}"""
+      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
     checkData(transfer, jsonRaw)
   }
 
@@ -164,17 +168,10 @@ class RPCModelSpec extends AlephiumSpec with EitherValues {
   }
 
   it should "encode/decode SendTransaction" in {
-    val transfer = SendTransaction("tx", "signature", "publicKey")
+    val signature = ED25519Signature.generate
+    val transfer  = SendTransaction("tx", signature)
     val jsonRaw =
-      """{"tx":"tx","signature":"signature","publicKey":"publicKey"}"""
+      s"""{"tx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
-  }
-
-  it should "encode/decode PayTo" in {
-    checkData[PayTo](PayTo.PKH, """"pkh"""")
-    checkData[PayTo](PayTo.SH, """"sh"""")
-
-    parseFail[PayTo](""""OOPS"""") is """Invalid: OOPS"""
-    parseFail[PayTo](""""OOPS"""") is """Invalid: OOPS"""
   }
 }
