@@ -11,6 +11,7 @@ import org.alephium.util.{AVector, U64}
 sealed trait TxOutput {
   def amount: U64
   def createdHeight: Int
+  def lockupScript: LockupScript
   def scriptHint: Int
 }
 
@@ -56,12 +57,16 @@ object AssetOutput {
                       t => (t.amount, t.tokens, t.createdHeight, t.lockupScript, t.additionalData))
 }
 
-final case class ContractOutput(amount: U64, createdHeight: Int, state: AVector[Val])
+final case class ContractOutput(amount: U64,
+                                createdHeight: Int,
+                                lockupScript: LockupScript,
+                                state: AVector[Val])
     extends TxOutput {
   def scriptHint: Int = 0
 }
 
 object ContractOutput {
   implicit val serde: Serde[ContractOutput] =
-    Serde.forProduct3(ContractOutput.apply, t => (t.amount, t.createdHeight, t.state))
+    Serde.forProduct4(ContractOutput.apply,
+                      t => (t.amount, t.createdHeight, t.lockupScript, t.state))
 }
