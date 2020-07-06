@@ -36,11 +36,11 @@ object LockupScript {
     override def _deserialize(input: ByteString): SerdeResult[(LockupScript, ByteString)] = {
       byteSerde._deserialize(input).flatMap {
         case (0, content) =>
-          serdeImpl[Hash]._deserialize(content).map(t => new P2PKH(t._1) -> t._2)
+          serdeImpl[Hash]._deserialize(content).map { case (pkHash, rest) => P2PKH(pkHash) -> rest }
         case (1, content) =>
-          serdeImpl[Hash]._deserialize(content).map(t => new P2SH(t._1) -> t._2)
+          serdeImpl[Hash]._deserialize(content).map { case (sHash, rest) => P2SH(sHash) -> rest }
         case (2, content) =>
-          serdeImpl[StatelessScript]._deserialize(content).map(t => new P2S(t._1) -> t._2)
+          serdeImpl[StatelessScript]._deserialize(content).map { case (s, rest) => P2S(s) -> rest }
         case (n, _) =>
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
       }
