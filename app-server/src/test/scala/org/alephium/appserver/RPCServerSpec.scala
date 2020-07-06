@@ -19,7 +19,8 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.RPCModel._
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ED25519, ED25519PrivateKey}
+import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core._
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -30,7 +31,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.serialize
@@ -40,7 +41,8 @@ class RPCServerSpec
     extends AlephiumSpec
     with ScalatestRouteTest
     with EitherValues
-    with ScalaFutures {
+    with ScalaFutures
+    with U64Helpers {
   import RPCServerSpec._
 
   behavior of "http"
@@ -83,13 +85,12 @@ class RPCServerSpec
   }
 
   it should "call get_balance" in new RouteHTTP {
-    checkCallResult("get_balance", parse(s"""{"address":"$dummyKey","type":"pkh"}""").toOption)(
+    checkCallResult("get_balance", parse(s"""{"address":"$dummyKeyAddress"}""").toOption)(
       dummyBalance)
   }
 
   it should "reject wrong get_balance call" in new RouteHTTP {
-    checkFailCallResult("get_balance", parse(s"""{"address":"OOPS","type":"pkh"}""").toOption)(
-      "Server error")
+    checkFailCallResult("get_balance", parse(s"""{"address":"OOPS"}""").toOption)("Invalid params")
     checkFailCallResult(
       "get_balance",
       parse(s"""{"address":"$dummyKey","type":"OOPS"}""").toOption)("Invalid params")
@@ -97,15 +98,7 @@ class RPCServerSpec
   }
 
   it should "call get_group" in new RouteHTTP {
-    checkCallResult("get_group", parse(s"""{"address":"$dummyKey"}""").toOption)(dummyGroup)
-  }
-
-  it should "call transfer" in new RouteHTTP {
-    checkCallResult(
-      "transfer",
-      parse(
-        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )(dummyTransferResult)
+    checkCallResult("get_group", parse(s"""{"address":"$dummyKeyAddress"}""").toOption)(dummyGroup)
   }
 
   it should "call send_transaction" in new RouteHTTP {
@@ -119,42 +112,15 @@ class RPCServerSpec
   it should "call create_transaction" in new RouteHTTP {
     checkCallResult(
       "create_transaction",
-      parse(
-        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1}""").toOption
+      parse(s"""{"fromKey":"$dummyKey","toAddress":"$dummyToAddres","value":1}""").toOption
     )(dummyCreateTransactionResult)
-  }
-
-  it should "reject wrong transfer call" in new RouteHTTP {
-    checkFailCallResult(
-      "transfer",
-      parse(
-        s"""{"fromAddress":"$dummyKey","fromType":"OOPS","toAddress":"$dummyToAddres","toType":"OOPS","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Invalid params")
-
-    checkFailCallResult(
-      "transfer",
-      parse(
-        s"""{"fromAddress":"$dummyKey","fromType":"pkh","toAddress":"$dummyToAddres","toType":"OOPS","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Invalid params")
-
-    checkFailCallResult(
-      "transfer",
-      parse(
-        s"""{"fromAddress":"$dummyKey","fromType":"OOPS","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Invalid params")
-
-    checkFailCallResult(
-      "transfer",
-      parse(
-        s"""{"fromAddress":"OOPS","fromType":"pkh","toAddress":"$dummyToAddres","toType":"pkh","value":1,"fromPrivateKey":"$dummyPrivateKey"}""").toOption
-    )("Server error")
   }
 
   it should "reject when address belongs to other groups" in new RouteHTTP {
     override val configValues = Map(
       ("alephium.broker.brokerId", 1)
     )
-    checkFailCallResult("get_balance", parse(s"""{"address":"$dummyKey","type":"pkh"}""").toOption)(
+    checkFailCallResult("get_balance", parse(s"""{"address":"$dummyKeyAddress"}""").toOption)(
       "Server error")
   }
   it should "reject GET" in new RouteHTTP {
@@ -275,16 +241,18 @@ class RPCServerSpec
     val dummyNeighborCliques      = NeighborCliques(AVector.empty)
     val dummyBalance              = Balance(0, 0)
     val dummyGroup                = Group(0)
-    val dummyKey                  = "4b67a9704059abf76b5d75be94b0d16a85dd66d7dc106fcc2dd200bab0f45f77"
-    val dummyToAddres             = "4681f79b0225c208e1dee62fe05af3e02a58571a0b668ea5472f35da7acc2f13"
-    val dummyPrivateKey           = "b0e218ff0d40482d37bb787dccc7a4c9a6d56c26885f66c6b5ce23c87c891f5e"
+    val dummyKey                  = "b4628b5e93e6356b8b2ce75174a57fbd2fe6907e6244d5ddfba78a94ebf9d7a5"
+    val dummyKeyAddress           = "1EvRjvdiVH24YUgjfCA7RZVTWj4bKexks9iY33YbL14zt"
+    val dummyToKey                = "3ec4489e0988fbe5ea1becd0804335cd78ae285883f4028009b0e69d0574cda9"
+    val dummyToAddres             = "19kCCFBGJV76XjyzszeMGTbnDVkAYwhHtZGKEvc1JdJEG"
+    val dummyPrivateKey           = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
     val dummyTx = ModelGen.transactionGen
-      .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.outputs.nonEmpty)
+      .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
       .sample
       .get
     val dummySignature = ED25519.sign(dummyTx.unsigned.hash.bytes,
                                       ED25519PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
-    lazy val dummyTransferResult = TransferResult(
+    lazy val dummyTransferResult = TxResult(
       dummyTx.hash.toHexString,
       dummyTx.fromGroup.value,
       dummyTx.toGroup.value
@@ -435,23 +403,18 @@ object RPCServerSpec {
       Right(AVector((blockHeader, 1)))
     }
 
-    override def getBalance(payTo: PayTo, address: ED25519PublicKey): IOResult[(BigInt, Int)] =
-      Right((BigInt(0), 0))
+    override def getBalance(address: Address): IOResult[(U64, Int)] = Right((U64.Zero, 0))
 
-    override def prepareUnsignedTx(
-        from: ED25519PublicKey,
-        fromPayTo: PayTo,
-        to: ED25519PublicKey,
-        toPayTo: PayTo,
-        value: BigInt
-    ): IOResult[Option[UnsignedTransaction]] =
+    override def prepareUnsignedTx(fromLockupScript: LockupScript,
+                                   fromUnlockScript: UnlockScript,
+                                   toLockupScript: LockupScript,
+                                   value: U64): IOResult[Option[UnsignedTransaction]] =
       Right(Some(dummyTx.unsigned))
 
-    override def prepareTx(from: ED25519PublicKey,
-                           fromPayTo: PayTo,
-                           to: ED25519PublicKey,
-                           toPayTo: PayTo,
-                           value: BigInt,
+    override def prepareTx(fromLockupScript: LockupScript,
+                           fromUnlockScript: UnlockScript,
+                           toLockupScript: LockupScript,
+                           value: U64,
                            fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }

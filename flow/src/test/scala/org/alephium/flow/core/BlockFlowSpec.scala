@@ -3,7 +3,6 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.util.Random
 
-import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -12,9 +11,10 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.validation.Validation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PayTo, PubScript}
-import org.alephium.util.AVector
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.util.{AVector, U64}
 
 class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   it should "compute correct blockflow height" in {
@@ -240,7 +240,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
-    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow, pubScript, 1)
     checkBalance(blockFlow, testGroup, genesisBalance - 1)
   }
@@ -273,25 +273,29 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
 
     addAndCheck(blockFlow1, block, 1)
-    val pubScript = block.nonCoinbase.head.unsigned.outputs.head.pubScript
+    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow1, pubScript, 1)
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val (_, toPublicKey) = chainIndex.to.generateKey(PayTo.PKH)
-    val coinbaseTx       = Transaction.coinbase(toPublicKey, ByteString.empty)
+    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
+    val (_, toPublicKey) = chainIndex.to.generateKey
+    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
     val transactions = {
       if (config.brokerInfo.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val balances                   = blockFlow.getUtxos(PayTo.PKH, publicKey).toOption.get
-        val total                      = balances.sumBy(_._2.value)
-        val (_, toPublicKey)           = chainIndex.to.generateKey(PayTo.PKH)
-        val inputs                     = balances.map(_._1)
-        val outputs = AVector(TxOutput.build(PayTo.PKH, 1, toPublicKey),
-                              TxOutput.build(PayTo.PKH, total - 1, publicKey))
-        val transferTx = Transaction.from(PayTo.PKH, inputs, outputs, publicKey, privateKey)
+        val fromLockupScript           = LockupScript.p2pkh(publicKey)
+        val unlockScript               = UnlockScript.p2pkh(publicKey)
+        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+        val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.amount)
+        val (_, toPublicKey)           = chainIndex.to.generateKey
+        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
+        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
+        val outputs = AVector[TxOutput](TxOutput.build(1, height, toLockupScript),
+                                        TxOutput.build(total - 1, height, fromLockupScript))
+        val transferTx = Transaction.from(inputs, outputs, privateKey)
         AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
     }
@@ -328,13 +332,18 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     blockFlow.getWeight(header) isE config.maxMiningTarget * weightFactor
   }
 
-  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: BigInt): Assertion = {
-    val address = genesisBalances(groupIndex)._2
-    blockFlow.getUtxos(PayTo.PKH, address).toOption.get.sumBy(_._2.value) is expected
+  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
+    val address   = genesisBalances(groupIndex)._2
+    val pubScript = LockupScript.p2pkh(address)
+    blockFlow
+      .getUtxos(pubScript)
+      .toOption
+      .get
+      .sumBy(_._2.amount.v) is expected.v
   }
 
-  def checkBalance(blockFlow: BlockFlow, pubScript: PubScript, expected: BigInt): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.value) is expected
+  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
+    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -357,20 +366,21 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     tips ++ bestDeps
   }
 
-  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): BigInt = {
-    val groupIndex = GroupIndex.from(PayTo.PKH, address)
-    config.brokerInfo.contains(groupIndex) is true
-    val query = blockFlow.getUtxos(PayTo.PKH, address)
-    query.toOption.get.sumBy(_._2.value)
+  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): U64 = {
+    val lockupScript = LockupScript.p2pkh(address)
+    config.brokerInfo.contains(lockupScript.groupIndex) is true
+    val query = blockFlow.getUtxos(lockupScript)
+    query.toOption.get.sumBy(_._2.amount.v)
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
     def show(txOutput: TxOutput): String = {
-      s"${txOutput.shortKey}:${txOutput.value}"
+      s"${txOutput.scriptHint}:${txOutput.amount}"
     }
 
     val address   = genesisBalances(config.brokerInfo.id)._2
-    val txOutputs = blockFlow.getUtxos(PayTo.PKH, address).toOption.get.map(_._2)
+    val pubScript = LockupScript.p2pkh(address)
+    val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 }

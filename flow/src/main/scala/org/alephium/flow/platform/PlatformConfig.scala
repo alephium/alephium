@@ -7,10 +7,10 @@ import scala.annotation.tailrec
 
 import com.typesafe.config.Config
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey}
+import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.PayTo
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 trait PlatformConfig extends Configs with PlatformIO {
@@ -33,13 +33,12 @@ object PlatformConfig {
     load(rootPath, None)
   }
 
-  def load(rootPath: Path,
-           genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
+  def load(rootPath: Path, genesisBalances: Option[AVector[(LockupScript, U64)]]): PlatformConfig =
     build(parseConfig(rootPath), rootPath, genesisBalances)
 
   def build(config: Config,
             rootPath: Path,
-            genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig = {
+            genesisBalances: Option[AVector[(LockupScript, U64)]]): PlatformConfig = {
     val alephCfg = config.getConfig("alephium")
     create(
       rootPath,
@@ -65,7 +64,7 @@ object PlatformConfig {
              miningCfg: Config,
              networkCfg: Config,
              discoveryCfg: Config,
-             genesisBalances: Option[AVector[(ED25519PublicKey, BigInt)]]): PlatformConfig =
+             genesisBalances: Option[AVector[(LockupScript, U64)]]): PlatformConfig =
     new PlatformConfig {
       /* Common */
       val all      = allCfg
@@ -155,14 +154,17 @@ object PlatformConfig {
     }
   // scalastyle:off method.length parameter.number
 
-  private def splitBalance(raw: String): (ED25519PublicKey, BigInt) = {
+  private def splitBalance(raw: String): (LockupScript, U64) = {
     val List(left, right) = raw.split(":").toList
-    val publicKeyOpt      = Hex.from(left).flatMap(ED25519PublicKey.from)
-    require(publicKeyOpt.nonEmpty, "Invalid public key")
+    val addressOpt        = LockupScript.fromBase58(left)
+    require(addressOpt.nonEmpty, "Invalid public key")
 
-    val publicKey = publicKeyOpt.get
-    val balance   = BigInt(right)
-    (publicKey, balance)
+    val address = addressOpt.get
+    val balance = {
+      val parsed = BigInt(right)
+      U64.from(parsed.underlying()).get
+    }
+    (address, balance)
   }
 
   def loadBlockFlow(cfg: Config)(implicit config: ConsensusConfig): AVector[AVector[Block]] = {
@@ -172,12 +174,12 @@ object PlatformConfig {
     loadBlockFlow(AVector.from(balances))
   }
 
-  def loadBlockFlow(balances: AVector[(ED25519PublicKey, BigInt)])(
+  def loadBlockFlow(balances: AVector[(LockupScript, U64)])(
       implicit config: ConsensusConfig): AVector[AVector[Block]] = {
     AVector.tabulate(config.groups, config.groups) {
       case (from, to) =>
         val transactions = if (from == to) {
-          val balancesOI  = balances.filter(p => GroupIndex.from(PayTo.PKH, p._1).value == from)
+          val balancesOI  = balances.filter(_._1.groupIndex.value == from)
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
         } else AVector.empty[Transaction]

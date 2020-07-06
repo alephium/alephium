@@ -8,7 +8,7 @@ import org.alephium.flow.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bits}
+import org.alephium.util.{AVector, Bytes}
 
 object HeightIndexStorage {
   implicit val hashesSerde: Serde[AVector[Hash]] = avectorSerde[Hash]
@@ -24,5 +24,5 @@ class HeightIndexStorage(
   private val postFix =
     ByteString(chainIndex.from.value.toByte, chainIndex.to.value.toByte, Storages.heightPostfix)
 
-  override def storageKey(key: Int): ByteString = Bits.toBytes(key) ++ postFix
+  override def storageKey(key: Int): ByteString = Bytes.toBytes(key) ++ postFix
 }

@@ -1,26 +1,39 @@
 package org.alephium.protocol.model
 
-import org.alephium.crypto.ED25519PublicKey
+import akka.util.ByteString
+
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.script.{PayTo, PubScript}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
+import org.alephium.util.{AVector, U64}
 
-final case class TxOutput(value: BigInt, pubScript: PubScript) {
-  def shortKey: Int = pubScript.shortKey
+final case class TxOutput(amount: U64,
+                          tokens: AVector[(TokenId, U64)],
+                          createdHeight: Int,
+                          lockupScript: LockupScript,
+                          additionalData: ByteString) {
+  def scriptHint: Int = lockupScript.shortKey
 
-  def toGroup(implicit config: GroupConfig): GroupIndex = pubScript.groupIndex
+  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
 object TxOutput {
-  implicit val serde: Serde[TxOutput] = Serde.forProduct2(apply, to => (to.value, to.pubScript))
+  private implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
+  implicit val serde: Serde[TxOutput] =
+    Serde.forProduct5(TxOutput.apply,
+                      t => (t.amount, t.tokens, t.createdHeight, t.lockupScript, t.additionalData))
 
-  def build(payTo: PayTo, value: BigInt, publicKey: ED25519PublicKey): TxOutput = {
-    val pubScript = PubScript.build(payTo, publicKey)
-    TxOutput(value, pubScript)
+  def build(amount: U64, createdHeight: Int, lockupScript: LockupScript): TxOutput = {
+    TxOutput(amount, AVector.empty, createdHeight, lockupScript, ByteString.empty)
+  }
+
+  def genesis(amount: U64, lockupScript: LockupScript): TxOutput = {
+    build(amount, ALF.GenesisHeight, lockupScript)
   }
 
   // TODO: use proper op_code when it's ready
-  def burn(value: BigInt): TxOutput = {
-    TxOutput(value, PubScript.empty)
+  def burn(amount: U64): TxOutput = {
+    build(amount, ALF.GenesisHeight, LockupScript.p2pkh(ALF.Hash.zero))
   }
 }

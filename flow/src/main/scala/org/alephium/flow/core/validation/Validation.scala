@@ -1,15 +1,17 @@
 package org.alephium.flow.core.validation
 
+import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core._
 import org.alephium.flow.io.{IOError, IOResult}
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.MerklePatriciaTrie
+import org.alephium.flow.trie.WorldState
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.script.{PubScript, Script, Witness}
-import org.alephium.util.{AVector, EitherF, Forest, TimeStamp}
+import org.alephium.protocol.vm._
+import org.alephium.serde._
+import org.alephium.util.{AVector, EitherF, Forest, TimeStamp, U64}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
@@ -147,7 +149,7 @@ object Validation {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.length == 0 && unsigned.outputs.length == 1 && coinbase.witnesses.isEmpty)
+    if (unsigned.inputs.isEmpty && unsigned.fixedOutputs.length == 1 && coinbase.generatedOutputs.isEmpty && coinbase.signatures.isEmpty)
       validBlock
     else invalidBlock(InvalidCoinbase)
   }
@@ -178,33 +180,33 @@ object Validation {
 
   private[validation] def checkBlockNonCoinbase(index: ChainIndex,
                                                 tx: Transaction,
-                                                trie: MerklePatriciaTrie)(
+                                                worldState: WorldState)(
       implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
       _ <- checkChainIndex(index, tx)
-      _ <- checkSpending(tx, trie)
+      _ <- checkSpending(tx, worldState)
     } yield ()
   }
 
   private[validation] def checkNonCoinbaseTx(index: ChainIndex,
                                              tx: Transaction,
-                                             trie: MerklePatriciaTrie)(
+                                             worldState: WorldState)(
       implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
       _ <- checkChainIndex(index, tx)
       _ <- checkTxDoubleSpending(tx)
-      _ <- checkSpending(tx, trie)
+      _ <- checkSpending(tx, worldState)
     } yield ()
   }
 
   private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult = {
     if (tx.unsigned.inputs.isEmpty) {
       invalidTx(EmptyInputs)
-    } else if (tx.unsigned.outputs.isEmpty) {
+    } else if (tx.outputsLength == 0) {
       invalidTx(EmptyOutputs)
     } else {
       validTx
@@ -212,32 +214,30 @@ object Validation {
   }
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
-    if (!tx.unsigned.outputs.forall(_.value >= 0)) {
-      invalidTx(NegativeOutputValue)
-    } else if (!(tx.unsigned.outputs.sumBy(_.value) < ALF.MaxALFValue)) {
-      invalidTx(OutputValueOverFlow)
-    } else {
-      validTx
+    tx.alfAmountInOutputs match {
+      case Some(sum) if sum < ALF.MaxALFValue => validTx
+      case _                                  => invalidTx(OutputValueOverFlow)
     }
   }
 
   private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult = {
     val fromOk = tx.unsigned.inputs.forall(_.fromGroup == index.from)
-    val toOk = tx.unsigned.outputs.forall { output =>
+    val toOk = (0 until tx.outputsLength).forall { i =>
+      val output = tx.getOutput(i)
       output.toGroup == index.from || output.toGroup == index.to
     }
-    val existed = tx.unsigned.outputs.exists(_.toGroup == index.to)
+    val existed = tx.unsigned.fixedOutputs.exists(_.toGroup == index.to)
     if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
   }
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
-    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
+        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
         else {
-          utxoUsed += input
+          utxoUsed += input.outputRef
           validTx
         }
       }
@@ -245,20 +245,20 @@ object Validation {
   }
 
   private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult = {
-    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputPoint]
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     tx.unsigned.inputs.foreachE { input =>
-      if (utxoUsed.contains(input)) invalidTx(DoubleSpent)
+      if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
       else {
-        utxoUsed += input
+        utxoUsed += input.outputRef
         validTx
       }
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction, trie: MerklePatriciaTrie)(
-      implicit config: ScriptConfig): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction,
+                                        worldState: WorldState): TxValidationResult = {
     val query = tx.unsigned.inputs.mapE { input =>
-      trie.get[TxOutputPoint, TxOutput](input)
+      worldState.get(input.outputRef)
     }
     query match {
       case Right(preOutputs)                 => checkSpending(tx, preOutputs)
@@ -267,8 +267,8 @@ object Validation {
     }
   }
 
-  private[validation] def checkSpending(tx: Transaction, preOutputs: AVector[TxOutput])(
-      implicit config: ScriptConfig): TxValidationResult = {
+  private[validation] def checkSpending(tx: Transaction,
+                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
     for {
       _ <- checkBalance(tx, preOutputs)
       _ <- checkWitnesses(tx, preOutputs)
@@ -277,26 +277,71 @@ object Validation {
 
   private[validation] def checkBalance(tx: Transaction,
                                        preOutputs: AVector[TxOutput]): TxValidationResult = {
-    val inputSum  = preOutputs.sumBy(_.value)
-    val outputSum = tx.unsigned.outputs.sumBy(_.value)
-    if (outputSum <= inputSum) validTx else invalidTx(InvalidBalance)
-  }
-
-  private[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput])(
-      implicit config: ScriptConfig): TxValidationResult = {
-    assume(tx.unsigned.inputs.length == preOutputs.length)
-    EitherF.foreachTry(preOutputs.indices) { idx =>
-      val witness = tx.witnesses(idx)
-      val output  = preOutputs(idx)
-      checkWitness(tx.hash, output.pubScript, witness)
+    val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
+    tx.alfAmountInOutputs match {
+      case Some(outputSum) if outputSum <= inputSum => validTx
+      case _                                        => invalidTx(InvalidBalance)
     }
   }
 
-  private[validation] def checkWitness(hash: Hash, pubScript: PubScript, witness: Witness)(
-      implicit config: ScriptConfig): TxValidationResult = {
-    Script.run(hash.bytes, pubScript, witness) match {
-      case Left(error) => invalidTx(InvalidWitness(error))
-      case Right(_)    => validTx
+  // TODO: signatures might not be 1-to-1 mapped to inputs
+  private[validation] def checkWitnesses(tx: Transaction,
+                                         preOutputs: AVector[TxOutput]): TxValidationResult = {
+    assume(tx.unsigned.inputs.length == preOutputs.length)
+    EitherF.foreachTry(preOutputs.indices) { idx =>
+      val unlockScript = tx.unsigned.inputs(idx).unlockScript
+      val signature    = tx.signatures(idx)
+      val output       = preOutputs(idx)
+      (output.lockupScript, unlockScript) match {
+        case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
+          checkP2pkh(tx, lock, unlock, signature)
+        case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
+          checkP2SH(tx, lock, unlock, signature)
+        case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
+          checkP2S(tx, lock, unlock, signature)
+        case _ =>
+          invalidTx(InvalidUnlockScriptType)
+      }
+    }
+  }
+
+  private[validation] def checkP2pkh(tx: Transaction,
+                                     lock: LockupScript.P2PKH,
+                                     unlock: UnlockScript.P2PKH,
+                                     signature: ED25519Signature): TxValidationResult = {
+    if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
+      invalidTx(InvalidPublicKeyHash)
+    } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+      invalidTx(InvalidSignature)
+    } else validTx
+  }
+
+  private[validation] def checkP2SH(tx: Transaction,
+                                    lock: LockupScript.P2SH,
+                                    unlock: UnlockScript.P2SH,
+                                    signature: ED25519Signature): TxValidationResult = {
+    if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
+      invalidTx(InvalidScriptHash)
+    } else {
+      checkScript(tx, unlock.script, unlock.params, signature)
+    }
+  }
+
+  private[validation] def checkP2S(tx: Transaction,
+                                   lock: LockupScript.P2S,
+                                   unlock: UnlockScript.P2S,
+                                   signature: ED25519Signature): TxValidationResult = {
+    checkScript(tx, lock.script, unlock.params, signature)
+  }
+
+  private[validation] def checkScript(tx: Transaction,
+                                      script: StatelessScript,
+                                      params: AVector[Val],
+                                      signature: ED25519Signature): TxValidationResult = {
+    val context = StatelessContext(tx.hash, signature)
+    StatelessVM.execute(context, script, AVector.empty, params) match {
+      case Right(_) => validTx // TODO: handle returns
+      case Left(e)  => invalidTx(InvalidUnlockScript(e))
     }
   }
 
