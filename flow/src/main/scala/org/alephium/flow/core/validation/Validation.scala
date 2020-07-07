@@ -264,7 +264,7 @@ object Validation {
   private[validation] def checkSpending(tx: Transaction,
                                         worldState: WorldState): TxValidationResult = {
     val query = tx.unsigned.inputs.mapE { input =>
-      worldState.get(input.outputRef)
+      worldState.getOutput(input.outputRef)
     }
     query match {
       case Right(preOutputs)                 => checkSpending(tx, preOutputs, worldState)
@@ -355,7 +355,7 @@ object Validation {
                                               index: Int,
                                               worldState: WorldState): TxValidationResult = {
     val outputRef = TxOutputRef.unsafe(tx, index)
-    worldState.exist(outputRef.key) match {
+    worldState.existContract(outputRef.key) match {
       case Right(exist) => if (exist) invalidTx(CreateContractWithOldId) else validTx
       case Left(error)  => invalidTx(WorldStateIOError(error))
     }

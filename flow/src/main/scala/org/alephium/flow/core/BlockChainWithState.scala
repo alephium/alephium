@@ -24,9 +24,10 @@ trait BlockChainWithState extends BlockChain {
   override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     for {
       oldTrie <- getTrie(block.parentHash)
+      _       <- persistBlock(block)
       newTrie <- updateState(oldTrie, block)
       _       <- addTrie(block.hash, newTrie)
-      _       <- super.add(block, weight)
+      _       <- add(block.header, weight)
     } yield ()
   }
 }

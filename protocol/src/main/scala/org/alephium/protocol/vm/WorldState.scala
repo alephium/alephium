@@ -8,32 +8,33 @@ import org.alephium.util.{AVector, U64}
 
 final case class WorldState(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
                             contractState: MerklePatriciaTrie[ALF.Hash, AVector[Val]]) {
-  def get(outputRef: TxOutputRef): IOResult[TxOutput] = {
+  def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
     outputState.get(outputRef)
   }
 
-  def get(key: ALF.Hash): IOResult[AVector[Val]] = {
+  def getContractState(key: ALF.Hash): IOResult[AVector[Val]] = {
     contractState.get(key)
   }
 
-  def put(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
+  def putOutput(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
     outputState.put(outputRef, output).map(WorldState(_, contractState))
   }
 
-  def put(key: ALF.Hash, state: AVector[Val]): IOResult[WorldState] = {
+  def putContractState(key: ALF.Hash, state: AVector[Val]): IOResult[WorldState] = {
     contractState.put(key, state).map(WorldState(outputState, _))
   }
 
-  def exist(contractKey: ALF.Hash): IOResult[Boolean] = {
+  def existContract(contractKey: ALF.Hash): IOResult[Boolean] = {
     contractState.getOpt(contractKey).map(_.nonEmpty)
   }
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState] = {
-    outputState.remove(outputRef).map(WorldState(_, contractState))
-  }
-
-  def remove(key: ALF.Hash): IOResult[WorldState] = {
-    contractState.remove(key).map(WorldState(outputState, _))
+    if (outputRef.isContractRef) {
+      for {
+        newOutputState   <- outputState.remove(outputRef)
+        newContractState <- contractState.remove(outputRef.key)
+      } yield WorldState(newOutputState, newContractState)
+    } else outputState.remove(outputRef).map(WorldState(_, contractState))
   }
 
   def toHashes: WorldState.Hashes =
