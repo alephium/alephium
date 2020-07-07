@@ -1,6 +1,7 @@
 package org.alephium.flow.io
 
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.RocksDBSource
 import org.alephium.protocol.ALF.Hash
 
 trait StoragesFixture {

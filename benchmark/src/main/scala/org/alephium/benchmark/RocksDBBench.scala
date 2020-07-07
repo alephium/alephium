@@ -8,7 +8,7 @@ import org.openjdk.jmh.annotations._
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
 
-import org.alephium.flow.io.{RocksDBColumn, RocksDBSource}
+import org.alephium.io.{RocksDBColumn, RocksDBSource}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 

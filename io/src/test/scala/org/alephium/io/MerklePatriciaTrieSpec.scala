@@ -1,4 +1,4 @@
-package org.alephium.flow.trie
+package org.alephium.io
 
 import scala.annotation.tailrec
 
@@ -6,9 +6,8 @@ import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
-import org.alephium.flow.io.{RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.io.MerklePatriciaTrie
-import org.alephium.protocol.ALF.Hash
+import org.alephium.crypto.{Keccak256 => Hash}
+import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Files}
 
@@ -95,7 +94,6 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   }
 
   trait TrieFixture {
-    import RocksDBSource.ColumnFamily
 
     private val tmpdir = Files.tmpDir
     private val dbname = "trie"

@@ -1,9 +1,9 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.io.Storages
 import org.alephium.io.IOResult
+import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.protocol.vm.WorldState

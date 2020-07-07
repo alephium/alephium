@@ -5,10 +5,10 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.io.RocksDBSource
 import org.alephium.flow.io.Storages
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.RocksDBSource
 import org.alephium.protocol.model.GroupIndex
 
 @BenchmarkMode(Array(Mode.AverageTime))

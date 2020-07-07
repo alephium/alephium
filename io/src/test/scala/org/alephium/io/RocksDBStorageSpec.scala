@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import org.alephium.macros.EnumerationMacros
 import org.alephium.util.{AlephiumSpec, AVector}
