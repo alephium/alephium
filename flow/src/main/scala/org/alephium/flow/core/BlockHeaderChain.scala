@@ -3,9 +3,9 @@ package org.alephium.flow.core
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{AVector, TimeStamp}
 

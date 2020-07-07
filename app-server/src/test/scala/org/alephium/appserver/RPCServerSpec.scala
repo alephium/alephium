@@ -29,8 +29,8 @@ import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils

@@ -2,12 +2,11 @@ package org.alephium.flow.core
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
-
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
+import org.alephium.io.IOError
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOError
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
 import org.alephium.util._
 

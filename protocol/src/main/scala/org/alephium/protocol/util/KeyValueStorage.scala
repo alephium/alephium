@@ -2,7 +2,7 @@ package org.alephium.protocol.util
 
 import akka.util.ByteString
 
-import org.alephium.protocol.io.IOResult
+import org.alephium.io.IOResult
 import org.alephium.serde._
 
 trait AbstractKeyValueStorage[K, V] {

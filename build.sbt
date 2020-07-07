@@ -23,6 +23,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
   .aggregate(macros,
              util,
              serde,
+             io,
              crypto,
              rpc,
              app,
@@ -79,6 +80,10 @@ lazy val serde = project("serde")
   )
   .dependsOn(util % "test->test;compile->compile")
 
+lazy val io = project("io")
+  .dependsOn(util % "test->test;compile->compile", serde)
+  .settings(libraryDependencies += rocksdb)
+
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
 
@@ -123,7 +128,7 @@ lazy val benchmark = mainProject("benchmark")
   .settings(scalacOptions += "-Xdisable-assertions")
 
 lazy val flow = project("flow")
-  .dependsOn(crypto, serde, util % "it,test->test")
+  .dependsOn(crypto, io, serde, util % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
       akka,
@@ -135,10 +140,9 @@ lazy val flow = project("flow")
   .dependsOn(protocol % "test->test;compile->compile")
 
 lazy val protocol = project("protocol")
-  .dependsOn(crypto, serde, util % "it,test->test")
+  .dependsOn(crypto, io, serde, util % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
-      rocksdb,
       fastparse
     )
   )

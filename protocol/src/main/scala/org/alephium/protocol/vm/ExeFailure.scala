@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.io.IOError
+import org.alephium.io.IOError
 
 trait ExeFailure
 case object InvalidFinalState                                  extends ExeFailure

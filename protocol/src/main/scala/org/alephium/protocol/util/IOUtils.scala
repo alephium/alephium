@@ -5,12 +5,10 @@ import java.nio.file.{Files, Path}
 
 import org.rocksdb.RocksDBException
 
-import org.alephium.protocol.io.IOResult
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.serde.SerdeError
 
 object IOUtils {
-  import org.alephium.protocol.io.IOError._
-
   def createDirUnsafe(path: Path): Unit = {
     if (!Files.exists(path)) {
       Files.createDirectory(path)
@@ -50,9 +48,9 @@ object IOUtils {
 
   @inline
   def error[T]: PartialFunction[Throwable, IOResult[T]] = {
-    case e: IOException       => Left(JavaIO(e))
-    case e: SecurityException => Left(JavaSecurity(e))
-    case e: RocksDBException  => Left(RocksDB(e))
-    case e: SerdeError        => Left(Serde(e))
+    case e: IOException       => Left(IOError.JavaIO(e))
+    case e: SecurityException => Left(IOError.JavaSecurity(e))
+    case e: RocksDBException  => Left(IOError.RocksDB(e))
+    case e: SerdeError        => Left(IOError.Serde(e))
   }
 }

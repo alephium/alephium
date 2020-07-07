@@ -4,8 +4,8 @@ import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.util.{KeyValueStorage, MerklePatriciaTrie}
 import org.alephium.protocol.vm.WorldState
 

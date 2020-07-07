@@ -3,8 +3,8 @@ package org.alephium.flow.io
 import RocksDBSource.ColumnFamily
 import org.rocksdb.{ReadOptions, WriteOptions}
 
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.protocol.util.KeyValueStorage
 

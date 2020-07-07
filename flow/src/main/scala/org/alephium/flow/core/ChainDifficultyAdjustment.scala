@@ -1,9 +1,9 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.IOResult
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ChainDifficultyAdjustment {

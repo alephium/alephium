@@ -1,7 +1,7 @@
 package org.alephium.flow.core.validation
 
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.vm.ExeFailure
 import org.alephium.util.AVector
 
