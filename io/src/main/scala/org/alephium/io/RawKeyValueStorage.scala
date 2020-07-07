@@ -1,4 +1,4 @@
-package org.alephium.protocol.util
+package org.alephium.io
 
 import akka.util.ByteString
 
