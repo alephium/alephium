@@ -4,8 +4,7 @@ import java.nio.file.{Files, Path, StandardOpenOption => OOption}
 
 import akka.util.ByteString
 
-import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.util.RawKeyValueStorage
+import org.alephium.io.{IOResult, IOUtils, RawKeyValueStorage}
 import org.alephium.util.Hex
 
 trait DiskSource extends RawKeyValueStorage with KeyValueSource {

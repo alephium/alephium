@@ -5,11 +5,10 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.{IOResult, IOUtils, RawKeyValueStorage}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.util.RawKeyValueStorage
 import org.alephium.serde._
 import org.alephium.util.AVector
 
