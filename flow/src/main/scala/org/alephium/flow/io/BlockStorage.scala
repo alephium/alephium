@@ -2,33 +2,23 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import org.alephium.io.{AbstractKeyValueStorage, IOError, IOResult, KeyValueStorage}
+import akka.util.ByteString
+
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
 import org.alephium.serde.{Serde, Serializer}
 import org.alephium.util.LruCache
 
-object BlockStorage {
-  import org.alephium.io.IOUtils._
+trait BlockStorage extends KeyValueStorage[Hash, Block] {
+  def put(block: Block): IOResult[Unit] = put(block.hash, block)
 
-  def create(root: Path, blocksFolder: String, cacheCapacity: Int): IOResult[BlockStorage] =
-    tryExecute {
-      createUnsafe(root, blocksFolder, cacheCapacity)
-    }
-
-  def createUnsafe(root: Path, blocksFolder: String, cacheCapacity: Int): BlockStorage = {
-    createDirUnsafe(root)
-    val path = root.resolve(blocksFolder)
-    createDirUnsafe(path)
-    val storage = new BlockStorageInnerImpl(path)
-    new BlockStorage(storage, cacheCapacity)
-  }
+  def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
 }
 
-class BlockStorage(val source: BlockStorageInner, val cacheCapacity: Int)(
+class BlockDiskStorage(val source: BlockDiskStorageInner, val cacheCapacity: Int)(
     implicit val keySerializer: Serializer[Hash],
     val valueSerde: Serde[Block])
-    extends AbstractKeyValueStorage[Hash, Block] {
+    extends BlockStorage {
   private val cache = LruCache[Hash, Block, IOError](cacheCapacity)
 
   def folder: Path = source.folder
@@ -53,24 +43,46 @@ class BlockStorage(val source: BlockStorageInner, val cacheCapacity: Int)(
     cache.putInCache(key, value)
   }
 
-  def put(block: Block): IOResult[Unit] = put(block.hash, block)
-
-  def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
-
   override def exists(key: Hash): IOResult[Boolean] =
     cache.exists(key)(source.exists(key))
 
   override def existsUnsafe(key: Hash): Boolean =
     cache.existsUnsafe(key)(source.existsUnsafe(key))
 
-  override def delete(key: Hash): IOResult[Unit] = ???
+  override def existsRawUnsafe(key: ByteString): Boolean = source.existsRawUnsafe(key)
 
-  override def deleteUnsafe(key: Hash): Unit = ???
+  override def getOptRawUnsafe(key: ByteString): Option[ByteString] = source.getOptRawUnsafe(key)
+
+  override def getRawUnsafe(key: ByteString): ByteString = source.getRawUnsafe(key)
+
+  override def putRawUnsafe(key: ByteString, value: ByteString): Unit =
+    source.putRawUnsafe(key, value)
+
+  override def delete(key: Hash): IOResult[Unit]      = ???
+  override def deleteUnsafe(key: Hash): Unit          = ???
+  override def deleteRawUnsafe(key: ByteString): Unit = ???
 }
 
-trait BlockStorageInner extends KeyValueStorage[Hash, Block] with DiskSource
+object BlockDiskStorage {
+  import org.alephium.io.IOUtils._
 
-class BlockStorageInnerImpl(val folder: Path)(
+  def create(root: Path, blocksFolder: String, cacheCapacity: Int): IOResult[BlockDiskStorage] =
+    tryExecute {
+      createUnsafe(root, blocksFolder, cacheCapacity)
+    }
+
+  def createUnsafe(root: Path, blocksFolder: String, cacheCapacity: Int): BlockDiskStorage = {
+    createDirUnsafe(root)
+    val path = root.resolve(blocksFolder)
+    createDirUnsafe(path)
+    val storage = new BlockDiskStorageInnerImpl(path)
+    new BlockDiskStorage(storage, cacheCapacity)
+  }
+}
+
+trait BlockDiskStorageInner extends KeyValueStorage[Hash, Block] with DiskSource
+
+class BlockDiskStorageInnerImpl(val folder: Path)(
     implicit val keySerializer: Serializer[Hash],
     val valueSerde: Serde[Block]
-) extends BlockStorageInner
+) extends BlockDiskStorageInner

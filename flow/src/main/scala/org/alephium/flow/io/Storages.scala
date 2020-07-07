@@ -28,7 +28,8 @@ object Storages {
       dbFolder: String,
       blocksFolder: String,
       writeOptions: WriteOptions)(implicit config: GroupConfig with Config): Storages = {
-    val blockStorage      = BlockStorage.createUnsafe(rootPath, blocksFolder, config.blockCacheCapacity)
+    val blockStorage =
+      BlockDiskStorage.createUnsafe(rootPath, blocksFolder, config.blockCacheCapacity)
     val db                = createRocksDBUnsafe(rootPath, dbFolder)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
