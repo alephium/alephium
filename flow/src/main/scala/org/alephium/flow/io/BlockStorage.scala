@@ -10,7 +10,7 @@ import org.alephium.serde.{Serde, Serializer}
 import org.alephium.util.LruCache
 
 object BlockStorage {
-  import org.alephium.protocol.util.IOUtils._
+  import org.alephium.io.IOUtils._
 
   def create(root: Path, blocksFolder: String, cacheCapacity: Int): IOResult[BlockStorage] =
     tryExecute {

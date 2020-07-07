@@ -1,11 +1,10 @@
-package org.alephium.protocol.util
+package org.alephium.io
 
 import java.io.IOException
 import java.nio.file.{Files, Path}
 
 import org.rocksdb.RocksDBException
 
-import org.alephium.io.{IOError, IOResult}
 import org.alephium.serde.SerdeError
 
 object IOUtils {

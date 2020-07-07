@@ -5,12 +5,11 @@ import java.nio.file.Path
 import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.util.IOUtils
+import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.util.AVector
 
 object RocksDBSource {
-  import org.alephium.protocol.util.IOUtils.tryExecute
+  import IOUtils.tryExecute
 
   {
     RocksDB.loadLibrary()
