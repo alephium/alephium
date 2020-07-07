@@ -18,12 +18,8 @@ class BlockFlowBench {
 
   implicit val config: PlatformConfig = PlatformConfig.loadDefault()
   private val storages: Storages = {
-    val dbFolder     = "db"
-    val blocksFolder = "blocks"
-    Storages.createUnsafe(config.rootPath,
-                          dbFolder,
-                          blocksFolder,
-                          RocksDBSource.Settings.writeOptions)
+    val dbFolder = "db"
+    Storages.createUnsafe(config.rootPath, dbFolder, RocksDBSource.Settings.writeOptions)
   }
   val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)(config)
 

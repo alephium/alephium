@@ -33,11 +33,10 @@ object Mode {
       extends Mode {
 
     private val storages: Storages = {
-      val postfix      = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
-      val dbFolder     = "db-" + postfix
-      val blocksFolder = "blocks-" + postfix
+      val postfix  = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
+      val dbFolder = "db-" + postfix
 
-      Storages.createUnsafe(config.rootPath, dbFolder, blocksFolder, Settings.writeOptions)
+      Storages.createUnsafe(config.rootPath, dbFolder, Settings.writeOptions)
     }
 
     override val node: Node = Node.build(builders, storages)
