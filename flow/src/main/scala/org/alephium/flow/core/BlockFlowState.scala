@@ -10,7 +10,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript, WorldState}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript, Val, WorldState}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -393,7 +393,7 @@ object BlockFlowState {
                                  relatedOutputs: Map[TxOutputRef, TxOutput])
       extends BlockCache
   final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput],
-                                   contracts: Map[Hash, StatelessScript],
+                                   contractStates: Map[Hash, AVector[Val]],
                                    inputs: Set[TxOutputRef])
       extends BlockCache { // For blocks on intra-group chain
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
@@ -404,9 +404,9 @@ object BlockFlowState {
   }
 
   private def convertOutputs(
-      block: Block): (Map[TxOutputRef, TxOutput], Map[Hash, StatelessScript]) = {
+      block: Block): (Map[TxOutputRef, TxOutput], Map[Hash, AVector[Val]]) = {
     val outputs   = mutable.Map.empty[TxOutputRef, TxOutput]
-    val contracts = mutable.Map.empty[Hash, StatelessScript]
+    val contracts = mutable.Map.empty[Hash, AVector[Val]]
     block.transactions.foreach { transaction =>
       (0 until transaction.outputsLength).foreach { index =>
         val output    = transaction.getOutput(index)
@@ -414,7 +414,7 @@ object BlockFlowState {
         outputs.update(outputRef, output)
         output match {
           case _: ContractOutput =>
-            contracts.update(outputRef.key, transaction.unsigned.contracts(contracts.size))
+            contracts.put(outputRef.key, transaction.unsigned.states(contracts.size))
           case _ => ()
         }
       }
@@ -454,9 +454,8 @@ object BlockFlowState {
     }
   }
 
-  def updateStateForContracts(
-      worldState: WorldState,
-      contracts: Iterable[(Hash, StatelessScript)]): IOResult[WorldState] = {
+  def updateStateForContracts(worldState: WorldState,
+                              contracts: Iterable[(Hash, AVector[Val])]): IOResult[WorldState] = {
     EitherF.foldTry(contracts, worldState) {
       case (worldState, (key, contract)) => worldState.put(key, contract)
     }
@@ -481,10 +480,10 @@ object BlockFlowState {
           trie0 <- updateStateForInputs(worldState, inputs)
           trie1 <- updateStateForOutputs(trie0, relatedOutputs)
         } yield trie1
-      case InOutBlockCache(outputs, contracts, inputs) =>
+      case InOutBlockCache(outputs, contractStates, inputs) =>
         for {
           trie0 <- updateStateForOutputs(worldState, outputs)
-          trie1 <- updateStateForContracts(trie0, contracts)
+          trie1 <- updateStateForContracts(trie0, contractStates)
           trie2 <- updateStateForInputs(trie1, inputs)
         } yield trie2
     }
