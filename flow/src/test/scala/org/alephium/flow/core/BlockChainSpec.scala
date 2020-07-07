@@ -2,6 +2,7 @@ package org.alephium.flow.core
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
+
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
 import org.alephium.io.IOError
