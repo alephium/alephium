@@ -80,12 +80,12 @@ lazy val serde = project("serde")
   )
   .dependsOn(util % "test->test;compile->compile")
 
-lazy val io = project("io")
-  .dependsOn(util % "test->test;compile->compile", serde)
-  .settings(libraryDependencies += rocksdb)
-
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
+
+lazy val io = project("io")
+  .dependsOn(util % "test->test;compile->compile", serde, crypto)
+  .settings(libraryDependencies += rocksdb)
 
 lazy val rpc = project("rpc")
   .settings(
