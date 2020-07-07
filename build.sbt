@@ -92,7 +92,7 @@ lazy val rpc = project("rpc")
       `circe-generic`,
       `scala-logging`,
       `akka-test`,
-      akkahttptest
+      `akka-http-test`
     )
   )
   .dependsOn(util % "test->test;compile->compile")
@@ -112,9 +112,9 @@ lazy val `app-server` = project("app-server")
   .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
-      akkahttpcors,
-      akkahttptest,
-      akkastreamtest
+      `akka-http-cors`,
+      `akka-http-test`,
+      `akka-stream-test`
     )
   )
 

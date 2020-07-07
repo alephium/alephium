@@ -8,15 +8,15 @@ object Version {
 }
 
 object Dependencies {
-  lazy val akka              = "com.typesafe.akka" %% "akka-actor"          % Version.akka
-  lazy val `akka-http`       = "com.typesafe.akka" %% "akka-http"           % Version.`akka-http`
-  lazy val `akka-http-circe` = "de.heikoseeberger" %% "akka-http-circe"     % "1.32.0"
-  lazy val `akka-slf4j`      = "com.typesafe.akka" %% "akka-slf4j"          % Version.akka
-  lazy val `akka-stream`     = "com.typesafe.akka" %% "akka-stream"         % Version.akka
-  lazy val `akka-test`       = "com.typesafe.akka" %% "akka-testkit"        % Version.akka % Test
-  lazy val akkahttptest      = "com.typesafe.akka" %% "akka-http-testkit"   % Version.`akka-http` % Test
-  lazy val akkahttpcors      = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
-  lazy val akkastreamtest    = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
+  lazy val akka               = "com.typesafe.akka" %% "akka-actor"          % Version.akka
+  lazy val `akka-http`        = "com.typesafe.akka" %% "akka-http"           % Version.`akka-http`
+  lazy val `akka-http-circe`  = "de.heikoseeberger" %% "akka-http-circe"     % "1.32.0"
+  lazy val `akka-slf4j`       = "com.typesafe.akka" %% "akka-slf4j"          % Version.akka
+  lazy val `akka-stream`      = "com.typesafe.akka" %% "akka-stream"         % Version.akka
+  lazy val `akka-test`        = "com.typesafe.akka" %% "akka-testkit"        % Version.akka % Test
+  lazy val `akka-http-test`   = "com.typesafe.akka" %% "akka-http-testkit"   % Version.`akka-http` % Test
+  lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
+  lazy val `akka-stream-test` = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
 
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"    % Version.circe
   lazy val `circe-generic` = "io.circe"                   %% "circe-generic"   % Version.circe
