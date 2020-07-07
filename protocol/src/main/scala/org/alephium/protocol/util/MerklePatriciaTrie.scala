@@ -2,7 +2,7 @@ package org.alephium.protocol.util
 
 import akka.util.ByteString
 
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}

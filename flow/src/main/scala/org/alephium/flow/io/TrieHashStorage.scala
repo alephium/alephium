@@ -4,9 +4,9 @@ import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.util.{KeyValueStorage, MerklePatriciaTrie}
+import org.alephium.protocol.util.MerklePatriciaTrie
 import org.alephium.protocol.vm.WorldState
 
 trait TrieHashStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
