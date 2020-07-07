@@ -1,9 +1,9 @@
 package org.alephium.protocol.vm
 
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
-import org.alephium.protocol.util.{KeyValueStorage, MerklePatriciaTrie}
+import org.alephium.protocol.util.MerklePatriciaTrie
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U64}
 
