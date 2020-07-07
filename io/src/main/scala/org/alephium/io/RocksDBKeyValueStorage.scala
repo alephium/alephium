@@ -1,8 +1,7 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import org.rocksdb._
 
-import org.alephium.io.KeyValueStorage
 import org.alephium.serde._
 
 object RocksDBKeyValueStorage {

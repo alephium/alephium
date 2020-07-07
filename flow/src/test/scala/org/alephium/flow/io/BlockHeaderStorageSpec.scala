@@ -2,6 +2,7 @@ package org.alephium.flow.io
 
 import org.scalatest.Assertion
 
+import org.alephium.io.RocksDBSource
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, ModelGen}
 import org.alephium.util.{AlephiumSpec, Files}

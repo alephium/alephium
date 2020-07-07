@@ -1,9 +1,7 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
-
-import org.alephium.io.{IOError, RawKeyValueStorage}
 
 object RocksDBColumn {
   import RocksDBSource.Settings
