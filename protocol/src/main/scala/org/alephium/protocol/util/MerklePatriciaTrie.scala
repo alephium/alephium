@@ -2,8 +2,8 @@ package org.alephium.protocol.util
 
 import akka.util.ByteString
 
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 

@@ -7,8 +7,8 @@ import akka.actor.Props
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.protocol.util.IOUtils

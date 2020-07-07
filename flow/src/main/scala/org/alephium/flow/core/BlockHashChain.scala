@@ -6,9 +6,9 @@ import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods

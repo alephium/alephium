@@ -7,8 +7,8 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.io.{IOError, IOResult}
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest, TimeStamp}
 

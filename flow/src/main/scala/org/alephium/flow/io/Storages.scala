@@ -5,9 +5,9 @@ import java.nio.file.Path
 import org.rocksdb.WriteOptions
 
 import org.alephium.flow.io.RocksDBSource.ColumnFamily
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.io.IOResult
 import org.alephium.protocol.util.MerklePatriciaTrie.Node
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector

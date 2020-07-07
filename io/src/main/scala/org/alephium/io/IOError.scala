@@ -1,4 +1,4 @@
-package org.alephium.protocol.io
+package org.alephium.io
 
 import org.rocksdb.RocksDBException
 

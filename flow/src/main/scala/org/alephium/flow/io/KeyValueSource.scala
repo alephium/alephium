@@ -1,6 +1,6 @@
 package org.alephium.flow.io
 
-import org.alephium.protocol.io.IOResult
+import org.alephium.io.IOResult
 
 trait KeyValueSource {
   def close(): IOResult[Unit]
