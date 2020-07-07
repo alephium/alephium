@@ -17,7 +17,7 @@ trait Context {
   var worldState: WorldState
 
   def updateState(key: Hash, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.update(key, state) match {
+    worldState.put(key, state) match {
       case Left(error) =>
         Left(IOErrorUpdateState(error))
       case Right(state) =>

@@ -4,7 +4,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatelessScript}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -60,7 +60,7 @@ object AssetOutput {
 final case class ContractOutput(amount: U64,
                                 createdHeight: Int,
                                 lockupScript: LockupScript,
-                                state: AVector[Val])
+                                code: StatelessScript)
     extends TxOutput {
   def scriptHint: Int = 0
 }
@@ -68,5 +68,5 @@ final case class ContractOutput(amount: U64,
 object ContractOutput {
   implicit val serde: Serde[ContractOutput] =
     Serde.forProduct4(ContractOutput.apply,
-                      t => (t.amount, t.createdHeight, t.lockupScript, t.state))
+                      t => (t.amount, t.createdHeight, t.lockupScript, t.code))
 }
