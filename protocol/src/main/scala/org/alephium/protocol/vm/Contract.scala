@@ -4,8 +4,6 @@ import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-trait ContractAddress
-
 final case class Method[Ctx <: Context](
     localsType: AVector[Val.Type],
     returnType: AVector[Val.Type],

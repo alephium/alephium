@@ -2,6 +2,8 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
+import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
 class Runtime[Ctx <: Context](val stack: Stack[Frame[Ctx]], var returnTo: AVector[Val])
@@ -11,7 +13,7 @@ object Runtime {
     new Runtime(stack, AVector.ofSize(0))
 }
 
-trait VM[Ctx <: Context] {
+sealed trait VM[Ctx <: Context] {
   def execute(ctx: Ctx,
               script: Script[Ctx],
               fields: AVector[Val],
@@ -39,6 +41,23 @@ trait VM[Ctx <: Context] {
   }
 }
 
-object StatelessVM extends VM[StatelessContext]
+object StatelessVM extends VM[StatelessContext] {
+  def runTxScripts(worldState: WorldState, block: Block): ExeResult[WorldState] = {
+    block.transactions.foldE(worldState) {
+      case (worldState, tx) =>
+        tx.unsigned.scriptOpt match {
+          case Some(script) => runTxScript(worldState, tx.hash, script)
+          case None         => Right(worldState)
+        }
+    }
+  }
+
+  def runTxScript(worldState: WorldState,
+                  txHash: Hash,
+                  script: StatelessScript): ExeResult[WorldState] = {
+    val context = StatelessContext(txHash, worldState)
+    execute(context, script, AVector.empty, AVector.empty).map(_ => context.worldState)
+  }
+}
 
 object StatefulVM extends VM[StatefulContext]
