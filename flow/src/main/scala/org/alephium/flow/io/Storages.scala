@@ -34,7 +34,7 @@ object Storages {
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
-    val trieHashStorage   = TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
+    val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
     val emptyWorldState   = WorldState.empty(trieStorage)
 
     Storages(AVector(db, blockStorage.source),
@@ -57,7 +57,7 @@ final case class Storages(
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
     emptyWorldState: WorldState,
-    trieHashStorage: TrieHashStorage,
+    trieHashStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage
 ) extends KeyValueSource {

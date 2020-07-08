@@ -115,9 +115,17 @@ object WorldState {
     }
 
     def persist: IOResult[Persisted] = {
-      EitherF.foldTry(contractStateChanges, initialState) {
-        case (worldState, (key, contractState)) => worldState.putContractState(key, contractState)
-      }
+      for {
+        state0 <- EitherF.foldTry(contractStateChanges, initialState) {
+          case (worldState, (key, contractState)) => worldState.putContractState(key, contractState)
+        }
+        state1 <- EitherF.foldTry(outputStateDeletes, state0) {
+          case (worldState, outputRef) => worldState.remove(outputRef)
+        }
+        state2 <- EitherF.foldTry(outputStateAdditions, state1) {
+          case (worldState, (outputRef, output)) => worldState.putOutput(outputRef, output)
+        }
+      } yield state2
     }
   }
 
@@ -138,10 +146,15 @@ object WorldState {
   }
 
   final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
-    def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
+    def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Persisted = {
       val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
       val contractState = MerklePatriciaTrie[ALF.Hash, AVector[Val]](contractStateHash, storage)
       Persisted(outputState, contractState)
+    }
+
+    def toCachedWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Cached = {
+      val initialState = toWorldState(storage)
+      Cached(initialState, Set.empty, Map.empty, Map.empty)
     }
   }
   object Hashes {
