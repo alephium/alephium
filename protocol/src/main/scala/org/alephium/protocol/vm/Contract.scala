@@ -105,6 +105,6 @@ class StatefulScriptObject(val code: StatefulScript, val fields: Array[Val])
 
 class StatefulContractObject(val code: StatefulContract,
                              val fields: Array[Val],
-                             val address: ContractAddress,
+                             val address: ALF.Hash,
                              val codeHash: ALF.Hash)
     extends ContractObj[StatefulContext]
