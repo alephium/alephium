@@ -13,7 +13,8 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util.{AVector, U64}
 
 class BlockFlowSpec extends AlephiumFlowSpec { Test =>
@@ -76,6 +77,37 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     cache0.length is 2
     cache0.contains(newBlocks(0).hash) is false
     cache0.contains(newBlocks(1).hash) is true
+  }
+
+  it should "handle contract states" in {
+    val input0 =
+      s"""
+         |contract Foo(mut x: U64) {
+         |  fn add(a: U64) -> () {
+         |    x = x + a
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val script0      = Compiler.compile(input0).toOption.get
+    val initialState = AVector[Val](Val.U64(U64.Zero))
+
+    val chainIndex        = ChainIndex.unsafe(0, 0)
+    val blockFlow         = BlockFlow.fromGenesisUnsafe(storages)
+    val block0            = mine(blockFlow, chainIndex, outputScriptOption = Some(script0 -> initialState))
+    val contractOutputRef = TxOutputRef.unsafe(block0.transactions.head, 0)
+    val contractKey       = contractOutputRef.key
+
+    contractOutputRef.isContractRef is true
+    addAndCheck(blockFlow, block0, 1)
+    checkState(blockFlow, chainIndex, contractKey, initialState)
+
+//    val input1   = ""
+//    val script1  = Compiler.compile(input1).toOption.get
+//    val newState = AVector[Val](Val.U64(U64.One))
+//    val block1   = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+//    addAndCheck(blockFlow, block1, 1)
+//    checkState(blockFlow, chainIndex, contractKey, newState)
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
@@ -279,7 +311,11 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow1, pubScript, 1)
   }
 
-  def mine(blockFlow: BlockFlow, chainIndex: ChainIndex, onlyTxForIntra: Boolean = false): Block = {
+  def mine(blockFlow: BlockFlow,
+           chainIndex: ChainIndex,
+           onlyTxForIntra: Boolean                                     = false,
+           outputScriptOption: Option[(StatelessScript, AVector[Val])] = None,
+           txScriptOption: Option[StatelessScript]                     = None): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -295,9 +331,20 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         val (_, toPublicKey)           = chainIndex.to.generateKey
         val toLockupScript             = LockupScript.p2pkh(toPublicKey)
         val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-        val outputs = AVector[TxOutput](TxOutput.asset(1, height, toLockupScript),
-                                        TxOutput.asset(total - 1, height, fromLockupScript))
-        val transferTx = Transaction.from(inputs, outputs, privateKey)
+
+        val output0 = outputScriptOption match {
+          case Some((script, _)) => TxOutput.contract(1, height, toLockupScript, script)
+          case None              => TxOutput.asset(1, height, toLockupScript)
+        }
+        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
+        val outputs = AVector[TxOutput](output0, output1)
+        val unsignedTx = outputScriptOption match {
+          case Some((_, state)) =>
+            UnsignedTransaction(txScriptOption, inputs, outputs, AVector(state))
+          case None =>
+            UnsignedTransaction(txScriptOption, inputs, outputs, AVector.empty)
+        }
+        val transferTx = Transaction.from(unsignedTx, privateKey)
         AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
     }
@@ -346,6 +393,13 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
     blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
+  }
+
+  def checkState(blockFlow: BlockFlow,
+                 chainIndex: ChainIndex,
+                 key: Hash,
+                 expected: AVector[Val]): Assertion = {
+    blockFlow.getBestTrie(chainIndex).toOption.get.getContractState(key) isE expected
   }
 
   def show(blockFlow: BlockFlow): String = {

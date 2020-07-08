@@ -30,6 +30,13 @@ object TxOutput {
     AssetOutput(amount, AVector.empty, createdHeight, lockupScript, ByteString.empty)
   }
 
+  def contract(amount: U64,
+               createdHeight: Int,
+               lockupScript: LockupScript,
+               code: StatelessScript): ContractOutput = {
+    ContractOutput(amount, createdHeight, lockupScript, code)
+  }
+
   def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
     asset(amount, ALF.GenesisHeight, lockupScript)
   }
