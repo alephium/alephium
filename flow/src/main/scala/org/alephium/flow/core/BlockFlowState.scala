@@ -151,7 +151,7 @@ trait BlockFlowState {
   private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): IOResult[WorldState] = {
     assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
-    getBlockChainWithState(groupIndex).getTrie(hash)
+    getBlockChainWithState(groupIndex).getWorldState(hash)
   }
 
   def getTrie(block: Block): IOResult[WorldState] = {
