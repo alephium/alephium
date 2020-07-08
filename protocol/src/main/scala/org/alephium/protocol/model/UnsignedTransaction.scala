@@ -5,7 +5,7 @@ import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript, Va
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
-final case class UnsignedTransaction(script: Option[StatelessScript],
+final case class UnsignedTransaction(scriptOpt: Option[StatelessScript],
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[TxOutput],
                                      states: AVector[AVector[Val]])
@@ -16,7 +16,7 @@ final case class UnsignedTransaction(script: Option[StatelessScript],
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
     Serde.forProduct4(UnsignedTransaction.apply,
-                      t => (t.script, t.inputs, t.fixedOutputs, t.states))
+                      t => (t.scriptOpt, t.inputs, t.fixedOutputs, t.states))
 
   def apply(inputs: AVector[TxInput], fixedOutputs: AVector[TxOutput]): UnsignedTransaction = {
     UnsignedTransaction(None, inputs, fixedOutputs, AVector.empty)

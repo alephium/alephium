@@ -38,6 +38,9 @@ object StatelessContext {
     apply(txHash, stack, worldState)
   }
 
+  def apply(txHash: Hash, worldState: WorldState): StatelessContext =
+    apply(txHash, Stack.ofCapacity[ED25519Signature](0), worldState)
+
   def apply(txHash: Hash,
             signatures: Stack[ED25519Signature],
             worldState: WorldState): StatelessContext =
