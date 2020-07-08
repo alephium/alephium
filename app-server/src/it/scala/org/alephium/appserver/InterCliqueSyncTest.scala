@@ -2,7 +2,7 @@ package org.alephium.appserver
 
 import java.net.InetSocketAddress
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
 class InterCliqueSyncTest extends AlephiumSpec {

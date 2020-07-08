@@ -1,6 +1,6 @@
 package org.alephium.appserver
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
