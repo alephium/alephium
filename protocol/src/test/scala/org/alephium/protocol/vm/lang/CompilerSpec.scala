@@ -2,16 +2,9 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.crypto.ED25519
+import org.alephium.crypto.{Byte32, ED25519}
 import org.alephium.protocol.ALF
-import org.alephium.protocol.vm.{
-  Stack,
-  StatelessContext,
-  StatelessScript,
-  StatelessVM,
-  Val,
-  WorldState
-}
+import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -20,10 +13,14 @@ class CompilerSpec extends AlephiumSpec {
   import Ast._
 
   it should "parse lexer" in {
+    val byte32 = Byte32.generate.toHexString.toUpperCase
+
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
     fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse(s"@$byte32", Lexer.byte32(_)).get.value is Val.Byte32(
+      Byte32.unsafe(Hex.from(byte32).get))
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
