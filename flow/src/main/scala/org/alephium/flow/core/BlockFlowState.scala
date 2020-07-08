@@ -305,8 +305,8 @@ trait BlockFlowState {
 
     for {
       bestTrie <- getBestTrie(groupIndex)
-      persistedUtxos <- bestTrie.outputState
-        .getAll(lockupScript.shortKeyBytes)
+      persistedUtxos <- bestTrie
+        .getOutputs(lockupScript.shortKeyBytes)
         .map(_.filter(p => lockedBy(p._2, lockupScript)).map {
           case (outputRef, output) =>
             Tuple2.apply[TxOutputRef, TxOutput](outputRef, output) // TODO: improve this by making AVector covariant
