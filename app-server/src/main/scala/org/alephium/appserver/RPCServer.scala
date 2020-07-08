@@ -9,7 +9,7 @@ import akka.util.{ByteString, Timeout}
 import io.circe._
 import io.circe.syntax._
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner

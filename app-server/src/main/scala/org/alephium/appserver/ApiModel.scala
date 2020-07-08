@@ -17,11 +17,11 @@ import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util.{AVector, Base58, Hex, TimeStamp, U64}
 
-sealed trait RPCModel
+sealed trait ApiModel
 
 // scalastyle:off number.of.methods
 // scalastyle:off number.of.types
-object RPCModel {
+object ApiModel {
   implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
   implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
   implicit val u64Codec: Codec[U64]     = Codec.from(u64Decoder, u64Encoder)
@@ -66,7 +66,7 @@ object RPCModel {
     implicit val codec: Codec[TimeStamp]       = Codec.from(decoderTS, encoderTS)
   }
 
-  final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends RPCModel
+  final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
     import TimeStampCodec._
     def decoder(implicit rpcConfig: RPCConfig): Decoder[FetchRequest] =
@@ -86,7 +86,7 @@ object RPCModel {
       Codec.from(decoder, encoder)
   }
 
-  final case class FetchResponse(blocks: Seq[BlockEntry]) extends RPCModel
+  final case class FetchResponse(blocks: Seq[BlockEntry]) extends ApiModel
   object FetchResponse {
     implicit val codec: Codec[FetchResponse] = deriveCodec[FetchResponse]
   }
@@ -139,7 +139,7 @@ object RPCModel {
       height: Int,
       deps: AVector[String],
       transactions: Option[AVector[Tx]]
-  ) extends RPCModel
+  ) extends ApiModel
   object BlockEntry {
     import TimeStampCodec._
     implicit val codec: Codec[BlockEntry] = deriveCodec[BlockEntry]
@@ -172,7 +172,7 @@ object RPCModel {
   final case class SelfClique(cliqueId: CliqueId,
                               peers: AVector[PeerAddress],
                               groupNumPerBroker: Int)
-      extends RPCModel
+      extends ApiModel
   object SelfClique {
     import CliqueIdCodec._
     def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
@@ -184,7 +184,7 @@ object RPCModel {
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
-  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends RPCModel
+  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends ApiModel
   object NeighborCliques {
     import CliqueIdCodec._
     implicit val cliqueEncoder: Encoder[CliqueInfo] =
@@ -195,17 +195,17 @@ object RPCModel {
     implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 
-  final case class GetBalance(address: Address) extends RPCModel
+  final case class GetBalance(address: Address) extends ApiModel
   object GetBalance {
     implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
   }
 
-  final case class GetGroup(address: Address) extends RPCModel
+  final case class GetGroup(address: Address) extends ApiModel
   object GetGroup {
     implicit val codec: Codec[GetGroup] = deriveCodec[GetGroup]
   }
 
-  final case class Balance(balance: U64, utxoNum: Int) extends RPCModel
+  final case class Balance(balance: U64, utxoNum: Int) extends ApiModel
   object Balance {
     implicit val codec: Codec[Balance] = deriveCodec[Balance]
     def apply(balance_utxoNum: (U64, Int)): Balance = {
@@ -213,7 +213,7 @@ object RPCModel {
     }
   }
 
-  final case class Group(group: Int) extends RPCModel
+  final case class Group(group: Int) extends ApiModel
   object Group {
     implicit val codec: Codec[Group] = deriveCodec[Group]
   }
@@ -222,14 +222,14 @@ object RPCModel {
       fromKey: ED25519PublicKey,
       toAddress: Address,
       value: U64
-  ) extends RPCModel {
+  ) extends ApiModel {
     def fromAddress: Address = LockupScript.p2pkh(fromKey)
   }
   object CreateTransaction {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
   }
 
-  final case class CreateTransactionResult(unsignedTx: String, hash: String) extends RPCModel
+  final case class CreateTransactionResult(unsignedTx: String, hash: String) extends ApiModel
   object CreateTransactionResult {
     implicit val codec: Codec[CreateTransactionResult] = deriveCodec[CreateTransactionResult]
 
@@ -238,12 +238,12 @@ object RPCModel {
                               Hex.toHexString(unsignedTx.hash.bytes))
   }
 
-  final case class SendTransaction(tx: String, signature: ED25519Signature) extends RPCModel
+  final case class SendTransaction(tx: String, signature: ED25519Signature) extends ApiModel
   object SendTransaction {
     implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }
 
-  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int) extends RPCModel
+  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int) extends ApiModel
   object TxResult {
     implicit val codec: Codec[TxResult] = deriveCodec[TxResult]
   }
@@ -251,7 +251,7 @@ object RPCModel {
   final case class InterCliquePeerInfo(cliqueId: CliqueId,
                                        address: InetSocketAddress,
                                        isSynced: Boolean)
-      extends RPCModel
+      extends ApiModel
   object InterCliquePeerInfo {
     import CliqueIdCodec._
 
@@ -263,28 +263,28 @@ object RPCModel {
   }
 
   final case class GetHashesAtHeight(val fromGroup: Int, val toGroup: Int, height: Int)
-      extends RPCModel
+      extends ApiModel
       with PerChain
   object GetHashesAtHeight {
     implicit val codec: Codec[GetHashesAtHeight] = deriveCodec[GetHashesAtHeight]
   }
 
-  final case class HashesAtHeight(headers: Seq[String]) extends RPCModel
+  final case class HashesAtHeight(headers: Seq[String]) extends ApiModel
   object HashesAtHeight {
     implicit val codec: Codec[HashesAtHeight] = deriveCodec[HashesAtHeight]
   }
 
-  final case class GetChainInfo(val fromGroup: Int, val toGroup: Int) extends RPCModel with PerChain
+  final case class GetChainInfo(val fromGroup: Int, val toGroup: Int) extends ApiModel with PerChain
   object GetChainInfo {
     implicit val codec: Codec[GetChainInfo] = deriveCodec[GetChainInfo]
   }
 
-  final case class ChainInfo(currentHeight: Int) extends RPCModel
+  final case class ChainInfo(currentHeight: Int) extends ApiModel
   object ChainInfo {
     implicit val codec: Codec[ChainInfo] = deriveCodec[ChainInfo]
   }
 
-  final case class GetBlock(hash: String) extends RPCModel
+  final case class GetBlock(hash: String) extends ApiModel
   object GetBlock {
     implicit val codec: Codec[GetBlock] = deriveCodec[GetBlock]
   }

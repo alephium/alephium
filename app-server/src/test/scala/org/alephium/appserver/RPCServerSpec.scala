@@ -18,7 +18,7 @@ import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey}
 import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.{Miner, Node}

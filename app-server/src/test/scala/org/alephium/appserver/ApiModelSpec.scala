@@ -8,7 +8,7 @@ import io.circe.syntax._
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
 import org.alephium.flow.U64Helpers
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
@@ -17,7 +17,7 @@ import org.alephium.rpc.CirceUtils
 import org.alephium.serde.serialize
 import org.alephium.util._
 
-class RPCModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
+class ApiModelSpec extends AlephiumSpec with EitherValues with U64Helpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
     CirceUtils.print(t.asJson)
   }

@@ -15,7 +15,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe.{Encoder, Json}
 import io.circe.syntax._
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -119,7 +119,7 @@ object RPCServerAbstract {
       Right(true)
     }
 
-  def wrap[T <: RPCModel: Encoder](req: Request, result: FutureTry[T])(
+  def wrap[T <: ApiModel: Encoder](req: Request, result: FutureTry[T])(
       implicit ec: ExecutionContext): Future[Response] = result.map {
     case Right(t)    => Response.successful(req, t)
     case Left(error) => error
