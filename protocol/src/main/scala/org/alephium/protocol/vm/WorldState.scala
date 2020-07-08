@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.io.{IOResult, KeyValueStorage, MerklePatriciaTrie}
+import org.alephium.io.{IOError, IOResult, KeyValueStorage, MerklePatriciaTrie}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.serde.Serde
@@ -22,6 +22,8 @@ sealed trait WorldState {
   def existContract(contractKey: ALF.Hash): IOResult[Boolean]
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState]
+
+  def persist: IOResult[WorldState.Persisted]
 }
 
 object WorldState {
@@ -61,16 +63,22 @@ object WorldState {
       } else outputState.remove(outputRef).map(Persisted(_, contractState))
     }
 
+    def persist: IOResult[WorldState.Persisted] = Right(this)
+
     def toHashes: WorldState.Hashes =
       WorldState.Hashes(outputState.rootHash, contractState.rootHash)
   }
 
-  // This will only be used for contract execution for the moment
+  // TODO: add cache for initialState
   final case class Cached(initialState: Persisted,
+                          outputStateDeletes: Set[TxOutputRef],
+                          outputStateAdditions: Map[TxOutputRef, TxOutput],
                           contractStateChanges: Map[ALF.Hash, AVector[Val]])
       extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
-      initialState.getOutput(outputRef)
+      if (outputStateAdditions.contains(outputRef)) Right(outputStateAdditions(outputRef))
+      else if (outputStateDeletes.contains(outputRef)) Left(IOError.KeyNotFound(outputRef))
+      else initialState.getOutput(outputRef)
     }
 
     override def getContractState(key: ALF.Hash): IOResult[AVector[Val]] = {
@@ -86,19 +94,24 @@ object WorldState {
     }
 
     override def putOutput(outputRef: TxOutputRef, output: TxOutput): IOResult[Cached] = {
-      ???
+      Right(this.copy(outputStateAdditions = outputStateAdditions + (outputRef -> output)))
     }
 
     override def putContractState(key: ALF.Hash, state: AVector[Val]): IOResult[Cached] = {
-      Right(Cached(initialState, contractStateChanges + (key -> state)))
+      Right(this.copy(contractStateChanges = contractStateChanges + (key -> state)))
     }
 
     override def existContract(contractKey: ALF.Hash): IOResult[Boolean] = {
-      initialState.existContract(contractKey)
+      if (contractStateChanges.contains(contractKey)) Right(true)
+      else initialState.existContract(contractKey)
     }
 
     override def remove(outputRef: TxOutputRef): IOResult[Cached] = {
-      ???
+      if (outputStateAdditions.contains(outputRef)) {
+        Right(this.copy(outputStateAdditions = outputStateAdditions - outputRef))
+      } else {
+        Right(this.copy(outputStateDeletes = outputStateDeletes + outputRef))
+      }
     }
 
     def persist: IOResult[Persisted] = {
@@ -121,7 +134,7 @@ object WorldState {
       MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
     val contractState: MerklePatriciaTrie[ALF.Hash, AVector[Val]] =
       MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
-    Persisted(outputState, contractState)
+    Cached(Persisted(outputState, contractState), Set.empty, Map.empty, Map.empty)
   }
 
   final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {

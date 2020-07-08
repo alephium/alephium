@@ -24,10 +24,7 @@ trait TrieHashStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
   }
 
   def putTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
-    worldState match {
-      case persisted: WorldState.Persisted => put(hash, persisted.toHashes)
-      case cached: WorldState.Cached       => cached.persist.flatMap(state => put(hash, state.toHashes))
-    }
+    worldState.persist.flatMap(state => put(hash, state.toHashes))
   }
 }
 

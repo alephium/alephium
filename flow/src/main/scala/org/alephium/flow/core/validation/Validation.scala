@@ -267,9 +267,9 @@ object Validation {
       worldState.getOutput(input.outputRef)
     }
     query match {
-      case Right(preOutputs)                 => checkSpending(tx, preOutputs, worldState)
-      case Left(IOError.RocksDB.keyNotFound) => invalidTx(NonExistInput)
-      case Left(error)                       => Left(Left(error))
+      case Right(preOutputs)            => checkSpending(tx, preOutputs, worldState)
+      case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
+      case Left(error)                  => Left(Left(error))
     }
   }
 

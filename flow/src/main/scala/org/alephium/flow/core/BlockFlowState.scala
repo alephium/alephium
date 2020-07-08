@@ -10,7 +10,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript, Val, WorldState}
+import org.alephium.protocol.vm._
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -484,7 +484,6 @@ object BlockFlowState {
     }
   }
 
-  // TODO: use cache for optimization
   def updateState(worldState: WorldState, block: Block, targetGroup: GroupIndex)(
       implicit config: GroupConfig): IOResult[WorldState] = {
     val chainIndex = block.chainIndex
@@ -510,9 +509,10 @@ object BlockFlowState {
   def updateStateForInOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
       implicit config: GroupConfig): IOResult[WorldState] = {
     for {
-      state0 <- updateStateForInputs(worldState, tx)
-      state1 <- updateStateForOutputs(state0, tx, targetGroup)
-    } yield state1
+      state0 <- updateStateForTxScript(worldState, tx)
+      state1 <- updateStateForInputs(state0, tx)
+      state2 <- updateStateForOutputs(state1, tx, targetGroup)
+    } yield state2
   }
 
   def updateStateForOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
@@ -526,6 +526,18 @@ object BlockFlowState {
   def updateStateForInBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
       implicit config: GroupConfig): IOResult[WorldState] = {
     updateStateForOutputs(worldState, tx, targetGroup)
+  }
+
+  def updateStateForTxScript(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
+    tx.unsigned.scriptOpt match {
+      case Some(script) =>
+        StatelessVM.runTxScript(worldState, tx.hash, script) match {
+          case Right(worldState)               => Right(worldState)
+          case Left(IOErrorUpdateState(error)) => Left(error)
+          case _                               => throw new RuntimeException(s"Updating world state for invalid tx")
+        }
+      case None => Right(worldState)
+    }
   }
 
   def updateStateForInputs(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
