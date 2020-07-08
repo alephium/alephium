@@ -191,17 +191,10 @@ class RPCServerSpec
 
   behavior of "companion object"
 
-  it should "safely handle `blockflowFetch` function" in new Fixture {
-    val dummyAddress = ModelGen.socketAddress.sample.get
-
+  it should "safely handle `blockflowFetch` function" in new RPCServerFixture {
     val blockflowFetchMaxAge = Duration.ofMinutes(10).get
-    implicit val rpcConfig: RPCConfig =
-      RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
-    implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
-
-    val blockFlow = new BlockFlowDummy(dummyBlock, blockFlowProbe.ref, dummyTx, storages)
     def blockflowFetch(params: String) = {
-      RPCServer.blockflowFetch(blockFlow, Request("blockflow_fetch", parse(params).toOption.get, 0))
+      server.doBlockflowFetch(Request("blockflow_fetch", parse(params).toOption.get, 0)).futureValue
     }
     val invalidParams = Response.Failure(Error.InvalidParams, Some(0L))
 
