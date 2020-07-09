@@ -4,7 +4,7 @@ import org.alephium.protocol.vm._
 
 sealed trait Operator {
   def getReturnType(argsType: Seq[Val.Type]): Seq[Val.Type]
-  def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
+  def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
 }
 
 sealed trait ArithOperator extends Operator {
@@ -15,7 +15,7 @@ sealed trait ArithOperator extends Operator {
   }
 }
 case object Add extends ArithOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(I64Add)
       case Val.U64  => Seq(U64Add)
@@ -26,7 +26,7 @@ case object Add extends ArithOperator {
   }
 }
 case object Sub extends ArithOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(I64Sub)
       case Val.U64  => Seq(U64Sub)
@@ -37,7 +37,7 @@ case object Sub extends ArithOperator {
   }
 }
 case object Mul extends ArithOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(I64Mul)
       case Val.U64  => Seq(U64Mul)
@@ -48,7 +48,7 @@ case object Mul extends ArithOperator {
   }
 }
 case object Div extends ArithOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(I64Div)
       case Val.U64  => Seq(U64Div)
@@ -59,7 +59,7 @@ case object Div extends ArithOperator {
   }
 }
 case object Mod extends ArithOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(I64Mod)
       case Val.U64  => Seq(U64Mod)
@@ -80,7 +80,7 @@ sealed trait TestOperator extends Operator {
   def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]]
 }
 case object Eq extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(EqI64)
       case Val.U64  => Seq(EqU64)
@@ -100,7 +100,7 @@ case object Eq extends TestOperator {
   }
 }
 case object Ne extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(NeI64)
       case Val.U64  => Seq(NeU64)
@@ -120,7 +120,7 @@ case object Ne extends TestOperator {
   }
 }
 case object Lt extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(LtI64)
       case Val.U64  => Seq(LtU64)
@@ -140,7 +140,7 @@ case object Lt extends TestOperator {
   }
 }
 case object Le extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(LeI64)
       case Val.U64  => Seq(LeU64)
@@ -160,7 +160,7 @@ case object Le extends TestOperator {
   }
 }
 case object Gt extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(GtI64)
       case Val.U64  => Seq(GtU64)
@@ -180,7 +180,7 @@ case object Gt extends TestOperator {
   }
 }
 case object Ge extends TestOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Val.I64  => Seq(GeI64)
       case Val.U64  => Seq(GeU64)
@@ -208,7 +208,7 @@ case object Not extends LogicalOperator {
     } else Seq(Val.Bool)
   }
 
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
 
   override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
     Seq(IfTrue(offset))
@@ -221,13 +221,13 @@ sealed trait BinaryLogicalOperator extends LogicalOperator {
   }
 }
 case object And extends BinaryLogicalOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
 
   override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
     Seq(IfNotAnd(offset))
 }
 case object Or extends BinaryLogicalOperator {
-  override def toIR(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
+  override def genCode(argsType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
 
   override def toBranchIR(left: Seq[Val.Type], offset: Byte): Seq[Instr[StatelessContext]] =
     Seq(IfNotOr(offset))

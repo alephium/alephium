@@ -23,13 +23,13 @@ object Ast {
         tpe = Some(t)
         t
     }
-    def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
+    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
   }
   final case class Const(v: Val) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = Seq(v.tpe)
 
     // TODO: support constants for all values
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       v match {
         case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
         case _: Val.Byte      => ???
@@ -51,7 +51,7 @@ object Ast {
   final case class Variable(id: Ident) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       val varInfo = ctx.getVariable(id)
       if (ctx.isField(id)) Seq(LoadField(varInfo.index))
       else Seq(LoadLocal(varInfo.index))
@@ -62,8 +62,8 @@ object Ast {
       op.getReturnType(expr.getType(ctx))
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      expr.toIR(ctx) ++ op.toIR(expr.getType(ctx))
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      expr.genCode(ctx) ++ op.genCode(expr.getType(ctx))
     }
   }
   final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
@@ -71,8 +71,8 @@ object Ast {
       op.getReturnType(left.getType(ctx) ++ right.getType(ctx))
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      left.toIR(ctx) ++ right.toIR(ctx) ++ op.toIR(left.getType(ctx) ++ right.getType(ctx))
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      left.genCode(ctx) ++ right.genCode(ctx) ++ op.genCode(left.getType(ctx) ++ right.getType(ctx))
     }
   }
   final case class ContractConv(contractType: TypeId, address: Expr) extends Expr {
@@ -82,7 +82,7 @@ object Ast {
       } else Seq(Val.Byte32)
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = Seq.empty
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = Seq.empty
   }
   final case class CallExpr(id: FuncId, args: Seq[Expr]) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
@@ -90,8 +90,8 @@ object Ast {
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      args.flatMap(_.toIR(ctx)) ++ ctx.getFunc(id).toIR(args.flatMap(_.getType(ctx)))
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.genCode(ctx)) ++ ctx.getFunc(id).genCode(args.flatMap(_.getType(ctx)))
     }
   }
   final case class ContractCallExpr(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Expr {
@@ -100,17 +100,17 @@ object Ast {
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }
   final case class ParenExpr(expr: Expr) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = expr.getType(ctx: Compiler.Ctx)
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = expr.toIR(ctx)
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = expr.genCode(ctx)
   }
 
   sealed trait Statement {
     def check(ctx: Compiler.Ctx): Unit
-    def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
+    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
   }
   object Statement {
     @inline def getCondIR(condition: Expr,
@@ -118,11 +118,11 @@ object Ast {
                           offset: Byte): Seq[Instr[StatelessContext]] = {
       condition match {
         case Binop(op: TestOperator, left, right) =>
-          left.toIR(ctx) ++ right.toIR(ctx) ++ op.toBranchIR(left.getType(ctx), offset)
+          left.genCode(ctx) ++ right.genCode(ctx) ++ op.toBranchIR(left.getType(ctx), offset)
         case UnaryOp(op: LogicalOperator, expr) =>
-          expr.toIR(ctx) ++ op.toBranchIR(expr.getType(ctx), offset)
+          expr.genCode(ctx) ++ op.toBranchIR(expr.getType(ctx), offset)
         case _ =>
-          condition.toIR(ctx) :+ IfFalse(offset)
+          condition.genCode(ctx) :+ IfFalse(offset)
       }
     }
   }
@@ -130,8 +130,8 @@ object Ast {
     override def check(ctx: Compiler.Ctx): Unit =
       ctx.addVariable(ident, value.getType(ctx: Compiler.Ctx), isMutable)
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      value.toIR(ctx) :+ ctx.toIR(ident)
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      value.genCode(ctx) :+ ctx.genCode(ident)
     }
   }
   final case class FuncDef(id: FuncId,
@@ -149,7 +149,7 @@ object Ast {
 
       val localVars  = ctx.getLocalVars(id)
       val localsType = localVars.map(_.tpe)
-      val instrs     = body.flatMap(_.toIR(ctx))
+      val instrs     = body.flatMap(_.genCode(ctx))
       Method[StatelessContext](AVector.from(localsType), AVector.from(rtypes), AVector.from(instrs))
     }
   }
@@ -159,8 +159,8 @@ object Ast {
       ctx.checkAssign(target, rhs.getType(ctx: Compiler.Ctx))
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      rhs.toIR(ctx) :+ ctx.toIR(target)
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      rhs.genCode(ctx) :+ ctx.genCode(target)
     }
   }
   final case class FuncCall(id: FuncId, args: Seq[Expr]) extends Statement {
@@ -170,11 +170,11 @@ object Ast {
       ()
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       val func       = ctx.getFunc(id)
       val argsType   = args.flatMap(_.getType(ctx))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.toIR(ctx)) ++ func.toIR(argsType) ++ Seq.fill(returnType.length)(Pop)
+      args.flatMap(_.genCode(ctx)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
   final case class ContractCall(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Statement {
@@ -184,7 +184,7 @@ object Ast {
       ()
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }
   final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
       extends Statement {
@@ -197,10 +197,10 @@ object Ast {
       }
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val elseIRs  = elseBranch.flatMap(_.toIR(ctx))
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      val elseIRs  = elseBranch.flatMap(_.genCode(ctx))
       val offsetIR = if (elseIRs.nonEmpty) Seq(Forward(elseIRs.length.toByte)) else Seq.empty
-      val ifIRs    = ifBranch.flatMap(_.toIR(ctx)) ++ offsetIR
+      val ifIRs    = ifBranch.flatMap(_.genCode(ctx)) ++ offsetIR
       if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
@@ -218,8 +218,8 @@ object Ast {
       }
     }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val bodyIR   = body.flatMap(_.toIR(ctx))
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      val bodyIR   = body.flatMap(_.genCode(ctx))
       val condIR   = Statement.getCondIR(condition, ctx, (bodyIR.length + 1).toByte)
       val whileLen = condIR.length + bodyIR.length + 1
       if (whileLen > 0xFF) {
@@ -233,8 +233,8 @@ object Ast {
     override def check(ctx: Compiler.Ctx): Unit = {
       ctx.checkReturn(exprs.flatMap(_.getType(ctx)))
     }
-    def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] =
-      exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
+    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] =
+      exprs.flatMap(_.genCode(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
   }
 
   final case class Contract(ident: TypeId, fields: Seq[Argument], funcs: Seq[FuncDef]) {
@@ -251,7 +251,7 @@ object Ast {
       fields.foreach(field => ctx.addVariable(field.ident, field.tpe, field.isMutable))
     }
 
-    def toIR(ctx: Compiler.Ctx): StatelessScript = {
+    def genCode(ctx: Compiler.Ctx): StatelessScript = {
       check(ctx)
       val fieldsTypes = AVector.from(fields.map(assign => assign.tpe))
       val methods     = AVector.from(funcs.map(func    => func.toMethod(ctx)))
