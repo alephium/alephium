@@ -69,6 +69,15 @@ trait Endpoints {
       .out(jsonBody[HashesAtHeight])
       .errorOut(jsonBody[Response.Failure])
 
+  //have to be lazy to let `groupConfig` being initialized
+  lazy val getChainInfo: Endpoint[(GroupIndex, GroupIndex), Response.Failure, ChainInfo, Nothing] =
+    endpoint.get
+      .in("chains")
+      .in(query[GroupIndex]("fromGroup"))
+      .in(query[GroupIndex]("toGroup"))
+      .out(jsonBody[ChainInfo])
+      .errorOut(jsonBody[Response.Failure])
+
   val getOpenapi =
     endpoint.get
       .in("openapi.yaml")
