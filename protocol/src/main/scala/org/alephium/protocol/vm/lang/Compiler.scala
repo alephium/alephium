@@ -37,7 +37,7 @@ object Compiler {
   }
 
   final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Byte)
-  class SimpleFunc(val id: Ast.CallId,
+  class SimpleFunc(val id: Ast.FuncId,
                    argsType: Seq[Val.Type],
                    val returnType: Seq[Val.Type],
                    index: Byte)
@@ -77,9 +77,9 @@ object Compiler {
       var scope: String,
       var varIndex: Int,
       contractObjects: mutable.HashMap[Ast.Ident, Ast.TypeId],
-      funcIdents: immutable.Map[Ast.CallId, SimpleFunc],
-      contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.CallId, SimpleFunc]]) {
-    def setFuncScope(funcId: Ast.CallId): Unit = {
+      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc],
+      contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc]]) {
+    def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope    = funcId.name
       varIndex = 0
       contractObjects.clear()
@@ -117,7 +117,7 @@ object Compiler {
       )
     }
 
-    def getLocalVars(func: Ast.CallId): Seq[VarInfo] = {
+    def getLocalVars(func: Ast.FuncId): Seq[VarInfo] = {
       varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
     }
 
@@ -131,7 +131,7 @@ object Compiler {
 
     def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
 
-    def getFunc(call: Ast.CallId): FuncInfo = {
+    def getFunc(call: Ast.FuncId): FuncInfo = {
       if (call.isBuiltIn) getBuiltInFunc(call)
       else getNewFunc(call)
     }
@@ -144,7 +144,7 @@ object Compiler {
       }
     }
 
-    def getFunc(objId: Ast.Ident, callId: Ast.CallId): FuncInfo = {
+    def getFunc(objId: Ast.Ident, callId: Ast.FuncId): FuncInfo = {
       val contract = contractObjects.getOrElse(
         objId,
         throw Error(s"Contract object ${objId.name} does not exist"))
@@ -152,12 +152,12 @@ object Compiler {
         .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
     }
 
-    private def getBuiltInFunc(call: Ast.CallId): FuncInfo = {
+    private def getBuiltInFunc(call: Ast.FuncId): FuncInfo = {
       BuiltIn.funcs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
-    private def getNewFunc(call: Ast.CallId): FuncInfo = {
+    private def getNewFunc(call: Ast.FuncId): FuncInfo = {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
     }
 
@@ -172,7 +172,7 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Val.Type]): Unit = {
-      val rtype = funcIdents(Ast.CallId(scope, false)).returnType
+      val rtype = funcIdents(Ast.FuncId(scope, false)).returnType
       if (returnType != rtype)
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
     }
