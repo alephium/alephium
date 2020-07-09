@@ -6,10 +6,11 @@ import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
-import org.alephium.util.TimeStamp
+import org.alephium.util.{TimeStamp, U64}
 
 object TapirCodecs {
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
@@ -20,6 +21,12 @@ object TapirCodecs {
 
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromCirce[Address]
+
+  implicit val publicKeyTapirCodec: Codec[String, ED25519PublicKey, TextPlain] =
+    fromCirce[ED25519PublicKey]
+
+  implicit val u64TapirCodec: Codec[String, U64, TextPlain] =
+    fromCirce[U64]
 
   implicit def groupIndexCodec(
       implicit groupConfig: GroupConfig): Codec[String, GroupIndex, TextPlain] =
