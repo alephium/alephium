@@ -69,7 +69,7 @@ object WorldState {
       WorldState.Hashes(outputState.rootHash, contractState.rootHash)
   }
 
-  // TODO: add cache for initialState
+  // TODO: add cache for initialState; and make this mutable for performance
   final case class Cached(initialState: Persisted,
                           outputStateDeletes: Set[TxOutputRef],
                           outputStateAdditions: Map[TxOutputRef, TxOutput],
