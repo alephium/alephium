@@ -122,10 +122,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    fastparse.parse(contract, Parser.contract(_)).isSuccess is true
-
-    val ast = fastparse.parse(contract, Parser.contract(_)).get.value
-    ast.check()
+    Compiler.compile(contract).isRight is true
   }
 
   it should "infer types" in {
@@ -150,8 +147,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-      val ast = fastparse.parse(contract, Parser.contract(_)).get.value
-      if (validity) ast.check() else assertThrows[Compiler.Error](ast.check())
+      Compiler.compile(contract).isRight is validity
     }
 
     check("mut", "a", "U64", "b", "U64", "U64", "foo", true)
