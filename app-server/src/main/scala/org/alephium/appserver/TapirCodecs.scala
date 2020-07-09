@@ -7,6 +7,8 @@ import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.TimeStamp
 
 object TapirCodecs {
@@ -18,6 +20,15 @@ object TapirCodecs {
 
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromCirce[Address]
+
+  implicit def groupIndexCodec(
+      implicit groupConfig: GroupConfig): Codec[String, GroupIndex, TextPlain] =
+    Codec.int.mapDecode(int =>
+      GroupIndex.from(int) match {
+        case Some(groupIndex) => DecodeResult.Value(groupIndex)
+        case None =>
+          DecodeResult.Error(s"$int", new IllegalArgumentException("Invalid group index"))
+    })(_.value)
 
   private def fromCirce[A: circe.Codec]: Codec[String, A, TextPlain] =
     Codec.string.mapDecode[A] { raw =>

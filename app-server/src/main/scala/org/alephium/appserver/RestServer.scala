@@ -16,6 +16,8 @@ import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.{Mode, PlatformConfig}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model._
 import org.alephium.util.Duration
 
 // scalastyle:off method.length
@@ -29,12 +31,14 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
   implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
+  implicit val groupConfig: GroupConfig = config
 
   private val docs: OpenAPI = List(
     getBlockflow,
     getBlock,
     getBalance,
-    getGroup
+    getGroup,
+    getHashesAtHeight
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   val route: Route =
@@ -50,6 +54,9 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
         getGroup
           .toRoute(address =>
             Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))) ~
+        getHashesAtHeight
+          .toRoute{ case (from, to, height) =>
+            Future.successful(ServerUtils.getHashesAtHeight(blockFlow, ChainIndex(from,to),  GetHashesAtHeight(from.value,to.value,height)))} ~
         getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
     )
 
