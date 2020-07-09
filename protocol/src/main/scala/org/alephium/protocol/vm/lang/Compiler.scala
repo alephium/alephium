@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm.lang
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 import fastparse.Parsed
 
@@ -10,9 +10,9 @@ object Compiler {
   def compile(input: String): Either[Error, StatelessScript] =
     try {
       fastparse.parse(input, Parser.contract(_)) match {
-        case Parsed.Success(ast, _) =>
-          val ctx = ast.check()
-          Right(ast.toIR(ctx))
+        case Parsed.Success(contract, _) =>
+          val ctx = Ctx.buildFor(contract)
+          Right(contract.toIR(ctx))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -37,11 +37,13 @@ object Compiler {
   }
 
   final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Byte)
-  class SimpleFunc(val name: String,
+  class SimpleFunc(val id: Ast.CallId,
                    argsType: Seq[Val.Type],
                    val returnType: Seq[Val.Type],
                    index: Byte)
       extends FuncInfo {
+    def name: String = id.name
+
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
       if (inputType == argsType) returnType
       else throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -51,16 +53,34 @@ object Compiler {
       Seq(CallLocal(index))
     }
   }
+  object SimpleFunc {
+    def from(funcs: Seq[Ast.FuncDef]): Seq[SimpleFunc] = {
+      funcs.view.zipWithIndex.map {
+        case (func, index) =>
+          new SimpleFunc(func.id, func.args.map(_.tpe), func.rtypes, index.toByte)
+      }.toSeq
+    }
+  }
+
+  object Ctx {
+    def buildFor(contract: Ast.Contract): Ctx =
+      Ctx(mutable.HashMap.empty,
+          "",
+          0,
+          mutable.HashMap.empty,
+          contract.funcTable,
+          immutable.Map(contract.ident -> contract.funcTable))
+  }
 
   final case class Ctx(
       varTable: mutable.HashMap[String, VarInfo],
       var scope: String,
       var varIndex: Int,
       contractObjects: mutable.HashMap[Ast.Ident, Ast.TypeId],
-      funcIdents: mutable.HashMap[String, SimpleFunc],
-      contractTable: mutable.HashMap[Ast.TypeId, mutable.HashMap[String, SimpleFunc]]) {
-    def setFuncScope(ident: Ast.Ident): Unit = {
-      scope    = ident.name
+      funcIdents: immutable.Map[Ast.CallId, SimpleFunc],
+      contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.CallId, SimpleFunc]]) {
+    def setFuncScope(funcId: Ast.CallId): Unit = {
+      scope    = funcId.name
       varIndex = 0
       contractObjects.clear()
     }
@@ -97,7 +117,7 @@ object Compiler {
       )
     }
 
-    def getLocalVars(func: Ast.Ident): Seq[VarInfo] = {
+    def getLocalVars(func: Ast.CallId): Seq[VarInfo] = {
       varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
     }
 
@@ -110,22 +130,6 @@ object Compiler {
     def isField(ident: Ast.Ident): Boolean = varTable.contains(ident.name)
 
     def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
-
-    def addFuncDefs(funcs: Seq[Ast.FuncDef]): Unit = {
-      if (funcs.length > 0xFF) throw Error(s"Number of functions are greater than ${funcs.length}")
-      funcs.zipWithIndex.foreach {
-        case (func, index) => addFuncDef(func, index.toByte)
-      }
-    }
-
-    def addFuncDef(func: Ast.FuncDef, index: Byte): Unit = {
-      val name = func.ident.name
-      if (funcIdents.contains(name)) {
-        throw Error(s"Functions have the same name $name")
-      } else {
-        funcIdents(name) = new SimpleFunc(name, func.args.map(_.tpe), func.rtypes, index)
-      }
-    }
 
     def getFunc(call: Ast.CallId): FuncInfo = {
       if (call.isBuiltIn) getBuiltInFunc(call)
@@ -145,8 +149,7 @@ object Compiler {
         objId,
         throw Error(s"Contract object ${objId.name} does not exist"))
       contractTable(contract)
-        .getOrElse(callId.name,
-                   throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
+        .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
     }
 
     private def getBuiltInFunc(call: Ast.CallId): FuncInfo = {
@@ -155,7 +158,7 @@ object Compiler {
     }
 
     private def getNewFunc(call: Ast.CallId): FuncInfo = {
-      funcIdents.getOrElse(call.name, throw Error(s"Function ${call.name} does not exist"))
+      funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
     }
 
     def checkAssign(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {
@@ -169,18 +172,9 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Val.Type]): Unit = {
-      val rtype = funcIdents(scope).returnType
+      val rtype = funcIdents(Ast.CallId(scope, false)).returnType
       if (returnType != rtype)
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
     }
-  }
-  object Ctx {
-    def empty: Ctx =
-      Ctx(mutable.HashMap.empty,
-          "",
-          0,
-          mutable.HashMap.empty,
-          mutable.HashMap.empty,
-          mutable.HashMap.empty)
   }
 }

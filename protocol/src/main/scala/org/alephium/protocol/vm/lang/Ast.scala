@@ -130,19 +130,20 @@ object Ast {
       value.toIR(ctx) :+ ctx.toIR(ident)
     }
   }
-  final case class FuncDef(ident: Ident,
+  final case class FuncDef(id: CallId,
                            args: Seq[Argument],
                            rtypes: Seq[Val.Type],
                            body: Seq[Statement]) {
     def check(ctx: Compiler.Ctx): Unit = {
-      ctx.setFuncScope(ident)
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, arg.isMutable))
       body.foreach(_.check(ctx))
     }
 
     def toMethod(ctx: Compiler.Ctx): Method[StatelessContext] = {
-      ctx.setFuncScope(ident)
-      val localVars  = ctx.getLocalVars(ident)
+      ctx.setFuncScope(id)
+      check(ctx)
+
+      val localVars  = ctx.getLocalVars(id)
       val localsType = localVars.map(_.tpe)
       val instrs     = body.flatMap(_.toIR(ctx))
       Method[StatelessContext](AVector.from(localsType), AVector.from(rtypes), AVector.from(instrs))
@@ -233,16 +234,22 @@ object Ast {
   }
 
   final case class Contract(ident: TypeId, fields: Seq[Argument], funcs: Seq[FuncDef]) {
-    def check(): Compiler.Ctx = {
-      val ctx = Compiler.Ctx.empty
+    lazy val funcTable: Map[CallId, Compiler.SimpleFunc] = {
+      val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
+      if (table.size != funcs.size) {
+        val duplicates = funcs.groupBy(_.id).filter(_._2.size > 1).keys
+        throw Compiler.Error(s"These functions ${duplicates} are defined multiple times")
+      }
+      table
+    }
+
+    def check(ctx: Compiler.Ctx): Unit = {
       fields.foreach(field => ctx.addVariable(field.ident, field.tpe, field.isMutable))
-      ctx.addFuncDefs(funcs)
-      funcs.foreach(_.check(ctx))
-      ctx
     }
 
     def toIR(ctx: Compiler.Ctx): StatelessScript = {
-      val fieldsTypes = AVector.from(fields.map(assign => ctx.getType(assign.ident)))
+      check(ctx)
+      val fieldsTypes = AVector.from(fields.map(assign => assign.tpe))
       val methods     = AVector.from(funcs.map(func    => func.toMethod(ctx)))
       StatelessScript(fieldsTypes, methods)
     }
