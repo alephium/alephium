@@ -43,6 +43,13 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /addresses/<address>/balance" in new RestServerFixture {
+    Get(s"/addresses/$dummyKeyAddress/balance") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[Balance] is dummyBalance
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,

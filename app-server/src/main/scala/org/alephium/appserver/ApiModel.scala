@@ -59,6 +59,7 @@ object ApiModel {
       } yield address
       addressOpt.toRight(s"Unable to decode address from $input")
     }
+  implicit val addressCodec: Codec[Address] = Codec.from(addressDecoder, addressEncoder)
 
   trait PerChain {
     val fromGroup: Int

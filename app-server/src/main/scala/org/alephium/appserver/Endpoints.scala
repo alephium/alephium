@@ -37,9 +37,17 @@ trait Endpoints {
       .errorOut(jsonBody[Response.Failure])
       .description("Get a block with hash")
 
+  val getBalance: Endpoint[Address, Response.Failure, Balance, Nothing] =
+    endpoint.get
+      .in("addresses")
+      .in(path[Address]("address"))
+      .in("balance")
+      .out(jsonBody[Balance])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Get the balance of a address")
+
   val getOpenapi =
     endpoint.get
       .in("openapi.yaml")
       .out(plainBody[String])
-
 }
