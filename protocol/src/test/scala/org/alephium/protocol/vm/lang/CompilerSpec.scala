@@ -23,6 +23,7 @@ class CompilerSpec extends AlephiumSpec {
       Byte32.unsafe(Hex.from(byte32).get))
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
+    fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = false)
     fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
@@ -61,14 +62,17 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x && y || z", Parser.expr(_)).get.value is
       Binop(Or, Binop(And, Variable(Ident("x")), Variable(Ident("y"))), Variable(Ident("z")))
     fastparse.parse("foo(x)", Parser.expr(_)).get.value is
-      Call(CallId("foo", false), List(Variable(Ident("x"))))
+      CallExpr(CallId("foo", false), List(Variable(Ident("x"))))
+    fastparse.parse("Foo(x)", Parser.expr(_)).get.value is
+      ContractConv(Ast.TypeId("Foo"), Variable(Ident("x")))
     fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
-      Call(CallId("foo", true), List(Variable(Ident("x"))))
+      CallExpr(CallId("foo", true), List(Variable(Ident("x"))))
     fastparse.parse("foo(x + y) + bar!(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
-        Call(CallId("foo", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
-        Call(CallId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        CallExpr(CallId("foo", false),
+                 List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
+        CallExpr(CallId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
   }
 
@@ -83,6 +87,7 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
     fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
+    fastparse.parse("foo.add(x, y)", Parser.statement(_)).isSuccess is true
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", Parser.statement(_))
       .isSuccess is true
