@@ -18,6 +18,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.util.Duration
 
+// scalastyle:off method.length
 class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
                                         actorSystem: ActorSystem,
                                         executionContext: ExecutionContext)
