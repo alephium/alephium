@@ -29,11 +29,11 @@ object Ast {
       v match {
         case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
         case _: Val.Byte      => ???
-        case u: Val.I64       => Seq(ConstInstr.i64(u))
-        case u: Val.U64       => Seq(ConstInstr.u64(u))
-        case u: Val.I256      => Seq(ConstInstr.i256(u))
-        case u: Val.U256      => Seq(ConstInstr.u256(u))
-        case _: Val.Byte32    => ???
+        case v: Val.I64       => Seq(ConstInstr.i64(v))
+        case v: Val.U64       => Seq(ConstInstr.u64(v))
+        case v: Val.I256      => Seq(ConstInstr.i256(v))
+        case v: Val.U256      => Seq(ConstInstr.u256(v))
+        case v: Val.Byte32    => Seq(Byte32Const(v))
         case _: Val.BoolVec   => ???
         case _: Val.ByteVec   => ???
         case _: Val.I64Vec    => ???
@@ -72,9 +72,13 @@ object Ast {
     }
   }
   final case class ContractConv(contractType: TypeId, address: Expr) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = ???
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+      if (address.getType(ctx) != Seq(Val.Byte32)) {
+        throw Compiler.Error(s"Invalid expr $address for contract address")
+      } else Seq(Val.Byte32)
+    }
 
-    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = Seq.empty
   }
   final case class CallExpr(id: CallId, args: Seq[Expr]) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
@@ -87,7 +91,10 @@ object Ast {
     }
   }
   final case class ContractCallExpr(objId: Ident, callId: CallId, args: Seq[Expr]) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = ???
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+      val funcInfo = ctx.getFunc(objId, callId)
+      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+    }
 
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }
@@ -166,7 +173,11 @@ object Ast {
     }
   }
   final case class ContractCall(objId: Ident, callId: CallId, args: Seq[Expr]) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = ???
+    override def check(ctx: Compiler.Ctx): Unit = {
+      val funcInfo = ctx.getFunc(objId, callId)
+      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+      ()
+    }
 
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }

@@ -5,7 +5,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -200,10 +200,10 @@ sealed trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
 }
 
 sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
-  def n: T
+  def const: T
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.push(n)
+    frame.push(const)
   }
 }
 
@@ -240,26 +240,32 @@ object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsa
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
-final case class I64Const(n: Val.I64) extends ConstInstr1[Val.I64] {
+final case class I64Const(const: Val.I64) extends ConstInstr1[Val.I64] {
   override def serialize(): ByteString =
-    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(n.v)
+    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(const.v)
 }
 object I64Const extends InstrCompanion1[Val.I64]
-final case class U64Const(n: Val.U64) extends ConstInstr1[Val.U64] {
+final case class U64Const(const: Val.U64) extends ConstInstr1[Val.U64] {
   override def serialize(): ByteString =
-    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
+    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(const.v)
 }
 object U64Const extends InstrCompanion1[Val.U64]
-final case class I256Const(n: Val.I256) extends ConstInstr1[Val.I256] {
+final case class I256Const(const: Val.I256) extends ConstInstr1[Val.I256] {
   override def serialize(): ByteString =
-    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(n.v)
+    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(const.v)
 }
 object I256Const extends InstrCompanion1[Val.I256]
-final case class U256Const(n: Val.U256) extends ConstInstr1[Val.U256] {
+final case class U256Const(const: Val.U256) extends ConstInstr1[Val.U256] {
   override def serialize(): ByteString =
-    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(n.v)
+    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(const.v)
 }
 object U256Const extends InstrCompanion1[Val.U256]
+
+final case class Byte32Const(const: Val.Byte32) extends ConstInstr1[Val.Byte32] {
+  override def serialize(): ByteString =
+    ByteString(Byte32Const.code) ++ serdeImpl[Byte32].serialize(const.v)
+}
+object Byte32Const extends InstrCompanion1[Val.Byte32]
 
 // Note: 0 <= index <= 0xFF
 final case class LoadLocal(index: Byte) extends OperandStackInstr {

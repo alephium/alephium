@@ -161,8 +161,9 @@ object Val {
     override def toString: String = "U256"
   }
   object Byte32 extends Type {
-    override val id: scala.Byte  = 6.toByte
-    override def default: Byte32 = Byte32(crypto.Byte32.zero)
+    implicit val serde: Serde[Byte32] = serdeImpl[crypto.Byte32].xmap(Byte32(_), _.v)
+    override val id: scala.Byte       = 6.toByte
+    override def default: Byte32      = Byte32(crypto.Byte32.zero)
 
     override def toString: String = "Byte32"
 
