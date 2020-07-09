@@ -2,6 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
+import org.alephium.protocol.ALF
 import org.alephium.util.{AVector, Collection}
 
 class Frame[Ctx <: Context](var pc: Int,
@@ -32,7 +33,7 @@ class Frame[Ctx <: Context](var pc: Int,
   def pop(): ExeResult[Val] = opStack.pop()
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def popT[T](): ExeResult[T] = pop().flatMap { elem =>
+  def popT[T <: Val](): ExeResult[T] = pop().flatMap { elem =>
     try Right(elem.asInstanceOf[T])
     catch {
       case _: ClassCastException => Left(InvalidType(elem))
@@ -86,6 +87,10 @@ class Frame[Ctx <: Context](var pc: Int,
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
     } yield Frame.build(ctx, obj, method, args, opStack.push)
+  }
+
+  def externalMethodFrame(contractKey: ALF.Hash, index: Int): ExeResult[Frame[Ctx]] = {
+    ???
   }
 
   @tailrec

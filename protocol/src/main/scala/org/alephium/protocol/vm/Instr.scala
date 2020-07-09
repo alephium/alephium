@@ -6,6 +6,7 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
+import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -81,7 +82,7 @@ object Instr {
     IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
     IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
-    CallLocal, Return,
+    CallLocal, CallExternal, Return,
     CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
     Keccak256Byte32, Keccak256ByteVec, CheckSignature
@@ -817,7 +818,7 @@ final case class IfFalse(offset: Byte) extends IfJumpInstr {
 }
 case object IfFalse extends InstrCompanion1[Byte]
 
-sealed trait BranchInstr[T] extends ControlInstr {
+sealed trait BranchInstr[T <: Val] extends ControlInstr {
   def code: Byte
   def offset: Byte
   def condition(value1: T, value2: T): Boolean
@@ -1012,8 +1013,19 @@ final case class CallLocal(index: Byte) extends CallInstr {
     } yield ()
   }
 }
-object CallLocal          extends InstrCompanion1[Byte]
-sealed trait CallExternal extends CallInstr
+object CallLocal extends InstrCompanion1[Byte]
+final case class CallExternal(index: Byte) extends CallInstr {
+  override def serialize(): ByteString = ByteString(CallExternal.code, index)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractKey <- frame.popT[Val.Byte32]().map(byte32 => ALF.Hash.unsafe(byte32.v.bytes))
+      newFrame    <- frame.externalMethodFrame(contractKey, Bytes.toPosInt(index))
+      _           <- newFrame.execute()
+    } yield ()
+  }
+}
+object CallExternal extends InstrCompanion1[Byte]
 
 sealed trait ReturnInstr extends StatelessInstr
 case object Return extends ReturnInstr with InstrCompanion0 {
@@ -1033,7 +1045,7 @@ sealed trait HashAlg       extends CryptoInstr
 sealed trait Signature     extends CryptoInstr
 sealed trait EllipticCurve extends CryptoInstr
 
-sealed trait CheckEqT[T] extends CryptoInstr with InstrCompanion0 {
+sealed trait CheckEqT[T <: Val] extends CryptoInstr with InstrCompanion0 {
   def check(x: T, y: T): ExeResult[Unit] = {
     if (x == y) Right(()) else Left(EqualityFailed)
   }
@@ -1062,7 +1074,7 @@ case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
 case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
 
-sealed abstract class Keccak256T[T] extends HashAlg with InstrCompanion0 {
+sealed abstract class Keccak256T[T <: Val] extends HashAlg with InstrCompanion0 {
   def convert(t: T): ByteString
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

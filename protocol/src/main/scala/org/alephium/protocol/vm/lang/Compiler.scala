@@ -24,6 +24,7 @@ object Compiler {
     def name: String
     def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
     def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
+    def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]]
   }
 
   final case class Error(message: String) extends Exception(message)
@@ -51,6 +52,10 @@ object Compiler {
 
     override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       Seq(CallLocal(index))
+    }
+
+    override def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]] = {
+      Seq(CallExternal(index))
     }
   }
   object SimpleFunc {
@@ -144,10 +149,12 @@ object Compiler {
       }
     }
 
+    def getContractType(objId: Ast.Ident): Ast.TypeId = {
+      contractObjects.getOrElse(objId, throw Error(s"Contract object ${objId.name} does not exist"))
+    }
+
     def getFunc(objId: Ast.Ident, callId: Ast.FuncId): FuncInfo = {
-      val contract = contractObjects.getOrElse(
-        objId,
-        throw Error(s"Contract object ${objId.name} does not exist"))
+      val contract = getContractType(objId)
       contractTable(contract)
         .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
     }
