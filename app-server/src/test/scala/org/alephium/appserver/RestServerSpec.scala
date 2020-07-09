@@ -57,6 +57,31 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /hashes" in new RestServerFixture {
+    Get(s"/hashes?fromGroup=1&toGroup=1&height=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[HashesAtHeight] is dummyHashesAtHeight
+    }
+    Get(s"/hashes?toGroup=1&height=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/hashes?fromGroup=1&height=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/hashes?fromGroup=1&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/hashes?fromGroup=10&toGroup=1&height=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/hashes?fromGroup=1&toGroup=10&height=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/hashes?fromGroup=1&toGroup=10&height=-1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,

@@ -7,12 +7,15 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
 import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.TimeStamp
 
 trait Endpoints {
 
   implicit def rpcConfig: RPCConfig
+  implicit def groupConfig: GroupConfig
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -54,6 +57,17 @@ trait Endpoints {
       .out(jsonBody[Group])
       .errorOut(jsonBody[Response.Failure])
       .description("Get the group of a address")
+
+  //have to be lazy to let `groupConfig` being initialized
+  lazy val getHashesAtHeight
+    : Endpoint[(GroupIndex, GroupIndex, Int), Response.Failure, HashesAtHeight, Nothing] =
+    endpoint.get
+      .in("hashes")
+      .in(query[GroupIndex]("fromGroup"))
+      .in(query[GroupIndex]("toGroup"))
+      .in(query[Int]("height"))
+      .out(jsonBody[HashesAtHeight])
+      .errorOut(jsonBody[Response.Failure])
 
   val getOpenapi =
     endpoint.get
