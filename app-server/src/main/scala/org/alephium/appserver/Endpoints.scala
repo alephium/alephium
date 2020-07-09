@@ -6,11 +6,12 @@ import sttp.tapir.json.circe.jsonBody
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
+import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.TimeStamp
+import org.alephium.util.{TimeStamp, U64}
 
 trait Endpoints {
 
@@ -77,6 +78,19 @@ trait Endpoints {
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
       .errorOut(jsonBody[Response.Failure])
+
+  val createTransaction: Endpoint[(ED25519PublicKey, Address, U64),
+                                  Response.Failure,
+                                  CreateTransactionResult,
+                                  Nothing] =
+    endpoint.get
+      .in("unsigned-transactions")
+      .in(query[ED25519PublicKey]("fromKey"))
+      .in(query[Address]("toAddress"))
+      .in(query[U64]("value"))
+      .out(jsonBody[CreateTransactionResult])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Create an unsigned transaction")
 
   val getOpenapi =
     endpoint.get

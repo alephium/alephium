@@ -101,6 +101,13 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /unsigned-transactions" in new RestServerFixture {
+    Get(s"/unsigned-transactions?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[CreateTransactionResult] is dummyCreateTransactionResult
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,

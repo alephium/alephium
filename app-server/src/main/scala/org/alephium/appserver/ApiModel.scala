@@ -36,8 +36,11 @@ object ApiModel {
       } yield key
       keyOpt.toRight(s"Unable to decode key from $input")
     }
-  implicit val publicKeyEncoder: Encoder[ED25519PublicKey]   = bytesEncoder
-  implicit val publicKeyDecoder: Decoder[ED25519PublicKey]   = bytesDecoder(ED25519PublicKey.from)
+  implicit val publicKeyEncoder: Encoder[ED25519PublicKey] = bytesEncoder
+  implicit val publicKeyDecoder: Decoder[ED25519PublicKey] = bytesDecoder(ED25519PublicKey.from)
+  implicit val publicKeyCodec: Codec[ED25519PublicKey] =
+    Codec.from(publicKeyDecoder, publicKeyEncoder)
+
   implicit val privateKeyEncoder: Encoder[ED25519PrivateKey] = bytesEncoder
   implicit val privateKeyDecoder: Decoder[ED25519PrivateKey] = bytesDecoder(ED25519PrivateKey.from)
   implicit val signatureEncoder: Encoder[ED25519Signature]   = bytesEncoder
