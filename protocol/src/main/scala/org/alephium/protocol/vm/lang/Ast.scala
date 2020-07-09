@@ -71,7 +71,12 @@ object Ast {
       left.toIR(ctx) ++ right.toIR(ctx) ++ op.toIR(left.getType(ctx) ++ right.getType(ctx))
     }
   }
-  final case class Call(id: CallId, args: Seq[Expr]) extends Expr {
+  final case class ContractConv(contractType: TypeId, address: Expr) extends Expr {
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = ???
+
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+  }
+  final case class CallExpr(id: CallId, args: Seq[Expr]) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
       val funcInfo = ctx.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
@@ -80,6 +85,11 @@ object Ast {
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       args.flatMap(_.toIR(ctx)) ++ ctx.getFunc(id).toIR(args.flatMap(_.getType(ctx)))
     }
+  }
+  final case class ContractCallExpr(objId: Ident, callId: CallId, args: Seq[Expr]) extends Expr {
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = ???
+
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }
   final case class ParenExpr(expr: Expr) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = expr.getType(ctx: Compiler.Ctx)
@@ -131,6 +141,7 @@ object Ast {
       Method[StatelessContext](AVector.from(localsType), AVector.from(rtypes), AVector.from(instrs))
     }
   }
+  // TODO: handle multiple returns
   final case class Assign(target: Ident, rhs: Expr) extends Statement {
     override def check(ctx: Compiler.Ctx): Unit = {
       ctx.checkAssign(target, rhs.getType(ctx: Compiler.Ctx))
@@ -153,6 +164,11 @@ object Ast {
       val returnType = func.getReturnType(argsType)
       args.flatMap(_.toIR(ctx)) ++ func.toIR(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
+  }
+  final case class ContractCall(objId: Ident, callId: CallId, args: Seq[Expr]) extends Statement {
+    override def check(ctx: Compiler.Ctx): Unit = ???
+
+    override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
   }
   final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
       extends Statement {

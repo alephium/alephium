@@ -17,7 +17,12 @@ object Parser {
   def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum | Lexer.bool | Lexer.byte32).map(Ast.Const)
   def variable[_: P]: P[Ast.Variable]               = P(Lexer.ident).map(Ast.Variable)
   def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
-  def call[_: P]: P[Ast.Call]                       = callAbs.map(Ast.Call.tupled)
+  def callExpr[_: P]: P[Ast.CallExpr]               = callAbs.map(Ast.CallExpr.tupled)
+  def contractConv[_: P]: P[Ast.ContractConv] =
+    P(Lexer.typeId ~ "(" ~ expr ~ ")").map(Ast.ContractConv.tupled)
+  def contractCallExpr[_: P]: P[Ast.ContractCallExpr] = P(Lexer.ident ~ "." ~ callAbs).map {
+    case (objId, (callId, exprs)) => Ast.ContractCallExpr(objId, callId, exprs)
+  }
 
   def chain[_: P](p: => P[Ast.Expr], op: => P[Operator]): P[Ast.Expr] =
     P(p ~ (op ~ p).rep).map {
@@ -53,7 +58,8 @@ object Parser {
   def arithExpr0[_: P]: P[Ast.Expr] = P(chain(arithExpr1, Lexer.opAdd | Lexer.opSub))
   def arithExpr1[_: P]: P[Ast.Expr] = P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
   def unaryExpr[_: P]: P[Ast.Expr]  = P(atom | (Lexer.opNot ~ atom).map(Ast.UnaryOp.tupled))
-  def atom[_: P]: P[Ast.Expr]       = P(const | call | variable | parenExpr)
+  def atom[_: P]: P[Ast.Expr] =
+    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
 
   def parenExpr[_: P]: P[Ast.ParenExpr] = P("(" ~ expr ~ ")").map(Ast.ParenExpr)
 
@@ -73,6 +79,9 @@ object Parser {
     P(Lexer.keyword("fn") ~/ Lexer.ident ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
+  def contractCall[_: P]: P[Ast.ContractCall] = P(Lexer.ident ~ "." ~ callAbs).map {
+    case (objId, (callId, exprs)) => Ast.ContractCall(objId, callId, exprs)
+  }
 
   def body[_: P]: P[Seq[Ast.Statement]] = P("{" ~ statement.rep(1) ~ "}")
   def elseBranch[_: P]: P[Seq[Ast.Statement]] =
@@ -83,7 +92,8 @@ object Parser {
   def whileStmt[_: P]: P[Ast.While] =
     P(Lexer.keyword("while") ~/ expr ~ body).map(Ast.While.tupled)
 
-  def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | whileStmt | ret)
+  def statement[_: P]: P[Ast.Statement] =
+    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)
 
   def contract[_: P]: P[Ast.Contract] =
     P(Start ~ Lexer.keyword("contract") ~/ Lexer.typeId ~ params ~ "{" ~ func.rep(1) ~ "}")
