@@ -5,6 +5,7 @@ import org.alephium.util.AVector
 
 object Ast {
   final case class Ident(name: String)
+  final case class TypeId(name: String)
   final case class CallId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
 
@@ -204,7 +205,7 @@ object Ast {
       exprs.flatMap(_.toIR(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
   }
 
-  final case class Contract(ident: Ident, fields: Seq[Argument], funcs: Seq[FuncDef]) {
+  final case class Contract(ident: TypeId, fields: Seq[Argument], funcs: Seq[FuncDef]) {
     def check(): Compiler.Ctx = {
       val ctx = Compiler.Ctx.empty
       fields.foreach(field => ctx.addVariable(field.ident, field.tpe, field.isMutable))

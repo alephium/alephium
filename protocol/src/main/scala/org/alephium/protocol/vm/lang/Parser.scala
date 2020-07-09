@@ -14,7 +14,7 @@ object Parser {
     Lexer.emptyChars(ctx)
   }
 
-  def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum | Lexer.bool).map(Ast.Const)
+  def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum | Lexer.bool | Lexer.byte32).map(Ast.Const)
   def variable[_: P]: P[Ast.Variable]               = P(Lexer.ident).map(Ast.Variable)
   def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
   def call[_: P]: P[Ast.Call]                       = callAbs.map(Ast.Call.tupled)
@@ -86,6 +86,6 @@ object Parser {
   def statement[_: P]: P[Ast.Statement] = P(varDef | assign | funcCall | ifelse | whileStmt | ret)
 
   def contract[_: P]: P[Ast.Contract] =
-    P(Start ~ Lexer.keyword("contract") ~/ Lexer.ident ~ params ~ "{" ~ func.rep(1) ~ "}")
+    P(Start ~ Lexer.keyword("contract") ~/ Lexer.typeId ~ params ~ "{" ~ func.rep(1) ~ "}")
       .map(Ast.Contract.tupled)
 }
