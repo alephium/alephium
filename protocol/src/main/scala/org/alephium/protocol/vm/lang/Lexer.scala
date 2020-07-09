@@ -7,7 +7,7 @@ import fastparse.NoWhitespace._
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.vm.Val
-import org.alephium.util.{Hex, I256, I64, U256, U64}
+import org.alephium.util._
 
 // scalastyle:off number.of.methods
 object Lexer {
@@ -18,7 +18,9 @@ object Lexer {
   def newline[_: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
   def ident[_: P]: P[Ast.Ident] =
-    P(letter ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
+    P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
+  def typeId[_: P]: P[Ast.TypeId] =
+    P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
   def callId[_: P]: P[Ast.CallId] = P(ident ~ "!".?.!).map {
     case (id, postfix) => Ast.CallId(id.name, postfix.nonEmpty)
   }
@@ -29,7 +31,7 @@ object Lexer {
   val types: Map[String, Val.Type] =
     Val.Type.types.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
   def tpe[_: P]: P[Val.Type] =
-    P(ident).filter(id => types.contains(id.name)).map(id => types.apply(id.name))
+    P(typeId).filter(id => types.contains(id.name)).map(id => types.apply(id.name))
 
   def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
   def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
