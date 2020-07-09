@@ -65,7 +65,7 @@ object Compiler {
   object Ctx {
     def buildFor(contract: Ast.Contract): Ctx =
       Ctx(mutable.HashMap.empty,
-          "",
+          Ast.FuncId.empty,
           0,
           mutable.HashMap.empty,
           contract.funcTable,
@@ -74,13 +74,13 @@ object Compiler {
 
   final case class Ctx(
       varTable: mutable.HashMap[String, VarInfo],
-      var scope: String,
+      var scope: Ast.FuncId,
       var varIndex: Int,
       contractObjects: mutable.HashMap[Ast.Ident, Ast.TypeId],
       funcIdents: immutable.Map[Ast.FuncId, SimpleFunc],
       contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc]]) {
     def setFuncScope(funcId: Ast.FuncId): Unit = {
-      scope    = funcId.name
+      scope    = funcId
       varIndex = 0
       contractObjects.clear()
     }
@@ -90,7 +90,7 @@ object Compiler {
     }
 
     private def scopedName(name: String): String = {
-      if (scope == "") name else s"$scope.$name"
+      if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
     def addVariable(ident: Ast.Ident, tpe: Val.Type, isMutable: Boolean): Unit = {
@@ -172,7 +172,7 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Val.Type]): Unit = {
-      val rtype = funcIdents(Ast.FuncId(scope, false)).returnType
+      val rtype = funcIdents(scope).returnType
       if (returnType != rtype)
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
     }
