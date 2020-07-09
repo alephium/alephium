@@ -9,6 +9,10 @@ object Ast {
   final case class FuncId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
 
+  object FuncId {
+    def empty: FuncId = FuncId("", isBuiltIn = false)
+  }
+
   sealed trait Expr {
     var tpe: Option[Seq[Val.Type]] = None
     protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type]
