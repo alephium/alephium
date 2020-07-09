@@ -10,6 +10,7 @@ import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signatur
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -41,6 +42,11 @@ object ApiModel {
   implicit val privateKeyDecoder: Decoder[ED25519PrivateKey] = bytesDecoder(ED25519PrivateKey.from)
   implicit val signatureEncoder: Encoder[ED25519Signature]   = bytesEncoder
   implicit val signatureDecoder: Decoder[ED25519Signature]   = bytesDecoder(ED25519Signature.from)
+
+  implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
+  implicit val hashDecoder: Decoder[Hash] =
+    byteStringDecoder.emap(Hash.from(_).toRight("cannot decode hash"))
+  implicit val hashCodec: Codec[Hash] = Codec.from(hashDecoder, hashEncoder)
 
   type Address = LockupScript
   implicit val addressEncoder: Encoder[Address] =
@@ -286,7 +292,7 @@ object ApiModel {
     implicit val codec: Codec[ChainInfo] = deriveCodec[ChainInfo]
   }
 
-  final case class GetBlock(hash: String) extends ApiModel
+  final case class GetBlock(hash: Hash) extends ApiModel
   object GetBlock {
     implicit val codec: Codec[GetBlock] = deriveCodec[GetBlock]
   }
