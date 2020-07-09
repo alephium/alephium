@@ -46,6 +46,15 @@ trait Endpoints {
       .errorOut(jsonBody[Response.Failure])
       .description("Get the balance of a address")
 
+  val getGroup: Endpoint[Address, Response.Failure, Group, Nothing] =
+    endpoint.get
+      .in("addresses")
+      .in(path[Address]("address"))
+      .in("group")
+      .out(jsonBody[Group])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Get the group of a address")
+
   val getOpenapi =
     endpoint.get
       .in("openapi.yaml")
