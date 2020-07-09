@@ -31,7 +31,8 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
   implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
 
   private val docs: OpenAPI = List(
-    getBlockflow
+    getBlockflow,
+    getBlock
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   val route: Route =
@@ -39,6 +40,8 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
       getBlockflow.toRoute(timeInterval =>
         Future.successful(
           ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))) ~
+        getBlock
+          .toRoute(hash      => Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))) ~
         getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
     )
 

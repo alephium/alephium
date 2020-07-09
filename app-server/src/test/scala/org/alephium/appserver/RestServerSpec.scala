@@ -10,6 +10,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.U64Helpers
 import org.alephium.flow.platform.Mode
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util._
 
 class RestServerSpec
@@ -27,6 +28,18 @@ class RestServerSpec
     }
     Get(s"/blockflow?fromTs=10&toTs=0}") ~> server.route ~> check {
       status is StatusCodes.BadRequest
+    }
+  }
+
+  it should "call GET /blocks/<hash>" in new RestServerFixture {
+    Get(s"/blocks/${dummyBlockHeader.hash.toHexString}") ~> server.route ~> check {
+      val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
+      if (config.brokerInfo.contains(chainIndex.from) || config.brokerInfo.contains(chainIndex.to)) {
+        status is StatusCodes.OK
+        responseAs[BlockEntry] is dummyBlockEntry
+      } else {
+        status is StatusCodes.BadRequest
+      }
     }
   }
 

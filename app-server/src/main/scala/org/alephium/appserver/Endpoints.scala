@@ -6,6 +6,7 @@ import sttp.tapir.json.circe.jsonBody
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
+import org.alephium.protocol.ALF.Hash
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.TimeStamp
 
@@ -27,6 +28,14 @@ trait Endpoints {
       .in(timeIntervalQuery)
       .out(jsonBody[FetchResponse])
       .errorOut(jsonBody[Response.Failure])
+
+  val getBlock: Endpoint[Hash, Response.Failure, BlockEntry, Nothing] =
+    endpoint.get
+      .in("blocks")
+      .in(path[Hash]("block_hash"))
+      .out(jsonBody[BlockEntry])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Get a block with hash")
 
   val getOpenapi =
     endpoint.get
