@@ -92,6 +92,14 @@ trait Endpoints {
       .errorOut(jsonBody[Response.Failure])
       .description("Create an unsigned transaction")
 
+  val sendTransaction: Endpoint[SendTransaction, Response.Failure, TxResult, Nothing] =
+    endpoint.post
+      .in("transactions")
+      .in(jsonBody[SendTransaction])
+      .out(jsonBody[TxResult])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Send a signed transaction")
+
   val getOpenapi =
     endpoint.get
       .in("openapi.yaml")

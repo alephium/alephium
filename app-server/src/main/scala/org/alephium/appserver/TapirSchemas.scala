@@ -3,6 +3,7 @@ package org.alephium.appserver
 import akka.util.ByteString
 import sttp.tapir.Schema
 
+import org.alephium.crypto.ED25519Signature
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
@@ -15,4 +16,5 @@ object TapirSchemas {
   implicit val pubScriptSchema: Schema[LockupScript]        = Schema(Schema.schemaForString.schemaType)
   implicit val byteStringSchema: Schema[ByteString]         = Schema(Schema.schemaForString.schemaType)
   implicit val groupIndexSchema: Schema[GroupIndex]         = Schema(Schema.schemaForInt.schemaType)
+  implicit val signatureSchema: Schema[ED25519Signature]    = Schema(Schema.schemaForString.schemaType)
 }

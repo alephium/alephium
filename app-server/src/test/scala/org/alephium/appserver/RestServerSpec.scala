@@ -11,6 +11,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.flow.U64Helpers
 import org.alephium.flow.platform.Mode
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 class RestServerSpec
@@ -105,6 +106,16 @@ class RestServerSpec
     Get(s"/unsigned-transactions?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[CreateTransactionResult] is dummyCreateTransactionResult
+    }
+  }
+
+  it should "call POST /transactions" in new RestServerFixture {
+    val tx =
+      s"""{"tx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
+    val entity = HttpEntity(ContentTypes.`application/json`, tx)
+    Post(s"/transactions", entity) ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[TxResult] is dummyTransferResult
     }
   }
 

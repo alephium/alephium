@@ -43,8 +43,9 @@ object ApiModel {
 
   implicit val privateKeyEncoder: Encoder[ED25519PrivateKey] = bytesEncoder
   implicit val privateKeyDecoder: Decoder[ED25519PrivateKey] = bytesDecoder(ED25519PrivateKey.from)
-  implicit val signatureEncoder: Encoder[ED25519Signature]   = bytesEncoder
-  implicit val signatureDecoder: Decoder[ED25519Signature]   = bytesDecoder(ED25519Signature.from)
+
+  implicit val signatureEncoder: Encoder[ED25519Signature] = bytesEncoder
+  implicit val signatureDecoder: Decoder[ED25519Signature] = bytesDecoder(ED25519Signature.from)
 
   implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
   implicit val hashDecoder: Decoder[Hash] =
