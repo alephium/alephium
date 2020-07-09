@@ -2,7 +2,7 @@ package org.alephium.appserver
 
 import scala.concurrent._
 
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
@@ -83,12 +83,11 @@ object ServerUtils {
   def getBlock(blockFlow: BlockFlow, query: GetBlock)(
       implicit cfg: ConsensusConfig): Try[BlockEntry] =
     for {
-      hash <- decodeHash(query.hash)
-      _    <- checkChainIndex(blockFlow, hash)
+      _ <- checkChainIndex(blockFlow, query.hash)
       block <- blockFlow
-        .getBlock(hash)
+        .getBlock(query.hash)
         .left
-        .map(_ => Response.failed(s"Fail fetching block with header ${hash.toHexString}"))
+        .map(_ => Response.failed(s"Fail fetching block with header ${query.hash.toHexString}"))
       height <- blockFlow
         .getHeight(block.header)
         .left
@@ -112,23 +111,6 @@ object ServerUtils {
         .left
         .map(_ => Response.failed("Failed in IO"))
     } yield ChainInfo(maxHeight)
-
-  private def decodeRandomBytes[T](raw: String,
-                                   from: ByteString => Option[T],
-                                   name: String): Try[T] = {
-    val addressOpt = for {
-      bytes   <- Hex.from(raw)
-      address <- from(bytes)
-    } yield address
-
-    addressOpt match {
-      case Some(address) => Right(address)
-      case None          => Left(Response.failed(s"Failed in decoding $name"))
-    }
-  }
-
-  private def decodeHash(raw: String): Try[Hash] =
-    decodeRandomBytes(raw, Hash.from, "hash")
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: Transaction)(
       implicit config: GroupConfig,
