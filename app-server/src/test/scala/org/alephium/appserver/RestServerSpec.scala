@@ -50,6 +50,13 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /addresses/<address>/group" in new RestServerFixture {
+    Get(s"/addresses/$dummyKeyAddress/group") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[Group] is dummyGroup
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,

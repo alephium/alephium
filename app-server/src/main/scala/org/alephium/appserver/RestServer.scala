@@ -33,7 +33,8 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
   private val docs: OpenAPI = List(
     getBlockflow,
     getBlock,
-    getBalance
+    getBalance,
+    getGroup
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   val route: Route =
@@ -46,6 +47,9 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
         getBalance
           .toRoute(address =>
             Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))) ~
+        getGroup
+          .toRoute(address =>
+            Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))) ~
         getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
     )
 
