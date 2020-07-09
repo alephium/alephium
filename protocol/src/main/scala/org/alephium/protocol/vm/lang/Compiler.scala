@@ -12,7 +12,7 @@ object Compiler {
       fastparse.parse(input, Parser.contract(_)) match {
         case Parsed.Success(contract, _) =>
           val ctx = Ctx.buildFor(contract)
-          Right(contract.toIR(ctx))
+          Right(contract.genCode(ctx))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -23,7 +23,7 @@ object Compiler {
   trait FuncInfo {
     def name: String
     def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
-    def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
+    def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
   }
 
   final case class Error(message: String) extends Exception(message)
@@ -49,7 +49,7 @@ object Compiler {
       else throw Error(s"Invalid args type $inputType for builtin func $name")
     }
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       Seq(CallLocal(index))
     }
   }
@@ -121,7 +121,7 @@ object Compiler {
       varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
     }
 
-    def toIR(ident: Ast.Ident): Instr[StatelessContext] = {
+    def genCode(ident: Ast.Ident): Instr[StatelessContext] = {
       val varInfo = getVariable(ident)
       if (isField(ident)) StoreField(varInfo.index.toByte)
       else StoreLocal(varInfo.index.toByte)

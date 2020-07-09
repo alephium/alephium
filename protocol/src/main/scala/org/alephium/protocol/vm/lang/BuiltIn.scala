@@ -15,7 +15,7 @@ object BuiltIn {
       else throw Error(s"Invalid args type $inputType for builtin func $name")
     }
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(instr)
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(instr)
   }
   abstract class GenericBuiltIn(val name: String) extends FuncInfo
 
@@ -25,7 +25,7 @@ object BuiltIn {
         throw Error(s"Invalid args type $inputType for builtin func $name")
       else Seq.empty
     }
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.Bool      => Seq(CheckEqBool)
         case Val.Byte      => Seq(CheckEqByte)
@@ -70,7 +70,7 @@ object BuiltIn {
   val toByte: ConversionBuiltIn = new ConversionBuiltIn("byte") {
     override def toType: Val.Type = Val.Byte
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.I64  => Seq(I64ToByte)
         case Val.U64  => Seq(U64ToByte)
@@ -83,7 +83,7 @@ object BuiltIn {
   val toI64: ConversionBuiltIn = new ConversionBuiltIn("i64") {
     override def toType: Val.Type = Val.I64
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.Byte => Seq(ByteToI64)
         case Val.U64  => Seq(U64ToI64)
@@ -96,7 +96,7 @@ object BuiltIn {
   val toU64: ConversionBuiltIn = new ConversionBuiltIn("u64") {
     override def toType: Val.Type = Val.U64
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.Byte => Seq(ByteToU64)
         case Val.I64  => Seq(I64ToU64)
@@ -109,7 +109,7 @@ object BuiltIn {
   val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
     override def toType: Val.Type = Val.I256
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.Byte => Seq(ByteToI256)
         case Val.I64  => Seq(I64ToI256)
@@ -122,7 +122,7 @@ object BuiltIn {
   val toU256: ConversionBuiltIn = new ConversionBuiltIn("u256") {
     override def toType: Val.Type = Val.U256
 
-    override def toIR(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Val.Byte => Seq(ByteToU256)
         case Val.I64  => Seq(I64ToU256)
