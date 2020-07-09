@@ -119,7 +119,12 @@ lazy val `app-server` = project("app-server")
     libraryDependencies ++= Seq(
       `akka-http-cors`,
       `akka-http-test`,
-      `akka-stream-test`
+      `akka-stream-test`,
+      `tapir-core`,
+      `tapir-circe`,
+      `tapir-akka`,
+      `tapir-openapi`,
+      `tapir-openapi-circe`
     )
   )
 

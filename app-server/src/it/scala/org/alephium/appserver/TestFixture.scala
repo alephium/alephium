@@ -111,6 +111,7 @@ trait TestFixtureLike
         ("alephium.network.publicAddress", s"localhost:$publicPort"),
         ("alephium.network.rpcPort", publicPort - 100),
         ("alephium.network.wsPort", publicPort - 200),
+        ("alephium.network.restPort", publicPort - 300),
         ("alephium.clique.brokerNum", brokerNum),
         ("alephium.broker.brokerId", brokerId)
       ) ++ bootstrap
@@ -155,7 +156,8 @@ trait TestFixtureLike
         ActorRefT.build(system, props, s"FairMiner")
       }
 
-      lazy val rpcServer: RPCServer = RPCServer(mode, miner)
+      lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
+      lazy val restServer: RestServer = RestServer(mode)
     }
 
     implicit val executionContext = server.system.dispatcher
