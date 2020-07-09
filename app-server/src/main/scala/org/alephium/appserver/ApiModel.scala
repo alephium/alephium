@@ -66,6 +66,8 @@ object ApiModel {
     implicit val codec: Codec[TimeStamp]       = Codec.from(decoderTS, encoderTS)
   }
 
+  final case class TimeInterval(from: TimeStamp, to: TimeStamp)
+
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
     import TimeStampCodec._

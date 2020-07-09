@@ -4,11 +4,13 @@ import scala.concurrent.ExecutionContext
 
 import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.AlephiumSpec
 
 class ServerSpec extends AlephiumSpec with ScalaFutures {
+  override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   behavior of "Server"
   it should "start and stop correctly" in {

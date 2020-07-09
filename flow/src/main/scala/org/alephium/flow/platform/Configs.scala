@@ -53,6 +53,7 @@ object Configs extends StrictLogging {
 
     def rpcPort: Option[Int]
     def wsPort: Option[Int]
+    def restPort: Option[Int]
   }
   trait PlatformGenesisConfig { def genesisBlocks: AVector[AVector[Block]] }
   trait PlatformScriptConfig extends ScriptConfig { def maxStackSize: Int }
