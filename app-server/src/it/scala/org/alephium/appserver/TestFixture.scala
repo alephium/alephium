@@ -157,7 +157,7 @@ trait TestFixtureLike
       }
 
       lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
-      lazy val restServer: RestServer = RestServer(mode)
+      lazy val restServer: RestServer = RestServer(mode, miner)
     }
 
     implicit val executionContext = server.system.dispatcher
