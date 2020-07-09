@@ -82,6 +82,25 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /chains" in new RestServerFixture {
+    Get(s"/chains?fromGroup=1&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[ChainInfo] is dummyChainInfo
+    }
+    Get(s"/chains?toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/chains?fromGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/chains?fromGroup=10&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+    Get(s"/chains?fromGroup=1&toGroup=10") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,

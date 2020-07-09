@@ -38,7 +38,8 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
     getBlock,
     getBalance,
     getGroup,
-    getHashesAtHeight
+    getHashesAtHeight,
+    getChainInfo
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   val route: Route =
@@ -57,6 +58,9 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
         getHashesAtHeight
           .toRoute{ case (from, to, height) =>
             Future.successful(ServerUtils.getHashesAtHeight(blockFlow, ChainIndex(from,to),  GetHashesAtHeight(from.value,to.value,height)))} ~
+        getChainInfo
+          .toRoute{ case (from, to) =>
+            Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from,to)))} ~
         getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
     )
 
