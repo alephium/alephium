@@ -29,8 +29,8 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
-    fastparse.parse("add", Lexer.callId(_)).get.value is Ast.CallId("add", false)
-    fastparse.parse("add!", Lexer.callId(_)).get.value is Ast.CallId("add", true)
+    fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
+    fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
   }
 
   it should "parse exprs" in {
@@ -62,17 +62,17 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x && y || z", Parser.expr(_)).get.value is
       Binop(Or, Binop(And, Variable(Ident("x")), Variable(Ident("y"))), Variable(Ident("z")))
     fastparse.parse("foo(x)", Parser.expr(_)).get.value is
-      CallExpr(CallId("foo", false), List(Variable(Ident("x"))))
+      CallExpr(FuncId("foo", false), List(Variable(Ident("x"))))
     fastparse.parse("Foo(x)", Parser.expr(_)).get.value is
       ContractConv(Ast.TypeId("Foo"), Variable(Ident("x")))
     fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
-      CallExpr(CallId("foo", true), List(Variable(Ident("x"))))
+      CallExpr(FuncId("foo", true), List(Variable(Ident("x"))))
     fastparse.parse("foo(x + y) + bar!(x + y)", Parser.expr(_)).get.value is
       Binop(
         Add,
-        CallExpr(CallId("foo", false),
+        CallExpr(FuncId("foo", false),
                  List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
-        CallExpr(CallId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
   }
 

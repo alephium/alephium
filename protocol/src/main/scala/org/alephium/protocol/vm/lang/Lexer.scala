@@ -21,8 +21,8 @@ object Lexer {
     P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
   def typeId[_: P]: P[Ast.TypeId] =
     P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
-  def callId[_: P]: P[Ast.CallId] = P(ident ~ "!".?.!).map {
-    case (id, postfix) => Ast.CallId(id.name, postfix.nonEmpty)
+  def funcId[_: P]: P[Ast.FuncId] = P(ident ~ "!".?.!).map {
+    case (id, postfix) => Ast.FuncId(id.name, postfix.nonEmpty)
   }
 
   private[lang] def getSimpleName(obj: Object): String = {

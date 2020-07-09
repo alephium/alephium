@@ -16,7 +16,7 @@ object Parser {
 
   def const[_: P]: P[Ast.Const]                     = P(Lexer.typedNum | Lexer.bool | Lexer.byte32).map(Ast.Const)
   def variable[_: P]: P[Ast.Variable]               = P(Lexer.ident).map(Ast.Variable)
-  def callAbs[_: P]: P[(Ast.CallId, Seq[Ast.Expr])] = P(Lexer.callId ~ "(" ~ expr.rep(0, ",") ~ ")")
+  def callAbs[_: P]: P[(Ast.FuncId, Seq[Ast.Expr])] = P(Lexer.funcId ~ "(" ~ expr.rep(0, ",") ~ ")")
   def callExpr[_: P]: P[Ast.CallExpr]               = callAbs.map(Ast.CallExpr.tupled)
   def contractConv[_: P]: P[Ast.ContractConv] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map(Ast.ContractConv.tupled)
@@ -76,7 +76,7 @@ object Parser {
   def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Val.Type]] = P("->" ~ "(" ~ Lexer.tpe.rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef] =
-    P(Lexer.keyword("fn") ~/ Lexer.callId ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
+    P(Lexer.keyword("fn") ~/ Lexer.funcId ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
   def contractCall[_: P]: P[Ast.ContractCall] = P(Lexer.ident ~ "." ~ callAbs).map {

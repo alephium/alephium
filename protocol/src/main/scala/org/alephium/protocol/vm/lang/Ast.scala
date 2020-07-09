@@ -6,7 +6,7 @@ import org.alephium.util.AVector
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
-  final case class CallId(name: String, isBuiltIn: Boolean)
+  final case class FuncId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
 
   sealed trait Expr {
@@ -80,7 +80,7 @@ object Ast {
 
     override def toIR(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = Seq.empty
   }
-  final case class CallExpr(id: CallId, args: Seq[Expr]) extends Expr {
+  final case class CallExpr(id: FuncId, args: Seq[Expr]) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
       val funcInfo = ctx.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
@@ -90,7 +90,7 @@ object Ast {
       args.flatMap(_.toIR(ctx)) ++ ctx.getFunc(id).toIR(args.flatMap(_.getType(ctx)))
     }
   }
-  final case class ContractCallExpr(objId: Ident, callId: CallId, args: Seq[Expr]) extends Expr {
+  final case class ContractCallExpr(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Expr {
     override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
       val funcInfo = ctx.getFunc(objId, callId)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
@@ -130,7 +130,7 @@ object Ast {
       value.toIR(ctx) :+ ctx.toIR(ident)
     }
   }
-  final case class FuncDef(id: CallId,
+  final case class FuncDef(id: FuncId,
                            args: Seq[Argument],
                            rtypes: Seq[Val.Type],
                            body: Seq[Statement]) {
@@ -159,7 +159,7 @@ object Ast {
       rhs.toIR(ctx) :+ ctx.toIR(target)
     }
   }
-  final case class FuncCall(id: CallId, args: Seq[Expr]) extends Statement {
+  final case class FuncCall(id: FuncId, args: Seq[Expr]) extends Statement {
     override def check(ctx: Compiler.Ctx): Unit = {
       val funcInfo = ctx.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
@@ -173,7 +173,7 @@ object Ast {
       args.flatMap(_.toIR(ctx)) ++ func.toIR(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
-  final case class ContractCall(objId: Ident, callId: CallId, args: Seq[Expr]) extends Statement {
+  final case class ContractCall(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Statement {
     override def check(ctx: Compiler.Ctx): Unit = {
       val funcInfo = ctx.getFunc(objId, callId)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
@@ -234,7 +234,7 @@ object Ast {
   }
 
   final case class Contract(ident: TypeId, fields: Seq[Argument], funcs: Seq[FuncDef]) {
-    lazy val funcTable: Map[CallId, Compiler.SimpleFunc] = {
+    lazy val funcTable: Map[FuncId, Compiler.SimpleFunc] = {
       val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
       if (table.size != funcs.size) {
         val duplicates = funcs.groupBy(_.id).filter(_._2.size > 1).keys
