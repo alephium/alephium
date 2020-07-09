@@ -82,7 +82,7 @@ object Ast {
       } else Seq(Val.Byte32)
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = Seq.empty
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = address.genCode(ctx)
   }
   final case class CallExpr(id: FuncId, args: Seq[Expr]) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
@@ -100,7 +100,10 @@ object Ast {
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.genCode(ctx)) ++ Seq(LoadLocal(ctx.getVariable(objId).index)) ++
+        ctx.getFunc(objId, callId).genCode(objId)
+    }
   }
   final case class ParenExpr(expr: Expr) extends Expr {
     override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = expr.getType(ctx: Compiler.Ctx)
@@ -184,7 +187,13 @@ object Ast {
       ()
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = ???
+    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+      val func       = ctx.getFunc(objId, callId)
+      val argsType   = args.flatMap(_.getType(ctx))
+      val returnType = func.getReturnType(argsType)
+      args.flatMap(_.genCode(ctx)) ++ Seq(LoadLocal(ctx.getVariable(objId).index)) ++
+        func.genCode(objId) ++ Seq.fill[Instr[StatelessContext]](returnType.length)(Pop)
+    }
   }
   final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
       extends Statement {

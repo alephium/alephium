@@ -5,11 +5,18 @@ import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
 object BuiltIn {
+  sealed trait BuiltIn extends FuncInfo {
+    def name: String
+
+    override def genCode(contract: Ast.Ident): Seq[Instr[StatelessContext]] = {
+      throw Compiler.Error(s"Built-in function $name does not belong to contract ${contract.name}")
+    }
+  }
   final case class SimpleBuiltIn(name: String,
                                  argsType: Seq[Val.Type],
                                  returnType: Seq[Val.Type],
                                  instr: Instr[StatelessContext])
-      extends FuncInfo {
+      extends BuiltIn {
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
       if (inputType == argsType) returnType
       else throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -17,7 +24,7 @@ object BuiltIn {
 
     override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = Seq(instr)
   }
-  abstract class GenericBuiltIn(val name: String) extends FuncInfo
+  abstract class GenericBuiltIn(val name: String) extends BuiltIn
 
   val checkEq: GenericBuiltIn = new GenericBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
