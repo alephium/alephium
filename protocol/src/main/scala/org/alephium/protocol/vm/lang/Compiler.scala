@@ -52,13 +52,17 @@ object Compiler {
     }
   }
 
-  final case class Ctx(varTable: mutable.HashMap[String, VarInfo],
-                       var scope: String,
-                       var varIndex: Int,
-                       funcIdents: mutable.HashMap[String, SimpleFunc]) {
+  final case class Ctx(
+      varTable: mutable.HashMap[String, VarInfo],
+      var scope: String,
+      var varIndex: Int,
+      contractObjects: mutable.HashMap[Ast.Ident, Ast.TypeId],
+      funcIdents: mutable.HashMap[String, SimpleFunc],
+      contractTable: mutable.HashMap[Ast.TypeId, mutable.HashMap[String, SimpleFunc]]) {
     def setFuncScope(ident: Ast.Ident): Unit = {
       scope    = ident.name
       varIndex = 0
+      contractObjects.clear()
     }
 
     def addVariable(ident: Ast.Ident, tpe: Seq[Val.Type], isMutable: Boolean): Unit = {
@@ -128,6 +132,23 @@ object Compiler {
       else getNewFunc(call)
     }
 
+    def addContractObject(id: Ast.Ident, tpe: Ast.TypeId): Unit = {
+      if (contractObjects.contains(id)) {
+        throw Error(s"Contracts have the same name ${id.name}")
+      } else {
+        contractObjects(id) = tpe
+      }
+    }
+
+    def getFunc(objId: Ast.Ident, callId: Ast.CallId): FuncInfo = {
+      val contract = contractObjects.getOrElse(
+        objId,
+        throw Error(s"Contract object ${objId.name} does not exist"))
+      contractTable(contract)
+        .getOrElse(callId.name,
+                   throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
+    }
+
     private def getBuiltInFunc(call: Ast.CallId): FuncInfo = {
       BuiltIn.funcs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
@@ -154,6 +175,12 @@ object Compiler {
     }
   }
   object Ctx {
-    def empty: Ctx = Ctx(mutable.HashMap.empty, "", 0, mutable.HashMap.empty)
+    def empty: Ctx =
+      Ctx(mutable.HashMap.empty,
+          "",
+          0,
+          mutable.HashMap.empty,
+          mutable.HashMap.empty,
+          mutable.HashMap.empty)
   }
 }
