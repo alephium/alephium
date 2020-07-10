@@ -24,9 +24,9 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
-    fastparse.parse("x: U64", Parser.argument(_)).get.value is
+    fastparse.parse("x: U64", Parser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
-    fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
+    fastparse.parse("mut x: U64", Parser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
