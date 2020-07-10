@@ -268,4 +268,15 @@ object Ast {
       StatelessScript(fieldsTypes, methods)
     }
   }
+
+  final case class MultiContract(contracts: Seq[Contract]) {
+    def get(contractIndex: Int): Contract = {
+      if (contractIndex >= 0 && contractIndex < contracts.size) contracts(contractIndex)
+      else throw Compiler.Error(s"Invalid contract index $contractIndex")
+    }
+
+    def genCode(ctx: Compiler.Ctx, contractIndex: Int): StatelessScript = {
+      get(contractIndex).genCode(ctx)
+    }
+  }
 }
