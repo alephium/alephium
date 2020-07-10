@@ -67,6 +67,8 @@ object Val {
       }
   }
 
+  def isNumeric(tpe: Type): Boolean = (tpe.id >= 2 && tpe.id <= 5)
+
   sealed trait Type {
     def id: scala.Byte
     def default: Val
@@ -79,8 +81,6 @@ object Val {
 
     val types: AVector[Type] = AVector[Type](Bool, Byte, I64, U64, I256, U256, Byte32) ++
       AVector[Type](BoolVec, ByteVec, I64Vec, U64Vec, I256Vec, U256Vec, Byte32Vec)
-
-    def isNumeric(tpe: Type): Boolean = (tpe.id >= 2 && tpe.id <= 5)
   }
 
   // TODO: optimize using value class
