@@ -46,9 +46,23 @@ object Type {
   case object Byte32Vec extends Type { def toVal: Val.Type = Val.Byte32Vec }
 
   sealed trait Contract extends Type {
+    def id: Ast.TypeId
     def toVal: Val.Type = Val.Byte32
+
+    override def hashCode(): Int = id.hashCode()
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: Contract => this.id == that.id
+      case _              => false
+    }
   }
-  final case class LocalVarContract(id: Ast.TypeId, variable: Ast.Ident)  extends Contract
-  final case class GlobalVarContract(id: Ast.TypeId, variable: Ast.Ident) extends Contract
-  final case class StackVarContract(id: Ast.TypeId)                       extends Contract
+  object Contract {
+    def local(id: Ast.TypeId, variable: Ast.Ident): LocalVar   = new LocalVar(id, variable)
+    def global(id: Ast.TypeId, variable: Ast.Ident): GlobalVar = new GlobalVar(id, variable)
+    def stack(id: Ast.TypeId): Stack                           = new Stack(id)
+
+    final class LocalVar(val id: Ast.TypeId, val variable: Ast.Ident)  extends Contract
+    final class GlobalVar(val id: Ast.TypeId, val variable: Ast.Ident) extends Contract
+    final class Stack(val id: Ast.TypeId)                              extends Contract
+  }
 }

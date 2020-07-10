@@ -105,7 +105,11 @@ object Compiler {
       } else if (varIndex >= 0xFF) {
         throw Error(s"Number of variables more than ${0xFF}")
       } else {
-        varTable(sname) = VarInfo(tpe, isMutable, varIndex.toByte)
+        val varType = tpe match {
+          case c: Type.Contract => Type.Contract.local(c.id, ident)
+          case _                => tpe
+        }
+        varTable(sname) = VarInfo(varType, isMutable, varIndex.toByte)
         varIndex += 1
       }
     }

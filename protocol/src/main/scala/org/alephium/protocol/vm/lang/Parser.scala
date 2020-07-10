@@ -71,14 +71,14 @@ object Parser {
   def assign[_: P]: P[Ast.Assign] = P(Lexer.ident ~ "=" ~ expr).map(Ast.Assign.tupled)
 
   def argType(arg: Ast.Ident, typeId: TypeId): Type = {
-    Lexer.primTpes.getOrElse(typeId.name, Type.LocalVarContract(typeId, arg))
+    Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, arg))
   }
   def argument[_: P]: P[Ast.Argument] = P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
     case (isMutable, ident, typeId) => Ast.Argument(ident, argType(ident, typeId), isMutable)
   }
   def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Type]] = P("->" ~ "(" ~ Lexer.typeId.rep(0, ",") ~ ")").map {
-    _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.StackVarContract(typeId)))
+    _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
   }
   def func[_: P]: P[Ast.FuncDef] =
     P(Lexer.keyword("fn") ~/ Lexer.funcId ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
