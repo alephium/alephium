@@ -24,7 +24,7 @@ object BuiltIn {
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
   }
-  abstract class GenericBuiltIn(val name: String) extends BuiltIn
+  sealed abstract class GenericBuiltIn(val name: String) extends BuiltIn
 
   val checkEq: GenericBuiltIn = new GenericBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
@@ -58,7 +58,7 @@ object BuiltIn {
   val checkSignature: SimpleBuiltIn =
     SimpleBuiltIn("checkSignature", Seq(Type.Byte32), Seq(), CheckSignature)
 
-  abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
+  sealed abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
     import ConversionBuiltIn.validTypes
 
     def toType: Type

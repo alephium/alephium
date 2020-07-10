@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path}
 
 import org.rocksdb.RocksDBException
 
+import org.alephium.io.IOError.KeyNotFound
 import org.alephium.serde.SerdeError
 
 object IOUtils {
@@ -51,5 +52,6 @@ object IOUtils {
     case e: SecurityException => Left(IOError.JavaSecurity(e))
     case e: RocksDBException  => Left(IOError.RocksDB(e))
     case e: SerdeError        => Left(IOError.Serde(e))
+    case e: KeyNotFound[_]    => Left(e)
   }
 }
