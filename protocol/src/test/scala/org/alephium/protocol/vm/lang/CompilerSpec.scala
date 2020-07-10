@@ -22,12 +22,12 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse(s"@$byte32", Lexer.byte32(_)).get.value is Val.Byte32(
       Byte32.unsafe(Hex.from(byte32).get))
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
-    fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
+    fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
     fastparse.parse("x: U64", Parser.argument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = false)
+      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
     fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
+      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)

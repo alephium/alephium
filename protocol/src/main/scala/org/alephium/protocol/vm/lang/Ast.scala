@@ -7,16 +7,16 @@ object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
-  final case class Argument(ident: Ident, tpe: Val.Type, isMutable: Boolean)
+  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean)
 
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
   sealed trait Expr {
-    var tpe: Option[Seq[Val.Type]] = None
-    protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type]
-    def getType(ctx: Compiler.Ctx): Seq[Val.Type] = tpe match {
+    var tpe: Option[Seq[Type]] = None
+    protected def _getType(ctx: Compiler.Ctx): Seq[Type]
+    def getType(ctx: Compiler.Ctx): Seq[Type] = tpe match {
       case Some(ts) => ts
       case None =>
         val t = _getType(ctx)
@@ -26,7 +26,7 @@ object Ast {
     def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
   }
   final case class Const(v: Val) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = Seq(v.tpe)
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
     // TODO: support constants for all values
     override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
@@ -49,7 +49,7 @@ object Ast {
     }
   }
   final case class Variable(id: Ident) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = Seq(ctx.getType(id))
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = Seq(ctx.getType(id))
 
     override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
       val varInfo = ctx.getVariable(id)
@@ -58,7 +58,7 @@ object Ast {
     }
   }
   final case class UnaryOp(op: Operator, expr: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
       op.getReturnType(expr.getType(ctx))
     }
 
@@ -67,7 +67,7 @@ object Ast {
     }
   }
   final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
       op.getReturnType(left.getType(ctx) ++ right.getType(ctx))
     }
 
@@ -76,16 +76,16 @@ object Ast {
     }
   }
   final case class ContractConv(contractType: TypeId, address: Expr) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
-      if (address.getType(ctx) != Seq(Val.Byte32)) {
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Type] = {
+      if (address.getType(ctx) != Seq(Type.Byte32)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
-      } else Seq(Val.Byte32)
+      } else Seq(Type.StackVarContract(contractType))
     }
 
     override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = address.genCode(ctx)
   }
   final case class CallExpr(id: FuncId, args: Seq[Expr]) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
       val funcInfo = ctx.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
@@ -95,7 +95,7 @@ object Ast {
     }
   }
   final case class ContractCallExpr(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = {
+    override protected def _getType(ctx: Compiler.Ctx): Seq[Type] = {
       val funcInfo = ctx.getFunc(objId, callId)
       funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
     }
@@ -106,7 +106,7 @@ object Ast {
     }
   }
   final case class ParenExpr(expr: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Val.Type] = expr.getType(ctx: Compiler.Ctx)
+    override def _getType(ctx: Compiler.Ctx): Seq[Type] = expr.getType(ctx: Compiler.Ctx)
 
     override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = expr.genCode(ctx)
   }
@@ -139,7 +139,7 @@ object Ast {
   }
   final case class FuncDef(id: FuncId,
                            args: Seq[Argument],
-                           rtypes: Seq[Val.Type],
+                           rtypes: Seq[Type],
                            body: Seq[Statement]) {
     def check(ctx: Compiler.Ctx): Unit = {
       args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, arg.isMutable))
@@ -151,9 +151,10 @@ object Ast {
       check(ctx)
 
       val localVars  = ctx.getLocalVars(id)
-      val localsType = localVars.map(_.tpe)
+      val localsType = localVars.map(_.tpe.toVal)
+      val returnType = AVector.from(rtypes.view.map(_.toVal))
       val instrs     = body.flatMap(_.genCode(ctx))
-      Method[StatelessContext](AVector.from(localsType), AVector.from(rtypes), AVector.from(instrs))
+      Method[StatelessContext](AVector.from(localsType), returnType, AVector.from(instrs))
     }
   }
   // TODO: handle multiple returns
@@ -198,7 +199,7 @@ object Ast {
   final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
       extends Statement {
     override def check(ctx: Compiler.Ctx): Unit = {
-      if (condition.getType(ctx) != Seq(Val.Bool)) {
+      if (condition.getType(ctx) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
       } else {
         ifBranch.foreach(_.check(ctx))
@@ -220,7 +221,7 @@ object Ast {
   }
   final case class While(condition: Expr, body: Seq[Statement]) extends Statement {
     override def check(ctx: Compiler.Ctx): Unit = {
-      if (condition.getType(ctx) != Seq(Val.Bool)) {
+      if (condition.getType(ctx) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
       } else {
         body.foreach(_.check(ctx))
@@ -262,8 +263,8 @@ object Ast {
 
     def genCode(ctx: Compiler.Ctx): StatelessScript = {
       check(ctx)
-      val fieldsTypes = AVector.from(fields.map(assign => assign.tpe))
-      val methods     = AVector.from(funcs.map(func    => func.toMethod(ctx)))
+      val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
+      val methods     = AVector.from(funcs.view.map(func    => func.toMethod(ctx)))
       StatelessScript(fieldsTypes, methods)
     }
   }

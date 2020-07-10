@@ -28,10 +28,6 @@ object Lexer {
   private[lang] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)
   }
-  val types: Map[String, Val.Type] =
-    Val.Type.types.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
-  def tpe[_: P]: P[Val.Type] =
-    P(typeId).filter(id => types.contains(id.name)).map(id => types.apply(id.name))
 
   def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
   def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
@@ -112,4 +108,7 @@ object Lexer {
   def keywordSet: Set[String] =
     Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
   // format: on
+
+  val primTpes: Map[String, Type] =
+    Type.primitives.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
 }

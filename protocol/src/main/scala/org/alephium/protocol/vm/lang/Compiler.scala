@@ -22,8 +22,8 @@ object Compiler {
 
   trait FuncInfo {
     def name: String
-    def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type]
-    def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]]
+    def getReturnType(inputType: Seq[Type]): Seq[Type]
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
     def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]]
   }
 
@@ -32,25 +32,22 @@ object Compiler {
     def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: $failure")
   }
 
-  def expectOneType(ident: Ast.Ident, tpe: Seq[Val.Type]): Val.Type = {
+  def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
     if (tpe.length == 1) tpe(0)
     else throw Error(s"Try to set types $tpe for varialbe $ident")
   }
 
-  final case class VarInfo(tpe: Val.Type, isMutable: Boolean, index: Byte)
-  class SimpleFunc(val id: Ast.FuncId,
-                   argsType: Seq[Val.Type],
-                   val returnType: Seq[Val.Type],
-                   index: Byte)
+  final case class VarInfo(tpe: Type, isMutable: Boolean, index: Byte)
+  class SimpleFunc(val id: Ast.FuncId, argsType: Seq[Type], val returnType: Seq[Type], index: Byte)
       extends FuncInfo {
     def name: String = id.name
 
-    override def getReturnType(inputType: Seq[Val.Type]): Seq[Val.Type] = {
+    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) returnType
       else throw Error(s"Invalid args type $inputType for builtin func $name")
     }
 
-    override def genCode(inputType: Seq[Val.Type]): Seq[Instr[StatelessContext]] = {
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       Seq(CallLocal(index))
     }
 
@@ -90,7 +87,7 @@ object Compiler {
       contractObjects.clear()
     }
 
-    def addVariable(ident: Ast.Ident, tpe: Seq[Val.Type], isMutable: Boolean): Unit = {
+    def addVariable(ident: Ast.Ident, tpe: Seq[Type], isMutable: Boolean): Unit = {
       addVariable(ident, expectOneType(ident, tpe), isMutable)
     }
 
@@ -98,7 +95,7 @@ object Compiler {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
-    def addVariable(ident: Ast.Ident, tpe: Val.Type, isMutable: Boolean): Unit = {
+    def addVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
       val name  = ident.name
       val sname = scopedName(name)
       if (varTable.contains(name)) {
@@ -134,7 +131,7 @@ object Compiler {
 
     def isField(ident: Ast.Ident): Boolean = varTable.contains(ident.name)
 
-    def getType(ident: Ast.Ident): Val.Type = getVariable(ident).tpe
+    def getType(ident: Ast.Ident): Type = getVariable(ident).tpe
 
     def getFunc(call: Ast.FuncId): FuncInfo = {
       if (call.isBuiltIn) getBuiltInFunc(call)
@@ -168,17 +165,17 @@ object Compiler {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
     }
 
-    def checkAssign(ident: Ast.Ident, tpe: Seq[Val.Type]): Unit = {
+    def checkAssign(ident: Ast.Ident, tpe: Seq[Type]): Unit = {
       checkAssign(ident, expectOneType(ident, tpe))
     }
 
-    def checkAssign(ident: Ast.Ident, tpe: Val.Type): Unit = {
+    def checkAssign(ident: Ast.Ident, tpe: Type): Unit = {
       val varInfo = getVariable(ident)
       if (varInfo.tpe != tpe) throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe}")
       if (!varInfo.isMutable) throw Error(s"Assign value to immutable variable $ident")
     }
 
-    def checkReturn(returnType: Seq[Val.Type]): Unit = {
+    def checkReturn(returnType: Seq[Type]): Unit = {
       val rtype = funcIdents(scope).returnType
       if (returnType != rtype)
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
