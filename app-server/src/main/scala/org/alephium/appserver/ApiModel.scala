@@ -313,4 +313,24 @@ object ApiModel {
     implicit val idEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
     implicit val idDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createId)
   }
+
+  sealed trait MinerAction
+
+  object MinerAction {
+    case object StartMining extends MinerAction
+    case object StopMining  extends MinerAction
+
+    implicit val decoder: Decoder[MinerAction] = Decoder[String].emap {
+      case "start-mining" => Right(StartMining)
+      case "stop-mining"  => Right(StopMining)
+      case other          => Left(s"Invalid miner action: $other")
+    }
+
+    implicit val encoder: Encoder[MinerAction] = Encoder[String].contramap {
+      case StartMining => "start-mining"
+      case StopMining  => "stop-mining"
+    }
+
+    implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
+  }
 }

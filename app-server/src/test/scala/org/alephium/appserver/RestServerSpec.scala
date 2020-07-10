@@ -9,6 +9,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.U64Helpers
+import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.Mode
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
@@ -119,7 +120,24 @@ class RestServerSpec
     }
   }
 
+  it should "call POST /miners" in new RestServerFixture {
+    Post(s"/miners?action=start-mining") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[Boolean] is true
+      minerProbe.expectMsg(Miner.Start)
+    }
+
+    Post(s"/miners?action=stop-mining") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[Boolean] is true
+      minerProbe.expectMsg(Miner.Stop)
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
+
+    val minerProbe = TestProbe()
+    val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
     lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
                                         dummyNeighborCliques,
@@ -127,6 +145,6 @@ class RestServerSpec
                                         TestProbe().ref,
                                         dummyTx,
                                         storages)
-    lazy val server: RestServer = RestServer(mode)
+    lazy val server: RestServer = RestServer(mode, miner)
   }
 }

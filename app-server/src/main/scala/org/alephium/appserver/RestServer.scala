@@ -15,6 +15,7 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.GroupConfig
@@ -44,7 +45,8 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
     getHashesAtHeight,
     getChainInfo,
     createTransaction,
-    sendTransaction
+    sendTransaction,
+    minerAction
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   val route: Route =
@@ -72,6 +74,11 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
         sendTransaction
           .toRoute{ transaction =>
             ServerUtils.sendTransaction(txHandler, transaction)} ~
+        minerAction
+          .toRoute{
+            case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
+            case MinerAction.StopMining => ServerUtils.execute(miner ! Miner.Stop)
+          } ~
         getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
     )
 
@@ -104,13 +111,13 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
 }
 
 object RestServer {
-  def apply(mode: Mode)(implicit system: ActorSystem,
+  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(implicit system: ActorSystem,
                         config: PlatformConfig,
                         executionContext: ExecutionContext): RestServer = {
     (for {
       restPort <- mode.config.restPort
     } yield {
-      new RestServer(mode, restPort)
+      new RestServer(mode, restPort,miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")

@@ -28,6 +28,9 @@ object TapirCodecs {
   implicit val u64TapirCodec: Codec[String, U64, TextPlain] =
     fromCirce[U64]
 
+  implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
+    fromCirce[MinerAction]
+
   implicit def groupIndexCodec(
       implicit groupConfig: GroupConfig): Codec[String, GroupIndex, TextPlain] =
     Codec.int.mapDecode(int =>
