@@ -64,6 +64,7 @@ object Instr {
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I64Const, U64Const, I256Const, U256Const,
+    Byte32Const,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,

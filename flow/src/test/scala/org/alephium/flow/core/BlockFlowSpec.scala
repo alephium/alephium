@@ -89,25 +89,41 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
          |  }
          |}
          |""".stripMargin
-    val script0      = Compiler.compile(input0).toOption.get
+    val script0      = Compiler.compileOneOf(input0, 0).toOption.get
     val initialState = AVector[Val](Val.U64(U64.Zero))
 
-    val chainIndex        = ChainIndex.unsafe(0, 0)
-    val blockFlow         = BlockFlow.fromGenesisUnsafe(storages)
-    val block0            = mine(blockFlow, chainIndex, outputScriptOption = Some(script0 -> initialState))
-    val contractOutputRef = TxOutputRef.unsafe(block0.transactions.head, 0)
-    val contractKey       = contractOutputRef.key
+    val chainIndex         = ChainIndex.unsafe(0, 0)
+    val blockFlow          = BlockFlow.fromGenesisUnsafe(storages)
+    val block0             = mine(blockFlow, chainIndex, outputScriptOption = Some(script0 -> initialState))
+    val contractOutputRef0 = TxOutputRef.unsafe(block0.transactions.head, 0)
+    val contractKey0       = contractOutputRef0.key
 
-    contractOutputRef.isContractRef is true
+    contractOutputRef0.isContractRef is true
     addAndCheck(blockFlow, block0, 1)
-    checkState(blockFlow, chainIndex, contractKey, initialState)
+    checkState(blockFlow, chainIndex, contractKey0, initialState)
 
-//    val input1   = ""
-//    val script1  = Compiler.compile(input1).toOption.get
-//    val newState = AVector[Val](Val.U64(U64.One))
-//    val block1   = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
-//    addAndCheck(blockFlow, block1, 1)
-//    checkState(blockFlow, chainIndex, contractKey, newState)
+    val input1 =
+      s"""
+         |contract Foo(mut x: U64) {
+         |  fn add(a: U64) -> () {
+         |    x = x + a
+         |    return
+         |  }
+         |}
+         |
+         |contract Bar() {
+         |  fn call() -> () {
+         |    let foo = Foo(@${contractKey0.toHexString.toUpperCase()})
+         |    foo.add(1)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val script1  = Compiler.compileOneOf(input1, 1).toOption.get
+    val newState = AVector[Val](Val.U64(U64.One))
+    val block1   = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    addAndCheck(blockFlow, block1, 2)
+    checkState(blockFlow, chainIndex, contractKey0, newState)
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in {

@@ -15,6 +15,14 @@ sealed trait WorldState {
 
   def getContractState(key: ALF.Hash): IOResult[AVector[Val]]
 
+  // TODO: fix type parameters
+  def getContractObj[Ctx <: Context](key: ALF.Hash): IOResult[ScriptObj[Ctx]] = {
+    for {
+      contractOutput <- getOutput(TxOutputRef.contract(key)).map(_.asInstanceOf[ContractOutput])
+      state          <- getContractState(key)
+    } yield contractOutput.code.toObject(key, state).asInstanceOf[ScriptObj[Ctx]]
+  }
+
   def putOutput(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState]
 
   def putContractState(key: ALF.Hash, state: AVector[Val]): IOResult[WorldState]

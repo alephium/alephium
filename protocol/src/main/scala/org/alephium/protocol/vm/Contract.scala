@@ -47,7 +47,11 @@ final case class StatelessScript(
     methods: AVector[Method[StatelessContext]]
 ) extends Script[StatelessContext] {
   override def toObject(fields: AVector[Val]): ScriptObj[StatelessContext] = {
-    new StatelessScriptObject(this, fields.toArray)
+    new StatelessScriptObject(None, this, fields.toArray)
+  }
+
+  def toObject(address: ALF.Hash, fields: AVector[Val]): ScriptObj[StatelessContext] = {
+    new StatelessScriptObject(Some(address), this, fields.toArray)
   }
 }
 
@@ -89,15 +93,21 @@ object StatefulContract {
     AVector(Method[StatefulContext](AVector.empty, AVector.empty, AVector(Pop))))
 }
 
-trait ContractObj[Ctx <: Context] {
+sealed trait ContractObj[Ctx <: Context] {
   def addressOpt: Option[ALF.Hash] = None
   def code: Contract[Ctx]
   def fields: Array[Val]
+
+  def getMethod(index: Int): Option[Method[Ctx]] = {
+    code.methods.get(index)
+  }
 }
 
 trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx]
 
-class StatelessScriptObject(val code: StatelessScript, val fields: Array[Val])
+class StatelessScriptObject(override val addressOpt: Option[ALF.Hash],
+                            val code: StatelessScript,
+                            val fields: Array[Val])
     extends ScriptObj[StatelessContext]
 
 class StatefulScriptObject(val code: StatefulScript, val fields: Array[Val])
