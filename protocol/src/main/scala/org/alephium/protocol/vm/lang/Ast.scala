@@ -79,7 +79,7 @@ object Ast {
     override protected def _getType(ctx: Compiler.Ctx): Seq[Type] = {
       if (address.getType(ctx) != Seq(Type.Byte32)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
-      } else Seq(Type.StackVarContract(contractType))
+      } else Seq(Type.Contract.stack(contractType))
     }
 
     override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = address.genCode(ctx)
