@@ -47,9 +47,9 @@ trait RPCServerAbstract extends StrictLogging {
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
   def doSendTransaction(req: Request): FutureTry[TxResult]
   def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
-    execute(miner ! Miner.Start)
+    ServerUtils.execute(miner ! Miner.Start)
   def doStopMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
-    execute(miner ! Miner.Stop)
+    ServerUtils.execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
 
@@ -112,12 +112,6 @@ object RPCServerAbstract {
   type FutureTry[T] = Future[Try[T]]
 
   val bufferSize: Int = 64
-
-  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
-    Future {
-      f
-      Right(true)
-    }
 
   def wrap[T <: ApiModel: Encoder](req: Request, result: FutureTry[T])(
       implicit ec: ExecutionContext): Future[Response] = result.map {

@@ -48,5 +48,5 @@ class ServerImpl(implicit val config: PlatformConfig,
   }
 
   lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
-  lazy val restServer: RestServer = RestServer(mode)
+  lazy val restServer: RestServer = RestServer(mode, miner)
 }

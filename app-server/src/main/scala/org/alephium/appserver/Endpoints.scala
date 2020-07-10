@@ -100,6 +100,14 @@ trait Endpoints {
       .errorOut(jsonBody[Response.Failure])
       .description("Send a signed transaction")
 
+  val minerAction: Endpoint[MinerAction, Response.Failure, Boolean, Nothing] =
+    endpoint.post
+      .in("miners")
+      .in(query[MinerAction]("action"))
+      .out(jsonBody[Boolean])
+      .errorOut(jsonBody[Response.Failure])
+      .description("Execute an action on miners")
+
   val getOpenapi =
     endpoint.get
       .in("openapi.yaml")

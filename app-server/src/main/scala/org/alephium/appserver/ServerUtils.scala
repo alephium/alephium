@@ -174,5 +174,11 @@ object ServerUtils {
     else Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
   }
 
+  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
+    Future {
+      f
+      Right(true)
+    }
+
   private def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 }
