@@ -2,8 +2,6 @@ package org.alephium.protocol.vm.lang
 
 import fastparse._
 
-import org.alephium.protocol.vm.lang.Ast.TypeId
-
 // scalastyle:off number.of.methods
 @SuppressWarnings(
   Array("org.wartremover.warts.JavaSerializable",
@@ -70,18 +68,17 @@ object Parser {
     P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map(Ast.VarDef.tupled)
   def assign[_: P]: P[Ast.Assign] = P(Lexer.ident ~ "=" ~ expr).map(Ast.Assign.tupled)
 
-  def argType(arg: Ast.Ident, typeId: TypeId): Type = {
-    Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, arg))
+  def funcArgument[_: P]: P[Ast.Argument] = P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
+    case (isMutable, ident, typeId) =>
+      val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, ident))
+      Ast.Argument(ident, tpe, isMutable)
   }
-  def argument[_: P]: P[Ast.Argument] = P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
-    case (isMutable, ident, typeId) => Ast.Argument(ident, argType(ident, typeId), isMutable)
-  }
-  def params[_: P]: P[Seq[Ast.Argument]] = P("(" ~ argument.rep(0, ",") ~ ")")
+  def funParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Type]] = P("->" ~ "(" ~ Lexer.typeId.rep(0, ",") ~ ")").map {
     _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
   }
   def func[_: P]: P[Ast.FuncDef] =
-    P(Lexer.keyword("fn") ~/ Lexer.funcId ~ params ~ returnType ~ "{" ~ statement.rep ~ "}")
+    P(Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map(Ast.FuncDef.tupled)
   def funcCall[_: P]: P[Ast.FuncCall] = callAbs.map(Ast.FuncCall.tupled)
   def contractCall[_: P]: P[Ast.ContractCall] = P(Lexer.ident ~ "." ~ callAbs).map {
@@ -100,7 +97,14 @@ object Parser {
   def statement[_: P]: P[Ast.Statement] =
     P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)
 
+  def contractArgument[_: P]: P[Ast.Argument] =
+    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
+      case (isMutable, ident, typeId) =>
+        val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.global(typeId, ident))
+        Ast.Argument(ident, tpe, isMutable)
+    }
+  def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
   def contract[_: P]: P[Ast.Contract] =
-    P(Start ~ Lexer.keyword("contract") ~/ Lexer.typeId ~ params ~ "{" ~ func.rep(1) ~ "}")
+    P(Start ~ Lexer.keyword("contract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
       .map(Ast.Contract.tupled)
 }
