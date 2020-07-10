@@ -161,6 +161,33 @@ class CompilerSpec extends AlephiumSpec {
     check("mut", "a", "U64", "b", "U64", "U64", "add")
   }
 
+  it should "parse multiple contracts" in {
+    val input =
+      s"""
+         |contract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |    return bar.foo()
+         |  }
+         |  
+         |  fn bar() -> () {
+         |    return
+         |  }
+         |}
+         |
+         |contract Bar() {
+         |  fn bar(foo: Foo) -> () {
+         |    return foo.bar()
+         |  }
+         |  
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileOneOf(input, 0).isRight is true
+    Compiler.compileOneOf(input, 1).isRight is true
+  }
+
   trait Fixture {
     def test(input: String,
              args: AVector[Val],

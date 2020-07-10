@@ -104,7 +104,11 @@ object Parser {
         Ast.Argument(ident, tpe, isMutable)
     }
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
-  def contract[_: P]: P[Ast.Contract] =
-    P(Start ~ Lexer.keyword("contract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
+  def singleContract[_: P]: P[Ast.Contract] =
+    P(Lexer.keyword("contract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
       .map(Ast.Contract.tupled)
+  def contract[_: P]: P[Ast.Contract] = P(Start ~ singleContract ~ End)
+
+  def multiContract[_: P]: P[Ast.MultiContract] =
+    P(Start ~ singleContract.rep(1) ~ End).map(Ast.MultiContract)
 }

@@ -5,6 +5,7 @@ import scala.collection.{immutable, mutable}
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Ast.MultiContract
 
 object Compiler {
   def compile(input: String): Either[Error, StatelessScript] =
@@ -26,6 +27,19 @@ object Compiler {
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
     def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]]
   }
+
+  def compileOneOf(input: String, index: Int): Either[Error, StatelessScript] =
+    try {
+      fastparse.parse(input, Parser.multiContract(_)) match {
+        case Parsed.Success(multiContract, _) =>
+          val ctx = Ctx.buildFor(multiContract, index)
+          Right(multiContract.genCode(ctx, index))
+        case failure: Parsed.Failure =>
+          Left(Error.parse(failure))
+      }
+    } catch {
+      case e: Error => Left(e)
+    }
 
   final case class Error(message: String) extends Exception(message)
   object Error {
@@ -69,22 +83,28 @@ object Compiler {
       Ctx(mutable.HashMap.empty,
           Ast.FuncId.empty,
           0,
-          mutable.HashMap.empty,
           contract.funcTable,
           immutable.Map(contract.ident -> contract.funcTable))
+
+    def buildFor(multiContract: MultiContract, contractIndex: Int): Ctx = {
+      val contractTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
+      Ctx(mutable.HashMap.empty,
+          Ast.FuncId.empty,
+          0,
+          multiContract.get(contractIndex).funcTable,
+          contractTable)
+    }
   }
 
   final case class Ctx(
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
-      contractObjects: mutable.HashMap[Ast.Ident, Ast.TypeId],
       funcIdents: immutable.Map[Ast.FuncId, SimpleFunc],
       contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc]]) {
     def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope    = funcId
       varIndex = 0
-      contractObjects.clear()
     }
 
     def addVariable(ident: Ast.Ident, tpe: Seq[Type], isMutable: Boolean): Unit = {
@@ -142,20 +162,15 @@ object Compiler {
       else getNewFunc(call)
     }
 
-    def addContractObject(id: Ast.Ident, tpe: Ast.TypeId): Unit = {
-      if (contractObjects.contains(id)) {
-        throw Error(s"Contracts have the same name ${id.name}")
-      } else {
-        contractObjects(id) = tpe
+    def getContract(objId: Ast.Ident): Ast.TypeId = {
+      getVariable(objId).tpe match {
+        case c: Type.Contract => c.id
+        case _                => throw Error(s"Invalid contract object id ${objId.name}")
       }
     }
 
-    def getContractType(objId: Ast.Ident): Ast.TypeId = {
-      contractObjects.getOrElse(objId, throw Error(s"Contract object ${objId.name} does not exist"))
-    }
-
     def getFunc(objId: Ast.Ident, callId: Ast.FuncId): FuncInfo = {
-      val contract = getContractType(objId)
+      val contract = getContract(objId)
       contractTable(contract)
         .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
     }
