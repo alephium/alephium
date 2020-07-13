@@ -15,21 +15,21 @@ object Ast {
 
   sealed trait Expr {
     var tpe: Option[Seq[Type]] = None
-    protected def _getType(ctx: Compiler.Ctx): Seq[Type]
-    def getType(ctx: Compiler.Ctx): Seq[Type] = tpe match {
+    protected def _getType(state: Compiler.State): Seq[Type]
+    def getType(state: Compiler.State): Seq[Type] = tpe match {
       case Some(ts) => ts
       case None =>
-        val t = _getType(ctx)
+        val t = _getType(state)
         tpe = Some(t)
         t
     }
-    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
+    def genCode(state: Compiler.State): Seq[Instr[StatelessContext]]
   }
   final case class Const(v: Val) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = Seq(Type.fromVal(v.tpe))
+    override def _getType(state: Compiler.State): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
     // TODO: support constants for all values
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
       v match {
         case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
         case _: Val.Byte      => ???
@@ -49,188 +49,190 @@ object Ast {
     }
   }
   final case class Variable(id: Ident) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = Seq(ctx.getType(id))
+    override def _getType(state: Compiler.State): Seq[Type] = Seq(state.getType(id))
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val varInfo = ctx.getVariable(id)
-      if (ctx.isField(id)) Seq(LoadField(varInfo.index))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      val varInfo = state.getVariable(id)
+      if (state.isField(id)) Seq(LoadField(varInfo.index))
       else Seq(LoadLocal(varInfo.index))
     }
   }
   final case class UnaryOp(op: Operator, expr: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
-      op.getReturnType(expr.getType(ctx))
+    override def _getType(state: Compiler.State): Seq[Type] = {
+      op.getReturnType(expr.getType(state))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      expr.genCode(ctx) ++ op.genCode(expr.getType(ctx))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      expr.genCode(state) ++ op.genCode(expr.getType(state))
     }
   }
   final case class Binop(op: Operator, left: Expr, right: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
-      op.getReturnType(left.getType(ctx) ++ right.getType(ctx))
+    override def _getType(state: Compiler.State): Seq[Type] = {
+      op.getReturnType(left.getType(state) ++ right.getType(state))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      left.genCode(ctx) ++ right.genCode(ctx) ++ op.genCode(left.getType(ctx) ++ right.getType(ctx))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      left.genCode(state) ++ right.genCode(state) ++ op.genCode(
+        left.getType(state) ++ right.getType(state))
     }
   }
   final case class ContractConv(contractType: TypeId, address: Expr) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Type] = {
-      if (address.getType(ctx) != Seq(Type.Byte32)) {
+    override protected def _getType(state: Compiler.State): Seq[Type] = {
+      if (address.getType(state) != Seq(Type.Byte32)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       } else Seq(Type.Contract.stack(contractType))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = address.genCode(ctx)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] =
+      address.genCode(state)
   }
   final case class CallExpr(id: FuncId, args: Seq[Expr]) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = {
-      val funcInfo = ctx.getFunc(id)
-      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+    override def _getType(state: Compiler.State): Seq[Type] = {
+      val funcInfo = state.getFunc(id)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      args.flatMap(_.genCode(ctx)) ++ ctx.getFunc(id).genCode(args.flatMap(_.getType(ctx)))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.genCode(state)) ++ state.getFunc(id).genCode(args.flatMap(_.getType(state)))
     }
   }
   final case class ContractCallExpr(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Expr {
-    override protected def _getType(ctx: Compiler.Ctx): Seq[Type] = {
-      val funcInfo = ctx.getFunc(objId, callId)
-      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+    override protected def _getType(state: Compiler.State): Seq[Type] = {
+      val funcInfo = state.getFunc(objId, callId)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      args.flatMap(_.genCode(ctx)) ++ Seq(LoadLocal(ctx.getVariable(objId).index)) ++
-        ctx.getFunc(objId, callId).genCode(objId)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      args.flatMap(_.genCode(state)) ++ Seq(LoadLocal(state.getVariable(objId).index)) ++
+        state.getFunc(objId, callId).genCode(objId)
     }
   }
   final case class ParenExpr(expr: Expr) extends Expr {
-    override def _getType(ctx: Compiler.Ctx): Seq[Type] = expr.getType(ctx: Compiler.Ctx)
+    override def _getType(state: Compiler.State): Seq[Type] = expr.getType(state: Compiler.State)
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = expr.genCode(ctx)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = expr.genCode(state)
   }
 
   sealed trait Statement {
-    def check(ctx: Compiler.Ctx): Unit
-    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]]
+    def check(state: Compiler.State): Unit
+    def genCode(state: Compiler.State): Seq[Instr[StatelessContext]]
   }
   object Statement {
     @inline def getCondIR(condition: Expr,
-                          ctx: Compiler.Ctx,
+                          state: Compiler.State,
                           offset: Byte): Seq[Instr[StatelessContext]] = {
       condition match {
         case Binop(op: TestOperator, left, right) =>
-          left.genCode(ctx) ++ right.genCode(ctx) ++ op.toBranchIR(left.getType(ctx), offset)
+          left.genCode(state) ++ right.genCode(state) ++ op.toBranchIR(left.getType(state), offset)
         case UnaryOp(op: LogicalOperator, expr) =>
-          expr.genCode(ctx) ++ op.toBranchIR(expr.getType(ctx), offset)
+          expr.genCode(state) ++ op.toBranchIR(expr.getType(state), offset)
         case _ =>
-          condition.genCode(ctx) :+ IfFalse(offset)
+          condition.genCode(state) :+ IfFalse(offset)
       }
     }
   }
   final case class VarDef(isMutable: Boolean, ident: Ident, value: Expr) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit =
-      ctx.addVariable(ident, value.getType(ctx: Compiler.Ctx), isMutable)
+    override def check(state: Compiler.State): Unit =
+      state.addVariable(ident, value.getType(state: Compiler.State), isMutable)
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      value.genCode(ctx) :+ ctx.genCode(ident)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      value.genCode(state) :+ state.genCode(ident)
     }
   }
   final case class FuncDef(id: FuncId,
                            args: Seq[Argument],
                            rtypes: Seq[Type],
                            body: Seq[Statement]) {
-    def check(ctx: Compiler.Ctx): Unit = {
-      args.foreach(arg => ctx.addVariable(arg.ident, arg.tpe, arg.isMutable))
-      body.foreach(_.check(ctx))
+    def check(state: Compiler.State): Unit = {
+      args.foreach(arg => state.addVariable(arg.ident, arg.tpe, arg.isMutable))
+      body.foreach(_.check(state))
     }
 
-    def toMethod(ctx: Compiler.Ctx): Method[StatelessContext] = {
-      ctx.setFuncScope(id)
-      check(ctx)
+    def toMethod(state: Compiler.State): Method[StatelessContext] = {
+      state.setFuncScope(id)
+      check(state)
 
-      val localVars  = ctx.getLocalVars(id)
+      val localVars  = state.getLocalVars(id)
       val localsType = localVars.map(_.tpe.toVal)
       val returnType = AVector.from(rtypes.view.map(_.toVal))
-      val instrs     = body.flatMap(_.genCode(ctx))
+      val instrs     = body.flatMap(_.genCode(state))
       Method[StatelessContext](AVector.from(localsType), returnType, AVector.from(instrs))
     }
   }
   // TODO: handle multiple returns
   final case class Assign(target: Ident, rhs: Expr) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      ctx.checkAssign(target, rhs.getType(ctx: Compiler.Ctx))
+    override def check(state: Compiler.State): Unit = {
+      state.checkAssign(target, rhs.getType(state: Compiler.State))
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      rhs.genCode(ctx) :+ ctx.genCode(target)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      rhs.genCode(state) :+ state.genCode(target)
     }
   }
   final case class FuncCall(id: FuncId, args: Seq[Expr]) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      val funcInfo = ctx.getFunc(id)
-      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+    override def check(state: Compiler.State): Unit = {
+      val funcInfo = state.getFunc(id)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
       ()
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val func       = ctx.getFunc(id)
-      val argsType   = args.flatMap(_.getType(ctx))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      val func       = state.getFunc(id)
+      val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(ctx)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
+      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
   final case class ContractCall(objId: Ident, callId: FuncId, args: Seq[Expr]) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      val funcInfo = ctx.getFunc(objId, callId)
-      funcInfo.getReturnType(args.flatMap(_.getType(ctx)))
+    override def check(state: Compiler.State): Unit = {
+      val funcInfo = state.getFunc(objId, callId)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
       ()
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val func       = ctx.getFunc(objId, callId)
-      val argsType   = args.flatMap(_.getType(ctx))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      val func       = state.getFunc(objId, callId)
+      val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(ctx)) ++ Seq(LoadLocal(ctx.getVariable(objId).index)) ++
+      args.flatMap(_.genCode(state)) ++ Seq(LoadLocal(state.getVariable(objId).index)) ++
         func.genCode(objId) ++ Seq.fill[Instr[StatelessContext]](returnType.length)(Pop)
     }
   }
   final case class IfElse(condition: Expr, ifBranch: Seq[Statement], elseBranch: Seq[Statement])
       extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      if (condition.getType(ctx) != Seq(Type.Bool)) {
+    override def check(state: Compiler.State): Unit = {
+      if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
       } else {
-        ifBranch.foreach(_.check(ctx))
-        elseBranch.foreach(_.check(ctx))
+        ifBranch.foreach(_.check(state))
+        elseBranch.foreach(_.check(state))
       }
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val elseIRs  = elseBranch.flatMap(_.genCode(ctx))
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      val elseIRs  = elseBranch.flatMap(_.genCode(state))
       val offsetIR = if (elseIRs.nonEmpty) Seq(Forward(elseIRs.length.toByte)) else Seq.empty
-      val ifIRs    = ifBranch.flatMap(_.genCode(ctx)) ++ offsetIR
+      val ifIRs    = ifBranch.flatMap(_.genCode(state)) ++ offsetIR
       if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
-      val condIR = Statement.getCondIR(condition, ctx, ifIRs.length.toByte)
+      val condIR = Statement.getCondIR(condition, state, ifIRs.length.toByte)
       condIR ++ ifIRs ++ elseIRs
     }
   }
   final case class While(condition: Expr, body: Seq[Statement]) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      if (condition.getType(ctx) != Seq(Type.Bool)) {
+    override def check(state: Compiler.State): Unit = {
+      if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
       } else {
-        body.foreach(_.check(ctx))
+        body.foreach(_.check(state))
       }
     }
 
-    override def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] = {
-      val bodyIR   = body.flatMap(_.genCode(ctx))
-      val condIR   = Statement.getCondIR(condition, ctx, (bodyIR.length + 1).toByte)
+    override def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] = {
+      val bodyIR   = body.flatMap(_.genCode(state))
+      val condIR   = Statement.getCondIR(condition, state, (bodyIR.length + 1).toByte)
       val whileLen = condIR.length + bodyIR.length + 1
       if (whileLen > 0xFF) {
         // TODO: support long branches
@@ -240,11 +242,11 @@ object Ast {
     }
   }
   final case class ReturnStmt(exprs: Seq[Expr]) extends Statement {
-    override def check(ctx: Compiler.Ctx): Unit = {
-      ctx.checkReturn(exprs.flatMap(_.getType(ctx)))
+    override def check(state: Compiler.State): Unit = {
+      state.checkReturn(exprs.flatMap(_.getType(state)))
     }
-    def genCode(ctx: Compiler.Ctx): Seq[Instr[StatelessContext]] =
-      exprs.flatMap(_.genCode(ctx)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
+    def genCode(state: Compiler.State): Seq[Instr[StatelessContext]] =
+      exprs.flatMap(_.genCode(state)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
   }
 
   final case class Contract(ident: TypeId, fields: Seq[Argument], funcs: Seq[FuncDef]) {
@@ -257,14 +259,14 @@ object Ast {
       table
     }
 
-    def check(ctx: Compiler.Ctx): Unit = {
-      fields.foreach(field => ctx.addVariable(field.ident, field.tpe, field.isMutable))
+    def check(state: Compiler.State): Unit = {
+      fields.foreach(field => state.addVariable(field.ident, field.tpe, field.isMutable))
     }
 
-    def genCode(ctx: Compiler.Ctx): StatelessScript = {
-      check(ctx)
+    def genCode(state: Compiler.State): StatelessScript = {
+      check(state)
       val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
-      val methods     = AVector.from(funcs.view.map(func    => func.toMethod(ctx)))
+      val methods     = AVector.from(funcs.view.map(func    => func.toMethod(state)))
       StatelessScript(fieldsTypes, methods)
     }
   }
@@ -275,8 +277,8 @@ object Ast {
       else throw Compiler.Error(s"Invalid contract index $contractIndex")
     }
 
-    def genCode(ctx: Compiler.Ctx, contractIndex: Int): StatelessScript = {
-      get(contractIndex).genCode(ctx)
+    def genCode(state: Compiler.State, contractIndex: Int): StatelessScript = {
+      get(contractIndex).genCode(state)
     }
   }
 }

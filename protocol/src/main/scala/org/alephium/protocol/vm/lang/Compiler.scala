@@ -12,8 +12,8 @@ object Compiler {
     try {
       fastparse.parse(input, Parser.contract(_)) match {
         case Parsed.Success(contract, _) =>
-          val ctx = Ctx.buildFor(contract)
-          Right(contract.genCode(ctx))
+          val state = State.buildFor(contract)
+          Right(contract.genCode(state))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -32,8 +32,8 @@ object Compiler {
     try {
       fastparse.parse(input, Parser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) =>
-          val ctx = Ctx.buildFor(multiContract, index)
-          Right(multiContract.genCode(ctx, index))
+          val state = State.buildFor(multiContract, index)
+          Right(multiContract.genCode(state, index))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -78,25 +78,25 @@ object Compiler {
     }
   }
 
-  object Ctx {
-    def buildFor(contract: Ast.Contract): Ctx =
-      Ctx(mutable.HashMap.empty,
-          Ast.FuncId.empty,
-          0,
-          contract.funcTable,
-          immutable.Map(contract.ident -> contract.funcTable))
+  object State {
+    def buildFor(contract: Ast.Contract): State =
+      State(mutable.HashMap.empty,
+            Ast.FuncId.empty,
+            0,
+            contract.funcTable,
+            immutable.Map(contract.ident -> contract.funcTable))
 
-    def buildFor(multiContract: MultiContract, contractIndex: Int): Ctx = {
+    def buildFor(multiContract: MultiContract, contractIndex: Int): State = {
       val contractTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
-      Ctx(mutable.HashMap.empty,
-          Ast.FuncId.empty,
-          0,
-          multiContract.get(contractIndex).funcTable,
-          contractTable)
+      State(mutable.HashMap.empty,
+            Ast.FuncId.empty,
+            0,
+            multiContract.get(contractIndex).funcTable,
+            contractTable)
     }
   }
 
-  final case class Ctx(
+  final case class State(
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
