@@ -94,8 +94,8 @@ object Instr {
   val toCode: Map[InstrCompanion[StatefulContext], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-sealed trait StatelessInstr extends Instr[StatelessContext]
 sealed trait StatefulInstr  extends Instr[StatefulContext]
+sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext]
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]

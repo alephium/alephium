@@ -81,7 +81,11 @@ object StatefulScript {
 final case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
-) extends Contract[StatefulContext]
+) extends Contract[StatefulContext] {
+  def toObject(address: ALF.Hash, fields: AVector[Val]): StatefulContractObject = {
+    new StatefulContractObject(this, fields.toArray, address)
+  }
+}
 
 object StatefulContract {
   implicit val serde: Serde[StatefulContract] =
@@ -115,6 +119,5 @@ class StatefulScriptObject(val code: StatefulScript, val fields: Array[Val])
 
 class StatefulContractObject(val code: StatefulContract,
                              val fields: Array[Val],
-                             val address: ALF.Hash,
-                             val codeHash: ALF.Hash)
+                             val address: ALF.Hash)
     extends ContractObj[StatefulContext]

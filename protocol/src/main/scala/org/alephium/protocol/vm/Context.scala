@@ -50,6 +50,10 @@ object StatelessContext {
     StatelessContext(Hash.zero, Stack.ofCapacity[ED25519Signature](0), WorldState.mock)
 }
 
-trait StatefulContext extends StatelessContext {
-  def contractEnv: ContractEnv
+class StatefulContext(override val txHash: Hash, var _worldState: WorldState)
+    extends StatelessContext(txHash, Stack.ofCapacity(0), _worldState)
+
+object StatefulContext {
+  def apply(txHash: Hash, worldState: WorldState): StatefulContext =
+    new StatefulContext(txHash, worldState)
 }

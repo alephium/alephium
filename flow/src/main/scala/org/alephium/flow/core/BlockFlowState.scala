@@ -531,7 +531,7 @@ object BlockFlowState {
   def updateStateForTxScript(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
-        StatelessVM.runTxScript(worldState, tx.hash, script) match {
+        StatefulVM.runTxScript(worldState, tx.hash, script) match {
           case Right(worldState)               => Right(worldState)
           case Left(IOErrorUpdateState(error)) => Left(error)
           case _                               => throw new RuntimeException(s"Updating world state for invalid tx")

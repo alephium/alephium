@@ -21,13 +21,6 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  trait FuncInfo {
-    def name: String
-    def getReturnType(inputType: Seq[Type]): Seq[Type]
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
-    def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]]
-  }
-
   def compileOneOf(input: String, index: Int): Either[Error, StatelessScript] =
     try {
       fastparse.parse(input, Parser.multiContract(_)) match {
@@ -40,6 +33,13 @@ object Compiler {
     } catch {
       case e: Error => Left(e)
     }
+
+  trait FuncInfo {
+    def name: String
+    def getReturnType(inputType: Seq[Type]): Seq[Type]
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
+    def genCode(objId: Ast.Ident): Seq[Instr[StatelessContext]]
+  }
 
   final case class Error(message: String) extends Exception(message)
   object Error {

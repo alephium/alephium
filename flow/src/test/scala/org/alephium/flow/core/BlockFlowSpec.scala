@@ -329,9 +329,9 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   def mine(blockFlow: BlockFlow,
            chainIndex: ChainIndex,
-           onlyTxForIntra: Boolean                                     = false,
-           outputScriptOption: Option[(StatelessScript, AVector[Val])] = None,
-           txScriptOption: Option[StatelessScript]                     = None): Block = {
+           onlyTxForIntra: Boolean                                      = false,
+           outputScriptOption: Option[(StatefulContract, AVector[Val])] = None,
+           txScriptOption: Option[StatefulScript]                       = None): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
