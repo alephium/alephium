@@ -1,11 +1,11 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.ALF.{Hash, HashSerde}
-import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript, Val}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
-final case class UnsignedTransaction(scriptOpt: Option[StatelessScript],
+final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[TxOutput],
                                      states: AVector[AVector[Val]])

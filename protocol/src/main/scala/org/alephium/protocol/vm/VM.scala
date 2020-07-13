@@ -42,6 +42,15 @@ sealed trait VM[Ctx <: Context] {
 }
 
 object StatelessVM extends VM[StatelessContext] {
+  def runTxScript(worldState: WorldState,
+                  txHash: Hash,
+                  script: StatelessScript): ExeResult[WorldState] = {
+    val context = StatelessContext(txHash, worldState)
+    execute(context, script, AVector.empty, AVector.empty).map(_ => context.worldState)
+  }
+}
+
+object StatefulVM extends VM[StatefulContext] {
   def runTxScripts(worldState: WorldState, block: Block): ExeResult[WorldState] = {
     block.transactions.foldE(worldState) {
       case (worldState, tx) =>
@@ -54,10 +63,8 @@ object StatelessVM extends VM[StatelessContext] {
 
   def runTxScript(worldState: WorldState,
                   txHash: Hash,
-                  script: StatelessScript): ExeResult[WorldState] = {
-    val context = StatelessContext(txHash, worldState)
+                  script: StatefulScript): ExeResult[WorldState] = {
+    val context = StatefulContext(txHash, worldState)
     execute(context, script, AVector.empty, AVector.empty).map(_ => context.worldState)
   }
 }
-
-object StatefulVM extends VM[StatefulContext]
