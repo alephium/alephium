@@ -303,8 +303,10 @@ object Ast {
     }
   }
 
+  sealed trait ContractWithState extends Contract[StatefulContext]
+
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
-      extends Contract[StatefulContext] {
+      extends ContractWithState {
     val fields: Seq[Argument] = Seq.empty
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
@@ -317,7 +319,7 @@ object Ast {
   final case class TxContract(ident: TypeId,
                               fields: Seq[Argument],
                               funcs: Seq[FuncDef[StatefulContext]])
-      extends Contract[StatefulContext] {
+      extends ContractWithState {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
       val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
@@ -326,14 +328,26 @@ object Ast {
     }
   }
 
-  final case class MultiTxContract(contracts: Seq[TxContract]) {
-    def get(contractIndex: Int): TxContract = {
+  final case class MultiTxContract(contracts: Seq[ContractWithState]) {
+    def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) contracts(contractIndex)
       else throw Compiler.Error(s"Invalid contract index $contractIndex")
     }
 
-    def genCode(state: Compiler.State[StatefulContext], contractIndex: Int): StatefulContract = {
-      get(contractIndex).genCode(state)
+    def genStatefulScript(contractIndex: Int): StatefulScript = {
+      val state = Compiler.State.buildFor(this, contractIndex)
+      get(contractIndex) match {
+        case script: TxScript => script.genCode(state)
+        case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
+      }
+    }
+
+    def genStatefulContract(contractIndex: Int): StatefulContract = {
+      val state = Compiler.State.buildFor(this, contractIndex)
+      get(contractIndex) match {
+        case contract: TxContract => contract.genCode(state)
+        case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+      }
     }
   }
 }

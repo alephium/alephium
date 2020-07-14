@@ -3,9 +3,8 @@ package org.alephium.protocol.vm
 import scala.annotation.tailrec
 
 import org.alephium.crypto.ED25519Signature
-import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.Block
 import org.alephium.protocol.ALF
+import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
 class Runtime[Ctx <: Context](val stack: Stack[Frame[Ctx]], var returnTo: AVector[Val])
@@ -45,7 +44,7 @@ sealed trait VM[Ctx <: Context] {
 
 object StatelessVM extends VM[StatelessContext] {
   def runAssetScript(worldState: WorldState,
-                     txHash: Hash,
+                     txHash: ALF.Hash,
                      script: StatelessScript,
                      args: AVector[Val],
                      signature: ED25519Signature): ExeResult[WorldState] = {
@@ -67,7 +66,7 @@ object StatefulVM extends VM[StatefulContext] {
   }
 
   def runTxScript(worldState: WorldState,
-                  txHash: Hash,
+                  txHash: ALF.Hash,
                   script: StatefulScript): ExeResult[WorldState] = {
     val context = StatefulContext(txHash, worldState)
     val obj     = script.toObject(AVector.empty)
@@ -75,7 +74,7 @@ object StatefulVM extends VM[StatefulContext] {
   }
 
   def runContract(worldState: WorldState,
-                  txHash: Hash,
+                  txHash: ALF.Hash,
                   contract: StatefulContract,
                   address: ALF.Hash,
                   fields: AVector[Val],
