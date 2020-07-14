@@ -56,4 +56,6 @@ class StatefulContext(override val txHash: Hash, var _worldState: WorldState)
 object StatefulContext {
   def apply(txHash: Hash, worldState: WorldState): StatefulContext =
     new StatefulContext(txHash, worldState)
+
+  val mock: StatefulContext = StatefulContext(Hash.zero, WorldState.mock)
 }

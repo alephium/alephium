@@ -39,38 +39,30 @@ sealed trait Contract[Ctx <: Context] {
 }
 
 sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
-  def toObject(fields: AVector[Val]): ScriptObj[Ctx]
+  val fields: AVector[Val.Type] = AVector.empty
+
+  def toObject(): ScriptObj[Ctx]
 }
 
-final case class StatelessScript(
-    fields: AVector[Val.Type],
-    methods: AVector[Method[StatelessContext]]
-) extends Script[StatelessContext] {
-  override def toObject(fields: AVector[Val]): ScriptObj[StatelessContext] = {
-    new StatelessScriptObject(None, this, fields.toArray)
-  }
-
-  def toObject(address: ALF.Hash, fields: AVector[Val]): ScriptObj[StatelessContext] = {
-    new StatelessScriptObject(Some(address), this, fields.toArray)
+final case class StatelessScript(methods: AVector[Method[StatelessContext]])
+    extends Script[StatelessContext] {
+  override def toObject(): ScriptObj[StatelessContext] = {
+    new StatelessScriptObject(None, this)
   }
 }
 
 object StatelessScript {
   implicit val serde: Serde[StatelessScript] =
-    Serde.forProduct2(StatelessScript.apply, t => (t.fields, t.methods))
+    Serde.forProduct1(StatelessScript.apply, _.methods)
 
   val failure: StatelessScript = StatelessScript(
-    AVector.empty,
     AVector(Method[StatelessContext](AVector.empty, AVector.empty, AVector(Pop))))
 }
 
-final case class StatefulScript(
-    methods: AVector[Method[StatefulContext]]
-) extends Script[StatefulContext] {
-  val fields: AVector[Val.Type] = AVector.empty
-
-  override def toObject(fields: AVector[Val]): ScriptObj[StatefulContext] = {
-    new StatefulScriptObject(this, fields.toArray)
+final case class StatefulScript(methods: AVector[Method[StatefulContext]])
+    extends Script[StatefulContext] {
+  override def toObject(): ScriptObj[StatefulContext] = {
+    new StatefulScriptObject(this)
   }
 }
 
@@ -114,15 +106,14 @@ sealed trait ContractObj[Ctx <: Context] {
   }
 }
 
-trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx]
+trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
+  val fields: Array[Val] = Array.empty
+}
 
-class StatelessScriptObject(override val addressOpt: Option[ALF.Hash],
-                            val code: StatelessScript,
-                            val fields: Array[Val])
+class StatelessScriptObject(override val addressOpt: Option[ALF.Hash], val code: StatelessScript)
     extends ScriptObj[StatelessContext]
 
-class StatefulScriptObject(val code: StatefulScript, val fields: Array[Val])
-    extends ScriptObj[StatefulContext]
+class StatefulScriptObject(val code: StatefulScript) extends ScriptObj[StatefulContext]
 
 class StatefulContractObject(val code: StatefulContract,
                              val fields: Array[Val],
