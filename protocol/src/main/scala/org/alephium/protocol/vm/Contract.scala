@@ -28,18 +28,18 @@ object Method {
 sealed trait Contract[Ctx <: Context] {
   def fields: AVector[Val.Type]
   def methods: AVector[Method[Ctx]]
+
+  def startFrame(ctx: Ctx,
+                 obj: ContractObj[Ctx],
+                 methodIndex: Int,
+                 args: AVector[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
+    Frame.build(ctx, obj, methodIndex, args: AVector[Val], returnTo)
+  }
 }
 
 sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
   def toObject(fields: AVector[Val]): ScriptObj[Ctx]
-
-  def startFrame(ctx: Ctx,
-                 initVals: AVector[Val],
-                 args: AVector[Val],
-                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
-    val obj = this.toObject(initVals)
-    Frame.build(ctx, obj, args: AVector[Val], returnTo)
-  }
 }
 
 final case class StatelessScript(
@@ -65,17 +65,17 @@ object StatelessScript {
 }
 
 final case class StatefulScript(
-    fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Script[StatefulContext] {
+  val fields: AVector[Val.Type] = AVector.empty
+
   override def toObject(fields: AVector[Val]): ScriptObj[StatefulContext] = {
     new StatefulScriptObject(this, fields.toArray)
   }
 }
 
 object StatefulScript {
-  implicit val serde: Serde[StatefulScript] =
-    Serde.forProduct2(StatefulScript.apply, t => (t.fields, t.methods))
+  implicit val serde: Serde[StatefulScript] = Serde.forProduct1(StatefulScript.apply, _.methods)
 }
 
 final case class StatefulContract(
@@ -104,6 +104,13 @@ sealed trait ContractObj[Ctx <: Context] {
 
   def getMethod(index: Int): Option[Method[Ctx]] = {
     code.methods.get(index)
+  }
+
+  def startFrame(ctx: Ctx,
+                 methodIndex: Int,
+                 args: AVector[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
+    Frame.build(ctx, this, methodIndex, args: AVector[Val], returnTo)
   }
 }
 

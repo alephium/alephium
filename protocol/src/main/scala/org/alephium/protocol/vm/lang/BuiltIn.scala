@@ -5,7 +5,7 @@ import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
 object BuiltIn {
-  sealed trait BuiltIn[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
+  sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
 
     override def genCode(contract: Ast.Ident): Seq[Instr[StatelessContext]] = {

@@ -2,8 +2,10 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
+import org.alephium.crypto.ED25519Signature
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
+import org.alephium.protocol.ALF
 import org.alephium.util.AVector
 
 class Runtime[Ctx <: Context](val stack: Stack[Frame[Ctx]], var returnTo: AVector[Val])
@@ -15,13 +17,13 @@ object Runtime {
 
 sealed trait VM[Ctx <: Context] {
   def execute(ctx: Ctx,
-              script: Script[Ctx],
-              fields: AVector[Val],
+              obj: ContractObj[Ctx],
+              methodIndex: Int,
               args: AVector[Val]): ExeResult[AVector[Val]] = {
     val stack = Stack.ofCapacity[Frame[Ctx]](frameStackMaxSize)
     val rt    = Runtime[Ctx](stack)
 
-    stack.push(script.startFrame(ctx, fields, args, value => Right(rt.returnTo = value)))
+    stack.push(obj.startFrame(ctx, methodIndex, args, value => Right(rt.returnTo = value)))
     execute(stack).map(_ => rt.returnTo)
   }
 
@@ -42,11 +44,14 @@ sealed trait VM[Ctx <: Context] {
 }
 
 object StatelessVM extends VM[StatelessContext] {
-  def runTxScript(worldState: WorldState,
-                  txHash: Hash,
-                  script: StatelessScript): ExeResult[WorldState] = {
-    val context = StatelessContext(txHash, worldState)
-    execute(context, script, AVector.empty, AVector.empty).map(_ => context.worldState)
+  def runAssetScript(worldState: WorldState,
+                     txHash: Hash,
+                     script: StatelessScript,
+                     args: AVector[Val],
+                     signature: ED25519Signature): ExeResult[WorldState] = {
+    val context = StatelessContext(txHash, signature, worldState)
+    val obj     = script.toObject(args)
+    execute(context, obj, 0, AVector.empty).map(_ => context.worldState)
   }
 }
 
@@ -65,6 +70,18 @@ object StatefulVM extends VM[StatefulContext] {
                   txHash: Hash,
                   script: StatefulScript): ExeResult[WorldState] = {
     val context = StatefulContext(txHash, worldState)
-    execute(context, script, AVector.empty, AVector.empty).map(_ => context.worldState)
+    val obj     = script.toObject(AVector.empty)
+    execute(context, obj, 0, AVector.empty).map(_ => context.worldState)
+  }
+
+  def runContract(worldState: WorldState,
+                  txHash: Hash,
+                  contract: StatefulContract,
+                  address: ALF.Hash,
+                  fields: AVector[Val],
+                  args: AVector[Val]): ExeResult[WorldState] = {
+    val context = StatefulContext(txHash, worldState)
+    val obj     = contract.toObject(address, fields)
+    execute(context, obj, 0, args).map(_ => context.worldState)
   }
 }

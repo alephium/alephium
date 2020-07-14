@@ -122,13 +122,17 @@ class Parser[Ctx <: StatelessContext] {
     }
 }
 
-object ScriptParser extends Parser[StatelessContext] {
-  def script[_: P]: P[Ast.TxScript] =
-    P(Start ~ Lexer.keyword("assetScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, funcs) => Ast.TxScript(typeId, funcs) }
+object StatelessParser extends Parser[StatelessContext] {
+  def assetScript[_: P]: P[Ast.AssetScript] =
+    P(Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
+      .map { case (typeId, funcs) => Ast.AssetScript(typeId, funcs) }
 }
 
-object ContractParser extends Parser[StatefulContext] {
+object StatefulParser extends Parser[StatefulContext] {
+  def txScript[_: P]: P[Ast.TxScript] =
+    P(Start ~ Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
+      .map { case (typeId, funcs) => Ast.TxScript(typeId, funcs) }
+
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(Lexer.keyword("Contract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")

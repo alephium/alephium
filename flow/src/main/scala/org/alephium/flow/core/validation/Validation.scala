@@ -414,8 +414,7 @@ object Validation {
                                       params: AVector[Val],
                                       signature: ED25519Signature,
                                       worldState: WorldState): TxValidationResult = {
-    val context = StatelessContext(tx.hash, signature, worldState)
-    StatelessVM.execute(context, script, AVector.empty, params) match {
+    StatelessVM.runAssetScript(worldState, tx.hash, script, params, signature) match {
       case Right(_) => validTx // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))
     }

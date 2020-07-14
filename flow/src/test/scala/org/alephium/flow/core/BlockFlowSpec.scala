@@ -89,7 +89,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
          |  }
          |}
          |""".stripMargin
-    val script0      = Compiler.compileOneOf(input0, 0).toOption.get
+    val script0      = Compiler.compileContract(input0).toOption.get
     val initialState = AVector[Val](Val.U64(U64.Zero))
 
     val chainIndex         = ChainIndex.unsafe(0, 0)
@@ -119,7 +119,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
          |  }
          |}
          |""".stripMargin
-    val script1  = Compiler.compileOneOf(input1, 1).toOption.get
+    val script1  = Compiler.compileTxScript(input1, 1).toOption.get
     val newState = AVector[Val](Val.U64(U64.One))
     val block1   = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block1, 2)
