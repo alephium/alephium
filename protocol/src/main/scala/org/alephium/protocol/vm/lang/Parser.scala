@@ -129,18 +129,17 @@ object StatelessParser extends Parser[StatelessContext] {
 }
 
 object StatefulParser extends Parser[StatefulContext] {
-  def txScript[_: P]: P[Ast.TxScript] =
-    P(Start ~ Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
+  def rawTxScript[_: P]: P[Ast.TxScript] =
+    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
       .map { case (typeId, funcs) => Ast.TxScript(typeId, funcs) }
+  def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
   def rawTxContract[_: P]: P[Ast.TxContract] =
-    P(Lexer.keyword("Contract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
+    P(Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
       .map { case (typeId, params, funcs) => Ast.TxContract(typeId, params, funcs) }
-
-  def contract[_: P]: P[Ast.TxContract] =
-    P(Start ~ rawTxContract ~ End)
+  def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
   def multiContract[_: P]: P[Ast.MultiTxContract] =
-    P(Start ~ contract.rep(1) ~ End).map(Ast.MultiTxContract.apply)
+    P(Start ~ (rawTxScript | rawTxContract).rep(1) ~ End).map(Ast.MultiTxContract.apply)
 }

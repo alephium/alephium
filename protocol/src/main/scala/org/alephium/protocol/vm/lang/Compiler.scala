@@ -21,31 +21,25 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] = {
-    compileOneOfContract(input, index).flatMap { contract =>
-      if (contract.fields.nonEmpty) {
-        Left(Error(s"Tx script does not have any fields"))
-      } else {
-        Right(StatefulScript(contract.methods))
-      }
-    }
-  }
+  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
+    compileStateful(input, _.genStatefulScript(index))
 
   def compileContract(input: String): Either[Error, StatefulContract] =
-    compileOneOfContract(input, 0)
+    compileContract(input, 0)
 
-  def compileOneOfContract(input: String, index: Int): Either[Error, StatefulContract] =
+  def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
+    compileStateful(input, _.genStatefulContract(index))
+
+  private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
-        case Parsed.Success(multiContract, _) =>
-          val state = State.buildFor(multiContract, index)
-          Right(multiContract.genCode(state, index))
-        case failure: Parsed.Failure =>
-          Left(Error.parse(failure))
+        case Parsed.Success(multiContract, _) => Right(genCode(multiContract))
+        case failure: Parsed.Failure          => Left(Error.parse(failure))
       }
     } catch {
       case e: Error => Left(e)
     }
+  }
 
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String

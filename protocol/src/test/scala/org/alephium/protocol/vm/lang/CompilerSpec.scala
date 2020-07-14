@@ -187,8 +187,8 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileOneOfContract(input, 0).isRight is true
-    Compiler.compileOneOfContract(input, 1).isRight is true
+    Compiler.compileContract(input, 0).isRight is true
+    Compiler.compileContract(input, 1).isRight is true
   }
 
   trait Fixture {
