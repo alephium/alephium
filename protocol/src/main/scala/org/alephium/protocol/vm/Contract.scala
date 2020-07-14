@@ -41,12 +41,12 @@ sealed trait Contract[Ctx <: Context] {
 sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
   val fields: AVector[Val.Type] = AVector.empty
 
-  def toObject(): ScriptObj[Ctx]
+  def toObject: ScriptObj[Ctx]
 }
 
 final case class StatelessScript(methods: AVector[Method[StatelessContext]])
     extends Script[StatelessContext] {
-  override def toObject(): ScriptObj[StatelessContext] = {
+  override def toObject: ScriptObj[StatelessContext] = {
     new StatelessScriptObject(None, this)
   }
 }
@@ -61,7 +61,7 @@ object StatelessScript {
 
 final case class StatefulScript(methods: AVector[Method[StatefulContext]])
     extends Script[StatefulContext] {
-  override def toObject(): ScriptObj[StatefulContext] = {
+  override def toObject: ScriptObj[StatefulContext] = {
     new StatefulScriptObject(this)
   }
 }

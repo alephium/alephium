@@ -44,8 +44,8 @@ object Compiler {
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def getReturnType(inputType: Seq[Type]): Seq[Type]
-    def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
-    def genCode(objId: Ast.Ident): Seq[Instr[Ctx]]
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
+    def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]]
   }
 
   final case class Error(message: String) extends Exception(message)
@@ -72,11 +72,11 @@ object Compiler {
       else throw Error(s"Invalid args type $inputType for builtin func $name")
     }
 
-    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       Seq(CallLocal(index))
     }
 
-    override def genCode(objId: Ast.Ident): Seq[Instr[Ctx]] = {
+    override def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]] = {
       Seq(CallExternal(index))
     }
   }

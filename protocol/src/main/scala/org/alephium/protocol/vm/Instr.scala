@@ -83,12 +83,12 @@ object Instr {
     IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
     IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
-    CallLocal, CallExternal, Return,
+    CallLocal, Return,
     CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
     Keccak256Byte32, Keccak256ByteVec, CheckSignature
   )
-  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs
+  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++ ArraySeq(CallExternal)
   // format: on
 
   val toCode: Map[InstrCompanion[StatefulContext], Int] = statefulInstrs.zipWithIndex.toMap
@@ -109,6 +109,21 @@ sealed abstract class InstrCompanion1[T: Serde] extends InstrCompanion[Stateless
   @inline def from[C <: StatelessContext](t: T): Instr[C] = apply(t)
 
   override def deserialize[C <: StatelessContext](
+      input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
+    serdeImpl[T]._deserialize(input).map {
+      case (t, rest) => (from(t), rest)
+    }
+  }
+}
+
+sealed abstract class StatefulInstrCompanion1[T: Serde] extends InstrCompanion[StatefulContext] {
+  lazy val code: Byte = Instr.toCode(this).toByte
+
+  def apply(t: T): Instr[StatefulContext]
+
+  @inline def from[C <: StatefulContext](t: T): Instr[C] = apply(t)
+
+  override def deserialize[C <: StatefulContext](
       input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
     serdeImpl[T]._deserialize(input).map {
       case (t, rest) => (from(t), rest)
@@ -1003,8 +1018,8 @@ final case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
 }
 object IfGeU256 extends InstrCompanion1[Byte]
 
-sealed trait CallInstr extends StatelessInstr
-final case class CallLocal(index: Byte) extends CallInstr {
+sealed trait CallInstr
+final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr {
   override def serialize(): ByteString = ByteString(CallLocal.code, index)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1015,18 +1030,18 @@ final case class CallLocal(index: Byte) extends CallInstr {
   }
 }
 object CallLocal extends InstrCompanion1[Byte]
-final case class CallExternal(index: Byte) extends CallInstr {
+final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr {
   override def serialize(): ByteString = ByteString(CallExternal.code, index)
 
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractKey <- frame.popT[Val.Byte32]().map(byte32 => ALF.Hash.unsafe(byte32.v.bytes))
-      newFrame    <- frame.externalMethodFrame(contractKey, Bytes.toPosInt(index))
+      newFrame    <- Frame.externalMethodFrame(frame, contractKey, Bytes.toPosInt(index))
       _           <- newFrame.execute()
     } yield ()
   }
 }
-object CallExternal extends InstrCompanion1[Byte]
+object CallExternal extends StatefulInstrCompanion1[Byte]
 
 sealed trait ReturnInstr extends StatelessInstr
 case object Return extends ReturnInstr with InstrCompanion0 {

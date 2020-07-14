@@ -26,7 +26,7 @@ class VMSpec extends AlephiumSpec {
                                returnType = AVector(Val.U64),
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
     val script = StatelessScript(methods = AVector(method0, method1))
-    val obj    = script.toObject()
+    val obj    = script.toObject
     StatelessVM.execute(StatelessContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE
       AVector[Val](Val.U64(U64.unsafe(3)))
   }
