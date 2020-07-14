@@ -5,7 +5,7 @@ import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
 object BuiltIn {
-  sealed trait BuiltIn extends FuncInfo {
+  sealed trait BuiltIn[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
 
     override def genCode(contract: Ast.Ident): Seq[Instr[StatelessContext]] = {
@@ -16,7 +16,7 @@ object BuiltIn {
                                  argsType: Seq[Type],
                                  returnType: Seq[Type],
                                  instr: Instr[StatelessContext])
-      extends BuiltIn {
+      extends BuiltIn[StatelessContext] {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) returnType
       else throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -24,7 +24,7 @@ object BuiltIn {
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
   }
-  sealed abstract class GenericBuiltIn(val name: String) extends BuiltIn
+  sealed abstract class GenericBuiltIn(val name: String) extends BuiltIn[StatelessContext]
 
   val checkEq: GenericBuiltIn = new GenericBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
@@ -141,7 +141,7 @@ object BuiltIn {
     }
   }
 
-  val funcs: Map[String, FuncInfo] = Seq(
+  val funcs: Map[String, FuncInfo[StatelessContext]] = Seq(
     keccak256,
     checkEq,
     checkSignature,
