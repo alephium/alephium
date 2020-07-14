@@ -89,18 +89,6 @@ class Frame[Ctx <: Context](var pc: Int,
     } yield Frame.build(ctx, obj, method, args, opStack.push)
   }
 
-  def externalMethodFrame(contractKey: ALF.Hash, index: Int): ExeResult[Frame[Ctx]] = {
-    for {
-      contractObj <- ctx.worldState
-        .getContractObj[Ctx](contractKey)
-        .left
-        .map[ExeFailure](IOErrorLoadContract)
-      method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
-      args   <- opStack.pop(method.localsType.length)
-      _      <- method.check(args)
-    } yield Frame.build(ctx, contractObj, method, args, opStack.push)
-  }
-
   @tailrec
   final def execute(): ExeResult[Unit] = {
     currentInstr match {
@@ -143,5 +131,21 @@ object Frame {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
     new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
+  }
+
+  def externalMethodFrame[C <: StatefulContext](
+      frame: Frame[C],
+      contractKey: ALF.Hash,
+      index: Int
+  ): ExeResult[Frame[StatefulContext]] = {
+    for {
+      contractObj <- frame.ctx.worldState
+        .getContractObj(contractKey)
+        .left
+        .map[ExeFailure](IOErrorLoadContract)
+      method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
+      args   <- frame.opStack.pop(method.localsType.length)
+      _      <- method.check(args)
+    } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack.push)
   }
 }

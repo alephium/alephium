@@ -9,7 +9,7 @@ import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
   Array("org.wartremover.warts.JavaSerializable",
         "org.wartremover.warts.Product",
         "org.wartremover.warts.Serializable"))
-class Parser[Ctx <: StatelessContext] {
+abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] =>
     Lexer.emptyChars(ctx)
   }
@@ -23,9 +23,6 @@ class Parser[Ctx <: StatelessContext] {
     callAbs.map { case (funcId, expr) => Ast.CallExpr(funcId, expr) }
   def contractConv[_: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
-  def contractCallExpr[_: P]: P[Ast.ContractCallExpr[Ctx]] = P(Lexer.ident ~ "." ~ callAbs).map {
-    case (objId, (callId, exprs)) => Ast.ContractCallExpr(objId, callId, exprs)
-  }
 
   def chain[_: P](p: => P[Ast.Expr[Ctx]], op: => P[Operator]): P[Ast.Expr[Ctx]] =
     P(p ~ (op ~ p).rep).map {
@@ -63,8 +60,7 @@ class Parser[Ctx <: StatelessContext] {
     P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
   def unaryExpr[_: P]: P[Ast.Expr[Ctx]] =
     P(atom | (Lexer.opNot ~ atom).map { case (op, expr) => Ast.UnaryOp.apply[Ctx](op, expr) })
-  def atom[_: P]: P[Ast.Expr[Ctx]] =
-    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
+  def atom[_: P]: P[Ast.Expr[Ctx]]
 
   def parenExpr[_: P]: P[Ast.ParenExpr[Ctx]] = P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
 
@@ -97,9 +93,6 @@ class Parser[Ctx <: StatelessContext] {
       }
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
-  def contractCall[_: P]: P[Ast.ContractCall[Ctx]] =
-    P(Lexer.ident ~ "." ~ callAbs)
-      .map { case (objId, (callId, exprs)) => Ast.ContractCall(objId, callId, exprs) }
 
   def block[_: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ statement.rep(1) ~ "}")
   def elseBranch[_: P]: P[Seq[Ast.Statement[Ctx]]] =
@@ -111,8 +104,7 @@ class Parser[Ctx <: StatelessContext] {
   def whileStmt[_: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
-  def statement[_: P]: P[Ast.Statement[Ctx]] =
-    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)
+  def statement[_: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[_: P]: P[Ast.Argument] =
     P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
@@ -123,12 +115,32 @@ class Parser[Ctx <: StatelessContext] {
 }
 
 object StatelessParser extends Parser[StatelessContext] {
+  def atom[_: P]: P[Ast.Expr[StatelessContext]] =
+    P(const | callExpr | contractConv | variable | parenExpr)
+
+  def statement[_: P]: P[Ast.Statement[StatelessContext]] =
+    P(varDef | assign | funcCall | ifelse | whileStmt | ret)
+
   def assetScript[_: P]: P[Ast.AssetScript] =
     P(Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
       .map { case (typeId, funcs) => Ast.AssetScript(typeId, funcs) }
 }
 
 object StatefulParser extends Parser[StatefulContext] {
+  def atom[_: P]: P[Ast.Expr[StatefulContext]] =
+    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
+
+  def contractCallExpr[_: P]: P[Ast.ContractCallExpr] = P(Lexer.ident ~ "." ~ callAbs).map {
+    case (objId, (callId, exprs)) => Ast.ContractCallExpr(objId, callId, exprs)
+  }
+
+  def contractCall[_: P]: P[Ast.ContractCall] =
+    P(Lexer.ident ~ "." ~ callAbs)
+      .map { case (objId, (callId, exprs)) => Ast.ContractCall(objId, callId, exprs) }
+
+  def statement[_: P]: P[Ast.Statement[StatefulContext]] =
+    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)
+
   def rawTxScript[_: P]: P[Ast.TxScript] =
     P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
       .map { case (typeId, funcs) => Ast.TxScript(typeId, funcs) }
