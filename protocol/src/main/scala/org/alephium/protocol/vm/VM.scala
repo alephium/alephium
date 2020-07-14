@@ -49,7 +49,7 @@ object StatelessVM extends VM[StatelessContext] {
                      args: AVector[Val],
                      signature: ED25519Signature): ExeResult[WorldState] = {
     val context = StatelessContext(txHash, signature, worldState)
-    val obj     = script.toObject()
+    val obj     = script.toObject
     execute(context, obj, 0, args).map(_ => context.worldState)
   }
 }
@@ -69,7 +69,7 @@ object StatefulVM extends VM[StatefulContext] {
                   txHash: ALF.Hash,
                   script: StatefulScript): ExeResult[WorldState] = {
     val context = StatefulContext(txHash, worldState)
-    val obj     = script.toObject()
+    val obj     = script.toObject
     execute(context, obj, 0, AVector.empty).map(_ => context.worldState)
   }
 

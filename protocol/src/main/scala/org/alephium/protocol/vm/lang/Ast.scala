@@ -143,7 +143,7 @@ object Ast {
                                                    value: Expr[Ctx])
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit =
-      state.addVariable(ident, value.getType(state: Compiler.State[Ctx]), isMutable)
+      state.addVariable(ident, value.getType(state), isMutable)
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       value.genCode(state) :+ state.genCode(ident)
@@ -173,7 +173,7 @@ object Ast {
   final case class Assign[Ctx <: StatelessContext](target: Ident, rhs: Expr[Ctx])
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkAssign(target, rhs.getType(state: Compiler.State[Ctx]))
+      state.checkAssign(target, rhs.getType(state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
