@@ -1,18 +1,19 @@
 package org.alephium.protocol.vm
 
+import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util._
 
 class VMSpec extends AlephiumSpec {
   it should "execute the following script" in {
     val method =
-      Method[StatelessContext](
+      Method[StatefulContext](
         localsType = AVector(Val.U64),
         returnType = AVector(Val.U64),
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return))
-    val script = StatelessScript(AVector(Val.U64, Val.U64), methods = AVector(method))
-    val obj    = script.toObject(AVector(Val.U64(U64.Zero), Val.U64(U64.One)))
-    StatelessVM.execute(StatelessContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
+    val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
+    val obj      = contract.toObject(ALF.Hash.zero, AVector(Val.U64(U64.Zero), Val.U64(U64.One)))
+    StatefulVM.execute(StatefulContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
       Val.U64(U64.unsafe(8)))
   }
 
@@ -24,8 +25,8 @@ class VMSpec extends AlephiumSpec {
       Method[StatelessContext](localsType = AVector(Val.U64),
                                returnType = AVector(Val.U64),
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
-    val script = StatelessScript(AVector.empty, methods = AVector(method0, method1))
-    val obj    = script.toObject(AVector.empty)
+    val script = StatelessScript(methods = AVector(method0, method1))
+    val obj    = script.toObject()
     StatelessVM.execute(StatelessContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE
       AVector[Val](Val.U64(U64.unsafe(3)))
   }
@@ -40,11 +41,11 @@ class VMSpec extends AlephiumSpec {
 
   it should "serde script" in {
     val method =
-      Method[StatelessContext](
+      Method[StatefulContext](
         localsType = AVector(Val.U64),
         returnType = AVector.empty,
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const1, U64Add, StoreField(1)))
-    val script = StatelessScript(AVector(Val.U64, Val.U64), methods = AVector(method))
-    serialize(script)(StatelessScript.serde).nonEmpty is true
+    val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
+    serialize(contract)(StatefulContract.serde).nonEmpty is true
   }
 }

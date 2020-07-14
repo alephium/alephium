@@ -297,9 +297,8 @@ object Ast {
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
-      val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
-      val methods     = AVector.from(funcs.view.map(func    => func.toMethod(state)))
-      StatelessScript(fieldsTypes, methods)
+      val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
+      StatelessScript(methods)
     }
   }
 
