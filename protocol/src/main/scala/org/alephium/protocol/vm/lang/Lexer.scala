@@ -14,6 +14,7 @@ object Lexer {
   def lowercase[_: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[_: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[_: P]: P[Unit]     = P(CharIn("0-9"))
+  def hex[_: P]: P[Unit]       = P(CharsWhileIn("0-9a-fA-F"))
   def letter[_: P]: P[Unit]    = P(lowercase | uppercase)
   def newline[_: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
@@ -35,7 +36,7 @@ object Lexer {
   def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[_: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
-  def hexNum[_: P]: P[BigInteger] = P("0x" ~ CharsWhileIn("0-9A-F")).!.map(new BigInteger(_, 16))
+  def hexNum[_: P]: P[BigInteger] = P("0x" ~ hex).!.map(new BigInteger(_, 16))
   def decNum[_: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
   def num[_: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
   def negatable[_: P](p: => P[BigInteger]): P[BigInteger] = ("-".?.! ~ p).map {
@@ -72,7 +73,7 @@ object Lexer {
           }
       }
 
-  def byte32Internal[_: P]: P[Val] = P(CharsWhileIn("0-9A-F")).!.map { hexString =>
+  def byte32Internal[_: P]: P[Val] = P(hex).!.map { hexString =>
     val byte32Opt = for {
       hex    <- Hex.from(hexString)
       byte32 <- Byte32.from(hex)
@@ -106,7 +107,7 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
+    Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
   // format: on
 
   val primTpes: Map[String, Type] =

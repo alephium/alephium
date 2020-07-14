@@ -37,13 +37,14 @@ object Instr {
   implicit val statefulSerde: Serde[Instr[StatefulContext]] = new Serde[Instr[StatefulContext]] {
     override def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
 
+    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     override def _deserialize(
         input: ByteString): SerdeResult[(Instr[StatefulContext], ByteString)] = {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
           SerdeError.validation(s"Instruction - invalid code $code"))
-        output <- instrCompanion.deserialize[StatefulContext](input)
+        output <- instrCompanion.deserialize[StatefulContext](input.tail)
       } yield output
     }
   }
