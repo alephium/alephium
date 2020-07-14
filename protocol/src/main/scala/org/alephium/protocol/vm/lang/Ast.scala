@@ -291,7 +291,7 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
   }
 
-  final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatelessContext]])
+  final case class AssetScript(ident: TypeId, funcs: Seq[FuncDef[StatelessContext]])
       extends Contract[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
@@ -300,6 +300,17 @@ object Ast {
       val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
       val methods     = AVector.from(funcs.view.map(func    => func.toMethod(state)))
       StatelessScript(fieldsTypes, methods)
+    }
+  }
+
+  final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
+      extends Contract[StatefulContext] {
+    val fields: Seq[Argument] = Seq.empty
+
+    def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
+      check(state)
+      val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
+      StatefulScript(methods)
     }
   }
 

@@ -24,9 +24,9 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
-    fastparse.parse("x: U64", Parser.funcArgument(_)).get.value is
+    fastparse.parse("x: U64", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
-    fastparse.parse("mut x: U64", Parser.funcArgument(_)).get.value is
+    fastparse.parse("mut x: U64", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
@@ -34,23 +34,23 @@ class CompilerSpec extends AlephiumSpec {
   }
 
   it should "parse exprs" in {
-    fastparse.parse("x + y", Parser.expr(_)).get.value is
-      Binop(Add, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("x >= y", Parser.expr(_)).get.value is
-      Binop(Ge, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("(x + y)", Parser.expr(_)).get.value is
-      ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
-    fastparse.parse("(x + y) + (x + y)", Parser.expr(_)).get.value is
-      Binop(Add,
-            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
-            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
-    fastparse.parse("x + y * z + u", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x + y", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
+    fastparse.parse("x >= y", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Ge, Variable(Ident("x")), Variable(Ident("y")))
+    fastparse.parse("(x + y)", StatelessParser.expr(_)).get.value is
+      ParenExpr[StatelessContext](Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+    fastparse.parse("(x + y) + (x + y)", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Add,
+                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
+                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+    fastparse.parse("x + y * z + u", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u")))
-    fastparse.parse("x < y <= y < z", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         And,
         Binop(
           And,
@@ -59,16 +59,18 @@ class CompilerSpec extends AlephiumSpec {
         ),
         Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
       )
-    fastparse.parse("x && y || z", Parser.expr(_)).get.value is
-      Binop(Or, Binop(And, Variable(Ident("x")), Variable(Ident("y"))), Variable(Ident("z")))
-    fastparse.parse("foo(x)", Parser.expr(_)).get.value is
-      CallExpr(FuncId("foo", false), List(Variable(Ident("x"))))
-    fastparse.parse("Foo(x)", Parser.expr(_)).get.value is
-      ContractConv(Ast.TypeId("Foo"), Variable(Ident("x")))
-    fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
-      CallExpr(FuncId("foo", true), List(Variable(Ident("x"))))
-    fastparse.parse("foo(x + y) + bar!(x + y)", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Or,
+                              Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
+                              Variable(Ident("z")))
+    fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", false), List(Variable(Ident("x"))))
+    fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
+      ContractConv[StatelessContext](Ast.TypeId("Foo"), Variable(Ident("x")))
+    fastparse.parse("foo!(x)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", true), List(Variable(Ident("x"))))
+    fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         Add,
         CallExpr(FuncId("foo", false),
                  List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
@@ -77,25 +79,26 @@ class CompilerSpec extends AlephiumSpec {
   }
 
   it should "parse return" in {
-    fastparse.parse("return x, y", Parser.ret(_)).isSuccess is true
-    fastparse.parse("return x + y", Parser.ret(_)).isSuccess is true
-    fastparse.parse("return (x + y)", Parser.ret(_)).isSuccess is true
+    fastparse.parse("return x, y", StatelessParser.ret(_)).isSuccess is true
+    fastparse.parse("return x + y", StatelessParser.ret(_)).isSuccess is true
+    fastparse.parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
   }
 
   it should "parse statements" in {
-    fastparse.parse("let x = 1", Parser.statement(_)).isSuccess is true
-    fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
-    fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
-    fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
-    fastparse.parse("foo.add(x, y)", Parser.statement(_)).isSuccess is true
+    fastparse.parse("let x = 1", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("foo.add(x, y)", StatelessParser.statement(_)).isSuccess is true
     fastparse
-      .parse("if x >= 1 { y = y + x } else { y = 0 }", Parser.statement(_))
+      .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
   }
 
   it should "parse functions" in {
     fastparse
-      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }", Parser.func(_))
+      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+             StatelessParser.func(_))
       .isSuccess is true
   }
 
@@ -122,7 +125,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compile(contract).isRight is true
+    Compiler.compileContract(contract).isRight is true
   }
 
   it should "infer types" in {
@@ -147,7 +150,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-      Compiler.compile(contract).isRight is validity
+      Compiler.compileContract(contract).isRight is validity
     }
 
     check("mut", "a", "U64", "b", "U64", "U64", "foo", true)
@@ -184,8 +187,8 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileOneOf(input, 0).isRight is true
-    Compiler.compileOneOf(input, 1).isRight is true
+    Compiler.compileOneOfContract(input, 0).isRight is true
+    Compiler.compileOneOfContract(input, 1).isRight is true
   }
 
   trait Fixture {
@@ -193,10 +196,12 @@ class CompilerSpec extends AlephiumSpec {
              args: AVector[Val],
              output: AVector[Val] = AVector.empty,
              fields: AVector[Val] = AVector.empty): Assertion = {
-      val contract = Compiler.compile(input).toOption.get
+      val contract = Compiler.compileContract(input).toOption.get
 
-      deserialize[StatelessScript](serialize(contract)) isE contract
-      StatelessVM.execute(StatelessContext.mock, contract, fields, args) isE output
+      deserialize[StatefulContract](serialize(contract)) isE contract
+      val context = StatefulContext(ALF.Hash.zero, WorldState.mock)
+      val obj     = contract.toObject(ALF.Hash.zero, fields)
+      StatefulVM.execute(context, obj, 0, args) isE output
     }
   }
 
@@ -222,29 +227,29 @@ class CompilerSpec extends AlephiumSpec {
   }
 
   it should "verify signature" in {
-    val input =
+    def input(hash: ALF.Hash) =
       s"""
-         |contract P2PKH(hash: Byte32) {
+         |AssetScript P2PKH() {
          |  fn verify(pk: Byte32) -> () {
+         |    let hash = @${hash.toHexString}
          |    checkEq!(hash, keccak256!(pk))
          |    checkSignature!(pk)
          |    return
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compile(input).toOption.get
-
-    deserialize[StatelessScript](serialize(contract)) isE contract
 
     val (priKey, pubKey) = ED25519.generatePriPub()
     val pubKeyHash       = ALF.Hash.hash(pubKey.bytes)
     val signature        = ED25519.sign(ALF.Hash.zero.bytes, priKey)
-    StatelessVM.execute(
-      StatelessContext(ALF.Hash.zero, Stack.unsafe(AVector(signature), 1), WorldState.mock),
-      contract,
-      AVector(Val.Byte32(pubKeyHash.toByte32)),
-      AVector(Val.Byte32(pubKey.toByte32))
-    ) isE AVector.empty[Val]
+
+    val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
+    deserialize[StatelessScript](serialize(script)) isE script
+
+    val args = AVector[Val](Val.Byte32(pubKey.toByte32))
+    StatelessVM
+      .runAssetScript(WorldState.mock, ALF.Hash.zero, script, args, signature)
+      .isRight is true
   }
 
   it should "converse values" in new Fixture {

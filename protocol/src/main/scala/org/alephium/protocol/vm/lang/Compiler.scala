@@ -8,12 +8,12 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.MultiTxContract
 
 object Compiler {
-  def compileStatelessScript(input: String): Either[Error, StatelessScript] =
+  def compileAssetScript(input: String): Either[Error, StatelessScript] =
     try {
-      fastparse.parse(input, ScriptParser.script(_)) match {
-        case Parsed.Success(contract, _) =>
-          val state = State.buildFor[StatelessContext](contract)
-          Right(contract.genCode(state))
+      fastparse.parse(input, StatelessParser.assetScript(_)) match {
+        case Parsed.Success(script, _) =>
+          val state = State.buildFor(script)
+          Right(script.genCode(state))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -21,9 +21,22 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  def compileOneOfStatelessScript(input: String, index: Int): Either[Error, StatefulContract] =
+  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] = {
+    compileOneOfContract(input, index).flatMap { contract =>
+      if (contract.fields.nonEmpty) {
+        Left(Error(s"Tx script does not have any fields"))
+      } else {
+        Right(StatefulScript(contract.methods))
+      }
+    }
+  }
+
+  def compileContract(input: String): Either[Error, StatefulContract] =
+    compileOneOfContract(input, 0)
+
+  def compileOneOfContract(input: String, index: Int): Either[Error, StatefulContract] =
     try {
-      fastparse.parse(input, ContractParser.multiContract(_)) match {
+      fastparse.parse(input, StatefulParser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) =>
           val state = State.buildFor(multiContract, index)
           Right(multiContract.genCode(state, index))
@@ -34,7 +47,7 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  trait FuncInfo[Ctx <: StatelessContext] {
+  trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
@@ -83,29 +96,30 @@ object Compiler {
   }
 
   object State {
-    def buildFor[Ctx <: StatelessContext](contract: Ast.Contract[Ctx]): State[Ctx] =
-      State(mutable.HashMap.empty,
-            Ast.FuncId.empty,
-            0,
-            contract.funcTable,
-            immutable.Map(contract.ident -> contract.funcTable))
+    def buildFor(script: Ast.AssetScript): State[StatelessContext] =
+      StateForScript(mutable.HashMap.empty,
+                     Ast.FuncId.empty,
+                     0,
+                     script.funcTable,
+                     immutable.Map(script.ident -> script.funcTable))
 
     def buildFor(multiContract: MultiTxContract, contractIndex: Int): State[StatefulContext] = {
       val contractTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
-      State(mutable.HashMap.empty,
-            Ast.FuncId.empty,
-            0,
-            multiContract.get(contractIndex).funcTable,
-            contractTable)
+      StateForContract(mutable.HashMap.empty,
+                       Ast.FuncId.empty,
+                       0,
+                       multiContract.get(contractIndex).funcTable,
+                       contractTable)
     }
   }
 
-  final case class State[Ctx <: StatelessContext](
-      varTable: mutable.HashMap[String, VarInfo],
-      var scope: Ast.FuncId,
-      var varIndex: Int,
-      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[Ctx]],
-      contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]) {
+  trait State[Ctx <: StatelessContext] {
+    def varTable: mutable.HashMap[String, VarInfo]
+    var scope: Ast.FuncId
+    var varIndex: Int
+    def funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
+    def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]
+
     def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope    = funcId
       varIndex = 0
@@ -179,10 +193,7 @@ object Compiler {
         .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
     }
 
-    private def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
-      BuiltIn.funcs
-        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
-    }
+    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx]
 
     private def getNewFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
@@ -202,6 +213,34 @@ object Compiler {
       val rtype = funcIdents(scope).returnType
       if (returnType != rtype)
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
+    }
+  }
+
+  final case class StateForScript(
+      varTable: mutable.HashMap[String, VarInfo],
+      var scope: Ast.FuncId,
+      var varIndex: Int,
+      val funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]],
+      val contractTable: immutable.Map[Ast.TypeId,
+                                       immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]]])
+      extends State[StatelessContext] {
+    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
+      BuiltIn.funcs
+        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
+    }
+  }
+
+  final case class StateForContract(
+      varTable: mutable.HashMap[String, VarInfo],
+      var scope: Ast.FuncId,
+      var varIndex: Int,
+      val funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]],
+      val contractTable: immutable.Map[Ast.TypeId,
+                                       immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]]])
+      extends State[StatefulContext] {
+    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
+      BuiltIn.funcs
+        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
   }
 }
