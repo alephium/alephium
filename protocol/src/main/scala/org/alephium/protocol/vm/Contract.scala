@@ -38,8 +38,12 @@ sealed trait Contract[Ctx <: Context] {
   }
 }
 
+object Contract {
+  val emptyFields: AVector[Val.Type] = AVector.ofSize(0)
+}
+
 sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
-  val fields: AVector[Val.Type] = AVector.empty
+  val fields: AVector[Val.Type] = Contract.emptyFields
 
   def toObject: ScriptObj[Ctx]
 }
