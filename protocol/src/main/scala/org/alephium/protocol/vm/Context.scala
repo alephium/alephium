@@ -14,14 +14,16 @@ trait ContractEnv
 trait Context {
   def txHash: Hash
   def signatures: Stack[ED25519Signature]
-  var worldState: WorldState
+  def worldState: WorldState
+
+  def updateWorldState(newWorldState: WorldState): Unit
 
   def updateState(key: Hash, state: AVector[Val]): ExeResult[Unit] = {
     worldState.putContractState(key, state) match {
       case Left(error) =>
         Left(IOErrorUpdateState(error))
       case Right(state) =>
-        this.worldState = state
+        updateWorldState(state)
         Right(())
     }
   }
@@ -30,7 +32,9 @@ trait Context {
 class StatelessContext(val txHash: Hash,
                        val signatures: Stack[ED25519Signature],
                        var worldState: WorldState)
-    extends Context
+    extends Context {
+  override def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
+}
 
 object StatelessContext {
   def apply(txHash: Hash, signature: ED25519Signature, worldState: WorldState): StatelessContext = {
@@ -50,7 +54,7 @@ object StatelessContext {
     StatelessContext(Hash.zero, Stack.ofCapacity[ED25519Signature](0), WorldState.mock)
 }
 
-class StatefulContext(override val txHash: Hash, var _worldState: WorldState)
+class StatefulContext(override val txHash: Hash, private val _worldState: WorldState)
     extends StatelessContext(txHash, Stack.ofCapacity(0), _worldState)
 
 object StatefulContext {

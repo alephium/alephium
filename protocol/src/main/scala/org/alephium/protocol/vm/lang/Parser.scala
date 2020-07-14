@@ -114,6 +114,10 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 }
 
+@SuppressWarnings(
+  Array("org.wartremover.warts.JavaSerializable",
+        "org.wartremover.warts.Product",
+        "org.wartremover.warts.Serializable"))
 object StatelessParser extends Parser[StatelessContext] {
   def atom[_: P]: P[Ast.Expr[StatelessContext]] =
     P(const | callExpr | contractConv | variable | parenExpr)
@@ -126,6 +130,10 @@ object StatelessParser extends Parser[StatelessContext] {
       .map { case (typeId, funcs) => Ast.AssetScript(typeId, funcs) }
 }
 
+@SuppressWarnings(
+  Array("org.wartremover.warts.JavaSerializable",
+        "org.wartremover.warts.Product",
+        "org.wartremover.warts.Serializable"))
 object StatefulParser extends Parser[StatefulContext] {
   def atom[_: P]: P[Ast.Expr[StatefulContext]] =
     P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)

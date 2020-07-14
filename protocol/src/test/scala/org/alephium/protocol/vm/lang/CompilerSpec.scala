@@ -13,7 +13,7 @@ class CompilerSpec extends AlephiumSpec {
   import Ast._
 
   it should "parse lexer" in {
-    val byte32 = Byte32.generate.toHexString.toUpperCase
+    val byte32 = Byte32.generate.toHexString
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
@@ -89,7 +89,7 @@ class CompilerSpec extends AlephiumSpec {
     fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
-    fastparse.parse("foo.add(x, y)", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
@@ -106,7 +106,7 @@ class CompilerSpec extends AlephiumSpec {
     val contract =
       s"""
          |// comment
-         |contract Foo(mut x: U64, mut y: U64, c: U64) {
+         |TxContract Foo(mut x: U64, mut y: U64, c: U64) {
          |  // comment
          |  fn add0(a: U64, b: U64) -> (U64) {
          |    return (a + b)
@@ -139,7 +139,7 @@ class CompilerSpec extends AlephiumSpec {
               validity: Boolean = false) = {
       val contract =
         s"""
-         |contract Foo($xMut x: U64) {
+         |TxContract Foo($xMut x: U64) {
          |  fn add($a: $aType, $b: $bType) -> ($rType) {
          |    x = a + b
          |    return (a - b)
@@ -167,28 +167,28 @@ class CompilerSpec extends AlephiumSpec {
   it should "parse multiple contracts" in {
     val input =
       s"""
-         |contract Foo() {
+         |TxContract Foo() {
          |  fn foo(bar: Bar) -> () {
          |    return bar.foo()
          |  }
-         |  
+         |
          |  fn bar() -> () {
          |    return
          |  }
          |}
          |
-         |contract Bar() {
+         |TxScript Bar {
          |  fn bar(foo: Foo) -> () {
          |    return foo.bar()
          |  }
-         |  
+         |
          |  fn foo() -> () {
          |    return
          |  }
          |}
          |""".stripMargin
     Compiler.compileContract(input, 0).isRight is true
-    Compiler.compileContract(input, 1).isRight is true
+    Compiler.compileTxScript(input, 1).isRight is true
   }
 
   trait Fixture {
@@ -208,7 +208,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "generate IR code" in new Fixture {
     val input =
       s"""
-         |contract Foo(x: U64) {
+         |TxContract Foo(x: U64) {
          |
          |  fn add(a: U64) -> (U64) {
          |    return square(x) + square(a)
@@ -229,7 +229,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "verify signature" in {
     def input(hash: ALF.Hash) =
       s"""
-         |AssetScript P2PKH() {
+         |AssetScript P2PKH {
          |  fn verify(pk: Byte32) -> () {
          |    let hash = @${hash.toHexString}
          |    checkEq!(hash, keccak256!(pk))
@@ -255,7 +255,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "converse values" in new Fixture {
     test(
       s"""
-         |contract Conversion() {
+         |TxContract Conversion() {
          |  fn main() -> () {
          |    let mut x = 5u
          |    x = u64!(5i)
@@ -272,7 +272,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test while" in new Fixture {
     test(
       s"""
-         |contract While() {
+         |TxContract While() {
          |  fn main() -> (U64) {
          |    let mut x = 5
          |    let mut done = false
@@ -292,7 +292,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test the following typical examples" in new Fixture {
     test(
       s"""
-         |contract Main() {
+         |TxContract Main() {
          |
          |  fn main() -> () {
          |    let an_i64 = 5i // Suffix annotation
@@ -325,7 +325,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: I64) -> (I64) {
          |    if n < 2i {
          |      return n
@@ -341,7 +341,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: U64) -> (U64) {
          |    if n < 2 {
          |      return n
@@ -357,7 +357,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: I256) -> (I256) {
          |    if n < 2I {
          |      return n
@@ -373,7 +373,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: U256) -> (U256) {
          |    if n < 2U {
          |      return n
@@ -389,7 +389,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Test() {
+         |TxContract Test() {
          |  fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
          |    let b0 = 1 == 1
          |    let b1 = 1 == 2
@@ -424,7 +424,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Foo() {
+         |TxContract Foo() {
          |  fn f(mut n: U64) -> (U64) {
          |    if n < 2 {
          |      n = n + 1
@@ -441,7 +441,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "execute quasi uniswap" in new Fixture {
     val contract =
       s"""
-         |contract Uniswap(
+         |TxContract Uniswap(
          |  mut alfReserve: U64,
          |  mut btcReserve: U64
          |) {
@@ -473,7 +473,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test operator precedence" in new Fixture {
     val contract =
       s"""
-         |contract Operator() {
+         |TxContract Operator() {
          |  fn main() -> (U64, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
          |    let y = 1 < 2 <= 2 < 3

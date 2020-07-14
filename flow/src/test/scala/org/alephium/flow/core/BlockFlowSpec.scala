@@ -82,7 +82,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   it should "handle contract states" in {
     val input0 =
       s"""
-         |contract Foo(mut x: U64) {
+         |TxContract Foo(mut x: U64) {
          |  fn add(a: U64) -> () {
          |    x = x + a
          |    return
@@ -104,16 +104,16 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
     val input1 =
       s"""
-         |contract Foo(mut x: U64) {
+         |TxContract Foo(mut x: U64) {
          |  fn add(a: U64) -> () {
          |    x = x + a
          |    return
          |  }
          |}
          |
-         |contract Bar() {
+         |TxScript Bar {
          |  fn call() -> () {
-         |    let foo = Foo(@${contractKey0.toHexString.toUpperCase()})
+         |    let foo = Foo(@${contractKey0.toHexString})
          |    foo.add(1)
          |    return
          |  }
