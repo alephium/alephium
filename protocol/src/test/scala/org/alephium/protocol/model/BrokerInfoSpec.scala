@@ -5,10 +5,10 @@ import org.scalacheck.Gen
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.util.AlephiumSpec
 
-class BrokerInfoSpec extends AlephiumSpec {
+class BrokerInfoSpec extends AlephiumSpec with ModelGenerators {
   it should "check equality properly" in {
     forAll { (id: Int, groupNumPerBroker: Int) =>
-      val address = ModelGen.socketAddress.sample.get
+      val address = socketAddressGen.sample.get
       val info0   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
       val info1   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
       info0 is info1
@@ -18,13 +18,13 @@ class BrokerInfoSpec extends AlephiumSpec {
   it should "check if group included" in {
     forAll(Gen.oneOf(2 to 1 << 4)) { _groups =>
       implicit val groupConfig = new GroupConfig { override def groups: Int = _groups }
-      forAll(ModelGen.groupNumPerBrokerGen) { _groupNumPerBroker =>
+      forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>
         implicit val cliqueConfig = new CliqueConfig {
           override def brokerNum: Int         = groups / groupNumPerBroker
           override def groupNumPerBroker: Int = _groupNumPerBroker
           override def groups: Int            = _groups
         }
-        forAll(ModelGen.brokerInfo) { brokerInfo =>
+        forAll(brokerInfoGen) { brokerInfo =>
           val count = (0 until _groups).count(brokerInfo.containsRaw)
           count is cliqueConfig.groupNumPerBroker
         }
@@ -34,7 +34,7 @@ class BrokerInfoSpec extends AlephiumSpec {
 
   it should "check if id is valid" in new GroupConfigFixture { self =>
     override def groups: Int = 4
-    forAll(ModelGen.groupNumPerBrokerGen(groupConfig)) { _groupNumPerBroker =>
+    forAll(groupNumPerBrokerGen(groupConfig)) { _groupNumPerBroker =>
       val cliqueConfig = new CliqueConfig {
         override def brokerNum: Int         = groups / groupNumPerBroker
         override def groupNumPerBroker: Int = _groupNumPerBroker

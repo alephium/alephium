@@ -7,10 +7,10 @@ import akka.testkit.TestProbe
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, ModelGen}
+import org.alephium.protocol.model.{Block, ModelGenerators}
 import org.alephium.util.ActorRefT
 
-class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
+class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with ModelGenerators {
   import FlowHandler._
 
   behavior of "FlowHandlerState"
@@ -20,7 +20,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
   }
 
   def genPending(missings: mutable.HashSet[Hash]): PendingBlock = {
-    val block = ModelGen.blockGen.sample.get
+    val block = blockGen.sample.get
     genPending(block, missings)
   }
 
@@ -33,7 +33,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
   }
 
   trait StateFix {
-    val block = ModelGen.blockGen.sample.get
+    val block = blockGen.sample.get
   }
 
   it should "add status" in {
@@ -64,9 +64,9 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") {
 
   it should "update status" in {
     val state  = new FlowHandlerState { override def statusSizeLimit: Int = 3 }
-    val block0 = ModelGen.blockGen.sample.get
-    val block1 = ModelGen.blockGen.sample.get
-    val block2 = ModelGen.blockGen.sample.get
+    val block0 = blockGen.sample.get
+    val block1 = blockGen.sample.get
+    val block2 = blockGen.sample.get
 
     val pending0 = genPending(block0, mutable.HashSet(block1.hash, block2.hash))
     state.addStatus(pending0)

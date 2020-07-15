@@ -2,10 +2,9 @@ package org.alephium.protocol.model
 
 import org.alephium.util.AlephiumSpec
 
-class CliqueIdSpec extends AlephiumSpec {
-
+class CliqueIdSpec extends AlephiumSpec with ModelGenerators {
   it should "compute hamming distance for peer ids" in {
-    forAll(ModelGen.cliqueId, ModelGen.cliqueId) { (id0, id1) =>
+    forAll(cliqueIdGen, cliqueIdGen) { (id0, id1) =>
       val output0 = CliqueId.hammingDist(id0, id1)
       val output1 = id0.hammingDist(id1)
       val output2 = id1.hammingDist(id0)

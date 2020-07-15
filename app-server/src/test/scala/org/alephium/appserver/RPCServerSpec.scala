@@ -27,6 +27,7 @@ import org.alephium.util._
 
 class RPCServerSpec
     extends AlephiumSpec
+    with ModelGenerators
     with ScalatestRouteTest
     with EitherValues
     with ScalaFutures
@@ -286,7 +287,7 @@ class RPCServerSpec
   trait RouteWS extends RPCServerFixture {
     val client = WSProbe()
 
-    val blockNotify = BlockNotify(ModelGen.blockGen.sample.get.header, height = 0)
+    val blockNotify = BlockNotify(blockGen.sample.get.header, height = 0)
     def sendEventAndCheck: Assertion = {
       mode.node.eventBus ! blockNotify
       val TextMessage.Strict(message) = client.expectMessage()

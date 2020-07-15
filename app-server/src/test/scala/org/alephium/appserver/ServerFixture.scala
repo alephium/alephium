@@ -25,13 +25,17 @@ import org.alephium.rpc.CirceUtils
 import org.alephium.serde.serialize
 import org.alephium.util._
 
-trait ServerFixture extends InfoFixture with PlatformConfigFixture with StoragesFixture {
+trait ServerFixture
+    extends InfoFixture
+    with PlatformConfigFixture
+    with StoragesFixture
+    with ModelGenerators {
 
   val now = TimeStamp.now()
 
   lazy val dummyBlockHeader =
-    ModelGen.blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
-  lazy val dummyBlock           = ModelGen.blockGen.sample.get.copy(header = dummyBlockHeader)
+    blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
+  lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo(config)
   lazy val dummySelfClique      = SelfClique.from(dummyIntraCliqueInfo)
@@ -46,7 +50,7 @@ trait ServerFixture extends InfoFixture with PlatformConfigFixture with Storages
   val dummyPrivateKey           = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
   val dummyHashesAtHeight       = HashesAtHeight(Seq.empty)
   val dummyChainInfo            = ChainInfo(0)
-  val dummyTx = ModelGen.transactionGen
+  val dummyTx = transactionGen
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
     .get

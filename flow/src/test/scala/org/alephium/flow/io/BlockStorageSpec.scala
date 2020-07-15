@@ -4,10 +4,10 @@ import org.scalatest.Assertion
 
 import org.alephium.io._
 import org.alephium.protocol.config.ConsensusConfigFixture
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.ModelGenerators
 import org.alephium.util.{AlephiumSpec, Files}
 
-class BlockStorageSpec extends AlephiumSpec {
+class BlockStorageSpec extends AlephiumSpec with ModelGenerators {
   import RocksDBSource.ColumnFamily
 
   trait Fixture extends ConsensusConfigFixture {
@@ -24,7 +24,7 @@ class BlockStorageSpec extends AlephiumSpec {
   }
 
   it should "save and read blocks" in new Fixture with ConsensusConfigFixture {
-    forAll(ModelGen.blockGen) { block =>
+    forAll(blockGen) { block =>
       storage.exists(block.hash) isE false
       storage.existsUnsafe(block.hash) is false
       storage.put(block).isRight is true
@@ -37,7 +37,7 @@ class BlockStorageSpec extends AlephiumSpec {
   }
 
   it should "fail to delete" in new Fixture with ConsensusConfigFixture {
-    forAll(ModelGen.blockGen) { block =>
+    forAll(blockGen) { block =>
       storage.put(block).isRight is true
       assertThrows[NotImplementedError] {
         storage.delete(block.hash)

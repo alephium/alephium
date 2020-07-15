@@ -10,19 +10,19 @@ import org.alephium.protocol.config.{CliqueConfig, ConsensusConfig, GroupConfig}
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AVector, U64}
 
-object ModelGen {
-  val txInputGen: Gen[TxInput] = for {
+trait ModelGenerators {
+  lazy val txInputGen: Gen[TxInput] = for {
     shortKey <- Gen.choose(0, 5)
   } yield {
     val outputRef = TxOutputRef(shortKey, Hash.random)
     TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
   }
 
-  val txOutputGen: Gen[TxOutput] = for {
+  lazy val txOutputGen: Gen[TxOutput] = for {
     value <- Gen.choose[Long](1, 5)
   } yield TxOutput.asset(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
 
-  val transactionGen: Gen[Transaction] = for {
+  lazy val transactionGen: Gen[Transaction] = for {
     inputNum  <- Gen.choose(1, 5)
     inputs    <- Gen.listOfN(inputNum, txInputGen)
     outputNum <- Gen.choose(1, 5)
@@ -40,30 +40,30 @@ object ModelGen {
   def blockGenNonEmpty(implicit config: ConsensusConfig): Gen[Block] =
     blockGen.retryUntil(_.transactions.nonEmpty)
 
-  def blockGenFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] =
+  def blockGenOf(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] =
     blockGenNonEmpty.retryUntil(_.chainIndex.relateTo(broker))
 
-  def blockGenNotFor(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] = {
+  def blockGenNotOf(broker: BrokerInfo)(implicit config: ConsensusConfig): Gen[Block] = {
     blockGenNonEmpty.retryUntil(!_.chainIndex.relateTo(broker))
   }
 
-  def blockGenFrom(group: GroupIndex)(implicit config: ConsensusConfig): Gen[Block] = {
+  def blockGenOf(group: GroupIndex)(implicit config: ConsensusConfig): Gen[Block] = {
     blockGenNonEmpty.retryUntil(_.chainIndex.from equals group)
   }
 
-  def blockGenWith(deps: AVector[Hash])(implicit config: ConsensusConfig): Gen[Block] =
+  def blockGenOf(deps: AVector[Hash])(implicit config: ConsensusConfig): Gen[Block] =
     for {
       txNum <- Gen.choose(0, 5)
       txs   <- Gen.listOfN(txNum, transactionGen)
     } yield Block.from(deps, AVector.from(txs), config.maxMiningTarget, 0)
 
-  def chainGen(length: Int, block: Block)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
-    chainGen(length, block.hash)
+  def chainGenOf(length: Int, block: Block)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
+    chainGenOf(length, block.hash)
 
-  def chainGen(length: Int)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
-    chainGen(length, Hash.zero)
+  def chainGenOf(length: Int)(implicit config: ConsensusConfig): Gen[AVector[Block]] =
+    chainGenOf(length, Hash.zero)
 
-  def chainGen(length: Int, initialHash: Hash)(
+  def chainGenOf(length: Int, initialHash: Hash)(
       implicit config: ConsensusConfig): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen).map { blocks =>
       blocks.foldLeft(AVector.empty[Block]) {
@@ -80,29 +80,29 @@ object ModelGen {
   def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
     Gen.choose(0, config.groups - 1).map(n => GroupIndex.unsafe(n))
 
-  def cliqueId: Gen[CliqueId] =
+  def cliqueIdGen: Gen[CliqueId] =
     Gen.resultOf[Unit, CliqueId](_ => CliqueId.generate)
 
   def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] = {
     Gen.oneOf((1 to config.groups).filter(i => (config.groups % i) equals 0))
   }
 
-  def brokerInfo(implicit config: CliqueConfig): Gen[BrokerInfo] = {
+  def brokerInfoGen(implicit config: CliqueConfig): Gen[BrokerInfo] = {
     for {
       id      <- Gen.choose(0, config.brokerNum - 1)
-      address <- socketAddress
+      address <- socketAddressGen
     } yield BrokerInfo.unsafe(id, config.groupNumPerBroker, address)
   }
 
-  def cliqueInfo(implicit config: GroupConfig): Gen[CliqueInfo] = {
+  def cliqueInfoGen(implicit config: GroupConfig): Gen[CliqueInfo] = {
     for {
       groupNumPerBroker <- groupNumPerBrokerGen
-      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddress)
-      cid               <- cliqueId
+      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cid               <- cliqueIdGen
     } yield CliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
   }
 
-  val socketAddress: Gen[InetSocketAddress] =
+  lazy val socketAddressGen: Gen[InetSocketAddress] =
     for {
       ip0  <- Gen.choose(0, 255)
       ip1  <- Gen.choose(0, 255)
