@@ -128,7 +128,7 @@ lazy val benchmark = mainProject("benchmark")
   .settings(scalacOptions += "-Xdisable-assertions")
 
 lazy val flow = project("flow")
-  .dependsOn(crypto, io, serde, util % "it,test->test")
+  .dependsOn(crypto, io, serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       akka,
@@ -140,7 +140,7 @@ lazy val flow = project("flow")
   .dependsOn(protocol % "test->test;compile->compile")
 
 lazy val protocol = project("protocol")
-  .dependsOn(crypto, io, serde, util % "it,test->test")
+  .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       fastparse
@@ -201,7 +201,7 @@ val commonSettings = Seq(
     `akka-test`,
     scalacheck,
     scalatest,
-    scalatestplus,
+    scalatestplus
   )
 )
 
