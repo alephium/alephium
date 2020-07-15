@@ -8,7 +8,7 @@ import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
-class DiscoveryMessageSpec extends AlephiumSpec {
+class DiscoveryMessageSpec extends AlephiumSpec with DiscoveryMessageGenerators {
   import DiscoveryMessage.Code
 
   implicit val ordering: Ordering[Code[_]] = Ordering.by(Code.toInt(_))
@@ -61,7 +61,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
       def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
-    forAll(DiscoveryMessageGen.message(peerFixture.config)) { msg =>
+    forAll(messageGen(peerFixture.config)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
       val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).toOption.get
       msg is value

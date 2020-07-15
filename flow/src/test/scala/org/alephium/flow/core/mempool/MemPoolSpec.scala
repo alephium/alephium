@@ -3,17 +3,17 @@ package org.alephium.flow.core.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{GroupIndex, ModelGen, Transaction}
+import org.alephium.protocol.model.{GroupIndex, ModelGenerators, Transaction}
 import org.alephium.util.{AVector, LockFixture}
 
-class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
+class MemPoolSpec extends AlephiumFlowSpec with LockFixture with ModelGenerators {
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(GroupIndex.unsafe(0))
     pool.size is 0
   }
 
   it should "contain/add/remove for transactions" in {
-    forAll(ModelGen.blockGenNonEmpty) { block =>
+    forAll(blockGenNonEmpty) { block =>
       val group =
         GroupIndex.unsafe(config.brokerInfo.groupFrom + Random.nextInt(config.groupNumPerBroker))
       val pool  = MemPool.empty(group)
@@ -35,7 +35,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture {
   trait Fixture extends WithLock {
     val group       = GroupIndex.unsafe(0)
     val pool        = MemPool.empty(group)
-    val block       = ModelGen.blockGenFrom(group).retryUntil(_.transactions.nonEmpty).sample.get
+    val block       = blockGenOf(group).retryUntil(_.transactions.nonEmpty).sample.get
     val weightedTxs = block.transactions.map((_, 1.0))
     val txNum       = block.transactions.length
     val rwl         = pool._getLock

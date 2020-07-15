@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
+class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture with ModelGenerators {
 
   behavior of "ChainIndex"
 
@@ -19,7 +19,7 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
   }
 
   it should "compute the correct index" in {
-    forAll(ModelGen.blockGen) { block =>
+    forAll(blockGen) { block =>
       val index = block.chainIndex
 
       val hash2Int = BigInt(1, block.hash.bytes.takeRight(2).toArray)
@@ -30,7 +30,7 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture {
   }
 
   it should "equalize same values" in {
-    forAll(ModelGen.groupIndexGen, ModelGen.groupIndexGen) { (from, to) =>
+    forAll(groupIndexGen, groupIndexGen) { (from, to) =>
       val index1 = ChainIndex(from, to)
       val index2 = ChainIndex(from, to)
       index1 is index2

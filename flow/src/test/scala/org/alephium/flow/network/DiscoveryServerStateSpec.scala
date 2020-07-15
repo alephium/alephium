@@ -12,10 +12,10 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGen}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGenerators}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
-class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
+class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") with ModelGenerators {
   import DiscoveryServerSpec._
   import DiscoveryMessage._
 
@@ -36,14 +36,13 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
       def bootstrap: AVector[InetSocketAddress] = AVector.empty
 
       def selfCliqueInfo: CliqueInfo =
-        CliqueInfo.unsafe(
-          CliqueId.generate,
-          AVector.tabulate(config.brokerNum)(_ => ModelGen.socketAddress.sample.get),
-          config.groupNumPerBroker)
+        CliqueInfo.unsafe(CliqueId.generate,
+                          AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get),
+                          config.groupNumPerBroker)
 
       setSocket(ActorRefT[Udp.Command](socketProbe.ref))
     }
-    val peerClique: CliqueInfo = ModelGen.cliqueInfo.sample.get
+    val peerClique: CliqueInfo = cliqueInfoGen.sample.get
 
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
@@ -93,7 +92,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     override def scanFrequency: Duration = Duration.unsafe(0)
 
     addToTable(peerClique)
-    val peer0 = ModelGen.cliqueInfo.sample.get
+    val peer0 = cliqueInfoGen.sample.get
     state.tryPing(peer0)
     state.isPending(peer0.id) is true
     state.cleanup()
@@ -106,7 +105,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") {
     override def peersPerGroup: Int = 4
 
     state.getActivePeers.length is 0
-    val toAdds = Gen.listOfN(peersPerGroup - 1, ModelGen.cliqueInfo).sample.get
+    val toAdds = Gen.listOfN(peersPerGroup - 1, cliqueInfoGen).sample.get
     toAdds.foreach(addToTable)
 
     val peers0 = state.getNeighbors(peerClique.id)
