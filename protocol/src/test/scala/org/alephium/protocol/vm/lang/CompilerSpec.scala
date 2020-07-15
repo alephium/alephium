@@ -2,50 +2,55 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.crypto.ED25519
-import org.alephium.protocol.{vm, ALF}
-import org.alephium.protocol.vm.{StatelessContext, StatelessScript, StatelessVM, Val}
+import org.alephium.crypto.{Byte32, ED25519}
+import org.alephium.protocol.ALF
+import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off no.equal
-class CompilerSpec extends AlephiumSpec {
+class CompilerSpec extends AlephiumSpec with MockFactory {
   import Ast._
 
   it should "parse lexer" in {
+    val byte32 = Byte32.generate.toHexString
+
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
     fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse(s"@$byte32", Lexer.byte32(_)).get.value is Val.Byte32(
+      Byte32.unsafe(Hex.from(byte32).get))
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
-    fastparse.parse("U64", Lexer.tpe(_)).get.value is Val.U64
-    fastparse.parse("x: U64", Parser.argument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = false)
-    fastparse.parse("mut x: U64", Parser.argument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Val.U64, isMutable = true)
+    fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
+    fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
+    fastparse.parse("x: U64", StatelessParser.funcArgument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
+    fastparse.parse("mut x: U64", StatelessParser.funcArgument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
-    fastparse.parse("add", Lexer.callId(_)).get.value is Ast.CallId("add", false)
-    fastparse.parse("add!", Lexer.callId(_)).get.value is Ast.CallId("add", true)
+    fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
+    fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
   }
 
   it should "parse exprs" in {
-    fastparse.parse("x + y", Parser.expr(_)).get.value is
-      Binop(Add, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("x >= y", Parser.expr(_)).get.value is
-      Binop(Ge, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("(x + y)", Parser.expr(_)).get.value is
-      ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
-    fastparse.parse("(x + y) + (x + y)", Parser.expr(_)).get.value is
-      Binop(Add,
-            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
-            ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
-    fastparse.parse("x + y * z + u", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x + y", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
+    fastparse.parse("x >= y", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Ge, Variable(Ident("x")), Variable(Ident("y")))
+    fastparse.parse("(x + y)", StatelessParser.expr(_)).get.value is
+      ParenExpr[StatelessContext](Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+    fastparse.parse("(x + y) + (x + y)", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Add,
+                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
+                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+    fastparse.parse("x + y * z + u", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u")))
-    fastparse.parse("x < y <= y < z", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         And,
         Binop(
           And,
@@ -54,39 +59,46 @@ class CompilerSpec extends AlephiumSpec {
         ),
         Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
       )
-    fastparse.parse("x && y || z", Parser.expr(_)).get.value is
-      Binop(Or, Binop(And, Variable(Ident("x")), Variable(Ident("y"))), Variable(Ident("z")))
-    fastparse.parse("foo(x)", Parser.expr(_)).get.value is
-      Call(CallId("foo", false), List(Variable(Ident("x"))))
-    fastparse.parse("foo!(x)", Parser.expr(_)).get.value is
-      Call(CallId("foo", true), List(Variable(Ident("x"))))
-    fastparse.parse("foo(x + y) + bar!(x + y)", Parser.expr(_)).get.value is
-      Binop(
+    fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](Or,
+                              Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
+                              Variable(Ident("z")))
+    fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", false), List(Variable(Ident("x"))))
+    fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
+      ContractConv[StatelessContext](Ast.TypeId("Foo"), Variable(Ident("x")))
+    fastparse.parse("foo!(x)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", true), List(Variable(Ident("x"))))
+    fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
         Add,
-        Call(CallId("foo", false), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
-        Call(CallId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        CallExpr(FuncId("foo", false),
+                 List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
+        CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
   }
 
   it should "parse return" in {
-    fastparse.parse("return x, y", Parser.ret(_)).isSuccess is true
-    fastparse.parse("return x + y", Parser.ret(_)).isSuccess is true
-    fastparse.parse("return (x + y)", Parser.ret(_)).isSuccess is true
+    fastparse.parse("return x, y", StatelessParser.ret(_)).isSuccess is true
+    fastparse.parse("return x + y", StatelessParser.ret(_)).isSuccess is true
+    fastparse.parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
   }
 
   it should "parse statements" in {
-    fastparse.parse("let x = 1", Parser.statement(_)).isSuccess is true
-    fastparse.parse("x = 1", Parser.statement(_)).isSuccess is true
-    fastparse.parse("x = true", Parser.statement(_)).isSuccess is true
-    fastparse.parse("add(x, y)", Parser.statement(_)).isSuccess is true
+    fastparse.parse("let x = 1", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse
-      .parse("if x >= 1 { y = y + x } else { y = 0 }", Parser.statement(_))
+      .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
   }
 
   it should "parse functions" in {
     fastparse
-      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }", Parser.func(_))
+      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+             StatelessParser.func(_))
       .isSuccess is true
   }
 
@@ -94,7 +106,7 @@ class CompilerSpec extends AlephiumSpec {
     val contract =
       s"""
          |// comment
-         |contract Foo(mut x: U64, mut y: U64, c: U64) {
+         |TxContract Foo(mut x: U64, mut y: U64, c: U64) {
          |  // comment
          |  fn add0(a: U64, b: U64) -> (U64) {
          |    return (a + b)
@@ -113,10 +125,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    fastparse.parse(contract, Parser.contract(_)).isSuccess is true
-
-    val ast = fastparse.parse(contract, Parser.contract(_)).get.value
-    ast.check()
+    Compiler.compileContract(contract).isRight is true
   }
 
   it should "infer types" in {
@@ -130,7 +139,7 @@ class CompilerSpec extends AlephiumSpec {
               validity: Boolean = false) = {
       val contract =
         s"""
-         |contract Foo($xMut x: U64) {
+         |TxContract Foo($xMut x: U64) {
          |  fn add($a: $aType, $b: $bType) -> ($rType) {
          |    x = a + b
          |    return (a - b)
@@ -141,8 +150,7 @@ class CompilerSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-      val ast = fastparse.parse(contract, Parser.contract(_)).get.value
-      if (validity) ast.check() else assertThrows[Compiler.Error](ast.check())
+      Compiler.compileContract(contract).isRight is validity
     }
 
     check("mut", "a", "U64", "b", "U64", "U64", "foo", true)
@@ -156,22 +164,51 @@ class CompilerSpec extends AlephiumSpec {
     check("mut", "a", "U64", "b", "U64", "U64", "add")
   }
 
+  it should "parse multiple contracts" in {
+    val input =
+      s"""
+         |TxContract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |    return bar.foo()
+         |  }
+         |
+         |  fn bar() -> () {
+         |    return
+         |  }
+         |}
+         |
+         |TxScript Bar {
+         |  fn bar(foo: Foo) -> () {
+         |    return foo.bar()
+         |  }
+         |
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(input, 0).isRight is true
+    Compiler.compileTxScript(input, 1).isRight is true
+  }
+
   trait Fixture {
     def test(input: String,
              args: AVector[Val],
              output: AVector[Val] = AVector.empty,
              fields: AVector[Val] = AVector.empty): Assertion = {
-      val contract = Compiler.compile(input).toOption.get
+      val contract = Compiler.compileContract(input).toOption.get
 
-      deserialize[StatelessScript](serialize(contract)) isE contract
-      StatelessVM.execute(StatelessContext.test, contract, fields, args) isE output
+      deserialize[StatefulContract](serialize(contract)) isE contract
+      val context = StatefulContext(ALF.Hash.zero, mockWorldState)
+      val obj     = contract.toObject(ALF.Hash.zero, fields)
+      StatefulVM.execute(context, obj, 0, args) isE output
     }
   }
 
   it should "generate IR code" in new Fixture {
     val input =
       s"""
-         |contract Foo(x: U64) {
+         |TxContract Foo(x: U64) {
          |
          |  fn add(a: U64) -> (U64) {
          |    return square(x) + square(a)
@@ -190,35 +227,35 @@ class CompilerSpec extends AlephiumSpec {
   }
 
   it should "verify signature" in {
-    val input =
+    def input(hash: ALF.Hash) =
       s"""
-         |contract P2PKH(hash: Byte32) {
+         |AssetScript P2PKH {
          |  fn verify(pk: Byte32) -> () {
+         |    let hash = @${hash.toHexString}
          |    checkEq!(hash, keccak256!(pk))
          |    checkSignature!(pk)
          |    return
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compile(input).toOption.get
-
-    deserialize[StatelessScript](serialize(contract)) isE contract
 
     val (priKey, pubKey) = ED25519.generatePriPub()
     val pubKeyHash       = ALF.Hash.hash(pubKey.bytes)
     val signature        = ED25519.sign(ALF.Hash.zero.bytes, priKey)
-    StatelessVM.execute(
-      StatelessContext(ALF.Hash.zero, vm.Stack.unsafe(AVector(signature), 1)),
-      contract,
-      AVector(Val.Byte32(pubKeyHash.toByte32)),
-      AVector(Val.Byte32(pubKey.toByte32))
-    ) isE AVector.empty[Val]
+
+    val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
+    deserialize[StatelessScript](serialize(script)) isE script
+
+    val args = AVector[Val](Val.Byte32(pubKey.toByte32))
+    StatelessVM
+      .runAssetScript(mockWorldState, ALF.Hash.zero, script, args, signature)
+      .isRight is true
   }
 
   it should "converse values" in new Fixture {
     test(
       s"""
-         |contract Conversion() {
+         |TxContract Conversion() {
          |  fn main() -> () {
          |    let mut x = 5u
          |    x = u64!(5i)
@@ -235,7 +272,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test while" in new Fixture {
     test(
       s"""
-         |contract While() {
+         |TxContract While() {
          |  fn main() -> (U64) {
          |    let mut x = 5
          |    let mut done = false
@@ -255,7 +292,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test the following typical examples" in new Fixture {
     test(
       s"""
-         |contract Main() {
+         |TxContract Main() {
          |
          |  fn main() -> () {
          |    let an_i64 = 5i // Suffix annotation
@@ -288,7 +325,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: I64) -> (I64) {
          |    if n < 2i {
          |      return n
@@ -304,7 +341,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: U64) -> (U64) {
          |    if n < 2 {
          |      return n
@@ -320,7 +357,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: I256) -> (I256) {
          |    if n < 2I {
          |      return n
@@ -336,7 +373,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Fibonacci() {
+         |TxContract Fibonacci() {
          |  fn f(n: U256) -> (U256) {
          |    if n < 2U {
          |      return n
@@ -352,7 +389,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Test() {
+         |TxContract Test() {
          |  fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
          |    let b0 = 1 == 1
          |    let b1 = 1 == 2
@@ -387,7 +424,7 @@ class CompilerSpec extends AlephiumSpec {
 
     test(
       s"""
-         |contract Foo() {
+         |TxContract Foo() {
          |  fn f(mut n: U64) -> (U64) {
          |    if n < 2 {
          |      n = n + 1
@@ -404,7 +441,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "execute quasi uniswap" in new Fixture {
     val contract =
       s"""
-         |contract Uniswap(
+         |TxContract Uniswap(
          |  mut alfReserve: U64,
          |  mut btcReserve: U64
          |) {
@@ -436,7 +473,7 @@ class CompilerSpec extends AlephiumSpec {
   it should "test operator precedence" in new Fixture {
     val contract =
       s"""
-         |contract Operator() {
+         |TxContract Operator() {
          |  fn main() -> (U64, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
          |    let y = 1 < 2 <= 2 < 3

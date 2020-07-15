@@ -81,7 +81,7 @@ class AlephiumMake(object):
         run('sbt app/stage')
 
     def test(self):
-        run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport')
+        run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
 
     def itest(self):
         run('sbt it:scalafmt it:scalastyle it:test')

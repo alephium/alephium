@@ -4,11 +4,12 @@ import java.nio.file.Path
 
 import org.rocksdb.WriteOptions
 
-import org.alephium.flow.io.RocksDBSource.ColumnFamily
-import org.alephium.flow.trie.MerklePatriciaTrie.Node
-import org.alephium.flow.trie.WorldState
+import org.alephium.io.{IOResult, KeyValueSource, RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.io.MerklePatriciaTrie.Node
+import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
 
 object Storages {
@@ -33,7 +34,7 @@ object Storages {
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
-    val trieHashStorage   = TrieHashRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
+    val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
     val emptyWorldState   = WorldState.empty(trieStorage)
 
     Storages(AVector(db, blockStorage.source),
@@ -56,7 +57,7 @@ final case class Storages(
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
     emptyWorldState: WorldState,
-    trieHashStorage: TrieHashStorage,
+    trieHashStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage
 ) extends KeyValueSource {

@@ -1,6 +1,7 @@
 package org.alephium.flow.io
 
 import org.alephium.flow.core.BlockHashChain
+import org.alephium.io.IOResult
 
 trait ChainStateStorage {
   def updateState(state: BlockHashChain.State): IOResult[Unit]

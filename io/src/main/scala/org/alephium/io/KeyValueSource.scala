@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 trait KeyValueSource {
   def close(): IOResult[Unit]

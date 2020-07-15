@@ -1,10 +1,8 @@
-package org.alephium.flow.trie
+package org.alephium.io
 
 import akka.util.ByteString
 
-import org.alephium.flow.io.{IOError, IOResult, KeyValueStorage}
-import org.alephium.flow.trie.MerklePatriciaTrie.Node
-import org.alephium.protocol.ALF.Hash
+import org.alephium.crypto.{Keccak256 => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 
@@ -188,9 +186,11 @@ object MerklePatriciaTrie {
 }
 
 // TODO: batch mode
-final class MerklePatriciaTrie[K: Serde, V: Serde](val rootHash: Hash,
-                                                   storage: KeyValueStorage[Hash, Node]) {
-  import MerklePatriciaTrie.{BranchNode, LeafNode, Node, TrieUpdateActions, getNibble}
+final class MerklePatriciaTrie[K: Serde, V: Serde](
+    val rootHash: Hash,
+    storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
+) {
+  import MerklePatriciaTrie._
 
   def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie[K, V]] = {
     result.toAdd
@@ -207,7 +207,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](val rootHash: Hash,
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
-      case None        => Left(IOError.RocksDB.keyNotFound)
+      case None        => Left(IOError.KeyNotFound(key))
       case Some(value) => Right(value)
     }
   }

@@ -2,6 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
+import org.alephium.protocol.ALF
 import org.alephium.util.{AVector, Collection}
 
 class Frame[Ctx <: Context](var pc: Int,
@@ -32,7 +33,7 @@ class Frame[Ctx <: Context](var pc: Int,
   def pop(): ExeResult[Val] = opStack.pop()
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def popT[T](): ExeResult[T] = pop().flatMap { elem =>
+  def popT[T <: Val](): ExeResult[T] = pop().flatMap { elem =>
     try Right(elem.asInstanceOf[T])
     catch {
       case _: ClassCastException => Left(InvalidType(elem))
@@ -69,8 +70,15 @@ class Frame[Ctx <: Context](var pc: Int,
     }
   }
 
+  def updateState(): ExeResult[Unit] = {
+    obj.addressOpt match {
+      case Some(address) => ctx.updateState(address, AVector.from(obj.fields))
+      case None          => Right(())
+    }
+  }
+
   private def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    obj.code.methods.get(index).toRight(InvalidMethodIndex(index))
+    obj.getMethod(index).toRight(InvalidMethodIndex(index))
   }
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]] = {
@@ -92,7 +100,8 @@ class Frame[Ctx <: Context](var pc: Int,
             execute()
           case Left(e) => Left(e)
         }
-      case None => Right(())
+      case None =>
+        updateState()
     }
   }
 }
@@ -113,13 +122,30 @@ object Frame {
     build(ctx, obj, method, args, returnTo)
   }
 
-  def build[Ctx <: Context](ctx: Ctx,
-                            obj: ContractObj[Ctx],
-                            method: Method[Ctx],
-                            args: AVector[Val],
-                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
+  private[Frame] def build[Ctx <: Context](
+      ctx: Ctx,
+      obj: ContractObj[Ctx],
+      method: Method[Ctx],
+      args: AVector[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
     new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
+  }
+
+  def externalMethodFrame[C <: StatefulContext](
+      frame: Frame[C],
+      contractKey: ALF.Hash,
+      index: Int
+  ): ExeResult[Frame[StatefulContext]] = {
+    for {
+      contractObj <- frame.ctx.worldState
+        .getContractObj(contractKey)
+        .left
+        .map[ExeFailure](IOErrorLoadContract)
+      method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
+      args   <- frame.opStack.pop(method.localsType.length)
+      _      <- method.check(args)
+    } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack.push)
   }
 }

@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
@@ -34,7 +34,7 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def getRawUnsafe(key: ByteString): ByteString = {
     val result = db.get(handle, readOptions, key.toArray)
-    if (result == null) throw IOError.RocksDB.keyNotFound.e
+    if (result == null) throw IOError.KeyNotFound(key)
     else ByteString.fromArrayUnsafe(result)
   }
 

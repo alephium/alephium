@@ -1,8 +1,8 @@
 package org.alephium.flow.core.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.io.IOResult
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.IOResult
 import org.alephium.protocol.model.Block
 
 object BlockValidation extends Validation[Block, BlockStatus]() {

@@ -5,9 +5,9 @@ import scala.collection.mutable
 import akka.actor.Props
 
 import org.alephium.flow.client.Miner
-import org.alephium.flow.io.{IOError, IOResult, IOUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
@@ -235,7 +235,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
     val timeSpan = {
       chain.getBlockHeader(header.parentHash) match {
-        case Left(_) => "???ms"
+        case Left(_) => "?ms"
         case Right(parentHeader) =>
           val span = header.timestamp.millis - parentHeader.timestamp.millis
           s"${span}ms"

@@ -5,7 +5,8 @@ import scala.language.reflectiveCalls
 import org.scalatest.Assertion
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.{ChainStateStorage, IOResult}
+import org.alephium.flow.io.ChainStateStorage
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.ChainIndex

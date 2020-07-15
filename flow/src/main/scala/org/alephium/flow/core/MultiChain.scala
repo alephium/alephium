@@ -2,9 +2,9 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import org.alephium.flow.io.IOResult
 import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}

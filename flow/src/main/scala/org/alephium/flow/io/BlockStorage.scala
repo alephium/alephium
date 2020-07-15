@@ -2,13 +2,14 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
+import org.alephium.io.{AbstractKeyValueStorage, IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.Block
 import org.alephium.serde.{Serde, Serializer}
 import org.alephium.util.LruCache
 
 object BlockStorage {
-  import IOUtils._
+  import org.alephium.io.IOUtils._
 
   def create(root: Path, blocksFolder: String, cacheCapacity: Int): IOResult[BlockStorage] =
     tryExecute {

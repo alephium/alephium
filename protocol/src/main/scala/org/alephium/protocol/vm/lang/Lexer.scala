@@ -5,30 +5,30 @@ import java.math.BigInteger
 import fastparse._
 import fastparse.NoWhitespace._
 
+import org.alephium.crypto.Byte32
 import org.alephium.protocol.vm.Val
-import org.alephium.util.{I256, I64, U256, U64}
+import org.alephium.util._
 
 // scalastyle:off number.of.methods
 object Lexer {
   def lowercase[_: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[_: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[_: P]: P[Unit]     = P(CharIn("0-9"))
+  def hex[_: P]: P[Unit]       = P(CharsWhileIn("0-9a-fA-F"))
   def letter[_: P]: P[Unit]    = P(lowercase | uppercase)
   def newline[_: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
   def ident[_: P]: P[Ast.Ident] =
-    P(letter ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
-  def callId[_: P]: P[Ast.CallId] = P(ident ~ "!".?.!).map {
-    case (id, postfix) => Ast.CallId(id.name, postfix.nonEmpty)
+    P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
+  def typeId[_: P]: P[Ast.TypeId] =
+    P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
+  def funcId[_: P]: P[Ast.FuncId] = P(ident ~ "!".?.!).map {
+    case (id, postfix) => Ast.FuncId(id.name, postfix.nonEmpty)
   }
 
   private[lang] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)
   }
-  val types: Map[String, Val.Type] =
-    Val.Type.types.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
-  def tpe[_: P]: P[Val.Type] =
-    P(ident).filter(id => types.contains(id.name)).map(id => types.apply(id.name))
 
   def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
   def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
@@ -36,7 +36,7 @@ object Lexer {
   def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[_: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
-  def hexNum[_: P]: P[BigInteger] = P("0x" ~ CharsWhileIn("0-9A-F")).!.map(new BigInteger(_, 16))
+  def hexNum[_: P]: P[BigInteger] = P("0x" ~ hex).!.map(new BigInteger(_, 16))
   def decNum[_: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
   def num[_: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
   def negatable[_: P](p: => P[BigInteger]): P[BigInteger] = ("-".?.! ~ p).map {
@@ -73,6 +73,18 @@ object Lexer {
           }
       }
 
+  def byte32Internal[_: P]: P[Val] = P(hex).!.map { hexString =>
+    val byte32Opt = for {
+      hex    <- Hex.from(hexString)
+      byte32 <- Byte32.from(hex)
+    } yield byte32
+    byte32Opt match {
+      case Some(byte32) => Val.Byte32(byte32)
+      case None         => throw Compiler.Error(s"Invalid Byte32 value: $hexString")
+    }
+  }
+  def byte32[_: P]: P[Val] = P("@" ~ byte32Internal)
+
   def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
     case "true" => Val.Bool(true)
     case _      => Val.Bool(false)
@@ -95,6 +107,9 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("contract", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
+    Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
   // format: on
+
+  val primTpes: Map[String, Type] =
+    Type.primitives.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
 }

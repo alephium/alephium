@@ -6,9 +6,9 @@ import akka.actor.ActorSystem
 
 import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Node
-import org.alephium.flow.io.RocksDBSource.Settings
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.clique.BrokerHandler
+import org.alephium.io.RocksDBSource.Settings
 
 trait Mode extends Stoppable {
   implicit def config: PlatformConfig

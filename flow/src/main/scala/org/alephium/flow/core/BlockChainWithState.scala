@@ -3,15 +3,16 @@ package org.alephium.flow.core
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.flow.trie.WorldState
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.vm.WorldState
 
 trait BlockChainWithState extends BlockChain {
-  def trieHashStorage: TrieHashStorage
+  def trieHashStorage: WorldStateStorage
 
-  def getTrie(hash: Hash): IOResult[WorldState] = {
-    trieHashStorage.getTrie(hash)
+  def getWorldState(hash: Hash): IOResult[WorldState] = {
+    trieHashStorage.getCachedWorldState(hash)
   }
 
   protected def addTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
@@ -22,10 +23,11 @@ trait BlockChainWithState extends BlockChain {
 
   override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     for {
-      oldTrie <- getTrie(block.parentHash)
-      newTrie <- updateState(oldTrie, block)
-      _       <- addTrie(block.hash, newTrie)
-      _       <- super.add(block, weight)
+      oldWorldState <- getWorldState(block.parentHash)
+      _             <- persistBlock(block)
+      newWorldState <- updateState(oldWorldState, block)
+      _             <- addTrie(block.hash, newWorldState)
+      _             <- add(block.header, weight)
     } yield ()
   }
 }

@@ -4,9 +4,8 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.flow.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.flow.trie.MerklePatriciaTrie
-import org.alephium.flow.trie.MerklePatriciaTrie.Node
+import org.alephium.io.{KeyValueStorage, MerklePatriciaTrie, RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.io.MerklePatriciaTrie.Node
 import org.alephium.protocol.ALF.Hash
 import org.alephium.util.Files
 

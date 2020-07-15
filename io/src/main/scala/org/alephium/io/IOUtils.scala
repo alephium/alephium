@@ -1,15 +1,14 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import java.io.IOException
 import java.nio.file.{Files, Path}
 
 import org.rocksdb.RocksDBException
 
+import org.alephium.io.IOError.KeyNotFound
 import org.alephium.serde.SerdeError
 
 object IOUtils {
-  import IOError._
-
   def createDirUnsafe(path: Path): Unit = {
     if (!Files.exists(path)) {
       Files.createDirectory(path)
@@ -49,9 +48,10 @@ object IOUtils {
 
   @inline
   def error[T]: PartialFunction[Throwable, IOResult[T]] = {
-    case e: IOException       => Left(JavaIO(e))
-    case e: SecurityException => Left(JavaSecurity(e))
-    case e: RocksDBException  => Left(RocksDB(e))
-    case e: SerdeError        => Left(Serde(e))
+    case e: IOException       => Left(IOError.JavaIO(e))
+    case e: SecurityException => Left(IOError.JavaSecurity(e))
+    case e: RocksDBException  => Left(IOError.RocksDB(e))
+    case e: SerdeError        => Left(IOError.Serde(e))
+    case e: KeyNotFound[_]    => Left(e)
   }
 }

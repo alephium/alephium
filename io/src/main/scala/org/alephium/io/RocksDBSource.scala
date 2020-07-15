@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import java.nio.file.Path
 
@@ -148,8 +148,8 @@ object RocksDBSource {
 
 class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle])
     extends KeyValueSource {
-  import RocksDBSource._
   import IOUtils.tryExecute
+  import RocksDBSource._
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))

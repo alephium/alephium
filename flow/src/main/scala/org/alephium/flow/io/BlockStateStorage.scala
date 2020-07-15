@@ -3,8 +3,9 @@ package org.alephium.flow.io
 import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
-import org.alephium.flow.io.RocksDBSource.ColumnFamily
 import org.alephium.flow.model.BlockState
+import org.alephium.io._
+import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.ALF.Hash
 
 trait BlockStateStorage extends KeyValueStorage[Hash, BlockState] {

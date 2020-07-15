@@ -1,4 +1,4 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import akka.util.ByteString
 
@@ -72,4 +72,5 @@ trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyVal
   def deleteUnsafe(key: K): Unit = {
     deleteRawUnsafe(storageKey(key))
   }
+
 }

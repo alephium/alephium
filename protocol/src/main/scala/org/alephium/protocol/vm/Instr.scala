@@ -5,7 +5,8 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, Keccak256}
+import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
+import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -36,13 +37,14 @@ object Instr {
   implicit val statefulSerde: Serde[Instr[StatefulContext]] = new Serde[Instr[StatefulContext]] {
     override def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
 
+    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     override def _deserialize(
         input: ByteString): SerdeResult[(Instr[StatefulContext], ByteString)] = {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
           SerdeError.validation(s"Instruction - invalid code $code"))
-        output <- instrCompanion.deserialize[StatefulContext](input)
+        output <- instrCompanion.deserialize[StatefulContext](input.tail)
       } yield output
     }
   }
@@ -63,6 +65,7 @@ object Instr {
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I64Const, U64Const, I256Const, U256Const,
+    Byte32Const,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
@@ -86,14 +89,14 @@ object Instr {
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
     Keccak256Byte32, Keccak256ByteVec, CheckSignature
   )
-  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs
+  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++ ArraySeq(CallExternal)
   // format: on
 
   val toCode: Map[InstrCompanion[StatefulContext], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-sealed trait StatelessInstr extends Instr[StatelessContext]
 sealed trait StatefulInstr  extends Instr[StatefulContext]
+sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext]
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
@@ -107,6 +110,21 @@ sealed abstract class InstrCompanion1[T: Serde] extends InstrCompanion[Stateless
   @inline def from[C <: StatelessContext](t: T): Instr[C] = apply(t)
 
   override def deserialize[C <: StatelessContext](
+      input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
+    serdeImpl[T]._deserialize(input).map {
+      case (t, rest) => (from(t), rest)
+    }
+  }
+}
+
+sealed abstract class StatefulInstrCompanion1[T: Serde] extends InstrCompanion[StatefulContext] {
+  lazy val code: Byte = Instr.toCode(this).toByte
+
+  def apply(t: T): Instr[StatefulContext]
+
+  @inline def from[C <: StatefulContext](t: T): Instr[C] = apply(t)
+
+  override def deserialize[C <: StatefulContext](
       input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
     serdeImpl[T]._deserialize(input).map {
       case (t, rest) => (from(t), rest)
@@ -200,10 +218,10 @@ sealed trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
 }
 
 sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
-  def n: T
+  def const: T
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.push(n)
+    frame.push(const)
   }
 }
 
@@ -240,26 +258,32 @@ object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsa
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
-final case class I64Const(n: Val.I64) extends ConstInstr1[Val.I64] {
+final case class I64Const(const: Val.I64) extends ConstInstr1[Val.I64] {
   override def serialize(): ByteString =
-    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(n.v)
+    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(const.v)
 }
 object I64Const extends InstrCompanion1[Val.I64]
-final case class U64Const(n: Val.U64) extends ConstInstr1[Val.U64] {
+final case class U64Const(const: Val.U64) extends ConstInstr1[Val.U64] {
   override def serialize(): ByteString =
-    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(n.v)
+    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(const.v)
 }
 object U64Const extends InstrCompanion1[Val.U64]
-final case class I256Const(n: Val.I256) extends ConstInstr1[Val.I256] {
+final case class I256Const(const: Val.I256) extends ConstInstr1[Val.I256] {
   override def serialize(): ByteString =
-    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(n.v)
+    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(const.v)
 }
 object I256Const extends InstrCompanion1[Val.I256]
-final case class U256Const(n: Val.U256) extends ConstInstr1[Val.U256] {
+final case class U256Const(const: Val.U256) extends ConstInstr1[Val.U256] {
   override def serialize(): ByteString =
-    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(n.v)
+    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(const.v)
 }
 object U256Const extends InstrCompanion1[Val.U256]
+
+final case class Byte32Const(const: Val.Byte32) extends ConstInstr1[Val.Byte32] {
+  override def serialize(): ByteString =
+    ByteString(Byte32Const.code) ++ serdeImpl[Byte32].serialize(const.v)
+}
+object Byte32Const extends InstrCompanion1[Val.Byte32]
 
 // Note: 0 <= index <= 0xFF
 final case class LoadLocal(index: Byte) extends OperandStackInstr {
@@ -811,7 +835,7 @@ final case class IfFalse(offset: Byte) extends IfJumpInstr {
 }
 case object IfFalse extends InstrCompanion1[Byte]
 
-sealed trait BranchInstr[T] extends ControlInstr {
+sealed trait BranchInstr[T <: Val] extends ControlInstr {
   def code: Byte
   def offset: Byte
   def condition(value1: T, value2: T): Boolean
@@ -995,8 +1019,8 @@ final case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
 }
 object IfGeU256 extends InstrCompanion1[Byte]
 
-sealed trait CallInstr extends StatelessInstr
-final case class CallLocal(index: Byte) extends CallInstr {
+sealed trait CallInstr
+final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr {
   override def serialize(): ByteString = ByteString(CallLocal.code, index)
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1006,8 +1030,19 @@ final case class CallLocal(index: Byte) extends CallInstr {
     } yield ()
   }
 }
-object CallLocal          extends InstrCompanion1[Byte]
-sealed trait CallExternal extends CallInstr
+object CallLocal extends InstrCompanion1[Byte]
+final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr {
+  override def serialize(): ByteString = ByteString(CallExternal.code, index)
+
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractKey <- frame.popT[Val.Byte32]().map(byte32 => ALF.Hash.unsafe(byte32.v.bytes))
+      newFrame    <- Frame.externalMethodFrame(frame, contractKey, Bytes.toPosInt(index))
+      _           <- newFrame.execute()
+    } yield ()
+  }
+}
+object CallExternal extends StatefulInstrCompanion1[Byte]
 
 sealed trait ReturnInstr extends StatelessInstr
 case object Return extends ReturnInstr with InstrCompanion0 {
@@ -1027,7 +1062,7 @@ sealed trait HashAlg       extends CryptoInstr
 sealed trait Signature     extends CryptoInstr
 sealed trait EllipticCurve extends CryptoInstr
 
-sealed trait CheckEqT[T] extends CryptoInstr with InstrCompanion0 {
+sealed trait CheckEqT[T <: Val] extends CryptoInstr with InstrCompanion0 {
   def check(x: T, y: T): ExeResult[Unit] = {
     if (x == y) Right(()) else Left(EqualityFailed)
   }
@@ -1056,7 +1091,7 @@ case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
 case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
 
-sealed abstract class Keccak256T[T] extends HashAlg with InstrCompanion0 {
+sealed abstract class Keccak256T[T <: Val] extends HashAlg with InstrCompanion0 {
   def convert(t: T): ByteString
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

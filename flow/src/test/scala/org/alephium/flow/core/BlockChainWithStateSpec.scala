@@ -1,11 +1,12 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.{IOResult, Storages}
-import org.alephium.flow.io.RocksDBSource.Settings
-import org.alephium.flow.trie.WorldState
+import org.alephium.flow.io.Storages
+import org.alephium.io.IOResult
+import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec {
@@ -24,7 +25,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
           updateStateForOutputs(worldState, outputs)
         case OutBlockCache(_, _) =>
           Right(worldState)
-        case InOutBlockCache(outputs, _) =>
+        case InOutBlockCache(outputs, _, _) =>
           updateStateForOutputs(worldState, outputs)
       }
     }

@@ -1,8 +1,8 @@
-package org.alephium.flow.io
+package org.alephium.io
 
 import org.rocksdb.{ReadOptions, WriteOptions}
 
-import org.alephium.flow.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.Settings
 
 trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): S =
