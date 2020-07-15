@@ -4,7 +4,7 @@ import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util._
 
-class VMSpec extends AlephiumSpec {
+class VMSpec extends AlephiumSpec with MockFactory {
   it should "execute the following script" in {
     val method =
       Method[StatefulContext](
@@ -13,7 +13,7 @@ class VMSpec extends AlephiumSpec {
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return))
     val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
     val obj      = contract.toObject(ALF.Hash.zero, AVector(Val.U64(U64.Zero), Val.U64(U64.One)))
-    StatefulVM.execute(StatefulContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
+    StatefulVM.execute(mockStatefulContext, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
       Val.U64(U64.unsafe(8)))
   }
 
@@ -27,7 +27,7 @@ class VMSpec extends AlephiumSpec {
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
     val script = StatelessScript(methods = AVector(method0, method1))
     val obj    = script.toObject
-    StatelessVM.execute(StatelessContext.mock, obj, 0, AVector(Val.U64(U64.Two))) isE
+    StatelessVM.execute(mockStatelessContext, obj, 0, AVector(Val.U64(U64.Two))) isE
       AVector[Val](Val.U64(U64.unsafe(3)))
   }
 

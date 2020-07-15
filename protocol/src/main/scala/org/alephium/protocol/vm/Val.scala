@@ -67,11 +67,10 @@ object Val {
       }
   }
 
-  def isNumeric(tpe: Type): Boolean = (tpe.id >= 2 && tpe.id <= 5)
-
   sealed trait Type {
     def id: scala.Byte
     def default: Val
+    def isNumeric: Boolean
   }
   object Type {
     implicit val serde: Serde[Type] =
@@ -121,28 +120,32 @@ object Val {
   }
 
   object Bool extends Type {
-    override val id: scala.Byte = 0.toByte
-    override def default: Bool  = Bool(false)
+    override val id: scala.Byte     = 0.toByte
+    override def default: Bool      = Bool(false)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "Bool"
   }
   object Byte extends Type {
-    override val id: scala.Byte = 1.toByte
-    override def default: Byte  = Byte(0.toByte)
+    override val id: scala.Byte     = 1.toByte
+    override def default: Byte      = Byte(0.toByte)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "Byte"
   }
   object I64 extends Type {
-    implicit val serde: Serde[I64] = i64Serde.xmap(I64(_), _.v)
-    override val id: scala.Byte    = 2.toByte
-    override def default: I64      = I64(util.I64.Zero)
+    implicit val serde: Serde[I64]  = i64Serde.xmap(I64(_), _.v)
+    override val id: scala.Byte     = 2.toByte
+    override def default: I64       = I64(util.I64.Zero)
+    override def isNumeric: Boolean = true
 
     override def toString: String = "I64"
   }
   object U64 extends Type {
-    implicit val serde: Serde[U64] = u64Serde.xmap(U64(_), _.v)
-    override val id: scala.Byte    = 3.toByte
-    override def default: U64      = U64(util.U64.Zero)
+    implicit val serde: Serde[U64]  = u64Serde.xmap(U64(_), _.v)
+    override val id: scala.Byte     = 3.toByte
+    override def default: U64       = U64(util.U64.Zero)
+    override def isNumeric: Boolean = true
 
     override def toString: String = "U64"
   }
@@ -150,6 +153,7 @@ object Val {
     implicit val serde: Serde[I256] = i256Serde.xmap(I256(_), _.v)
     override val id: scala.Byte     = 4.toByte
     override def default: I256      = I256(util.I256.Zero)
+    override def isNumeric: Boolean = true
 
     override def toString: String = "I256"
   }
@@ -157,6 +161,7 @@ object Val {
     implicit val serde: Serde[U256] = u256Serde.xmap(U256(_), _.v)
     override val id: scala.Byte     = 5.toByte
     override def default: U256      = U256(util.U256.Zero)
+    override def isNumeric: Boolean = true
 
     override def toString: String = "U256"
   }
@@ -164,6 +169,7 @@ object Val {
     implicit val serde: Serde[Byte32] = serdeImpl[crypto.Byte32].xmap(Byte32(_), _.v)
     override val id: scala.Byte       = 6.toByte
     override def default: Byte32      = Byte32(crypto.Byte32.zero)
+    override def isNumeric: Boolean   = false
 
     override def toString: String = "Byte32"
 
@@ -171,44 +177,51 @@ object Val {
   }
 
   object BoolVec extends Type {
-    override val id: scala.Byte   = 7.toByte
-    override def default: BoolVec = BoolVec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 7.toByte
+    override def default: BoolVec   = BoolVec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "BoolVec"
   }
   object ByteVec extends Type {
-    override val id: scala.Byte   = 8.toByte
-    override def default: ByteVec = ByteVec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 8.toByte
+    override def default: ByteVec   = ByteVec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "ByteVec"
   }
   object I64Vec extends Type {
-    override val id: scala.Byte  = 9.toByte
-    override def default: I64Vec = I64Vec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 9.toByte
+    override def default: I64Vec    = I64Vec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "I64Vec"
   }
   object U64Vec extends Type {
-    override val id: scala.Byte  = 10.toByte
-    override def default: U64Vec = U64Vec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 10.toByte
+    override def default: U64Vec    = U64Vec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "U64Vec"
   }
   object I256Vec extends Type {
-    override val id: scala.Byte   = 11.toByte
-    override def default: I256Vec = I256Vec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 11.toByte
+    override def default: I256Vec   = I256Vec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "I256Vec"
   }
   object U256Vec extends Type {
-    override val id: scala.Byte   = 12.toByte
-    override def default: U256Vec = U256Vec(ArrayBuffer.empty)
+    override val id: scala.Byte     = 12.toByte
+    override def default: U256Vec   = U256Vec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "U256Vec"
   }
   object Byte32Vec extends Type {
     override val id: scala.Byte     = 13.toByte
     override def default: Byte32Vec = Byte32Vec(ArrayBuffer.empty)
+    override def isNumeric: Boolean = false
 
     override def toString: String = "Byte32Vec"
   }

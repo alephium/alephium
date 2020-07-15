@@ -49,9 +49,6 @@ object StatelessContext {
             signatures: Stack[ED25519Signature],
             worldState: WorldState): StatelessContext =
     new StatelessContext(txHash, signatures, worldState)
-
-  val mock: StatelessContext =
-    StatelessContext(Hash.zero, Stack.ofCapacity[ED25519Signature](0), WorldState.mock)
 }
 
 class StatefulContext(override val txHash: Hash, private val _worldState: WorldState)
@@ -60,6 +57,4 @@ class StatefulContext(override val txHash: Hash, private val _worldState: WorldS
 object StatefulContext {
   def apply(txHash: Hash, worldState: WorldState): StatefulContext =
     new StatefulContext(txHash, worldState)
-
-  val mock: StatefulContext = StatefulContext(Hash.zero, WorldState.mock)
 }

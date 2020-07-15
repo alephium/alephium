@@ -144,14 +144,6 @@ object WorldState {
     Persisted(emptyOutputTrie, emptyContractTrie)
   }
 
-  val mock: WorldState = {
-    val outputState: MerklePatriciaTrie[TxOutputRef, TxOutput] =
-      MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
-    val contractState: MerklePatriciaTrie[ALF.Hash, AVector[Val]] =
-      MerklePatriciaTrie(ALF.Hash.zero, KeyValueStorage.mock[ALF.Hash, MerklePatriciaTrie.Node])
-    Cached(Persisted(outputState, contractState), Set.empty, Map.empty, Map.empty)
-  }
-
   final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
     def toWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Persisted = {
       val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
