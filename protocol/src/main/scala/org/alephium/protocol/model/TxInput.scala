@@ -29,10 +29,10 @@ object TxInput {
 
 /**
   *
-  * @param scriptHint short index of [[LockupScript]] for quick outputs query
+  * @param scriptHint short index of LockupScript for quick outputs query
   *                   0 is reserved for contract outputs
-  * @param key hash of the hash of transaction and index of the [[AssetOutput]];
-  *            or hash of the first signature for [[ContractOutput]]
+  * @param key hash of the hash of transaction and index of the AssetOutput;
+  *            or hash of the first signature for ContractOutput
   */
 final case class TxOutputRef(scriptHint: Int, key: ALF.Hash) {
   def isContractRef: Boolean = scriptHint == 0

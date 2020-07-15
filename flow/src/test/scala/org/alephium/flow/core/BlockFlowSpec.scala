@@ -119,11 +119,16 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
          |  }
          |}
          |""".stripMargin
-    val script1  = Compiler.compileTxScript(input1, 1).toOption.get
-    val newState = AVector[Val](Val.U64(U64.One))
-    val block1   = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    val script1   = Compiler.compileTxScript(input1, 1).toOption.get
+    val newState1 = AVector[Val](Val.U64(U64.One))
+    val block1    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block1, 2)
-    checkState(blockFlow, chainIndex, contractKey0, newState)
+    checkState(blockFlow, chainIndex, contractKey0, newState1)
+
+    val newState2 = AVector[Val](Val.U64(U64.Two))
+    val block2    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    addAndCheck(blockFlow, block2, 3)
+    checkState(blockFlow, chainIndex, contractKey0, newState2)
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in {
