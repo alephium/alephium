@@ -23,19 +23,20 @@ import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, Duration}
 
 // scalastyle:off method.length
-class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
-                                        actorSystem: ActorSystem,
-                                        executionContext: ExecutionContext)
+class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
+    implicit config: PlatformConfig,
+    actorSystem: ActorSystem,
+    executionContext: ExecutionContext)
     extends Endpoints
     with StrictLogging {
 
-  private val blockFlow: BlockFlow    = mode.node.blockFlow
+  private val blockFlow: BlockFlow                    = mode.node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = mode.node.allHandlers.txHandler
-  private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
+  private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
-  implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
+  implicit val rpcConfig: RPCConfig     = RPCConfig.load(config.aleph)
   implicit val groupConfig: GroupConfig = config
-  implicit val askTimeout: Timeout  = Timeout(rpcConfig.askTimeout.asScala)
+  implicit val askTimeout: Timeout      = Timeout(rpcConfig.askTimeout.asScala)
 
   private val docs: OpenAPI = List(
     getBlockflow,
@@ -49,37 +50,65 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
     minerAction
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
+  private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
+    Future.successful(
+      ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
+  }
+
+  private val getBlockRoute = getBlock.toRoute { hash =>
+    Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))
+  }
+
+  private val getBalanceRoute = getBalance.toRoute { address =>
+    Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))
+  }
+
+  private val getGroupRoute = getGroup.toRoute { address =>
+    Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))
+  }
+
+  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
+    case (from, to, height) =>
+      Future.successful(
+        ServerUtils.getHashesAtHeight(blockFlow,
+                                      ChainIndex(from, to),
+                                      GetHashesAtHeight(from.value, to.value, height)))
+  }
+
+  private val getChainInfoRoute = getChainInfo.toRoute {
+    case (from, to) =>
+      Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
+  }
+
+  private val createTransactionRoute = createTransaction.toRoute {
+    case (fromKey, toAddress, value) =>
+      Future.successful(
+        ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))
+  }
+
+  private val sendTransactionRoute = sendTransaction.toRoute { transaction =>
+    ServerUtils.sendTransaction(txHandler, transaction)
+  }
+
+  private val minerActionRoute = minerAction.toRoute {
+    case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
+    case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
+  }
+
+  private val getOpenapiRoute = getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
+
   val route: Route =
     cors()(
-      getBlockflow.toRoute(timeInterval =>
-        Future.successful(
-          ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))) ~
-        getBlock
-          .toRoute(hash => Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))) ~
-        getBalance
-          .toRoute(address =>
-            Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))) ~
-        getGroup
-          .toRoute(address =>
-            Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))) ~
-        getHashesAtHeight
-          .toRoute{ case (from, to, height) =>
-            Future.successful(ServerUtils.getHashesAtHeight(blockFlow, ChainIndex(from,to),  GetHashesAtHeight(from.value,to.value,height)))} ~
-        getChainInfo
-          .toRoute{ case (from, to) =>
-            Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from,to)))} ~
-        createTransaction
-          .toRoute{ case (fromKey, toAddress, value) =>
-            Future.successful(ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))} ~
-        sendTransaction
-          .toRoute{ transaction =>
-            ServerUtils.sendTransaction(txHandler, transaction)} ~
-        minerAction
-          .toRoute{
-            case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
-            case MinerAction.StopMining => ServerUtils.execute(miner ! Miner.Stop)
-          } ~
-        getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
+      getBlockflowRoute ~
+        getBlockRoute ~
+        getBalanceRoute ~
+        getGroupRoute ~
+        getHashesAtHeightRoute ~
+        getChainInfoRoute ~
+        createTransactionRoute ~
+        sendTransactionRoute ~
+        minerActionRoute ~
+        getOpenapiRoute
     )
 
   private var started: Boolean                                = false
@@ -111,13 +140,14 @@ class RestServer(mode: Mode, port: Int)(implicit config: PlatformConfig,
 }
 
 object RestServer {
-  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(implicit system: ActorSystem,
-                        config: PlatformConfig,
-                        executionContext: ExecutionContext): RestServer = {
+  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(
+      implicit system: ActorSystem,
+      config: PlatformConfig,
+      executionContext: ExecutionContext): RestServer = {
     (for {
       restPort <- mode.config.restPort
     } yield {
-      new RestServer(mode, restPort,miner)
+      new RestServer(mode, restPort, miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")
