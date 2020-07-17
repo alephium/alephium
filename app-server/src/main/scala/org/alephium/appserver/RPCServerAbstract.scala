@@ -15,7 +15,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe.{Encoder, Json}
 import io.circe.syntax._
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -47,9 +47,9 @@ trait RPCServerAbstract extends StrictLogging {
   def doCreateTransaction(req: Request): FutureTry[CreateTransactionResult]
   def doSendTransaction(req: Request): FutureTry[TxResult]
   def doStartMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
-    execute(miner ! Miner.Start)
+    ServerUtils.execute(miner ! Miner.Start)
   def doStopMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
-    execute(miner ! Miner.Stop)
+    ServerUtils.execute(miner ! Miner.Stop)
 
   def runServer(): Future[Unit]
 
@@ -113,13 +113,7 @@ object RPCServerAbstract {
 
   val bufferSize: Int = 64
 
-  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
-    Future {
-      f
-      Right(true)
-    }
-
-  def wrap[T <: RPCModel: Encoder](req: Request, result: FutureTry[T])(
+  def wrap[T <: ApiModel: Encoder](req: Request, result: FutureTry[T])(
       implicit ec: ExecutionContext): Future[Response] = result.map {
     case Right(t)    => Response.successful(req, t)
     case Left(error) => error

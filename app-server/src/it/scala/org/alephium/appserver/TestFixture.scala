@@ -17,7 +17,7 @@ import io.circe.parser.parse
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.appserver.RPCModel._
+import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
 import org.alephium.flow.client.{Miner, Node}
@@ -111,6 +111,7 @@ trait TestFixtureLike
         ("alephium.network.publicAddress", s"localhost:$publicPort"),
         ("alephium.network.rpcPort", publicPort - 100),
         ("alephium.network.wsPort", publicPort - 200),
+        ("alephium.network.restPort", publicPort - 300),
         ("alephium.clique.brokerNum", brokerNum),
         ("alephium.broker.brokerId", brokerId)
       ) ++ bootstrap
@@ -155,7 +156,8 @@ trait TestFixtureLike
         ActorRefT.build(system, props, s"FairMiner")
       }
 
-      lazy val rpcServer: RPCServer = RPCServer(mode, miner)
+      lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
+      lazy val restServer: RestServer = RestServer(mode, miner)
     }
 
     implicit val executionContext = server.system.dispatcher

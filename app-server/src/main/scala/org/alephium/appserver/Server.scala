@@ -17,13 +17,19 @@ trait Server extends Stoppable {
 
   def mode: Mode
   def rpcServer: RPCServer
+  def restServer: RestServer
   def miner: ActorRefT[Miner.Command]
 
-  def start(): Future[Unit] = rpcServer.runServer
+  def start(): Future[Unit] =
+    for {
+      _ <- rpcServer.runServer
+      _ <- restServer.runServer
+    } yield ()
 
   def stop(): Future[Unit] =
     for {
       _ <- rpcServer.stop()
+      _ <- restServer.stop()
       _ <- mode.stop()
     } yield (())
 }
@@ -41,5 +47,6 @@ class ServerImpl(implicit val config: PlatformConfig,
     ActorRefT.build(system, props, s"FairMiner")
   }
 
-  lazy val rpcServer: RPCServer = RPCServer(mode, miner)
+  lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
+  lazy val restServer: RestServer = RestServer(mode, miner)
 }
