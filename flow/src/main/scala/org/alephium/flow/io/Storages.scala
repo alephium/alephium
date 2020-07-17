@@ -23,13 +23,10 @@ object Storages {
     def blockCacheCapacity: Int
   }
 
-  def createUnsafe(
-      rootPath: Path,
-      dbFolder: String,
-      blocksFolder: String,
-      writeOptions: WriteOptions)(implicit config: GroupConfig with Config): Storages = {
-    val blockStorage      = BlockStorage.createUnsafe(rootPath, blocksFolder, config.blockCacheCapacity)
+  def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(
+      implicit config: GroupConfig with Config): Storages = {
     val db                = createRocksDBUnsafe(rootPath, dbFolder)
+    val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
@@ -37,7 +34,7 @@ object Storages {
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
     val emptyWorldState   = WorldState.empty(trieStorage)
 
-    Storages(AVector(db, blockStorage.source),
+    Storages(AVector(db),
              headerStorage,
              blockStorage,
              emptyWorldState,

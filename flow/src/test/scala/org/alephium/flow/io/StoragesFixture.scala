@@ -15,14 +15,10 @@ trait StoragesFixture {
 
 object StoragesFixture {
   def buildStorages(implicit config: PlatformConfig): Storages = {
-    val postFix      = Hash.random.toHexString
-    val dbFolders    = s"db-$postFix"
-    val blocksFolder = s"blocks-$postFix"
+    val postFix   = Hash.random.toHexString
+    val dbFolders = s"db-$postFix"
     val storages: Storages =
-      Storages.createUnsafe(config.rootPath,
-                            dbFolders,
-                            blocksFolder,
-                            RocksDBSource.Settings.syncWrite)
+      Storages.createUnsafe(config.rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
     storages
   }
 }

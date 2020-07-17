@@ -31,9 +31,8 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec {
     }
 
     def buildGenesis(): BlockChainWithState = {
-      val dbFolder     = "db-" + Hash.random.toHexString
-      val blocksFolder = "blocks-" + Hash.random.toHexString
-      val storages     = Storages.createUnsafe(rootPath, dbFolder, blocksFolder, Settings.syncWrite)
+      val dbFolder = "db-" + Hash.random.toHexString
+      val storages = Storages.createUnsafe(rootPath, dbFolder, Settings.syncWrite)
       BlockChainWithState.createUnsafe(
         ChainIndex.unsafe(0, 0),
         genesis,
