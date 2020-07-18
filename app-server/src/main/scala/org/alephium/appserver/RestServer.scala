@@ -1,5 +1,6 @@
 package org.alephium.appserver
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
 import akka.actor.ActorSystem
@@ -20,14 +21,15 @@ import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, Duration}
+import org.alephium.util.{ActorRefT, Duration, Service}
 
 // scalastyle:off method.length
 class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
     implicit config: PlatformConfig,
     actorSystem: ActorSystem,
-    executionContext: ExecutionContext)
+    protected val executionContext: ExecutionContext)
     extends Endpoints
+    with Service
     with StrictLogging {
 
   private val blockFlow: BlockFlow                    = mode.node.blockFlow
@@ -111,11 +113,11 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
         getOpenapiRoute
     )
 
-  private var started: Boolean                                = false
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
 
-  def runServer(): Future[Unit] = {
-    started = true
+  override def subServices: ArraySeq[Service] = ArraySeq(mode)
+
+  protected def startSelfOnce(): Future[Unit] = {
     for {
       httpBinding <- Http()
         .bindAndHandle(route, rpcConfig.networkInterface.getHostAddress, port)
@@ -125,17 +127,13 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
     }
   }
 
-  def stop(): Future[Unit] =
-    if (started) {
-      for {
-        httpStop <- httpBindingPromise.future.flatMap(
-          _.terminate(hardDeadline = terminationHardDeadline))
-      } yield {
-        logger.info(s"http unbound with message $httpStop.")
-        ()
-      }
-    } else {
-      Future.successful(())
+  protected def stopSelfOnce(): Future[Unit] =
+    for {
+      httpBinding <- httpBindingPromise.future
+      httpStop    <- httpBinding.terminate(hardDeadline = terminationHardDeadline)
+    } yield {
+      logger.info(s"http unbound with message $httpStop.")
+      ()
     }
 }
 

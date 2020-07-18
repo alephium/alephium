@@ -51,8 +51,6 @@ trait RPCServerAbstract extends StrictLogging {
   def doStopMining(miner: ActorRefT[Miner.Command]): FutureTry[Boolean] =
     ServerUtils.execute(miner ! Miner.Stop)
 
-  def runServer(): Future[Unit]
-
   def handleEvent(event: EventBus.Event): TextMessage = {
     event match {
       case bn @ FlowHandler.BlockNotify(_, _) =>

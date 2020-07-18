@@ -1,15 +1,15 @@
 package org.alephium.appserver
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.{Mode, PlatformConfig}
-import org.alephium.util.ActorRefT
+import org.alephium.util.{ActorRefT, Service}
 
-trait Server extends Stoppable {
+trait Server extends Service {
 
   implicit def config: PlatformConfig
   implicit def system: ActorSystem
@@ -20,18 +20,14 @@ trait Server extends Stoppable {
   def restServer: RestServer
   def miner: ActorRefT[Miner.Command]
 
-  def start(): Future[Unit] =
-    for {
-      _ <- rpcServer.runServer
-      _ <- restServer.runServer
-    } yield ()
+  override def subServices: ArraySeq[Service] = ArraySeq(rpcServer, restServer, mode)
 
-  def stop(): Future[Unit] =
-    for {
-      _ <- rpcServer.stop()
-      _ <- restServer.stop()
-      _ <- mode.stop()
-    } yield (())
+  override protected def startSelfOnce(): Future[Unit] =
+    Future.successful(())
+
+  override protected def stopSelfOnce(): Future[Unit] = {
+    Future.successful(())
+  }
 }
 
 class ServerImpl(implicit val config: PlatformConfig,
