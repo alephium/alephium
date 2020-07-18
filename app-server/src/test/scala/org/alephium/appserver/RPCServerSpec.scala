@@ -26,7 +26,7 @@ import org.alephium.util._
 
 class RPCServerSpec
     extends AlephiumSpec
-    with ModelGenerators
+    with NoIndexModelGenerators
     with ScalatestRouteTest
     with EitherValues
     with ScalaFutures

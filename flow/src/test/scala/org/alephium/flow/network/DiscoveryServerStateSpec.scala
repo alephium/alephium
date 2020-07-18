@@ -12,12 +12,14 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, ModelGenerators}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
-class DiscoveryServerStateSpec extends AlephiumActorSpec("DiscoveryServer") with ModelGenerators {
-  import DiscoveryServerSpec._
+class DiscoveryServerStateSpec
+    extends AlephiumActorSpec("DiscoveryServer")
+    with NoIndexModelGenerators {
   import DiscoveryMessage._
+  import DiscoveryServerSpec._
 
   trait Fixture { self =>
     def groupSize: Int          = 3

@@ -8,11 +8,11 @@ import org.alephium.flow.platform._
 import org.alephium.io.IOError
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, ModelGenerators}
+import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
 import org.alephium.util._
 
-class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
-  trait Fixture extends PlatformConfigFixture with ModelGenerators {
+class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
+  trait Fixture extends PlatformConfigFixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
     val blockGen = blockGenOf(AVector.fill(config.depsNum)(genesis.hash))
     val chainGen = chainGenOf(4, genesis)

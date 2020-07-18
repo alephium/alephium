@@ -21,8 +21,9 @@ import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
 import org.alephium.util.{ActorRefT, AVector}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") with ModelGenerators {
-  Spec =>
+class BrokerHandlerSpec
+    extends AlephiumFlowActorSpec("BrokerHandlerSpec")
+    with NoIndexModelGeneratorsLike { Spec =>
   behavior of "BrokerHandler"
 
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
@@ -295,7 +296,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") with 
   behavior of "Relay protocol"
 
   it should "send tx to txHandler" in new RelayFixture {
-    val tx     = transactionGen().sample.get
+    val tx     = transactionGen.sample.get
     val sendTx = SendTxs(AVector(tx))
     tcpHandler ! Tcp.Received(Message.serialize(sendTx))
     allProbes.txHandler.expectMsgType[TxHandler.AddTx]

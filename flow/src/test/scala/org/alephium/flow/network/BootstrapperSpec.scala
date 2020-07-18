@@ -5,10 +5,10 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow._
 import org.alephium.flow.network.bootstrap.InfoFixture
-import org.alephium.protocol.model.ModelGenerators
+import org.alephium.protocol.model.NoIndexModelGenerators
 import org.alephium.util.{ActorRefT, AlephiumSpec}
 
-class BootstrapperSpec extends AlephiumSpec with ModelGenerators {
+class BootstrapperSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "bootstrap a master" in new MasterFixture("BootstrapperSpec-master") {
     val bootstrapper = system.actorOf(
       Bootstrapper.props(
