@@ -1,19 +1,20 @@
 package org.alephium.flow.client
 
-import scala.concurrent.Future
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
 
-import org.alephium.flow.{Stoppable, Utils}
+import org.alephium.flow.Utils
 import org.alephium.flow.core._
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.util.{ActorRefT, BaseActor, EventBus}
+import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
-trait Node extends Stoppable {
+trait Node extends Service {
   implicit def config: PlatformConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
@@ -25,10 +26,16 @@ trait Node extends Stoppable {
   def allHandlers: AllHandlers
   def monitor: ActorRefT[Node.Command]
 
-  def stop(): Future[Unit] =
-    monitor
-      .ask(Node.Stop)(Timeout(Utils.shutdownTimeout.asScala))
-      .mapTo[Unit]
+  override implicit def executionContext: ExecutionContext = system.dispatcher
+
+  override def subServices: ArraySeq[Service] = ArraySeq.empty
+
+  override protected def startSelfOnce(): Future[Unit] = Future.successful(())
+
+  override protected def stopSelfOnce(): Future[Unit] = {
+    val timeout = Timeout(Utils.shutdownTimeout.asScala)
+    monitor.ask(Node.Stop)(timeout).mapTo[Unit]
+  }
 }
 
 object Node {

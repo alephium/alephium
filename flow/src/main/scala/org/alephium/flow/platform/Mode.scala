@@ -1,16 +1,17 @@
 package org.alephium.flow.platform
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.io.RocksDBSource.Settings
+import org.alephium.util.Service
 
-trait Mode extends Stoppable {
+trait Mode extends Service {
   implicit def config: PlatformConfig
   implicit def system: ActorSystem
   implicit def executionContext: ExecutionContext
@@ -19,10 +20,12 @@ trait Mode extends Stoppable {
 
   def node: Node
 
+  override def subServices: ArraySeq[Service] = ArraySeq(node)
+
+  override protected def startSelfOnce(): Future[Unit] = Future.successful(())
 }
 
 object Mode {
-
   type Builder = BrokerHandler.Builder
 
   def defaultBuilders: Builder = new BrokerHandler.Builder {}
@@ -41,10 +44,10 @@ object Mode {
 
     override val node: Node = Node.build(builders, storages)
 
-    override def stop(): Future[Unit] =
-      for {
-        _ <- node.stop()
-        _ <- Future.successful(storages.close())
-      } yield ()
+    override protected def stopSelfOnce(): Future[Unit] =
+      storages.close() match {
+        case Left(error) => Future.failed(error)
+        case Right(_)    => Future.successful(())
+      }
   }
 }
