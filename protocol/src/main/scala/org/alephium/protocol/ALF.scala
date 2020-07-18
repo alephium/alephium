@@ -12,6 +12,8 @@ object ALF {
   val GenesisHeight: Int          = 0
   val GenesisWeight: BigInt       = 0
   val GenesisTimestamp: TimeStamp = TimeStamp.zero
+
+  val MaxTxOutputNum: Int = 128
   //scalastyle:on magic.number
 
   type Hash = Keccak256
