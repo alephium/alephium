@@ -50,7 +50,7 @@ trait ServerFixture
   val dummyPrivateKey           = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
   val dummyHashesAtHeight       = HashesAtHeight(Seq.empty)
   val dummyChainInfo            = ChainInfo(0)
-  val dummyTx = transactionGen
+  val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
     .get
