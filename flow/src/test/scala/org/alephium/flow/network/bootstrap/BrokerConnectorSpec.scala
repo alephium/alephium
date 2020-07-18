@@ -8,17 +8,20 @@ import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Serde
 
-class BrokerConnectorSpec extends AlephiumFlowActorSpec("BrokerConnector") with InfoFixture {
+class BrokerConnectorSpec
+    extends AlephiumFlowActorSpec("BrokerConnector")
+    with InfoFixture
+    with ModelGenerators {
   it should "follow this workflow" in {
     val connection        = TestProbe()
     val cliqueCoordinator = TestProbe()
     val brokerConnector =
       system.actorOf(BrokerConnector.props(connection.ref, cliqueCoordinator.ref))
     val randomId      = Random.nextInt(config.brokerNum)
-    val randomAddress = ModelGen.socketAddress.sample.get
+    val randomAddress = socketAddressGen.sample.get
     val randomInfo = PeerInfo.unsafe(randomId,
                                      config.groupNumPerBroker,
                                      randomAddress.getAddress,

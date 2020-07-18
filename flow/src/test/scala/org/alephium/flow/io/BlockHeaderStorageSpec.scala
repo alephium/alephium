@@ -4,10 +4,10 @@ import org.scalatest.Assertion
 
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.config.ConsensusConfigFixture
-import org.alephium.protocol.model.{BlockHeader, ModelGen}
+import org.alephium.protocol.model.{BlockHeader, ModelGenerators}
 import org.alephium.util.{AlephiumSpec, Files}
 
-class BlockHeaderStorageSpec extends AlephiumSpec {
+class BlockHeaderStorageSpec extends AlephiumSpec with ModelGenerators {
   import RocksDBSource.ColumnFamily
 
   trait Fixture extends ConsensusConfigFixture {
@@ -19,7 +19,7 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
     val headerStorage = BlockHeaderRockDBStorage(source, ColumnFamily.All)
 
     def generate(): BlockHeader = {
-      val block = ModelGen.blockGen.sample.get
+      val block = blockGen.sample.get
       block.header
     }
 
@@ -51,7 +51,7 @@ class BlockHeaderStorageSpec extends AlephiumSpec {
   }
 
   it should "work for transactions" in new Fixture with ConsensusConfigFixture {
-    forAll(ModelGen.blockGen) { block =>
+    forAll(blockGen) { block =>
       val header = block.header
       val hash   = block.hash
       headerStorage.put(header).isRight is true

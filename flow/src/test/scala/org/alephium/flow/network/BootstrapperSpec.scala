@@ -5,11 +5,10 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow._
 import org.alephium.flow.network.bootstrap.InfoFixture
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.ModelGenerators
 import org.alephium.util.{ActorRefT, AlephiumSpec}
 
-class BootstrapperSpec extends AlephiumSpec {
-
+class BootstrapperSpec extends AlephiumSpec with ModelGenerators {
   it should "bootstrap a master" in new MasterFixture("BootstrapperSpec-master") {
     val bootstrapper = system.actorOf(
       Bootstrapper.props(
@@ -63,7 +62,7 @@ class BootstrapperSpec extends AlephiumSpec {
     )
 
     val connected =
-      Tcp.Connected(ModelGen.socketAddress.sample.get, ModelGen.socketAddress.sample.get)
+      Tcp.Connected(socketAddressGen.sample.get, socketAddressGen.sample.get)
     val intraCliqueInfo = genIntraCliqueInfo
     val cliqueInfo      = intraCliqueInfo.cliqueInfo
 

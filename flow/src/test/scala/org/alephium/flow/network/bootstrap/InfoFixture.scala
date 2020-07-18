@@ -1,11 +1,11 @@
 package org.alephium.flow.network.bootstrap
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.ModelGenerators
 
-trait InfoFixture {
+trait InfoFixture extends ModelGenerators {
   def genIntraCliqueInfo(implicit config: GroupConfig): IntraCliqueInfo = {
-    val info = ModelGen.cliqueInfo.sample.get
+    val info = cliqueInfoGen.sample.get
     val peers = info.peers.mapWithIndex { (address, id) =>
       PeerInfo.unsafe(id, info.groupNumPerBroker, address.getAddress, address.getPort, None, None)
     }

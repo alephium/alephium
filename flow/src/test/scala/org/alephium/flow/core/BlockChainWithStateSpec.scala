@@ -5,15 +5,15 @@ import org.alephium.flow.io.Storages
 import org.alephium.io.IOResult
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
+import org.alephium.protocol.model.{Block, ChainIndex, ModelGenerators}
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
 
-class BlockChainWithStateSpec extends AlephiumFlowSpec {
+class BlockChainWithStateSpec extends AlephiumFlowSpec with ModelGenerators {
   trait Fixture {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
-    val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
-    val chainGen = ModelGen.chainGen(4, genesis)
+    val blockGen = blockGenOf(AVector.fill(config.depsNum)(genesis.hash))
+    val chainGen = chainGenOf(4, genesis)
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
     val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))
 

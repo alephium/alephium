@@ -11,7 +11,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, TimeStamp, U64}
 
-class ValidationSpec extends AlephiumFlowSpec {
+class ValidationSpec extends AlephiumFlowSpec with ModelGenerators {
   import Validation._
   import ValidationStatus._
 
@@ -32,16 +32,16 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   it should "validate group for block" in {
-    forAll(ModelGen.blockGenFor(config.brokerInfo)) { block =>
+    forAll(blockGenOf(config.brokerInfo)) { block =>
       check(Validation.checkGroup(block))
     }
-    forAll(ModelGen.blockGenNotFor(config.brokerInfo)) { block =>
+    forAll(blockGenNotOf(config.brokerInfo)) { block =>
       check(Validation.checkGroup(block), InvalidGroup)
     }
   }
 
   it should "validate timestamp for block" in {
-    val header  = ModelGen.blockGen.sample.get.header
+    val header  = blockGen.sample.get.header
     val now     = TimeStamp.now()
     val before  = (now - Duration.ofMinutesUnsafe(61)).get
     val after   = now + Duration.ofMinutesUnsafe(61)
@@ -57,7 +57,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   it should "validate nonEmpty transaction list" in {
-    val block0 = ModelGen.blockGen.retryUntil(_.transactions.nonEmpty).sample.get
+    val block0 = blockGen.retryUntil(_.transactions.nonEmpty).sample.get
     val block1 = block0.copy(transactions = AVector.empty)
     check(Validation.checkNonEmptyTransactions(block0))
     check(Validation.checkNonEmptyTransactions(block1), EmptyTransactionList)
@@ -67,8 +67,8 @@ class ValidationSpec extends AlephiumFlowSpec {
     val (privateKey, publicKey) = ED25519.generatePriPub()
     val block0                  = Block.from(AVector.empty, AVector.empty, config.maxMiningTarget, 0)
 
-    val input0          = ModelGen.txInputGen.sample.get
-    val output0         = ModelGen.txOutputGen.sample.get
+    val input0          = txInputGen.sample.get
+    val output0         = txOutputGen.sample.get
     val emptyInputs     = AVector.empty[TxInput]
     val emptyOutputs    = AVector.empty[TxOutput]
     val emptySignatures = AVector.empty[ED25519Signature]
@@ -116,7 +116,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val output1   = genAlfOutput(U64.MaxValue)
     val output2   = genAlfOutput(U64.Zero)
     val output3   = genAlfOutput(U64.One)
-    val input     = ModelGen.txInputGen.sample.get
+    val input     = txInputGen.sample.get
     val tx0 =
       Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
     val tx1 =
@@ -131,7 +131,7 @@ class ValidationSpec extends AlephiumFlowSpec {
     val output1   = genAlfOutput(sum.subOneUnsafe())
     val output2   = genAlfOutput(U64.One)
     val output3   = genAlfOutput(U64.Two)
-    val input     = ModelGen.txInputGen.sample.get
+    val input     = txInputGen.sample.get
     val tx0 =
       Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
     val tx1 =
@@ -149,7 +149,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   it should "test token balance overflow" in {
-    val input     = ModelGen.txInputGen.sample.get
+    val input     = txInputGen.sample.get
     val tokenId   = ALF.Hash.generate
     val preOutput = genTokenOutput(tokenId, U64.MaxValue)
     val output1   = genTokenOutput(tokenId, U64.MaxValue)
@@ -164,7 +164,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   it should "validate token balances" in {
-    val input     = ModelGen.txInputGen.sample.get
+    val input     = txInputGen.sample.get
     val tokenId   = ALF.Hash.generate
     val sum       = U64.MaxValue.subUnsafe(U64.Two)
     val preOutput = genTokenOutput(tokenId, sum)
@@ -180,7 +180,7 @@ class ValidationSpec extends AlephiumFlowSpec {
   }
 
   it should "create new token" in {
-    val input   = ModelGen.txInputGen.sample.get
+    val input   = txInputGen.sample.get
     val tokenId = input.hash
     val output  = genTokenOutput(tokenId, U64.MaxValue)
     val tx      = Transaction.from(AVector(input), AVector(output), signatures = AVector.empty)

@@ -8,14 +8,14 @@ import org.alephium.flow.platform._
 import org.alephium.io.IOError
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, ModelGen}
+import org.alephium.protocol.model.{Block, ChainIndex, ModelGenerators}
 import org.alephium.util._
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
-  trait Fixture extends PlatformConfigFixture {
+  trait Fixture extends PlatformConfigFixture with ModelGenerators {
     val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
-    val blockGen = ModelGen.blockGenWith(AVector.fill(config.depsNum)(genesis.hash))
-    val chainGen = ModelGen.chainGen(4, genesis)
+    val blockGen = blockGenOf(AVector.fill(config.depsNum)(genesis.hash))
+    val chainGen = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
       val storages = StoragesFixture.buildStorages
@@ -86,7 +86,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "work correctly for a chain of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, genesis)) { blocks =>
+    forAll(chainGenOf(4, genesis)) { blocks =>
       val chain = buildBlockChain()
       addBlocks(chain, blocks)
       val headBlock     = genesis
@@ -110,8 +110,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "work correctly with two chains of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, genesis)) { longChain =>
-      forAll(ModelGen.chainGen(2, genesis)) { shortChain =>
+    forAll(chainGenOf(4, genesis)) { longChain =>
+      forAll(chainGenOf(2, genesis)) { shortChain =>
         val chain = buildBlockChain()
 
         addBlocks(chain, shortChain)
@@ -141,8 +141,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "test chain diffs with two chains of blocks" in new Fixture {
-    forAll(ModelGen.chainGen(4, genesis)) { longChain =>
-      forAll(ModelGen.chainGen(3, genesis)) { shortChain =>
+    forAll(chainGenOf(4, genesis)) { longChain =>
+      forAll(chainGenOf(3, genesis)) { shortChain =>
         val chain = buildBlockChain()
         addBlocks(chain, shortChain)
         addBlocks(chain, longChain)
@@ -159,7 +159,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "compute correct weights for a single chain" in new Fixture {
-    forAll(ModelGen.chainGen(5)) { blocks =>
+    forAll(chainGenOf(5)) { blocks =>
       val chain = createBlockChain(blocks.init)
       blocks.init.foreach(block => chain.contains(block) isE true)
       chain.maxHeight isE 3
@@ -172,8 +172,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "compute corrent weights for two chains with same root" in new Fixture {
-    forAll(ModelGen.chainGen(5)) { blocks1 =>
-      forAll(ModelGen.chainGen(1, blocks1.head)) { blocks2 =>
+    forAll(chainGenOf(5)) { blocks1 =>
+      forAll(chainGenOf(1, blocks1.head)) { blocks2 =>
         val chain = createBlockChain(blocks1)
         addBlocks(chain, blocks2)
 
@@ -195,7 +195,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   trait UnforkedFixture extends Fixture {
     val chain  = buildBlockChain()
-    val blocks = ModelGen.chainGen(2, genesis).sample.get
+    val blocks = chainGenOf(2, genesis).sample.get
     addBlocks(chain, blocks)
   }
 
@@ -220,8 +220,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   trait ForkedFixture extends Fixture {
     val chain  = buildBlockChain()
-    val chain0 = ModelGen.chainGen(2, genesis).sample.get
-    val chain1 = ModelGen.chainGen(2, genesis).sample.get
+    val chain0 = chainGenOf(2, genesis).sample.get
+    val chain1 = chainGenOf(2, genesis).sample.get
     addBlocks(chain, chain0)
     addBlocks(chain, chain1)
   }
@@ -232,7 +232,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHashesAfter(chain1.head.hash) isE chain1.tail.map(_.hash)
     chain.getHashesAfter(genesis.hash).toOption.get.toSet is allHashes
 
-    chain.getHashesAfter(ModelGen.blockGen.sample.get.hash) isE AVector.empty[Hash]
+    chain.getHashesAfter(blockGen.sample.get.hash) isE AVector.empty[Hash]
   }
 
   it should "test isBefore" in new ForkedFixture {

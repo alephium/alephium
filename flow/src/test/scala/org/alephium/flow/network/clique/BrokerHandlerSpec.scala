@@ -21,11 +21,12 @@ import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
 import org.alephium.util.{ActorRefT, AVector}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spec =>
+class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") with ModelGenerators {
+  Spec =>
   behavior of "BrokerHandler"
 
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
-    val cliqueInfo = ModelGen.cliqueInfo.sample.get
+    val cliqueInfo = cliqueInfoGen.sample.get
     val id         = Random.nextInt(cliqueInfo.brokerNum)
     val address    = cliqueInfo.peers(id)
     val brokerInfo = BrokerInfo.unsafe(id, cliqueInfo.groupNumPerBroker, address)
@@ -294,7 +295,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
   behavior of "Relay protocol"
 
   it should "send tx to txHandler" in new RelayFixture {
-    val tx     = ModelGen.transactionGen.sample.get
+    val tx     = transactionGen.sample.get
     val sendTx = SendTxs(AVector(tx))
     tcpHandler ! Tcp.Received(Message.serialize(sendTx))
     allProbes.txHandler.expectMsgType[TxHandler.AddTx]
@@ -334,7 +335,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") { Spe
       syncHandler.uponHandshaked(remoteCliqueInfo.id, remoteBrokerInfo)
       syncHandler.isSyncing is true
 
-      val block      = ModelGen.blockGenFor(config.brokerInfo).sample.get
+      val block      = blockGenOf(config.brokerInfo).sample.get
       val blocksMsg0 = Message.serialize(SyncResponse(AVector(block), AVector.empty))
       syncHandlerRef ! Tcp.Received(blocksMsg0)
       syncHandler.isSyncing is true

@@ -1,10 +1,10 @@
 package org.alephium.flow.core.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.ModelGen
+import org.alephium.protocol.model.ModelGenerators
 import org.alephium.util.LockFixture
 
-class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
+class TxPoolSpec extends AlephiumFlowSpec with LockFixture with ModelGenerators {
   it should "initialize an empty tx pool" in {
     val pool = TxPool.empty(3)
     pool.isFull is false
@@ -13,7 +13,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
 
   it should "contain/add/remove for new transactions" in {
     val pool = TxPool.empty(3)
-    forAll(ModelGen.blockGenNonEmpty) { block =>
+    forAll(blockGenNonEmpty) { block =>
       val weightedTxs = block.transactions.map((_, 1.0))
       val numberAdded = pool.add(weightedTxs)
       pool.size is numberAdded
@@ -33,7 +33,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture {
 
   trait Fixture extends WithLock {
     val pool        = TxPool.empty(3)
-    val block       = ModelGen.blockGenNonEmpty.sample.get
+    val block       = blockGenNonEmpty.sample.get
     val weightedTxs = block.transactions.map((_, 1.0))
     val txNum       = block.transactions.length
     val rwl         = pool._getLock
