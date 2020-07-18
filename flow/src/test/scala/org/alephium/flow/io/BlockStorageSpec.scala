@@ -4,10 +4,10 @@ import org.scalatest.Assertion
 
 import org.alephium.io._
 import org.alephium.protocol.config.ConsensusConfigFixture
-import org.alephium.protocol.model.ModelGenerators
+import org.alephium.protocol.model.NoIndexModelGenerators
 import org.alephium.util.{AlephiumSpec, Files}
 
-class BlockStorageSpec extends AlephiumSpec with ModelGenerators {
+class BlockStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
   import RocksDBSource.ColumnFamily
 
   trait Fixture extends ConsensusConfigFixture {

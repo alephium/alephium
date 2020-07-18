@@ -11,7 +11,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, TimeStamp, U64}
 
-class ValidationSpec extends AlephiumFlowSpec with ModelGenerators {
+class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import Validation._
   import ValidationStatus._
 

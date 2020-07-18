@@ -2,11 +2,12 @@ package org.alephium.protocol.message
 
 import org.scalacheck.Gen
 
+import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
-import org.alephium.protocol.model.{CliqueId, ModelGenerators}
+import org.alephium.protocol.model.CliqueId
 import org.alephium.util.AVector
 
-trait DiscoveryMessageGenerators extends ModelGenerators {
+trait DiscoveryMessageGenerators extends Generators {
   import DiscoveryMessage._
 
   lazy val findNodeGen: Gen[FindNode] = for {

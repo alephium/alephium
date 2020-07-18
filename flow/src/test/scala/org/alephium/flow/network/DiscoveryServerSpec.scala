@@ -7,10 +7,10 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
-import org.alephium.protocol.model.{CliqueInfo, ModelGenerators}
+import org.alephium.protocol.model.{CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumActorSpec, Duration}
 
-object DiscoveryServerSpec extends ModelGenerators {
+object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =
     new InetSocketAddress(InetAddress.getLocalHost, port)
 
@@ -35,7 +35,9 @@ object DiscoveryServerSpec extends ModelGenerators {
   }
 }
 
-class DiscoveryServerSpec extends AlephiumActorSpec("DiscoveryServerSpec") {
+class DiscoveryServerSpec
+    extends AlephiumActorSpec("DiscoveryServerSpec")
+    with NoIndexModelGenerators {
   import DiscoveryServerSpec._
 
   def generateCliqueInfo(master: InetSocketAddress)(implicit config: GroupConfig): CliqueInfo = {

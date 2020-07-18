@@ -8,7 +8,6 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.Miner
 import org.alephium.flow.platform.Mode
 import org.alephium.protocol.model.ChainIndex
@@ -20,7 +19,7 @@ class RestServerSpec
     with ScalatestRouteTest
     with EitherValues
     with ScalaFutures
-    with U64Helpers {
+    with NumericHelpers {
   import ServerFixture._
 
   it should "call GET /blockflow" in new RestServerFixture {
