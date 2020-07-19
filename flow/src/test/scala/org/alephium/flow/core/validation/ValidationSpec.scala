@@ -111,6 +111,13 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
   }
 
+  it should "test both ALF and token balances" in {
+    forAll(transactionGenWithPreOutputs) {
+      case (tx, preOutput) =>
+        checkTx(checkBalance(tx, preOutput))
+    }
+  }
+
   it should "test ALF balance overflow" in {
     val preOutput = genAlfOutput(U64.MaxValue)
     val output1   = genAlfOutput(U64.MaxValue)
@@ -182,9 +189,14 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   it should "create new token" in {
     val input   = txInputGen.sample.get
     val tokenId = input.hash
-    val output  = genTokenOutput(tokenId, U64.MaxValue)
-    val tx      = Transaction.from(AVector(input), AVector(output), signatures = AVector.empty)
-    checkTx(checkBalance(tx, AVector.empty))
+
+    val output0 = genTokenOutput(tokenId, U64.MaxValue)
+    val tx0     = Transaction.from(AVector(input), AVector(output0), signatures = AVector.empty)
+    checkTx(checkBalance(tx0, AVector.empty))
+
+    val output1 = genTokenOutput(ALF.Hash.generate, U64.MaxValue)
+    val tx1     = Transaction.from(AVector(input), AVector(output1), signatures = AVector.empty)
+    checkTx(checkBalance(tx1, AVector.empty), InvalidBalance)
   }
 
   // TODO: Add more mocking test

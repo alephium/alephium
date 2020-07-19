@@ -247,14 +247,14 @@ trait TxGenerators
       inputs   <- Gen.listOfN(inputNum, assetInputInfoGen(groupIndex)())
     } yield AVector.from(inputs)
 
-  def transactionGen(chainIndex: ChainIndex)(
+  def transactionGenWithPreOutputs(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]]  = assetsToSpendGen(chainIndex.from),
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,
       lockupScript: Gen[LockupScript]              = p2pkhLockupGen(chainIndex.to),
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
-  ): Gen[Transaction] =
+  ): Gen[(Transaction, AVector[TxOutput])] =
     for {
       assetInfos    <- assetsToSpend
       contractInfos <- contractsToSpend
@@ -266,7 +266,27 @@ trait TxGenerators
                                               dataGen)
       signatures = assetInfos.map(info => ED25519.sign(unsignedTx.hash.bytes, info.privateKey)) ++
         contractInfos.map(info => ED25519.sign(unsignedTx.hash.bytes, info.privateKey))
-    } yield Transaction(unsignedTx, AVector.empty, signatures)
+    } yield {
+      val tx = Transaction(unsignedTx, AVector.empty, signatures)
+      val preOutput = assetInfos.map[TxOutput](_.referredOutput) ++ contractInfos.map(
+        _.referredOutput)
+      tx -> preOutput
+    }
+
+  def transactionGen(chainIndex: ChainIndex)(
+      assetsToSpend: Gen[AVector[AssetInputInfo]]  = assetsToSpendGen(chainIndex.from),
+      contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
+      issueNewToken: Boolean                       = true,
+      lockupScript: Gen[LockupScript]              = p2pkhLockupGen(chainIndex.to),
+      heightGen: Gen[Int]                          = createdHeightGen,
+      dataGen: Gen[ByteString]                     = dataGen
+  ): Gen[Transaction] =
+    transactionGenWithPreOutputs(chainIndex)(assetsToSpend,
+                                             contractsToSpend,
+                                             issueNewToken,
+                                             lockupScript,
+                                             heightGen,
+                                             dataGen).map(_._1)
 }
 
 trait BlockGenerators extends TxGenerators {
@@ -276,13 +296,13 @@ trait BlockGenerators extends TxGenerators {
     blockGenOf(chainIndex, AVector(Hash.zero))
 
   def blockGenOf(broker: BrokerInfo): Gen[Block] =
-    chainIndexGenRelatedTo(broker).flatMap(blockGen(_))
+    chainIndexGenRelatedTo(broker).flatMap(blockGen)
 
   def blockGenNotOf(broker: BrokerInfo): Gen[Block] =
-    chainIndexGenNotRelatedTo(broker).flatMap(blockGen(_))
+    chainIndexGenNotRelatedTo(broker).flatMap(blockGen)
 
   def blockGenOf(group: GroupIndex): Gen[Block] =
-    chainIndexFrom(group).flatMap(blockGen(_))
+    chainIndexFrom(group).flatMap(blockGen)
 
   private def gen(chainIndex: ChainIndex, deps: AVector[Hash], txs: AVector[Transaction]): Block = {
     @tailrec
@@ -325,41 +345,25 @@ trait ModelGenerators extends BlockGenerators
 trait NoIndexModelGeneratorsLike extends ModelGenerators {
   implicit def config: ConsensusConfig
 
-  lazy val txInputGen: Gen[TxInput] =
-    for {
-      groupIndex <- groupIndexGen
-      txInput    <- txInputGen(groupIndex)
-    } yield txInput
+  lazy val txInputGen: Gen[TxInput] = groupIndexGen.flatMap(txInputGen(_))
+
+  lazy val transactionGenWithPreOutputs: Gen[(Transaction, AVector[TxOutput])] =
+    chainIndexGen.flatMap(transactionGenWithPreOutputs(_)())
 
   lazy val transactionGen: Gen[Transaction] =
-    for {
-      chainIndex <- chainIndexGen
-      tx         <- transactionGen(chainIndex)()
-    } yield tx
+    chainIndexGen.flatMap(transactionGen(_)())
 
   lazy val blockGen: Gen[Block] =
-    for {
-      chainIndex <- chainIndexGen
-      block      <- blockGen(chainIndex)
-    } yield block
+    chainIndexGen.flatMap(blockGen(_))
 
   def blockGenOf(deps: AVector[Hash]): Gen[Block] =
-    for {
-      chainIndex <- chainIndexGen
-      block      <- blockGenOf(chainIndex, deps)
-    } yield block
+    chainIndexGen.flatMap(blockGenOf(_, deps))
 
   def chainGenOf(length: Int, block: Block): Gen[AVector[Block]] =
-    for {
-      chainIndex <- chainIndexGen
-      blocks     <- chainGenOf(chainIndex, length, block)
-    } yield blocks
+    chainIndexGen.flatMap(chainGenOf(_, length, block))
 
   def chainGenOf(length: Int): Gen[AVector[Block]] =
-    for {
-      chainIndex <- chainIndexGen
-      blocks     <- chainGenOf(chainIndex, length)
-    } yield blocks
+    chainIndexGen.flatMap(chainGenOf(_, length))
 }
 
 trait NoIndexModelGenerators extends NoIndexModelGeneratorsLike with ConsensusConfigFixture
