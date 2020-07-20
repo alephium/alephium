@@ -333,4 +333,22 @@ object ApiModel {
 
     implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
   }
+
+  final case class ApiKey(value: String) extends AnyVal {
+    def hash: Hash = Hash.hash(value)
+  }
+
+  object ApiKey {
+    def createApiKey(raw: String): Either[String, ApiKey] = {
+      if (raw.length < 32) {
+        Left("Api key must have at least 32 characters")
+      } else {
+        Right(ApiKey(raw))
+      }
+    }
+
+    implicit val encoder: Encoder[ApiKey] = Encoder.encodeString.contramap(_.value)
+    implicit val decoder: Decoder[ApiKey] = Decoder.decodeString.emap(createApiKey)
+    implicit val codec: Codec[ApiKey]     = Codec.from(decoder, encoder)
+  }
 }

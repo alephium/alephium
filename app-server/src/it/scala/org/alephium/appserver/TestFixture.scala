@@ -23,6 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -46,6 +47,9 @@ trait TestFixtureLike
   val publicKey               = "9b85fef33febd483e055b01af0671714b56c6f3b6f45612589c2d6ae5337fb6d"
   val privateKey              = "9167a5de4cfd4cd36a5ab065e21b2659f34cfd3503fde883b0fa5556d03cb64f"
   val (transferAddress, _, _) = generateAccount
+
+  val apiKey     = Hash.generate.toHexString
+  val apiKeyHash = Hash.hash(apiKey)
 
   val initialBalance = Balance(100, 1)
   val transferAmount = 10
@@ -113,7 +117,8 @@ trait TestFixtureLike
         ("alephium.network.wsPort", publicPort - 200),
         ("alephium.network.restPort", publicPort - 300),
         ("alephium.clique.brokerNum", brokerNum),
-        ("alephium.broker.brokerId", brokerId)
+        ("alephium.broker.brokerId", brokerId),
+        ("alephium.rpc.apiKeyHash", apiKeyHash.toHexString)
       ) ++ bootstrap
         .map(address => Map("alephium.bootstrap" -> s"localhost:${address.getPort}"))
         .getOrElse(Map.empty)

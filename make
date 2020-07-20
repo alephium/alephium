@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, multiprocessing, os, subprocess, sys, tempfile
+import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, sha3
 
 port_start = 9973
 
@@ -105,6 +105,11 @@ class AlephiumMake(object):
         print("logs dir: " + tempdir + "/alephium")
 
         deployedNodes = get_env_default_int('deployedNodes', 0)
+
+        apiKey = secrets.token_hex(32)
+        apiKeyHash = sha3.keccak_256(str.encode(apiKey)).hexdigest()
+        print("api key: " + apiKey)
+
         for node in range(deployedNodes, deployedNodes + nodes):
             port = 9973 + node
             rpcPort = port + 1000
@@ -113,7 +118,6 @@ class AlephiumMake(object):
             publicAddress = "localhost:" + str(port)
             masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
-
             print("Starting a new node")
             print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
 
@@ -126,7 +130,7 @@ class AlephiumMake(object):
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} ALEPHIUM_HOME={} nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, homedir, homedir))
+            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} apiKeyHash={} ALEPHIUM_HOME={} nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]
