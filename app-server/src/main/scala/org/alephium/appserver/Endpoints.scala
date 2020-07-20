@@ -1,7 +1,10 @@
 package org.alephium.appserver
 
+import scala.concurrent.Future
+
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
+import sttp.tapir.server.PartialServerEndpoint
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
@@ -18,6 +21,8 @@ trait Endpoints {
   implicit def rpcConfig: RPCConfig
   implicit def groupConfig: GroupConfig
 
+  type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, Response.Failure, B, Nothing, Future]
+
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
@@ -25,6 +30,19 @@ trait Endpoints {
         Validator.custom({ case (from, to) => from <= to }, "`fromTs` must be before `toTs`"))
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
+
+  private def checkApiKey(apiKey: ApiKey): Either[Response.Failure, ApiKey] =
+    if (apiKey.hash == rpcConfig.apiKeyHash) {
+      Right(apiKey)
+    } else {
+      Left(Response.failed(Error.UnauthorizedError))
+    }
+
+  private val authEndpoint: AuthEndpoint[Unit, Unit] =
+    endpoint
+      .in(auth.apiKey(header[ApiKey]("X-API-KEY")))
+      .errorOut(jsonBody[Response.Failure])
+      .serverLogicForCurrent(apiKey => Future.successful(checkApiKey(apiKey)))
 
   val getBlockflow: Endpoint[TimeInterval, Response.Failure, FetchResponse, Nothing] =
     endpoint.get
@@ -92,20 +110,18 @@ trait Endpoints {
       .errorOut(jsonBody[Response.Failure])
       .description("Create an unsigned transaction")
 
-  val sendTransaction: Endpoint[SendTransaction, Response.Failure, TxResult, Nothing] =
-    endpoint.post
+  val sendTransaction: AuthEndpoint[SendTransaction, TxResult] =
+    authEndpoint.post
       .in("transactions")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
-      .errorOut(jsonBody[Response.Failure])
       .description("Send a signed transaction")
 
-  val minerAction: Endpoint[MinerAction, Response.Failure, Boolean, Nothing] =
-    endpoint.post
+  val minerAction: AuthEndpoint[MinerAction, Boolean] =
+    authEndpoint.post
       .in("miners")
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
-      .errorOut(jsonBody[Response.Failure])
       .description("Execute an action on miners")
 
   val getOpenapi =
