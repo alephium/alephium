@@ -25,6 +25,7 @@ trait LockupScriptGenerators extends Generators {
     for {
       publicKey <- publicKeyGen(groupIndex)
     } yield LockupScript.p2pkh(publicKey)
+
   def p2pkScriptGen(groupIndex: GroupIndex): Gen[ScriptPair] =
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
@@ -32,9 +33,8 @@ trait LockupScriptGenerators extends Generators {
 }
 
 trait TxInputGenerators extends Generators {
-  private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] = {
+  private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] =
     Gen.choose(0, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
-  }
 
   def txInputGen(groupIndex: GroupIndex): Gen[TxInput] =
     for {
@@ -62,7 +62,6 @@ trait TokenGenerators extends Generators with NumericHelpers {
     tokens   <- Gen.listOfN(tokenNum, tokenGen)
   } yield AVector.from(tokens)
 
-  import ModelGenerators.Balances
   def split(amount: U64, minAmount: U64, num: Int): AVector[U64] = {
     assume(num > 0)
     val remainder = amount - (minAmount * num)
@@ -93,9 +92,7 @@ trait TxGenerators
     with TxInputGenerators
     with TokenGenerators {
 
-  lazy val createdHeightGen: Gen[Int] = {
-    Gen.choose(ALF.GenesisHeight, Int.MaxValue)
-  }
+  lazy val createdHeightGen: Gen[Int] = Gen.choose(ALF.GenesisHeight, Int.MaxValue)
 
   lazy val dataGen: Gen[ByteString] = for {
     length <- Gen.choose(0, 20)
@@ -130,6 +127,7 @@ trait TxGenerators
          |""".stripMargin
     Compiler.compileContract(input).toOption.get
   }
+
   lazy val counterStateGen: Gen[AVector[Val]] =
     Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U64(U64.unsafe(n))))
 
