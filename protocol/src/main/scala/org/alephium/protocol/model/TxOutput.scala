@@ -46,6 +46,14 @@ object TxOutput {
   }
 }
 
+/**
+  *
+  * @param amount the number of ALF in the output
+  * @param tokens secondary tokens in the output
+  * @param createdHeight height when the output was created, might be smaller than the block height
+  * @param lockupScript guarding script for unspent output
+  * @param additionalData data payload for additional information
+  */
 final case class AssetOutput(amount: U64,
                              tokens: AVector[(TokenId, U64)],
                              createdHeight: Int,

@@ -5,6 +5,15 @@ import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript, Val
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
+/**
+  * Upto one new token might be issued in each transaction exception for the coinbase transaction
+  * The id of the new token will be hash of the first input
+  *
+  * @param scriptOpt optional script for invoking stateful contracts
+  * @param inputs a vector of TxInput
+  * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
+  * @param states a vector of contract states, each one of which is a vector of vm Val
+  */
 final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[TxOutput],

@@ -8,12 +8,10 @@ import org.alephium.protocol.config.DiscoveryConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
-class DiscoveryMessageSpec extends AlephiumSpec with DiscoveryMessageGenerators {
+class DiscoveryMessageSpec extends AlephiumSpec {
   import DiscoveryMessage.Code
 
   implicit val ordering: Ordering[Code[_]] = Ordering.by(Code.toInt(_))
-
-  behavior of "DiscoveryMessage"
 
   it should "index all codes" in {
     val codes = EnumerationMacros.sealedInstancesOf[Code[_]]
@@ -47,7 +45,8 @@ class DiscoveryMessageSpec extends AlephiumSpec with DiscoveryMessageGenerators 
     }
   }
 
-  it should "support serde for all message types" in new DiscoveryConfigFixture {
+  it should "support serde for all message types" in new DiscoveryConfigFixture
+  with DiscoveryMessageGenerators {
     def groups: Int            = 4
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1

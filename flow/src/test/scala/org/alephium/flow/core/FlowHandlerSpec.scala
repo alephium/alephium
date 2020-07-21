@@ -7,13 +7,11 @@ import akka.testkit.TestProbe
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.model.{Block, ModelGenerators}
+import org.alephium.protocol.model.{Block, NoIndexModelGeneratorsLike}
 import org.alephium.util.ActorRefT
 
-class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with ModelGenerators {
+class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexModelGeneratorsLike {
   import FlowHandler._
-
-  behavior of "FlowHandlerState"
 
   def genPending(block: Block): PendingBlock = {
     genPending(block, mutable.HashSet.empty)

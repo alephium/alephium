@@ -14,7 +14,6 @@ import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.flow.U64Helpers
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
 import org.alephium.flow.platform.Mode
@@ -27,11 +26,11 @@ import org.alephium.util._
 
 class RPCServerSpec
     extends AlephiumSpec
-    with ModelGenerators
+    with NoIndexModelGenerators
     with ScalatestRouteTest
     with EitherValues
     with ScalaFutures
-    with U64Helpers {
+    with NumericHelpers {
   import ServerFixture._
 
   behavior of "http"

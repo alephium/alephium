@@ -3,8 +3,7 @@ package org.alephium.protocol.config
 import org.alephium.util.Duration
 
 trait ConsensusConfigFixture {
-
-  implicit val consensusConfig = new ConsensusConfig {
+  implicit val config = new ConsensusConfig {
     override val groups: Int = 3
 
     override def numZerosAtLeastInHash: Int = 0

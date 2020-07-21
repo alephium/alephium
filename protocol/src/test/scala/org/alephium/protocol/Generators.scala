@@ -1,0 +1,74 @@
+package org.alephium.protocol
+
+import java.net.InetSocketAddress
+
+import org.scalacheck.Gen
+
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
+import org.alephium.protocol.model._
+import org.alephium.util.{AVector, NumericHelpers}
+
+trait Generators extends NumericHelpers {
+  implicit def config: GroupConfig
+
+  lazy val hashGen: Gen[ALF.Hash] =
+    Gen.const(()).map(_ => ALF.Hash.generate)
+
+  lazy val groupIndexGen: Gen[GroupIndex] =
+    Gen.choose(0, config.groups - 1).map(GroupIndex.unsafe)
+
+  lazy val chainIndexGen: Gen[ChainIndex] = for {
+    from <- Gen.choose(0, config.groups - 1)
+    to   <- Gen.choose(0, config.groups - 1)
+  } yield ChainIndex.unsafe(from, to)
+
+  def chainIndexGenRelatedTo(broker: BrokerInfo): Gen[ChainIndex] =
+    chainIndexGen.retryUntil(_.relateTo(broker))
+
+  def chainIndexGenNotRelatedTo(broker: BrokerInfo): Gen[ChainIndex] =
+    chainIndexGen.retryUntil(!_.relateTo(broker))
+
+  def chainIndexFrom(groupIndex: GroupIndex): Gen[ChainIndex] =
+    Gen.choose(0, config.groups - 1).map(ChainIndex.unsafe(groupIndex.value, _))
+
+  def keypairGen(groupIndex: GroupIndex): Gen[(ED25519PrivateKey, ED25519PublicKey)] =
+    Gen.const(()).map(_ => groupIndex.generateKey)
+
+  def publicKeyGen(groupIndex: GroupIndex): Gen[ED25519PublicKey] =
+    keypairGen(groupIndex).map(_._2)
+
+  def cliqueIdGen: Gen[CliqueId] =
+    Gen.const(()).map(_ => CliqueId.generate)
+
+  def groupNumPerBrokerGen: Gen[Int] =
+    Gen.oneOf((1 to config.groups).filter(i => (config.groups % i) equals 0))
+
+  def brokerInfoGen(implicit config: CliqueConfig): Gen[BrokerInfo] =
+    for {
+      id      <- Gen.choose(0, config.brokerNum - 1)
+      address <- socketAddressGen
+    } yield BrokerInfo.unsafe(id, config.groupNumPerBroker, address)
+
+  def cliqueInfoGen(implicit config: GroupConfig): Gen[CliqueInfo] =
+    for {
+      groupNumPerBroker <- groupNumPerBrokerGen
+      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cid               <- cliqueIdGen
+    } yield CliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
+
+  lazy val socketAddressGen: Gen[InetSocketAddress] =
+    for {
+      ip0  <- Gen.choose(0, 255)
+      ip1  <- Gen.choose(0, 255)
+      ip2  <- Gen.choose(0, 255)
+      ip3  <- Gen.choose(0, 255)
+      port <- Gen.choose(0x401, 65535)
+    } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
+}
+
+trait DefaultGenerators extends Generators {
+  override implicit def config: GroupConfig = new GroupConfig {
+    override def groups: Int = 3
+  }
+}

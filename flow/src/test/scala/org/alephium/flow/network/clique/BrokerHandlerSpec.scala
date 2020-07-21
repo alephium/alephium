@@ -21,8 +21,9 @@ import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
 import org.alephium.util.{ActorRefT, AVector}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") with ModelGenerators {
-  Spec =>
+class BrokerHandlerSpec
+    extends AlephiumFlowActorSpec("BrokerHandlerSpec")
+    with NoIndexModelGeneratorsLike { Spec =>
   behavior of "BrokerHandler"
 
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
