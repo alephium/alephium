@@ -62,12 +62,15 @@ object WorldState {
     }
 
     def remove(outputRef: TxOutputRef): IOResult[Persisted] = {
-      if (outputRef.isContractRef) {
-        for {
-          newOutputState   <- outputState.remove(outputRef)
-          newContractState <- contractState.remove(outputRef.key)
-        } yield Persisted(newOutputState, newContractState)
-      } else outputState.remove(outputRef).map(Persisted(_, contractState))
+      outputRef match {
+        case _: AssetOutputRef =>
+          outputState.remove(outputRef).map(Persisted(_, contractState))
+        case ContractOutputRef(key) =>
+          for {
+            newOutputState   <- outputState.remove(outputRef)
+            newContractState <- contractState.remove(key)
+          } yield Persisted(newOutputState, newContractState)
+      }
     }
 
     def persist: IOResult[WorldState.Persisted] = Right(this)
@@ -138,7 +141,7 @@ object WorldState {
 
   def empty(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): WorldState = {
     val emptyOutputTrie =
-      MerklePatriciaTrie.build(storage, TxOutputRef.empty, TxOutput.burn(U64.Zero))
+      MerklePatriciaTrie.build(storage, TxOutputRef.emptyTreeNode, TxOutput.burn(U64.Zero))
     val emptyContractTrie =
       MerklePatriciaTrie.build(storage, ALF.Hash.zero, AVector.empty[Val])
     Persisted(emptyOutputTrie, emptyContractTrie)

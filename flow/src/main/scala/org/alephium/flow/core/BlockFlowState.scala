@@ -428,7 +428,10 @@ object BlockFlowState {
   // This is only used for out blocks for a specific group
   private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
       implicit config: GroupConfig): Map[TxOutputRef, TxOutput] = {
-    convertOutputs(block)._1.filter(_._1.fromGroup == groupIndex)
+    convertOutputs(block)._1.filter {
+      case (outputRef: AssetOutputRef, _) if outputRef.fromGroup == groupIndex => true
+      case _                                                                   => false
+    }
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
