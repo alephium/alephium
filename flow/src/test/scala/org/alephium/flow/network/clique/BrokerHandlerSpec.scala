@@ -3,7 +3,6 @@ package org.alephium.flow.network.clique
 import java.net.InetSocketAddress
 
 import scala.collection.mutable
-import scala.util.Random
 
 import akka.actor.Props
 import akka.io.Tcp
@@ -19,7 +18,7 @@ import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Random}
 
 class BrokerHandlerSpec
     extends AlephiumFlowActorSpec("BrokerHandlerSpec")
@@ -28,7 +27,7 @@ class BrokerHandlerSpec
 
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
     val cliqueInfo = cliqueInfoGen.sample.get
-    val id         = Random.nextInt(cliqueInfo.brokerNum)
+    val id         = Random.source.nextInt(cliqueInfo.brokerNum)
     val address    = cliqueInfo.peers(id)
     val brokerInfo = BrokerInfo.unsafe(id, cliqueInfo.groupNumPerBroker, address)
     (address, cliqueInfo, brokerInfo)
@@ -277,7 +276,7 @@ class BrokerHandlerSpec
   }
 
   it should "reply pong to ping" in new RelayFixture {
-    val nonce    = Random.nextInt()
+    val nonce    = Random.source.nextInt()
     val message1 = Ping(nonce, System.currentTimeMillis())
     val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)
@@ -286,7 +285,7 @@ class BrokerHandlerSpec
 
   it should "fail if receive a wrong ping" in new RelayFixture {
     watch(tcpHandler)
-    val nonce    = Random.nextInt()
+    val nonce    = Random.source.nextInt()
     val message1 = Pong(nonce)
     val data1    = Message.serialize(message1)
     tcpHandler ! Tcp.Received(data1)

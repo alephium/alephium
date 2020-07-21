@@ -145,7 +145,7 @@ trait TestFixtureLike
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
-        ActorSystem(s"$name-${scala.util.Random.nextInt}", platformConfig.config.all)
+        ActorSystem(s"$name-${Random.source.nextInt}", platformConfig.config.all)
       implicit val executionContext = system.dispatcher
       implicit val config           = platformConfig.config
 

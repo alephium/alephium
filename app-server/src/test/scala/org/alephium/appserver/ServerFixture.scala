@@ -1,7 +1,6 @@
 package org.alephium.appserver
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
@@ -99,7 +98,8 @@ object ServerFixture {
     val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
 
     val eventBus =
-      ActorRefT.build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.nextInt}")
+      ActorRefT
+        .build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.source.nextInt}")
 
     val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborCliques)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)

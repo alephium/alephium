@@ -4,7 +4,6 @@ import scala.{specialized => sp}
 import scala.collection.mutable.ArrayBuffer
 import scala.math.Ordering.Double.IeeeOrdering
 import scala.reflect.ClassTag
-import scala.util.Random
 
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
@@ -192,7 +191,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vc.dropRight(vc.length).isEmpty is true
       vc.dropRightUpto(vc.length + 1).isEmpty is true
 
-      val k = Random.nextInt(vc.length)
+      val k = Random.source.nextInt(vc.length)
       checkEq(vc.take(k), vc.toArray.take(k))
       checkEq(vc.takeRight(k), vc.toArray.takeRight(k))
       checkEq(vc.drop(k), vc.toArray.drop(k))
@@ -341,7 +340,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "replace" in new Fixture {
     forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
-      val index = Random.nextInt(vc.length)
+      val index = Random.source.nextInt(vc.length)
       val vc1   = vc.replace(index, vc.head)
       vc.indices.foreach { i =>
         if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i)

@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Random
 
 import akka.actor.{Props, Timers}
 import akka.io.Tcp
@@ -21,7 +20,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.{SerdeError, SerdeResult}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest, Random}
 
 object BrokerHandler {
   sealed trait Command
@@ -243,7 +242,7 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
       log.debug("No Pong message received in time")
       stop()
     } else {
-      pingNonce = Random.nextInt()
+      pingNonce = Random.source.nextInt()
       val timestamp = System.currentTimeMillis()
       sendPayload(Ping(pingNonce, timestamp))
     }
