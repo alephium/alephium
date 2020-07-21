@@ -13,6 +13,7 @@ import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Span}
 
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -154,7 +155,7 @@ class RPCServerSpec
   }
 
   it should "run/stop the server" in new RouteHTTP {
-    server.runServer().futureValue is (())
+    server.start().futureValue is (())
     server.stop().futureValue is (())
   }
 
@@ -255,7 +256,8 @@ class RPCServerSpec
   }
 
   trait RouteHTTP extends RPCServerFixture {
-    implicit lazy val askTimeout = Timeout(server.rpcConfig.askTimeout.asScala)
+    implicit lazy val askTimeout: Timeout       = Timeout(server.rpcConfig.askTimeout.asScala)
+    implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(2000, Millis))
 
     def checkCall[T](method: String, params: Option[Json])(f: Response.Success => T): T = {
       rpcRequest(method, params.getOrElse(Json.obj()), 0) ~> server.httpRoute ~> check {

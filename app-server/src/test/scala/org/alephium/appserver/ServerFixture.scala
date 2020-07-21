@@ -126,6 +126,8 @@ object ServerFixture {
 
     val monitorProbe                     = TestProbe()
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
+
+    override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
   }
 
   class BlockFlowDummy(block: Block,
@@ -192,9 +194,6 @@ object ServerFixture {
     lazy val node =
       new NodeDummy(intraCliqueInfo, neighborCliques, block, blockFlowProbe, dummyTx, storages)
 
-    override def stop(): Future[Unit] =
-      for {
-        _ <- node.stop()
-      } yield ()
+    override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
   }
 }

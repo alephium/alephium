@@ -239,9 +239,8 @@ trait TestFixtureLike
 
     override val node: Node = Node.build(Mode.defaultBuilders, storages)
 
-    override def stop(): Future[Unit] =
+    override def stopSelfOnce(): Future[Unit] =
       for {
-        _ <- node.stop()
         _ <- Future.successful(storages.close())
         _ <- Future.successful(storages.dESTROYUnsafe())
       } yield (())

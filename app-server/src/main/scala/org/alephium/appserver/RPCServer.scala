@@ -1,5 +1,6 @@
 package org.alephium.appserver
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
 import akka.actor.ActorSystem
@@ -10,7 +11,6 @@ import io.circe._
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.flow.Stoppable
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.{BlockFlow, TxHandler}
 import org.alephium.flow.core.FlowHandler.BlockNotify
@@ -20,14 +20,14 @@ import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{ActorRefT, Duration}
+import org.alephium.util.{ActorRefT, Duration, Service}
 
 class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
     implicit val system: ActorSystem,
     val config: PlatformConfig,
     val executionContext: ExecutionContext)
     extends RPCServerAbstract
-    with Stoppable {
+    with Service {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
@@ -107,12 +107,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   val httpRoute: Route = routeHttp(miner)
   val wsRoute: Route   = routeWs(mode.node.eventBus)
 
-  private var started: Boolean                                = false
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
   private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
 
-  def runServer(): Future[Unit] = {
-    started = true
+  override def subServices: ArraySeq[Service] = ArraySeq(mode)
+
+  protected def startSelfOnce(): Future[Unit] = {
     for {
       httpBinding <- Http()
         .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
@@ -126,21 +126,18 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     }
   }
 
-  def stop(): Future[Unit] =
-    if (started) {
-      for {
-        httpStop <- httpBindingPromise.future.flatMap(
-          _.terminate(hardDeadline = terminationHardDeadline))
-        wsStop <- wsBindingPromise.future.flatMap(
-          _.terminate(hardDeadline = terminationHardDeadline))
-      } yield {
-        logger.info(s"http unbound with message $httpStop.")
-        logger.info(s"ws unbound with message $wsStop.")
-        ()
-      }
-    } else {
-      Future.successful(())
+  protected def stopSelfOnce(): Future[Unit] = {
+    for {
+      httpBinding <- httpBindingPromise.future
+      httpStop    <- httpBinding.terminate(hardDeadline = terminationHardDeadline)
+      wsBinding   <- wsBindingPromise.future
+      wsStop      <- wsBinding.terminate(hardDeadline = terminationHardDeadline)
+    } yield {
+      logger.info(s"http unbound with message $httpStop.")
+      logger.info(s"ws unbound with message $wsStop.")
+      ()
     }
+  }
 }
 
 object RPCServer extends {
