@@ -1,12 +1,10 @@
 package org.alephium.serde
 
-import java.security.SecureRandom
-
 import scala.reflect.runtime.universe.TypeTag
 
 import akka.util.ByteString
 
-import org.alephium.util.Hex
+import org.alephium.util.{Hex, Random}
 
 trait RandomBytes {
   def bytes: ByteString
@@ -62,12 +60,10 @@ object RandomBytes {
 
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
-      source.nextBytes(xs)
+      Random.source.nextBytes(xs)
       unsafe(ByteString.fromArrayUnsafe(xs))
     }
 
     implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafe, toBytes)
   }
-
-  val source: SecureRandom = SecureRandom.getInstanceStrong
 }
