@@ -2,11 +2,9 @@ package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
-import org.alephium.io.IOResult
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike}
-import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -17,19 +15,6 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
     val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))
 
-    def myUpdateState(worldState: WorldState, block: Block): IOResult[WorldState] = {
-      import BlockFlowState._
-      val cache = convertBlock(block, block.chainIndex.from)
-      cache match {
-        case InBlockCache(outputs) =>
-          updateStateForOutputs(worldState, outputs)
-        case OutBlockCache(_, _) =>
-          Right(worldState)
-        case InOutBlockCache(outputs, _, _) =>
-          updateStateForOutputs(worldState, outputs)
-      }
-    }
-
     def buildGenesis(): BlockChainWithState = {
       val dbFolder = "db-" + Hash.random.toHexString
       val storages = Storages.createUnsafe(rootPath, dbFolder, Settings.syncWrite)
@@ -37,7 +22,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
         ChainIndex.unsafe(0, 0),
         genesis,
         storages,
-        myUpdateState,
+        (worldState, _) => Right(worldState),
         BlockChainWithState.initializeGenesis(genesis, storages.emptyWorldState)(_))
     }
   }

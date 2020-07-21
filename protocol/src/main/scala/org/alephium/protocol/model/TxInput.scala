@@ -59,16 +59,15 @@ object TxOutputRef {
 
   def contract(key: Hash): TxOutputRef = ContractOutputRef(key)
 
+  def key(tx: Transaction, outputIndex: Int): ALF.Hash = {
+    Hash.hash(tx.hash.bytes ++ Bytes.toBytes(outputIndex))
+  }
+
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
+    val refKey = key(transaction, outputIndex)
     transaction.getOutput(outputIndex) match {
-      case output: AssetOutput =>
-        val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
-        assume(output.scriptHint != 0)
-        AssetOutputRef(output.scriptHint, outputHash)
-      case _: ContractOutput =>
-        // TODO: check non-empty signature in validation
-        val outputHash = Hash.hash(transaction.signatures.head.bytes ++ Bytes.toBytes(outputIndex))
-        ContractOutputRef(outputHash)
+      case output: AssetOutput => AssetOutputRef(output.scriptHint, refKey)
+      case _: ContractOutput   => ContractOutputRef(refKey)
     }
   }
 }
