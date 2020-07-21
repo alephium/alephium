@@ -45,7 +45,7 @@ trait TxInputGenerators extends Generators {
       shortKey <- shortKeyGen(groupIndex)
       hash     <- hashGen
     } yield {
-      val outputRef = TxOutputRef(shortKey, hash)
+      val outputRef = TxOutputRef.from(shortKey, hash)
       TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
     }
 }
@@ -184,7 +184,7 @@ trait TxGenerators
                                                 dataGen)
       outputHash <- hashGen
     } yield {
-      val outputRef = TxOutputRef(assetOutput.scriptHint, outputHash)
+      val outputRef = TxOutputRef.from(assetOutput.scriptHint, outputHash)
       val txInput   = TxInput(outputRef, unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
