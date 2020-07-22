@@ -104,7 +104,7 @@ object Validation {
 
   private[validation] def checkGroup(block: Block)(
       implicit config: PlatformConfig): BlockValidationResult[Unit] = {
-    if (block.chainIndex.relateTo(config.brokerInfo)) validBlock
+    if (block.chainIndex.relateTo(config.brokerInfo)) validBlock(())
     else invalidBlock(InvalidGroup)
   }
 
@@ -116,13 +116,13 @@ object Validation {
 
     val ok1 = headerTs < now.plusHoursUnsafe(1)
     val ok2 = isSyncing || (headerTs > now.plusHoursUnsafe(-1)) // Note: now -1hour is always positive
-    if (ok1 && ok2) validHeader else invalidHeader(InvalidTimeStamp)
+    if (ok1 && ok2) validHeader(()) else invalidHeader(InvalidTimeStamp)
   }
 
   private[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult[Unit] = {
     val current = BigInt(1, data.hash.bytes.toArray)
     assert(current >= 0)
-    if (current <= data.target) validHeader else invalidHeader(InvalidWorkAmount)
+    if (current <= data.target) validHeader(()) else invalidHeader(InvalidWorkAmount)
   }
 
   private[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(
@@ -130,7 +130,7 @@ object Validation {
     headerChain.getHashTarget(header.parentHash) match {
       case Left(error) => Left(Left(error))
       case Right(target) =>
-        if (target == header.target) validHeader else invalidHeader(InvalidWorkTarget)
+        if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
     }
   }
 
@@ -139,25 +139,25 @@ object Validation {
     header.blockDeps.filterNotE(flow.contains) match {
       case Left(error) => Left(Left(error))
       case Right(missings) =>
-        if (missings.isEmpty) validHeader else invalidHeader(MissingDeps(missings))
+        if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
     }
   }
 
   private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult[Unit] = {
-    if (block.transactions.nonEmpty) validBlock else invalidBlock(EmptyTransactionList)
+    if (block.transactions.nonEmpty) validBlock(()) else invalidBlock(EmptyTransactionList)
   }
 
   private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (unsigned.inputs.isEmpty && unsigned.fixedOutputs.length == 1 && coinbase.generatedOutputs.isEmpty && coinbase.signatures.isEmpty)
-      validBlock
+      validBlock(())
     else invalidBlock(InvalidCoinbase)
   }
 
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
-    if (block.header.txsHash == Hash.hash(block.transactions)) validBlock
+    if (block.header.txsHash == Hash.hash(block.transactions)) validBlock(())
     else invalidBlock(InvalidMerkleRoot)
   }
 
@@ -175,7 +175,7 @@ object Validation {
       } yield ()
       convert(result)
     } else {
-      validBlock
+      validBlock(())
     }
   }
 
@@ -210,13 +210,13 @@ object Validation {
     } else if (tx.outputsLength == 0) {
       invalidTx(EmptyOutputs)
     } else {
-      validTx
+      validTx(())
     }
   }
 
   private[validation] def checkOutputValue(tx: Transaction): TxValidationResult[Unit] = {
     tx.alfAmountInOutputs match {
-      case Some(sum) if sum < ALF.MaxALFValue => validTx
+      case Some(sum) if sum < ALF.MaxALFValue => validTx(())
       case _                                  => invalidTx(BalanceOverFlow)
     }
   }
@@ -234,7 +234,7 @@ object Validation {
     val toGroups  = (0 until tx.outputsLength).map(i => getToGroup(tx.getOutput(i), fromGroup))
     val toOk      = toGroups.forall(groupIndex => groupIndex == index.from || groupIndex == index.to)
     val existed   = toGroups.view.take(tx.unsigned.fixedOutputs.length).contains(index.to)
-    if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
+    if (fromOk && toOk && existed) validTx(()) else invalidTx(InvalidChainIndex)
   }
 
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult[Unit] = {
@@ -244,7 +244,7 @@ object Validation {
         if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
         else {
           utxoUsed += input.outputRef
-          validTx
+          validTx(())
         }
       }
     }
@@ -256,7 +256,7 @@ object Validation {
       if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
       else {
         utxoUsed += input.outputRef
-        validTx
+        validTx(())
       }
     }
   }
@@ -295,7 +295,7 @@ object Validation {
       preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
     tx.alfAmountInOutputs match {
-      case Some(outputSum) if outputSum <= inputSum => validTx
+      case Some(outputSum) if outputSum <= inputSum => validTx(())
       case Some(_)                                  => invalidTx(InvalidBalance)
       case None                                     => invalidTx(BalanceOverFlow)
     }
@@ -312,7 +312,7 @@ object Validation {
           case (tokenId, balance) =>
             (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance) || tokenId == tx.unsigned.inputs.head.hash
         }
-        if (ok) validTx else invalidTx(InvalidBalance)
+        if (ok) validTx(()) else invalidTx(InvalidBalance)
       }
     } yield ()
   }
@@ -373,7 +373,7 @@ object Validation {
       invalidTx(InvalidPublicKeyHash)
     } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
       invalidTx(InvalidSignature)
-    } else validTx
+    } else validTx(())
   }
 
   private[validation] def checkP2SH(tx: Transaction,
@@ -402,7 +402,7 @@ object Validation {
                                       signature: ED25519Signature,
                                       worldState: WorldState): TxValidationResult[Unit] = {
     StatelessVM.runAssetScript(worldState, tx.hash, script, params, signature) match {
-      case Right(_) => validTx // TODO: handle returns
+      case Right(_) => validTx(()) // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))
     }
   }
