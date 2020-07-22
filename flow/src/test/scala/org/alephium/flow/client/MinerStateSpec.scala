@@ -1,7 +1,5 @@
 package org.alephium.flow.client
 
-import scala.util.Random
-
 import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
@@ -10,7 +8,7 @@ import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, TestUt
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Random}
 
 class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
@@ -53,7 +51,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     forAll(Gen.choose(0, config.groupNumPerBroker - 1), Gen.choose(0, config.groups - 1)) {
       (fromShift, to) =>
         val oldCount   = getMiningCount(fromShift, to)
-        val countDelta = Random.nextInt(Integer.MAX_VALUE)
+        val countDelta = Random.source.nextInt(Integer.MAX_VALUE)
         increaseCounts(fromShift, to, countDelta)
         val newCount = getMiningCount(fromShift, to)
         (newCount - oldCount) is countDelta
@@ -61,8 +59,8 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "pick up correct task" in new Fixture {
-    val fromShift = Random.nextInt(config.groupNumPerBroker)
-    val to        = Random.nextInt(config.groups)
+    val fromShift = Random.source.nextInt(config.groupNumPerBroker)
+    val to        = Random.source.nextInt(config.groups)
     (0 until config.groups).foreach { i =>
       if (i != to) increaseCounts(fromShift, i, config.nonceStep + 1)
     }

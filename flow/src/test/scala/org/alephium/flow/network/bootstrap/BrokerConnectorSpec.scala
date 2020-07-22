@@ -1,7 +1,5 @@
 package org.alephium.flow.network.bootstrap
 
-import scala.util.Random
-
 import akka.io.Tcp
 import akka.testkit.TestProbe
 import akka.util.ByteString
@@ -10,6 +8,7 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Serde
+import org.alephium.util.Random
 
 class BrokerConnectorSpec
     extends AlephiumFlowActorSpec("BrokerConnector")
@@ -20,7 +19,7 @@ class BrokerConnectorSpec
     val cliqueCoordinator = TestProbe()
     val brokerConnector =
       system.actorOf(BrokerConnector.props(connection.ref, cliqueCoordinator.ref))
-    val randomId      = Random.nextInt(config.brokerNum)
+    val randomId      = Random.source.nextInt(config.brokerNum)
     val randomAddress = socketAddressGen.sample.get
     val randomInfo = PeerInfo.unsafe(randomId,
                                      config.groupNumPerBroker,

@@ -12,7 +12,7 @@ import org.scalatest.Assertion
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigFixture}
+import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigFixture, GroupConfig}
 import org.alephium.protocol.model.ModelGenerators.{Balances, ScriptPair}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
@@ -20,6 +20,8 @@ import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U64}
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
+
+  implicit def config: GroupConfig
 
   def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript] =
     for {
@@ -33,6 +35,8 @@ trait LockupScriptGenerators extends Generators {
 }
 
 trait TxInputGenerators extends Generators {
+  implicit def config: GroupConfig
+
   private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] =
     Gen.choose(0, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
 

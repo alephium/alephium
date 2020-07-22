@@ -4,7 +4,7 @@ import akka.util.ByteString
 import org.bouncycastle.math.ec.rfc8032.{Ed25519 => bcEd25519}
 
 import org.alephium.serde.RandomBytes
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Random}
 
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 
@@ -42,7 +42,7 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
   override def generatePriPub(): (ED25519PrivateKey, ED25519PublicKey) = {
     val privateKey = Array.ofDim[Byte](ED25519PrivateKey.length)
     val publicKey  = Array.ofDim[Byte](ED25519PublicKey.length)
-    bcEd25519.generatePrivateKey(RandomBytes.source, privateKey)
+    bcEd25519.generatePrivateKey(Random.source, privateKey)
     bcEd25519.generatePublicKey(privateKey, 0, publicKey, 0)
     (ED25519PrivateKey.unsafe(ByteString.fromArrayUnsafe(privateKey)),
      ED25519PublicKey.unsafe(ByteString.fromArrayUnsafe(publicKey)))
