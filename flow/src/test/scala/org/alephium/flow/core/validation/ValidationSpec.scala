@@ -13,21 +13,20 @@ import org.alephium.util.{AVector, Duration, TimeStamp, U64}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import Validation._
-  import ValidationStatus._
 
-  def check(res: BlockValidationResult): Assertion = {
+  def check[T](res: BlockValidationResult[T]): Assertion = {
     res.isRight is true
   }
 
-  def check(res: BlockValidationResult, error: InvalidBlockStatus): Assertion = {
+  def check[T](res: BlockValidationResult[T], error: InvalidBlockStatus): Assertion = {
     res.left.value isE error
   }
 
-  def checkTx(res: TxValidationResult): Assertion = {
+  def checkTx[T](res: TxValidationResult[T]): Assertion = {
     res.isRight is true
   }
 
-  def checkTx(res: TxValidationResult, error: InvalidTxStatus): Assertion = {
+  def checkTx[T](res: TxValidationResult[T], error: InvalidTxStatus): Assertion = {
     res.left.value isE error
   }
 
