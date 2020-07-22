@@ -1,6 +1,7 @@
 package org.alephium.util
 
-import scala.{inline, specialized => sp}
+import scala.{specialized => sp}
+import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import org.alephium.macros.HPC
@@ -548,8 +549,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     arr
   }
 
-  def toSet: Set[A] = {
-    toIterable.toSet
+  def toSeq: Seq[A] = {
+    ArraySeq.unsafeWrapArray(toArray)
   }
 
   def toIterable: Iterable[A] = {
@@ -558,6 +559,10 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
       def iterator: Iterator[A] = elems.iterator.slice(start, end)
       override def foreach[U](f: A => U): Unit = self.foreach(f)
     }
+  }
+
+  def toSet: Set[A] = {
+    toIterable.toSet
   }
 
   def indices: Range = 0 until length

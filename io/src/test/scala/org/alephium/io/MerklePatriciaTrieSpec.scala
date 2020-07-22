@@ -190,7 +190,7 @@ object MerklePatriciaTrieSpec {
         case BranchNode(path, children) =>
           val nChild = children.map(_.fold(0)(_ => 1)).sum
           print(s"($shortHash, ${path.length} $nChild); ")
-          children.toArray.toSeq.flatten
+          children.toSeq.flatten
         case LeafNode(path, data) =>
           val value = deserialize[V](data).toOption.get
           print(s"($shortHash, #${path.length}, $value)")
