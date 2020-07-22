@@ -31,7 +31,7 @@ object Validation {
   private[validation] def validateHeaderUntilDependencies(
       header: BlockHeader,
       flow: BlockFlow,
-      isSyncing: Boolean): HeaderValidationResult = {
+      isSyncing: Boolean): HeaderValidationResult[Unit] = {
     for {
       _ <- checkTimeStamp(header, isSyncing)
       _ <- checkWorkAmount(header)
@@ -40,7 +40,7 @@ object Validation {
   }
 
   private[validation] def validateHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
-      implicit config: PlatformConfig): HeaderValidationResult = {
+      implicit config: PlatformConfig): HeaderValidationResult[Unit] = {
     val headerChain = flow.getHeaderChain(header)
     for {
       _ <- checkWorkTarget(header, headerChain)
@@ -48,7 +48,7 @@ object Validation {
   }
 
   private[validation] def validateHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformConfig): HeaderValidationResult = {
+      implicit config: PlatformConfig): HeaderValidationResult[Unit] = {
     for {
       _ <- validateHeaderUntilDependencies(header, flow, isSyncing)
       _ <- validateHeaderAfterDependencies(header, flow)
@@ -58,12 +58,12 @@ object Validation {
   private[validation] def validateBlockUntilDependencies(
       block: Block,
       flow: BlockFlow,
-      isSyncing: Boolean): BlockValidationResult = {
+      isSyncing: Boolean): BlockValidationResult[Unit] = {
     validateHeaderUntilDependencies(block.header, flow, isSyncing)
   }
 
   private[validation] def validateBlockAfterDependencies(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     for {
       _ <- validateHeaderAfterDependencies(block.header, flow)
       _ <- validateBlockAfterHeader(block, flow)
@@ -71,7 +71,7 @@ object Validation {
   }
 
   private[validation] def validateBlock(block: Block, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformConfig): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     for {
       _ <- validateHeader(block.header, flow, isSyncing)
       _ <- validateBlockAfterHeader(block, flow)
@@ -79,7 +79,7 @@ object Validation {
   }
 
   private[validation] def validateBlockAfterHeader(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
@@ -90,7 +90,7 @@ object Validation {
   }
 
   private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
-      implicit config: PlatformConfig): TxValidationResult = {
+      implicit config: PlatformConfig): TxValidationResult[Unit] = {
     val index = ChainIndex(tx.fromGroup, tx.toGroup)
     for {
       trie <- ValidationStatus.from(flow.getBestPersistedTrie(index.from))
@@ -103,14 +103,14 @@ object Validation {
    */
 
   private[validation] def checkGroup(block: Block)(
-      implicit config: PlatformConfig): BlockValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     if (block.chainIndex.relateTo(config.brokerInfo)) validBlock
     else invalidBlock(InvalidGroup)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private[validation] def checkTimeStamp(header: BlockHeader,
-                                         isSyncing: Boolean): HeaderValidationResult = {
+                                         isSyncing: Boolean): HeaderValidationResult[Unit] = {
     val now      = TimeStamp.now()
     val headerTs = header.timestamp
 
@@ -119,14 +119,14 @@ object Validation {
     if (ok1 && ok2) validHeader else invalidHeader(InvalidTimeStamp)
   }
 
-  private[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult = {
+  private[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult[Unit] = {
     val current = BigInt(1, data.hash.bytes.toArray)
     assert(current >= 0)
     if (current <= data.target) validHeader else invalidHeader(InvalidWorkAmount)
   }
 
   private[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(
-      implicit config: GroupConfig): HeaderValidationResult = {
+      implicit config: GroupConfig): HeaderValidationResult[Unit] = {
     headerChain.getHashTarget(header.parentHash) match {
       case Left(error) => Left(Left(error))
       case Right(target) =>
@@ -135,7 +135,7 @@ object Validation {
   }
 
   private[validation] def checkDependencies(header: BlockHeader,
-                                            flow: BlockFlow): HeaderValidationResult = {
+                                            flow: BlockFlow): HeaderValidationResult[Unit] = {
     header.blockDeps.filterNotE(flow.contains) match {
       case Left(error) => Left(Left(error))
       case Right(missings) =>
@@ -143,11 +143,11 @@ object Validation {
     }
   }
 
-  private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult = {
+  private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult[Unit] = {
     if (block.transactions.nonEmpty) validBlock else invalidBlock(EmptyTransactionList)
   }
 
-  private[validation] def checkCoinbase(block: Block): BlockValidationResult = {
+  private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (unsigned.inputs.isEmpty && unsigned.fixedOutputs.length == 1 && coinbase.generatedOutputs.isEmpty && coinbase.signatures.isEmpty)
@@ -156,13 +156,13 @@ object Validation {
   }
 
   // TODO: use Merkle hash for transactions
-  private[validation] def checkMerkleRoot(block: Block): BlockValidationResult = {
+  private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
     if (block.header.txsHash == Hash.hash(block.transactions)) validBlock
     else invalidBlock(InvalidMerkleRoot)
   }
 
   private[validation] def checkNonCoinbases(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): TxsValidationResult = {
+      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     val index      = block.chainIndex
     val brokerInfo = config.brokerInfo
     assert(index.relateTo(brokerInfo))
@@ -175,14 +175,14 @@ object Validation {
       } yield ()
       convert(result)
     } else {
-      validTxs
+      validBlock
     }
   }
 
   private[validation] def checkBlockNonCoinbase(index: ChainIndex,
                                                 tx: Transaction,
                                                 worldState: WorldState)(
-      implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
+      implicit config: GroupConfig with ScriptConfig): TxValidationResult[Unit] = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
@@ -194,7 +194,7 @@ object Validation {
   private[validation] def checkNonCoinbaseTx(index: ChainIndex,
                                              tx: Transaction,
                                              worldState: WorldState)(
-      implicit config: GroupConfig with ScriptConfig): TxValidationResult = {
+      implicit config: GroupConfig with ScriptConfig): TxValidationResult[Unit] = {
     for {
       _ <- checkNonEmpty(tx)
       _ <- checkOutputValue(tx)
@@ -204,7 +204,7 @@ object Validation {
     } yield ()
   }
 
-  private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult = {
+  private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult[Unit] = {
     if (tx.unsigned.inputs.isEmpty) {
       invalidTx(EmptyInputs)
     } else if (tx.outputsLength == 0) {
@@ -214,7 +214,7 @@ object Validation {
     }
   }
 
-  private[validation] def checkOutputValue(tx: Transaction): TxValidationResult = {
+  private[validation] def checkOutputValue(tx: Transaction): TxValidationResult[Unit] = {
     tx.alfAmountInOutputs match {
       case Some(sum) if sum < ALF.MaxALFValue => validTx
       case _                                  => invalidTx(BalanceOverFlow)
@@ -228,7 +228,7 @@ object Validation {
   }
 
   private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
-      implicit config: GroupConfig): TxValidationResult = {
+      implicit config: GroupConfig): TxValidationResult[Unit] = {
     val fromOk    = tx.unsigned.inputs.forall(_.fromGroup == index.from)
     val fromGroup = tx.fromGroup
     val toGroups  = (0 until tx.outputsLength).map(i => getToGroup(tx.getOutput(i), fromGroup))
@@ -237,7 +237,7 @@ object Validation {
     if (fromOk && toOk && existed) validTx else invalidTx(InvalidChainIndex)
   }
 
-  private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult = {
+  private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
@@ -250,7 +250,7 @@ object Validation {
     }
   }
 
-  private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult = {
+  private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     tx.unsigned.inputs.foreachE { input =>
       if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
@@ -262,7 +262,7 @@ object Validation {
   }
 
   private[validation] def checkSpending(tx: Transaction,
-                                        worldState: WorldState): TxValidationResult = {
+                                        worldState: WorldState): TxValidationResult[Unit] = {
     val query = tx.unsigned.inputs.mapE { input =>
       worldState.getOutput(input.outputRef)
     }
@@ -275,7 +275,7 @@ object Validation {
 
   private[validation] def checkSpending(tx: Transaction,
                                         preOutputs: AVector[TxOutput],
-                                        worldState: WorldState): TxValidationResult = {
+                                        worldState: WorldState): TxValidationResult[Unit] = {
     for {
       _ <- checkBalance(tx, preOutputs)
       _ <- checkWitnesses(tx, preOutputs, worldState)
@@ -283,15 +283,16 @@ object Validation {
   }
 
   private[validation] def checkBalance(tx: Transaction,
-                                       preOutputs: AVector[TxOutput]): TxValidationResult = {
+                                       preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     for {
       _ <- checkAlfBalance(tx, preOutputs)
       _ <- checkTokenBalance(tx, preOutputs)
     } yield ()
   }
 
-  private[validation] def checkAlfBalance(tx: Transaction,
-                                          preOutputs: AVector[TxOutput]): TxValidationResult = {
+  private[validation] def checkAlfBalance(
+      tx: Transaction,
+      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
     tx.alfAmountInOutputs match {
       case Some(outputSum) if outputSum <= inputSum => validTx
@@ -300,8 +301,9 @@ object Validation {
     }
   }
 
-  private[validation] def checkTokenBalance(tx: Transaction,
-                                            preOutputs: AVector[TxOutput]): TxValidationResult = {
+  private[validation] def checkTokenBalance(
+      tx: Transaction,
+      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     for {
       inputBalances  <- computeTokenBalances(preOutputs)
       outputBalances <- computeTokenBalances(tx.unsigned.fixedOutputs ++ tx.generatedOutputs)
@@ -337,7 +339,7 @@ object Validation {
   // TODO: signatures might not be 1-to-1 mapped to inputs
   private[validation] def checkWitnesses(tx: Transaction,
                                          preOutputs: AVector[TxOutput],
-                                         worldState: WorldState): TxValidationResult = {
+                                         worldState: WorldState): TxValidationResult[Unit] = {
     assume(tx.unsigned.inputs.length == preOutputs.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val unlockScript = tx.unsigned.inputs(idx).unlockScript
@@ -350,7 +352,7 @@ object Validation {
                                             lockupScript: LockupScript,
                                             unlockScript: UnlockScript,
                                             signature: ED25519Signature,
-                                            worldState: WorldState): TxValidationResult = {
+                                            worldState: WorldState): TxValidationResult[Unit] = {
     (lockupScript, unlockScript) match {
       case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
         checkP2pkh(tx, lock, unlock, signature)
@@ -366,7 +368,7 @@ object Validation {
   private[validation] def checkP2pkh(tx: Transaction,
                                      lock: LockupScript.P2PKH,
                                      unlock: UnlockScript.P2PKH,
-                                     signature: ED25519Signature): TxValidationResult = {
+                                     signature: ED25519Signature): TxValidationResult[Unit] = {
     if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
       invalidTx(InvalidPublicKeyHash)
     } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
@@ -378,7 +380,7 @@ object Validation {
                                     lock: LockupScript.P2SH,
                                     unlock: UnlockScript.P2SH,
                                     signature: ED25519Signature,
-                                    worldState: WorldState): TxValidationResult = {
+                                    worldState: WorldState): TxValidationResult[Unit] = {
     if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
       invalidTx(InvalidScriptHash)
     } else {
@@ -390,7 +392,7 @@ object Validation {
                                    lock: LockupScript.P2S,
                                    unlock: UnlockScript.P2S,
                                    signature: ED25519Signature,
-                                   worldState: WorldState): TxValidationResult = {
+                                   worldState: WorldState): TxValidationResult[Unit] = {
     checkScript(tx, lock.script, unlock.params, signature, worldState)
   }
 
@@ -398,7 +400,7 @@ object Validation {
                                       script: StatelessScript,
                                       params: AVector[Val],
                                       signature: ED25519Signature,
-                                      worldState: WorldState): TxValidationResult = {
+                                      worldState: WorldState): TxValidationResult[Unit] = {
     StatelessVM.runAssetScript(worldState, tx.hash, script, params, signature) match {
       case Right(_) => validTx // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))

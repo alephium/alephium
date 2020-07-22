@@ -26,32 +26,18 @@ final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
 final case object EmptyTransactionList              extends InvalidBlockStatus
 final case object InvalidCoinbase                   extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
-
-sealed trait InvalidTxsStatus                       extends InvalidBlockStatus
-final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidTxsStatus
+final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
 
 object ValidationStatus {
-  private[validation] type HeaderValidationResult =
-    Either[Either[IOError, InvalidHeaderStatus], Unit]
-  private[validation] type BlockValidationError  = Either[IOError, InvalidBlockStatus]
-  private[validation] type BlockValidationResult = Either[BlockValidationError, Unit]
-  private[validation] type TxsValidationError    = Either[IOError, InvalidTxsStatus]
-  private[validation] type TxsValidationResult   = Either[TxsValidationError, Unit]
-  private[validation] type TxValidationError     = Either[IOError, InvalidTxStatus]
-  private[validation] type TxValidationResult    = Either[TxValidationError, Unit]
-
-  private[validation] def invalidHeader(status: InvalidHeaderStatus): HeaderValidationResult =
+  private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =
     Left(Right(status))
-  private[validation] def invalidBlock(status: InvalidBlockStatus): BlockValidationResult =
+  private[validation] def invalidBlock[T](status: InvalidBlockStatus): BlockValidationResult[T] =
     Left(Right(status))
-  private[validation] def invalidTxs(status: InvalidTxsStatus): TxsValidationResult =
+  private[validation] def invalidTx[T](status: InvalidTxStatus): TxValidationResult[T] =
     Left(Right(status))
-  private[validation] def invalidTx(status: InvalidTxStatus): TxValidationResult =
-    Left(Right(status))
-  private[validation] val validHeader: HeaderValidationResult = Right(())
-  private[validation] val validBlock: BlockValidationResult   = Right(())
-  private[validation] val validTxs: TxsValidationResult       = Right(())
-  private[validation] val validTx: TxValidationResult         = Right(())
+  private[validation] def validHeader: HeaderValidationResult[Unit] = Right(())
+  private[validation] def validBlock: BlockValidationResult[Unit]   = Right(())
+  private[validation] def validTx: TxValidationResult[Unit]         = Right(())
 
   private[validation] def from[Invalid, T](
       result: IOResult[T]): Either[Either[IOError, Invalid], T] = {
@@ -68,16 +54,16 @@ object ValidationStatus {
       case Right(())         => Right(default)
     }
 
-  private[validation] def convert(x: TxValidationResult): TxsValidationResult =
+  private[validation] def convert[T](x: TxValidationResult[T]): BlockValidationResult[T] =
     x match {
       case Left(Left(error)) => Left(Left(error))
       case Left(Right(t))    => Left(Right(ExistInvalidTx(t)))
-      case Right(())         => Right(())
+      case Right(t)          => Right(t)
     }
 }
 
 sealed trait TxStatus        extends ValidationStatus
-sealed trait InvalidTxStatus extends TxStatus
+sealed trait InvalidTxStatus extends TxStatus with InvalidStatus
 final case object ValidTx    extends TxStatus with ValidStatus
 
 final case object EmptyInputs                           extends InvalidTxStatus
