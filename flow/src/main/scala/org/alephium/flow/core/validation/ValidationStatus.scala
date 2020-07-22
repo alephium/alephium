@@ -35,9 +35,9 @@ object ValidationStatus {
     Left(Right(status))
   private[validation] def invalidTx[T](status: InvalidTxStatus): TxValidationResult[T] =
     Left(Right(status))
-  private[validation] def validHeader: HeaderValidationResult[Unit] = Right(())
-  private[validation] def validBlock: BlockValidationResult[Unit]   = Right(())
-  private[validation] def validTx: TxValidationResult[Unit]         = Right(())
+  private[validation] def validHeader[T](t: T): HeaderValidationResult[T] = Right(t)
+  private[validation] def validBlock[T](t: T): BlockValidationResult[T]   = Right(t)
+  private[validation] def validTx[T](t: T): TxValidationResult[T]         = Right(t)
 
   private[validation] def from[Invalid, T](
       result: IOResult[T]): Either[Either[IOError, Invalid], T] = {
@@ -67,7 +67,12 @@ sealed trait InvalidTxStatus extends TxStatus with InvalidStatus
 final case object ValidTx    extends TxStatus with ValidStatus
 
 final case object EmptyInputs                           extends InvalidTxStatus
+final case object TooManyInputs                         extends InvalidTxStatus
 final case object EmptyOutputs                          extends InvalidTxStatus
+final case object TooManyOutputs                        extends InvalidTxStatus
+final case object InvalidInputIndex                     extends InvalidTxStatus
+final case object InvalidOutputIndex                    extends InvalidTxStatus
+final case object DuplicatedInputs                      extends InvalidTxStatus
 final case object NegativeOutputValue                   extends InvalidTxStatus
 final case object InvalidChainIndex                     extends InvalidTxStatus
 final case object DoubleSpent                           extends InvalidTxStatus

@@ -39,7 +39,7 @@ sealed abstract class TxOutputRef {
   * @param key hash of the hash of transaction and index of the AssetOutput;
   *            or hash of the first signature for ContractOutput
   */
-final case class AssetOutputRef(scriptHint: Int, key: ALF.Hash) extends TxOutputRef {
+final case class AssetOutputRef private (scriptHint: Int, key: ALF.Hash) extends TxOutputRef {
   def fromGroup(implicit config: GroupConfig): GroupIndex = LockupScript.groupIndex(scriptHint)
 }
 final case class ContractOutputRef(key: ALF.Hash) extends TxOutputRef {

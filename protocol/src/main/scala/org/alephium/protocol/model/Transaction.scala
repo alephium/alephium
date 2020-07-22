@@ -9,11 +9,6 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U64}
 
-/*
- * For the moment, if a transaction does not have any input, then it's a coinbase transaction
- * In this way, we could pad many coinbase transactions into one block without hacking any code
- *
- */
 final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              signatures: AVector[ED25519Signature])
