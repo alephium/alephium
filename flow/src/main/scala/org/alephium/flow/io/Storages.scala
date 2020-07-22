@@ -32,7 +32,7 @@ object Storages {
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
-    val emptyWorldState   = WorldState.empty(trieStorage)
+    val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
 
     Storages(AVector(db),
              headerStorage,

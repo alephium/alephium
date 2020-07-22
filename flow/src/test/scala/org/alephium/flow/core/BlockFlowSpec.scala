@@ -419,7 +419,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
                  chainIndex: ChainIndex,
                  key: Hash,
                  expected: AVector[Val]): Assertion = {
-    blockFlow.getBestTrie(chainIndex).toOption.get.getContractState(key) isE expected
+    blockFlow.getBestPersistedTrie(chainIndex.from).toOption.get.getContractState(key) isE expected
   }
 
   def show(blockFlow: BlockFlow): String = {

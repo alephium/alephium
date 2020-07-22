@@ -3,7 +3,7 @@ package org.alephium.protocol.vm
 import scala.annotation.tailrec
 
 import org.alephium.protocol.ALF
-import org.alephium.util.{AVector, Collection}
+import org.alephium.util.AVector
 
 class Frame[Ctx <: Context](var pc: Int,
                             obj: ContractObj[Ctx],
@@ -41,11 +41,11 @@ class Frame[Ctx <: Context](var pc: Int,
   }
 
   def getLocal(index: Int): ExeResult[Val] = {
-    if (Collection.checkIndex(locals, index)) Right(locals(index)) else Left(InvalidLocalIndex)
+    if (locals.isDefinedAt(index)) Right(locals(index)) else Left(InvalidLocalIndex)
   }
 
   def setLocal(index: Int, v: Val): ExeResult[Unit] = {
-    if (!Collection.checkIndex(locals, index)) {
+    if (!locals.isDefinedAt(index)) {
       Left(InvalidLocalIndex)
     } else if (locals(index).tpe != v.tpe) {
       Left(InvalidLocalType)
@@ -56,12 +56,12 @@ class Frame[Ctx <: Context](var pc: Int,
 
   def getField(index: Int): ExeResult[Val] = {
     val fields = obj.fields
-    if (Collection.checkIndex(fields, index)) Right(fields(index)) else Left(InvalidFieldIndex)
+    if (fields.isDefinedAt(index)) Right(fields(index)) else Left(InvalidFieldIndex)
   }
 
   def setField(index: Int, v: Val): ExeResult[Unit] = {
     val fields = obj.fields
-    if (!Collection.checkIndex(fields, index)) {
+    if (!fields.isDefinedAt(index)) {
       Left(InvalidFieldIndex)
     } else if (fields(index).tpe != v.tpe) {
       Left(InvalidFieldType)
