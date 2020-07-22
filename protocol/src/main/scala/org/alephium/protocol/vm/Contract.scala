@@ -1,5 +1,7 @@
 package org.alephium.protocol.vm
 
+import scala.collection.mutable
+
 import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -79,7 +81,7 @@ final case class StatefulContract(
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext] {
   def toObject(address: ALF.Hash, fields: AVector[Val]): StatefulContractObject = {
-    new StatefulContractObject(this, fields.toArray, address)
+    StatefulContractObject(this, fields.toArray, address)
   }
 }
 
@@ -91,7 +93,7 @@ object StatefulContract {
 sealed trait ContractObj[Ctx <: Context] {
   def addressOpt: Option[ALF.Hash]
   def code: Contract[Ctx]
-  def fields: Array[Val]
+  def fields: mutable.ArraySeq[Val]
 
   def getMethod(index: Int): Option[Method[Ctx]] = {
     code.methods.get(index)
@@ -106,17 +108,18 @@ sealed trait ContractObj[Ctx <: Context] {
 }
 
 sealed trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
-  val addressOpt: Option[ALF.Hash] = None
-  val fields: Array[Val]           = Array.empty
+  val addressOpt: Option[ALF.Hash]  = None
+  val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
 
-final class StatelessScriptObject(val code: StatelessScript) extends ScriptObj[StatelessContext]
+final case class StatelessScriptObject(val code: StatelessScript)
+    extends ScriptObj[StatelessContext]
 
-final class StatefulScriptObject(val code: StatefulScript) extends ScriptObj[StatefulContext]
+final case class StatefulScriptObject(val code: StatefulScript) extends ScriptObj[StatefulContext]
 
-final class StatefulContractObject(val code: StatefulContract,
-                                   val fields: Array[Val],
-                                   val address: ALF.Hash)
+final case class StatefulContractObject(val code: StatefulContract,
+                                        val fields: mutable.ArraySeq[Val],
+                                        val address: ALF.Hash)
     extends ContractObj[StatefulContext] {
   override def addressOpt: Option[ALF.Hash] = Some(address)
 }

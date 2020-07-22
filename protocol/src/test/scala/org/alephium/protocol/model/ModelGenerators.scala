@@ -38,7 +38,18 @@ trait TxInputGenerators extends Generators {
   implicit def config: GroupConfig
 
   private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] =
-    Gen.choose(0, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
+    Gen.choose(1, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
+
+  def assetOutputRefGen(groupIndex: GroupIndex): Gen[AssetOutputRef] = {
+    for {
+      shortKey <- shortKeyGen(groupIndex)
+      hash     <- hashGen
+    } yield AssetOutputRef(shortKey, hash)
+  }
+
+  def contractOutputRefGen: Gen[ContractOutputRef] = {
+    hashGen.map(ContractOutputRef)
+  }
 
   def txInputGen(groupIndex: GroupIndex): Gen[TxInput] =
     for {
