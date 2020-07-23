@@ -277,7 +277,10 @@ trait TxGenerators
       inputs   <- Gen.listOfN(inputNum, assetInputInfoGen(groupIndex)())
     } yield AVector.from(inputs)
 
-  def transactionGenWithPreOutputs(minInputs: Int  = 1, maxInputs: Int = 100)(
+  def transactionGenWithPreOutputs(
+      minInputs: Int = 1,
+      maxInputs: Int = 100
+  )(
       chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,
@@ -304,7 +307,10 @@ trait TxGenerators
       tx -> preOutput
     }
 
-  def transactionGen(minInputs: Int                = 1, maxInputs: Int = 100)(
+  def transactionGen(
+      minInputs: Int = 1,
+      maxInputs: Int = 20
+  )(
       chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,

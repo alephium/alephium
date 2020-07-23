@@ -21,9 +21,8 @@ class BlockSpec extends AlephiumSpec with ConsensusConfigFixture with NoIndexMod
 
   it should "calculate chain index" in {
     forAll(chainIndexGen) { chainIndex =>
-      forAll(blockGen(chainIndex)) { block =>
-        block.chainIndex is chainIndex
-      }
+      val block = blockGen(chainIndex).sample.get
+      block.chainIndex is chainIndex
     }
   }
 }

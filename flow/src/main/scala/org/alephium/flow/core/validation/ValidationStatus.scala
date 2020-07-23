@@ -5,6 +5,8 @@ import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.vm.ExeFailure
 import org.alephium.util.AVector
 
+// scalastyle:off number.of.types
+
 sealed trait ValidationStatus
 sealed trait InvalidStatus extends ValidationStatus
 sealed trait ValidStatus   extends ValidationStatus
