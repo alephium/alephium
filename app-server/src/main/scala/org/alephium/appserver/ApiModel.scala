@@ -16,7 +16,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
-import org.alephium.util.{AVector, Base58, Hex, TimeStamp, U64}
+import org.alephium.util._
 
 sealed trait ApiModel
 
@@ -107,19 +107,14 @@ object ApiModel {
   final case class OutputRef(scriptHint: Int, key: String)
   object OutputRef {
     def from(outputRef: TxOutputRef): OutputRef =
-      OutputRef(
-        outputRef.scriptHint,
-        outputRef.key.toHexString
-      )
+      OutputRef(outputRef.hint.value, outputRef.key.toHexString)
     implicit val codec: Codec[OutputRef] = deriveCodec[OutputRef]
   }
 
   final case class Input(outputRef: OutputRef, unlockScript: ByteString)
   object Input {
-
     def from(input: TxInput): Input =
       Input(OutputRef.from(input.outputRef), serialize(input.unlockScript))
-
     implicit val codec: Codec[Input] = deriveCodec[Input]
   }
 
@@ -154,7 +149,6 @@ object ApiModel {
       transactions: Option[AVector[Tx]]
   ) extends ApiModel
   object BlockEntry {
-    import TimeStampCodec._
     implicit val codec: Codec[BlockEntry] = deriveCodec[BlockEntry]
 
     def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): BlockEntry = {
@@ -187,13 +181,12 @@ object ApiModel {
                               groupNumPerBroker: Int)
       extends ApiModel
   object SelfClique {
-    import CliqueIdCodec._
     def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
       SelfClique(cliqueInfo.id,
                  cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
                  cliqueInfo.groupNumPerBroker)
     }
-
+    import CliqueIdCodec._
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
@@ -266,11 +259,9 @@ object ApiModel {
                                        isSynced: Boolean)
       extends ApiModel
   object InterCliquePeerInfo {
-    import CliqueIdCodec._
-
     def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo =
       InterCliquePeerInfo(syncStatus.cliqueId, syncStatus.address, syncStatus.isSynced)
-
+    import CliqueIdCodec._
     implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
       deriveCodec[InterCliquePeerInfo]
   }
@@ -312,6 +303,7 @@ object ApiModel {
 
     implicit val idEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
     implicit val idDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createId)
+    implicit val codec: Codec[CliqueId]       = Codec.from(idDecoder, idEncoder)
   }
 
   sealed trait MinerAction

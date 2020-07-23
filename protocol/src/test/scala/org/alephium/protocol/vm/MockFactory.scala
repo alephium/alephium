@@ -5,13 +5,12 @@ import org.alephium.io.{MerklePatriciaTrie, MockFactory => IOMockFactory}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{TxOutput, TxOutputRef}
 import org.alephium.protocol.vm.WorldState.{Cached, Persisted}
-import org.alephium.util.AVector
 
 trait MockFactory extends IOMockFactory {
   lazy val mockWorldState: WorldState = {
     val outputState: MerklePatriciaTrie[TxOutputRef, TxOutput] =
       MerklePatriciaTrie(ALF.Hash.zero, unimplementedStorage[ALF.Hash, MerklePatriciaTrie.Node])
-    val contractState: MerklePatriciaTrie[ALF.Hash, AVector[Val]] =
+    val contractState: MerklePatriciaTrie[ALF.Hash, ContractState] =
       MerklePatriciaTrie(ALF.Hash.zero, unimplementedStorage[ALF.Hash, MerklePatriciaTrie.Node])
     Cached(Persisted(outputState, contractState), Set.empty, Map.empty, Map.empty)
   }

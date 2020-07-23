@@ -25,6 +25,10 @@ object Method {
     Serde.forProduct3(Method[StatelessContext], t => (t.localsType, t.returnType, t.instrs))
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
     Serde.forProduct3(Method[StatefulContext], t => (t.localsType, t.returnType, t.instrs))
+
+  // TODO: make this fail based on genesis height
+  def forMPT: Method[StatefulContext] =
+    Method[StatefulContext](AVector.empty, AVector.empty, AVector(Pop))
 }
 
 sealed trait Contract[Ctx <: Context] {
@@ -80,6 +84,10 @@ final case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext] {
+  def toObject(address: ALF.Hash, contractState: ContractState): StatefulContractObject = {
+    StatefulContractObject(this, contractState.fields.toArray, address)
+  }
+
   def toObject(address: ALF.Hash, fields: AVector[Val]): StatefulContractObject = {
     StatefulContractObject(this, fields.toArray, address)
   }
@@ -88,6 +96,8 @@ final case class StatefulContract(
 object StatefulContract {
   implicit val serde: Serde[StatefulContract] =
     Serde.forProduct2(StatefulContract.apply, t => (t.fields, t.methods))
+
+  val forMPT: StatefulContract = StatefulContract(AVector.empty, AVector(Method.forMPT))
 }
 
 sealed trait ContractObj[Ctx <: Context] {

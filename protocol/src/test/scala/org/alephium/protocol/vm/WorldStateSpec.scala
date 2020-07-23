@@ -19,7 +19,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   def generateContract: Gen[(ContractOutputRef, ContractOutput, AVector[Val])] = {
     for {
       groupIndex        <- groupIndexGen
-      contractOutputRef <- contractOutputRefGen
+      contractOutputRef <- contractOutputRefGen(groupIndex)
       contractOutput    <- contractOutputGen(groupIndex)()
       contractState     <- counterStateGen
     } yield (contractOutputRef, contractOutput, contractState)

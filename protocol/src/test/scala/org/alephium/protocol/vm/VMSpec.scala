@@ -1,10 +1,9 @@
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.ALF
 import org.alephium.serde._
 import org.alephium.util._
 
-class VMSpec extends AlephiumSpec with MockFactory {
+class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "execute the following script" in {
     val method =
       Method[StatefulContext](
@@ -12,8 +11,9 @@ class VMSpec extends AlephiumSpec with MockFactory {
         returnType = AVector(Val.U64),
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return))
     val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
-    val obj      = contract.toObject(ALF.Hash.zero, AVector(Val.U64(U64.Zero), Val.U64(U64.One)))
-    StatefulVM.execute(mockStatefulContext, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
+    val (obj, context) =
+      prepareContract(contract, AVector[Val](Val.U64(U64.Zero), Val.U64(U64.One)))
+    StatefulVM.execute(context, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
       Val.U64(U64.unsafe(8)))
   }
 
