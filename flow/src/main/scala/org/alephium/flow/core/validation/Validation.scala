@@ -3,7 +3,6 @@ package org.alephium.flow.core.validation
 import org.alephium.flow.core._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -166,44 +165,11 @@ object Validation {
     }
   }
 
-  private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult[Unit] = {
-    if (tx.unsigned.inputs.isEmpty) {
-      invalidTx(EmptyInputs)
-    } else if (tx.outputsLength == 0) {
-      invalidTx(EmptyOutputs)
-    } else {
-      validTx(())
-    }
-  }
-
-  private[validation] def checkOutputValue(tx: Transaction): TxValidationResult[Unit] = {
-    tx.alfAmountInOutputs match {
-      case Some(sum) if sum < ALF.MaxALFValue => validTx(())
-      case _                                  => invalidTx(BalanceOverFlow)
-    }
-  }
-
-  private def getToGroup(output: TxOutput, default: GroupIndex)(
-      implicit config: GroupConfig): GroupIndex = output match {
-    case assetOutput: AssetOutput => assetOutput.toGroup
-    case _: ContractOutput        => default
-  }
-
-  private[validation] def checkChainIndex(index: ChainIndex, tx: Transaction)(
-      implicit config: GroupConfig): TxValidationResult[Unit] = {
-    val fromOk    = tx.unsigned.inputs.forall(_.fromGroup == index.from)
-    val fromGroup = tx.fromGroup
-    val toGroups  = (0 until tx.outputsLength).map(i => getToGroup(tx.getOutput(i), fromGroup))
-    val toOk      = toGroups.forall(groupIndex => groupIndex == index.from || groupIndex == index.to)
-    val existed   = toGroups.view.take(tx.unsigned.fixedOutputs.length).contains(index.to)
-    if (fromOk && toOk && existed) validTx(()) else invalidTx(InvalidChainIndex)
-  }
-
   private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
+        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpending)
         else {
           utxoUsed += input.outputRef
           validTx(())

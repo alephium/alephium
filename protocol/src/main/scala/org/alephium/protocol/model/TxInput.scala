@@ -43,6 +43,9 @@ final case class AssetOutputRef private (hint: Hint, key: ALF.Hash) extends TxOu
 object AssetOutputRef {
   def unsafe(hint: Hint, key: ALF.Hash): AssetOutputRef = new AssetOutputRef(hint, key)
 
+  def from(scriptHint: ScriptHint, key: ALF.Hash): AssetOutputRef =
+    unsafe(Hint.ofAsset(scriptHint), key)
+
   def from(assetOutput: AssetOutput, key: ALF.Hash): AssetOutputRef = unsafe(assetOutput.hint, key)
 }
 
@@ -52,6 +55,9 @@ final case class ContractOutputRef private (hint: Hint, key: ALF.Hash) extends T
 }
 object ContractOutputRef {
   def unsafe(hint: Hint, key: ALF.Hash): ContractOutputRef = new ContractOutputRef(hint, key)
+
+  def from(scriptHint: ScriptHint, key: ALF.Hash): ContractOutputRef =
+    unsafe(Hint.ofContract(scriptHint), key)
 
   def from(contractOutput: ContractOutput, key: ALF.Hash): ContractOutputRef =
     unsafe(contractOutput.hint, key)

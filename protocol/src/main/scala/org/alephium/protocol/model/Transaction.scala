@@ -15,11 +15,12 @@ final case class Transaction(unsigned: UnsignedTransaction,
     extends ALF.HashSerde[Transaction] {
   override val hash: ALF.Hash = unsigned.hash
 
+  // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
-    assume(unsigned.inputs.nonEmpty)
     unsigned.inputs.head.fromGroup
   }
 
+  // this might only works for validated tx
   def toGroup(implicit config: GroupConfig): GroupIndex = {
     val from    = fromGroup
     val outputs = unsigned.fixedOutputs
@@ -31,6 +32,7 @@ final case class Transaction(unsigned: UnsignedTransaction,
     }
   }
 
+  // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
@@ -44,7 +46,7 @@ final case class Transaction(unsigned: UnsignedTransaction,
     }
   }
 
-  def alfAmountInOutputs: Option[U64] = {
+  lazy val alfAmountInOutputs: Option[U64] = {
     val sum1Opt =
       unsigned.fixedOutputs
         .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))

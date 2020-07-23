@@ -118,20 +118,6 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     }
   }
 
-  it should "test ALF balance overflow" in {
-    val preOutput = genAlfOutput(U64.MaxValue)
-    val output1   = genAlfOutput(U64.MaxValue)
-    val output2   = genAlfOutput(U64.Zero)
-    val output3   = genAlfOutput(U64.One)
-    val input     = txInputGen.sample.get
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
-  }
-
   it should "validate ALF balances" in {
     val sum       = U64.MaxValue.subUnsafe(U64.Two)
     val preOutput = genAlfOutput(sum)
