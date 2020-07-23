@@ -1,18 +1,14 @@
 package org.alephium.flow.core.validation
 
-import scala.collection.mutable
-
-import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core._
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.{GroupConfig, ScriptConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{WorldState, _}
 import org.alephium.serde._
-import org.alephium.util.{AVector, EitherF, Forest, TimeStamp, U64}
+import org.alephium.util.{AVector, Forest, TimeStamp}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
   def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
@@ -89,15 +85,6 @@ object Validation {
     } yield ()
   }
 
-  private[validation] def validateNonCoinbaseTx(tx: Transaction, flow: BlockFlow)(
-      implicit config: PlatformConfig): TxValidationResult[Unit] = {
-    val index = ChainIndex(tx.fromGroup, tx.toGroup)
-    for {
-      trie <- ValidationStatus.from(flow.getBestPersistedTrie(index.from))
-      _    <- checkNonCoinbaseTx(index, tx, trie)
-    } yield ()
-  }
-
   /*
    * The following functions are all the check functions behind validations
    */
@@ -171,37 +158,12 @@ object Validation {
       val result = for {
         _    <- checkBlockDoubleSpending(block)
         trie <- ValidationStatus.from(flow.getPersistedTrie(block))
-        _    <- block.nonCoinbase.foreachE(checkBlockNonCoinbase(index, _, trie))
+        _    <- block.nonCoinbase.foreachE(NonCoinbaseValidation.checkBlockTx(_, trie))
       } yield ()
       convert(result)
     } else {
       validBlock(())
     }
-  }
-
-  private[validation] def checkBlockNonCoinbase(index: ChainIndex,
-                                                tx: Transaction,
-                                                worldState: WorldState)(
-      implicit config: GroupConfig with ScriptConfig): TxValidationResult[Unit] = {
-    for {
-      _ <- checkNonEmpty(tx)
-      _ <- checkOutputValue(tx)
-      _ <- checkChainIndex(index, tx)
-      _ <- checkSpending(tx, worldState)
-    } yield ()
-  }
-
-  private[validation] def checkNonCoinbaseTx(index: ChainIndex,
-                                             tx: Transaction,
-                                             worldState: WorldState)(
-      implicit config: GroupConfig with ScriptConfig): TxValidationResult[Unit] = {
-    for {
-      _ <- checkNonEmpty(tx)
-      _ <- checkOutputValue(tx)
-      _ <- checkChainIndex(index, tx)
-      _ <- checkTxDoubleSpending(tx)
-      _ <- checkSpending(tx, worldState)
-    } yield ()
   }
 
   private[validation] def checkNonEmpty(tx: Transaction): TxValidationResult[Unit] = {
@@ -247,163 +209,6 @@ object Validation {
           validTx(())
         }
       }
-    }
-  }
-
-  private[validation] def checkTxDoubleSpending(tx: Transaction): TxValidationResult[Unit] = {
-    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
-    tx.unsigned.inputs.foreachE { input =>
-      if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
-      else {
-        utxoUsed += input.outputRef
-        validTx(())
-      }
-    }
-  }
-
-  private[validation] def checkSpending(tx: Transaction,
-                                        worldState: WorldState): TxValidationResult[Unit] = {
-    val query = tx.unsigned.inputs.mapE { input =>
-      worldState.getOutput(input.outputRef)
-    }
-    query match {
-      case Right(preOutputs)            => checkSpending(tx, preOutputs, worldState)
-      case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
-      case Left(error)                  => Left(Left(error))
-    }
-  }
-
-  private[validation] def checkSpending(tx: Transaction,
-                                        preOutputs: AVector[TxOutput],
-                                        worldState: WorldState): TxValidationResult[Unit] = {
-    for {
-      _ <- checkBalance(tx, preOutputs)
-      _ <- checkWitnesses(tx, preOutputs, worldState)
-    } yield ()
-  }
-
-  private[validation] def checkBalance(tx: Transaction,
-                                       preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-    for {
-      _ <- checkAlfBalance(tx, preOutputs)
-      _ <- checkTokenBalance(tx, preOutputs)
-    } yield ()
-  }
-
-  private[validation] def checkAlfBalance(
-      tx: Transaction,
-      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-    val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
-    tx.alfAmountInOutputs match {
-      case Some(outputSum) if outputSum <= inputSum => validTx(())
-      case Some(_)                                  => invalidTx(InvalidBalance)
-      case None                                     => invalidTx(BalanceOverFlow)
-    }
-  }
-
-  private[validation] def checkTokenBalance(
-      tx: Transaction,
-      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-    for {
-      inputBalances  <- computeTokenBalances(preOutputs)
-      outputBalances <- computeTokenBalances(tx.unsigned.fixedOutputs ++ tx.generatedOutputs)
-      _ <- {
-        val ok = outputBalances.forall {
-          case (tokenId, balance) =>
-            (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance) || tokenId == tx.unsigned.inputs.head.hash
-        }
-        if (ok) validTx(()) else invalidTx(InvalidBalance)
-      }
-    } yield ()
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private[validation] def computeTokenBalances(
-      outputs: AVector[TxOutput]): Either[TxValidationError, mutable.Map[TokenId, U64]] =
-    try {
-      val balances = mutable.Map.empty[TokenId, U64]
-      outputs.foreach {
-        case output: AssetOutput =>
-          output.tokens.foreach {
-            case (tokenId, amount) =>
-              val total = balances.getOrElse(tokenId, U64.Zero)
-              balances.put(tokenId, total.add(amount).get)
-          }
-        case _ => ()
-      }
-      Right(balances)
-    } catch {
-      case _: NoSuchElementException => Left(Right(BalanceOverFlow))
-    }
-
-  // TODO: signatures might not be 1-to-1 mapped to inputs
-  private[validation] def checkWitnesses(tx: Transaction,
-                                         preOutputs: AVector[TxOutput],
-                                         worldState: WorldState): TxValidationResult[Unit] = {
-    assume(tx.unsigned.inputs.length == preOutputs.length)
-    EitherF.foreachTry(preOutputs.indices) { idx =>
-      val unlockScript = tx.unsigned.inputs(idx).unlockScript
-      val signature    = tx.signatures(idx)
-      checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signature, worldState)
-    }
-  }
-
-  private[validation] def checkLockupScript(tx: Transaction,
-                                            lockupScript: LockupScript,
-                                            unlockScript: UnlockScript,
-                                            signature: ED25519Signature,
-                                            worldState: WorldState): TxValidationResult[Unit] = {
-    (lockupScript, unlockScript) match {
-      case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-        checkP2pkh(tx, lock, unlock, signature)
-      case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-        checkP2SH(tx, lock, unlock, signature, worldState)
-      case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
-        checkP2S(tx, lock, unlock, signature, worldState)
-      case _ =>
-        invalidTx(InvalidUnlockScriptType)
-    }
-  }
-
-  private[validation] def checkP2pkh(tx: Transaction,
-                                     lock: LockupScript.P2PKH,
-                                     unlock: UnlockScript.P2PKH,
-                                     signature: ED25519Signature): TxValidationResult[Unit] = {
-    if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
-      invalidTx(InvalidPublicKeyHash)
-    } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
-      invalidTx(InvalidSignature)
-    } else validTx(())
-  }
-
-  private[validation] def checkP2SH(tx: Transaction,
-                                    lock: LockupScript.P2SH,
-                                    unlock: UnlockScript.P2SH,
-                                    signature: ED25519Signature,
-                                    worldState: WorldState): TxValidationResult[Unit] = {
-    if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
-      invalidTx(InvalidScriptHash)
-    } else {
-      checkScript(tx, unlock.script, unlock.params, signature, worldState)
-    }
-  }
-
-  private[validation] def checkP2S(tx: Transaction,
-                                   lock: LockupScript.P2S,
-                                   unlock: UnlockScript.P2S,
-                                   signature: ED25519Signature,
-                                   worldState: WorldState): TxValidationResult[Unit] = {
-    checkScript(tx, lock.script, unlock.params, signature, worldState)
-  }
-
-  private[validation] def checkScript(tx: Transaction,
-                                      script: StatelessScript,
-                                      params: AVector[Val],
-                                      signature: ED25519Signature,
-                                      worldState: WorldState): TxValidationResult[Unit] = {
-    StatelessVM.runAssetScript(worldState, tx.hash, script, params, signature) match {
-      case Right(_) => validTx(()) // TODO: handle returns
-      case Left(e)  => invalidTx(InvalidUnlockScript(e))
     }
   }
 
