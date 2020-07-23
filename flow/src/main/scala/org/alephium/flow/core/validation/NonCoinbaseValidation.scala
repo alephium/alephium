@@ -48,14 +48,14 @@ object NonCoinbaseValidation {
 
   def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
     val inputNum = tx.unsigned.inputs.length
-    if (inputNum == 0) invalidTx(EmptyInputs)
+    if (inputNum == 0) invalidTx(NoInputs)
     else if (inputNum > ALF.MaxTxInputNum) invalidTx(TooManyInputs)
     else validTx(())
   }
 
   def checkOutputNum(tx: Transaction): TxValidationResult[Unit] = {
     val outputNum = tx.outputsLength
-    if (outputNum == 0) invalidTx(EmptyOutputs)
+    if (outputNum == 0) invalidTx(NoOutputs)
     else if (outputNum > ALF.MaxTxOutputNum) invalidTx(TooManyOutputs)
     else validTx(())
   }
@@ -71,21 +71,23 @@ object NonCoinbaseValidation {
   def checkChainIndex(tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult[ChainIndex] = {
     val inputIndexes = tx.unsigned.inputs.map(_.fromGroup).toSet
-    if (inputIndexes.size != 1) invalidTx(InvalidChainIndex)
+    if (inputIndexes.size != 1) invalidTx(InvalidInputGroupIndex)
     else {
       val fromIndex = inputIndexes.head
       val outputIndexes =
         (0 until tx.outputsLength).view.map(tx.getOutput(_).toGroup).filter(_ != fromIndex).toSet
-      val outputIndexesRest = outputIndexes - fromIndex
-      if (outputIndexesRest.size != 1) invalidTx(InvalidChainIndex)
-      else validTx(ChainIndex(inputIndexes.head, outputIndexesRest.head))
+      outputIndexes.size match {
+        case 0 => validTx(ChainIndex(fromIndex, fromIndex))
+        case 1 => validTx(ChainIndex(fromIndex, outputIndexes.head))
+        case _ => invalidTx(InvalidOutputGroupIndex)
+      }
     }
   }
 
   def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     tx.unsigned.inputs.foreachE { input =>
-      if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpent)
+      if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpending)
       else {
         utxoUsed += input.outputRef
         validTx(())

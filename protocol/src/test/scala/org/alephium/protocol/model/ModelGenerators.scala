@@ -37,7 +37,7 @@ trait LockupScriptGenerators extends Generators {
 trait TxInputGenerators extends Generators {
   implicit def config: GroupConfig
 
-  private def scriptHintGen(groupIndex: GroupIndex): Gen[ScriptHint] =
+  def scriptHintGen(groupIndex: GroupIndex): Gen[ScriptHint] =
     Gen.choose(0, Int.MaxValue).map(ScriptHint.fromHash).retryUntil(_.groupIndex equals groupIndex)
 
   def assetOutputRefGen(groupIndex: GroupIndex): Gen[AssetOutputRef] = {
@@ -229,19 +229,21 @@ trait TxGenerators
   private lazy val noContracts: Gen[AVector[ContractInfo]] =
     Gen.const(()).map(_ => AVector.empty)
 
+  type IndexLockupScriptGen = GroupIndex => Gen[LockupScript]
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,
-      lockupScriptGen: Gen[LockupScript]           = p2pkhLockupGen(chainIndex.to),
+      lockupScriptGen: IndexLockupScriptGen        = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
   ): Gen[UnsignedTransaction] =
     for {
-      assets        <- assetsToSpend
-      contracts     <- contractsToSpend
-      createdHeight <- heightGen
-      lockupScript  <- lockupScriptGen
+      assets           <- assetsToSpend
+      contracts        <- contractsToSpend
+      createdHeight    <- heightGen
+      fromLockupScript <- lockupScriptGen(chainIndex.from)
+      toLockupScript   <- lockupScriptGen(chainIndex.to)
     } yield {
       val inputs         = assets.map(_.txInput) ++ contracts.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput) ++ contracts.map(_.referredOutput)
@@ -252,29 +254,40 @@ trait TxGenerators
       }
 
       val initialBalances = Balances(alfAmount, tokenTable.toMap)
-      val outputNum       = min(alfAmount / minAmount, inputs.length * 2, ALF.MaxTxOutputNum)
-      val splitBalances   = split(initialBalances, outputNum.v.toInt)
-      val outputs =
-        splitBalances.map[TxOutput](_.toOutput(createdHeight, lockupScript, dataGen.sample.get))
+      val outputNum       = min(alfAmount / minAmount, inputs.length * 2, ALF.MaxTxOutputNum).v.toInt
+      val splitBalances   = split(initialBalances, outputNum)
+      val selectedIndex   = Gen.choose(0, outputNum - 1).sample.get
+      val outputs = splitBalances.mapWithIndex[TxOutput] {
+        case (balance, index) =>
+          val lockupScript =
+            if (index equals selectedIndex) toLockupScript
+            else {
+              Gen.oneOf(fromLockupScript, toLockupScript).sample.get
+            }
+          balance.toOutput(createdHeight, lockupScript, dataGen.sample.get)
+      }
       UnsignedTransaction(None, inputs, outputs, AVector.empty)
     }
 
-  def assetsToSpendGen(groupIndex: GroupIndex): Gen[AVector[AssetInputInfo]] =
+  def assetsToSpendGen(groupIndex: GroupIndex,
+                       minInputs: Int,
+                       maxInputs: Int): Gen[AVector[AssetInputInfo]] =
     for {
-      inputNum <- smallPositiveInt
+      inputNum <- Gen.choose(minInputs, maxInputs)
       inputs   <- Gen.listOfN(inputNum, assetInputInfoGen(groupIndex)())
     } yield AVector.from(inputs)
 
-  def transactionGenWithPreOutputs(chainIndex: ChainIndex)(
-      assetsToSpend: Gen[AVector[AssetInputInfo]]  = assetsToSpendGen(chainIndex.from),
+  def transactionGenWithPreOutputs(minInputs: Int  = 1, maxInputs: Int = 100)(
+      chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,
-      lockupScript: Gen[LockupScript]              = p2pkhLockupGen(chainIndex.to),
+      lockupScript: IndexLockupScriptGen           = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
   ): Gen[(Transaction, AVector[TxOutput])] =
     for {
-      assetInfos    <- assetsToSpend
+      chainIndex    <- chainIndexGen
+      assetInfos    <- assetsToSpendGen(chainIndex.from, minInputs, maxInputs)
       contractInfos <- contractsToSpend
       unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos),
                                               Gen.const(contractInfos),
@@ -291,20 +304,20 @@ trait TxGenerators
       tx -> preOutput
     }
 
-  def transactionGen(chainIndex: ChainIndex)(
-      assetsToSpend: Gen[AVector[AssetInputInfo]]  = assetsToSpendGen(chainIndex.from),
+  def transactionGen(minInputs: Int                = 1, maxInputs: Int = 100)(
+      chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
       issueNewToken: Boolean                       = true,
-      lockupScript: Gen[LockupScript]              = p2pkhLockupGen(chainIndex.to),
+      lockupScript: IndexLockupScriptGen           = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
   ): Gen[Transaction] =
-    transactionGenWithPreOutputs(chainIndex)(assetsToSpend,
-                                             contractsToSpend,
-                                             issueNewToken,
-                                             lockupScript,
-                                             heightGen,
-                                             dataGen).map(_._1)
+    transactionGenWithPreOutputs(minInputs, maxInputs)(chainIndexGen,
+                                                       contractsToSpend,
+                                                       issueNewToken,
+                                                       lockupScript,
+                                                       heightGen,
+                                                       dataGen).map(_._1)
 }
 
 trait BlockGenerators extends TxGenerators {
@@ -335,7 +348,7 @@ trait BlockGenerators extends TxGenerators {
   def blockGenOf(chainIndex: ChainIndex, deps: AVector[Hash]): Gen[Block] =
     for {
       txNum <- Gen.choose(1, 5)
-      txs   <- Gen.listOfN(txNum, transactionGen(chainIndex)())
+      txs   <- Gen.listOfN(txNum, transactionGen()(chainIndexGen = Gen.const(chainIndex)))
     } yield gen(chainIndex, deps, AVector.from(txs))
 
   def chainGenOf(chainIndex: ChainIndex, length: Int, block: Block): Gen[AVector[Block]] =
@@ -366,10 +379,7 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
   lazy val txInputGen: Gen[TxInput] = groupIndexGen.flatMap(txInputGen(_))
 
   lazy val transactionGenWithPreOutputs: Gen[(Transaction, AVector[TxOutput])] =
-    chainIndexGen.flatMap(transactionGenWithPreOutputs(_)())
-
-  lazy val transactionGen: Gen[Transaction] =
-    chainIndexGen.flatMap(transactionGen(_)())
+    transactionGenWithPreOutputs()(chainIndexGen = chainIndexGen)
 
   lazy val blockGen: Gen[Block] =
     chainIndexGen.flatMap(blockGen(_))

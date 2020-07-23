@@ -1,5 +1,7 @@
 package org.alephium.protocol.model
 
+import org.scalacheck.Gen
+
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
@@ -17,7 +19,7 @@ class TransactionSpec
 
   it should "calculate chain index" in {
     forAll(chainIndexGen) { chainIndex =>
-      forAll(transactionGen(chainIndex)()) { tx =>
+      forAll(transactionGen()(chainIndexGen = Gen.const(chainIndex))) { tx =>
         tx.chainIndex is chainIndex
       }
     }
