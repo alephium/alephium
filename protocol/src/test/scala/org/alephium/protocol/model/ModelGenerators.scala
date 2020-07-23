@@ -5,7 +5,7 @@ import scala.collection.mutable
 import scala.util.Sorting
 
 import akka.util.ByteString
-import org.scalacheck.Arbitrary.arbByte
+import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -37,26 +37,31 @@ trait LockupScriptGenerators extends Generators {
 trait TxInputGenerators extends Generators {
   implicit def config: GroupConfig
 
-  private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] =
-    Gen.choose(1, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
+  private def scriptHintGen(groupIndex: GroupIndex): Gen[ScriptHint] =
+    Gen.choose(0, Int.MaxValue).map(ScriptHint.fromHash).retryUntil(_.groupIndex equals groupIndex)
 
   def assetOutputRefGen(groupIndex: GroupIndex): Gen[AssetOutputRef] = {
     for {
-      shortKey <- shortKeyGen(groupIndex)
-      hash     <- hashGen
-    } yield AssetOutputRef(shortKey, hash)
+      scriptHint <- scriptHintGen(groupIndex)
+      hash       <- hashGen
+    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), hash)
   }
 
-  def contractOutputRefGen: Gen[ContractOutputRef] = {
-    hashGen.map(ContractOutputRef)
+  def contractOutputRefGen(groupIndex: GroupIndex): Gen[ContractOutputRef] = {
+    for {
+      scriptHint <- scriptHintGen(groupIndex)
+      hash       <- hashGen
+    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), hash)
   }
 
   def txInputGen(groupIndex: GroupIndex): Gen[TxInput] =
     for {
-      shortKey <- shortKeyGen(groupIndex)
-      hash     <- hashGen
+      scriptHint <- scriptHintGen(groupIndex)
+      isAsset    <- arbBool.arbitrary
+      hash       <- hashGen
     } yield {
-      val outputRef = TxOutputRef.from(shortKey, hash)
+      val hint      = if (isAsset) Hint.ofAsset(scriptHint) else Hint.ofContract(scriptHint)
+      val outputRef = TxOutputRef.from(hint, hash)
       TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
     }
 }
@@ -195,7 +200,7 @@ trait TxGenerators
                                                 dataGen)
       outputHash <- hashGen
     } yield {
-      val outputRef = TxOutputRef.from(assetOutput.scriptHint, outputHash)
+      val outputRef = AssetOutputRef.from(assetOutput, outputHash)
       val txInput   = TxInput(outputRef, unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -216,7 +221,7 @@ trait TxGenerators
       state      <- stateGen
       outputHash <- hashGen
     } yield {
-      val outputRef = TxOutputRef.contract(outputHash)
+      val outputRef = ContractOutputRef.from(contractOutput, outputHash)
       val txInput   = TxInput(outputRef, unlock)
       ContractInfo(txInput, contractOutput, state, privateKey)
     }

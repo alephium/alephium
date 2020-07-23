@@ -21,7 +21,7 @@ class ServerSpec extends AlephiumSpec with ScalaFutures {
 
     val server = new ServerImpl
 
-    server.start.futureValue is (())
-    server.stop.futureValue is (())
+    server.start().futureValue is ()
+    server.stop().futureValue is ()
   }
 }

@@ -12,7 +12,11 @@ sealed trait TxOutput {
   def amount: U64
   def createdHeight: Int
   def lockupScript: LockupScript
-  def scriptHint: Int
+
+  def hint: Hint
+
+  def scriptHint: ScriptHint                            = lockupScript.scriptHint
+  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
 object TxOutput {
@@ -44,6 +48,13 @@ object TxOutput {
   def burn(amount: U64): TxOutput = {
     asset(amount, ALF.GenesisHeight, LockupScript.p2pkh(ALF.Hash.zero))
   }
+
+  // TODO: improve this when vm is mature
+  def forMPT: TxOutput =
+    ContractOutput(U64.One,
+                   ALF.GenesisHeight,
+                   LockupScript.p2pkh(ALF.Hash.zero),
+                   StatefulContract.forMPT)
 }
 
 /**
@@ -60,9 +71,7 @@ final case class AssetOutput(amount: U64,
                              lockupScript: LockupScript,
                              additionalData: ByteString)
     extends TxOutput {
-  def scriptHint: Int = lockupScript.shortKey
-
-  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  override def hint: Hint = Hint.ofAsset(scriptHint)
 }
 
 object AssetOutput {
@@ -77,7 +86,7 @@ final case class ContractOutput(amount: U64,
                                 lockupScript: LockupScript,
                                 code: StatefulContract)
     extends TxOutput {
-  def scriptHint: Int = 0
+  override def hint: Hint = Hint.ofContract(scriptHint)
 }
 
 object ContractOutput {

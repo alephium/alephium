@@ -13,7 +13,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val clique1           = bootClique(nbOfNodes = 2)
     val masterPortClique1 = clique1.head.config.masterAddress.getPort
 
-    clique1.foreach(_.start)
+    clique1.foreach(_.start())
 
     startWS(wsPort(masterPortClique1))
 
@@ -34,7 +34,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
                  bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
     val masterPortClique2 = clique2.head.config.masterAddress.getPort
 
-    clique2.foreach(_.start)
+    clique2.foreach(_.start())
 
     clique2.zip(clique1).foreach {
       case (server, remote) =>

@@ -9,7 +9,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off no.equal
-class CompilerSpec extends AlephiumSpec with MockFactory {
+class CompilerSpec extends AlephiumSpec with ContextGenerators {
   import Ast._
 
   it should "parse lexer" in {
@@ -199,8 +199,7 @@ class CompilerSpec extends AlephiumSpec with MockFactory {
       val contract = Compiler.compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
-      val context = StatefulContext(ALF.Hash.zero, mockWorldState)
-      val obj     = contract.toObject(ALF.Hash.zero, fields)
+      val (obj, context) = prepareContract(contract, fields)
       StatefulVM.execute(context, obj, 0, args) isE output
     }
   }
