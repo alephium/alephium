@@ -15,18 +15,22 @@ final case class Transaction(unsigned: UnsignedTransaction,
     extends ALF.HashSerde[Transaction] {
   override val hash: ALF.Hash = unsigned.hash
 
-  // TODO: make these two functions safe
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
     assume(unsigned.inputs.nonEmpty)
     unsigned.inputs.head.fromGroup
   }
+
   def toGroup(implicit config: GroupConfig): GroupIndex = {
-    assume(unsigned.fixedOutputs.nonEmpty)
-    unsigned.fixedOutputs.head match {
-      case output: AssetOutput => output.toGroup
-      case _: ContractOutput   => fromGroup
+    val from    = fromGroup
+    val outputs = unsigned.fixedOutputs
+    if (outputs.isEmpty) from
+    else {
+      val index = outputs.indexWhere(_.toGroup != from)
+      if (index == -1) from
+      else outputs(index).toGroup
     }
   }
+
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length

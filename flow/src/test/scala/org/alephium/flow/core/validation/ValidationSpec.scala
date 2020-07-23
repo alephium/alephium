@@ -13,6 +13,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp, U64}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import Validation._
+  import NonCoinbaseValidation._
 
   def check[T](res: BlockValidationResult[T]): Assertion = {
     res.isRight is true
@@ -143,7 +144,7 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     val tx1 =
       Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
     checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidBalance)
+    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidAlfBalance)
   }
 
   def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
@@ -182,7 +183,7 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     val tx1 =
       Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
     checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidBalance)
+    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidTokenBalance)
   }
 
   it should "create new token" in {
@@ -195,7 +196,7 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
 
     val output1 = genTokenOutput(ALF.Hash.generate, U64.MaxValue)
     val tx1     = Transaction.from(AVector(input), AVector(output1), signatures = AVector.empty)
-    checkTx(checkBalance(tx1, AVector.empty), InvalidBalance)
+    checkTx(checkBalance(tx1, AVector.empty), InvalidTokenBalance)
   }
 
   // TODO: Add more mocking test

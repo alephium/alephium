@@ -73,11 +73,11 @@ final case object TooManyOutputs                        extends InvalidTxStatus
 final case object InvalidInputIndex                     extends InvalidTxStatus
 final case object InvalidOutputIndex                    extends InvalidTxStatus
 final case object DuplicatedInputs                      extends InvalidTxStatus
-final case object NegativeOutputValue                   extends InvalidTxStatus
 final case object InvalidChainIndex                     extends InvalidTxStatus
 final case object DoubleSpent                           extends InvalidTxStatus
 final case object NonExistInput                         extends InvalidTxStatus
-final case object InvalidBalance                        extends InvalidTxStatus
+final case object InvalidAlfBalance                     extends InvalidTxStatus
+final case object InvalidTokenBalance                   extends InvalidTxStatus
 final case object BalanceOverFlow                       extends InvalidTxStatus
 final case object InvalidWitnessLength                  extends InvalidTxStatus
 final case object InvalidPublicKeyHash                  extends InvalidTxStatus
