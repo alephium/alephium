@@ -36,9 +36,9 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
   private val txHandler: ActorRefT[TxHandler.Command] = mode.node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
-  implicit val rpcConfig: RPCConfig     = RPCConfig.load(config.aleph)
+  implicit val apiConfig: ApiConfig     = ApiConfig.load(config.aleph)
   implicit val groupConfig: GroupConfig = config
-  implicit val askTimeout: Timeout      = Timeout(rpcConfig.askTimeout.asScala)
+  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
     Future.successful(
@@ -124,7 +124,7 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
   protected def startSelfOnce(): Future[Unit] = {
     for {
       httpBinding <- Http()
-        .bindAndHandle(route, rpcConfig.networkInterface.getHostAddress, port)
+        .bindAndHandle(route, apiConfig.networkInterface.getHostAddress, port)
     } yield {
       logger.info(s"Listening http request on $httpBinding")
       httpBindingPromise.success(httpBinding)
