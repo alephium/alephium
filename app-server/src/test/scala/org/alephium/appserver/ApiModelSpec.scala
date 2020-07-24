@@ -189,7 +189,7 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
 
     forAll(rawApiKeyGen) { rawApiKey =>
       val jsonApiKey = s""""$rawApiKey""""
-      checkData(ApiKey(rawApiKey), jsonApiKey)
+      checkData(ApiKey.unsafe(rawApiKey), jsonApiKey)
     }
 
     val invalidRawApiKeyGen = for {

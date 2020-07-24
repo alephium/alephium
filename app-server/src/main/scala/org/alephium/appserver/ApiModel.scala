@@ -334,16 +334,17 @@ object ApiModel {
     implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
   }
 
-  final case class ApiKey(value: String) extends AnyVal {
+  sealed abstract case class ApiKey private (val value: String) {
     def hash: Hash = Hash.hash(value)
   }
 
   object ApiKey {
+    def unsafe(raw: String): ApiKey = new ApiKey(raw) {}
     def createApiKey(raw: String): Either[String, ApiKey] = {
       if (raw.length < 32) {
         Left("Api key must have at least 32 characters")
       } else {
-        Right(ApiKey(raw))
+        Right(new ApiKey(raw) {})
       }
     }
 
