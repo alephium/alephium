@@ -180,8 +180,8 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
     checkData(transfer, jsonRaw)
   }
 
-  it should "encode/decode ApiSpec" in {
-    def alphaNumStrOfSizeGen(size: Int) = Gen.listOfN(size, Gen.alphaChar).map(_.mkString)
+  it should "encode/decode ApiKey" in {
+    def alphaNumStrOfSizeGen(size: Int) = Gen.listOfN(size, Gen.alphaNumChar).map(_.mkString)
     val rawApiKeyGen = for {
       size      <- Gen.choose(32, 512)
       apiKeyStr <- alphaNumStrOfSizeGen(size)

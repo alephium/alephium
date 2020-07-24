@@ -102,13 +102,13 @@ class AlephiumMake(object):
         nodes = get_env_int('nodes')
         assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
-        print("logs dir: " + tempdir + "/alephium")
+        print("Logs dir: " + tempdir + "/alephium")
 
         deployedNodes = get_env_default_int('deployedNodes', 0)
 
-        apiKey = secrets.token_hex(32)
+        apiKey = secrets.token_urlsafe(32)
         apiKeyHash = sha3.keccak_256(str.encode(apiKey)).hexdigest()
-        print("api key: " + apiKey)
+        print("Api key: " + apiKey)
 
         for node in range(deployedNodes, deployedNodes + nodes):
             port = 9973 + node
