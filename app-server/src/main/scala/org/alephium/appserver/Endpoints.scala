@@ -18,7 +18,7 @@ import org.alephium.util.{TimeStamp, U64}
 
 trait Endpoints {
 
-  implicit def rpcConfig: RPCConfig
+  implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig
 
   type BaseEndpoint[A, B] = Endpoint[A, Response.Failure, B, Nothing]
@@ -33,7 +33,7 @@ trait Endpoints {
         (timeInterval.from, timeInterval.to))
 
   private def checkApiKey(apiKey: ApiKey): Either[Response.Failure, ApiKey] =
-    if (apiKey.hash == rpcConfig.apiKeyHash) {
+    if (apiKey.hash == apiConfig.apiKeyHash) {
       Right(apiKey)
     } else {
       Left(Response.failed(Error.UnauthorizedError))

@@ -82,7 +82,7 @@ object ApiModel {
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
     import TimeStampCodec._
-    def decoder(implicit rpcConfig: RPCConfig): Decoder[FetchRequest] =
+    def decoder(implicit apiConfig: ApiConfig): Decoder[FetchRequest] =
       deriveDecoder[FetchRequest]
         .ensure(
           fetchRequest => fetchRequest.fromTs <= fetchRequest.toTs,
@@ -91,11 +91,11 @@ object ApiModel {
         .ensure(
           fetchRequest =>
             (fetchRequest.toTs -- fetchRequest.fromTs)
-              .exists(_ <= rpcConfig.blockflowFetchMaxAge),
-          s"interval cannot be greater than ${rpcConfig.blockflowFetchMaxAge}"
+              .exists(_ <= apiConfig.blockflowFetchMaxAge),
+          s"interval cannot be greater than ${apiConfig.blockflowFetchMaxAge}"
         )
     implicit val encoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
-    def codec(implicit rpcConfig: RPCConfig): Codec[FetchRequest] =
+    def codec(implicit apiConfig: ApiConfig): Codec[FetchRequest] =
       Codec.from(decoder, encoder)
   }
 

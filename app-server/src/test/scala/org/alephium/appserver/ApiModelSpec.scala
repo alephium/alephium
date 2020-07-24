@@ -31,8 +31,8 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
 
   val apiKey = Hash.generate.toHexString
 
-  implicit val rpcConfig: RPCConfig =
-    RPCConfig(dummyAddress.getAddress,
+  implicit val apiConfig: ApiConfig =
+    ApiConfig(dummyAddress.getAddress,
               blockflowFetchMaxAge,
               askTimeout = Duration.zero,
               apiKeyHash = Hash.hash(apiKey))
