@@ -7,7 +7,7 @@ import org.scalatest.EitherValues._
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Duration, TimeStamp}
+import org.alephium.util.AVector
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import Validation._
@@ -35,22 +35,6 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     forAll(blockGenNotOf(config.brokerInfo)) { block =>
       check(Validation.checkGroup(block), InvalidGroup)
     }
-  }
-
-  it should "validate timestamp for block" in {
-    val header  = blockGen.sample.get.header
-    val now     = TimeStamp.now()
-    val before  = (now - Duration.ofMinutesUnsafe(61)).get
-    val after   = now + Duration.ofMinutesUnsafe(61)
-    val header0 = header.copy(timestamp = now)
-    val header1 = header.copy(timestamp = before)
-    val header2 = header.copy(timestamp = after)
-    check(Validation.checkTimeStamp(header0, isSyncing = false))
-    check(Validation.checkTimeStamp(header1, isSyncing = false), InvalidTimeStamp)
-    check(Validation.checkTimeStamp(header2, isSyncing = false), InvalidTimeStamp)
-    check(Validation.checkTimeStamp(header0, isSyncing = true))
-    check(Validation.checkTimeStamp(header1, isSyncing = true))
-    check(Validation.checkTimeStamp(header2, isSyncing = true), InvalidTimeStamp)
   }
 
   it should "validate nonEmpty transaction list" in {
