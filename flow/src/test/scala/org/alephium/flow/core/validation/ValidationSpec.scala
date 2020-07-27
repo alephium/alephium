@@ -114,7 +114,7 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   it should "test both ALF and token balances" in {
     forAll(transactionGenWithPreOutputs) {
       case (tx, preOutput) =>
-        checkTx(checkBalance(tx, preOutput))
+        checkTx(checkBalance(tx, preOutput.map(_.referredOutput)))
     }
   }
 

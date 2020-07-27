@@ -13,7 +13,7 @@ import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigFixture, GroupConfig}
-import org.alephium.protocol.model.ModelGenerators.{Balances, ScriptPair}
+import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U64}
@@ -169,21 +169,6 @@ trait TxGenerators
     value <- Gen.choose[Long](1, 5)
   } yield TxOutput.asset(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
 
-  sealed trait TxInputStateInfo {
-    def referredOutput: TxOutput
-  }
-
-  case class AssetInputInfo(txInput: TxInput,
-                            referredOutput: AssetOutput,
-                            privateKey: ED25519PrivateKey)
-      extends TxInputStateInfo
-
-  case class ContractInfo(txInput: TxInput,
-                          referredOutput: ContractOutput,
-                          state: AVector[Val],
-                          privateKey: ED25519PrivateKey)
-      extends TxInputStateInfo
-
   def assetInputInfoGen(groupIndex: GroupIndex)(
       amountGen: Gen[U64]                     = amountGen,
       tokensGen: Gen[AVector[(TokenId, U64)]] = tokensGen,
@@ -287,7 +272,7 @@ trait TxGenerators
       lockupScript: IndexLockupScriptGen           = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
-  ): Gen[(Transaction, AVector[TxOutput])] =
+  ): Gen[(Transaction, AVector[TxInputStateInfo])] =
     for {
       chainIndex    <- chainIndexGen
       assetInfos    <- assetsToSpendGen(chainIndex.from, minInputs, maxInputs)
@@ -302,8 +287,8 @@ trait TxGenerators
         contractInfos.map(info => ED25519.sign(unsignedTx.hash.bytes, info.privateKey))
     } yield {
       val tx = Transaction(unsignedTx, AVector.empty, signatures)
-      val preOutput = assetInfos.map[TxOutput](_.referredOutput) ++ contractInfos.map(
-        _.referredOutput)
+      val preOutput = assetInfos.map[TxInputStateInfo](identity) ++ contractInfos
+        .map[TxInputStateInfo](identity)
       tx -> preOutput
     }
 
@@ -384,7 +369,7 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
 
   lazy val txInputGen: Gen[TxInput] = groupIndexGen.flatMap(txInputGen(_))
 
-  lazy val transactionGenWithPreOutputs: Gen[(Transaction, AVector[TxOutput])] =
+  lazy val transactionGenWithPreOutputs: Gen[(Transaction, AVector[TxInputStateInfo])] =
     transactionGenWithPreOutputs()(chainIndexGen = chainIndexGen)
 
   lazy val blockGen: Gen[Block] =
@@ -413,6 +398,21 @@ object ModelGenerators {
       AssetOutput(alfAmount, tokensVec, createdHeight, lockupScript, data)
     }
   }
+
+  sealed trait TxInputStateInfo {
+    def referredOutput: TxOutput
+  }
+
+  case class AssetInputInfo(txInput: TxInput,
+                            referredOutput: AssetOutput,
+                            privateKey: ED25519PrivateKey)
+      extends TxInputStateInfo
+
+  case class ContractInfo(txInput: TxInput,
+                          referredOutput: ContractOutput,
+                          state: AVector[Val],
+                          privateKey: ED25519PrivateKey)
+      extends TxInputStateInfo
 }
 
 class ModelGeneratorsSpec extends AlephiumSpec with TokenGenerators with DefaultGenerators {
