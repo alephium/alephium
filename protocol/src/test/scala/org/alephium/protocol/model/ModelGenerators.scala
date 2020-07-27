@@ -263,12 +263,12 @@ trait TxGenerators
     } yield AVector.from(inputs)
 
   def transactionGenWithPreOutputs(
-      minInputs: Int = 1,
-      maxInputs: Int = 100
+      minInputs: Int         = 1,
+      maxInputs: Int         = 10,
+      issueNewToken: Boolean = true
   )(
       chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
-      issueNewToken: Boolean                       = true,
       lockupScript: IndexLockupScriptGen           = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
@@ -293,22 +293,21 @@ trait TxGenerators
     }
 
   def transactionGen(
-      minInputs: Int = 1,
-      maxInputs: Int = 10
+      minInputs: Int         = 1,
+      maxInputs: Int         = 10,
+      issueNewToken: Boolean = true
   )(
       chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
-      issueNewToken: Boolean                       = true,
       lockupScript: IndexLockupScriptGen           = p2pkhLockupGen,
       heightGen: Gen[Int]                          = createdHeightGen,
       dataGen: Gen[ByteString]                     = dataGen
   ): Gen[Transaction] =
-    transactionGenWithPreOutputs(minInputs, maxInputs)(chainIndexGen,
-                                                       contractsToSpend,
-                                                       issueNewToken,
-                                                       lockupScript,
-                                                       heightGen,
-                                                       dataGen).map(_._1)
+    transactionGenWithPreOutputs(minInputs, maxInputs, issueNewToken)(chainIndexGen,
+                                                                      contractsToSpend,
+                                                                      lockupScript,
+                                                                      heightGen,
+                                                                      dataGen).map(_._1)
 }
 
 trait BlockGenerators extends TxGenerators {

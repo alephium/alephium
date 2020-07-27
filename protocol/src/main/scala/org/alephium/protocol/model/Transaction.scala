@@ -61,6 +61,8 @@ final case class Transaction(unsigned: UnsignedTransaction,
       sum  <- sum1.add(sum2)
     } yield sum
   }
+
+  def newTokenId: TokenId = unsigned.inputs.head.hash
 }
 
 object Transaction {

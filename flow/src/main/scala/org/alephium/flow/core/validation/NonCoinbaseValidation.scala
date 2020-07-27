@@ -150,7 +150,7 @@ object NonCoinbaseValidation {
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private[validation] def computeTokenBalances(
-      outputs: AVector[TxOutput]): Either[TxValidationError, mutable.Map[TokenId, U64]] =
+      outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U64]] =
     try {
       val balances = mutable.Map.empty[TokenId, U64]
       outputs.foreach {
