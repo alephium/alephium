@@ -1,5 +1,6 @@
 package org.alephium.flow.core.validation
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
@@ -174,5 +175,79 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val worldStateNew = prepareWorldState(inputInfos)
         getPreOutputs(tx, worldStateNew) isE inputInfos.map(_.referredOutput)
     }
+  }
+
+  it should "test both ALF and token balances" in {
+    forAll(transactionGenWithPreOutputs) {
+      case (tx, preOutput) =>
+        passCheck(checkBalance(tx, preOutput.map(_.referredOutput)))
+    }
+  }
+
+  it should "validate ALF balances" in {
+    val sum       = U64.MaxValue.subUnsafe(U64.Two)
+    val preOutput = genAlfOutput(sum)
+    val output1   = genAlfOutput(sum.subOneUnsafe())
+    val output2   = genAlfOutput(U64.One)
+    val output3   = genAlfOutput(U64.Two)
+    val input     = txInputGen.sample.get
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    passCheck(checkBalance(tx0, AVector(preOutput)))
+    failCheck(checkBalance(tx1, AVector(preOutput)), InvalidAlfBalance)
+  }
+
+  def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
+    AssetOutput(U64.Zero,
+                AVector(tokenId -> amount),
+                0,
+                LockupScript.p2pkh(ALF.Hash.zero),
+                ByteString.empty)
+  }
+
+  it should "test token balance overflow" in {
+    val input     = txInputGen.sample.get
+    val tokenId   = ALF.Hash.generate
+    val preOutput = genTokenOutput(tokenId, U64.MaxValue)
+    val output1   = genTokenOutput(tokenId, U64.MaxValue)
+    val output2   = genTokenOutput(tokenId, U64.Zero)
+    val output3   = genTokenOutput(tokenId, U64.One)
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    passCheck(checkBalance(tx0, AVector(preOutput)))
+    failCheck(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
+  }
+
+  it should "validate token balances" in {
+    val input     = txInputGen.sample.get
+    val tokenId   = ALF.Hash.generate
+    val sum       = U64.MaxValue.subUnsafe(U64.Two)
+    val preOutput = genTokenOutput(tokenId, sum)
+    val output1   = genTokenOutput(tokenId, sum.subOneUnsafe())
+    val output2   = genTokenOutput(tokenId, U64.One)
+    val output3   = genTokenOutput(tokenId, U64.Two)
+    val tx0 =
+      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
+    val tx1 =
+      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
+    passCheck(checkBalance(tx0, AVector(preOutput)))
+    failCheck(checkBalance(tx1, AVector(preOutput)), InvalidTokenBalance)
+  }
+
+  it should "create new token" in {
+    val input   = txInputGen.sample.get
+    val tokenId = input.hash
+
+    val output0 = genTokenOutput(tokenId, U64.MaxValue)
+    val tx0     = Transaction.from(AVector(input), AVector(output0), signatures = AVector.empty)
+    passCheck(checkBalance(tx0, AVector.empty))
+
+    val output1 = genTokenOutput(ALF.Hash.generate, U64.MaxValue)
+    val tx1     = Transaction.from(AVector(input), AVector(output1), signatures = AVector.empty)
+    failCheck(checkBalance(tx1, AVector.empty), InvalidTokenBalance)
   }
 }
