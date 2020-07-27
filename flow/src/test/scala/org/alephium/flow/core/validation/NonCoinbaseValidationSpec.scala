@@ -73,12 +73,14 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   it should "check ALF balance overflow" in new StatelessFixture {
     forAll(transactionGen()()) { tx =>
-      val alfAmount = tx.alfAmountInOutputs.get
-      val delta     = U64.MaxValue - alfAmount + 1
-      val txNew     = modifyAlfAmount(tx, delta)
-      passCheck(checkAlfOutputAmount(tx))
-      failCheck(checkAlfOutputAmount(txNew), BalanceOverFlow)
-      failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+      whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
+        val alfAmount = tx.alfAmountInOutputs.get
+        val delta     = U64.MaxValue - alfAmount + 1
+        val txNew     = modifyAlfAmount(tx, delta)
+        passCheck(checkAlfOutputAmount(tx))
+        failCheck(checkAlfOutputAmount(txNew), BalanceOverFlow)
+        failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+      }
     }
   }
 
@@ -256,10 +258,12 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   it should "test token balance overflow" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs(issueNewToken = false)()) {
       case (tx, preOutputs) =>
-        val tokenId     = sampleToken(tx)
-        val tokenAmount = getTokenAmount(tx, tokenId)
-        val txNew       = modifyTokenAmount(tx, tokenId, U64.MaxValue - tokenAmount + 1 + _)
-        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+        whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
+          val tokenId     = sampleToken(tx)
+          val tokenAmount = getTokenAmount(tx, tokenId)
+          val txNew       = modifyTokenAmount(tx, tokenId, U64.MaxValue - tokenAmount + 1 + _)
+          failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+        }
     }
   }
 
