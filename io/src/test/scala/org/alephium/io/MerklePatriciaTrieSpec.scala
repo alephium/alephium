@@ -7,9 +7,8 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
 import org.alephium.crypto.{Keccak256 => Hash}
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Files}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class MerklePatriciaTrieSpec extends AlephiumSpec {
   import MerklePatriciaTrie._
@@ -93,26 +92,14 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     LeafNode(genesisPath, genesisValue.bytes)
   }
 
-  trait TrieFixture {
-
-    private val tmpdir = Files.tmpDir
-    private val dbname = "trie"
-    private val dbPath = tmpdir.resolve(dbname)
-
-    private val storage =
-      RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-
-    val db   = RocksDBKeyValueStorage[Hash, MerklePatriciaTrie.Node](storage, ColumnFamily.Trie)
+  trait TrieFixture extends StorageFixture {
+    val db   = newDB[Hash, MerklePatriciaTrie.Node]
     var trie = MerklePatriciaTrie.build[Hash, Hash](db, genesisKey, genesisValue)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Hash.random.bytes
       val data = ByteString.fromString(Gen.alphaStr.sample.get)
       (keyPrefix ++ key.drop(keyPrefix.length), data)
-    }
-
-    protected def postTest(): Assertion = {
-      storage.dESTROY().isRight is true
     }
   }
 

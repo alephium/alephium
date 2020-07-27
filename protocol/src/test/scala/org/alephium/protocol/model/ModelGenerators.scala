@@ -38,14 +38,25 @@ trait TxInputGenerators extends Generators {
   implicit def config: GroupConfig
 
   private def shortKeyGen(groupIndex: GroupIndex): Gen[Int] =
-    Gen.choose(0, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
+    Gen.choose(1, Int.MaxValue).retryUntil(LockupScript.groupIndex(_) equals groupIndex)
+
+  def assetOutputRefGen(groupIndex: GroupIndex): Gen[AssetOutputRef] = {
+    for {
+      shortKey <- shortKeyGen(groupIndex)
+      hash     <- hashGen
+    } yield AssetOutputRef(shortKey, hash)
+  }
+
+  def contractOutputRefGen: Gen[ContractOutputRef] = {
+    hashGen.map(ContractOutputRef)
+  }
 
   def txInputGen(groupIndex: GroupIndex): Gen[TxInput] =
     for {
       shortKey <- shortKeyGen(groupIndex)
       hash     <- hashGen
     } yield {
-      val outputRef = TxOutputRef(shortKey, hash)
+      val outputRef = TxOutputRef.from(shortKey, hash)
       TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
     }
 }
@@ -184,7 +195,7 @@ trait TxGenerators
                                                 dataGen)
       outputHash <- hashGen
     } yield {
-      val outputRef = TxOutputRef(assetOutput.scriptHint, outputHash)
+      val outputRef = TxOutputRef.from(assetOutput.scriptHint, outputHash)
       val txInput   = TxInput(outputRef, unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }

@@ -13,8 +13,8 @@ trait WorldStateStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
 
   override def storageKey(key: Hash): ByteString = key.bytes ++ ByteString(Storages.trieHashPostfix)
 
-  def getWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
-    get(hash).map(_.toWorldState(trieStorage))
+  def getPersistedWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
+    get(hash).map(_.toPersistedWorldState(trieStorage))
   }
 
   def getCachedWorldState(hash: Hash): IOResult[WorldState.Cached] = {

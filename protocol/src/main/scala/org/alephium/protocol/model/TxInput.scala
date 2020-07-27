@@ -27,6 +27,11 @@ object TxInput {
     Serde.forProduct2(TxInput.apply, ti => (ti.outputRef, ti.unlockScript))
 }
 
+sealed abstract class TxOutputRef {
+  def scriptHint: Int
+  def key: ALF.Hash
+}
+
 /**
   *
   * @param scriptHint short index of LockupScript for quick outputs query
@@ -34,32 +39,35 @@ object TxInput {
   * @param key hash of the hash of transaction and index of the AssetOutput;
   *            or hash of the first signature for ContractOutput
   */
-final case class TxOutputRef(scriptHint: Int, key: ALF.Hash) {
-  def isContractRef: Boolean = scriptHint == 0
-
-  def fromGroup(implicit config: GroupConfig): GroupIndex =
-    LockupScript.groupIndex(scriptHint)
+final case class AssetOutputRef(scriptHint: Int, key: ALF.Hash) extends TxOutputRef {
+  def fromGroup(implicit config: GroupConfig): GroupIndex = LockupScript.groupIndex(scriptHint)
+}
+final case class ContractOutputRef(key: ALF.Hash) extends TxOutputRef {
+  override def scriptHint: Int = 0
 }
 
 object TxOutputRef {
   implicit val serde: Serde[TxOutputRef] =
-    Serde.forProduct2(TxOutputRef.apply, t => (t.scriptHint, t.key))
+    Serde.forProduct2(TxOutputRef.from, t => (t.scriptHint, t.key))
+
+  def from(scriptHint: Int, key: ALF.Hash): TxOutputRef = {
+    if (scriptHint == 0) ContractOutputRef(key) else AssetOutputRef(scriptHint, key)
+  }
 
   // Only use this to initialize Merkle tree of ouptuts
-  def empty: TxOutputRef = TxOutputRef(0, ALF.Hash.zero)
+  def emptyTreeNode: TxOutputRef = AssetOutputRef(1, ALF.Hash.zero)
 
-  def contract(key: Hash): TxOutputRef = TxOutputRef(0, key)
+  def contract(key: Hash): TxOutputRef = ContractOutputRef(key)
+
+  def key(tx: Transaction, outputIndex: Int): ALF.Hash = {
+    Hash.hash(tx.hash.bytes ++ Bytes.toBytes(outputIndex))
+  }
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
+    val refKey = key(transaction, outputIndex)
     transaction.getOutput(outputIndex) match {
-      case output: AssetOutput =>
-        val outputHash = Hash.hash(transaction.hash.bytes ++ Bytes.toBytes(outputIndex))
-        assume(output.scriptHint != 0)
-        TxOutputRef(output.scriptHint, outputHash)
-      case output: ContractOutput =>
-        // TODO: check non-empty signature in validation
-        val outputHash = Hash.hash(transaction.signatures.head.bytes ++ Bytes.toBytes(outputIndex))
-        TxOutputRef(output.scriptHint, outputHash)
+      case output: AssetOutput => AssetOutputRef(output.scriptHint, refKey)
+      case _: ContractOutput   => ContractOutputRef(refKey)
     }
   }
 }

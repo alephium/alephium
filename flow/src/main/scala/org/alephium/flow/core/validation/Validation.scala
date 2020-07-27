@@ -93,7 +93,7 @@ object Validation {
       implicit config: PlatformConfig): TxValidationResult = {
     val index = ChainIndex(tx.fromGroup, tx.toGroup)
     for {
-      trie <- ValidationStatus.from(flow.getBestTrie(index))
+      trie <- ValidationStatus.from(flow.getBestPersistedTrie(index.from))
       _    <- checkNonCoinbaseTx(index, tx, trie)
     } yield ()
   }
@@ -170,7 +170,7 @@ object Validation {
     if (brokerInfo.contains(index.from)) {
       val result = for {
         _    <- checkBlockDoubleSpending(block)
-        trie <- ValidationStatus.from(flow.getTrie(block))
+        trie <- ValidationStatus.from(flow.getPersistedTrie(block))
         _    <- block.nonCoinbase.foreachE(checkBlockNonCoinbase(index, _, trie))
       } yield ()
       convert(result)
@@ -342,22 +342,7 @@ object Validation {
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val unlockScript = tx.unsigned.inputs(idx).unlockScript
       val signature    = tx.signatures(idx)
-      preOutputs(idx) match {
-        case assetOutput: AssetOutput =>
-          checkLockupScript(tx, assetOutput.lockupScript, unlockScript, signature, worldState)
-        case _: ContractOutput =>
-          checkContractOutput(tx, idx, worldState)
-      }
-    }
-  }
-
-  private[validation] def checkContractOutput(tx: Transaction,
-                                              index: Int,
-                                              worldState: WorldState): TxValidationResult = {
-    val outputRef = TxOutputRef.unsafe(tx, index)
-    worldState.existContract(outputRef.key) match {
-      case Right(exist) => if (exist) invalidTx(CreateContractWithOldId) else validTx
-      case Left(error)  => invalidTx(WorldStateIOError(error))
+      checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signature, worldState)
     }
   }
 

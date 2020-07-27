@@ -97,7 +97,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val contractOutputRef0 = TxOutputRef.unsafe(block0.transactions.head, 0)
     val contractKey0       = contractOutputRef0.key
 
-    contractOutputRef0.isContractRef is true
+    contractOutputRef0 is a[ContractOutputRef]
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState)
 
@@ -419,7 +419,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
                  chainIndex: ChainIndex,
                  key: Hash,
                  expected: AVector[Val]): Assertion = {
-    blockFlow.getBestTrie(chainIndex).toOption.get.getContractState(key) isE expected
+    blockFlow.getBestPersistedTrie(chainIndex.from).toOption.get.getContractState(key) isE expected
   }
 
   def show(blockFlow: BlockFlow): String = {

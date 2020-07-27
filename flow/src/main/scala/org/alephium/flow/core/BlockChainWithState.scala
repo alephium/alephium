@@ -11,7 +11,11 @@ import org.alephium.protocol.vm.WorldState
 trait BlockChainWithState extends BlockChain {
   def trieHashStorage: WorldStateStorage
 
-  def getWorldState(hash: Hash): IOResult[WorldState] = {
+  def getPersistedWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
+    trieHashStorage.getPersistedWorldState(hash)
+  }
+
+  def getCachedWorldState(hash: Hash): IOResult[WorldState.Cached] = {
     trieHashStorage.getCachedWorldState(hash)
   }
 
@@ -23,7 +27,7 @@ trait BlockChainWithState extends BlockChain {
 
   override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     for {
-      oldWorldState <- getWorldState(block.parentHash)
+      oldWorldState <- getCachedWorldState(block.parentHash)
       _             <- persistBlock(block)
       newWorldState <- updateState(oldWorldState, block)
       _             <- addTrie(block.hash, newWorldState)

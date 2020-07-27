@@ -148,15 +148,28 @@ trait BlockFlowState {
     blockHeaderChains(from.value)(to.value)
   }
 
-  private def getTrie(deps: AVector[Hash], groupIndex: GroupIndex): IOResult[WorldState] = {
+  private def getPersistedTrie(deps: AVector[Hash],
+                               groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assert(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
-    getBlockChainWithState(groupIndex).getWorldState(hash)
+    getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  def getTrie(block: Block): IOResult[WorldState] = {
+  private def getCachedTrie(deps: AVector[Hash],
+                            groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+    assert(deps.length == config.depsNum)
+    val hash = deps(config.groups - 1 + groupIndex.value)
+    getBlockChainWithState(groupIndex).getCachedWorldState(hash)
+  }
+
+  def getPersistedTrie(block: Block): IOResult[WorldState] = {
     val header = block.header
-    getTrie(header.blockDeps, header.chainIndex.from)
+    getPersistedTrie(header.blockDeps, header.chainIndex.from)
+  }
+
+  def getCachedTrie(block: Block): IOResult[WorldState] = {
+    val header = block.header
+    getCachedTrie(header.blockDeps, header.chainIndex.from)
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
@@ -164,19 +177,21 @@ trait BlockFlowState {
     bestDeps(groupShift)
   }
 
-  def getBestTrie(chainIndex: ChainIndex): IOResult[WorldState] = {
-    getBestTrie(chainIndex.from)
-  }
-
   def getBestHeight(chainIndex: ChainIndex): IOResult[Int] = {
     val bestParent = getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
     getHashChain(chainIndex.from, chainIndex.to).getHeight(bestParent)
   }
 
-  def getBestTrie(groupIndex: GroupIndex): IOResult[WorldState] = {
+  def getBestPersistedTrie(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assert(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    getTrie(deps.deps, groupIndex)
+    getPersistedTrie(deps.deps, groupIndex)
+  }
+
+  def getBestCachedTrie(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+    assert(config.brokerInfo.contains(groupIndex))
+    val deps = getBestDeps(groupIndex)
+    getCachedTrie(deps.deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
@@ -287,13 +302,6 @@ trait BlockFlowState {
     }
   }
 
-  def getAllInputs(chainIndex: ChainIndex, tx: Transaction): IOResult[AVector[TxOutput]] = {
-    for {
-      trie   <- getBestTrie(chainIndex)
-      inputs <- tx.unsigned.inputs.mapE(input => trie.getOutput(input.outputRef))
-    } yield inputs
-  }
-
   private def lockedBy(output: TxOutput, lockupScript: LockupScript): Boolean = output match {
     case o: AssetOutput => o.lockupScript == lockupScript
     case _              => false
@@ -304,7 +312,7 @@ trait BlockFlowState {
     assert(config.brokerInfo.contains(groupIndex))
 
     for {
-      bestTrie <- getBestTrie(groupIndex)
+      bestTrie <- getBestPersistedTrie(groupIndex)
       persistedUtxos <- bestTrie
         .getOutputs(lockupScript.shortKeyBytes)
         .map(_.filter(p => lockedBy(p._2, lockupScript)).map {
@@ -428,7 +436,10 @@ object BlockFlowState {
   // This is only used for out blocks for a specific group
   private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
       implicit config: GroupConfig): Map[TxOutputRef, TxOutput] = {
-    convertOutputs(block)._1.filter(_._1.fromGroup == groupIndex)
+    convertOutputs(block)._1.filter {
+      case (outputRef: AssetOutputRef, _) if outputRef.fromGroup == groupIndex => true
+      case _                                                                   => false
+    }
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
@@ -442,45 +453,6 @@ object BlockFlowState {
       OutBlockCache(convertInputs(block), convertRelatedOutputs(block, groupIndex))
     } else {
       InBlockCache(convertOutputs(block)._1) // there should be no [[ContractOutput]]
-    }
-  }
-
-  def updateStateForOutputs(worldState: WorldState,
-                            outputs: Iterable[(TxOutputRef, TxOutput)]): IOResult[WorldState] = {
-    EitherF.foldTry(outputs, worldState) {
-      case (worldState, (outputRef, output)) => worldState.putOutput(outputRef, output)
-    }
-  }
-
-  def updateStateForContracts(worldState: WorldState,
-                              contracts: Iterable[(Hash, AVector[Val])]): IOResult[WorldState] = {
-    EitherF.foldTry(contracts, worldState) {
-      case (worldState, (key, contract)) => worldState.putContractState(key, contract)
-    }
-  }
-
-  def updateStateForInputs(worldState: WorldState,
-                           inputs: Iterable[TxOutputRef]): IOResult[WorldState] = {
-    EitherF.foldTry(inputs, worldState) {
-      case (worldState, outputRef) => worldState.remove(outputRef)
-    }
-  }
-
-  def updateState(worldState: WorldState, blockCache: BlockCache): IOResult[WorldState] = {
-    blockCache match {
-      case InBlockCache(outputs) =>
-        updateStateForOutputs(worldState, outputs)
-      case OutBlockCache(inputs, relatedOutputs) =>
-        for {
-          trie0 <- updateStateForInputs(worldState, inputs)
-          trie1 <- updateStateForOutputs(trie0, relatedOutputs)
-        } yield trie1
-      case InOutBlockCache(outputs, contractStates, inputs) =>
-        for {
-          trie0 <- updateStateForOutputs(worldState, outputs)
-          trie1 <- updateStateForContracts(trie0, contractStates)
-          trie2 <- updateStateForInputs(trie1, inputs)
-        } yield trie2
     }
   }
 
@@ -552,13 +524,11 @@ object BlockFlowState {
       targetGroup: GroupIndex)(implicit config: GroupConfig): IOResult[WorldState] = {
     (tx.unsigned.fixedOutputs ++ tx.generatedOutputs).foldWithIndexE(worldState) {
       case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
-        state.putOutput(TxOutputRef.unsafe(tx, index), output)
+        val outputRef = AssetOutputRef(output.scriptHint, TxOutputRef.key(tx, index))
+        state.addAsset(outputRef, output)
       case (state, output: ContractOutput, index) =>
-        val outputRef = TxOutputRef.unsafe(tx, index)
-        for {
-          state0 <- state.putOutput(outputRef, output)
-          state1 <- state0.putContractState(outputRef.key, tx.unsigned.states(index))
-        } yield state1
+        val outputRef = ContractOutputRef(TxOutputRef.key(tx, index))
+        state.addContract(outputRef, output, tx.unsigned.states(index)) // validated before
       case (state, _, _) => Right(state)
     }
   }
