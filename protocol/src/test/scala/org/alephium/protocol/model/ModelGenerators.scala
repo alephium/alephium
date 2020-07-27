@@ -309,7 +309,7 @@ trait TxGenerators
 
   def transactionGen(
       minInputs: Int = 1,
-      maxInputs: Int = 20
+      maxInputs: Int = 10
   )(
       chainIndexGen: Gen[ChainIndex]               = chainIndexGen,
       contractsToSpend: Gen[AVector[ContractInfo]] = noContracts,
