@@ -30,7 +30,7 @@ trait RPCServerAbstract extends StrictLogging {
   implicit def system: ActorSystem
   implicit def executionContext: ExecutionContext
   implicit def config: PlatformConfig
-  implicit def rpcConfig: RPCConfig
+  implicit def apiConfig: ApiConfig
   implicit def askTimeout: Timeout
 
   def doBlockNotify(blockNotify: BlockNotify): Json

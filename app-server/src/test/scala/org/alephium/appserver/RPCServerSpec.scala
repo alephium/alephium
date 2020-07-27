@@ -256,7 +256,7 @@ class RPCServerSpec
   }
 
   trait RouteHTTP extends RPCServerFixture {
-    implicit lazy val askTimeout: Timeout       = Timeout(server.rpcConfig.askTimeout.asScala)
+    implicit lazy val askTimeout                = Timeout(server.apiConfig.askTimeout.asScala)
     implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(2000, Millis))
 
     def checkCall[T](method: String, params: Option[Json])(f: Response.Success => T): T = {

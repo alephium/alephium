@@ -31,8 +31,8 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
-  implicit val rpcConfig: RPCConfig = RPCConfig.load(config.aleph)
-  implicit val askTimeout: Timeout  = Timeout(rpcConfig.askTimeout.asScala)
+  implicit val apiConfig: ApiConfig = ApiConfig.load(config.aleph)
+  implicit val askTimeout: Timeout  = Timeout(apiConfig.askTimeout.asScala)
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
@@ -115,9 +115,9 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   protected def startSelfOnce(): Future[Unit] = {
     for {
       httpBinding <- Http()
-        .bindAndHandle(httpRoute, rpcConfig.networkInterface.getHostAddress, rpcPort)
+        .bindAndHandle(httpRoute, apiConfig.networkInterface.getHostAddress, rpcPort)
       wsBinding <- Http()
-        .bindAndHandle(wsRoute, rpcConfig.networkInterface.getHostAddress, wsPort)
+        .bindAndHandle(wsRoute, apiConfig.networkInterface.getHostAddress, wsPort)
     } yield {
       logger.info(s"Listening http request on $httpBinding")
       logger.info(s"Listening ws request on $wsBinding")

@@ -22,6 +22,9 @@ object TapirCodecs {
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromCirce[Address]
 
+  implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
+    fromCirce[ApiKey]
+
   implicit val publicKeyTapirCodec: Codec[String, ED25519PublicKey, TextPlain] =
     fromCirce[ED25519PublicKey]
 

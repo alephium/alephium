@@ -82,7 +82,7 @@ object ApiModel {
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
     import TimeStampCodec._
-    def decoder(implicit rpcConfig: RPCConfig): Decoder[FetchRequest] =
+    def decoder(implicit apiConfig: ApiConfig): Decoder[FetchRequest] =
       deriveDecoder[FetchRequest]
         .ensure(
           fetchRequest => fetchRequest.fromTs <= fetchRequest.toTs,
@@ -91,11 +91,11 @@ object ApiModel {
         .ensure(
           fetchRequest =>
             (fetchRequest.toTs -- fetchRequest.fromTs)
-              .exists(_ <= rpcConfig.blockflowFetchMaxAge),
-          s"interval cannot be greater than ${rpcConfig.blockflowFetchMaxAge}"
+              .exists(_ <= apiConfig.blockflowFetchMaxAge),
+          s"interval cannot be greater than ${apiConfig.blockflowFetchMaxAge}"
         )
     implicit val encoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
-    def codec(implicit rpcConfig: RPCConfig): Codec[FetchRequest] =
+    def codec(implicit apiConfig: ApiConfig): Codec[FetchRequest] =
       Codec.from(decoder, encoder)
   }
 
@@ -332,5 +332,24 @@ object ApiModel {
     }
 
     implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
+  }
+
+  sealed abstract case class ApiKey private (val value: String) {
+    def hash: Hash = Hash.hash(value)
+  }
+
+  object ApiKey {
+    def unsafe(raw: String): ApiKey = new ApiKey(raw) {}
+    def createApiKey(raw: String): Either[String, ApiKey] = {
+      if (raw.length < 32) {
+        Left("Api key must have at least 32 characters")
+      } else {
+        Right(new ApiKey(raw) {})
+      }
+    }
+
+    implicit val encoder: Encoder[ApiKey] = Encoder.encodeString.contramap(_.value)
+    implicit val decoder: Decoder[ApiKey] = Decoder.decodeString.emap(createApiKey)
+    implicit val codec: Codec[ApiKey]     = Codec.from(decoder, encoder)
   }
 }

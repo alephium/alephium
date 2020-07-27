@@ -32,6 +32,8 @@ trait ServerFixture
 
   val now = TimeStamp.now()
 
+  val apiKey = ApiKey.unsafe("XDGphUFhHMHgRXoVRYU_NKrZ3jO93qYWIQ07T6hTN7k")
+
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)

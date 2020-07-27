@@ -1,6 +1,7 @@
 package org.alephium.appserver
 
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestProbe
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -113,20 +114,28 @@ class RestServerSpec
     val tx =
       s"""{"tx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
     val entity = HttpEntity(ContentTypes.`application/json`, tx)
-    Post(s"/transactions", entity) ~> server.route ~> check {
+    Post(s"/transactions", entity)
+      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxResult] is dummyTransferResult
+    }
+
+    //Fail without api-key
+    Post(s"/transactions", entity) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
     }
   }
 
   it should "call POST /miners" in new RestServerFixture {
-    Post(s"/miners?action=start-mining") ~> server.route ~> check {
+    Post(s"/miners?action=start-mining")
+      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Start)
     }
 
-    Post(s"/miners?action=stop-mining") ~> server.route ~> check {
+    Post(s"/miners?action=stop-mining")
+      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Stop)

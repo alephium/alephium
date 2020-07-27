@@ -10,10 +10,10 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
-import sttp.tapir.docs.openapi.RichOpenAPIEndpoints
+import sttp.tapir.docs.openapi.RichOpenAPIServerEndpoints
 import sttp.tapir.openapi.OpenAPI
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
-import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
+import sttp.tapir.server.akkahttp._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
@@ -36,40 +36,28 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
   private val txHandler: ActorRefT[TxHandler.Command] = mode.node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
-  implicit val rpcConfig: RPCConfig     = RPCConfig.load(config.aleph)
+  implicit val apiConfig: ApiConfig     = ApiConfig.load(config.aleph)
   implicit val groupConfig: GroupConfig = config
-  implicit val askTimeout: Timeout      = Timeout(rpcConfig.askTimeout.asScala)
+  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
-  private val docs: OpenAPI = List(
-    getBlockflow,
-    getBlock,
-    getBalance,
-    getGroup,
-    getHashesAtHeight,
-    getChainInfo,
-    createTransaction,
-    sendTransaction,
-    minerAction
-  ).toOpenAPI("Alephium BlockFlow API", "1.0")
-
-  private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
+  private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
     Future.successful(
       ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
   }
 
-  private val getBlockRoute = getBlock.toRoute { hash =>
+  private val getBlockLogic = getBlock.serverLogic { hash =>
     Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))
   }
 
-  private val getBalanceRoute = getBalance.toRoute { address =>
+  private val getBalanceLogic = getBalance.serverLogic { address =>
     Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
-  private val getGroupRoute = getGroup.toRoute { address =>
+  private val getGroupLogic = getGroup.serverLogic { address =>
     Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))
   }
 
-  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
+  private val getHashesAtHeightLogic = getHashesAtHeight.serverLogic {
     case (from, to, height) =>
       Future.successful(
         ServerUtils.getHashesAtHeight(blockFlow,
@@ -77,39 +65,55 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
                                       GetHashesAtHeight(from.value, to.value, height)))
   }
 
-  private val getChainInfoRoute = getChainInfo.toRoute {
+  private val getChainInfoLogic = getChainInfo.serverLogic {
     case (from, to) =>
       Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
-  private val createTransactionRoute = createTransaction.toRoute {
+  private val createTransactionLogic = createTransaction.serverLogic {
     case (fromKey, toAddress, value) =>
       Future.successful(
         ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))
   }
 
-  private val sendTransactionRoute = sendTransaction.toRoute { transaction =>
-    ServerUtils.sendTransaction(txHandler, transaction)
+  private val sendTransactionLogic = sendTransaction.serverLogic {
+    case (_, transaction) =>
+      ServerUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val minerActionRoute = minerAction.toRoute {
-    case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
-    case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
+  private val minerActionLogic = minerAction.serverLogic {
+    case (_, action) =>
+      action match {
+        case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
+        case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
+      }
   }
+
+  private val docs: OpenAPI = List(
+    getBlockflowLogic,
+    getBlockLogic,
+    getBalanceLogic,
+    getGroupLogic,
+    getHashesAtHeightLogic,
+    getChainInfoLogic,
+    createTransactionLogic,
+    sendTransactionLogic,
+    minerActionLogic
+  ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
   private val getOpenapiRoute = getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
 
   val route: Route =
     cors()(
-      getBlockflowRoute ~
-        getBlockRoute ~
-        getBalanceRoute ~
-        getGroupRoute ~
-        getHashesAtHeightRoute ~
-        getChainInfoRoute ~
-        createTransactionRoute ~
-        sendTransactionRoute ~
-        minerActionRoute ~
+      getBlockflowLogic.toRoute ~
+        getBlockLogic.toRoute ~
+        getBalanceLogic.toRoute ~
+        getGroupLogic.toRoute ~
+        getHashesAtHeightLogic.toRoute ~
+        getChainInfoLogic.toRoute ~
+        createTransactionLogic.toRoute ~
+        sendTransactionLogic.toRoute ~
+        minerActionLogic.toRoute ~
         getOpenapiRoute
     )
 
@@ -120,7 +124,7 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
   protected def startSelfOnce(): Future[Unit] = {
     for {
       httpBinding <- Http()
-        .bindAndHandle(route, rpcConfig.networkInterface.getHostAddress, port)
+        .bindAndHandle(route, apiConfig.networkInterface.getHostAddress, port)
     } yield {
       logger.info(s"Listening http request on $httpBinding")
       httpBindingPromise.success(httpBinding)

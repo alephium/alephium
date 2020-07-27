@@ -10,6 +10,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
+import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
@@ -28,8 +29,13 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
-  implicit val rpcConfig: RPCConfig =
-    RPCConfig(dummyAddress.getAddress, blockflowFetchMaxAge, askTimeout = Duration.zero)
+  val apiKey = Hash.generate.toHexString
+
+  implicit val apiConfig: ApiConfig =
+    ApiConfig(dummyAddress.getAddress,
+              blockflowFetchMaxAge,
+              askTimeout = Duration.zero,
+              apiKeyHash = Hash.hash(apiKey))
   implicit val fetchRequestCodec = FetchRequest.codec
 
   def generateKeyHash(): String = {
@@ -172,5 +178,27 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
     val jsonRaw =
       s"""{"tx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
+  }
+
+  it should "encode/decode ApiKey" in {
+    def alphaNumStrOfSizeGen(size: Int) = Gen.listOfN(size, Gen.alphaNumChar).map(_.mkString)
+    val rawApiKeyGen = for {
+      size      <- Gen.choose(32, 512)
+      apiKeyStr <- alphaNumStrOfSizeGen(size)
+    } yield apiKeyStr
+
+    forAll(rawApiKeyGen) { rawApiKey =>
+      val jsonApiKey = s""""$rawApiKey""""
+      checkData(ApiKey.unsafe(rawApiKey), jsonApiKey)
+    }
+
+    val invalidRawApiKeyGen = for {
+      size    <- Gen.choose(0, 31)
+      invalid <- alphaNumStrOfSizeGen(size)
+    } yield invalid
+
+    forAll(invalidRawApiKeyGen) { invaildApiKey =>
+      parseFail[ApiKey](s""""$invaildApiKey"""") is s"Api key must have at least 32 characters"
+    }
   }
 }
