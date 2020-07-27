@@ -247,7 +247,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val args = AVector[Val](Val.Byte32(pubKey.toByte32))
     StatelessVM
-      .runAssetScript(mockWorldState, ALF.Hash.zero, script, args, signature)
+      .runAssetScript(cachedWorldState, ALF.Hash.zero, script, args, signature)
       .isRight is true
   }
 

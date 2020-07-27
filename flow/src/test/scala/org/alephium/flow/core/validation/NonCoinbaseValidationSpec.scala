@@ -9,13 +9,11 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, VMFactory}
 import org.alephium.util.{AVector, U64}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import NonCoinbaseValidation._
-
-  val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
     result.isRight is true
@@ -35,7 +33,11 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   behavior of "Stateless Validation"
 
-  it should "check empty inputs" in {
+  trait StatelessFixture {
+    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+  }
+
+  it should "check empty inputs" in new StatelessFixture {
     forAll(transactionGen(1, 1)()) { tx =>
       val unsignedNew = tx.unsigned.copy(inputs = AVector.empty)
       val txNew       = tx.copy(unsigned        = unsignedNew)
@@ -44,7 +46,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
-  it should "check empty outputs" in {
+  it should "check empty outputs" in new StatelessFixture {
     forAll(transactionGen(1, 1)()) { tx =>
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
       val txNew       = tx.copy(unsigned              = unsignedNew)
@@ -57,7 +59,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
   }
 
-  it should "check ALF balance overflow" in {
+  it should "check ALF balance overflow" in new StatelessFixture {
     val output1 = genAlfOutput(U64.MaxValue)
     val output2 = genAlfOutput(U64.Zero)
     val output3 = genAlfOutput(U64.One)
@@ -71,7 +73,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     failValidation(validateMempoolTx(tx1, blockFlow), BalanceOverFlow)
   }
 
-  it should "check the inputs indexes" in {
+  it should "check the inputs indexes" in new StatelessFixture {
     forAll(transactionGen(2, 5)()) { tx =>
       passCheck(checkChainIndex(tx))
 
@@ -99,7 +101,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
-  it should "check the output indexes" in {
+  it should "check the output indexes" in new StatelessFixture {
     forAll(transactionGen(2, 5)()) { tx =>
       passCheck(checkChainIndex(tx))
 
@@ -129,7 +131,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
-  it should "check distinction of inputs" in {
+  it should "check distinction of inputs" in new StatelessFixture {
     forAll(transactionGen(1, 3)()) { tx =>
       passCheck(checkUniqueInputs(tx))
 
@@ -139,5 +141,11 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       failCheck(checkUniqueInputs(txNew), DoubleSpending)
       failValidation(validateMempoolTx(txNew, blockFlow), DoubleSpending)
     }
+  }
+
+  behavior of "stateful validation"
+
+  trait StatefulFixture extends VMFactory {
+    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
   }
 }
