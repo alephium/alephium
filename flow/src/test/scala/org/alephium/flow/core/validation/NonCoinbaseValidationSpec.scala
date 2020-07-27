@@ -61,18 +61,25 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
   }
 
+  def modifyAlfAmount(tx: Transaction, delta: U64): Transaction = {
+    val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()
+    val outputNew = output match {
+      case o: AssetOutput    => o.copy(amount = o.amount + delta)
+      case o: ContractOutput => o.copy(amount = o.amount + delta)
+    }
+    tx.copy(unsigned =
+      tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+  }
+
   it should "check ALF balance overflow" in new StatelessFixture {
-    val output1 = genAlfOutput(U64.MaxValue)
-    val output2 = genAlfOutput(U64.Zero)
-    val output3 = genAlfOutput(U64.One)
-    val input   = txInputGen.sample.get
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    passCheck(checkAlfOutputAmount(tx0))
-    failCheck(checkAlfOutputAmount(tx1), BalanceOverFlow)
-    failValidation(validateMempoolTx(tx1, blockFlow), BalanceOverFlow)
+    forAll(transactionGen()()) { tx =>
+      val alfAmount = tx.alfAmountInOutputs.get
+      val delta     = U64.MaxValue - alfAmount + 1
+      val txNew     = modifyAlfAmount(tx, delta)
+      passCheck(checkAlfOutputAmount(tx))
+      failCheck(checkAlfOutputAmount(txNew), BalanceOverFlow)
+      failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+    }
   }
 
   it should "check the inputs indexes" in new StatelessFixture {
@@ -148,7 +155,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   behavior of "stateful validation"
 
   trait StatefulFixture extends VMFactory {
-    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+    lazy val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
 
     def prepareWorldState(inputInfos: AVector[TxInputStateInfo]): WorldState = {
       inputInfos.fold(cachedWorldState) {
@@ -166,6 +173,60 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
             .toOption
             .get
       }
+    }
+
+    def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
+      AssetOutput(U64.Zero,
+                  AVector(tokenId -> amount),
+                  0,
+                  LockupScript.p2pkh(ALF.Hash.zero),
+                  ByteString.empty)
+    }
+
+    def modifyTokenAmount(tx: Transaction, tokenId: TokenId, f: U64 => U64): Transaction = {
+      val fixedOutputs = tx.unsigned.fixedOutputs
+      val relatedOutputIndexes = fixedOutputs
+        .mapWithIndex {
+          case (output: AssetOutput, index) => (index, output.tokens.exists(_._1 equals tokenId))
+          case (_, index)                   => (index, false)
+        }
+        .map(_._1)
+      val selected    = relatedOutputIndexes.sample()
+      val output      = fixedOutputs(selected).asInstanceOf[AssetOutput]
+      val tokenIndex  = output.tokens.indexWhere(_._1 equals tokenId)
+      val tokenAmount = output.tokens(tokenIndex)._2
+      val outputNew =
+        output.copy(tokens = output.tokens.replace(tokenIndex, tokenId -> f(tokenAmount)))
+      tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = fixedOutputs.replace(selected, outputNew)))
+    }
+
+    def sampleToken(tx: Transaction): TokenId = {
+      val tokens = tx.unsigned.fixedOutputs.flatMap {
+        case output: AssetOutput => output.tokens.map(_._1)
+        case _: ContractOutput   => AVector.ofSize[TokenId](0)
+      }
+      tokens.sample()
+    }
+
+    def getTokenAmount(tx: Transaction, tokenId: TokenId): U64 = {
+      tx.unsigned.fixedOutputs.fold(U64.Zero) {
+        case (acc, output: AssetOutput) =>
+          acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
+        case (acc, _) => acc
+      }
+    }
+
+    def replaceTokenId(tx: Transaction, from: TokenId, to: TokenId): Transaction = {
+      val outputsNew = tx.unsigned.fixedOutputs.map[TxOutput] {
+        case output: AssetOutput =>
+          val tokensNew = output.tokens.map {
+            case (id, amount) if id equals from => (to, amount)
+            case pair                           => pair
+          }
+          output.copy(tokens = tokensNew)
+        case output: ContractOutput => output
+      }
+      tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
     }
   }
 
@@ -185,69 +246,48 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "validate ALF balances" in {
-    val sum       = U64.MaxValue.subUnsafe(U64.Two)
-    val preOutput = genAlfOutput(sum)
-    val output1   = genAlfOutput(sum.subOneUnsafe())
-    val output2   = genAlfOutput(U64.One)
-    val output3   = genAlfOutput(U64.Two)
-    val input     = txInputGen.sample.get
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    passCheck(checkBalance(tx0, AVector(preOutput)))
-    failCheck(checkBalance(tx1, AVector(preOutput)), InvalidAlfBalance)
+    forAll(transactionGenWithPreOutputs) {
+      case (tx, preOutputs) =>
+        val txNew = modifyAlfAmount(tx, 1)
+        failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput)), InvalidAlfBalance)
+    }
   }
 
-  def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
-    AssetOutput(U64.Zero,
-                AVector(tokenId -> amount),
-                0,
-                LockupScript.p2pkh(ALF.Hash.zero),
-                ByteString.empty)
+  it should "test token balance overflow" in new StatefulFixture {
+    forAll(transactionGenWithPreOutputs(issueNewToken = false)()) {
+      case (tx, preOutputs) =>
+        val tokenId     = sampleToken(tx)
+        val tokenAmount = getTokenAmount(tx, tokenId)
+        val txNew       = modifyTokenAmount(tx, tokenId, U64.MaxValue - tokenAmount + 1 + _)
+        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+    }
   }
 
-  it should "test token balance overflow" in {
-    val input     = txInputGen.sample.get
-    val tokenId   = ALF.Hash.generate
-    val preOutput = genTokenOutput(tokenId, U64.MaxValue)
-    val output1   = genTokenOutput(tokenId, U64.MaxValue)
-    val output2   = genTokenOutput(tokenId, U64.Zero)
-    val output3   = genTokenOutput(tokenId, U64.One)
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    passCheck(checkBalance(tx0, AVector(preOutput)))
-    failCheck(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
+  it should "validate token balances" in new StatefulFixture {
+    forAll(transactionGenWithPreOutputs(issueNewToken = false)()) {
+      case (tx, preOutputs) =>
+        val tokenId = sampleToken(tx)
+        val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
+        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
+    }
   }
 
-  it should "validate token balances" in {
-    val input     = txInputGen.sample.get
-    val tokenId   = ALF.Hash.generate
-    val sum       = U64.MaxValue.subUnsafe(U64.Two)
-    val preOutput = genTokenOutput(tokenId, sum)
-    val output1   = genTokenOutput(tokenId, sum.subOneUnsafe())
-    val output2   = genTokenOutput(tokenId, U64.One)
-    val output3   = genTokenOutput(tokenId, U64.Two)
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    passCheck(checkBalance(tx0, AVector(preOutput)))
-    failCheck(checkBalance(tx1, AVector(preOutput)), InvalidTokenBalance)
-  }
+  it should "create new token" in new StatefulFixture {
+    forAll(transactionGenWithPreOutputs(issueNewToken = true)()) {
+      case (tx, preOutputs) =>
+        val newTokenId = tx.newTokenId
+        val newTokenIssued = tx.unsigned.fixedOutputs.exists {
+          case output: AssetOutput => output.tokens.exists(_._1 equals newTokenId)
+          case _                   => false
+        }
+        newTokenIssued is true
 
-  it should "create new token" in {
-    val input   = txInputGen.sample.get
-    val tokenId = input.hash
+        val txNew0 = replaceTokenId(tx, tx.newTokenId, ALF.Hash.generate)
+        failCheck(checkTokenBalance(txNew0, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
 
-    val output0 = genTokenOutput(tokenId, U64.MaxValue)
-    val tx0     = Transaction.from(AVector(input), AVector(output0), signatures = AVector.empty)
-    passCheck(checkBalance(tx0, AVector.empty))
-
-    val output1 = genTokenOutput(ALF.Hash.generate, U64.MaxValue)
-    val tx1     = Transaction.from(AVector(input), AVector(output1), signatures = AVector.empty)
-    failCheck(checkBalance(tx1, AVector.empty), InvalidTokenBalance)
+        val tokenAmount = getTokenAmount(tx, newTokenId)
+        val txNew1      = modifyTokenAmount(tx, newTokenId, U64.MaxValue - tokenAmount + 1 + _)
+        failCheck(checkTokenBalance(txNew1, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+    }
   }
 }
