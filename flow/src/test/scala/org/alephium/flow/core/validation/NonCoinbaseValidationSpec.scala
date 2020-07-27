@@ -9,7 +9,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, VMFactory}
+import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, ContractInfo, TxInputStateInfo}
+import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
 import org.alephium.util.{AVector, U64}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -147,5 +148,31 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   trait StatefulFixture extends VMFactory {
     val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+
+    def prepareWorldState(inputInfos: AVector[TxInputStateInfo]): WorldState = {
+      inputInfos.fold(cachedWorldState) {
+        case (worldState, inputInfo: AssetInputInfo) =>
+          worldState
+            .addAsset(inputInfo.txInput.outputRef.asInstanceOf[AssetOutputRef],
+                      inputInfo.referredOutput)
+            .toOption
+            .get
+        case (worldState, inputInfo: ContractInfo) =>
+          worldState
+            .addContract(inputInfo.txInput.outputRef.asInstanceOf[ContractOutputRef],
+                         inputInfo.referredOutput,
+                         inputInfo.state)
+            .toOption
+            .get
+      }
+    }
+  }
+
+  it should "get previous outputs of tx inputs" in new StatefulFixture {
+    forAll(transactionGenWithPreOutputs) {
+      case (tx, inputInfos) =>
+        val worldStateNew = prepareWorldState(inputInfos)
+        getPreOutputs(tx, worldStateNew) isE inputInfos.map(_.referredOutput)
+    }
   }
 }
