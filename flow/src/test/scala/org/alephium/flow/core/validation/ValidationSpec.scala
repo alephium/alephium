@@ -6,14 +6,11 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Duration, TimeStamp, U64}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import Validation._
-  import NonCoinbaseValidation._
 
   def check[T](res: BlockValidationResult[T]): Assertion = {
     res.isRight is true
@@ -105,84 +102,6 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
     check(checkCoinbase(block8), InvalidCoinbase)
-  }
-
-  def genAlfOutput(amount: U64): AssetOutput = {
-    TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
-  }
-
-  it should "test both ALF and token balances" in {
-    forAll(transactionGenWithPreOutputs) {
-      case (tx, preOutput) =>
-        checkTx(checkBalance(tx, preOutput.map(_.referredOutput)))
-    }
-  }
-
-  it should "validate ALF balances" in {
-    val sum       = U64.MaxValue.subUnsafe(U64.Two)
-    val preOutput = genAlfOutput(sum)
-    val output1   = genAlfOutput(sum.subOneUnsafe())
-    val output2   = genAlfOutput(U64.One)
-    val output3   = genAlfOutput(U64.Two)
-    val input     = txInputGen.sample.get
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidAlfBalance)
-  }
-
-  def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
-    AssetOutput(U64.Zero,
-                AVector(tokenId -> amount),
-                0,
-                LockupScript.p2pkh(ALF.Hash.zero),
-                ByteString.empty)
-  }
-
-  it should "test token balance overflow" in {
-    val input     = txInputGen.sample.get
-    val tokenId   = ALF.Hash.generate
-    val preOutput = genTokenOutput(tokenId, U64.MaxValue)
-    val output1   = genTokenOutput(tokenId, U64.MaxValue)
-    val output2   = genTokenOutput(tokenId, U64.Zero)
-    val output3   = genTokenOutput(tokenId, U64.One)
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), BalanceOverFlow)
-  }
-
-  it should "validate token balances" in {
-    val input     = txInputGen.sample.get
-    val tokenId   = ALF.Hash.generate
-    val sum       = U64.MaxValue.subUnsafe(U64.Two)
-    val preOutput = genTokenOutput(tokenId, sum)
-    val output1   = genTokenOutput(tokenId, sum.subOneUnsafe())
-    val output2   = genTokenOutput(tokenId, U64.One)
-    val output3   = genTokenOutput(tokenId, U64.Two)
-    val tx0 =
-      Transaction.from(AVector(input), AVector(output1, output2), signatures = AVector.empty)
-    val tx1 =
-      Transaction.from(AVector(input), AVector(output1, output3), signatures = AVector.empty)
-    checkTx(checkBalance(tx0, AVector(preOutput)))
-    checkTx(checkBalance(tx1, AVector(preOutput)), InvalidTokenBalance)
-  }
-
-  it should "create new token" in {
-    val input   = txInputGen.sample.get
-    val tokenId = input.hash
-
-    val output0 = genTokenOutput(tokenId, U64.MaxValue)
-    val tx0     = Transaction.from(AVector(input), AVector(output0), signatures = AVector.empty)
-    checkTx(checkBalance(tx0, AVector.empty))
-
-    val output1 = genTokenOutput(ALF.Hash.generate, U64.MaxValue)
-    val tx1     = Transaction.from(AVector(input), AVector(output1), signatures = AVector.empty)
-    checkTx(checkBalance(tx1, AVector.empty), InvalidTokenBalance)
   }
 
   // TODO: Add more mocking test
