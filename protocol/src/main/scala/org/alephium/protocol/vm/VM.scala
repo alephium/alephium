@@ -52,6 +52,16 @@ object StatelessVM extends VM[StatelessContext] {
     val obj     = script.toObject
     execute(context, obj, 0, args).map(_ => context.worldState)
   }
+
+  def runAssetScript(worldState: WorldState,
+                     txHash: ALF.Hash,
+                     script: StatelessScript,
+                     args: AVector[Val],
+                     signatures: Stack[ED25519Signature]): ExeResult[WorldState] = {
+    val context = StatelessContext(txHash, signatures, worldState)
+    val obj     = script.toObject
+    execute(context, obj, 0, args).map(_ => context.worldState)
+  }
 }
 
 object StatefulVM extends VM[StatefulContext] {
