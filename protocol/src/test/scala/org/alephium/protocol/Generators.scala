@@ -25,6 +25,9 @@ trait Generators extends NumericHelpers {
   def chainIndexGenRelatedTo(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(_.relateTo(broker))
 
+  def chainIndexGenForBroker(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
+    chainIndexGen.retryUntil(index => broker.contains(index.from))
+
   def chainIndexGenNotRelatedTo(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(!_.relateTo(broker))
 
