@@ -172,67 +172,74 @@ object NonCoinbaseValidation {
                                          preOutputs: AVector[TxOutput],
                                          worldState: WorldState): TxValidationResult[Unit] = {
     assume(tx.unsigned.inputs.length == preOutputs.length)
+    val signatures = Stack.unsafe(tx.signatures.reverse, tx.signatures.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
       val unlockScript = tx.unsigned.inputs(idx).unlockScript
-      val signature    = tx.signatures(idx)
-      checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signature, worldState)
+      checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signatures, worldState)
     }
   }
 
   private[validation] def checkLockupScript(tx: Transaction,
                                             lockupScript: LockupScript,
                                             unlockScript: UnlockScript,
-                                            signature: ED25519Signature,
+                                            signatures: Stack[ED25519Signature],
                                             worldState: WorldState): TxValidationResult[Unit] = {
     (lockupScript, unlockScript) match {
       case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-        checkP2pkh(tx, lock, unlock, signature)
+        checkP2pkh(tx, lock, unlock, signatures)
       case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-        checkP2SH(tx, lock, unlock, signature, worldState)
+        checkP2SH(tx, lock, unlock, signatures, worldState)
       case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
-        checkP2S(tx, lock, unlock, signature, worldState)
+        checkP2S(tx, lock, unlock, signatures, worldState)
       case _ =>
         invalidTx(InvalidUnlockScriptType)
     }
   }
 
-  private[validation] def checkP2pkh(tx: Transaction,
-                                     lock: LockupScript.P2PKH,
-                                     unlock: UnlockScript.P2PKH,
-                                     signature: ED25519Signature): TxValidationResult[Unit] = {
+  private[validation] def checkP2pkh(
+      tx: Transaction,
+      lock: LockupScript.P2PKH,
+      unlock: UnlockScript.P2PKH,
+      signatures: Stack[ED25519Signature]): TxValidationResult[Unit] = {
     if (ALF.Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
       invalidTx(InvalidPublicKeyHash)
-    } else if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
-      invalidTx(InvalidSignature)
-    } else validTx(())
+    } else {
+      signatures.pop() match {
+        case Right(signature) =>
+          if (!ED25519.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+            invalidTx(InvalidSignature)
+          } else validTx(())
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
   }
 
   private[validation] def checkP2SH(tx: Transaction,
                                     lock: LockupScript.P2SH,
                                     unlock: UnlockScript.P2SH,
-                                    signature: ED25519Signature,
+                                    signatures: Stack[ED25519Signature],
                                     worldState: WorldState): TxValidationResult[Unit] = {
     if (ALF.Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
       invalidTx(InvalidScriptHash)
     } else {
-      checkScript(tx, unlock.script, unlock.params, signature, worldState)
+      checkScript(tx, unlock.script, unlock.params, signatures, worldState)
     }
   }
 
   private[validation] def checkP2S(tx: Transaction,
                                    lock: LockupScript.P2S,
                                    unlock: UnlockScript.P2S,
-                                   signature: ED25519Signature,
+                                   signatures: Stack[ED25519Signature],
                                    worldState: WorldState): TxValidationResult[Unit] = {
-    checkScript(tx, lock.script, unlock.params, signature, worldState)
+    checkScript(tx, lock.script, unlock.params, signatures, worldState)
   }
 
   private[validation] def checkScript(tx: Transaction,
                                       script: StatelessScript,
                                       params: AVector[Val],
-                                      signature: ED25519Signature,
+                                      signatures: Stack[ED25519Signature],
                                       worldState: WorldState): TxValidationResult[Unit] = {
-    StatelessVM.runAssetScript(worldState, tx.hash, script, params, signature) match {
+    StatelessVM.runAssetScript(worldState, tx.hash, script, params, signatures) match {
       case Right(_) => validTx(()) // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))
     }

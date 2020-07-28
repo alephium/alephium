@@ -84,6 +84,7 @@ final case object InvalidWitnessLength                  extends InvalidTxStatus
 final case object InvalidPublicKeyHash                  extends InvalidTxStatus
 final case object InvalidScriptHash                     extends InvalidTxStatus
 final case object InvalidSignature                      extends InvalidTxStatus
+final case object NotEnoughSignature                    extends InvalidTxStatus
 final case object InvalidUnlockScriptType               extends InvalidTxStatus
 final case class InvalidUnlockScript(error: ExeFailure) extends InvalidTxStatus
 final case object CreateContractWithOldId               extends InvalidTxStatus

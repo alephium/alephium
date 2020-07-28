@@ -5,6 +5,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
+import org.alephium.crypto.ED25519Signature
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOResult
@@ -277,7 +278,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "create new token" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs(issueNewToken = true)) {
+    forAll(transactionGenWithPreOutputs()) {
       case (tx, preOutputs) =>
         val newTokenId = tx.newTokenId
         val newTokenIssued = tx.unsigned.fixedOutputs.exists {
@@ -292,6 +293,40 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val tokenAmount = getTokenAmount(tx, newTokenId)
         val txNew1      = modifyTokenAmount(tx, newTokenId, U64.MaxValue - tokenAmount + 1 + _)
         failCheck(checkTokenBalance(txNew1, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+    }
+  }
+
+  it should "validate witnesses" in new StatefulFixture {
+    import ModelGenerators.ScriptPair
+    forAll(transactionGenWithPreOutputs(1, 1)) {
+      case (tx, preOutputs) =>
+        val inputsState              = preOutputs.map(_.referredOutput)
+        val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
+        val unsigned                 = tx.unsigned
+        val inputs                   = unsigned.inputs
+
+        passCheck(checkWitnesses(tx, inputsState, cachedWorldState))
+
+        {
+          val txNew = tx.copy(signatures = tx.signatures.init)
+          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), NotEnoughSignature)
+        }
+
+        {
+          val (sampleIndex, sample) = inputs.sampleWithIndex()
+          val inputNew              = sample.copy(unlockScript = unlock)
+          val inputsNew             = inputs.replace(sampleIndex, inputNew)
+          val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
+          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), InvalidPublicKeyHash)
+        }
+
+        {
+          val signature        = ED25519Signature.generate
+          val (sampleIndex, _) = tx.signatures.sampleWithIndex()
+          val signaturesNew    = tx.signatures.replace(sampleIndex, signature)
+          val txNew            = tx.copy(signatures = signaturesNew)
+          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), InvalidSignature)
+        }
     }
   }
 }
