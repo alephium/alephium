@@ -13,8 +13,7 @@ import org.alephium.protocol.vm._
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, EitherF, U64}
 
-// Note: only non-coinbase transactions are validated here
-object NonCoinbaseValidation {
+trait NonCoinbaseValidation {
   import ValidationStatus._
 
   def validateMempoolTx(tx: Transaction, flow: BlockFlow)(
@@ -26,8 +25,7 @@ object NonCoinbaseValidation {
     } yield ()
     convert(validationResult, ValidTx)
   }
-
-  def checkBlockTx(tx: Transaction, worldState: WorldState)(
+  protected[validation] def checkBlockTx(tx: Transaction, worldState: WorldState)(
       implicit config: GroupConfig): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(tx)
@@ -35,7 +33,7 @@ object NonCoinbaseValidation {
     } yield ()
   }
 
-  def checkStateless(tx: Transaction)(
+  protected[validation] def checkStateless(tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult[ChainIndex] = {
     for {
       _          <- checkInputNum(tx)
@@ -46,22 +44,53 @@ object NonCoinbaseValidation {
       _          <- checkOutputDataSize(tx)
     } yield chainIndex
   }
+  protected[validation] def checkStateful(tx: Transaction,
+                                          worldState: WorldState): TxValidationResult[Unit] = {
+    for {
+      preOutputs <- getPreOutputs(tx, worldState)
+      _          <- checkAlfBalance(tx, preOutputs)
+      _          <- checkTokenBalance(tx, preOutputs)
+      _          <- checkWitnesses(tx, preOutputs, worldState)
+    } yield ()
+  }
 
-  def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
+  protected[validation] def getPreOutputs(
+      tx: Transaction,
+      worldState: WorldState): TxValidationResult[AVector[TxOutput]]
+
+  // format off for the sake of reading and checking rules
+  // format: off
+  protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U64]
+  protected[validation] def checkChainIndex(tx: Transaction)(implicit config: GroupConfig): TxValidationResult[ChainIndex]
+  protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
+
+  protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
+  protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
+  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], worldState: WorldState): TxValidationResult[Unit]
+  // format: on
+}
+
+// Note: only non-coinbase transactions are validated here
+object NonCoinbaseValidation extends NonCoinbaseValidation {
+  import ValidationStatus._
+  protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
     val inputNum = tx.unsigned.inputs.length
     if (inputNum == 0) invalidTx(NoInputs)
     else if (inputNum > ALF.MaxTxInputNum) invalidTx(TooManyInputs)
     else validTx(())
   }
 
-  def checkOutputNum(tx: Transaction): TxValidationResult[Unit] = {
+  protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit] = {
     val outputNum = tx.outputsLength
     if (outputNum == 0) invalidTx(NoOutputs)
     else if (outputNum > ALF.MaxTxOutputNum) invalidTx(TooManyOutputs)
     else validTx(())
   }
 
-  def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U64] = {
+  protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U64] = {
     tx.alfAmountInOutputs match {
       case Some(total) => validTx(total)
       case None        => invalidTx(BalanceOverFlow)
@@ -69,7 +98,7 @@ object NonCoinbaseValidation {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def checkChainIndex(tx: Transaction)(
+  protected[validation] def checkChainIndex(tx: Transaction)(
       implicit config: GroupConfig): TxValidationResult[ChainIndex] = {
     val inputIndexes = tx.unsigned.inputs.map(_.fromGroup).toSet
     if (inputIndexes.size != 1) invalidTx(InvalidInputGroupIndex)
@@ -85,7 +114,7 @@ object NonCoinbaseValidation {
     }
   }
 
-  def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
+  protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     tx.unsigned.inputs.foreachE { input =>
       if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpending)
@@ -96,7 +125,7 @@ object NonCoinbaseValidation {
     }
   }
 
-  def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
+  protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
     EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
       val output = tx.getOutput(outputIndex)
       if (output.additionalData.length > ALF.MaxOutputDataSize) invalidTx(OutputDataSizeExceeded)
@@ -104,17 +133,9 @@ object NonCoinbaseValidation {
     }
   }
 
-  def checkStateful(tx: Transaction, worldState: WorldState): TxValidationResult[Unit] = {
-    for {
-      preOutputs <- getPreOutputs(tx, worldState)
-      _          <- checkAlfBalance(tx, preOutputs)
-      _          <- checkTokenBalance(tx, preOutputs)
-      _          <- checkWitnesses(tx, preOutputs, worldState)
-    } yield ()
-  }
-
-  def getPreOutputs(tx: Transaction,
-                    worldState: WorldState): TxValidationResult[AVector[TxOutput]] = {
+  protected[validation] def getPreOutputs(
+      tx: Transaction,
+      worldState: WorldState): TxValidationResult[AVector[TxOutput]] = {
     val query = tx.unsigned.inputs.mapE { input =>
       worldState.getOutput(input.outputRef)
     }
@@ -125,14 +146,9 @@ object NonCoinbaseValidation {
     }
   }
 
-  def checkBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-    for {
-      _ <- checkAlfBalance(tx, preOutputs)
-      _ <- checkTokenBalance(tx, preOutputs)
-    } yield ()
-  }
-
-  def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
+  protected[validation] def checkAlfBalance(
+      tx: Transaction,
+      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
     tx.alfAmountInOutputs match {
       case Some(outputSum) if outputSum <= inputSum => validTx(())
@@ -141,7 +157,7 @@ object NonCoinbaseValidation {
     }
   }
 
-  private[validation] def checkTokenBalance(
+  protected[validation] def checkTokenBalance(
       tx: Transaction,
       preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
     for {
@@ -158,7 +174,7 @@ object NonCoinbaseValidation {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private[validation] def computeTokenBalances(
+  protected[validation] def computeTokenBalances(
       outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U64]] =
     try {
       val balances = mutable.Map.empty[TokenId, U64]
@@ -177,9 +193,9 @@ object NonCoinbaseValidation {
     }
 
   // TODO: signatures might not be 1-to-1 mapped to inputs
-  private[validation] def checkWitnesses(tx: Transaction,
-                                         preOutputs: AVector[TxOutput],
-                                         worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkWitnesses(tx: Transaction,
+                                           preOutputs: AVector[TxOutput],
+                                           worldState: WorldState): TxValidationResult[Unit] = {
     assume(tx.unsigned.inputs.length == preOutputs.length)
     val signatures = Stack.unsafe(tx.signatures.reverse, tx.signatures.length)
     EitherF.foreachTry(preOutputs.indices) { idx =>
@@ -188,11 +204,11 @@ object NonCoinbaseValidation {
     }
   }
 
-  private[validation] def checkLockupScript(tx: Transaction,
-                                            lockupScript: LockupScript,
-                                            unlockScript: UnlockScript,
-                                            signatures: Stack[ED25519Signature],
-                                            worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkLockupScript(tx: Transaction,
+                                              lockupScript: LockupScript,
+                                              unlockScript: UnlockScript,
+                                              signatures: Stack[ED25519Signature],
+                                              worldState: WorldState): TxValidationResult[Unit] = {
     (lockupScript, unlockScript) match {
       case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
         checkP2pkh(tx, lock, unlock, signatures)
@@ -205,7 +221,7 @@ object NonCoinbaseValidation {
     }
   }
 
-  private[validation] def checkP2pkh(
+  protected[validation] def checkP2pkh(
       tx: Transaction,
       lock: LockupScript.P2PKH,
       unlock: UnlockScript.P2PKH,
@@ -223,11 +239,11 @@ object NonCoinbaseValidation {
     }
   }
 
-  private[validation] def checkP2SH(tx: Transaction,
-                                    lock: LockupScript.P2SH,
-                                    unlock: UnlockScript.P2SH,
-                                    signatures: Stack[ED25519Signature],
-                                    worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkP2SH(tx: Transaction,
+                                      lock: LockupScript.P2SH,
+                                      unlock: UnlockScript.P2SH,
+                                      signatures: Stack[ED25519Signature],
+                                      worldState: WorldState): TxValidationResult[Unit] = {
     if (ALF.Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
       invalidTx(InvalidScriptHash)
     } else {
@@ -235,19 +251,19 @@ object NonCoinbaseValidation {
     }
   }
 
-  private[validation] def checkP2S(tx: Transaction,
-                                   lock: LockupScript.P2S,
-                                   unlock: UnlockScript.P2S,
-                                   signatures: Stack[ED25519Signature],
-                                   worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkP2S(tx: Transaction,
+                                     lock: LockupScript.P2S,
+                                     unlock: UnlockScript.P2S,
+                                     signatures: Stack[ED25519Signature],
+                                     worldState: WorldState): TxValidationResult[Unit] = {
     checkScript(tx, lock.script, unlock.params, signatures, worldState)
   }
 
-  private[validation] def checkScript(tx: Transaction,
-                                      script: StatelessScript,
-                                      params: AVector[Val],
-                                      signatures: Stack[ED25519Signature],
-                                      worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkScript(tx: Transaction,
+                                        script: StatelessScript,
+                                        params: AVector[Val],
+                                        signatures: Stack[ED25519Signature],
+                                        worldState: WorldState): TxValidationResult[Unit] = {
     StatelessVM.runAssetScript(worldState, tx.hash, script, params, signatures) match {
       case Right(_) => validTx(()) // TODO: handle returns
       case Left(e)  => invalidTx(InvalidUnlockScript(e))

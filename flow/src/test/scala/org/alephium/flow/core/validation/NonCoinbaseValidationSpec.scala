@@ -285,7 +285,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   it should "test both ALF and token balances" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs()) {
       case (tx, preOutputs) =>
-        passCheck(checkBalance(tx, preOutputs.map(_.referredOutput)))
+        passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput)))
+        passCheck(checkTokenBalance(tx, preOutputs.map(_.referredOutput)))
         passCheck(checkBlockTx(tx, prepareWorldState(preOutputs)))
     }
   }
