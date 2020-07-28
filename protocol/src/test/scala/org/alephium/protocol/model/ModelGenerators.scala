@@ -135,7 +135,7 @@ trait TxGenerators
       createdHeight  <- heightGen
       lockupScript   <- scriptGen
       additionalData <- dataGen
-    } yield AssetOutput(amount, AVector.from(tokens), createdHeight, lockupScript, additionalData)
+    } yield AssetOutput(amount, createdHeight, lockupScript, AVector.from(tokens), additionalData)
   }
 
   lazy val counterContract: StatefulContract = {
@@ -165,7 +165,7 @@ trait TxGenerators
       createdHeight <- heightGen
       lockupScript  <- scriptGen
       code          <- codeGen
-    } yield ContractOutput(amount, createdHeight, lockupScript, code)
+    } yield ContractOutput(amount, createdHeight, lockupScript, code, ByteString.empty)
   }
 
   lazy val txOutputGen: Gen[TxOutput] = for {
@@ -180,7 +180,7 @@ trait TxGenerators
       outputHash                             <- hashGen
     } yield {
       val assetOutput =
-        AssetOutput(balances.alfAmount, AVector.from(balances.tokens), height, lockup, data)
+        AssetOutput(balances.alfAmount, height, lockup, AVector.from(balances.tokens), data)
       val txInput = TxInput(AssetOutputRef.from(assetOutput, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -392,7 +392,7 @@ object ModelGenerators {
   final case class Balances(alfAmount: U64, tokens: Map[TokenId, U64]) {
     def toOutput(createdHeight: Int, lockupScript: LockupScript, data: ByteString): AssetOutput = {
       val tokensVec = AVector.from(tokens)
-      AssetOutput(alfAmount, tokensVec, createdHeight, lockupScript, data)
+      AssetOutput(alfAmount, createdHeight, lockupScript, tokensVec, data)
     }
   }
 

@@ -113,7 +113,7 @@ object Transaction {
 
   def coinbase(publicKey: ED25519PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val txOutput = AssetOutput(ALF.CoinBaseValue, tokens = AVector.empty, height, pkScript, data)
+    val txOutput = AssetOutput(ALF.CoinBaseValue, height, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }

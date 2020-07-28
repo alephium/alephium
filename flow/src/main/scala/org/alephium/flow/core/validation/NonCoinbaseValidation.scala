@@ -43,6 +43,7 @@ object NonCoinbaseValidation {
       _          <- checkAlfOutputAmount(tx)
       chainIndex <- checkChainIndex(tx)
       _          <- checkUniqueInputs(tx)
+      _          <- checkOutputDataSize(tx)
     } yield chainIndex
   }
 
@@ -92,6 +93,14 @@ object NonCoinbaseValidation {
         utxoUsed += input.outputRef
         validTx(())
       }
+    }
+  }
+
+  def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
+    EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
+      val output = tx.getOutput(outputIndex)
+      if (output.additionalData.length > ALF.MaxOutputDataSize) invalidTx(OutputDataSizeExceeded)
+      else Right(())
     }
   }
 
