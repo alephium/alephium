@@ -141,7 +141,7 @@ object NonCoinbaseValidation {
       _ <- {
         val ok = outputBalances.forall {
           case (tokenId, balance) =>
-            (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance) || tokenId == tx.unsigned.inputs.head.hash
+            (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance) || tokenId == tx.newTokenId
         }
         if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
       }

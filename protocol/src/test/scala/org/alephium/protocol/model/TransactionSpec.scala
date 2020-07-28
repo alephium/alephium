@@ -19,7 +19,7 @@ class TransactionSpec
 
   it should "calculate chain index" in {
     forAll(chainIndexGen) { chainIndex =>
-      forAll(transactionGen()(chainIndexGen = Gen.const(chainIndex))) { tx =>
+      forAll(transactionGen(chainIndexGen = Gen.const(chainIndex))) { tx =>
         tx.chainIndex is chainIndex
       }
     }
