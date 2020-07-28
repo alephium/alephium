@@ -295,7 +295,7 @@ class BrokerHandlerSpec
   behavior of "Relay protocol"
 
   it should "send tx to txHandler" in new RelayFixture {
-    val tx     = transactionGen()().sample.get
+    val tx     = transactionGen().sample.get
     val sendTx = SendTxs(AVector(tx))
     tcpHandler ! Tcp.Received(Message.serialize(sendTx))
     allProbes.txHandler.expectMsgType[TxHandler.AddTx]
