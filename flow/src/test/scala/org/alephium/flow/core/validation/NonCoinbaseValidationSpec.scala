@@ -13,7 +13,7 @@ import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, ContractInfo, TxInputStateInfo}
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.{AVector, Random, U64}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   import NonCoinbaseValidation._
@@ -56,10 +56,6 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       failCheck(checkOutputNum(txNew), NoOutputs)
       failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
     }
-  }
-
-  def genAlfOutput(amount: U64): AssetOutput = {
-    TxOutput.asset(amount, 0, LockupScript.p2pkh(ALF.Hash.zero))
   }
 
   def modifyAlfAmount(tx: Transaction, delta: U64): Transaction = {
@@ -155,6 +151,31 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
+  it should "check output data size" in new StatelessFixture {
+    private def modifyData(outputs: AVector[TxOutput], index: Int): AVector[TxOutput] = {
+      val dataNew = ByteString.fromArrayUnsafe(Array.fill(ALF.MaxOutputDataSize + 1)(0))
+      dataNew.length is ALF.MaxOutputDataSize + 1
+      val outputNew = outputs(index) match {
+        case o: AssetOutput    => o.copy(additionalData = dataNew)
+        case o: ContractOutput => o.copy(additionalData = dataNew)
+      }
+      outputs.replace(index, outputNew)
+    }
+
+    forAll(transactionGen(1, 3)) { tx =>
+      val outputIndex = Random.source.nextInt(tx.outputsLength)
+      val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
+        val outputsNew = modifyData(tx.unsigned.fixedOutputs, outputIndex)
+        tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
+      } else {
+        val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
+        val outputsNew     = modifyData(tx.generatedOutputs, correctedIndex)
+        tx.copy(generatedOutputs = outputsNew)
+      }
+      failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
+    }
+  }
+
   behavior of "stateful validation"
 
   trait StatefulFixture extends VMFactory {
@@ -180,9 +201,9 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
     def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
       AssetOutput(U64.Zero,
-                  AVector(tokenId -> amount),
                   0,
                   LockupScript.p2pkh(ALF.Hash.zero),
+                  AVector(tokenId -> amount),
                   ByteString.empty)
     }
 
