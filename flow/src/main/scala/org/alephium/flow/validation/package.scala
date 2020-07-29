@@ -1,4 +1,4 @@
-package org.alephium.flow.core
+package org.alephium.flow
 
 import org.alephium.io.IOError
 

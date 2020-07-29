@@ -8,7 +8,7 @@ import akka.actor.Props
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.validation.Validation
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local

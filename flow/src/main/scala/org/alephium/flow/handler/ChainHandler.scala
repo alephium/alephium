@@ -5,7 +5,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.validation._
+import org.alephium.flow.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
