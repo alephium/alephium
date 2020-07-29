@@ -78,7 +78,7 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def build(self):
-        run('sbt app/stage')
+        run('sbt app-server/stage')
 
     def test(self):
         run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
@@ -130,7 +130,7 @@ class AlephiumMake(object):
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} apiKeyHash={} ALEPHIUM_HOME={} nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
+            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} apiKeyHash={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]
@@ -138,7 +138,7 @@ class AlephiumMake(object):
         rpc_call_all(method, args)
 
     def kill(self):
-        run("ps aux | grep -i org.alephium.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
+        run("ps aux | grep -i org.alephium.appserver.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
 
     def clean(self):
         run('sbt clean')

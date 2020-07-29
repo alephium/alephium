@@ -1,4 +1,4 @@
-package org.alephium
+package org.alephium.appserver
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
@@ -6,7 +6,6 @@ import scala.util.{Failure, Success}
 import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.appserver.{Server, ServerImpl}
 import org.alephium.flow.{TaskTrigger, Utils}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.util.ActorRefT
