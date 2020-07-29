@@ -7,7 +7,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.validation.Validation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform.PlatformConfigFixture
 import org.alephium.protocol.ALF.Hash

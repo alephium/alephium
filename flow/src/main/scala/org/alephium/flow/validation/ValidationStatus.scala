@@ -1,4 +1,4 @@
-package org.alephium.flow.core.validation
+package org.alephium.flow.validation
 
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash

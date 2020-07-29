@@ -5,7 +5,7 @@ import scala.collection.mutable
 import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.validation._
+import org.alephium.flow.validation._
 import org.alephium.flow.handler.FlowHandler.HeaderAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig

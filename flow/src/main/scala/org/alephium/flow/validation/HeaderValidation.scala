@@ -1,4 +1,4 @@
-package org.alephium.flow.core.validation
+package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.platform.PlatformConfig

@@ -1,4 +1,4 @@
-package org.alephium.flow.core.validation
+package org.alephium.flow.validation
 
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._

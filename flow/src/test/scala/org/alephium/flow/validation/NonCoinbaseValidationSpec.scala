@@ -1,4 +1,4 @@
-package org.alephium.flow.core.validation
+package org.alephium.flow.validation
 
 import akka.util.ByteString
 import org.scalacheck.Gen
