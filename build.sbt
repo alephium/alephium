@@ -20,23 +20,10 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(macros,
-             util,
-             serde,
-             io,
-             crypto,
-             rpc,
-             app,
-             `app-debug`,
-             `app-server`,
-             benchmark,
-             flow,
-             protocol)
+  .aggregate(macros, util, serde, io, crypto, rpc, `app-server`, benchmark, flow, protocol)
 
 def mainProject(id: String): Project =
-  project(id)
-    .enablePlugins(JavaAppPackaging)
-    .dependsOn(`app-server`)
+  project(id).enablePlugins(JavaAppPackaging).dependsOn(flow)
 
 def project(path: String): Project = {
   baseProject(path)
@@ -102,18 +89,7 @@ lazy val rpc = project("rpc")
   )
   .dependsOn(util % "test->test;compile->compile")
 
-lazy val app = mainProject("app")
-
-lazy val `app-debug` = mainProject("app-debug")
-  .settings(
-    libraryDependencies ++= Seq(
-      metrics,
-      `metrics-jmx`
-    ),
-    coverageEnabled := false
-  )
-
-lazy val `app-server` = project("app-server")
+lazy val `app-server` = mainProject("app-server")
   .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test")
   .settings(
     libraryDependencies ++= Seq(
@@ -130,6 +106,7 @@ lazy val `app-server` = project("app-server")
 
 lazy val benchmark = mainProject("benchmark")
   .enablePlugins(JmhPlugin)
+  .dependsOn(flow)
   .settings(scalacOptions += "-Xdisable-assertions")
 
 lazy val flow = project("flow")

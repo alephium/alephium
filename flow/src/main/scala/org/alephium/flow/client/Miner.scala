@@ -85,8 +85,8 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
       updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
-    case _: Miner.Command =>
-      log.debug("ignore other miner commands")
+    case cmd: Miner.Command =>
+      log.debug(s"ignore miner commands $cmd")
   }
 
   def awaitStop: Receive = {
