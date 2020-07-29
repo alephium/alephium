@@ -21,10 +21,16 @@ final case object ValidHeader    extends HeaderStatus with ValidStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
 final case object InvalidGroup                      extends InvalidBlockStatus
+final case object InvalidGenesisTimeStamp           extends InvalidHeaderStatus
+final case object InvalidGenesisDeps                extends InvalidHeaderStatus
+final case object InvalidGenesisWorkTarget          extends InvalidHeaderStatus
+final case object NoIncreasingTimeStamp             extends InvalidHeaderStatus
+final case object TooAdvancedTimeStamp              extends InvalidHeaderStatus
 final case object InvalidTimeStamp                  extends InvalidHeaderStatus
 final case object InvalidWorkAmount                 extends InvalidHeaderStatus
 final case object InvalidWorkTarget                 extends InvalidHeaderStatus
 final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
+final case class HeaderIOError(e: IOError)          extends InvalidHeaderStatus
 final case object EmptyTransactionList              extends InvalidBlockStatus
 final case object InvalidCoinbase                   extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
