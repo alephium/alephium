@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
+import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.io.IOResult

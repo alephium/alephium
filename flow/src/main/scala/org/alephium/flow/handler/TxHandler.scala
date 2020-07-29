@@ -3,7 +3,7 @@ package org.alephium.flow.handler
 import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.mempool.MemPool
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.core.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
