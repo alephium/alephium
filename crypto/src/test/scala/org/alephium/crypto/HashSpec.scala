@@ -7,7 +7,6 @@ import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
 
 class HashSpec extends AlephiumSpec {
-
   def check[T <: RandomBytes](provider: HashSchema[T], message: String, expected: ByteString)(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
@@ -67,6 +66,17 @@ class HashSpec extends AlephiumSpec {
       "Hello World3" -> hex"1F92B7907A9564266AB8D351117090B96BE9D7B3C22172DA122106E253F61810",
       "Hello World4" -> hex"BA647048F3B513C233E3EBB60EC3B0122B49CE4D0A433254E03D54C1EE617D90",
       "Hello World5" -> hex"6CC1E7EC6FE939BB0EF7A10FE3D03DF052387B3CAF1416FD1CBAE3EF5C45657A"
+    )
+  )
+
+  check(
+    Blake2b,
+    Map(
+      "Hello World1" -> hex"8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a",
+      "Hello World2" -> hex"4712c917c8ab6451d2c0adcc6af62926fec2d7ef1ee6a75282fca261b9a7b6a6",
+      "Hello World3" -> hex"8f4c9c1048dc913ce1d3b031a7c52f108023385f2c240c390000b06c911064b6",
+      "Hello World4" -> hex"b60cf83ffeb99da4b250ec680f7402bba6a6c75f3bdae16ef7ef0b4b762a9f4b",
+      "Hello World5" -> hex"06bacc3a528511c9066a576813e80698e041f513ac478d31dd79b39e378f0dfe"
     )
   )
 }
