@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.io.Tcp
 
-import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}

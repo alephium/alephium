@@ -1,4 +1,4 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import java.nio.file.Path
 

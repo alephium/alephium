@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
-import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}

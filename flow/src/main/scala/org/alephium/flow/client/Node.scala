@@ -8,6 +8,7 @@ import akka.util.Timeout
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core._
+import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.clique.BrokerHandler

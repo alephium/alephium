@@ -1,7 +1,8 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex

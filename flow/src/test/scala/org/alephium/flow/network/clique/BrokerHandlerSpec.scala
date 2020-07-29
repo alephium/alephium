@@ -12,7 +12,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, FlowHandler, TestUtils, TxHandler}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.message._

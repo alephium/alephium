@@ -1,16 +1,17 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.flow.Utils
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.validation._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model.{ChainIndex, FlowData}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest, TimeStamp}
+import org.alephium.util._
 
 object ChainHandler {
   trait Event

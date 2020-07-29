@@ -7,8 +7,9 @@ import scala.util.{Failure, Random, Success}
 import akka.actor.Props
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, FlowHandler}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig

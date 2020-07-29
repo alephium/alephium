@@ -1,6 +1,6 @@
 package org.alephium.flow.client
 
-import org.alephium.flow.core.{AllHandlers, BlockChainHandler}
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex

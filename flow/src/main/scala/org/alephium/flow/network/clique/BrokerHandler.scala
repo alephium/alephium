@@ -10,8 +10,8 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core._
 import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin._
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
