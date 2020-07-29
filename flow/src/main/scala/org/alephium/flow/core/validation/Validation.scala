@@ -4,15 +4,15 @@ import org.alephium.flow.core._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
-abstract class Validation[T <: FlowData, S <: ValidationStatus]() {
-  def validate(data: T, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformConfig): IOResult[S]
+abstract class Validation[T <: FlowData, S <: ValidationStatus] {
+  def validate(data: T, flow: BlockFlow)(implicit config: PlatformConfig): IOResult[S]
 
-  def validateUntilDependencies(data: T, flow: BlockFlow, isSyncing: Boolean): IOResult[S]
+  def validateUntilDependencies(data: T, flow: BlockFlow)(
+      implicit config: ConsensusConfig): IOResult[S]
 
   def validateAfterDependencies(data: T, flow: BlockFlow)(
       implicit config: PlatformConfig): IOResult[S]
