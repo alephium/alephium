@@ -10,6 +10,11 @@ import org.bouncycastle.crypto.Digest
 import org.alephium.serde._
 
 object HashSchema {
+  def unsafeBlake2b(bs: ByteString): Blake2b = {
+    assert(bs.size == Blake2b.length)
+    new Blake2b(bs)
+  }
+
   def unsafeKeccak256(bs: ByteString): Keccak256 = {
     assert(bs.size == Keccak256.length)
     new Keccak256(bs)

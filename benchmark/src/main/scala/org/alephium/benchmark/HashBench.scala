@@ -2,22 +2,30 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import akka.util.ByteString
 import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.infra.Blackhole
 
-import org.alephium.crypto.Sha256
-import org.alephium.protocol.ALF.Hash
+import org.alephium.crypto.{Blake2b, Keccak256, Sha256}
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
+@State(Scope.Thread)
 class HashBench {
+  val data: ByteString = ByteString.fromArrayUnsafe(Array.fill(1024)(0))
 
   @Benchmark
-  def randomHash(): Hash = {
-    Hash.random
+  def black2b(bh: Blackhole): Unit = {
+    bh.consume(Blake2b.hash(data))
   }
 
   @Benchmark
-  def randomSha256(): Sha256 = {
-    Sha256.random
+  def keccak256(bh: Blackhole): Unit = {
+    bh.consume(Keccak256.hash(data))
+  }
+
+  @Benchmark
+  def sha256(bh: Blackhole): Unit = {
+    bh.consume(Sha256.hash(data))
   }
 }
