@@ -1,4 +1,4 @@
-package org.alephium.flow.core.mempool
+package org.alephium.flow.mempool
 
 import org.alephium.protocol.model.Transaction
 import org.alephium.util.AVector
