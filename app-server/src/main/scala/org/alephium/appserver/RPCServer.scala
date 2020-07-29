@@ -12,8 +12,9 @@ import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
-import org.alephium.flow.core.{BlockFlow, TxHandler}
-import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}

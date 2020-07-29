@@ -16,7 +16,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Span}
 
 import org.alephium.flow.client.Miner
-import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.platform.Mode
 import org.alephium.protocol.ALF.Hash
 import org.alephium.protocol.model._

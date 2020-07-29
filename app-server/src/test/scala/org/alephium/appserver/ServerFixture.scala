@@ -11,6 +11,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
+import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}

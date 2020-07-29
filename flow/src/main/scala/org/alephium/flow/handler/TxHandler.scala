@@ -1,7 +1,8 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import akka.actor.Props
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.mempool.MemPool
 import org.alephium.flow.core.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.flow.model.DataOrigin

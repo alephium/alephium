@@ -3,7 +3,8 @@ package org.alephium.flow.client
 import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, BlockFlow, FlowHandler, TestUtils}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.ActorRefT

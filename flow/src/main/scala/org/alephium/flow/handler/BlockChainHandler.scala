@@ -1,12 +1,13 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import scala.collection.mutable
 
 import akka.actor.Props
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.FlowHandler.BlockAdded
+import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.core.validation._
+import org.alephium.flow.handler.FlowHandler.BlockAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig

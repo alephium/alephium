@@ -7,7 +7,7 @@ import io.circe._
 import io.circe.generic.semiauto._
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
-import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.ALF.Hash

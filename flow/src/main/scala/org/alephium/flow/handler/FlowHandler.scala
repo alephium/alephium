@@ -1,10 +1,11 @@
-package org.alephium.flow.core
+package org.alephium.flow.handler
 
 import scala.collection.mutable
 
 import akka.actor.Props
 
 import org.alephium.flow.client.Miner
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult, IOUtils}

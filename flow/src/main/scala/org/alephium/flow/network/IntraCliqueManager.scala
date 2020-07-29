@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.{TaskTrigger, Utils}
-import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.clique.BrokerHandler
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}

@@ -4,7 +4,8 @@ import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, TestUtils}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, TestUtils}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.protocol.model.ChainIndex

@@ -17,7 +17,8 @@ import sttp.tapir.server.akkahttp._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
-import org.alephium.flow.core.{BlockFlow, TxHandler}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.platform.{Mode, PlatformConfig}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
