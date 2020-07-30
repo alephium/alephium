@@ -61,7 +61,7 @@ trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
   protected[validation] def checkGenesisDependencies(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkTarget(header: BlockHeader)(implicit config: ConsensusConfig): HeaderValidationResult[Unit]
- 
+
   protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampDrift(header: BlockHeader)(implicit config: ConsensusConfig): HeaderValidationResult[Unit]
   protected[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult[Unit]
