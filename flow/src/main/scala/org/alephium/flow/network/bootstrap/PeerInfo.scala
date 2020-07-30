@@ -8,7 +8,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.serde._
 
-sealed abstract case class PeerInfo(
+final case class PeerInfo private (
     id: Int,
     groupNumPerBroker: Int,
     address: InetAddress,
@@ -24,7 +24,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
              tcpPort: Int,
              rpcPort: Option[Int],
              wsPort: Option[Int]): PeerInfo =
-    new PeerInfo(id, groupNumPerBroker, address, tcpPort, rpcPort, wsPort) {}
+    new PeerInfo(id, groupNumPerBroker, address, tcpPort, rpcPort, wsPort)
 
   val _serde: Serde[PeerInfo] =
     Serde.forProduct6(unsafe,
@@ -46,6 +46,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
                  broker.address.getAddress,
                  broker.address.getPort,
                  config.rpcPort,
-                 config.wsPort) {}
+                 config.wsPort)
   }
 }
