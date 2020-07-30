@@ -1,7 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.{Hash, HashSerde}
+import org.alephium.protocol.{ALF, Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
@@ -58,7 +57,7 @@ object BlockHeader {
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: ALF.Hash, target: BigInt, nonce: BigInt): BlockHeader = {
+  def genesis(txsHash: Hash, target: BigInt, nonce: BigInt): BlockHeader = {
     BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 }

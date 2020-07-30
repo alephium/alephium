@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.TimeStamp
 

@@ -8,7 +8,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -221,8 +221,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def calHashDiffFromSameHeight(newHash: ALF.Hash,
-                                        oldHash: ALF.Hash): IOResult[ChainDiff] = {
+  private def calHashDiffFromSameHeight(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
     if (newHash == oldHash) Right(ChainDiff(AVector.empty, AVector.empty))
     else {
       for {

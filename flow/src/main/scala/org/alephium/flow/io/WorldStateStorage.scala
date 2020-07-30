@@ -5,7 +5,7 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.vm.WorldState
 
 trait WorldStateStorage extends KeyValueStorage[Hash, WorldState.Hashes] {

@@ -5,7 +5,7 @@ import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
 

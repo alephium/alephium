@@ -3,7 +3,7 @@ package org.alephium.protocol.vm.lang
 import org.scalatest.Assertion
 
 import org.alephium.crypto.{Byte32, ED25519}
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -226,7 +226,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "verify signature" in {
-    def input(hash: ALF.Hash) =
+    def input(hash: Hash) =
       s"""
          |AssetScript P2PKH {
          |  fn verify(pk: Byte32) -> () {
@@ -239,15 +239,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
 
     val (priKey, pubKey) = ED25519.generatePriPub()
-    val pubKeyHash       = ALF.Hash.hash(pubKey.bytes)
-    val signature        = ED25519.sign(ALF.Hash.zero.bytes, priKey)
+    val pubKeyHash       = Hash.hash(pubKey.bytes)
+    val signature        = ED25519.sign(Hash.zero.bytes, priKey)
 
     val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args = AVector[Val](Val.Byte32(pubKey.toByte32))
     StatelessVM
-      .runAssetScript(cachedWorldState, ALF.Hash.zero, script, args, signature)
+      .runAssetScript(cachedWorldState, Hash.zero, script, args, signature)
       .isRight is true
   }
 

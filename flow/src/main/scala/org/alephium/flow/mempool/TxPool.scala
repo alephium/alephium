@@ -3,7 +3,7 @@ package org.alephium.flow.mempool
 import scala.collection.mutable
 
 import org.alephium.flow.mempool.TxPool.WeightedId
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Transaction
 import org.alephium.util.{AVector, RWLock}
 

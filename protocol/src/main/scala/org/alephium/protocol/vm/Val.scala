@@ -5,7 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 
 import org.alephium.crypto
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
 import org.alephium.util
 import org.alephium.util._

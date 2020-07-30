@@ -5,7 +5,7 @@ import java.util.InputMismatchException
 import akka.util.ByteString
 
 import org.alephium.io.{IOError, IOResult, KeyValueStorage, MerklePatriciaTrie}
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, EitherF}
@@ -13,9 +13,9 @@ import org.alephium.util.{AVector, EitherF}
 sealed abstract class WorldState {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
-  protected[vm] def getContractState(key: ALF.Hash): IOResult[ContractState]
+  protected[vm] def getContractState(key: Hash): IOResult[ContractState]
 
-  def getContractObj(key: ALF.Hash): IOResult[StatefulContractObject] = {
+  def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
     for {
       state <- getContractState(key)
       output <- {
@@ -38,14 +38,14 @@ sealed abstract class WorldState {
                   output: ContractOutput,
                   fields: AVector[Val]): IOResult[WorldState]
 
-  def updateContract(key: ALF.Hash, fields: AVector[Val]): IOResult[WorldState] = {
+  def updateContract(key: Hash, fields: AVector[Val]): IOResult[WorldState] = {
     for {
       oldState <- getContractState(key)
       newState <- updateContract(key, ContractState(oldState.hint, fields))
     } yield newState
   }
 
-  def updateContract(key: ALF.Hash, state: ContractState): IOResult[WorldState]
+  def updateContract(key: Hash, state: ContractState): IOResult[WorldState]
 
   def remove(outputRef: TxOutputRef): IOResult[WorldState]
 
@@ -54,7 +54,7 @@ sealed abstract class WorldState {
 
 object WorldState {
   final case class Persisted(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
-                             contractState: MerklePatriciaTrie[ALF.Hash, ContractState])
+                             contractState: MerklePatriciaTrie[Hash, ContractState])
       extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
@@ -64,7 +64,7 @@ object WorldState {
       outputState.getAll(outputRefPrefix)
     }
 
-    override def getContractState(key: ALF.Hash): IOResult[ContractState] = {
+    override def getContractState(key: Hash): IOResult[ContractState] = {
       contractState.get(key)
     }
 
@@ -87,7 +87,7 @@ object WorldState {
       } yield Persisted(newOutputState, newContractState)
     }
 
-    override def updateContract(key: ALF.Hash, state: ContractState): IOResult[Persisted] = {
+    override def updateContract(key: Hash, state: ContractState): IOResult[Persisted] = {
       contractState.put(key, state).map(Persisted(outputState, _))
     }
 
@@ -121,7 +121,7 @@ object WorldState {
   final case class Cached(initialState: Persisted,
                           outputStateDeletes: Set[TxOutputRef],
                           outputStateAdditions: Map[TxOutputRef, TxOutput],
-                          contractStateChanges: Map[ALF.Hash, ContractState])
+                          contractStateChanges: Map[Hash, ContractState])
       extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       if (outputStateAdditions.contains(outputRef)) Right(outputStateAdditions(outputRef))
@@ -129,7 +129,7 @@ object WorldState {
       else initialState.getOutput(outputRef)
     }
 
-    override protected[vm] def getContractState(key: ALF.Hash): IOResult[ContractState] = {
+    override protected[vm] def getContractState(key: Hash): IOResult[ContractState] = {
       contractStateChanges.get(key) match {
         case Some(state) => Right(state)
         case None        => initialState.getContractState(key)
@@ -149,7 +149,7 @@ object WorldState {
                   contractStateChanges = contractStateChanges + (outputRef.key -> state)))
     }
 
-    override def updateContract(key: ALF.Hash, state: ContractState): IOResult[Cached] = {
+    override def updateContract(key: Hash, state: ContractState): IOResult[Cached] = {
       Right(this.copy(contractStateChanges = contractStateChanges + (key -> state)))
     }
 
@@ -178,29 +178,29 @@ object WorldState {
     }
   }
 
-  def emptyPersisted(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Persisted = {
+  def emptyPersisted(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Persisted = {
     val genesisRef        = TxOutputRef.emptyTreeNode
     val emptyOutput       = TxOutput.forMPT
     val emptyOutputTrie   = MerklePatriciaTrie.build(storage, genesisRef, emptyOutput)
     val emptyState        = ContractState(genesisRef.hint, AVector.empty)
-    val emptyContractTrie = MerklePatriciaTrie.build(storage, ALF.Hash.zero, emptyState)
+    val emptyContractTrie = MerklePatriciaTrie.build(storage, Hash.zero, emptyState)
     Persisted(emptyOutputTrie, emptyContractTrie)
   }
 
-  def emptyCached(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Cached = {
+  def emptyCached(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
     val persisted = emptyPersisted(storage)
     Cached(persisted, Set.empty, Map.empty, Map.empty)
   }
 
-  final case class Hashes(outputStateHash: ALF.Hash, contractStateHash: ALF.Hash) {
+  final case class Hashes(outputStateHash: Hash, contractStateHash: Hash) {
     def toPersistedWorldState(
-        storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Persisted = {
+        storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Persisted = {
       val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
-      val contractState = MerklePatriciaTrie[ALF.Hash, ContractState](contractStateHash, storage)
+      val contractState = MerklePatriciaTrie[Hash, ContractState](contractStateHash, storage)
       Persisted(outputState, contractState)
     }
 
-    def toCachedWorldState(storage: KeyValueStorage[ALF.Hash, MerklePatriciaTrie.Node]): Cached = {
+    def toCachedWorldState(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
       val initialState = toPersistedWorldState(storage)
       Cached(initialState, Set.empty, Map.empty, Map.empty)
     }

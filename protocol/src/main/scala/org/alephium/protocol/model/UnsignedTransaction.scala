@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF.{Hash, HashSerde}
+import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript, Val}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}

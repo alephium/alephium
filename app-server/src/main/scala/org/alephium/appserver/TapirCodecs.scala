@@ -7,7 +7,7 @@ import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.{TimeStamp, U64}

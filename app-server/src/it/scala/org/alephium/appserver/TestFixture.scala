@@ -23,7 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe

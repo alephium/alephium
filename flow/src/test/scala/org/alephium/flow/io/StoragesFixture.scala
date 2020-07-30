@@ -2,7 +2,7 @@ package org.alephium.flow.io
 
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.RocksDBSource
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 
 trait StoragesFixture {
   implicit def config: PlatformConfig

@@ -2,7 +2,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._

@@ -10,8 +10,8 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, NumericHelpers}
 
 trait Generators extends NumericHelpers {
-  lazy val hashGen: Gen[ALF.Hash] =
-    Gen.const(()).map(_ => ALF.Hash.generate)
+  lazy val hashGen: Gen[Hash] =
+    Gen.const(()).map(_ => Hash.generate)
 
   def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
     Gen.choose(0, config.groups - 1).map(GroupIndex.unsafe)

@@ -8,7 +8,7 @@ import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector

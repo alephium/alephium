@@ -10,7 +10,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils

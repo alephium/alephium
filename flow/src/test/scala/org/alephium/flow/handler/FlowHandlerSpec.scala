@@ -6,7 +6,7 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, NoIndexModelGeneratorsLike}
 import org.alephium.util.ActorRefT
 

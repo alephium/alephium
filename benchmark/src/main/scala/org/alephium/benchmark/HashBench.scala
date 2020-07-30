@@ -12,7 +12,7 @@ import org.alephium.crypto.{Blake2b, Keccak256, Sha256}
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 class HashBench {
-  val data: ByteString = ByteString.fromArrayUnsafe(Array.fill(1024)(0))
+  val data: ByteString = ByteString.fromArrayUnsafe(Array.fill(1 << 10)(0))
 
   @Benchmark
   def black2b(bh: Blackhole): Unit = {

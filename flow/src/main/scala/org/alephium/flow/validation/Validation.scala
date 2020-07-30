@@ -3,7 +3,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core._
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}

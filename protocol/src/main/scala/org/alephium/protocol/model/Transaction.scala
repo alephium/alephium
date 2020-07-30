@@ -3,7 +3,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
@@ -12,8 +12,8 @@ import org.alephium.util.{AVector, U64}
 final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              signatures: AVector[ED25519Signature])
-    extends ALF.HashSerde[Transaction] {
-  override val hash: ALF.Hash = unsigned.hash
+    extends HashSerde[Transaction] {
+  override val hash: Hash = unsigned.hash
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {

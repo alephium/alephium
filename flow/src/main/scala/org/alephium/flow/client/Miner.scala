@@ -13,7 +13,7 @@ import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor}

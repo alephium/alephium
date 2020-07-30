@@ -7,7 +7,7 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.platform._
 import org.alephium.io.IOError
 import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
 import org.alephium.util._
 
