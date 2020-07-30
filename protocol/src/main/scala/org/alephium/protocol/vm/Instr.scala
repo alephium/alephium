@@ -6,9 +6,10 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.serde._
 import org.alephium.util
+
 import org.alephium.util.{Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
@@ -1036,7 +1037,7 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      contractKey <- frame.popT[Val.Byte32]().map(byte32 => ALF.Hash.unsafe(byte32.v.bytes))
+      contractKey <- frame.popT[Val.Byte32]().map(byte32 => Hash.unsafe(byte32.v.bytes))
       newFrame    <- Frame.externalMethodFrame(frame, contractKey, Bytes.toPosInt(index))
       _           <- newFrame.execute()
     } yield ()

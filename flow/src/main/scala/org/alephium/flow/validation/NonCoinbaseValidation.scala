@@ -6,7 +6,7 @@ import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -226,7 +226,7 @@ object NonCoinbaseValidation extends NonCoinbaseValidation {
       lock: LockupScript.P2PKH,
       unlock: UnlockScript.P2PKH,
       signatures: Stack[ED25519Signature]): TxValidationResult[Unit] = {
-    if (ALF.Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
+    if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
       invalidTx(InvalidPublicKeyHash)
     } else {
       signatures.pop() match {
@@ -244,7 +244,7 @@ object NonCoinbaseValidation extends NonCoinbaseValidation {
                                       unlock: UnlockScript.P2SH,
                                       signatures: Stack[ED25519Signature],
                                       worldState: WorldState): TxValidationResult[Unit] = {
-    if (ALF.Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
+    if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
       invalidTx(InvalidScriptHash)
     } else {
       checkScript(tx, unlock.script, unlock.params, signatures, worldState)

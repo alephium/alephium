@@ -10,7 +10,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._

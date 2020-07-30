@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF.{Hash, HashSerde}
+import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}

@@ -6,7 +6,7 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 import org.alephium.flow.core.BlockHashChain
 import org.alephium.io.{IOResult, IOUtils, RawKeyValueStorage, RocksDBColumn, RocksDBSource}
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._

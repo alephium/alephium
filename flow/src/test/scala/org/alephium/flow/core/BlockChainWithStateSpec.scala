@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
 import org.alephium.io.RocksDBSource.Settings
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike}
 import org.alephium.util.AVector
 

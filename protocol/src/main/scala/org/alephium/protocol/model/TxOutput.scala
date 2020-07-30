@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, StatefulContract}
 import org.alephium.serde._
@@ -47,14 +47,14 @@ object TxOutput {
   }
 
   def burn(amount: U64): TxOutput = {
-    asset(amount, ALF.GenesisHeight, LockupScript.p2pkh(ALF.Hash.zero))
+    asset(amount, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero))
   }
 
   // TODO: improve this when vm is mature
   def forMPT: TxOutput =
     ContractOutput(U64.One,
                    ALF.GenesisHeight,
-                   LockupScript.p2pkh(ALF.Hash.zero),
+                   LockupScript.p2pkh(Hash.zero),
                    StatefulContract.forMPT,
                    ByteString.empty)
 }

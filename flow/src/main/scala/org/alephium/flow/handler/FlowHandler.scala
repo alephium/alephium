@@ -9,7 +9,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.util._

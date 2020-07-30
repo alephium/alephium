@@ -18,7 +18,7 @@ import org.scalatest.time.{Millis, Span}
 import org.alephium.flow.client.Miner
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.platform.Mode
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._

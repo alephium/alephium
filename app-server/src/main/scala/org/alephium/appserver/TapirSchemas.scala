@@ -4,7 +4,7 @@ import akka.util.ByteString
 import sttp.tapir.Schema
 
 import org.alephium.crypto.ED25519Signature
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp}

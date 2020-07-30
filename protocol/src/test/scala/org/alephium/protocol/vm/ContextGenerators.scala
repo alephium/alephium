@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{GroupIndex, NoIndexModelGenerators}
 import org.alephium.util.AVector
 
@@ -15,7 +15,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val worldStateNew =
       cachedWorldState.addContract(contractOutputRef, contractOutput, fields).toOption.get
     val obj     = contract.toObject(contractOutputRef.key, fields)
-    val context = StatefulContext(ALF.Hash.zero, worldStateNew)
+    val context = StatefulContext(Hash.zero, worldStateNew)
     obj -> context
   }
 }

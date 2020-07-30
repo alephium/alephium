@@ -9,7 +9,7 @@ import org.alephium.flow.validation._
 import org.alephium.flow.handler.FlowHandler.HeaderAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{ActorRefT, Forest}
 

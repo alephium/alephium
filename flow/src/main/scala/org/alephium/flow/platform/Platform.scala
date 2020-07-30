@@ -2,7 +2,7 @@ package org.alephium.flow.platform
 
 import java.nio.file.Path
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.{Env, Files}
 
 object Platform {

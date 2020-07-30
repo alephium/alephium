@@ -3,7 +3,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
@@ -82,7 +82,7 @@ object BlockValidation extends Validation[Block, BlockStatus] {
 
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
-    if (block.header.txsHash == ALF.Hash.hash(block.transactions)) validBlock(())
+    if (block.header.txsHash == Hash.hash(block.transactions)) validBlock(())
     else invalidBlock(InvalidMerkleRoot)
   }
 

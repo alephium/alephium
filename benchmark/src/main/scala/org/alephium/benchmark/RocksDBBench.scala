@@ -8,7 +8,7 @@ import org.rocksdb.util.SizeUnit
 
 import org.alephium.crypto.Keccak256
 import org.alephium.io.{RocksDBColumn, RocksDBSource}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.{Files, Random}
 
 @BenchmarkMode(Array(Mode.SingleShotTime))

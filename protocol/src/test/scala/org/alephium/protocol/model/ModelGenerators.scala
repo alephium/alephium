@@ -11,7 +11,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigFixture, GroupConfig}
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}

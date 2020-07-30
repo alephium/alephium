@@ -1,6 +1,6 @@
 package org.alephium.flow.model
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, BlockHeader, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 

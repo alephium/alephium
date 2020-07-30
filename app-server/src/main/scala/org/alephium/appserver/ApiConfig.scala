@@ -4,7 +4,7 @@ import java.net.InetAddress
 
 import com.typesafe.config.Config
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.{Duration, Hex}
 
 final case class ApiConfig(

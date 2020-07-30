@@ -7,7 +7,7 @@ import org.rocksdb.WriteOptions
 import org.alephium.io.{IOResult, KeyValueSource, RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.io.MerklePatriciaTrie.Node
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector

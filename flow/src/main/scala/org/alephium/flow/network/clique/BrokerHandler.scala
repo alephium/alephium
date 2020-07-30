@@ -15,7 +15,7 @@ import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin._
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._

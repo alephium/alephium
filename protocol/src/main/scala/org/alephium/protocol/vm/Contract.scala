@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -84,11 +84,11 @@ final case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext] {
-  def toObject(address: ALF.Hash, contractState: ContractState): StatefulContractObject = {
+  def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
     StatefulContractObject(this, contractState.fields.toArray, address)
   }
 
-  def toObject(address: ALF.Hash, fields: AVector[Val]): StatefulContractObject = {
+  def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
     StatefulContractObject(this, fields.toArray, address)
   }
 }
@@ -101,7 +101,7 @@ object StatefulContract {
 }
 
 sealed trait ContractObj[Ctx <: Context] {
-  def addressOpt: Option[ALF.Hash]
+  def addressOpt: Option[Hash]
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
 
@@ -118,7 +118,7 @@ sealed trait ContractObj[Ctx <: Context] {
 }
 
 sealed trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
-  val addressOpt: Option[ALF.Hash]  = None
+  val addressOpt: Option[Hash]      = None
   val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
 
@@ -129,7 +129,7 @@ final case class StatefulScriptObject(val code: StatefulScript) extends ScriptOb
 
 final case class StatefulContractObject(val code: StatefulContract,
                                         val fields: mutable.ArraySeq[Val],
-                                        val address: ALF.Hash)
+                                        val address: Hash)
     extends ContractObj[StatefulContext] {
-  override def addressOpt: Option[ALF.Hash] = Some(address)
+  override def addressOpt: Option[Hash] = Some(address)
 }

@@ -9,7 +9,7 @@ import org.alephium.crypto.ED25519Signature
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, ContractInfo, TxInputStateInfo}
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
@@ -219,10 +219,10 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   behavior of "stateful validation"
 
   trait StatefulFixture extends StatelessFixture {
-    def genTokenOutput(tokenId: ALF.Hash, amount: U64): AssetOutput = {
+    def genTokenOutput(tokenId: Hash, amount: U64): AssetOutput = {
       AssetOutput(U64.Zero,
                   0,
-                  LockupScript.p2pkh(ALF.Hash.zero),
+                  LockupScript.p2pkh(Hash.zero),
                   AVector(tokenId -> amount),
                   ByteString.empty)
     }
@@ -333,7 +333,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         }
         newTokenIssued is true
 
-        val txNew0 = replaceTokenId(tx, tx.newTokenId, ALF.Hash.generate)
+        val txNew0 = replaceTokenId(tx, tx.newTokenId, Hash.generate)
         failCheck(checkTokenBalance(txNew0, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
         failCheck(checkBlockTx(txNew0, prepareWorldState(preOutputs)), InvalidTokenBalance)
 

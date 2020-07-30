@@ -8,7 +8,7 @@ import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, Val
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, Transaction}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}

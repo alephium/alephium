@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
 
