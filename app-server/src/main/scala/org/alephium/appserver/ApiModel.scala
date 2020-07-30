@@ -185,6 +185,7 @@ object ApiModel {
                  cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
                  cliqueInfo.groupNumPerBroker)
     }
+    import CliqueIdCodec._
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
@@ -259,6 +260,7 @@ object ApiModel {
   object InterCliquePeerInfo {
     def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo =
       InterCliquePeerInfo(syncStatus.cliqueId, syncStatus.address, syncStatus.isSynced)
+    import CliqueIdCodec._
     implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
       deriveCodec[InterCliquePeerInfo]
   }
