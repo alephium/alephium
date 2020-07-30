@@ -2,7 +2,7 @@ package org.alephium.io
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{Keccak256 => Hash}
+import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 

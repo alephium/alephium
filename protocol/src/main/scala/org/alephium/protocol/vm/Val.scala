@@ -5,6 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 
 import org.alephium.crypto
+import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Hash
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
 import org.alephium.util
@@ -173,7 +174,8 @@ object Val {
 
     override def toString: String = "Byte32"
 
-    def from(hash: Hash): Byte32 = Byte32(crypto.Byte32.unsafe(hash.bytes))
+    def from(hash: Hash): Byte32      = Byte32(crypto.Byte32.unsafe(hash.bytes))
+    def from(hash: Keccak256): Byte32 = Byte32(crypto.Byte32.unsafe(hash.bytes))
   }
 
   object BoolVec extends Type {

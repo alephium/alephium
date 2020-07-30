@@ -6,7 +6,7 @@ import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{Keccak256 => Hash}
+import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 
