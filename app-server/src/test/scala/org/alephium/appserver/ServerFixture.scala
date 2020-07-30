@@ -45,13 +45,12 @@ trait ServerFixture
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
   lazy val dummyBalance         = Balance(U64.Zero, 0)
   lazy val dummyGroup           = Group(0)
-  lazy val dummyKey             = "b4628b5e93e6356b8b2ce75174a57fbd2fe6907e6244d5ddfba78a94ebf9d7a5"
-  lazy val dummyKeyAddress      = "1EvRjvdiVH24YUgjfCA7RZVTWj4bKexks9iY33YbL14zt"
-  lazy val dummyToKey           = "3ec4489e0988fbe5ea1becd0804335cd78ae285883f4028009b0e69d0574cda9"
-  lazy val dummyToAddres        = "19kCCFBGJV76XjyzszeMGTbnDVkAYwhHtZGKEvc1JdJEG"
-  lazy val dummyPrivateKey      = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
-  lazy val dummyHashesAtHeight  = HashesAtHeight(Seq.empty)
-  lazy val dummyChainInfo       = ChainInfo(0)
+
+  lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
+  lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get
+
+  lazy val dummyHashesAtHeight = HashesAtHeight(Seq.empty)
+  lazy val dummyChainInfo      = ChainInfo(0)
   lazy val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample

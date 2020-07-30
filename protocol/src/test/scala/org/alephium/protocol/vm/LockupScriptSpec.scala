@@ -14,13 +14,13 @@ class LockupScriptSpec extends AlephiumSpec {
   }
 
   it should "encode and decode p2pkh address to and from Base58" in {
-    test("1Dx7Y4RxkCvoYvhQpMnRZi2yJnSbUeoVZY5R1vSYWSk9p",
-         "9b85fef33febd483e055b01af0671714b56c6f3b6f45612589c2d6ae5337fb6d")
-    test("1Ca33aWTUJFyoGbn7VuQoPqQgX9nyZKdLg9qVMh7JkMmw",
-         "61bfcd3752298738385a69911105509a380d111e32b20bf4775959840095f572")
-    test("13eh6wZfCah2ARW7ZE7HTYC8TvVhTteqNwjrqTHUk1XhD",
-         "a8b0bd9198dcedb03dc0dc27267fc6f97def5c4471e1137160daed4a44c279c3")
-    test("1AFmfTe1S6TYsKLmuMxhUSDj8hCvBVoAuff1CQnysNx15",
-         "42335fabcc60bdd1f279722805ee33448e2750a4a40e729d2ebcdfba9ce5e3de")
+    test("1BHhKnn8moe8GsELAUQZKBhTeDTbPBmLXTCANkZ6eAHdK",
+         "e7599ec69d841b61fe316d6d5ea8702263ecaa8ac883e04edcc021dbd1c33776")
+    test("1Er5PoAV2NAPWAuH1E3eNtVnWftDT7krb1zBuLKpSxGyz",
+         "29b118a333ec8aa20257cf8670eaab74ef1e737b1c8e9977cc63090988e06992")
+    test("1DWu6iQySTRzVX6Fra6taEGVN9L8XgNHemP9QXwwRnVJg",
+         "e25fcbff5d5534077ff21d93b229a5f1218b70b995f8492fc360958f0643a9c5")
+    test("1GsuUk3ZjxbKAVutz1jsRqXNGLYWcxAM9Ztkw9GGVEK7C",
+         "7a1d3ef98e21e8dd3077b2a5e1f67c75e9fbe3e02ff1d9e4dfe34a05acf92ebe")
   }
 }

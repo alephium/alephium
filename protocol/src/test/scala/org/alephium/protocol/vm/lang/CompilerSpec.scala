@@ -231,7 +231,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |AssetScript P2PKH {
          |  fn verify(pk: Byte32) -> () {
          |    let hash = @${hash.toHexString}
-         |    checkEq!(hash, keccak256!(pk))
+         |    checkEq!(hash, blake2b!(pk))
          |    checkSignature!(pk)
          |    return
          |  }

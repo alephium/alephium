@@ -32,6 +32,17 @@ trait LockupScriptGenerators extends Generators {
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield ScriptPair(LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey), privateKey)
+
+  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript, ED25519PublicKey, ED25519PrivateKey)] =
+    for {
+      (privateKey, publicKey) <- keypairGen(groupIndex)
+    } yield (LockupScript.p2pkh(publicKey), publicKey, privateKey)
+
+  def addressStringGen(groupIndex: GroupIndex): Gen[(String, String, String)] =
+    addressGen(groupIndex).map {
+      case (script, publicKey, privateKey) =>
+        (script.toBase58, publicKey.toHexString, privateKey.toHexString)
+    }
 }
 
 trait TxInputGenerators extends Generators {

@@ -5,7 +5,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
+import org.alephium.crypto._
 import org.alephium.protocol.Hash
 import org.alephium.serde._
 import org.alephium.util
@@ -87,7 +87,7 @@ object Instr {
     CallLocal, Return,
     CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
     CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
-    Keccak256Byte32, Keccak256ByteVec, CheckSignature
+    Blake2bByte32, Blake2bByteVec, Keccak256Byte32, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++ ArraySeq(CallExternal)
   // format: on
@@ -1058,7 +1058,6 @@ case object Return extends ReturnInstr with InstrCompanion0 {
 }
 
 sealed trait CryptoInstr   extends StatelessInstr
-sealed trait HashAlg       extends CryptoInstr
 sealed trait Signature     extends CryptoInstr
 sealed trait EllipticCurve extends CryptoInstr
 
@@ -1091,29 +1090,59 @@ case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
 case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
 
-sealed abstract class Keccak256T[T <: Val] extends HashAlg with InstrCompanion0 {
+sealed abstract class HashAlg[T <: Val, H <: RandomBytes] extends CryptoInstr with InstrCompanion0 {
   def convert(t: T): ByteString
 
+  def hash(bs: ByteString): H
+
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      value <- frame.popT[T]()
-      _ <- {
-        val bs   = convert(value)
-        val hash = Keccak256.hash(bs)
-        frame.push(Val.Byte32.from(hash))
-      }
-    } yield ()
+    frame.popT[T]().flatMap { value =>
+      val bs = convert(value)
+      frame.push(Val.Byte32.from(hash(bs)))
+    }
   }
 }
 
-case object Keccak256Byte32 extends Keccak256T[Val.Byte32] {
-  override def convert(t: Val.Byte32): ByteString = t.v.bytes
+object HashAlg {
+  trait Byte32Convertor {
+    def convert(t: Val.Byte32): ByteString = t.v.bytes
+  }
+
+  trait ByteVecConvertor {
+    def convert(t: Val.ByteVec): ByteString =
+      ByteString.fromArrayUnsafe(t.a.toArray)
+  }
+
+  trait Blake2bHash {
+    def hash(bs: ByteString): Blake2b = Blake2b.hash(bs)
+  }
+
+  trait Keccak256Hash {
+    def hash(bs: ByteString): Keccak256 = Keccak256.hash(bs)
+  }
 }
 
-case object Keccak256ByteVec extends Keccak256T[Val.ByteVec] {
-  override def convert(t: Val.ByteVec): ByteString =
-    ByteString.fromArrayUnsafe(t.a.toArray)
-}
+case object Blake2bByte32
+    extends HashAlg[Val.Byte32, Blake2b]
+    with HashAlg.Byte32Convertor
+    with HashAlg.Blake2bHash
+
+// TODO: maybe remove Keccak from the VM
+case object Keccak256Byte32
+    extends HashAlg[Val.Byte32, Keccak256]
+    with HashAlg.Byte32Convertor
+    with HashAlg.Keccak256Hash
+
+case object Blake2bByteVec
+    extends HashAlg[Val.ByteVec, Blake2b]
+    with HashAlg.ByteVecConvertor
+    with HashAlg.Blake2bHash
+
+// TODO: maybe remove Keccak from the VM
+case object Keccak256ByteVec
+    extends HashAlg[Val.ByteVec, Keccak256]
+    with HashAlg.ByteVecConvertor
+    with HashAlg.Keccak256Hash
 
 case object CheckSignature extends Signature with InstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

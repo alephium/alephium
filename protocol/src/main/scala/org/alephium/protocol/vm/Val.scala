@@ -174,8 +174,9 @@ object Val {
 
     override def toString: String = "Byte32"
 
-    def from(hash: Hash): Byte32      = Byte32(crypto.Byte32.unsafe(hash.bytes))
-    def from(hash: Keccak256): Byte32 = Byte32(crypto.Byte32.unsafe(hash.bytes))
+    def from(hash: RandomBytes): Byte32 = Byte32(crypto.Byte32.unsafe(hash.bytes))
+    def from(hash: Hash): Byte32        = Byte32(crypto.Byte32.unsafe(hash.bytes))
+    def from(hash: Keccak256): Byte32   = Byte32(crypto.Byte32.unsafe(hash.bytes))
   }
 
   object BoolVec extends Type {
