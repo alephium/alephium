@@ -6,7 +6,7 @@ import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
-sealed abstract case class BrokerInfo(
+final case class BrokerInfo private (
     id: Int,
     groupNumPerBroker: Int,
     address: InetSocketAddress
@@ -50,12 +50,12 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
       implicit config: GroupConfig): Option[BrokerInfo] = {
     if (validate(id, groupNumPerBroker).isRight)
-      Some(new BrokerInfo(id, groupNumPerBroker, address) {})
+      Some(new BrokerInfo(id, groupNumPerBroker, address))
     else None
   }
 
   def unsafe(id: Int, groupNumPerBroker: Int, address: InetSocketAddress): BrokerInfo =
-    new BrokerInfo(id, groupNumPerBroker, address) {}
+    new BrokerInfo(id, groupNumPerBroker, address)
 
   def validate(id: Int, groupNumPerBroker: Int)(
       implicit config: GroupConfig): Either[String, Unit] = {

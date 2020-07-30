@@ -81,7 +81,6 @@ object ApiModel {
 
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
-    import TimeStampCodec._
     def decoder(implicit apiConfig: ApiConfig): Decoder[FetchRequest] =
       deriveDecoder[FetchRequest]
         .ensure(
@@ -186,7 +185,6 @@ object ApiModel {
                  cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
                  cliqueInfo.groupNumPerBroker)
     }
-    import CliqueIdCodec._
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
@@ -261,7 +259,6 @@ object ApiModel {
   object InterCliquePeerInfo {
     def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo =
       InterCliquePeerInfo(syncStatus.cliqueId, syncStatus.address, syncStatus.isSynced)
-    import CliqueIdCodec._
     implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
       deriveCodec[InterCliquePeerInfo]
   }
@@ -326,17 +323,17 @@ object ApiModel {
     implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
   }
 
-  sealed abstract case class ApiKey private (val value: String) {
+  final case class ApiKey private (val value: String) {
     def hash: Hash = Hash.hash(value)
   }
 
   object ApiKey {
-    def unsafe(raw: String): ApiKey = new ApiKey(raw) {}
+    def unsafe(raw: String): ApiKey = new ApiKey(raw)
     def createApiKey(raw: String): Either[String, ApiKey] = {
       if (raw.length < 32) {
         Left("Api key must have at least 32 characters")
       } else {
-        Right(new ApiKey(raw) {})
+        Right(new ApiKey(raw))
       }
     }
 

@@ -8,7 +8,7 @@ import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-sealed abstract case class IntraCliqueInfo(
+final case class IntraCliqueInfo private (
     id: CliqueId,
     peers: AVector[PeerInfo],
     groupNumPerBroker: Int
@@ -21,7 +21,7 @@ sealed abstract case class IntraCliqueInfo(
 
 object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
   def unsafe(id: CliqueId, peers: AVector[PeerInfo], groupNumPerBroker: Int): IntraCliqueInfo = {
-    new IntraCliqueInfo(id, peers, groupNumPerBroker) {}
+    new IntraCliqueInfo(id, peers, groupNumPerBroker)
   }
 
   private implicit val peerSerde  = PeerInfo._serde
