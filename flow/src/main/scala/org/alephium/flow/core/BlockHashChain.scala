@@ -89,7 +89,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getBestTipUnsafe: Hash = {
-    assert(tips.size != 0)
+    assume(tips.size != 0)
     val weighted = getAllTips.map { hash =>
       hash -> getWeightUnsafe(hash)
     }

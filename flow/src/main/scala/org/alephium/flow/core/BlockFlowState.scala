@@ -94,7 +94,7 @@ trait BlockFlowState {
   }
 
   def getBlockCache(groupIndex: GroupIndex, hash: Hash): IOResult[BlockCache] = {
-    assert(ChainIndex.from(hash).relateTo(groupIndex))
+    assume(ChainIndex.from(hash).relateTo(groupIndex))
     getGroupCache(groupIndex).get(hash) {
       getBlockChain(hash).getBlock(hash).map(convertBlock(_, groupIndex))
     }
@@ -123,7 +123,7 @@ trait BlockFlowState {
   def getBlockChain(hash: Hash): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
-    assert(brokerInfo.contains(from) || brokerInfo.contains(to))
+    assume(brokerInfo.contains(from) || brokerInfo.contains(to))
     if (brokerInfo.contains(from)) {
       outBlockChains(from.value - brokerInfo.groupFrom)(to.value)
     } else {
@@ -136,7 +136,7 @@ trait BlockFlowState {
   }
 
   protected def getBlockChainWithState(group: GroupIndex): BlockChainWithState = {
-    assert(brokerInfo.contains(group))
+    assume(brokerInfo.contains(group))
     intraGroupChains(group.value - brokerInfo.groupFrom)
   }
 
@@ -150,14 +150,14 @@ trait BlockFlowState {
 
   private def getPersistedTrie(deps: AVector[Hash],
                                groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
-    assert(deps.length == config.depsNum)
+    assume(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
   private def getCachedTrie(deps: AVector[Hash],
                             groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
-    assert(deps.length == config.depsNum)
+    assume(deps.length == config.depsNum)
     val hash = deps(config.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
@@ -183,19 +183,19 @@ trait BlockFlowState {
   }
 
   def getBestPersistedTrie(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
-    assert(config.brokerInfo.contains(groupIndex))
+    assume(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getPersistedTrie(deps.deps, groupIndex)
   }
 
   def getBestCachedTrie(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
-    assert(config.brokerInfo.contains(groupIndex))
+    assume(config.brokerInfo.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getCachedTrie(deps.deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
-    assert(brokerInfo.containsRaw(mainGroup))
+    assume(brokerInfo.containsRaw(mainGroup))
     val groupShift = mainGroup - brokerInfo.groupFrom
     bestDeps(groupShift) = deps
   }
@@ -254,7 +254,7 @@ trait BlockFlowState {
 
   protected def getTipsDiff(newTips: AVector[Hash],
                             oldTips: AVector[Hash]): IOResult[AVector[Hash]] = {
-    assert(newTips.length == oldTips.length)
+    assume(newTips.length == oldTips.length)
     EitherF.foldTry(newTips.indices, AVector.empty[Hash]) { (acc, i) =>
       getTipsDiff(newTips(i), oldTips(i)).map(acc ++ _)
     }
@@ -262,7 +262,7 @@ trait BlockFlowState {
 
   protected def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
     val chainIndex = block.chainIndex
-    assert(chainIndex.isIntraGroup)
+    assume(chainIndex.isIntraGroup)
     for {
       newTips <- getInOutTips(block.header, chainIndex.from, inclusive = false)
       oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
@@ -292,7 +292,7 @@ trait BlockFlowState {
   // Note: update state only for intra group blocks
   def updateState(worldState: WorldState, block: Block): IOResult[WorldState] = {
     val chainIndex = block.chainIndex
-    assert(chainIndex.isIntraGroup)
+    assume(chainIndex.isIntraGroup)
     if (block.header.isGenesis) {
       BlockFlowState.updateState(worldState, block, chainIndex.from)
     } else {
@@ -309,7 +309,7 @@ trait BlockFlowState {
 
   def getUtxos(lockupScript: LockupScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
     val groupIndex = lockupScript.groupIndex
-    assert(config.brokerInfo.contains(groupIndex))
+    assume(config.brokerInfo.contains(groupIndex))
 
     for {
       bestTrie <- getBestPersistedTrie(groupIndex)
@@ -445,7 +445,7 @@ object BlockFlowState {
   def convertBlock(block: Block, groupIndex: GroupIndex)(
       implicit config: PlatformConfig): BlockCache = {
     val index = block.chainIndex
-    assert(index.relateTo(groupIndex))
+    assume(index.relateTo(groupIndex))
     if (index.isIntraGroup) {
       val (outputs, contracts) = convertOutputs(block)
       InOutBlockCache(outputs, contracts, convertInputs(block))

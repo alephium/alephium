@@ -57,7 +57,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "encode flag correctly" in {
     def test(length: Int, isLeaf: Boolean, flag: Int): Assertion = {
-      assert(flag >= 0 && flag < 256)
+      assume(flag >= 0 && flag < 256)
       Node.SerdeNode.encodeFlag(length, isLeaf) is flag
       Node.SerdeNode.decodeFlag(flag) is ((length, isLeaf))
     }

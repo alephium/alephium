@@ -117,7 +117,7 @@ object HeaderValidation extends HeaderValidation {
   protected[validation] def checkWorkAmount[T <: FlowData](
       data: T): HeaderValidationResult[Unit] = {
     val current = BigInt(1, data.hash.bytes.toArray)
-    assert(current >= 0)
+    assume(current >= 0)
     if (current <= data.target) validHeader(()) else invalidHeader(InvalidWorkAmount)
   }
 

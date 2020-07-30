@@ -112,7 +112,7 @@ trait ConnectionWriter extends BaseActor {
   private val messagesToSent = collection.mutable.Queue.empty[ByteString]
 
   private def send(message: ByteString): Unit = {
-    assert(!isWaitingAck)
+    assume(!isWaitingAck)
     isWaitingAck = true
     connection ! Tcp.Write(message, BrokerHandler.TcpAck)
   }
@@ -126,7 +126,7 @@ trait ConnectionWriter extends BaseActor {
   }
 
   def trySendBuffered(): Unit = {
-    assert(isWaitingAck)
+    assume(isWaitingAck)
     isWaitingAck = false
     if (messagesToSent.nonEmpty) {
       send(messagesToSent.dequeue())
@@ -290,7 +290,7 @@ trait MessageHandler extends ConnectionUtil {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def handleNewBlocks(forest: Forest[Hash, Block]): Unit = {
-    assert(forest.nonEmpty)
+    assume(forest.nonEmpty)
     val chainIndex = forest.roots.head.value.chainIndex
     if (chainIndex.relateTo(config.brokerInfo)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
@@ -370,7 +370,7 @@ trait Sync extends P2PStage {
   private val blockNotifyList = scala.collection.mutable.HashSet.empty[ChainIndex]
 
   def startSync(): Unit = {
-    assert(!selfSynced)
+    assume(!selfSynced)
     flowHandler ! FlowHandler.GetSyncInfo(remoteBrokerInfo, isSameClique)
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
@@ -381,7 +381,7 @@ trait Sync extends P2PStage {
   def uponSynced(): Unit
 
   private def checkRemoteSynced(numNewData: Int): Unit = {
-    assert(!remoteSynced)
+    assume(!remoteSynced)
     if (numNewData == 0) {
       remoteSynced = true
     }
@@ -389,7 +389,7 @@ trait Sync extends P2PStage {
   }
 
   private def checkSelfSynced(numNewData: Int): Unit = {
-    assert(!selfSynced)
+    assume(!selfSynced)
     if (numNewData == 0) {
       selfSynced = true
     }
@@ -415,7 +415,7 @@ trait Sync extends P2PStage {
       sendPayload(SyncResponse(blocks, headers)) // Note: send data even when both are empty
       checkRemoteSynced(blocks.length + headers.length)
     case BlockChainHandler.BlocksAdded(chainIndex) =>
-      assert(blockNotifyList.contains(chainIndex))
+      assume(blockNotifyList.contains(chainIndex))
       log.debug(s"all the blocks sent for $chainIndex are added")
       blockNotifyList -= chainIndex
       if (blockNotifyList.isEmpty) {

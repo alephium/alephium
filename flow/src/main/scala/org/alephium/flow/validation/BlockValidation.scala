@@ -90,7 +90,7 @@ object BlockValidation extends Validation[Block, BlockStatus] {
       implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     val index      = block.chainIndex
     val brokerInfo = config.brokerInfo
-    assert(index.relateTo(brokerInfo))
+    assume(index.relateTo(brokerInfo))
 
     if (brokerInfo.contains(index.from)) {
       val result = for {

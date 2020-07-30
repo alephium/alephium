@@ -19,12 +19,12 @@ final case class AllHandlers(
   }
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
-    assert(chainIndex.relateTo(config.brokerInfo))
+    assume(chainIndex.relateTo(config.brokerInfo))
     blockHandlers(chainIndex)
   }
 
   def getHeaderHandler(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
-    assert(!chainIndex.relateTo(config.brokerInfo))
+    assume(!chainIndex.relateTo(config.brokerInfo))
     headerHandlers(chainIndex)
   }
 }

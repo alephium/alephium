@@ -137,7 +137,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    assert(config.brokerInfo.contains(chainIndex.from))
+    assume(config.brokerInfo.contains(chainIndex.from))
     val template = blockFlow.prepareBlockFlow(chainIndex)
     template match {
       case Left(error) =>

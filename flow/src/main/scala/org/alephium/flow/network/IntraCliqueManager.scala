@@ -87,7 +87,7 @@ class IntraCliqueManager(
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
-      assert(block.chainIndex.relateTo(config.brokerInfo))
+      assume(block.chainIndex.relateTo(config.brokerInfo))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       // TODO: optimize this without using iteration
       brokers.foreach {

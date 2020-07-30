@@ -13,14 +13,14 @@ trait RandomBytes {
 
   def beforeLast: Byte = {
     val size = bytes.size
-    assert(size >= 2)
+    assume(size >= 2)
     bytes(size - 2)
   }
 
   override def hashCode(): Int = {
     val size = bytes.size
 
-    assert(size >= 4)
+    assume(size >= 4)
 
     (bytes(size - 4) & 0xFF) << 24 |
       (bytes(size - 3) & 0xFF) << 16 |

@@ -24,7 +24,7 @@ trait ChainDifficultyAdjustment {
       hashes     <- chainBack(hash, earlyHeight)
       timestamps <- hashes.mapE(h => getTimestamp(h))
     } yield {
-      assert(timestamps.length == config.medianTimeInterval + 1)
+      assume(timestamps.length == config.medianTimeInterval + 1)
       calMedian(timestamps)
     }
   }

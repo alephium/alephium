@@ -98,7 +98,7 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
 
   def handleMining: Receive = {
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
-      assert(config.brokerInfo.contains(chainIndex.from))
+      assume(config.brokerInfo.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - config.brokerInfo.groupFrom
       val to        = chainIndex.to.value
       increaseCounts(fromShift, to, miningCount)
