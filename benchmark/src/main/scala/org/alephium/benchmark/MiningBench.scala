@@ -4,8 +4,8 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.flow.validation.Validation
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.validation.Validation
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, Random}
 

@@ -9,7 +9,6 @@ import org.alephium.crypto.{Byte32, ED25519, ED25519PublicKey, Keccak256}
 import org.alephium.protocol.Hash
 import org.alephium.serde._
 import org.alephium.util
-
 import org.alephium.util.{Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types

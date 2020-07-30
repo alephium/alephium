@@ -17,8 +17,8 @@ import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
-import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.FlowHandler
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.rpc.{CirceUtils, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}

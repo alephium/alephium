@@ -8,11 +8,11 @@ import akka.actor.Props
 
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.validation.Validation
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.validation.Validation
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript

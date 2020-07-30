@@ -4,10 +4,10 @@ import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, Transaction}
