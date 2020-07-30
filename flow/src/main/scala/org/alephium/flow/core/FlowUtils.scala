@@ -76,7 +76,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
-    assert(config.brokerInfo.contains(chainIndex.from))
+    assume(config.brokerInfo.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
@@ -89,7 +89,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
-    assert(config.brokerInfo.contains(chainIndex.from))
+    assume(config.brokerInfo.contains(chainIndex.from))
     val singleChain  = getBlockChain(chainIndex)
     val bestDeps     = getBestDeps(chainIndex.from)
     val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))

@@ -86,9 +86,9 @@ class BrokerHandlerSpec
             hello.version is 0
             hello.cliqueId is selfCliqueInfo.id
             hello.brokerInfo is config.brokerInfo
-          case _ => assert(false)
+          case _ => assume(false)
         }
-      case _ => assert(false)
+      case _ => assume(false)
     }
 
     val helloAck = HelloAck.unsafe(remoteCliqueInfo.id, remoteBrokerInfo)
@@ -139,9 +139,9 @@ class BrokerHandlerSpec
           case ack: HelloAck =>
             ack.cliqueId is selfCliqueInfo.id
             ack.brokerInfo is config.brokerInfo
-          case _ => assert(false)
+          case _ => assume(false)
         }
-      case _ => assert(false)
+      case _ => assume(false)
     }
     pingpongProbe.expectMsg("start")
   }

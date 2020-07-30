@@ -26,7 +26,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
 
     def createBlockChain(blocks: AVector[Block]): BlockChain = {
-      assert(blocks.nonEmpty)
+      assume(blocks.nonEmpty)
       val chain = buildBlockChain(blocks.head)
       blocks.toIterable.zipWithIndex.tail foreach {
         case (block, index) =>

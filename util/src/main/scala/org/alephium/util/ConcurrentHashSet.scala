@@ -24,7 +24,7 @@ class ConcurrentHashSet[K](s: JCHashMap[K, Boolean]) {
 
   def remove(k: K): Unit = {
     val result = s.remove(k)
-    assert(result)
+    assume(result)
   }
 
   def removeIfExist(k: K): Unit = {

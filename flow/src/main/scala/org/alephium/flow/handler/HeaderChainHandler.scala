@@ -57,7 +57,7 @@ class HeaderChainHandler(
   override def handleMissingParent(headers: Forest[Hash, BlockHeader],
                                    broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin): Unit = {
-    assert(origin.isInstanceOf[DataOrigin.IntraClique])
+    assume(origin.isInstanceOf[DataOrigin.IntraClique])
     log.warning(s"missing parent headers, might be bug or compromised node in the clique")
     feedbackAndClear(broker, dataInvalid())
   }

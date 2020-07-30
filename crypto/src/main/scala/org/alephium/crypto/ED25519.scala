@@ -10,7 +10,7 @@ class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey
 
 object ED25519PrivateKey
     extends RandomBytes.Companion[ED25519PrivateKey](bs => {
-      assert(bs.size == bcEd25519.SECRET_KEY_SIZE)
+      assume(bs.size == bcEd25519.SECRET_KEY_SIZE)
       new ED25519PrivateKey(bs)
     }, _.bytes) {
   override def length: Int = bcEd25519.SECRET_KEY_SIZE
@@ -22,7 +22,7 @@ class ED25519PublicKey(val bytes: ByteString) extends PublicKey {
 
 object ED25519PublicKey
     extends RandomBytes.Companion[ED25519PublicKey](bs => {
-      assert(bs.size == bcEd25519.PUBLIC_KEY_SIZE)
+      assume(bs.size == bcEd25519.PUBLIC_KEY_SIZE)
       new ED25519PublicKey(bs)
     }, _.bytes) {
   override def length: Int = bcEd25519.PUBLIC_KEY_SIZE
@@ -32,7 +32,7 @@ class ED25519Signature(val bytes: ByteString) extends Signature
 
 object ED25519Signature
     extends RandomBytes.Companion[ED25519Signature](bs => {
-      assert(bs.size == bcEd25519.SIGNATURE_SIZE)
+      assume(bs.size == bcEd25519.SIGNATURE_SIZE)
       new ED25519Signature(bs)
     }, _.bytes) {
   override def length: Int = bcEd25519.SIGNATURE_SIZE

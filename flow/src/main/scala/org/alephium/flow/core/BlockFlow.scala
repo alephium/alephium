@@ -50,7 +50,7 @@ object BlockFlow extends StrictLogging {
       extends BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
-      assert(index.relateTo(config.brokerInfo))
+      assume(index.relateTo(config.brokerInfo))
 
       cacheBlock(block)
       for {
@@ -62,7 +62,7 @@ object BlockFlow extends StrictLogging {
 
     def add(header: BlockHeader): IOResult[Unit] = {
       val index = header.chainIndex
-      assert(!index.relateTo(config.brokerInfo))
+      assume(!index.relateTo(config.brokerInfo))
 
       for {
         weight <- calWeight(header)
@@ -159,7 +159,7 @@ object BlockFlow extends StrictLogging {
     private def isExtendingUnsafe(current: Hash, previous: Hash): Boolean = {
       val index1 = ChainIndex.from(current)
       val index2 = ChainIndex.from(previous)
-      assert(index1.from == index2.from)
+      assume(index1.from == index2.from)
 
       val chain = getHashChain(index2)
       if (index1.to == index2.to) Utils.unsafe(chain.isBefore(previous, current))
@@ -171,7 +171,7 @@ object BlockFlow extends StrictLogging {
 
     private def isCompatibleUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Boolean = {
       val newRtips = getRtipsUnsafe(tip, from)
-      assert(rtips.length == newRtips.length)
+      assume(rtips.length == newRtips.length)
       rtips.indices forall { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)
@@ -181,7 +181,7 @@ object BlockFlow extends StrictLogging {
 
     private def updateRtipsUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Unit = {
       val newRtips = getRtipsUnsafe(tip, from)
-      assert(rtips.length == newRtips.length)
+      assume(rtips.length == newRtips.length)
       rtips.indices foreach { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)

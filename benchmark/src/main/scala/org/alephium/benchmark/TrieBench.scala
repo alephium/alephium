@@ -40,6 +40,6 @@ class TrieBench {
       key
     }
     keys.foreach(trie.removeRaw)
-    assert(trie.rootHash == genesisHash)
+    assume(trie.rootHash == genesisHash)
   }
 }

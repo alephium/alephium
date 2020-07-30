@@ -33,22 +33,22 @@ final case class BlockHeader(
   }
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash = {
-    assert(!isGenesis)
+    assume(!isGenesis)
     blockDeps.takeRight(config.groups)(toIndex.value)
   }
 
   def inDeps(implicit config: GroupConfig): AVector[Hash] = {
-    assert(!isGenesis)
+    assume(!isGenesis)
     blockDeps.dropRight(config.groups)
   }
 
   def outDeps(implicit config: GroupConfig): AVector[Hash] = {
-    assert(!isGenesis)
+    assume(!isGenesis)
     blockDeps.takeRight(config.groups)
   }
 
   def outTips(implicit config: GroupConfig): AVector[Hash] = {
-    assert(!isGenesis)
+    assume(!isGenesis)
     blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
   }
 }

@@ -17,7 +17,7 @@ class ConcurrentQueue[E] private (q: ConcurrentLinkedDeque[E]) {
 
   def dequeue: E = {
     val res = q.poll()
-    assert(res != null)
+    assume(res != null)
     res
   }
 
