@@ -37,13 +37,15 @@ class RPCServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new ServerFixture {
-    val header =
-      BlockHeader(AVector(Hash.hash("foo")), Hash.hash("bar"), TimeStamp.zero, 1, 2)
+    val dep         = Hash.hash("foo")
+    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, 1, 2)
     val blockNotify = BlockNotify(header, 1)
+    val headerHash  = header.hash.toHexString
+    val chainIndex  = header.chainIndex
 
     val result = RPCServer.blockNotifyEncode(blockNotify)
 
-    show(result) is """{"hash":"9d131ee1587f668cebefa70937dd8a1b374463131b23411d9cf02d8462c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d"]}"""
+    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":["${dep.toHexString}"]}"""
   }
 
   it should "call mining_start" in new RouteHTTP {

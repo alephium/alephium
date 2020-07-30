@@ -6,7 +6,7 @@ import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature, Sha256}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
@@ -326,7 +326,7 @@ object ApiModel {
   }
 
   final case class ApiKey private (val value: String) {
-    def hash: Hash = Hash.hash(value)
+    def hash: Sha256 = Sha256.hash(value)
   }
 
   object ApiKey {

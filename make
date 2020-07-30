@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, sha3
+import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, hashlib
 
 port_start = 9973
 
@@ -107,7 +107,7 @@ class AlephiumMake(object):
         deployedNodes = get_env_default_int('deployedNodes', 0)
 
         apiKey = secrets.token_urlsafe(32)
-        apiKeyHash = sha3.keccak_256(str.encode(apiKey)).hexdigest()
+        apiKeyHash = hashlib.sha256(str.encode(apiKey)).hexdigest()
         print("Api key: " + apiKey)
 
         for node in range(deployedNodes, deployedNodes + nodes):

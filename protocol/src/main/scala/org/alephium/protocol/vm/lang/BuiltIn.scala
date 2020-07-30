@@ -53,6 +53,8 @@ object BuiltIn {
     }
   }
 
+  val blake2b: SimpleBuiltIn =
+    SimpleBuiltIn("blake2b", Seq(Type.Byte32), Seq(Type.Byte32), Blake2bByte32)
   val keccak256: SimpleBuiltIn =
     SimpleBuiltIn("keccak256", Seq(Type.Byte32), Seq(Type.Byte32), Keccak256Byte32)
   val checkSignature: SimpleBuiltIn =
@@ -142,6 +144,7 @@ object BuiltIn {
   }
 
   val funcs: Map[String, FuncInfo[StatelessContext]] = Seq(
+    blake2b,
     keccak256,
     checkEq,
     checkSignature,
