@@ -9,8 +9,8 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
-import org.alephium.flow.platform.Mode
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -21,7 +21,6 @@ class RestServerSpec
     with EitherValues
     with ScalaFutures
     with NumericHelpers {
-  import ServerFixture._
 
   it should "call GET /blockflow" in new RestServerFixture {
     Get(s"/blockflow?fromTs=0&toTs=0") ~> server.route ~> check {
@@ -36,7 +35,7 @@ class RestServerSpec
   it should "call GET /blocks/<hash>" in new RestServerFixture {
     Get(s"/blocks/${dummyBlockHeader.hash.toHexString}") ~> server.route ~> check {
       val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
-      if (config.brokerInfo.contains(chainIndex.from) || config.brokerInfo.contains(chainIndex.to)) {
+      if (brokerConfig.contains(chainIndex.from) || brokerConfig.contains(chainIndex.to)) {
         status is StatusCodes.OK
         responseAs[BlockEntry] is dummyBlockEntry
       } else {
@@ -143,16 +142,16 @@ class RestServerSpec
   }
 
   trait RestServerFixture extends ServerFixture {
+    lazy val minerProbe = TestProbe()
+    lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
-    val minerProbe = TestProbe()
-    val miner      = ActorRefT[Miner.Command](minerProbe.ref)
-
-    lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
-                                        dummyNeighborCliques,
-                                        dummyBlock,
-                                        TestProbe().ref,
-                                        dummyTx,
-                                        storages)
-    lazy val server: RestServer = RestServer(mode, miner)
+    lazy val blockFlowProbe = TestProbe()
+    lazy val node = new NodeDummy(dummyIntraCliqueInfo,
+                                  dummyNeighborCliques,
+                                  dummyBlock,
+                                  blockFlowProbe.ref,
+                                  dummyTx,
+                                  storages)
+    lazy val server: RestServer = RestServer(node, miner)
   }
 }

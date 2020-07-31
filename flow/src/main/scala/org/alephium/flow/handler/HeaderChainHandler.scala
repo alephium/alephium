@@ -7,16 +7,17 @@ import akka.actor.Props
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.FlowHandler.HeaderAdded
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.validation._
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.{ActorRefT, Forest}
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
-            flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): Props =
+            flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
+                                                         consensusConfig: ConsensusConfig): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
@@ -37,14 +38,15 @@ object HeaderChainHandler {
   case object InvalidHeaders                            extends Event
 }
 
-class HeaderChainHandler(
-    blockFlow: BlockFlow,
-    chainIndex: ChainIndex,
-    flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
+class HeaderChainHandler(blockFlow: BlockFlow,
+                         chainIndex: ChainIndex,
+                         flowHandler: ActorRefT[FlowHandler.Command])(
+    implicit brokerConfig: BrokerConfig,
+    consensusConfig: ConsensusConfig)
     extends ChainHandler[BlockHeader, HeaderStatus, HeaderChainHandler.Command](
       blockFlow,
       chainIndex,
-      HeaderValidation(config)) {
+      HeaderValidation.build) {
   import HeaderChainHandler._
 
   override def receive: Receive = {

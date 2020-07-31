@@ -2,21 +2,24 @@ package org.alephium.flow.network.bootstrap
 
 import akka.actor.ActorRef
 
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
 import org.alephium.protocol.model.CliqueId
 import org.alephium.util.AVector
 
 trait CliqueCoordinatorState {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
+  implicit def networkSetting: NetworkSetting
+  implicit def discoveryConfig: DiscoveryConfig
 
-  val brokerNum        = config.brokerNum
+  val brokerNum        = brokerConfig.brokerNum
   val brokerInfos      = Array.fill[Option[PeerInfo]](brokerNum)(None)
   val brokerConnectors = Array.fill[Option[ActorRef]](brokerNum)(None)
 
   def addBrokerInfo(info: PeerInfo, sender: ActorRef): Boolean = {
     val id = info.id
-    if (id != config.brokerInfo.brokerId &&
-        info.groupNumPerBroker == config.groupNumPerBroker &&
+    if (id != brokerConfig.brokerId &&
+        info.groupNumPerBroker == brokerConfig.groupNumPerBroker &&
         brokerInfos(id).isEmpty) {
       brokerInfos(id)      = Some(info)
       brokerConnectors(id) = Some(sender)
@@ -26,31 +29,31 @@ trait CliqueCoordinatorState {
 
   def isBrokerInfoFull: Boolean = {
     brokerInfos.zipWithIndex.forall {
-      case (opt, idx) => opt.nonEmpty || idx == config.brokerInfo.brokerId
+      case (opt, idx) => opt.nonEmpty || idx == brokerConfig.brokerId
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def broadcast[T](message: T): Unit = {
     brokerConnectors.zipWithIndex.foreach {
-      case (opt, idx) => if (idx != config.brokerInfo.brokerId) opt.get ! message
+      case (opt, idx) => if (idx != brokerConfig.brokerId) opt.get ! message
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   protected def buildCliqueInfo: IntraCliqueInfo = {
-    val infos = AVector.tabulate(config.brokerNum) { i =>
-      if (i == config.brokerInfo.brokerId) PeerInfo.self else brokerInfos(i).get
+    val infos = AVector.tabulate(brokerConfig.brokerNum) { i =>
+      if (i == brokerConfig.brokerId) PeerInfo.self else brokerInfos(i).get
     }
-    assume(infos.length * config.groupNumPerBroker == config.groups)
-    IntraCliqueInfo.unsafe(CliqueId.unsafe(config.discoveryPublicKey.bytes),
+    assume(infos.length * brokerConfig.groupNumPerBroker == brokerConfig.groups)
+    IntraCliqueInfo.unsafe(CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes),
                            infos,
-                           config.groupNumPerBroker)
+                           brokerConfig.groupNumPerBroker)
   }
 
   val readys: Array[Boolean] = {
     val result = Array.fill(brokerNum)(false)
-    result(config.brokerInfo.brokerId) = true
+    result(brokerConfig.brokerId) = true
     result
   }
   def isAllReady: Boolean     = readys.forall(identity)
@@ -58,7 +61,7 @@ trait CliqueCoordinatorState {
 
   val closeds: Array[Boolean] = {
     val result = Array.fill(brokerNum)(false)
-    result(config.brokerInfo.brokerId) = true
+    result(brokerConfig.brokerId) = true
     result
   }
   def isAllClosed: Boolean = closeds.forall(identity)

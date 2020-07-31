@@ -2,10 +2,11 @@ package org.alephium.flow.core
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.WorldState
 
 trait BlockChainWithState extends BlockChain {
@@ -37,37 +38,40 @@ trait BlockChainWithState extends BlockChain {
 }
 
 object BlockChainWithState {
-  def fromGenesisUnsafe(storages: Storages)(
-      chainIndex: ChainIndex,
-      updateState: BlockFlow.TrieUpdater)(implicit config: PlatformConfig): BlockChainWithState = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val initialize   = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
-    createUnsafe(chainIndex, genesisBlock, storages, updateState, initialize)
+  def fromGenesisUnsafe(storages: Storages)(genesisBlock: Block,
+                                            updateState: BlockFlow.TrieUpdater)(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting): BlockChainWithState = {
+    val initialize = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
+    createUnsafe(genesisBlock, storages, updateState, initialize)
   }
 
-  def fromStorageUnsafe(storages: Storages)(
-      chainIndex: ChainIndex,
-      updateState: BlockFlow.TrieUpdater)(implicit config: PlatformConfig): BlockChainWithState = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock, storages, updateState, initializeFromStorage)
+  def fromStorageUnsafe(storages: Storages)(genesisBlock: Block,
+                                            updateState: BlockFlow.TrieUpdater)(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting): BlockChainWithState = {
+    createUnsafe(genesisBlock, storages, updateState, initializeFromStorage)
   }
 
   def createUnsafe(
-      chainIndex: ChainIndex,
       rootBlock: Block,
       storages: Storages,
       _updateState: BlockFlow.TrieUpdater,
       initialize: BlockChainWithState => IOResult[Unit]
-  )(implicit _config: PlatformConfig): BlockChainWithState = {
+  )(implicit _brokerConfig: BrokerConfig,
+    _consensusSetting: ConsensusSetting): BlockChainWithState = {
     val blockchain = new BlockChainWithState {
-      override implicit val config    = _config
-      override val blockStorage       = storages.blockStorage
-      override val headerStorage      = storages.headerStorage
-      override val blockStateStorage  = storages.blockStateStorage
-      override val trieHashStorage    = storages.trieHashStorage
-      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
-      override val genesisHash        = rootBlock.hash
+      override val brokerConfig      = _brokerConfig
+      override val consensusConfig   = _consensusSetting
+      override val blockStorage      = storages.blockStorage
+      override val headerStorage     = storages.headerStorage
+      override val blockStateStorage = storages.blockStateStorage
+      override val trieHashStorage   = storages.trieHashStorage
+      override val heightIndexStorage =
+        storages.nodeStateStorage.heightIndexStorage(rootBlock.chainIndex)
+      override val chainStateStorage =
+        storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
+      override val genesisHash = rootBlock.hash
 
       override def updateState(worldState: WorldState, block: Block): IOResult[WorldState] =
         _updateState(worldState, block)

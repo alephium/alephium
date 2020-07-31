@@ -76,9 +76,7 @@ trait NonCoinbaseValidation {
 object NonCoinbaseValidation {
   import ValidationStatus._
 
-  def apply(groupConfig: GroupConfig): NonCoinbaseValidation = {
-    new Impl()(groupConfig)
-  }
+  def build(implicit groupConfig: GroupConfig): NonCoinbaseValidation = new Impl()
 
   class Impl(implicit val groupConfig: GroupConfig) extends NonCoinbaseValidation {
     protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {

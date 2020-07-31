@@ -1,6 +1,7 @@
 package org.alephium.flow.mempool
 
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.{AVector, RWLock}
 
@@ -9,7 +10,7 @@ import org.alephium.util.{AVector, RWLock}
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
-class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit config: PlatformConfig)
+class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit groupConfig: GroupConfig)
     extends RWLock {
   def getPool(index: ChainIndex): TxPool = {
     assume(group == index.from)
@@ -37,7 +38,7 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
   // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(toRemove: AVector[AVector[Transaction]],
             toAdd: AVector[AVector[(Transaction, Double)]]): (Int, Int) = writeOnly {
-    assume(toRemove.length == config.groups && toAdd.length == config.groups)
+    assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
     // First, add transactions from short chains, then remove transactions from canonical chains
     val added   = toAdd.foldWithIndex(0)((sum, txs, toGroup)    => sum + pools(toGroup).add(txs))
@@ -51,8 +52,9 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit confi
 }
 
 object MemPool {
-  def empty(groupIndex: GroupIndex)(implicit config: PlatformConfig): MemPool = {
-    val pools = AVector.fill(config.groups)(TxPool.empty(config.txPoolCapacity))
+  def empty(groupIndex: GroupIndex)(implicit groupConfig: GroupConfig,
+                                    memPoolSetting: MemPoolSetting): MemPool = {
+    val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
     new MemPool(groupIndex, pools)
   }
 }

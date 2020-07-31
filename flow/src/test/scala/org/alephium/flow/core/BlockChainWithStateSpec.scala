@@ -9,8 +9,8 @@ import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   trait Fixture {
-    val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
-    val blockGen = blockGenOf(AVector.fill(config.depsNum)(genesis.hash))
+    val genesis  = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
+    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
     val chainGen = chainGenOf(4, genesis)
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
     val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))
@@ -21,7 +21,6 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       val dbFolder = "db-" + Hash.random.toHexString
       val storages = Storages.createUnsafe(rootPath, dbFolder, Settings.syncWrite)
       BlockChainWithState.createUnsafe(
-        ChainIndex.unsafe(0, 0),
         genesis,
         storages,
         (worldState, _) => { updateCount += 1; Right(worldState) },

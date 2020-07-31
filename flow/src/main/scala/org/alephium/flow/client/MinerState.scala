@@ -2,19 +2,22 @@ package org.alephium.flow.client
 
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.MiningSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.ActorRefT
 
 trait MinerState {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
+  implicit def miningConfig: MiningSetting
 
   def handlers: AllHandlers
 
-  protected val miningCounts = Array.fill[BigInt](config.groupNumPerBroker, config.groups)(0)
-  protected val running      = Array.fill(config.groupNumPerBroker, config.groups)(false)
+  protected val miningCounts =
+    Array.fill[BigInt](brokerConfig.groupNumPerBroker, brokerConfig.groups)(0)
+  protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
   protected lazy val pendingTasks =
-    Array.tabulate(config.groupNumPerBroker, config.groups)(prepareTemplate)
+    Array.tabulate(brokerConfig.groupNumPerBroker, brokerConfig.groups)(prepareTemplate)
 
   def getMiningCount(fromShift: Int, to: Int): BigInt = miningCounts(fromShift)(to)
 
@@ -34,8 +37,8 @@ trait MinerState {
 
   def updateTasks(): Unit = {
     for {
-      fromShift <- 0 until config.groupNumPerBroker
-      to        <- 0 until config.groups
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
     } {
       val blockTemplate = prepareTemplate(fromShift, to)
       pendingTasks(fromShift)(to) = blockTemplate
@@ -46,10 +49,11 @@ trait MinerState {
   protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
     val minCount = miningCounts.map(_.min).min
     for {
-      fromShift <- 0 until config.groupNumPerBroker
-      to        <- 0 until config.groups
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
       if {
-        (miningCounts(fromShift)(to) <= minCount + config.nonceStep) && !isRunning(fromShift, to)
+        (miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep) && !isRunning(fromShift,
+                                                                                         to)
       }
     } yield {
       (fromShift, to, pendingTasks(fromShift)(to))
@@ -59,7 +63,7 @@ trait MinerState {
   protected def startNewTasks(): Unit = {
     pickTasks().foreach {
       case (fromShift, to, template) =>
-        val index        = ChainIndex.unsafe(fromShift + config.brokerInfo.groupFrom, to)
+        val index        = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
         val blockHandler = handlers.getBlockHandler(index)
         startTask(fromShift, to, template, blockHandler)
         setRunning(fromShift, to)

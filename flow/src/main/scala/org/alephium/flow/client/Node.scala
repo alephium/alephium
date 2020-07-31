@@ -11,12 +11,11 @@ import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
-import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
 trait Node extends Service {
-  implicit def config: PlatformConfig
+  implicit def config: AlephiumConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
   def server: ActorRefT[TcpServer.Command]
@@ -40,26 +39,33 @@ trait Node extends Service {
 }
 
 object Node {
-  def build(builders: BrokerHandler.Builder, storages: Storages)(
+  def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
-      platformConfig: PlatformConfig): Node = new Node {
-    val config          = platformConfig
-    implicit val system = actorSystem
+      _config: AlephiumConfig
+  ): Node = new Node {
+    implicit val system          = actorSystem
+    val config                   = _config
+    implicit val brokerConfig    = config.broker
+    implicit val consensusConfig = config.consensus
+    implicit val networkSetting  = config.network
+    implicit val discoveryConfig = config.discovery
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
-    val server: ActorRefT[TcpServer.Command] = ActorRefT
-      .build[TcpServer.Command](system, TcpServer.props(config.publicAddress.getPort), "TcpServer")
+    val server: ActorRefT[TcpServer.Command] =
+      ActorRefT.build[TcpServer.Command](system,
+                                         TcpServer.props(config.network.publicAddress.getPort),
+                                         "TcpServer")
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
 
     val discoveryProps: Props =
-      DiscoveryServer.props(config.publicAddress, config.bootstrap)(config, config)
+      DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
     val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system, CliqueManager.props(builders, discoveryServer), "CliqueManager")
+      ActorRefT.build(system, CliqueManager.props(discoveryServer), "CliqueManager")
 
     val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
 
@@ -74,13 +80,17 @@ object Node {
       ActorRefT.build(system, Monitor.props(this), "NodeMonitor")
   }
 
-  def buildBlockFlowUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+  def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {
     val nodeStateStorage = storages.nodeStateStorage
     val isInitialized    = Utils.unsafe(nodeStateStorage.isInitialized())
     if (isInitialized) {
-      BlockFlow.fromStorageUnsafe(storages)
+      BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)(config.broker,
+                                                                  config.consensus,
+                                                                  config.mempool)
     } else {
-      val blockflow = BlockFlow.fromGenesisUnsafe(storages)
+      val blockflow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)(config.broker,
+                                                                                  config.consensus,
+                                                                                  config.mempool)
       Utils.unsafe(nodeStateStorage.setInitialized())
       blockflow
     }

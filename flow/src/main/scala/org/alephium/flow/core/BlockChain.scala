@@ -3,10 +3,11 @@ package org.alephium.flow.core
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io._
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
@@ -62,33 +63,35 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 }
 
 object BlockChain {
-  def fromGenesisUnsafe(storages: Storages)(chainIndex: ChainIndex)(
-      implicit config: PlatformConfig): BlockChain = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    val initialize   = initializeGenesis(genesisBlock)(_)
-    createUnsafe(chainIndex, genesisBlock, storages, initialize)
+  def fromGenesisUnsafe(storages: Storages)(genesisBlock: Block)(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting): BlockChain = {
+    val initialize = initializeGenesis(genesisBlock)(_)
+    createUnsafe(genesisBlock, storages, initialize)
   }
 
-  def fromStorageUnsafe(storages: Storages)(chainIndex: ChainIndex)(
-      implicit config: PlatformConfig): BlockChain = {
-    val genesisBlock = config.genesisBlocks(chainIndex.from.value)(chainIndex.to.value)
-    createUnsafe(chainIndex, genesisBlock, storages, initializeFromStorage)
+  def fromStorageUnsafe(storages: Storages)(genesisBlock: Block)(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting): BlockChain = {
+    createUnsafe(genesisBlock, storages, initializeFromStorage)
   }
 
   def createUnsafe(
-      chainIndex: ChainIndex,
       rootBlock: Block,
       storages: Storages,
       initialize: BlockChain => IOResult[Unit]
-  )(implicit _config: PlatformConfig): BlockChain = {
+  )(implicit _brokerConfig: BrokerConfig, _consensusSetting: ConsensusSetting): BlockChain = {
     val blockchain: BlockChain = new BlockChain {
-      override implicit val config    = _config
-      override val blockStorage       = storages.blockStorage
-      override val headerStorage      = storages.headerStorage
-      override val blockStateStorage  = storages.blockStateStorage
-      override val heightIndexStorage = storages.nodeStateStorage.heightIndexStorage(chainIndex)
-      override val chainStateStorage  = storages.nodeStateStorage.chainStateStorage(chainIndex)
-      override val genesisHash: Hash  = rootBlock.hash
+      override val brokerConfig      = _brokerConfig
+      override val consensusConfig   = _consensusSetting
+      override val blockStorage      = storages.blockStorage
+      override val headerStorage     = storages.headerStorage
+      override val blockStateStorage = storages.blockStateStorage
+      override val heightIndexStorage =
+        storages.nodeStateStorage.heightIndexStorage(rootBlock.chainIndex)
+      override val chainStateStorage =
+        storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
+      override val genesisHash: Hash = rootBlock.hash
     }
 
     Utils.unsafe(initialize(blockchain))

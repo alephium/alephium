@@ -14,7 +14,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
     forAll(blockGen) { block =>
       val group =
         GroupIndex.unsafe(
-          config.brokerInfo.groupFrom + Random.source.nextInt(config.groupNumPerBroker))
+          brokerConfig.groupFrom + Random.source.nextInt(brokerConfig.groupNumPerBroker))
       val pool  = MemPool.empty(group)
       val index = block.chainIndex
       if (index.from.equals(group)) {
@@ -58,8 +58,8 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
   }
 
   it should "use write lock for reorg" in new Fixture {
-    val foo = AVector.fill(config.groups)(AVector.empty[Transaction])
-    val bar = AVector.fill(config.groups)(AVector.empty[(Transaction, Double)])
+    val foo = AVector.fill(brokerConfig.groups)(AVector.empty[Transaction])
+    val bar = AVector.fill(brokerConfig.groups)(AVector.empty[(Transaction, Double)])
     checkWriteLock(rwl)((1, 1), pool.reorg(foo, bar), (0, 0))
   }
 }

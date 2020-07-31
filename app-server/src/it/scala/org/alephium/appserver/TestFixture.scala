@@ -3,7 +3,8 @@ package org.alephium.appserver
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.{Await, Promise}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -22,7 +23,7 @@ import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
-import org.alephium.flow.platform._
+import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
@@ -43,9 +44,9 @@ trait TestFixtureLike
     (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "1Dx7Y4RxkCvoYvhQpMnRZi2yJnSbUeoVZY5R1vSYWSk9p"
-  val publicKey               = "9b85fef33febd483e055b01af0671714b56c6f3b6f45612589c2d6ae5337fb6d"
-  val privateKey              = "9167a5de4cfd4cd36a5ab065e21b2659f34cfd3503fde883b0fa5556d03cb64f"
+  val address                 = "1BHhKnn8moe8GsELAUQZKBhTeDTbPBmLXTCANkZ6eAHdK"
+  val publicKey               = "e7599ec69d841b61fe316d6d5ea8702263ecaa8ac883e04edcc021dbd1c33776"
+  val privateKey              = "4449039341f7a2b435b7ea87a65b53284bffd82b41c574a0fd3eb27968634ffa"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
@@ -104,26 +105,30 @@ trait TestFixtureLike
     }
   }
 
-  def buildConfig(publicPort: Int,
-                  masterPort: Int,
-                  brokerId: Int,
-                  brokerNum: Int                       = 2,
-                  bootstrap: Option[InetSocketAddress] = None) = {
-    new PlatformConfigFixture {
+  def buildEnv(publicPort: Int,
+               masterPort: Int,
+               brokerId: Int,
+               brokerNum: Int                       = 2,
+               bootstrap: Option[InetSocketAddress] = None) = {
+    new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
-        ("alephium.network.masterAddress", s"localhost:${masterPort}"),
-        ("alephium.network.publicAddress", s"localhost:$publicPort"),
-        ("alephium.network.rpcPort", publicPort - 100),
-        ("alephium.network.wsPort", publicPort - 200),
-        ("alephium.network.restPort", publicPort - 300),
-        ("alephium.clique.brokerNum", brokerNum),
-        ("alephium.broker.brokerId", brokerId),
-        ("alephium.rpc.apiKeyHash", apiKeyHash.toHexString)
-      ) ++ bootstrap
-        .map(address => Map("alephium.bootstrap" -> s"localhost:${address.getPort}"))
-        .getOrElse(Map.empty)
-      override implicit lazy val config =
-        PlatformConfig.build(newConfig, rootPath, None)
+        ("alephium.network.master-address", s"localhost:$masterPort"),
+        ("alephium.network.public-address", s"localhost:$publicPort"),
+        ("alephium.network.rpc-port", publicPort - 100),
+        ("alephium.network.ws-port", publicPort - 200),
+        ("alephium.network.rest-port", publicPort - 300),
+        ("alephium.broker.broker-num", brokerNum),
+        ("alephium.broker.broker-id", brokerId),
+        ("alephium.api.api-key-hash", apiKeyHash.toHexString)
+      )
+      override implicit lazy val config = {
+        val tmp = AlephiumConfig.build(newConfig, None).toOption.get
+        bootstrap match {
+          case Some(address) =>
+            tmp.copy(discovery = tmp.discovery.copy(bootstrap = ArraySeq(address)))
+          case None => tmp
+        }
+      }
     }
   }
 
@@ -146,23 +151,25 @@ trait TestFixtureLike
                brokerNum: Int                       = 2,
                masterPort: Int                      = defaultMasterPort,
                bootstrap: Option[InetSocketAddress] = None): Server = {
-    val platformConfig = buildConfig(publicPort, masterPort, brokerId, brokerNum, bootstrap)
+    val platformEnv = buildEnv(publicPort, masterPort, brokerId, brokerNum, bootstrap)
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
-        ActorSystem(s"$name-${Random.source.nextInt}", platformConfig.config.all)
+        ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
-      implicit val config           = platformConfig.config
+      implicit val config           = platformEnv.config
+      implicit val apiConfig        = ApiConfig.load(platformEnv.newConfig).toOption.get
 
-      override val mode: Mode = new ModeTest
+      override val node: Node = Node.build(platformEnv.storages)
       lazy val miner: ActorRefT[Miner.Command] = {
-        val props =
-          Miner.props(mode.node)(config).withDispatcher("akka.actor.mining-dispatcher")
+        val props = Miner
+          .props(node)(config.broker, config.mining)
+          .withDispatcher("akka.actor.mining-dispatcher")
         ActorRefT.build(system, props, s"FairMiner")
       }
 
-      lazy val rpcServer: RPCServer   = RPCServer(mode, miner)
-      lazy val restServer: RestServer = RestServer(mode, miner)
+      lazy val rpcServer: RPCServer   = RPCServer(node, miner)
+      lazy val restServer: RestServer = RestServer(node, miner)
     }
 
     implicit val executionContext = server.system.dispatcher
@@ -235,19 +242,4 @@ trait TestFixtureLike
 
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
     jsonRpc("blockflow_fetch", s"""{"fromTs":${fromTs.millis},"toTs":${toTs.millis}}""")
-
-  class ModeTest(implicit val system: ActorSystem,
-                 val config: PlatformConfig,
-                 val executionContext: ExecutionContext)
-      extends Mode
-      with StoragesFixture {
-
-    override val node: Node = Node.build(Mode.defaultBuilders, storages)
-
-    override def stopSelfOnce(): Future[Unit] =
-      for {
-        _ <- Future.successful(storages.close())
-        _ <- Future.successful(storages.dESTROYUnsafe())
-      } yield (())
-  }
 }

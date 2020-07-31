@@ -5,10 +5,10 @@ import scala.reflect.ClassTag
 
 import org.alephium.crypto.ED25519PrivateKey
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -17,74 +17,82 @@ import org.alephium.util._
 trait BlockFlowState {
   import BlockFlowState._
 
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
+  def consensusConfig: ConsensusSetting
+  def groups: Int = brokerConfig.groups
+  def genesisBlocks: AVector[AVector[Block]]
 
-  val brokerInfo: BrokerInfo = config.brokerInfo
-
-  val groups: Int = config.groups
-
-  private val bestDeps = Array.tabulate(config.groupNumPerBroker) { fromShift =>
-    val mainGroup = brokerInfo.groupFrom + fromShift
+  private val bestDeps = Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
+    val mainGroup = brokerConfig.groupFrom + fromShift
     val deps1 = AVector.tabulate(groups - 1) { i =>
-      if (i < mainGroup) config.genesisBlocks(i).head.hash
-      else config.genesisBlocks(i + 1).head.hash
+      if (i < mainGroup) genesisBlocks(i).head.hash
+      else genesisBlocks(i + 1).head.hash
     }
-    val deps2 = config.genesisBlocks(mainGroup).map(_.hash)
+    val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps(deps1 ++ deps2)
   }
 
-  def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState
-  def blockchainBuilder: ChainIndex                                   => BlockChain
-  def blockheaderChainBuilder: ChainIndex                             => BlockHeaderChain
+  def blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState
+  def blockchainBuilder: Block                                   => BlockChain
+  def blockheaderChainBuilder: BlockHeader                       => BlockHeaderChain
 
   private val intraGroupChains: AVector[BlockChainWithState] = {
-    AVector.tabulate(config.groupNumPerBroker) { groupShift =>
-      val group = brokerInfo.groupFrom + groupShift
-      blockchainWithStateBuilder(ChainIndex.unsafe(group, group), updateState)
+    AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
+      val group        = brokerConfig.groupFrom + groupShift
+      val genesisBlock = genesisBlocks(group)(group)
+      blockchainWithStateBuilder(genesisBlock, updateState)
     }
   }
 
   private val inBlockChains: AVector[AVector[BlockChain]] =
-    AVector.tabulate(config.groupNumPerBroker, groups - config.groupNumPerBroker) { (toShift, k) =>
-      val mainGroup = brokerInfo.groupFrom + toShift
-      val fromIndex = if (k < brokerInfo.groupFrom) k else k + config.groupNumPerBroker
-      blockchainBuilder(ChainIndex.unsafe(fromIndex, mainGroup))
+    AVector.tabulate(brokerConfig.groupNumPerBroker, groups - brokerConfig.groupNumPerBroker) {
+      (toShift, k) =>
+        val mainGroup    = brokerConfig.groupFrom + toShift
+        val fromIndex    = if (k < brokerConfig.groupFrom) k else k + brokerConfig.groupNumPerBroker
+        val genesisBlock = genesisBlocks(fromIndex)(mainGroup)
+        blockchainBuilder(genesisBlock)
     }
   private val outBlockChains: AVector[AVector[BlockChain]] =
-    AVector.tabulate(config.groupNumPerBroker, groups) { (fromShift, to) =>
-      val mainGroup = brokerInfo.groupFrom + fromShift
+    AVector.tabulate(brokerConfig.groupNumPerBroker, groups) { (fromShift, to) =>
+      val mainGroup = brokerConfig.groupFrom + fromShift
       if (mainGroup == to) {
         intraGroupChains(fromShift)
       } else {
-        blockchainBuilder(ChainIndex.unsafe(mainGroup, to))
+        val genesisBlock = genesisBlocks(mainGroup)(to)
+        blockchainBuilder(genesisBlock)
       }
     }
   private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
     AVector.tabulate(groups, groups) {
       case (from, to) =>
-        if (brokerInfo.containsRaw(from)) {
-          val fromShift = from - brokerInfo.groupFrom
+        if (brokerConfig.containsRaw(from)) {
+          val fromShift = from - brokerConfig.groupFrom
           outBlockChains(fromShift)(to)
-        } else if (brokerInfo.containsRaw(to)) {
-          val toShift   = to - brokerInfo.groupFrom
-          val fromIndex = if (from < brokerInfo.groupFrom) from else from - config.groupNumPerBroker
+        } else if (brokerConfig.containsRaw(to)) {
+          val toShift = to - brokerConfig.groupFrom
+          val fromIndex =
+            if (from < brokerConfig.groupFrom) from else from - brokerConfig.groupNumPerBroker
           inBlockChains(toShift)(fromIndex)
-        } else blockheaderChainBuilder(ChainIndex.unsafe(from, to))
+        } else {
+          val genesisHeader = genesisBlocks(from)(to).header
+          blockheaderChainBuilder(genesisHeader)
+        }
     }
 
   // Cache latest blocks for assisting merkle trie
-  private val groupCaches = AVector.fill(config.groupNumPerBroker) {
-    LruCache[Hash, BlockCache, IOError](config.blockCacheCapacity)
+  private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
+    LruCache[Hash, BlockCache, IOError](
+      consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum)
   }
 
   def getGroupCache(groupIndex: GroupIndex): LruCache[Hash, BlockCache, IOError] = {
-    assume(brokerInfo.contains(groupIndex))
-    groupCaches(groupIndex.value - brokerInfo.groupFrom)
+    assume(brokerConfig.contains(groupIndex))
+    groupCaches(groupIndex.value - brokerConfig.groupFrom)
   }
 
   def cacheBlock(block: Block): Unit = {
     val index = block.chainIndex
-    (brokerInfo.groupFrom until brokerInfo.groupUntil).foreach { group =>
+    (brokerConfig.groupFrom until brokerConfig.groupUntil).foreach { group =>
       val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {
@@ -123,21 +131,21 @@ trait BlockFlowState {
   def getBlockChain(hash: Hash): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
-    assume(brokerInfo.contains(from) || brokerInfo.contains(to))
-    if (brokerInfo.contains(from)) {
-      outBlockChains(from.value - brokerInfo.groupFrom)(to.value)
+    assume(brokerConfig.contains(from) || brokerConfig.contains(to))
+    if (brokerConfig.contains(from)) {
+      outBlockChains(from.value - brokerConfig.groupFrom)(to.value)
     } else {
       val fromIndex =
-        if (from.value < brokerInfo.groupFrom) from.value
-        else from.value - config.groupNumPerBroker
-      val toShift = to.value - brokerInfo.groupFrom
+        if (from.value < brokerConfig.groupFrom) from.value
+        else from.value - brokerConfig.groupNumPerBroker
+      val toShift = to.value - brokerConfig.groupFrom
       inBlockChains(toShift)(fromIndex)
     }
   }
 
   protected def getBlockChainWithState(group: GroupIndex): BlockChainWithState = {
-    assume(brokerInfo.contains(group))
-    intraGroupChains(group.value - brokerInfo.groupFrom)
+    assume(brokerConfig.contains(group))
+    intraGroupChains(group.value - brokerConfig.groupFrom)
   }
 
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain = {
@@ -150,15 +158,15 @@ trait BlockFlowState {
 
   private def getPersistedTrie(deps: AVector[Hash],
                                groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
-    assume(deps.length == config.depsNum)
-    val hash = deps(config.groups - 1 + groupIndex.value)
+    assume(deps.length == brokerConfig.depsNum)
+    val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
   private def getCachedTrie(deps: AVector[Hash],
                             groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
-    assume(deps.length == config.depsNum)
-    val hash = deps(config.groups - 1 + groupIndex.value)
+    assume(deps.length == brokerConfig.depsNum)
+    val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
 
@@ -173,7 +181,7 @@ trait BlockFlowState {
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
-    val groupShift = groupIndex.value - brokerInfo.groupFrom
+    val groupShift = groupIndex.value - brokerConfig.groupFrom
     bestDeps(groupShift)
   }
 
@@ -183,20 +191,20 @@ trait BlockFlowState {
   }
 
   def getBestPersistedTrie(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
-    assume(config.brokerInfo.contains(groupIndex))
+    assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getPersistedTrie(deps.deps, groupIndex)
   }
 
   def getBestCachedTrie(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
-    assume(config.brokerInfo.contains(groupIndex))
+    assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getCachedTrie(deps.deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
-    assume(brokerInfo.containsRaw(mainGroup))
-    val groupShift = mainGroup - brokerInfo.groupFrom
+    assume(brokerConfig.containsRaw(mainGroup))
+    val groupShift = mainGroup - brokerConfig.groupFrom
     bestDeps(groupShift) = deps
   }
 
@@ -205,7 +213,7 @@ trait BlockFlowState {
   def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Hash] = {
     val index = header.chainIndex
     if (header.isGenesis) {
-      config.genesisBlocks(index.from.value).map(_.hash)
+      genesisBlocks(index.from.value).map(_.hash)
     } else {
       if (inclusive) {
         header.outDeps.replace(index.to.value, header.hash)
@@ -218,7 +226,7 @@ trait BlockFlowState {
   def getInTip(dep: Hash, currentGroup: GroupIndex): IOResult[Hash] = {
     getBlockHeader(dep).map { header =>
       val from = header.chainIndex.from
-      if (header.isGenesis) config.genesisBlocks(from.value)(currentGroup.value).hash
+      if (header.isGenesis) genesisBlocks(from.value)(currentGroup.value).hash
       else {
         if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
       }
@@ -231,10 +239,10 @@ trait BlockFlowState {
                    inclusive: Boolean): IOResult[AVector[Hash]] = {
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
-        if (i < currentGroup.value) config.genesisBlocks(i)(currentGroup.value).hash
-        else config.genesisBlocks(i + 1)(currentGroup.value).hash
+        if (i < currentGroup.value) genesisBlocks(i)(currentGroup.value).hash
+        else genesisBlocks(i + 1)(currentGroup.value).hash
       }
-      val outTips = config.genesisBlocks(currentGroup.value).map(_.hash)
+      val outTips = genesisBlocks(currentGroup.value).map(_.hash)
       Right(inTips ++ outTips)
     } else {
       val outTips = getOutTips(header, inclusive)
@@ -309,7 +317,7 @@ trait BlockFlowState {
 
   def getUtxos(lockupScript: LockupScript): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
     val groupIndex = lockupScript.groupIndex
-    assume(config.brokerInfo.contains(groupIndex))
+    assume(brokerConfig.contains(groupIndex))
 
     for {
       bestTrie <- getBestPersistedTrie(groupIndex)
@@ -435,7 +443,7 @@ object BlockFlowState {
 
   // This is only used for out blocks for a specific group
   private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
-      implicit config: GroupConfig): Map[TxOutputRef, TxOutput] = {
+      implicit brokerConfig: GroupConfig): Map[TxOutputRef, TxOutput] = {
     convertOutputs(block)._1.filter {
       case (outputRef: AssetOutputRef, _) if outputRef.fromGroup == groupIndex => true
       case _                                                                   => false
@@ -443,7 +451,7 @@ object BlockFlowState {
   }
 
   def convertBlock(block: Block, groupIndex: GroupIndex)(
-      implicit config: PlatformConfig): BlockCache = {
+      implicit brokerConfig: BrokerConfig): BlockCache = {
     val index = block.chainIndex
     assume(index.relateTo(groupIndex))
     if (index.isIntraGroup) {
@@ -457,7 +465,7 @@ object BlockFlowState {
   }
 
   def updateState(worldState: WorldState, block: Block, targetGroup: GroupIndex)(
-      implicit config: GroupConfig): IOResult[WorldState] = {
+      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
@@ -479,7 +487,7 @@ object BlockFlowState {
   }
 
   def updateStateForInOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit config: GroupConfig): IOResult[WorldState] = {
+      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     for {
       state0 <- updateStateForTxScript(worldState, tx)
       state1 <- updateStateForInputs(state0, tx)
@@ -488,7 +496,7 @@ object BlockFlowState {
   }
 
   def updateStateForOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit config: GroupConfig): IOResult[WorldState] = {
+      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     for {
       state0 <- updateStateForInputs(worldState, tx)
       state1 <- updateStateForOutputs(state0, tx, targetGroup)
@@ -496,7 +504,7 @@ object BlockFlowState {
   }
 
   def updateStateForInBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit config: GroupConfig): IOResult[WorldState] = {
+      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     updateStateForOutputs(worldState, tx, targetGroup)
   }
 
@@ -521,7 +529,7 @@ object BlockFlowState {
   private def updateStateForOutputs(
       worldState: WorldState,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit config: GroupConfig): IOResult[WorldState] = {
+      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     (tx.unsigned.fixedOutputs ++ tx.generatedOutputs).foldWithIndexE(worldState) {
       case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = AssetOutputRef.from(output, TxOutputRef.key(tx, index))

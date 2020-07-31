@@ -44,7 +44,7 @@ object ServerUtils {
     } yield balance
 
   def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = {
-    Right(Group(query.address.groupIndex(blockFlow.config).value))
+    Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
   def createTransaction(blockFlow: BlockFlow,
@@ -158,8 +158,8 @@ object ServerUtils {
   }
 
   def checkGroup(blockFlow: BlockFlow, address: Address): Try[Unit] = {
-    val groupIndex = address.groupIndex(blockFlow.config)
-    if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
+    val groupIndex = address.groupIndex(blockFlow.brokerConfig)
+    if (blockFlow.brokerConfig.contains(groupIndex)) Right(())
     else {
       val addressStr = CirceUtils.print(address.asJson)
       Left(Response.failed(s"Address $addressStr belongs to other groups"))
@@ -169,8 +169,8 @@ object ServerUtils {
   def checkChainIndex(blockFlow: BlockFlow, hash: Hash)(
       implicit groupConfig: GroupConfig): Try[Unit] = {
     val chainIndex = ChainIndex.from(hash)
-    if (blockFlow.config.brokerInfo.contains(chainIndex.from) || blockFlow.config.brokerInfo
-          .contains(chainIndex.to)) Right(())
+    if (blockFlow.brokerConfig.contains(chainIndex.from) ||
+        blockFlow.brokerConfig.contains(chainIndex.to)) Right(())
     else Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
   }
 

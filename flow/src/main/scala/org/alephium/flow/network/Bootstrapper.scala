@@ -4,7 +4,8 @@ import akka.actor.{ActorContext, ActorRef, Props}
 import akka.io.Tcp
 
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
@@ -13,7 +14,9 @@ object Bootstrapper {
       server: ActorRefT[TcpServer.Command],
       discoveryServer: ActorRefT[DiscoveryServer.Command],
       cliqueManager: ActorRefT[CliqueManager.Command]
-  )(implicit config: PlatformConfig): Props =
+  )(implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting,
+    discoveryConfig: DiscoveryConfig): Props =
     props(
       server,
       discoveryServer,
@@ -28,15 +31,18 @@ object Bootstrapper {
       cliqueManager: ActorRefT[CliqueManager.Command],
       cliqueCoordinatorBuilder: (ActorContext, ActorRef) => ActorRef,
       brokerBuilder: (ActorContext, ActorRef)            => ActorRef
-  )(implicit config: PlatformConfig): Props = {
-    if (config.brokerNum == 1) {
-      assume(config.groupNumPerBroker == config.groups)
-      val cliqueId        = CliqueId.unsafe(config.discoveryPublicKey.bytes)
-      val peerInfos       = AVector(PeerInfo.self)
-      val intraCliqueInfo = IntraCliqueInfo.unsafe(cliqueId, peerInfos, config.groupNumPerBroker)
+  )(implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting,
+    discoveryConfig: DiscoveryConfig): Props = {
+    if (brokerConfig.brokerNum == 1) {
+      assume(brokerConfig.groupNumPerBroker == brokerConfig.groups)
+      val cliqueId  = CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes)
+      val peerInfos = AVector(PeerInfo.self)
+      val intraCliqueInfo =
+        IntraCliqueInfo.unsafe(cliqueId, peerInfos, brokerConfig.groupNumPerBroker)
       Props(
         new SingleNodeCliqueBootstrapper(server, discoveryServer, cliqueManager, intraCliqueInfo))
-    } else if (config.isCoordinator) {
+    } else if (networkSetting.isCoordinator) {
       Props(
         new CliqueCoordinatorBootstrapper(server,
                                           discoveryServer,
@@ -48,20 +54,21 @@ object Bootstrapper {
   }
 
   object Builder {
-    def cliqueCoordinator(implicit config: PlatformConfig): (ActorContext, ActorRef) => ActorRef = {
+    def cliqueCoordinator(
+        implicit brokerConfig: BrokerConfig,
+        networkSetting: NetworkSetting,
+        discoveryConfig: DiscoveryConfig): (ActorContext, ActorRef) => ActorRef = {
       (actorContext, bootstrapper) =>
         actorContext.actorOf(
           CliqueCoordinator.props(ActorRefT[Bootstrapper.Command](bootstrapper)),
           "CliqueCoordinator"
         )
     }
-    def broker(implicit config: PlatformConfig): (ActorContext, ActorRef) => ActorRef = {
+    def broker(implicit brokerConfig: BrokerConfig,
+               networkSetting: NetworkSetting): (ActorContext, ActorRef) => ActorRef = {
       (actorContext, bootstrapper) =>
         actorContext.actorOf(
-          Broker.props(config.masterAddress,
-                       config.brokerInfo,
-                       config.retryTimeout,
-                       ActorRefT[Bootstrapper.Command](bootstrapper)),
+          Broker.props(ActorRefT[Bootstrapper.Command](bootstrapper)),
           "Broker"
         )
     }

@@ -2,6 +2,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import akka.event.LoggingAdapter
@@ -36,7 +37,7 @@ class DiscoveryServerStateSpec
       implicit def discoveryConfig: DiscoveryConfig = self.config
       def log: LoggingAdapter                       = system.log
 
-      def bootstrap: AVector[InetSocketAddress] = AVector.empty
+      def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
 
       def selfCliqueInfo: CliqueInfo =
         CliqueInfo.unsafe(CliqueId.generate,

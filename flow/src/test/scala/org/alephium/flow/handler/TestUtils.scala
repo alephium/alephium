@@ -5,8 +5,8 @@ import java.nio.file.Path
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOUtils
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, Files => AFiles}
 
@@ -16,26 +16,26 @@ object TestUtils {
                              blockHandlers: Map[ChainIndex, TestProbe],
                              headerHandlers: Map[ChainIndex, TestProbe])
 
-  def createBlockHandlersProbe(implicit config: PlatformConfig,
+  def createBlockHandlersProbe(implicit brokerConfig: BrokerConfig,
                                system: ActorSystem): (AllHandlers, AllHandlerProbs) = {
     val flowProbe   = TestProbe()
     val flowHandler = ActorRefT[FlowHandler.Command](flowProbe.ref)
     val txProbe     = TestProbe()
     val txHandler   = ActorRefT[TxHandler.Command](txProbe.ref)
     val blockHandlers = (for {
-      from <- 0 until config.groups
-      to   <- 0 until config.groups
+      from <- 0 until brokerConfig.groups
+      to   <- 0 until brokerConfig.groups
       chainIndex = ChainIndex.unsafe(from, to)
-      if chainIndex.relateTo(config.brokerInfo)
+      if chainIndex.relateTo(brokerConfig)
     } yield {
       val probe = TestProbe()
       chainIndex -> (ActorRefT[BlockChainHandler.Command](probe.ref) -> probe)
     }).toMap
     val headerHandlers = (for {
-      from <- 0 until config.groups
-      to   <- 0 until config.groups
+      from <- 0 until brokerConfig.groups
+      to   <- 0 until brokerConfig.groups
       chainIndex = ChainIndex.unsafe(from, to)
-      if !chainIndex.relateTo(config.brokerInfo)
+      if !chainIndex.relateTo(brokerConfig)
     } yield {
       val probe = TestProbe()
       chainIndex -> (ActorRefT[HeaderChainHandler.Command](probe.ref) -> probe)

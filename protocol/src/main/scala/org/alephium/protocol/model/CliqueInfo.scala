@@ -28,6 +28,9 @@ final case class CliqueInfo private (
   def brokerNum: Int = peers.length
 
   def masterAddress: InetSocketAddress = peers.head
+
+  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): BrokerInfo =
+    brokers(brokerConfig.brokerId)
 }
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {

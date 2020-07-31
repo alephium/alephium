@@ -39,66 +39,69 @@ akka {
 }
 
 alephium {
-  groups = ${groups}
-
-  clique {
-    brokerNum = ${groups}
-    brokerNum = ${?brokerNum}
-  }
-
   broker {
-    brokerId = ${brokerId}
+    groups = ${groups}
+    broker-num = ${groups}
+    broker-num = ${?broker-num}
+    broker-id = ${broker-id}
   }
 
   consensus {
-    numZerosAtLeastInHash = 18
-    numZerosAtLeastInHash = ${?zeros}
-    blockTargetTime = 2 minutes
-    tipsPruneInterval = 100
-    blockCacheCapacityPerChain = 25
+    num-zeros-at-least-in-hash = 18
+    num-zeros-at-least-in-hash = ${?zeros}
+    block-target-time = 2 minutes
+    tips-prune-interval = 100
+    block-cache-capacity-per-chain = 25
   }
 
   mining {
-    nonceStep = 10000
+    nonce-step = 10000
   }
 
   network {
-    pingFrequency = 300 second
-    retryTimeout = 300 second
-    publicAddress = ${publicAddress}
-    masterAddress = ${masterAddress}
-    numOfSyncBlocksLimit = 128
+    ping-frequency = 300 second
+    retry-timeout = 300 second
+    public-address = ${public-address}
+    master-address = ${master-address}
+    num-of-sync-blocks-limit = 128
 
-    rpcPort = 0
-    rpcPort = ${?rpcPort}
-    wsPort = 0
-    wsPort = ${?wsPort}
-    restPort = 0
-    restPort = ${?restPort}
+    rpc-port = 0
+    rpc-port = ${?rpc-port}
+    ws-port = 0
+    ws-port = ${?ws-port}
+    rest-port = 0
+    rest-port = ${?rest-port}
   }
 
   discovery {
-    peersPerGroup = 16
-    scanMaxPerGroup = 8
-    scanFrequency = 120.seconds
-    scanFastFrequency = 10.seconds
-    neighborsPerGroup = 8
+    bootstrap = []
+    bootstrap = ${?bootstrap}
+
+    peers-per-group = 16
+    scan-max-per-group = 8
+    scan-frequency = 120.seconds
+    scan-fast-frequency = 10.seconds
+    neighbors-per-group = 8
+  }
+
+  mempool {
+    tx-pool-capacity = 1000
+    tx-max-number-per-block = 1000
   }
 
   api {
-    network.interface = "127.0.0.1"
-    blockflowFetch.maxAge = 30 minutes
-    ask.timeout = 5 seconds
-    apiKeyHash = ${?apiKeyHash}
+    network-interface = "127.0.0.1"
+    blockflow-fetch-max-age = 30 minutes
+    ask-timeout = 5 seconds
+    api-key-hash = ${?api-key-hash}
   }
 
-  bootstrap=""
-  bootstrap = ${?bootstrap}
-
-  genesis = [
-    "1Dx7Y4RxkCvoYvhQpMnRZi2yJnSbUeoVZY5R1vSYWSk9p:100",
-    "1Ca33aWTUJFyoGbn7VuQoPqQgX9nyZKdLg9qVMh7JkMmw:100",
-    "13eh6wZfCah2ARW7ZE7HTYC8TvVhTteqNwjrqTHUk1XhD:100",
-    "1AFmfTe1S6TYsKLmuMxhUSDj8hCvBVoAuff1CQnysNx15:100",
-  ]
+  genesis = {
+    balances = [
+      "1BHhKnn8moe8GsELAUQZKBhTeDTbPBmLXTCANkZ6eAHdK:100",
+      "1Er5PoAV2NAPWAuH1E3eNtVnWftDT7krb1zBuLKpSxGyz:100",
+      "1DWu6iQySTRzVX6Fra6taEGVN9L8XgNHemP9QXwwRnVJg:100",
+      "1GsuUk3ZjxbKAVutz1jsRqXNGLYWcxAM9Ztkw9GGVEK7C:100",
+    ]
+  }
 }

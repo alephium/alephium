@@ -5,15 +5,14 @@ import scala.annotation.tailrec
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.ALF
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
 
   def genesisHash: Hash
 

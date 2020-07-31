@@ -4,25 +4,21 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.io.StoragesFixture
-import org.alephium.flow.platform._
+import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
-import org.alephium.protocol.ALF
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
-import org.alephium.util._
+import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.model.{Block, NoIndexModelGenerators}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
-  trait Fixture extends PlatformConfigFixture {
-    val genesis  = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
-    val blockGen = blockGenOf(AVector.fill(config.depsNum)(genesis.hash))
+  trait Fixture extends AlephiumConfigFixture {
+    val genesis  = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
+    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
     val chainGen = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
-      val storages = StoragesFixture.buildStorages
-      BlockChain.createUnsafe(ChainIndex.unsafe(0, 0),
-                              genesisBlock,
-                              storages,
-                              BlockChain.initializeGenesis(genesisBlock)(_))
+      val storages = StoragesFixture.buildStorages(rootPath)
+      BlockChain.createUnsafe(genesisBlock, storages, BlockChain.initializeGenesis(genesisBlock)(_))
     }
 
     def createBlockChain(blocks: AVector[Block]): BlockChain = {

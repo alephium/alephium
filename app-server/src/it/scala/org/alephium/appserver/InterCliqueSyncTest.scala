@@ -2,6 +2,9 @@ package org.alephium.appserver
 
 import java.net.InetSocketAddress
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
 import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
@@ -11,20 +14,20 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val fromTs = TimeStamp.now()
 
     val clique1           = bootClique(nbOfNodes = 2)
-    val masterPortClique1 = clique1.head.config.masterAddress.getPort
+    val masterPortClique1 = clique1.head.config.network.masterAddress.getPort
 
-    clique1.foreach(_.start())
+    Future.sequence(clique1.map(_.start())).futureValue
 
     startWS(wsPort(masterPortClique1))
 
     clique1.foreach { server =>
-      request[Boolean](startMining, rpcPort(server.config.publicAddress.getPort)) is true
+      request[Boolean](startMining, rpcPort(server.config.network.publicAddress.getPort)) is true
     }
 
     blockNotifyProbe.receiveN(1, Duration.ofMinutesUnsafe(2).asScala)
 
     clique1.foreach { server =>
-      request[Boolean](stopMining, rpcPort(server.config.publicAddress.getPort)) is true
+      request[Boolean](stopMining, rpcPort(server.config.network.publicAddress.getPort)) is true
     }
 
     val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
@@ -32,20 +35,20 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val clique2 =
       bootClique(nbOfNodes = 2,
                  bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
-    val masterPortClique2 = clique2.head.config.masterAddress.getPort
+    val masterPortClique2 = clique2.head.config.network.masterAddress.getPort
 
-    clique2.foreach(_.start())
+    Future.sequence(clique2.map(_.start())).futureValue
 
     clique2.zip(clique1).foreach {
       case (server, remote) =>
         eventually {
           val response =
             request[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo,
-                                              rpcPort(server.config.publicAddress.getPort))
+                                              rpcPort(server.config.network.publicAddress.getPort))
           response is Seq(
             InterCliquePeerInfo(selfClique1.cliqueId,
                                 new InetSocketAddress("localhost",
-                                                      remote.config.publicAddress.getPort),
+                                                      remote.config.network.publicAddress.getPort),
                                 true))
         }
     }

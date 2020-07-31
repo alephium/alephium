@@ -2,19 +2,20 @@ package org.alephium.flow.network.clique
 
 import java.net.InetSocketAddress
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
-import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
@@ -23,8 +24,6 @@ import org.alephium.util.{ActorRefT, AVector, Random}
 class BrokerHandlerSpec
     extends AlephiumFlowActorSpec("BrokerHandlerSpec")
     with NoIndexModelGeneratorsLike { Spec =>
-  behavior of "BrokerHandler"
-
   def genBroker(): (InetSocketAddress, CliqueInfo, BrokerInfo) = {
     val cliqueInfo = cliqueInfoGen.sample.get
     val id         = Random.source.nextInt(cliqueInfo.brokerNum)
@@ -48,35 +47,20 @@ class BrokerHandlerSpec
     val cliqueManagerT           = ActorRefT[CliqueManager.Command](cliqueManager.ref)
   }
 
+  behavior of "BrokerHandler"
+
   it should "send hello to inbound connections" in new BaseFixture {
     val pingpongProbe = TestProbe()
-    val builder = new BrokerHandler.Builder {
-      override def createInboundBrokerHandler(
-          selfCliqueInfo: CliqueInfo,
-          remote: InetSocketAddress,
-          connection: ActorRefT[Tcp.Command],
-          blockHandlers: AllHandlers,
-          cliqueManager: ActorRefT[CliqueManager.Command]
-      )(implicit config: PlatformConfig): Props =
-        Props(new InboundBrokerHandler(selfCliqueInfo,
-                                       remote,
-                                       connection,
-                                       blockHandlers,
-                                       cliqueManager) {
+    val inboundBrokerHandler =
+      system.actorOf(Props(
+        new InboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT) {
           override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
 
           override def startPingPong(): Unit = pingpongProbe.ref ! "start"
 
           isSyncing is false
-        })
-    }
-    val inboundBrokerHandler =
-      system.actorOf(
-        builder.createInboundBrokerHandler(selfCliqueInfo,
-                                           remote,
-                                           connectionT,
-                                           allHandlers,
-                                           cliqueManagerT))
+        }))
+
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgPF() {
       case write: Tcp.Write =>
@@ -85,7 +69,7 @@ class BrokerHandlerSpec
           case hello: Hello =>
             hello.version is 0
             hello.cliqueId is selfCliqueInfo.id
-            hello.brokerInfo is config.brokerInfo
+            hello.brokerInfo is selfCliqueInfo.selfBrokerInfo
           case _ => assume(false)
         }
       case _ => assume(false)
@@ -98,34 +82,19 @@ class BrokerHandlerSpec
 
   it should "response HelloAck to Hello" in new BaseFixture {
     val pingpongProbe = TestProbe()
-    val builder = new BrokerHandler.Builder {
-      override def createOutboundBrokerHandler(
-          selfCliqueInfo: CliqueInfo,
-          remoteCliqueId: CliqueId,
-          remoteBroker: BrokerInfo,
-          blockHandlers: AllHandlers,
-          cliqueManager: ActorRefT[CliqueManager.Command]
-      )(implicit config: PlatformConfig): Props = {
-        Props(
-          new OutboundBrokerHandler(selfCliqueInfo,
-                                    remoteCliqueId,
-                                    remoteBroker,
-                                    blockHandlers,
-                                    cliqueManager) {
-            override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
-
-            override def startPingPong(): Unit = pingpongProbe.ref ! "start"
-
-            isSyncing is false
-          })
-      }
-    }
     val outboundBrokerHandler = system.actorOf(
-      builder.createOutboundBrokerHandler(selfCliqueInfo,
-                                          remoteCliqueInfo.id,
-                                          remoteBrokerInfo,
-                                          allHandlers,
-                                          cliqueManagerT))
+      Props(
+        new OutboundBrokerHandler(selfCliqueInfo,
+                                  remoteCliqueInfo.id,
+                                  remoteBrokerInfo,
+                                  allHandlers,
+                                  cliqueManagerT) {
+          override def handleRelayPayload(payload: Payload): Unit = payloadHandler.ref ! payload
+
+          override def startPingPong(): Unit = pingpongProbe.ref ! "start"
+
+          isSyncing is false
+        }))
 
     outboundBrokerHandler.tell(Tcp.Connected(remote, local), connection.ref)
     connection.expectMsgType[Tcp.Register]
@@ -138,7 +107,7 @@ class BrokerHandlerSpec
         message.payload match {
           case ack: HelloAck =>
             ack.cliqueId is selfCliqueInfo.id
-            ack.brokerInfo is config.brokerInfo
+            ack.brokerInfo is selfCliqueInfo.selfBrokerInfo
           case _ => assume(false)
         }
       case _ => assume(false)
@@ -147,25 +116,14 @@ class BrokerHandlerSpec
   }
 
   trait Fixture extends BaseFixture { obj =>
-    val builder = new BrokerHandler.Builder {
-      override def createInboundBrokerHandler(
-          selfCliqueInfo: CliqueInfo,
-          remote: InetSocketAddress,
-          connection: ActorRefT[Tcp.Command],
-          blockHandlers: AllHandlers,
-          cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
-        Props(new InboundBrokerHandler(selfCliqueInfo,
-                                       remote,
-                                       connection,
-                                       blockHandlers,
-                                       cliqueManager) {
+    val tcpHandler = system.actorOf(
+      Props(
+        new InboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT) {
           setPayloadHandler(payloadHandler.ref ! _)
 
           self ! BrokerHandler.TcpAck // confirm that hello is sent out
         })
-    }
-    val tcpHandler = system.actorOf(builder
-      .createInboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT))
+    )
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -237,28 +195,20 @@ class BrokerHandlerSpec
   }
 
   trait RelayFixture extends BaseFixture { obj =>
-    val builder = new BrokerHandler.Builder {
-      override def createInboundBrokerHandler(
-          selfCliqueInfo: CliqueInfo,
-          remote: InetSocketAddress,
-          connection: ActorRefT[Tcp.Command],
-          allHandlers: AllHandlers,
-          cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
-        Props(
-          new InboundBrokerHandler(selfCliqueInfo, remote, connection, allHandlers, cliqueManager) {
-            override val allHandlers: AllHandlers = obj.allHandlers
+    val tcpHandler = system.actorOf(
+      Props(
+        new InboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT) {
+          override val allHandlers: AllHandlers = obj.allHandlers
 
-            override def unhandled(message: Any): Unit = {
-              throw new RuntimeException(s"Test Failed: $message")
-            }
+          override def unhandled(message: Any): Unit = {
+            throw new RuntimeException(s"Test Failed: $message")
+          }
 
-            startRelay()
+          startRelay()
 
-            self ! BrokerHandler.TcpAck
-          })
-    }
-    val tcpHandler = system.actorOf(builder
-      .createInboundBrokerHandler(selfCliqueInfo, remote, connectionT, allHandlers, cliqueManagerT))
+          self ! BrokerHandler.TcpAck
+        })
+    )
 
     connection.expectMsgType[Tcp.Register]
     connection.expectMsgType[Tcp.Write]
@@ -307,8 +257,16 @@ class BrokerHandlerSpec
   behavior of "Sync protocol"
 
   trait SyncFixture extends BaseFixture { Base =>
+    @tailrec
+    final def genRemoteClique(valid: Boolean): (CliqueInfo, BrokerInfo) = {
+      val (_, cliqueInfo, brokerInfo) = genBroker()
+      if (brokerInfo.intersect(brokerConfig) equals valid) (cliqueInfo, brokerInfo)
+      else genRemoteClique(valid)
+    }
+
     val syncHandlerRef = TestActorRef(new BrokerHandler {
-      override def config: PlatformConfig                          = Spec.config
+      override def brokerConfig: BrokerConfig                      = Spec.brokerConfig
+      override def networkSetting: NetworkSetting                  = Spec.networkSetting
       override def remote: InetSocketAddress                       = Base.remote
       var remoteCliqueId: CliqueId                                 = _
       var remoteBrokerInfo: BrokerInfo                             = _
@@ -328,36 +286,56 @@ class BrokerHandlerSpec
       override def handleSendBlocks(blocks: AVector[Block],
                                     notifyListOpt: Option[mutable.HashSet[ChainIndex]]): Unit = ()
     })
+    watch(syncHandlerRef)
     val syncHandler = syncHandlerRef.underlyingActor
 
-    def testSync(remoteCliqueInfo: CliqueInfo, remoteBrokerInfo: BrokerInfo): Assertion = {
+    def testSync(remoteCliqueInfo: CliqueInfo,
+                 remoteBrokerInfo: BrokerInfo,
+                 valid: Boolean): Object = {
       syncHandler.isSyncing is false
       syncHandler.uponHandshaked(remoteCliqueInfo.id, remoteBrokerInfo)
-      syncHandler.isSyncing is true
 
-      val block      = blockGenOf(config.brokerInfo).sample.get
-      val blocksMsg0 = Message.serialize(SyncResponse(AVector(block), AVector.empty))
-      syncHandlerRef ! Tcp.Received(blocksMsg0)
-      syncHandler.isSyncing is true
-      val blocksMsg1 = Message.serialize(SyncResponse(AVector.empty, AVector.empty))
-      syncHandlerRef ! Tcp.Received(blocksMsg1)
-      syncHandlerRef ! FlowHandler.SyncData(AVector.empty, AVector.empty)
-      syncHandler.isSyncing is false
+      if (valid) {
+        syncHandler.isSyncing is true
+
+        val block      = blockGenOf(brokerConfig).sample.get
+        val blocksMsg0 = Message.serialize(SyncResponse(AVector(block), AVector.empty))
+        syncHandlerRef ! Tcp.Received(blocksMsg0)
+        syncHandler.isSyncing is true
+        val blocksMsg1 = Message.serialize(SyncResponse(AVector.empty, AVector.empty))
+        syncHandlerRef ! Tcp.Received(blocksMsg1)
+        syncHandlerRef ! FlowHandler.SyncData(AVector.empty, AVector.empty)
+        syncHandler.isSyncing is false
+      } else {
+        expectTerminated(syncHandlerRef)
+      }
     }
+  }
+
+  it should "not sync invalid intra-clique node" in new SyncFixture {
+    testSync(selfCliqueInfo, selfBrokerInfo, false)
   }
 
   it should "sync intra-clique node" in new SyncFixture {
     val remoteCliqueInfoNew: CliqueInfo =
-      CliqueInfo.unsafe(this.selfCliqueInfo.id, AVector.empty, config.groupNumPerBroker)
+      CliqueInfo.unsafe(this.selfCliqueInfo.id, AVector.empty, brokerConfig.groupNumPerBroker)
     val remoteBrokerInfoNew: BrokerInfo =
-      BrokerInfo.unsafe((config.brokerInfo.brokerId + 1) % config.brokerNum,
-                        config.groupNumPerBroker,
+      BrokerInfo.unsafe((brokerConfig.brokerId + 1) % brokerConfig.brokerNum,
+                        brokerConfig.groupNumPerBroker,
                         remote)
-    testSync(remoteCliqueInfoNew, remoteBrokerInfoNew)
+    testSync(remoteCliqueInfoNew, remoteBrokerInfoNew, true)
+  }
+
+  it should "not sync inter-clique node" in new SyncFixture {
+
+    val (invalidRemoteCliqueInfo, invalidRemoteBrokerInfo) = genRemoteClique(false)
+    invalidRemoteCliqueInfo.id isnot selfCliqueInfo.id
+    testSync(invalidRemoteCliqueInfo, invalidRemoteBrokerInfo, false)
   }
 
   it should "sync inter-clique node" in new SyncFixture {
-    remoteCliqueInfo.id isnot selfCliqueInfo.id
-    testSync(remoteCliqueInfo, config.brokerInfo)
+    val (validRemoteCliqueInfo, validRemoteBrokerInfo) = genRemoteClique(true)
+    validRemoteCliqueInfo.id isnot selfCliqueInfo.id
+    testSync(validRemoteCliqueInfo, validRemoteBrokerInfo, true)
   }
 }

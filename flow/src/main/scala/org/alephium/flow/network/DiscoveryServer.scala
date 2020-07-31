@@ -2,6 +2,8 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.immutable.ArraySeq
+
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
@@ -13,7 +15,7 @@ import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
-  def props(publicAddress: InetSocketAddress, bootstrap: AVector[InetSocketAddress])(
+  def props(publicAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props =
     Props(new DiscoveryServer(publicAddress, bootstrap))
@@ -21,7 +23,7 @@ object DiscoveryServer {
   def props(publicAddress: InetSocketAddress, peers: InetSocketAddress*)(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props = {
-    props(publicAddress, AVector.from(peers))
+    props(publicAddress, ArraySeq.from(peers))
   }
 
   final case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
@@ -60,7 +62,7 @@ object DiscoveryServer {
  *  TODO: each group has several buckets instead of just one bucket
  */
 class DiscoveryServer(val publicAddress: InetSocketAddress,
-                      val bootstrap: AVector[InetSocketAddress])(
+                      val bootstrap: ArraySeq[InetSocketAddress])(
     implicit val groupConfig: GroupConfig,
     val discoveryConfig: DiscoveryConfig)
     extends BaseActor
