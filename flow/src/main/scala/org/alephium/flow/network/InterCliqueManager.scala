@@ -137,7 +137,7 @@ trait InterCliqueManagerState {
   private val brokers = collection.mutable.HashMap.empty[(CliqueId, Int), BrokerState]
 
   def addBroker(cliqueId: CliqueId, brokerInfo: BrokerInfo, broker: ActorRef): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.id
+    val brokerKey = cliqueId -> brokerInfo.brokerId
     if (!brokers.contains(brokerKey)) {
       brokers += brokerKey -> BrokerState(brokerInfo, broker, isSynced = false)
     } else {
@@ -162,7 +162,7 @@ trait InterCliqueManagerState {
   }
 
   def setSynced(cliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.id
+    val brokerKey = cliqueId -> brokerInfo.brokerId
     brokers.get(brokerKey) match {
       case Some(state) => brokers(brokerKey) = state.setSynced()
       case None        => log.warning(s"Unexpected message Synced from $cliqueId")

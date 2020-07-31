@@ -6,45 +6,38 @@ import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
-final case class BrokerInfo private (
-    id: Int,
-    groupNumPerBroker: Int,
-    address: InetSocketAddress
-) {
-  val groupFrom: Int = id * groupNumPerBroker
+trait BrokerGroupInfo {
+  def brokerId: Int
+  def groupNumPerBroker: Int
 
-  val groupUntil: Int = (id + 1) * groupNumPerBroker
+  lazy val groupFrom: Int = brokerId * groupNumPerBroker
+
+  lazy val groupUntil: Int = (brokerId + 1) * groupNumPerBroker
 
   def contains(index: GroupIndex): Boolean = containsRaw(index.value)
 
   def containsRaw(index: Int): Boolean = groupFrom <= index && index < groupUntil
 
-  def intersect(another: BrokerInfo): Boolean =
+  def intersect(another: BrokerGroupInfo): Boolean =
     BrokerInfo.intersect(groupFrom, groupUntil, another.groupFrom, another.groupUntil)
 
-  def calIntersection(another: BrokerInfo): (Int, Int) = {
+  def calIntersection(another: BrokerGroupInfo): (Int, Int) = {
     (math.max(groupFrom, another.groupFrom), math.min(groupUntil, another.groupUntil))
-  }
-
-  override def toString: String = s"BrokerInfo($id, $groupNumPerBroker, $address)"
-
-  override def equals(obj: Any): Boolean = obj match {
-    case that: BrokerInfo =>
-      id == that.id && groupNumPerBroker == that.groupNumPerBroker && address == that.address
-    case _ => false
-  }
-
-  override def hashCode(): Int = {
-    id.hashCode() ^ groupNumPerBroker ^ address.hashCode()
   }
 }
 
+final case class BrokerInfo private (
+    brokerId: Int,
+    groupNumPerBroker: Int,
+    address: InetSocketAddress
+) extends BrokerGroupInfo
+
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   val _serde: Serde[BrokerInfo] =
-    Serde.forProduct3(unsafe, t => (t.id, t.groupNumPerBroker, t.address))
+    Serde.forProduct3(unsafe, t => (t.brokerId, t.groupNumPerBroker, t.address))
 
   override def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    validate(info.id, info.groupNumPerBroker)
+    validate(info.brokerId, info.groupNumPerBroker)
   }
 
   def from(id: Int, groupNumPerBroker: Int, address: InetSocketAddress)(

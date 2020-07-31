@@ -36,7 +36,7 @@ object Mode {
       extends Mode {
 
     private val storages: Storages = {
-      val postfix  = s"${config.brokerInfo.id}-${config.publicAddress.getPort}"
+      val postfix  = s"${config.brokerInfo.brokerId}-${config.publicAddress.getPort}"
       val dbFolder = "db-" + postfix
 
       Storages.createUnsafe(config.rootPath, dbFolder, Settings.writeOptions)

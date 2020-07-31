@@ -301,7 +301,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   it should "transfer token for inter-group transactions" in {
     import config.brokerInfo
 
-    val anotherBroker = (brokerInfo.id + 1 + Random.source.nextInt(config.brokerNum - 1)) % config.brokerNum
+    val anotherBroker = (brokerInfo.brokerId + 1 + Random.source.nextInt(config.brokerNum - 1)) % config.brokerNum
     val newConfigFixture = new PlatformConfigFixture {
       override val configValues = Map(
         ("alephium.broker.brokerId", anotherBroker)
@@ -459,7 +459,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       s"${txOutput.scriptHint}:${txOutput.amount}"
     }
 
-    val address   = genesisBalances(config.brokerInfo.id)._2
+    val address   = genesisBalances(config.brokerInfo.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
     val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))

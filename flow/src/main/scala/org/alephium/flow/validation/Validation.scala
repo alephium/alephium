@@ -1,17 +1,15 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core._
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus] {
-  implicit def groupConfig: GroupConfig
+  implicit def brokerConfig: BrokerConfig
   implicit def consensusConfig: ConsensusConfig
-  implicit def platformConfig: PlatformConfig
 
   def validate(data: T, flow: BlockFlow): IOResult[S]
 

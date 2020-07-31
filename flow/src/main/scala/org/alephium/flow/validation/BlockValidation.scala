@@ -4,7 +4,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
 trait BlockValidation extends Validation[Block, BlockStatus] {
@@ -63,7 +63,7 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
   }
 
   private[validation] def checkGroup(block: Block): BlockValidationResult[Unit] = {
-    if (block.chainIndex.relateTo(platformConfig.brokerInfo)) validBlock(())
+    if (block.chainIndex.relateTo(brokerConfig)) validBlock(())
     else invalidBlock(InvalidGroup)
   }
 
@@ -87,11 +87,10 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
 
   private[validation] def checkNonCoinbases(block: Block,
                                             flow: BlockFlow): BlockValidationResult[Unit] = {
-    val index      = block.chainIndex
-    val brokerInfo = platformConfig.brokerInfo
-    assume(index.relateTo(brokerInfo))
+    val index = block.chainIndex
+    assume(index.relateTo(brokerConfig))
 
-    if (brokerInfo.contains(index.from)) {
+    if (brokerConfig.contains(index.from)) {
       val result = for {
         _    <- checkBlockDoubleSpending(block)
         trie <- ValidationStatus.from(flow.getPersistedTrie(block))
@@ -120,16 +119,14 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
 object BlockValidation {
   def apply(platformConfig: PlatformConfig): BlockValidation = new Impl(platformConfig)
 
-  class Impl(_platformConfig: PlatformConfig) extends BlockValidation {
-    override implicit def groupConfig: GroupConfig = _platformConfig
+  class Impl(platformConfig: PlatformConfig) extends BlockValidation {
+    override implicit def brokerConfig: BrokerConfig = platformConfig
 
-    override implicit def consensusConfig: ConsensusConfig = _platformConfig
+    override implicit def consensusConfig: ConsensusConfig = platformConfig
 
-    override implicit def platformConfig: PlatformConfig = _platformConfig
-
-    override def headerValidation: HeaderValidation = HeaderValidation(_platformConfig)
+    override def headerValidation: HeaderValidation = HeaderValidation(platformConfig)
 
     override def nonCoinbaseValidation: NonCoinbaseValidation =
-      NonCoinbaseValidation(_platformConfig)
+      NonCoinbaseValidation(platformConfig)
   }
 }

@@ -22,9 +22,8 @@ class BrokerInfoSpec extends AlephiumSpec {
         implicit val config = new GroupConfig { override def groups: Int = _groups }
         forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>
           implicit val cliqueConfig = new CliqueConfig {
-            override def brokerNum: Int         = groups / groupNumPerBroker
-            override def groupNumPerBroker: Int = _groupNumPerBroker
-            override def groups: Int            = _groups
+            override def brokerNum: Int = groups / _groupNumPerBroker
+            override def groups: Int    = _groups
           }
           forAll(brokerInfoGen) { brokerInfo =>
             val count = (0 until _groups).count(brokerInfo.containsRaw)
@@ -42,9 +41,9 @@ class BrokerInfoSpec extends AlephiumSpec {
     }
     forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>
       val cliqueConfig = new CliqueConfig {
-        override def brokerNum: Int         = groups / groupNumPerBroker
-        override def groupNumPerBroker: Int = _groupNumPerBroker
-        override def groups: Int            = self.groups
+        override def brokerNum: Int              = groups / groupNumPerBroker
+        override lazy val groupNumPerBroker: Int = _groupNumPerBroker
+        override val groups: Int                 = self.groups
       }
       0 until cliqueConfig.brokerNum foreach { id =>
         BrokerInfo.validate(id, _groupNumPerBroker).isRight is true

@@ -63,7 +63,7 @@ class Broker(masterAddress: InetSocketAddress,
     case Tcp.Received(data) =>
       BrokerConnector.unwrap(IntraCliqueInfo._deserialize(unaligned ++ data)) match {
         case Right(Some((cliqueInfo, _))) =>
-          val ack = BrokerConnector.Ack(brokerInfo.id)
+          val ack = BrokerConnector.Ack(brokerInfo.brokerId)
           connection ! BrokerConnector.envelop(ack)
           context become awaitReady(connection, cliqueInfo, ByteString.empty)
         case Right(None) =>

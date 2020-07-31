@@ -350,7 +350,7 @@ class BrokerHandlerSpec
     val remoteCliqueInfoNew: CliqueInfo =
       CliqueInfo.unsafe(this.selfCliqueInfo.id, AVector.empty, config.groupNumPerBroker)
     val remoteBrokerInfoNew: BrokerInfo =
-      BrokerInfo.unsafe((config.brokerInfo.id + 1) % config.brokerNum,
+      BrokerInfo.unsafe((config.brokerInfo.brokerId + 1) % config.brokerNum,
                         config.groupNumPerBroker,
                         remote)
     testSync(remoteCliqueInfoNew, remoteBrokerInfoNew)

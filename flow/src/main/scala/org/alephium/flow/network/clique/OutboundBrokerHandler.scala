@@ -70,7 +70,7 @@ class OutboundBrokerHandler(
 
   def handleBrokerInfo(_remoteCliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
     if (_remoteCliqueId != remoteCliqueId ||
-        remoteBrokerInfo.id != brokerInfo.id ||
+        remoteBrokerInfo.brokerId != brokerInfo.brokerId ||
         remoteBrokerInfo.groupNumPerBroker != brokerInfo.groupNumPerBroker) {
       context stop self
     }

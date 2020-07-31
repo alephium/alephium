@@ -29,7 +29,7 @@ class IntraCliqueManager(
     cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
     extends BaseActor {
   cliqueInfo.brokers.foreach { remoteBroker =>
-    if (remoteBroker.id > config.brokerInfo.id) {
+    if (remoteBroker.brokerId > config.brokerInfo.brokerId) {
       val address = remoteBroker.address
       log.debug(s"Connect to broker $remoteBroker")
       val props = builder.createOutboundBrokerHandler(cliqueInfo,
@@ -50,7 +50,7 @@ class IntraCliqueManager(
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connection from $remote")
       val index = cliqueInfo.peers.indexWhere(_ == remote)
-      if (index < config.brokerInfo.id) {
+      if (index < config.brokerInfo.brokerId) {
         // Note: index == -1 is also the right condition
         log.debug(s"Inbound connection: $remote")
         val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
@@ -66,10 +66,10 @@ class IntraCliqueManager(
     case CliqueManager.Syncing(cliqueId, broker) =>
       log.debug(s"Start syncing with intra-clique node: $cliqueId, $broker")
     case CliqueManager.Synced(cliqueId, brokerInfo) =>
-      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.id)) {
+      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()
-        val newBrokers = brokers + (brokerInfo.id -> (brokerInfo -> sender()))
+        val newBrokers = brokers + (brokerInfo.brokerId -> (brokerInfo -> sender()))
         checkAllSynced(newBrokers)
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
