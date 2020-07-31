@@ -5,7 +5,7 @@ import org.alephium.serde.RandomBytes
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
-  def relateTo(brokerInfo: BrokerInfo): Boolean = {
+  def relateTo(brokerInfo: BrokerGroupInfo): Boolean = {
     brokerInfo.contains(from) || brokerInfo.contains(to)
   }
 

@@ -3,7 +3,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.TimeStamp
 
@@ -74,12 +74,10 @@ object HeaderValidation {
   import ValidationStatus._
 
   def apply(platformConfig: PlatformConfig): HeaderValidation = {
-    new Impl()(platformConfig, platformConfig, platformConfig)
+    new Impl()(platformConfig, platformConfig)
   }
 
-  final class Impl(implicit val groupConfig: GroupConfig,
-                   val consensusConfig: ConsensusConfig,
-                   val platformConfig: PlatformConfig)
+  final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader): HeaderValidationResult[Unit] = {

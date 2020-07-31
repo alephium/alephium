@@ -38,7 +38,7 @@ object Configs extends StrictLogging {
     def timeSpanMax: Duration
   }
   trait PlatformDiscoveryConfig extends DC
-  trait PlatformBrokerConfig { def brokerInfo: BrokerInfo }
+  trait PlatformBrokerConfig    extends BrokerConfig { def brokerInfo: BrokerInfo }
   trait PlatformMiningConfig { def nonceStep: BigInt }
   trait PlatformNetworkConfig {
     def pingFrequency: Duration

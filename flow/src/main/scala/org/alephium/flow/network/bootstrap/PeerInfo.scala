@@ -41,7 +41,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
 
   def self(implicit config: PlatformConfig): PeerInfo = {
     val broker = config.brokerInfo
-    new PeerInfo(broker.id,
+    new PeerInfo(broker.brokerId,
                  broker.groupNumPerBroker,
                  broker.address.getAddress,
                  broker.address.getPort,

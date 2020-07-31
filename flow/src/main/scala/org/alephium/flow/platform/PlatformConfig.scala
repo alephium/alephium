@@ -114,9 +114,9 @@ object PlatformConfig {
       /* Network */
 
       /* Broker */
+      val brokerId: Int = brokerCfg.getInt("brokerId")
       val brokerInfo: BrokerInfo = {
-        val myId = brokerCfg.getInt("brokerId")
-        BrokerInfo.from(myId, groupNumPerBroker, publicAddress)(this).get
+        BrokerInfo.from(brokerId, groupNumPerBroker, publicAddress)(this).get
       }
       /* Broker */
 
