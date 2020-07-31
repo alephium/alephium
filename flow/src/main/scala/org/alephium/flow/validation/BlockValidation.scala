@@ -1,7 +1,6 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
@@ -117,16 +116,12 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
 }
 
 object BlockValidation {
-  def apply(platformConfig: PlatformConfig): BlockValidation = new Impl(platformConfig)
+  def build(implicit brokerConfig: BrokerConfig,
+            consensusConfig: ConsensusConfig): BlockValidation = new Impl()
 
-  class Impl(platformConfig: PlatformConfig) extends BlockValidation {
-    override implicit def brokerConfig: BrokerConfig = platformConfig
-
-    override implicit def consensusConfig: ConsensusConfig = platformConfig
-
-    override def headerValidation: HeaderValidation = HeaderValidation(platformConfig)
-
-    override def nonCoinbaseValidation: NonCoinbaseValidation =
-      NonCoinbaseValidation(platformConfig)
+  class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
+      extends BlockValidation {
+    override def headerValidation: HeaderValidation           = HeaderValidation.build
+    override def nonCoinbaseValidation: NonCoinbaseValidation = NonCoinbaseValidation.build
   }
 }

@@ -9,9 +9,9 @@ import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.handler.FlowHandler.BlockAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.validation._
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, Forest}
@@ -20,7 +20,8 @@ object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
             cliqueManager: ActorRefT[CliqueManager.Command],
-            flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): Props =
+            flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
+                                                         consensusConfig: ConsensusConfig): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
@@ -42,14 +43,15 @@ object BlockChainHandler {
   final case class FetchSince(tips: AVector[Hash])     extends Event
 }
 
-class BlockChainHandler(
-    blockFlow: BlockFlow,
-    chainIndex: ChainIndex,
-    cliqueManager: ActorRefT[CliqueManager.Command],
-    flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
+class BlockChainHandler(blockFlow: BlockFlow,
+                        chainIndex: ChainIndex,
+                        cliqueManager: ActorRefT[CliqueManager.Command],
+                        flowHandler: ActorRefT[FlowHandler.Command])(
+    implicit brokerConfig: BrokerConfig,
+    consensusConfig: ConsensusConfig)
     extends ChainHandler[Block, BlockStatus, BlockChainHandler.Command](blockFlow,
                                                                         chainIndex,
-                                                                        BlockValidation(config)) {
+                                                                        BlockValidation.build) {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
@@ -79,7 +81,7 @@ class BlockChainHandler(
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
     val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
     val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
-    if (config.brokerInfo.contains(block.chainIndex.from)) {
+    if (brokerConfig.contains(block.chainIndex.from)) {
       cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
     }
   }

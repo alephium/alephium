@@ -5,7 +5,7 @@ import scala.collection.mutable
 import org.scalatest.Assertion
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Block
@@ -15,7 +15,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   case class HashState(parentOpt: Option[Hash], timestamp: TimeStamp, height: Int)
 
   trait Fixture extends ChainDifficultyAdjustment {
-    implicit val config: PlatformConfig = Test.config
+    override val consensusConfig: ConsensusSetting = Test.consensusConfig
 
     val hashesTable = mutable.HashMap.empty[Hash, HashState]
     hashesTable(Hash.zero) = HashState(None, TimeStamp.zero, 0)
@@ -48,12 +48,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "calculate target correctly" in new Fixture {
-    val genesis       = Block.genesis(AVector.empty, config.maxMiningTarget, 0)
+    val genesis       = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
     val gHeader       = genesis.header
     val currentTarget = genesis.header.target
-    reTarget(currentTarget, config.expectedTimeSpan.millis) is gHeader.target
-    reTarget(currentTarget, (config.expectedTimeSpan timesUnsafe 2).millis) is (gHeader.target * 2)
-    reTarget(currentTarget, (config.expectedTimeSpan divUnsafe 2).millis) is (gHeader.target / 2)
+    reTarget(currentTarget, consensusConfig.expectedTimeSpan.millis) is gHeader.target
+    reTarget(currentTarget, (consensusConfig.expectedTimeSpan timesUnsafe 2).millis) is (gHeader.target * 2)
+    reTarget(currentTarget, (consensusConfig.expectedTimeSpan divUnsafe 2).millis) is (gHeader.target / 2)
   }
 
   it should "compute the correct median value" in {
@@ -71,31 +71,31 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   it should "calculate correct median block time" in new Fixture {
     assertThrows[AssertionError](calMedianBlockTime(currentHash))
 
-    for (i <- 1 until config.medianTimeInterval) {
+    for (i <- 1 until consensusConfig.medianTimeInterval) {
       addNewHash(i)
     }
     assertThrows[AssertionError](calMedianBlockTime(currentHash))
 
-    addNewHash(config.medianTimeInterval)
+    addNewHash(consensusConfig.medianTimeInterval)
     assertThrows[AssertionError](calMedianBlockTime(currentHash))
 
-    addNewHash(config.medianTimeInterval + 1)
-    val median1 = TimeStamp.unsafe(((config.medianTimeInterval + 3) / 2).toLong)
-    val median2 = TimeStamp.unsafe(((config.medianTimeInterval + 1) / 2).toLong)
+    addNewHash(consensusConfig.medianTimeInterval + 1)
+    val median1 = TimeStamp.unsafe(((consensusConfig.medianTimeInterval + 3) / 2).toLong)
+    val median2 = TimeStamp.unsafe(((consensusConfig.medianTimeInterval + 1) / 2).toLong)
     calMedianBlockTime(currentHash) isE (median1 -> median2)
   }
 
   it should "adjust difficulty properly" in new Fixture {
-    for (i <- 1 until config.medianTimeInterval) {
+    for (i <- 1 until consensusConfig.medianTimeInterval) {
       addNewHash(i)
     }
     calHashTarget(currentHash, 9999) isE 9999
 
-    addNewHash(config.medianTimeInterval)
+    addNewHash(consensusConfig.medianTimeInterval)
     calHashTarget(currentHash, 9999) isE 9999
 
-    addNewHash(config.medianTimeInterval + 1)
-    val expected = BigInt(9999) * config.timeSpanMin.millis / config.expectedTimeSpan.millis
+    addNewHash(consensusConfig.medianTimeInterval + 1)
+    val expected = BigInt(9999) * consensusConfig.timeSpanMin.millis / consensusConfig.expectedTimeSpan.millis
     calHashTarget(currentHash, 9999) isE expected
   }
 }

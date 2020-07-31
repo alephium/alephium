@@ -27,13 +27,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.toOption.get is error
   }
 
-  class Fixture extends BlockValidation.Impl(config)
+  class Fixture extends BlockValidation.Impl()
 
   it should "validate group for block" in new Fixture {
-    forAll(blockGenOf(config.brokerInfo)) { block =>
+    forAll(blockGenOf(brokerConfig)) { block =>
       passCheck(checkGroup(block))
     }
-    forAll(blockGenNotOf(config.brokerInfo)) { block =>
+    forAll(blockGenNotOf(brokerConfig)) { block =>
       failCheck(checkGroup(block), InvalidGroup)
     }
   }
@@ -47,7 +47,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   it should "validate coinbase transaction" in new Fixture {
     val (privateKey, publicKey) = ED25519.generatePriPub()
-    val block0                  = Block.from(AVector.empty, AVector.empty, config.maxMiningTarget, 0)
+    val block0                  = Block.from(AVector.empty, AVector.empty, consensusConfig.maxMiningTarget, 0)
 
     val input0          = txInputGen.sample.get
     val output0         = txOutputGen.sample.get

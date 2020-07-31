@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, EventBus}
 
@@ -13,18 +13,18 @@ final case class AllHandlers(
     txHandler: ActorRefT[TxHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])(
-    implicit config: PlatformConfig) {
+    implicit brokerConfig: BrokerConfig) {
   def orderedHandlers: Seq[ActorRefT[_]] = {
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
   }
 
   def getBlockHandler(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
-    assume(chainIndex.relateTo(config.brokerInfo))
+    assume(chainIndex.relateTo(brokerConfig))
     blockHandlers(chainIndex)
   }
 
   def getHeaderHandler(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
-    assume(!chainIndex.relateTo(config.brokerInfo))
+    assume(!chainIndex.relateTo(brokerConfig))
     headerHandlers(chainIndex)
   }
 }
@@ -33,16 +33,19 @@ object AllHandlers {
   def build(system: ActorSystem,
             cliqueManager: ActorRefT[CliqueManager.Command],
             blockFlow: BlockFlow,
-            eventBus: ActorRefT[EventBus.Message])(implicit config: PlatformConfig): AllHandlers = {
+            eventBus: ActorRefT[EventBus.Message])(
+      implicit brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig): AllHandlers = {
     val flowProps   = FlowHandler.props(blockFlow, eventBus)
     val flowHandler = ActorRefT.build[FlowHandler.Command](system, flowProps, "FlowHandler")
     buildWithFlowHandler(system, cliqueManager, blockFlow, flowHandler)
   }
-  def buildWithFlowHandler(
-      system: ActorSystem,
-      cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlow: BlockFlow,
-      flowHandler: ActorRefT[FlowHandler.Command])(implicit config: PlatformConfig): AllHandlers = {
+  def buildWithFlowHandler(system: ActorSystem,
+                           cliqueManager: ActorRefT[CliqueManager.Command],
+                           blockFlow: BlockFlow,
+                           flowHandler: ActorRefT[FlowHandler.Command])(
+      implicit brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow, cliqueManager)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
@@ -54,12 +57,13 @@ object AllHandlers {
                                  cliqueManager: ActorRefT[CliqueManager.Command],
                                  blockFlow: BlockFlow,
                                  flowHandler: ActorRefT[FlowHandler.Command])(
-      implicit config: PlatformConfig): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
+      implicit brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
-      from <- 0 until config.groups
-      to   <- 0 until config.groups
+      from <- 0 until brokerConfig.groups
+      to   <- 0 until brokerConfig.groups
       chainIndex = ChainIndex.unsafe(from, to)
-      if chainIndex.relateTo(config.brokerInfo)
+      if chainIndex.relateTo(brokerConfig)
     } yield {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
@@ -73,12 +77,13 @@ object AllHandlers {
   private def buildHeaderHandlers(system: ActorSystem,
                                   blockFlow: BlockFlow,
                                   flowHandler: ActorRefT[FlowHandler.Command])(
-      implicit config: PlatformConfig): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
+      implicit brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
-      from <- 0 until config.groups
-      to   <- 0 until config.groups
+      from <- 0 until brokerConfig.groups
+      to   <- 0 until brokerConfig.groups
       chainIndex = ChainIndex.unsafe(from, to)
-      if !chainIndex.relateTo(config.brokerInfo)
+      if !chainIndex.relateTo(brokerConfig)
     } yield {
       val headerHander = ActorRefT.build[HeaderChainHandler.Command](
         system,

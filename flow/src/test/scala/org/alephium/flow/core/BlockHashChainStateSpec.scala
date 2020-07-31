@@ -8,15 +8,14 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.ChainStateStorage
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
 class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
   trait Fixture {
     val chainState = new BlockHashChainState {
-      private val dummyIndex               = ChainIndex.unsafe(0, 0)(Test.config)
-      override def config: ConsensusConfig = Test.config
+      private val dummyIndex       = ChainIndex.unsafe(0, 0)
+      override def consensusConfig = Test.consensusConfig
       override def chainStateStorage: ChainStateStorage =
         Test.storages.nodeStateStorage.chainStateStorage(dummyIndex)
 
@@ -53,7 +52,8 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
     chainState.setGenesisState(hashes(0), TimeStamp.zero)
     chainState.setGenesisState(hashes(1), TimeStamp.unsafe(1))
     checkState(2, Set(hashes(0), hashes(1)))
-    chainState.setGenesisState(hashes(2), TimeStamp.unsafe(1) + Test.config.tipsPruneDuration)
+    chainState.setGenesisState(hashes(2),
+                               TimeStamp.unsafe(1) + Test.consensusConfig.tipsPruneDuration)
     checkState(3, Set(hashes(1), hashes(2)))
   }
 }

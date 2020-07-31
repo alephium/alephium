@@ -121,16 +121,16 @@ class AlephiumMake(object):
             print("Starting a new node")
             print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
 
-            bootstrap = ""
+            bootstrap = "[]"
             if node // brokerNum > 0:
-                bootstrap = "localhost:" + str(9973 + node % brokerNum)
+                bootstrap = "[localhost:" + str(9973 + node % brokerNum) + "]"
 
             homedir = "{}/alephium/node-{}".format(tempdir, node)
 
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} apiKeyHash={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
+            run('broker-num={} broker-id={} public-address={} master-address={} rpc-port={} ws-port={} rest-port={} bootstrap={} api-key-hash={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]

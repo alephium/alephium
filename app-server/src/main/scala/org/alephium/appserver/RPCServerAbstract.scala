@@ -19,7 +19,6 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.Miner
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.rpc.{CirceUtils, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
 import org.alephium.util.{ActorRefT, EventBus}
@@ -29,7 +28,6 @@ trait RPCServerAbstract extends StrictLogging {
 
   implicit def system: ActorSystem
   implicit def executionContext: ExecutionContext
-  implicit def config: PlatformConfig
   implicit def apiConfig: ApiConfig
   implicit def askTimeout: Timeout
 

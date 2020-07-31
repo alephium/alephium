@@ -12,12 +12,7 @@ import org.scalatest.Assertion
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{
-  ConsensusConfig,
-  ConsensusConfigFixture,
-  GroupConfig,
-  GroupConfigFixture
-}
+import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
@@ -334,10 +329,10 @@ trait BlockGenerators extends TxGenerators {
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
     blockGenOf(chainIndex, AVector(Hash.zero))
 
-  def blockGenOf(broker: BrokerInfo): Gen[Block] =
+  def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)
 
-  def blockGenNotOf(broker: BrokerInfo): Gen[Block] =
+  def blockGenNotOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenNotRelatedTo(broker).flatMap(blockGen)
 
   def blockGenOf(group: GroupIndex): Gen[Block] =

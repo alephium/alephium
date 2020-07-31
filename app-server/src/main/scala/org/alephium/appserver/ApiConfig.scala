@@ -3,9 +3,13 @@ package org.alephium.appserver
 import java.net.InetAddress
 
 import com.typesafe.config.Config
+import pureconfig.ConfigReader.Result
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import org.alephium.crypto.Sha256
-import org.alephium.util.{Duration, Hex}
+import org.alephium.flow.setting.PureConfigUtils._
+import org.alephium.util.Duration
 
 final case class ApiConfig(
     networkInterface: InetAddress,
@@ -15,15 +19,9 @@ final case class ApiConfig(
 )
 
 object ApiConfig {
-  // TODO: error handling here
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def load(implicit config: Config): ApiConfig = {
-    val api = config.getConfig("api")
-    ApiConfig(
-      InetAddress.getByName(api.getString("network.interface")),
-      Duration.from(api.getDuration("blockflowFetch.maxAge")).get,
-      Duration.from(api.getDuration("ask.timeout")).get,
-      Sha256.from(Hex.from(api.getString("apiKeyHash")).get).get
-    )
+  def load(config: Config): Result[ApiConfig] = {
+    val path          = "alephium.api"
+    val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
+    ConfigSource.fromConfig(configLocated).load[ApiConfig]
   }
 }

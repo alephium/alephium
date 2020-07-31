@@ -1,7 +1,6 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.BlockHeader
@@ -73,9 +72,8 @@ trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
 object HeaderValidation {
   import ValidationStatus._
 
-  def apply(platformConfig: PlatformConfig): HeaderValidation = {
-    new Impl()(platformConfig, platformConfig)
-  }
+  def build(implicit brokerConfig: BrokerConfig,
+            consensusConfig: ConsensusConfig): HeaderValidation = new Impl()
 
   final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends HeaderValidation {

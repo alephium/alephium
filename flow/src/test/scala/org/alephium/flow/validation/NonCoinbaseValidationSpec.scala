@@ -7,7 +7,6 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.ED25519Signature
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
@@ -54,10 +53,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "pass valid transactions" in new Fixture {
-    forAll(transactionGenWithPreOutputs(
-      1,
-      1,
-      chainIndexGen = chainIndexGenForBroker(config.brokerInfo))) {
+    forAll(transactionGenWithPreOutputs(1, 1, chainIndexGen = chainIndexGenForBroker(brokerConfig))) {
       case (tx, preOutputs) =>
         passCheck(checkBlockTx(tx, prepareWorldState(preOutputs)))
     }
@@ -66,7 +62,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   behavior of "Stateless Validation"
 
   trait StatelessFixture extends Fixture {
-    val blockFlow = BlockFlow.fromGenesisUnsafe(storages)
+    val blockFlow = genesisBlockFlow()
 
     def modifyAlfAmount(tx: Transaction, delta: U64): Transaction = {
       val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()

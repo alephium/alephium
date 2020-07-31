@@ -1,61 +1,64 @@
 alephium {
-  groups = 3
-
-  clique {
-    brokerNum = 3
-  }
-
   broker {
-    brokerId = 0
+    groups = 3
+    broker-num = 3
+    broker-id = 0
   }
 
   consensus {
-    numZerosAtLeastInHash = 0
-    blockTargetTime = 2 minutes
-    tipsPruneInterval = 2
-    blockCacheCapacityPerChain = 4
+    num-zeros-at-least-in-hash = 0
+    block-target-time = 2 minutes
+    tips-prune-interval = 2
+    block-cache-capacity-per-chain = 4
   }
 
   mining {
-    nonceStep = 10000
+    nonce-step = 10000
   }
 
   network {
-    pingFrequency = 300 second
-    retryTimeout = 300 second
-    publicAddress = "localhost:9973"
-    masterAddress = "localhost:9972"
-    numOfSyncBlocksLimit = 4
+    ping-frequency = 300 second
+    retry-timeout = 300 second
+    public-address = "localhost:9973"
+    master-address = "localhost:9972"
+    num-of-sync-blocks-limit = 4
 
-    rpcPort = 10973
-    wsPort = 11973
-    restPort = 12973
+    rpc-port = 10973
+    ws-port = 11973
+    rest-port = 12973
   }
 
   discovery {
-    peersPerGroup = 16
-    scanMaxPerGroup = 8
-    scanFrequency = 120.seconds
-    scanFastFrequency = 10.seconds
-    neighborsPerGroup = 8
+    bootstrap = []
+    bootstrap = ${?bootstrap}
+
+    peers-per-group = 16
+    scan-max-per-group = 8
+    scan-frequency = 120.seconds
+    scan-fast-frequency = 10.seconds
+    neighbors-per-group = 8
   }
 
   api {
-    network.interface = "127.0.0.1"
-    blockflowFetch.maxAge = 30 minutes
-    ask.timeout = 5 seconds
-    apiKeyHash = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c683779"
+    network-interface = "127.0.0.1"
+    blockflow-fetch-max-age = 30 minutes
+    ask-timeout = 5 seconds
+    api-key-hash = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c683779"
   }
 
-  bootstrap=""
-  bootstrap = ${?bootstrap}
+  mempool {
+    tx-pool-capacity = 1000
+    tx-max-number-per-block = 1000
+  }
 
-  genesis = [
-    "1Dx7Y4RxkCvoYvhQpMnRZi2yJnSbUeoVZY5R1vSYWSk9p:100",
-    "1Ca33aWTUJFyoGbn7VuQoPqQgX9nyZKdLg9qVMh7JkMmw:100",
-    "13eh6wZfCah2ARW7ZE7HTYC8TvVhTteqNwjrqTHUk1XhD:100",
-    "1AFmfTe1S6TYsKLmuMxhUSDj8hCvBVoAuff1CQnysNx15:100",
-  ]
+  genesis = {
+    balances = [
+      "1BHhKnn8moe8GsELAUQZKBhTeDTbPBmLXTCANkZ6eAHdK:100",
+      "1Er5PoAV2NAPWAuH1E3eNtVnWftDT7krb1zBuLKpSxGyz:100",
+      "1DWu6iQySTRzVX6Fra6taEGVN9L8XgNHemP9QXwwRnVJg:100",
+      "1GsuUk3ZjxbKAVutz1jsRqXNGLYWcxAM9Ztkw9GGVEK7C:100",
+    ]
+  }
 }
 
 akka {

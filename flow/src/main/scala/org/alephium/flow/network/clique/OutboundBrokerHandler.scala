@@ -7,17 +7,19 @@ import akka.io.{IO, Tcp}
 
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, Duration, TimeStamp}
 
 object OutboundBrokerHandler {
-  def props(
-      selfCliqueInfo: CliqueInfo,
-      remoteCliqueId: CliqueId,
-      remoteBroker: BrokerInfo,
-      allHandlers: AllHandlers,
-      cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
+  def props(selfCliqueInfo: CliqueInfo,
+            remoteCliqueId: CliqueId,
+            remoteBroker: BrokerInfo,
+            allHandlers: AllHandlers,
+            cliqueManager: ActorRefT[CliqueManager.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting): Props =
     Props(
       new OutboundBrokerHandler(selfCliqueInfo,
                                 remoteCliqueId,
@@ -31,16 +33,17 @@ object OutboundBrokerHandler {
   sealed trait Event
 }
 
-class OutboundBrokerHandler(
-    val selfCliqueInfo: CliqueInfo,
-    val remoteCliqueId: CliqueId,
-    val remoteBrokerInfo: BrokerInfo,
-    val allHandlers: AllHandlers,
-    val cliqueManager: ActorRefT[CliqueManager.Command])(implicit val config: PlatformConfig)
+class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
+                            val remoteCliqueId: CliqueId,
+                            val remoteBrokerInfo: BrokerInfo,
+                            val allHandlers: AllHandlers,
+                            val cliqueManager: ActorRefT[CliqueManager.Command])(
+    implicit val brokerConfig: BrokerConfig,
+    val networkSetting: NetworkSetting)
     extends BrokerHandler {
   override def remote: InetSocketAddress = remoteBrokerInfo.address
 
-  val until: TimeStamp = TimeStamp.now() + config.retryTimeout
+  val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
   IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
 

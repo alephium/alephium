@@ -6,16 +6,16 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, Transaction}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object TxHandler {
   def props(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Command])(
-      implicit config: PlatformConfig): Props =
+      implicit groupConfig: GroupConfig): Props =
     Props(new TxHandler(blockFlow, cliqueManager))
 
   sealed trait Command
@@ -27,9 +27,9 @@ object TxHandler {
 }
 
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Command])(
-    implicit config: PlatformConfig)
+    implicit groupConfig: GroupConfig)
     extends BaseActor {
-  private val nonCoinbaseValidation = NonCoinbaseValidation(config)
+  private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
   override def receive: Receive = {
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)

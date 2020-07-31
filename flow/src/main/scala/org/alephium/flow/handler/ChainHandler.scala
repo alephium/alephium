@@ -6,10 +6,10 @@ import scala.reflect.ClassTag
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util._
 
@@ -20,7 +20,7 @@ object ChainHandler {
 abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Command](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
-    validator: Validation[T, S])(implicit config: PlatformConfig)
+    validator: Validation[T, S])(implicit brokerConfig: BrokerConfig)
     extends ChainHandlerState[T]
     with BaseActor {
   import ChainHandler.Event

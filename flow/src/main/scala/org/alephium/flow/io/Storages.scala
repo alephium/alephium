@@ -19,12 +19,8 @@ object Storages {
   val heightPostfix: Byte        = 3
   val chainStatePostfix: Byte    = 4
 
-  trait Config {
-    def blockCacheCapacity: Int
-  }
-
   def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(
-      implicit config: GroupConfig with Config): Storages = {
+      implicit config: GroupConfig): Storages = {
     val db                = createRocksDBUnsafe(rootPath, dbFolder)
     val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)

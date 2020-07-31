@@ -6,15 +6,17 @@ import akka.util.ByteString
 
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object CliqueManager {
-  def props(builder: BrokerHandler.Builder, discoveryServer: ActorRefT[DiscoveryServer.Command])(
-      implicit config: PlatformConfig): Props =
-    Props(new CliqueManager(builder, discoveryServer))
+  def props(discoveryServer: ActorRefT[DiscoveryServer.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting,
+      discoverySetting: DiscoverySetting): Props =
+    Props(new CliqueManager(discoveryServer))
 
   trait Command
   final case class Start(cliqueInfo: CliqueInfo) extends Command
@@ -35,9 +37,10 @@ object CliqueManager {
   final case object IsSelfCliqueSynced                                 extends Command
 }
 
-class CliqueManager(
-    builder: BrokerHandler.Builder,
-    discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig)
+class CliqueManager(discoveryServer: ActorRefT[DiscoveryServer.Command])(
+    implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting,
+    discoverySetting: DiscoverySetting)
     extends BaseActor {
   import CliqueManager._
 
@@ -59,7 +62,7 @@ class CliqueManager(
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
-        context.actorOf(IntraCliqueManager.props(builder, cliqueInfo, allHandlers, ActorRefT(self)),
+        context.actorOf(IntraCliqueManager.props(cliqueInfo, allHandlers, ActorRefT(self)),
                         "IntraCliqueManager")
       pool.foreach {
         case (connection, message) =>

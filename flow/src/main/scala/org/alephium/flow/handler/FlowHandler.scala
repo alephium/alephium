@@ -7,16 +7,17 @@ import akka.actor.Props
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
   def props(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-      implicit config: PlatformConfig): Props =
+      implicit brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig): Props =
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
@@ -78,12 +79,13 @@ object FlowHandler {
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
 class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-    implicit config: PlatformConfig)
+    implicit brokerConfig: BrokerConfig,
+    consensusConfig: ConsensusConfig)
     extends BaseActor
     with FlowHandlerState {
   import FlowHandler._
 
-  override def statusSizeLimit: Int = config.brokerNum * 8
+  override def statusSizeLimit: Int = brokerConfig.brokerNum * 8
 
   override def receive: Receive = handleWith(None)
 
@@ -137,7 +139,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    assume(config.brokerInfo.contains(chainIndex.from))
+    assume(brokerConfig.contains(chainIndex.from))
     val template = blockFlow.prepareBlockFlow(chainIndex)
     template match {
       case Left(error) =>
@@ -228,12 +230,13 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
     val heights = for {
-      i <- 0 until config.groups
-      j <- 0 until config.groups
+      i <- 0 until brokerConfig.groups
+      j <- 0 until brokerConfig.groups
       height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight.getOrElse(-1)
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
-    val targetRatio = (BigDecimal(header.target) / BigDecimal(config.maxMiningTarget)).toFloat
+    val targetRatio =
+      (BigDecimal(header.target) / BigDecimal(consensusConfig.maxMiningTarget)).toFloat
     val timeSpan = {
       chain.getBlockHeader(header.parentHash) match {
         case Left(_) => "?ms"

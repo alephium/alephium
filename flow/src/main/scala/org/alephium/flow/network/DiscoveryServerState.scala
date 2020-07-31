@@ -2,6 +2,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
 import akka.event.LoggingAdapter
@@ -18,7 +19,7 @@ trait DiscoveryServerState {
   implicit def discoveryConfig: DiscoveryConfig
   def log: LoggingAdapter
 
-  def bootstrap: AVector[InetSocketAddress]
+  def bootstrap: ArraySeq[InetSocketAddress]
   def selfCliqueInfo: CliqueInfo
 
   import DiscoveryServer._
@@ -110,7 +111,7 @@ trait DiscoveryServerState {
       .foreach(status => fetchNeighbors(status.info))
     val emptySlotNum = discoveryConfig.scanMaxPerGroup - sortedNeighbors.length
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
-    bootstrap.takeUpto(bootstrapNum).foreach(tryPing)
+    bootstrap.take(bootstrapNum).foreach(tryPing)
   }
 
   def shouldScanFast(): Boolean = {

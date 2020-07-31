@@ -2,9 +2,10 @@ package org.alephium.flow.network.bootstrap
 
 import java.net.InetAddress
 
-import org.alephium.flow.platform.{Configs, PlatformConfig}
+import org.alephium.flow.platform.Configs
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.SafeSerdeImpl
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.serde._
 
@@ -39,13 +40,14 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
     } yield ()
   }
 
-  def self(implicit config: PlatformConfig): PeerInfo = {
-    val broker = config.brokerInfo
-    new PeerInfo(broker.brokerId,
-                 broker.groupNumPerBroker,
-                 broker.address.getAddress,
-                 broker.address.getPort,
-                 config.rpcPort,
-                 config.wsPort)
+  def self(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): PeerInfo = {
+    new PeerInfo(
+      brokerConfig.brokerId,
+      brokerConfig.groupNumPerBroker,
+      networkSetting.publicAddress.getAddress,
+      networkSetting.publicAddress.getPort,
+      networkSetting.rpcPort,
+      networkSetting.wsPort
+    )
   }
 }
