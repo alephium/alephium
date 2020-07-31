@@ -15,7 +15,7 @@ import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
   trait Fixture {
     val chainState = new BlockHashChainState {
-      private val dummyIndex               = ChainIndex.unsafe(0, 0)(config)
+      private val dummyIndex               = ChainIndex.unsafe(0, 0)(Test.config)
       override def config: ConsensusConfig = Test.config
       override def chainStateStorage: ChainStateStorage =
         Test.storages.nodeStateStorage.chainStateStorage(dummyIndex)

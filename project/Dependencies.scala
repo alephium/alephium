@@ -21,6 +21,7 @@ object Dependencies {
 
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"    % Version.circe
   lazy val `circe-generic` = "io.circe"                   %% "circe-generic"   % Version.circe
+  lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.13.0"
   lazy val bcprov          = "org.bouncycastle"           % "bcprov-jdk15on"   % "1.64"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.2.2"
   lazy val logback         = "ch.qos.logback"             % "logback-classic"  % "1.2.3"

@@ -29,6 +29,8 @@ object TxHandler {
 class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Command])(
     implicit config: PlatformConfig)
     extends BaseActor {
+  private val nonCoinbaseValidation = NonCoinbaseValidation(config)
+
   override def receive: Receive = {
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)
   }
@@ -39,7 +41,7 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
     val chainIndex = ChainIndex(fromGroup, toGroup)
     val mempool    = blockFlow.getPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
-      NonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
+      nonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
           log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
           addFailed(tx)

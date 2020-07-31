@@ -1,9 +1,8 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
 
-class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture with NoIndexModelGenerators {
+class ChainIndexSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "check when it's intra group index" in {
     val index0 = ChainIndex.unsafe(0, 0)
     val index1 = ChainIndex.unsafe(0, 1)
@@ -20,9 +19,9 @@ class ChainIndexSpec extends AlephiumSpec with ConsensusConfigFixture with NoInd
       val index = block.chainIndex
 
       val hash2Int = BigInt(1, block.hash.bytes.takeRight(2).toArray)
-      val rawIndex = (hash2Int % config.chainNum).toInt
-      index.from.value is rawIndex / config.groups
-      index.to.value is rawIndex % config.groups
+      val rawIndex = (hash2Int % groupConfig.chainNum).toInt
+      index.from.value is rawIndex / groupConfig.groups
+      index.to.value is rawIndex % groupConfig.groups
     }
   }
 

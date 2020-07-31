@@ -41,9 +41,10 @@ class HeaderChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
     flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
-    extends ChainHandler[BlockHeader, HeaderStatus, HeaderChainHandler.Command](blockFlow,
-                                                                                chainIndex,
-                                                                                HeaderValidation) {
+    extends ChainHandler[BlockHeader, HeaderStatus, HeaderChainHandler.Command](
+      blockFlow,
+      chainIndex,
+      HeaderValidation(config)) {
   import HeaderChainHandler._
 
   override def receive: Receive = {

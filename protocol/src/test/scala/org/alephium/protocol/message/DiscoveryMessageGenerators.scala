@@ -25,7 +25,8 @@ trait DiscoveryMessageGenerators extends Generators {
       infos <- Gen.listOf(cliqueInfoGen)
     } yield Neighbors(AVector.from(infos))
 
-  def messageGen(implicit config: DiscoveryConfig): Gen[DiscoveryMessage] =
+  def messageGen(implicit discoveryConfig: DiscoveryConfig,
+                 groupConfig: GroupConfig): Gen[DiscoveryMessage] =
     for {
       cliqueId <- Gen.const(()).map(_ => CliqueId.generate)
       payload  <- Gen.oneOf[Payload](findNodeGen, pingGen, pongGen, neighborsGen)

@@ -1,14 +1,10 @@
 package org.alephium.protocol.config
 
-import java.net.InetSocketAddress
-
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.util.Duration
 
 // TODO: refactor this as two configs
-trait DiscoveryConfig extends CliqueConfig {
-  def publicAddress: InetSocketAddress
-
+trait DiscoveryConfig {
   def discoveryPrivateKey: ED25519PrivateKey
 
   def discoveryPublicKey: ED25519PublicKey

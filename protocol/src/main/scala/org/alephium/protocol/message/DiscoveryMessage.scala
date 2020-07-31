@@ -5,7 +5,7 @@ import scala.language.existentials
 import akka.util.ByteString
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
-import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -62,7 +62,8 @@ object DiscoveryMessage {
       intSerde.serialize(Code.toInt(code)) ++ data
     }
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Payload] = {
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[Payload] = {
       deserializerCode._deserialize(input).flatMap {
         case (cmd, rest) =>
           cmd match {
@@ -79,7 +80,8 @@ object DiscoveryMessage {
   object Ping extends Code[Ping] {
     def serialize(ping: Ping): ByteString = CliqueInfo.serialize(ping.cliqueInfo)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Ping] = {
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[Ping] = {
       CliqueInfo.deserialize(input).map(Ping.apply)
     }
   }
@@ -89,7 +91,8 @@ object DiscoveryMessage {
     def serialize(pong: Pong): ByteString =
       CliqueInfo.serialize(pong.cliqueInfo)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Pong] = {
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[Pong] = {
       CliqueInfo.deserialize(input).map(Pong.apply)
     }
   }
@@ -101,7 +104,8 @@ object DiscoveryMessage {
     def serialize(data: FindNode): ByteString =
       serde.serialize(data.targetId)
 
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[FindNode] =
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[FindNode] =
       serde.deserialize(input).map(FindNode(_))
   }
 
@@ -113,7 +117,8 @@ object DiscoveryMessage {
 
     private implicit val infoDeserializer = CliqueInfo._serde
     private val deserializer              = avectorDeserializer[CliqueInfo]
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[Neighbors] = {
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[Neighbors] = {
       deserializer.deserialize(input).flatMap { peers =>
         peers.foreachE(CliqueInfo.validate) match {
           case Right(_)    => Right(Neighbors(peers))
@@ -125,7 +130,8 @@ object DiscoveryMessage {
 
   sealed trait Code[T] {
     def serialize(t: T): ByteString
-    def deserialize(input: ByteString)(implicit config: DiscoveryConfig): SerdeResult[T]
+    def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
+                                       groupConfig: GroupConfig): SerdeResult[T]
   }
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
@@ -147,7 +153,8 @@ object DiscoveryMessage {
   }
 
   def deserialize(myCliqueId: CliqueId, input: ByteString)(
-      implicit config: DiscoveryConfig): SerdeResult[DiscoveryMessage] = {
+      implicit discoveryConfig: DiscoveryConfig,
+      groupConfig: GroupConfig): SerdeResult[DiscoveryMessage] = {
     for {
       headerPair <- Header._deserialize(myCliqueId, input)
       header = headerPair._1

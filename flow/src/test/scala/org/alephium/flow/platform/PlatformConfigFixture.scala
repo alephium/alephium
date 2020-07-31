@@ -5,7 +5,7 @@ import scala.jdk.CollectionConverters._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Env, U64}
@@ -24,7 +24,7 @@ trait PlatformConfigFixture {
 
   lazy val groups0 = newConfig.getInt("alephium.groups")
 
-  lazy val groupConfig = new GroupConfig { override def groups: Int = groups0 }
+  lazy val groupConfig: GroupConfig = new GroupConfig { override def groups: Int = groups0 }
 
   lazy val genesisBalances =
     AVector.tabulate[(ED25519PrivateKey, ED25519PublicKey, U64)](groups0) { i =>
@@ -37,4 +37,6 @@ trait PlatformConfigFixture {
     PlatformConfig.build(newConfig,
                          rootPath,
                          Some(genesisBalances.map(p => (LockupScript.p2pkh(p._2), p._3))))
+
+  lazy val consensusConfig: ConsensusConfig = config
 }

@@ -54,7 +54,8 @@ object Node {
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
 
-    val discoveryProps: Props = DiscoveryServer.props(config.bootstrap)(config)
+    val discoveryProps: Props =
+      DiscoveryServer.props(config.publicAddress, config.bootstrap)(config, config)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
     val cliqueManager: ActorRefT[CliqueManager.Command] =

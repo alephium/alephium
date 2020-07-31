@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 import com.typesafe.config.Config
 
 import org.alephium.crypto.ED25519
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
@@ -77,8 +77,7 @@ object PlatformConfig {
       /* Group */
 
       /* Clique */
-      val brokerNum: Int         = cliqueCfg.getInt("brokerNum")
-      val groupNumPerBroker: Int = groups / brokerNum
+      val brokerNum: Int = cliqueCfg.getInt("brokerNum")
       require(groups % brokerNum == 0)
       /* Clique */
 
@@ -96,10 +95,6 @@ object PlatformConfig {
       val timeSpanMin: Duration = (expectedTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
       val timeSpanMax: Duration = (expectedTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
       /* Consensus */
-
-      /* Script */
-      val maxStackSize: Int = 1024
-      /* Script */
 
       /* mining */
       val nonceStep: BigInt = miningCfg.getInt("nonceStep")
@@ -138,8 +133,8 @@ object PlatformConfig {
 
       /* Genesis */
       val genesisBlocks: AVector[AVector[Block]] = genesisBalances match {
-        case None           => loadBlockFlow(alephCfg)(this)
-        case Some(balances) => loadBlockFlow(balances)(this)
+        case None           => loadBlockFlow(alephCfg)(this, this)
+        case Some(balances) => loadBlockFlow(balances)(this, this)
       }
       /* Genesis */
 
@@ -168,7 +163,8 @@ object PlatformConfig {
     (address, balance)
   }
 
-  def loadBlockFlow(cfg: Config)(implicit config: ConsensusConfig): AVector[AVector[Block]] = {
+  def loadBlockFlow(cfg: Config)(implicit groupConfig: GroupConfig,
+                                 consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
     import scala.jdk.CollectionConverters._
     val entries  = cfg.getStringList("genesis").asScala
     val balances = entries.map(splitBalance)
@@ -176,8 +172,9 @@ object PlatformConfig {
   }
 
   def loadBlockFlow(balances: AVector[(LockupScript, U64)])(
-      implicit config: ConsensusConfig): AVector[AVector[Block]] = {
-    AVector.tabulate(config.groups, config.groups) {
+      implicit groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
+    AVector.tabulate(groupConfig.groups, groupConfig.groups) {
       case (from, to) =>
         val transactions = if (from == to) {
           val balancesOI  = balances.filter(_._1.groupIndex.value == from)
@@ -189,10 +186,11 @@ object PlatformConfig {
   }
 
   def mineGenesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
-      implicit config: ConsensusConfig): Block = {
+      implicit groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.genesis(transactions, config.maxMiningTarget, nonce)
+      val block = Block.genesis(transactions, consensusConfig.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
       if (block.chainIndex == chainIndex) block else iter(nonce + 1)
     }

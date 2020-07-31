@@ -104,7 +104,7 @@ lazy val `app-server` = mainProject("app-server")
     )
   )
 
-lazy val benchmark = mainProject("benchmark")
+lazy val benchmark = project("benchmark")
   .enablePlugins(JmhPlugin)
   .dependsOn(flow)
   .settings(scalacOptions += "-Xdisable-assertions")
@@ -125,7 +125,8 @@ lazy val protocol = project("protocol")
   .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
-      fastparse
+      fastparse,
+      pureconfig
     )
   )
 

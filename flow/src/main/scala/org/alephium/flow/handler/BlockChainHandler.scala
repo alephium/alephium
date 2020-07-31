@@ -49,7 +49,7 @@ class BlockChainHandler(
     flowHandler: ActorRefT[FlowHandler.Command])(implicit val config: PlatformConfig)
     extends ChainHandler[Block, BlockStatus, BlockChainHandler.Command](blockFlow,
                                                                         chainIndex,
-                                                                        BlockValidation) {
+                                                                        BlockValidation(config)) {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
