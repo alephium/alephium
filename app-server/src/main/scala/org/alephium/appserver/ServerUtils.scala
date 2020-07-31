@@ -12,7 +12,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._
 import org.alephium.rpc.CirceUtils
@@ -22,7 +22,7 @@ import org.alephium.util.{ActorRefT, AVector, Hex, U64}
 
 object ServerUtils {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest)(
-      implicit cfg: ConsensusConfig): Try[FetchResponse] = {
+      implicit cfg: GroupConfig): Try[FetchResponse] = {
     val entriesEither = for {
       headers <- blockFlow.getHeightedBlockHeaders(fetchRequest.fromTs, fetchRequest.toTs)
     } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
@@ -81,8 +81,7 @@ object ServerUtils {
     }
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock)(
-      implicit cfg: ConsensusConfig): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
     for {
       _ <- checkChainIndex(blockFlow, query.hash)
       block <- blockFlow

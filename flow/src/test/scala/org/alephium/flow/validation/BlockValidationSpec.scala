@@ -11,8 +11,6 @@ import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  import BlockValidation._
-
   def passCheck[T](result: BlockValidationResult[T]): Assertion = {
     result.isRight is true
   }
@@ -29,7 +27,9 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.toOption.get is error
   }
 
-  it should "validate group for block" in {
+  class Fixture extends BlockValidation.Impl(config)
+
+  it should "validate group for block" in new Fixture {
     forAll(blockGenOf(config.brokerInfo)) { block =>
       passCheck(checkGroup(block))
     }
@@ -38,14 +38,14 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     }
   }
 
-  it should "validate nonEmpty transaction list" in {
+  it should "validate nonEmpty transaction list" in new Fixture {
     val block0 = blockGen.retryUntil(_.transactions.nonEmpty).sample.get
     val block1 = block0.copy(transactions = AVector.empty)
     passCheck(checkNonEmptyTransactions(block0))
     failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
   }
 
-  it should "validate coinbase transaction" in {
+  it should "validate coinbase transaction" in new Fixture {
     val (privateKey, publicKey) = ED25519.generatePriPub()
     val block0                  = Block.from(AVector.empty, AVector.empty, config.maxMiningTarget, 0)
 

@@ -16,8 +16,6 @@ import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
 import org.alephium.util.{AVector, Random, U64}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  import NonCoinbaseValidation._
-
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
     result.isRight is true
   }
@@ -34,7 +32,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     result.toOption.get is error
   }
 
-  trait Fixture extends VMFactory {
+  class Fixture extends NonCoinbaseValidation.Impl with VMFactory {
     // TODO: prepare blockflow to test checkMempool
     def prepareWorldState(inputInfos: AVector[TxInputStateInfo]): WorldState = {
       inputInfos.fold(cachedWorldState) {

@@ -9,13 +9,15 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
 abstract class Validation[T <: FlowData, S <: ValidationStatus] {
-  def validate(data: T, flow: BlockFlow)(implicit config: PlatformConfig): IOResult[S]
+  implicit def groupConfig: GroupConfig
+  implicit def consensusConfig: ConsensusConfig
+  implicit def platformConfig: PlatformConfig
 
-  def validateUntilDependencies(data: T, flow: BlockFlow)(
-      implicit config: ConsensusConfig): IOResult[S]
+  def validate(data: T, flow: BlockFlow): IOResult[S]
 
-  def validateAfterDependencies(data: T, flow: BlockFlow)(
-      implicit config: PlatformConfig): IOResult[S]
+  def validateUntilDependencies(data: T, flow: BlockFlow): IOResult[S]
+
+  def validateAfterDependencies(data: T, flow: BlockFlow): IOResult[S]
 }
 
 // scalastyle:off number.of.methods
@@ -30,7 +32,13 @@ object Validation {
 
   def validateMined[T <: FlowData](data: T, index: ChainIndex)(
       implicit config: GroupConfig): Boolean = {
-    data.chainIndex == index && HeaderValidation.checkWorkAmount(data).isRight
+    data.chainIndex == index && checkWorkAmount(data)
+  }
+
+  protected[validation] def checkWorkAmount[T <: FlowData](data: T): Boolean = {
+    val current = BigInt(1, data.hash.bytes.toArray)
+    assume(current >= 0)
+    current <= data.target
   }
 }
 // scalastyle:on number.of.methods

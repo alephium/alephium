@@ -14,7 +14,8 @@ import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 trait DiscoveryServerState {
-  implicit def config: GroupConfig with DiscoveryConfig
+  implicit def groupConfig: GroupConfig
+  implicit def discoveryConfig: DiscoveryConfig
   def log: LoggingAdapter
 
   def bootstrap: AVector[InetSocketAddress]
@@ -25,7 +26,7 @@ trait DiscoveryServerState {
   private var socket: ActorRefT[Udp.Command] = _
   protected val table                        = mutable.HashMap.empty[CliqueId, PeerStatus]
   private val pendings                       = mutable.HashMap.empty[CliqueId, AwaitPong]
-  private val pendingMax                     = 2 * config.groups * config.neighborsPerGroup
+  private val pendingMax                     = 2 * groupConfig.groups * discoveryConfig.neighborsPerGroup
 
   def setSocket(s: ActorRefT[Udp.Command]): Unit = {
     socket = s
@@ -43,7 +44,9 @@ trait DiscoveryServerState {
     } else {
       AVector.from(table.values.map(_.info).filter(_.id != target)) :+ selfCliqueInfo
     }
-    candidates.sortBy(info => target.hammingDist(info.id)).takeUpto(config.neighborsPerGroup)
+    candidates
+      .sortBy(info => target.hammingDist(info.id))
+      .takeUpto(discoveryConfig.neighborsPerGroup)
   }
 
   def isInTable(cliqueId: CliqueId): Boolean = {
@@ -81,13 +84,14 @@ trait DiscoveryServerState {
   def cleanup(): Unit = {
     val now = TimeStamp.now()
     val toRemove = table.values
-      .filter(status => (now -- status.updateAt).exists(_ >= config.peersTimeout))
+      .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.peersTimeout))
       .map(_.info.id)
       .toSet
     table --= toRemove
 
     val deadPendings = pendings.collect {
-      case (cliqueId, status) if (now -- status.pingAt).exists(_ >= config.peersTimeout) => cliqueId
+      case (cliqueId, status) if (now -- status.pingAt).exists(_ >= discoveryConfig.peersTimeout) =>
+        cliqueId
     }
     pendings --= deadPendings
   }
@@ -102,9 +106,9 @@ trait DiscoveryServerState {
     val sortedNeighbors =
       AVector.from(table.values).sortBy(status => selfCliqueInfo.id.hammingDist(status.info.id))
     sortedNeighbors
-      .takeUpto(config.scanMaxPerGroup)
+      .takeUpto(discoveryConfig.scanMaxPerGroup)
       .foreach(status => fetchNeighbors(status.info))
-    val emptySlotNum = config.scanMaxPerGroup - sortedNeighbors.length
+    val emptySlotNum = discoveryConfig.scanMaxPerGroup - sortedNeighbors.length
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
     bootstrap.takeUpto(bootstrapNum).foreach(tryPing)
   }
@@ -144,7 +148,7 @@ trait DiscoveryServerState {
     pendings.get(cliqueId) match {
       case Some(AwaitPong(_, _)) =>
         pendings.remove(cliqueId)
-        if (table.size < config.neighborsPerGroup) {
+        if (table.size < discoveryConfig.neighborsPerGroup) {
           appendPeer(cliqueInfo)
         } else {
           tryInsert(cliqueInfo)

@@ -21,7 +21,6 @@ trait Configs
     with Configs.PlatformGenesisConfig
     with Configs.PlatformMiningConfig
     with Configs.PlatformNetworkConfig
-    with Configs.PlatformScriptConfig
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Configs extends StrictLogging {
@@ -56,7 +55,6 @@ object Configs extends StrictLogging {
     def restPort: Option[Int]
   }
   trait PlatformGenesisConfig { def genesisBlocks: AVector[AVector[Block]] }
-  trait PlatformScriptConfig extends ScriptConfig { def maxStackSize: Int }
 
   def parseAddress(s: String): InetSocketAddress = {
     val List(left, right) = s.split(':').toList

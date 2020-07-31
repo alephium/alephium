@@ -15,9 +15,8 @@ final case class CliqueInfo private (
     groupNumPerBroker: Int
 ) { self =>
   def cliqueConfig: CliqueConfig = new CliqueConfig {
-    val groups: Int            = peers.length * self.groupNumPerBroker
-    val brokerNum: Int         = peers.length
-    val groupNumPerBroker: Int = self.groupNumPerBroker
+    val groups: Int    = peers.length * self.groupNumPerBroker
+    val brokerNum: Int = peers.length
   }
 
   def brokers: AVector[BrokerInfo] = {

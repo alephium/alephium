@@ -37,7 +37,7 @@ class BrokerInfoSpec extends AlephiumSpec {
 
   it should "check if id is valid" in new GroupConfigFixture with Generators { self =>
     override def groups: Int = 4
-    override implicit val config = new GroupConfig {
+    override implicit lazy val groupConfig: GroupConfig = new GroupConfig {
       override def groups: Int = self.groups
     }
     forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>

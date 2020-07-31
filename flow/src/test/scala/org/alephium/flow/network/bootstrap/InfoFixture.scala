@@ -5,7 +5,7 @@ import org.alephium.protocol.model.ModelGenerators
 
 trait InfoFixture extends ModelGenerators {
   def genIntraCliqueInfo(implicit config: GroupConfig): IntraCliqueInfo = {
-    val info = cliqueInfoGen.sample.get
+    val info = cliqueInfoGen(config).sample.get
     val peers = info.peers.mapWithIndex { (address, id) =>
       PeerInfo.unsafe(id, info.groupNumPerBroker, address.getAddress, address.getPort, None, None)
     }

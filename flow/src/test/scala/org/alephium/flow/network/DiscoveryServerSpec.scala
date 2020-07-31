@@ -6,7 +6,7 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.crypto.ED25519
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumActorSpec, Duration}
 
@@ -17,9 +17,10 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
-                   _scanFrequency: Duration = Duration.unsafe(500)): DiscoveryConfig = {
-    new DiscoveryConfig {
-      val publicAddress: InetSocketAddress          = new InetSocketAddress("localhost", port)
+                   _scanFrequency: Duration = Duration.unsafe(500))
+    : (InetSocketAddress, DiscoveryConfig with CliqueConfig) = {
+    val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
+    val discoveryConfig = new DiscoveryConfig with CliqueConfig {
       val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
 
       val peersPerGroup: Int          = _peersPerGroup
@@ -28,10 +29,10 @@ object DiscoveryServerSpec {
       val scanFastFrequency: Duration = _scanFrequency
       val neighborsPerGroup: Int      = _peersPerGroup
 
-      val groups: Int            = groupSize
-      val brokerNum: Int         = groupSize
-      val groupNumPerBroker: Int = 1
+      val groups: Int    = groupSize
+      val brokerNum: Int = groupSize
     }
+    publicAddress -> discoveryConfig
   }
 }
 
@@ -40,8 +41,8 @@ class DiscoveryServerSpec
     with NoIndexModelGenerators {
   import DiscoveryServerSpec._
 
-  def generateCliqueInfo(master: InetSocketAddress)(implicit config: GroupConfig): CliqueInfo = {
-    val randomInfo = cliqueInfoGen.sample.get
+  def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
+    val randomInfo = cliqueInfoGen(groupConfig).sample.get
     val newPeers   = randomInfo.peers.replace(0, master)
     val newInfo    = CliqueInfo.unsafe(randomInfo.id, newPeers, randomInfo.groupNumPerBroker)
     newInfo.masterAddress is master
@@ -49,15 +50,18 @@ class DiscoveryServerSpec
   }
 
   it should "discovery each other for two cliques" in new GroupConfigFixture {
-    val groups      = Gen.choose(2, 10).sample.get
-    val port0       = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo0 = generateCliqueInfo(createAddr(port0))
-    val config0     = createConfig(groups, port0, 1)
-    val server0     = system.actorOf(DiscoveryServer.props()(config0), "server0")
-    val port1       = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo1 = generateCliqueInfo(createAddr(port1))
-    val config1     = createConfig(groups, port1, 1)
-    val server1     = system.actorOf(DiscoveryServer.props(createAddr(port0))(config1), "server1")
+    val groups              = Gen.choose(2, 10).sample.get
+    val port0               = SocketUtil.temporaryLocalPort(udp = true)
+    val cliqueInfo0         = generateCliqueInfo(createAddr(port0), groupConfig)
+    val (address0, config0) = createConfig(groups, port0, 1)
+    val port1               = SocketUtil.temporaryLocalPort(udp = true)
+    val cliqueInfo1         = generateCliqueInfo(createAddr(port1), groupConfig)
+    val (address1, config1) = createConfig(groups, port1, 1)
+
+    val server0 =
+      system.actorOf(DiscoveryServer.props(address0)(groupConfig, config0), "server0")
+    val server1 =
+      system.actorOf(DiscoveryServer.props(address1, address0)(groupConfig, config1), "server1")
 
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)

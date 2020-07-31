@@ -4,55 +4,55 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
-object BlockValidation extends Validation[Block, BlockStatus] {
+trait BlockValidation extends Validation[Block, BlockStatus] {
   import ValidationStatus._
 
-  override def validate(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): IOResult[BlockStatus] = {
+  def headerValidation: HeaderValidation
+  def nonCoinbaseValidation: NonCoinbaseValidation
+
+  override def validate(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
     convert(checkBlock(block, flow), ValidBlock)
   }
 
-  override def validateUntilDependencies(block: Block, flow: BlockFlow)(
-      implicit config: ConsensusConfig): IOResult[BlockStatus] = {
+  override def validateUntilDependencies(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
     convert(checkBlockUntilDependencies(block, flow), ValidBlock)
   }
 
-  def validateAfterDependencies(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): IOResult[BlockStatus] = {
+  def validateAfterDependencies(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
     convert(checkBlockAfterDependencies(block, flow), ValidBlock)
   }
 
-  def validateAfterHeader(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): IOResult[BlockStatus] = {
+  def validateAfterHeader(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
     convert(checkBlockAfterHeader(block, flow), ValidBlock)
   }
 
-  private[validation] def checkBlockUntilDependencies(block: Block, flow: BlockFlow)(
-      implicit config: ConsensusConfig): BlockValidationResult[Unit] = {
-    HeaderValidation.checkHeaderUntilDependencies(block.header, flow)
+  private[validation] def checkBlockUntilDependencies(
+      block: Block,
+      flow: BlockFlow): BlockValidationResult[Unit] = {
+    headerValidation.checkHeaderUntilDependencies(block.header, flow)
   }
 
-  private[validation] def checkBlockAfterDependencies(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkBlockAfterDependencies(
+      block: Block,
+      flow: BlockFlow): BlockValidationResult[Unit] = {
     for {
-      _ <- HeaderValidation.checkHeaderAfterDependencies(block.header, flow)
+      _ <- headerValidation.checkHeaderAfterDependencies(block.header, flow)
       _ <- checkBlockAfterHeader(block, flow)
     } yield ()
   }
 
-  private[validation] def checkBlock(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkBlock(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
     for {
-      _ <- HeaderValidation.checkHeader(block.header, flow)
+      _ <- headerValidation.checkHeader(block.header, flow)
       _ <- checkBlockAfterHeader(block, flow)
     } yield ()
   }
 
-  private[validation] def checkBlockAfterHeader(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkBlockAfterHeader(block: Block,
+                                                flow: BlockFlow): BlockValidationResult[Unit] = {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
@@ -62,9 +62,8 @@ object BlockValidation extends Validation[Block, BlockStatus] {
     } yield ()
   }
 
-  private[validation] def checkGroup(block: Block)(
-      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
-    if (block.chainIndex.relateTo(config.brokerInfo)) validBlock(())
+  private[validation] def checkGroup(block: Block): BlockValidationResult[Unit] = {
+    if (block.chainIndex.relateTo(platformConfig.brokerInfo)) validBlock(())
     else invalidBlock(InvalidGroup)
   }
 
@@ -86,17 +85,17 @@ object BlockValidation extends Validation[Block, BlockStatus] {
     else invalidBlock(InvalidMerkleRoot)
   }
 
-  private[validation] def checkNonCoinbases(block: Block, flow: BlockFlow)(
-      implicit config: PlatformConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkNonCoinbases(block: Block,
+                                            flow: BlockFlow): BlockValidationResult[Unit] = {
     val index      = block.chainIndex
-    val brokerInfo = config.brokerInfo
+    val brokerInfo = platformConfig.brokerInfo
     assume(index.relateTo(brokerInfo))
 
     if (brokerInfo.contains(index.from)) {
       val result = for {
         _    <- checkBlockDoubleSpending(block)
         trie <- ValidationStatus.from(flow.getPersistedTrie(block))
-        _    <- block.nonCoinbase.foreachE(NonCoinbaseValidation.checkBlockTx(_, trie))
+        _    <- block.nonCoinbase.foreachE(nonCoinbaseValidation.checkBlockTx(_, trie))
       } yield ()
       convert(result)
     } else {
@@ -115,5 +114,22 @@ object BlockValidation extends Validation[Block, BlockStatus] {
         }
       }
     }
+  }
+}
+
+object BlockValidation {
+  def apply(platformConfig: PlatformConfig): BlockValidation = new Impl(platformConfig)
+
+  class Impl(_platformConfig: PlatformConfig) extends BlockValidation {
+    override implicit def groupConfig: GroupConfig = _platformConfig
+
+    override implicit def consensusConfig: ConsensusConfig = _platformConfig
+
+    override implicit def platformConfig: PlatformConfig = _platformConfig
+
+    override def headerValidation: HeaderValidation = HeaderValidation(_platformConfig)
+
+    override def nonCoinbaseValidation: NonCoinbaseValidation =
+      NonCoinbaseValidation(_platformConfig)
   }
 }

@@ -18,7 +18,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.platform.{Mode, PlatformConfig}
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, Service}
@@ -193,6 +193,6 @@ object RPCServer extends {
     }
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: ConsensusConfig): Json =
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig): Json =
     BlockEntry.from(blockNotify).asJson
 }
