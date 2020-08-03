@@ -2,6 +2,7 @@ package org.alephium.flow.setting
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.FiniteDuration
 
 import pureconfig.ConfigReader
@@ -57,4 +58,20 @@ object PureConfigUtils {
         .flatMap(Sha256.from)
         .toRight(CannotConvert(hashInput, "Sha256", "oops"))
     }
+
+  private val bootstrapStringReader = ConfigReader[String].map(_.split(",")).emap {
+    case Array(empty) if empty == "" => Right(ArraySeq.empty)
+    case inputs =>
+      val result = inputs.map(parseHostAndPort)
+      if (result.contains(None)) {
+        Left(CannotConvert(inputs.mkString(", "), "ArraySeq[InetAddress]", "oops"))
+      } else {
+        Right(ArraySeq.from(result.collect { case Some(address) => address }))
+      }
+  }
+
+  //We can't put explicitly the type, otherwise the automatic derivation of `pureconfig` fail
+  @SuppressWarnings(Array("org.wartremover.warts.PublicInference"))
+  implicit val bootstrapReader =
+    ConfigReader[ArraySeq[InetSocketAddress]].orElse(bootstrapStringReader)
 }
