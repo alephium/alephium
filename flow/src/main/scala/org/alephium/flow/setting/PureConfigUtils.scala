@@ -62,12 +62,10 @@ object PureConfigUtils {
   private val bootstrapStringReader = ConfigReader[String].map(_.split(",")).emap {
     case Array(empty) if empty == "" => Right(ArraySeq.empty)
     case inputs =>
-      val result = inputs.map(parseHostAndPort)
-      if (result.contains(None)) {
-        Left(CannotConvert(inputs.mkString(", "), "ArraySeq[InetAddress]", "oops"))
-      } else {
-        Right(ArraySeq.from(result.collect { case Some(address) => address }))
-      }
+      val result = inputs.flatMap(parseHostAndPort)
+      Either.cond(result.size == inputs.size,
+                  ArraySeq.from(result),
+                  CannotConvert(inputs.mkString(", "), "ArraySeq[InetAddress]", "oops"))
   }
 
   //We can't put explicitly the type, otherwise the automatic derivation of `pureconfig` fail
