@@ -2,6 +2,8 @@ package org.alephium.util
 
 import scala.collection.mutable
 
+import org.alephium.util.Forest.Node
+
 object Forest {
   // Note: the parent node should comes first in values; otherwise return None
   def tryBuild[K, T](values: AVector[T], toKey: T => K, toParent: T => K): Option[Forest[K, T]] = {
@@ -36,6 +38,18 @@ object Forest {
   def build[K, T](value: T, toKey: T => K): Forest[K, T] = {
     val node = Node(toKey(value), value, mutable.ArrayBuffer.empty[Node[K, T]])
     new Forest(mutable.ArrayBuffer(node))
+  }
+
+  final case class Node[K, T](key: K, value: T, children: mutable.ArrayBuffer[Node[K, T]]) {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def contains(another: K): Boolean = {
+      key == another || children.exists(_.contains(another))
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flatten: AVector[Node[K, T]] = {
+      AVector(this) ++ children.foldLeft(AVector.empty[Node[K, T]])(_ ++ _.flatten)
+    }
   }
 }
 
@@ -80,17 +94,5 @@ final class Forest[K, T](val roots: mutable.ArrayBuffer[Node[K, T]]) {
   // Note: the other forest might connected to this current forest
   def simpleMerge(another: Forest[K, T]): Unit = {
     roots.appendAll(another.roots)
-  }
-}
-
-final case class Node[K, T](key: K, value: T, children: mutable.ArrayBuffer[Node[K, T]]) {
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def contains(another: K): Boolean = {
-    key == another || children.exists(_.contains(another))
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def flatten: AVector[Node[K, T]] = {
-    AVector(this) ++ children.foldLeft(AVector.empty[Node[K, T]])(_ ++ _.flatten)
   }
 }

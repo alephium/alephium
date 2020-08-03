@@ -1,4 +1,4 @@
-package org.alephium.flow.platform
+package org.alephium.flow.setting
 
 import java.nio.file.{Files => JFiles, Path}
 

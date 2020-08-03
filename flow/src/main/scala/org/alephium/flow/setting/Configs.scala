@@ -1,4 +1,4 @@
-package org.alephium.flow.platform
+package org.alephium.flow.setting
 
 import java.io.File
 import java.nio.file.Path

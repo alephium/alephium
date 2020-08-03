@@ -2,8 +2,7 @@ package org.alephium.flow.network.bootstrap
 
 import java.net.InetAddress
 
-import org.alephium.flow.platform.Configs
-import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.setting.{Configs, NetworkSetting}
 import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.BrokerInfo

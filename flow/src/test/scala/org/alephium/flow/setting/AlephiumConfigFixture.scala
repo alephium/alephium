@@ -6,7 +6,6 @@ import scala.jdk.CollectionConverters._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.platform.{Configs, Platform}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript

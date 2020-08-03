@@ -10,8 +10,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.{TaskTrigger, Utils}
-import org.alephium.flow.platform.{Configs, Platform}
-import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.ActorRefT
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
