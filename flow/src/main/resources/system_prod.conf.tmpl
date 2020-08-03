@@ -40,15 +40,15 @@ akka {
 
 alephium {
   broker {
-    groups = ${groups}
-    broker-num = ${groups}
-    broker-num = ${?broker-num}
-    broker-id = ${broker-id}
+    groups = ${GROUPS}
+    broker-num = ${GROUPS}
+    broker-num = ${?BROKER_NUM}
+    broker-id = ${BROKER_ID}
   }
 
   consensus {
     num-zeros-at-least-in-hash = 18
-    num-zeros-at-least-in-hash = ${?zeros}
+    num-zeros-at-least-in-hash = ${?ZEROS}
     block-target-time = 2 minutes
     tips-prune-interval = 100
     block-cache-capacity-per-chain = 25
@@ -61,21 +61,21 @@ alephium {
   network {
     ping-frequency = 300 second
     retry-timeout = 300 second
-    public-address = ${public-address}
-    master-address = ${master-address}
+    public-address = ${PUBLIC_ADDRESS}
+    master-address = ${MASTER_ADDRESS}
     num-of-sync-blocks-limit = 128
 
     rpc-port = 0
-    rpc-port = ${?rpc-port}
+    rpc-port = ${?RPC_PORT}
     ws-port = 0
-    ws-port = ${?ws-port}
+    ws-port = ${?WS_PORT}
     rest-port = 0
-    rest-port = ${?rest-port}
+    rest-port = ${?REST_PORT}
   }
 
   discovery {
     bootstrap = []
-    bootstrap = ${?bootstrap}
+    bootstrap = ${?BOOTSTRAP}
 
     peers-per-group = 16
     scan-max-per-group = 8
@@ -93,7 +93,7 @@ alephium {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
-    api-key-hash = ${?api-key-hash}
+    api-key-hash = ${?API_KEY_HASH}
   }
 
   genesis = {
