@@ -8,8 +8,7 @@ import org.openjdk.jmh.annotations._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.model.BlockDeps
-import org.alephium.flow.platform.Platform
-import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.setting.{AlephiumConfig, Platform}
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.model.GroupIndex
 

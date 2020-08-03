@@ -22,7 +22,7 @@ import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.serialize
-import org.alephium.util.{Node => _, _}
+import org.alephium.util._
 
 class RPCServerSpec
     extends AlephiumSpec

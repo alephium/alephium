@@ -12,8 +12,6 @@ import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
 import org.alephium.crypto.ED25519
-import org.alephium.flow.platform.Configs
-import org.alephium.flow.platform.Configs.parseConfig
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.LockupScript
@@ -108,7 +106,7 @@ object AlephiumConfig {
 
   def load(rootPath: Path,
            genesisBalances: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] =
-    build(parseConfig(rootPath), genesisBalances)
+    build(Configs.parseConfig(rootPath), genesisBalances)
 
   def build(config: Config,
             genesisBalancesOpt: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] = {

@@ -4,6 +4,8 @@ import scala.collection.mutable
 
 import org.scalatest.Assertion
 
+import org.alephium.util.Forest.Node
+
 class ForestSpec extends AlephiumSpec {
   def checkBuild(roots: AVector[Int], pairs: List[(Int, Int)]): Assertion = {
     val links  = mutable.HashMap.empty ++ pairs

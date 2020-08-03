@@ -6,8 +6,7 @@ import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.flow.platform.{Configs, Platform}
-import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.AlephiumSpec
 
 class ServerSpec extends AlephiumSpec with ScalaFutures {
