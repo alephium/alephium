@@ -35,7 +35,6 @@ object Validation {
 
   protected[validation] def checkWorkAmount[T <: FlowData](data: T): Boolean = {
     val current = BigInt(1, data.hash.bytes.toArray)
-    assume(current >= 0)
     current <= data.target
   }
 }
