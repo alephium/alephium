@@ -5,20 +5,18 @@ import akka.util.ByteString
 import org.alephium.crypto.ED25519PublicKey
 import org.alephium.protocol.ALF.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{Base58, Bytes, DjbHash}
+import org.alephium.util.{Base58, Bytes}
 
 sealed trait LockupScript extends HashSerde[LockupScript] {
   override lazy val hash: Hash = _getHash
 
-  lazy val shortKey: Int = DjbHash.intHash(hash.bytes)
+  lazy val scriptHint: ScriptHint = ScriptHint.fromHash(hash)
 
-  def shortKeyBytes: ByteString = serialize(shortKey)
+  def assetHintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
 
-  def groupIndex(implicit config: GroupConfig): GroupIndex = {
-    LockupScript.groupIndex(shortKey)
-  }
+  def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
 
   def toBase58: String = Base58.encode(serialize(this))
 }

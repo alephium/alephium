@@ -155,7 +155,7 @@ lazy val protocol = project("protocol")
 val commonSettings = Seq(
   organization := "org.alephium",
   version := "0.2.1-SNAPSHOT",
-  scalaVersion := "2.13.2",
+  scalaVersion := "2.13.3",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
@@ -165,6 +165,7 @@ val commonSettings = Seq(
     "-explaintypes",
     "-feature",
     "-unchecked",
+    "-Xsource:3",
     "-Xfatal-warnings",
     "-Xlint:adapted-args",
     "-Xlint:constant",
@@ -173,7 +174,6 @@ val commonSettings = Seq(
     "-Xlint:inaccessible",
     "-Xlint:infer-any",
     "-Xlint:missing-interpolator",
-    "-Xlint:nullary-override",
     "-Xlint:nullary-unit",
     "-Xlint:option-implicit",
     "-Xlint:package-object-classes",

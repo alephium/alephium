@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import akka.actor.Props
 
 import org.alephium.flow.core.mempool.MemPool
-import org.alephium.flow.core.validation.{InvalidTxStatus, TxValidation, ValidTx}
+import org.alephium.flow.core.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.platform.PlatformConfig
@@ -38,7 +38,7 @@ class TxHandler(blockFlow: BlockFlow, cliqueManager: ActorRefT[CliqueManager.Com
     val chainIndex = ChainIndex(fromGroup, toGroup)
     val mempool    = blockFlow.getPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
-      TxValidation.validateNonCoinbase(tx, blockFlow) match {
+      NonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
         case Right(s: InvalidTxStatus) =>
           log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
           addFailed(tx)

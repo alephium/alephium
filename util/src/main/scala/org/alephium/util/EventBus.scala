@@ -29,8 +29,10 @@ class EventBus() extends BaseActor {
         subscriber ! event
       }
     case Subscribe =>
-      if (!subscribers(sender)) { subscribers += sender }
+      val subscriber = sender()
+      if (!subscribers.contains(subscriber)) { subscribers += subscriber }
     case Unsubscribe =>
-      if (subscribers(sender)) { subscribers -= sender }
+      val subscriber = sender()
+      if (subscribers.contains(subscriber)) { subscribers -= subscriber }
   }
 }

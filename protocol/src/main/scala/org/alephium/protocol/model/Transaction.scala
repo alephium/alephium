@@ -9,29 +9,30 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U64}
 
-/*
- * For the moment, if a transaction does not have any input, then it's a coinbase transaction
- * In this way, we could pad many coinbase transactions into one block without hacking any code
- *
- */
 final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              signatures: AVector[ED25519Signature])
     extends ALF.HashSerde[Transaction] {
   override val hash: ALF.Hash = unsigned.hash
 
-  // TODO: make these two functions safe
+  // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
-    assume(unsigned.inputs.nonEmpty)
     unsigned.inputs.head.fromGroup
   }
+
+  // this might only works for validated tx
   def toGroup(implicit config: GroupConfig): GroupIndex = {
-    assume(unsigned.fixedOutputs.nonEmpty)
-    unsigned.fixedOutputs.head match {
-      case output: AssetOutput => output.toGroup
-      case _: ContractOutput   => fromGroup
+    val from    = fromGroup
+    val outputs = unsigned.fixedOutputs
+    if (outputs.isEmpty) from
+    else {
+      val index = outputs.indexWhere(_.toGroup != from)
+      if (index == -1) from
+      else outputs(index).toGroup
     }
   }
+
+  // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
@@ -45,7 +46,7 @@ final case class Transaction(unsigned: UnsignedTransaction,
     }
   }
 
-  def alfAmountInOutputs: Option[U64] = {
+  lazy val alfAmountInOutputs: Option[U64] = {
     val sum1Opt =
       unsigned.fixedOutputs
         .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))
@@ -60,6 +61,8 @@ final case class Transaction(unsigned: UnsignedTransaction,
       sum  <- sum1.add(sum2)
     } yield sum
   }
+
+  def newTokenId: TokenId = unsigned.inputs.head.hash
 }
 
 object Transaction {
@@ -110,7 +113,7 @@ object Transaction {
 
   def coinbase(publicKey: ED25519PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val txOutput = AssetOutput(ALF.CoinBaseValue, tokens = AVector.empty, height, pkScript, data)
+    val txOutput = AssetOutput(ALF.CoinBaseValue, height, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
   }

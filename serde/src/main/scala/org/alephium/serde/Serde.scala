@@ -257,7 +257,7 @@ object Serde extends ProductSerde {
     }
   }
 
-  private[serde] def bytesSerde(bytes: Int): Serde[ByteString] = new FixedSizeSerde[ByteString] {
+  def bytesSerde(bytes: Int): Serde[ByteString] = new FixedSizeSerde[ByteString] {
     override val serdeSize: Int = bytes
 
     override def serialize(bs: ByteString): ByteString = {

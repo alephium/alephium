@@ -1,6 +1,8 @@
 package org.alephium.util
 
-import org.scalacheck.Arbitrary
+import scala.annotation.nowarn
+
+import org.scalacheck.{Arbitrary, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
@@ -11,6 +13,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 trait AlephiumSpec extends AnyFlatSpecLike with ScalaCheckDrivenPropertyChecks with Matchers {
+  @nowarn protected implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   implicit lazy val bytesArb: Arbitrary[AVector[Byte]] = Arbitrary(
     arbitrary[List[Byte]].map(AVector.from))

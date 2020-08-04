@@ -314,7 +314,7 @@ trait BlockFlowState {
     for {
       bestTrie <- getBestPersistedTrie(groupIndex)
       persistedUtxos <- bestTrie
-        .getOutputs(lockupScript.shortKeyBytes)
+        .getOutputs(lockupScript.assetHintBytes) // TODO: consider contract hint too
         .map(_.filter(p => lockedBy(p._2, lockupScript)).map {
           case (outputRef, output) =>
             Tuple2.apply[TxOutputRef, TxOutput](outputRef, output) // TODO: improve this by making AVector covariant
@@ -524,10 +524,10 @@ object BlockFlowState {
       targetGroup: GroupIndex)(implicit config: GroupConfig): IOResult[WorldState] = {
     (tx.unsigned.fixedOutputs ++ tx.generatedOutputs).foldWithIndexE(worldState) {
       case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
-        val outputRef = AssetOutputRef(output.scriptHint, TxOutputRef.key(tx, index))
+        val outputRef = AssetOutputRef.from(output, TxOutputRef.key(tx, index))
         state.addAsset(outputRef, output)
       case (state, output: ContractOutput, index) =>
-        val outputRef = ContractOutputRef(TxOutputRef.key(tx, index))
+        val outputRef = ContractOutputRef.from(output, TxOutputRef.key(tx, index))
         state.addContract(outputRef, output, tx.unsigned.states(index)) // validated before
       case (state, _, _) => Right(state)
     }

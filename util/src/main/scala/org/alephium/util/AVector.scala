@@ -543,6 +543,18 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(arr)
   }
 
+  def sample(): A = {
+    assume(nonEmpty)
+    val selected = Random.source.nextInt(length)
+    apply(selected)
+  }
+
+  def sampleWithIndex(): (Int, A) = {
+    assume(nonEmpty)
+    val selected = Random.source.nextInt(length)
+    (selected, apply(selected))
+  }
+
   def toArray: Array[A] = {
     val arr = new Array[A](length)
     System.arraycopy(elems, start, arr, 0, length)
