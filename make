@@ -26,8 +26,8 @@ def rpc_call(args):
     return (host, port, cmd, run_capture(cmd))
 
 def rpc_call_all(method, params):
-    nodes = get_env_int('nodes')
-    deployedNodes = get_env_default_int('deployedNodes', 0)
+    nodes = get_env_int('NODES')
+    deployedNodes = get_env_default_int('DEPLOYED_NODES', 0)
 
     calls = []
     for node in range(deployedNodes, deployedNodes + nodes):
@@ -97,14 +97,14 @@ class AlephiumMake(object):
 
     def run(self):
         tempdir = tempfile.gettempdir()
-        groups = get_env_int('groups')
-        brokerNum = get_env_default_int('brokerNum', groups)
-        nodes = get_env_int('nodes')
+        groups = get_env_int('GROUPS')
+        brokerNum = get_env_default_int('BROKER_NUM', groups)
+        nodes = get_env_int('NODES')
         assert(groups % brokerNum == 0 and nodes % brokerNum == 0)
 
         print("Logs dir: " + tempdir + "/alephium")
 
-        deployedNodes = get_env_default_int('deployedNodes', 0)
+        deployedNodes = get_env_default_int('DEPLOYED_NODES', 0)
 
         apiKey = secrets.token_urlsafe(32)
         apiKeyHash = hashlib.sha256(str.encode(apiKey)).hexdigest()
@@ -121,16 +121,16 @@ class AlephiumMake(object):
             print("Starting a new node")
             print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
 
-            bootstrap = "[]"
+            bootstrap = ""
             if node // brokerNum > 0:
-                bootstrap = "[localhost:" + str(9973 + node % brokerNum) + "]"
+                bootstrap = "localhost:" + str(9973 + node % brokerNum)
 
             homedir = "{}/alephium/node-{}".format(tempdir, node)
 
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('broker-num={} broker-id={} public-address={} master-address={} rpc-port={} ws-port={} rest-port={} bootstrap={} api-key-hash={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
+            run('BROKER_NUM={} BROKER_ID={} PUBLIC_ADDRESS={} MASTER_ADDRESS={} RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]

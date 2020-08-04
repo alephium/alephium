@@ -64,16 +64,16 @@ alephium {
     num-of-sync-blocks-limit = 128
 
     rpc-port = 0
-    rpc-port = ${?rpc-port}
+    rpc-port = ${?RPC_PORT}
     ws-port = 0
-    ws-port = ${?ws-port}
+    ws-port = ${?WS_PORT}
     rest-port = 0
-    rest-port = ${?rest-port}
+    rest-port = ${?REST_PORT}
   }
 
   discovery {
     bootstrap = []
-    bootstrap = ${?bootstrap}
+    bootstrap = ${?BOOTSTRAP}
 
     peers-per-group = 16
     scan-max-per-group = 8
@@ -86,7 +86,7 @@ alephium {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
-    api-key-hash = ${?api-key-hash}
+    api-key-hash = ${?API_KEY_HASH}
   }
 
   mempool {
