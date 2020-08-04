@@ -32,5 +32,7 @@ class ConcurrentHashSet[K](s: JCHashMap[K, Boolean]) {
     ()
   }
 
-  def iterable: Iterable[K] = s.keySet().asScala
+  def iterable: Iterable[K] = s.synchronized {
+    s.keySet().asScala.toIndexedSeq
+  }
 }
