@@ -3,27 +3,29 @@ package org.alephium.flow.core
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.core.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
+import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
+import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 
 trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
+  implicit def mempoolSetting: MemPoolSetting
 
-  val mempools = AVector.tabulate(config.groupNumPerBroker) { idx =>
-    val group = GroupIndex.unsafe(brokerInfo.groupFrom + idx)
+  val mempools = AVector.tabulate(brokerConfig.groupNumPerBroker) { idx =>
+    val group = GroupIndex.unsafe(brokerConfig.groupFrom + idx)
     MemPool.empty(group)
   }
 
   def getPool(mainGroup: Int): MemPool = {
-    mempools(mainGroup - brokerInfo.groupFrom)
+    mempools(mainGroup - brokerConfig.groupFrom)
   }
 
   def getPool(chainIndex: ChainIndex): MemPool = {
-    mempools(chainIndex.from.value - brokerInfo.groupFrom)
+    mempools(chainIndex.from.value - brokerConfig.groupFrom)
   }
 
   def calMemPoolChangesUnsafe(mainGroup: Int,
@@ -31,7 +33,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
                               newDeps: BlockDeps): MemPoolChanges = {
     val oldOutDeps = oldDeps.outDeps
     val newOutDeps = newDeps.outDeps
-    val diffs = AVector.tabulate(config.groups) { i =>
+    val diffs = AVector.tabulate(brokerConfig.groups) { i =>
       val oldDep = oldOutDeps(i)
       val newDep = newOutDeps(i)
       val index  = ChainIndex.unsafe(mainGroup, i)
@@ -66,7 +68,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
   private def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
-    getPool(chainIndex).collectForBlock(chainIndex, config.txMaxNumberPerBlock)
+    getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
   }
 
   // Reduce height by 3 to make tx valid with high probability in case of forks
@@ -76,7 +78,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
-    assert(config.brokerInfo.contains(chainIndex.from))
+    assume(brokerConfig.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
@@ -89,7 +91,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
-    assert(config.brokerInfo.contains(chainIndex.from))
+    assume(brokerConfig.contains(chainIndex.from))
     val singleChain  = getBlockChain(chainIndex)
     val bestDeps     = getBestDeps(chainIndex.from)
     val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
@@ -100,7 +102,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 }
 
 trait SyncUtils {
-  def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo
+  def getInterCliqueSyncInfo(brokerConfig: BrokerInfo): SyncInfo
 
   def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo
 }

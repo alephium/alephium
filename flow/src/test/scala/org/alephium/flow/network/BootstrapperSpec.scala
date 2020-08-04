@@ -5,10 +5,10 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow._
 import org.alephium.flow.network.bootstrap.InfoFixture
-import org.alephium.protocol.model.NoIndexModelGenerators
-import org.alephium.util.{ActorRefT, AlephiumSpec}
+import org.alephium.protocol.model.NoIndexModelGeneratorsLike
+import org.alephium.util.ActorRefT
 
-class BootstrapperSpec extends AlephiumSpec with NoIndexModelGenerators {
+class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   it should "bootstrap a master" in new MasterFixture("BootstrapperSpec-master") {
     val bootstrapper = system.actorOf(
       Bootstrapper.props(
@@ -57,8 +57,8 @@ class BootstrapperSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   class MasterFixture(name: String) extends AlephiumFlowActorSpec(name) with InfoFixture {
     override val configValues = Map(
-      ("alephium.network.masterAddress", s"localhost:9972"),
-      ("alephium.network.publicAddress", s"localhost:9972")
+      ("alephium.network.master-address", s"localhost:9972"),
+      ("alephium.network.public-address", s"localhost:9972")
     )
 
     val connected =

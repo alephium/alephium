@@ -9,15 +9,14 @@ import org.alephium.util.AVector
 
 // All the groups [0, ..., G-1] are divided into G/gFactor continuous groups
 // Assume the peers are ordered according to the groups they correspond to
-sealed abstract case class CliqueInfo(
+final case class CliqueInfo private (
     id: CliqueId,
     peers: AVector[InetSocketAddress],
     groupNumPerBroker: Int
 ) { self =>
   def cliqueConfig: CliqueConfig = new CliqueConfig {
-    val groups: Int            = peers.length * self.groupNumPerBroker
-    val brokerNum: Int         = peers.length
-    val groupNumPerBroker: Int = self.groupNumPerBroker
+    val groups: Int    = peers.length * self.groupNumPerBroker
+    val brokerNum: Int = peers.length
   }
 
   def brokers: AVector[BrokerInfo] = {
@@ -29,6 +28,9 @@ sealed abstract case class CliqueInfo(
   def brokerNum: Int = peers.length
 
   def masterAddress: InetSocketAddress = peers.head
+
+  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): BrokerInfo =
+    brokers(brokerConfig.brokerId)
 }
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
@@ -50,6 +52,6 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
   def unsafe(id: CliqueId,
              peers: AVector[InetSocketAddress],
              groupNumPerBroker: Int): CliqueInfo = {
-    new CliqueInfo(id, peers, groupNumPerBroker) {}
+    new CliqueInfo(id, peers, groupNumPerBroker)
   }
 }

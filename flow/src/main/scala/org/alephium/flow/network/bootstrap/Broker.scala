@@ -1,47 +1,40 @@
 package org.alephium.flow.network.bootstrap
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
 
 object Broker {
-  def props(masterAddress: InetSocketAddress,
-            brokerInfo: BrokerInfo,
-            retryTimeout: Duration,
-            bootstrapper: ActorRefT[Bootstrapper.Command])(
-      implicit config: PlatformConfig
-  ): Props =
-    Props(new Broker(masterAddress, brokerInfo, retryTimeout, bootstrapper))
+  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting
+  ): Props = Props(new Broker(bootstrapper))
 
   sealed trait Command
   case object Retry extends Command
 }
 
-class Broker(masterAddress: InetSocketAddress,
-             brokerInfo: BrokerInfo,
-             retryTimeout: Duration,
-             bootstrapper: ActorRefT[Bootstrapper.Command])(implicit val config: PlatformConfig)
+class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfig: BrokerConfig,
+                                                            networkSetting: NetworkSetting)
     extends BaseActor
     with SerdeUtils {
-  def until: TimeStamp = TimeStamp.now() + retryTimeout
+  def until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
-  IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
+  IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress)
 
   override def receive: Receive = awaitMaster(until)
 
   def awaitMaster(until: TimeStamp): Receive = {
     case Broker.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(masterAddress)
+      IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress)
 
     case _: Tcp.Connected =>
-      log.debug(s"Connected to master: $masterAddress")
+      log.debug(s"Connected to master: ${networkSetting.masterAddress}")
       val connection = sender()
       connection ! Tcp.Register(self)
       connection ! BrokerConnector.envelop(PeerInfo.self)
@@ -63,7 +56,7 @@ class Broker(masterAddress: InetSocketAddress,
     case Tcp.Received(data) =>
       BrokerConnector.unwrap(IntraCliqueInfo._deserialize(unaligned ++ data)) match {
         case Right(Some((cliqueInfo, _))) =>
-          val ack = BrokerConnector.Ack(brokerInfo.id)
+          val ack = BrokerConnector.Ack(brokerConfig.brokerId)
           connection ! BrokerConnector.envelop(ack)
           context become awaitReady(connection, cliqueInfo, ByteString.empty)
         case Right(None) =>

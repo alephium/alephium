@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
@@ -27,12 +27,11 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def brokerInfo: BrokerInfo
     def isCoordinator: Boolean
 
-    implicit val config: DiscoveryConfig = new DiscoveryConfig {
-      val groups: Int            = self.groups
-      val brokerNum: Int         = self.brokerNum
-      val groupNumPerBroker: Int = self.groupNumPerBroker
+    implicit val groupConfig: GroupConfig = new GroupConfig {
+      override def groups: Int = self.groups
+    }
 
-      def publicAddress: InetSocketAddress       = self.publicAddress
+    implicit val discoveryConfig: DiscoveryConfig = new DiscoveryConfig {
       val (privateKey, publicKey)                = ED25519.generatePriPub()
       def discoveryPrivateKey: ED25519PrivateKey = privateKey
       def discoveryPublicKey: ED25519PublicKey   = publicKey
@@ -60,9 +59,13 @@ class DiscoveryMessageSpec extends AlephiumSpec {
       def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
-    forAll(messageGen(peerFixture.config)) { msg =>
-      val bytes = DiscoveryMessage.serialize(msg)(peerFixture.config)
-      val value = DiscoveryMessage.deserialize(CliqueId.generate, bytes)(config).toOption.get
+    forAll(messageGen(peerFixture.discoveryConfig, peerFixture.groupConfig)) { msg =>
+      val bytes = DiscoveryMessage.serialize(msg)(peerFixture.discoveryConfig)
+      val value =
+        DiscoveryMessage
+          .deserialize(CliqueId.generate, bytes)
+          .toOption
+          .get
       msg is value
     }
   }

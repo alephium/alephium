@@ -5,10 +5,10 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
@@ -22,17 +22,37 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 object BlockFlow extends StrictLogging {
   type TrieUpdater = (WorldState, Block) => IOResult[WorldState]
 
-  def fromGenesisUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+  def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
+    fromGenesisUnsafe(storages, config.genesisBlocks)(config.broker,
+                                                      config.consensus,
+                                                      config.mempool)
+  }
+
+  def fromGenesisUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting,
+      memPoolSetting: MemPoolSetting): BlockFlow = {
     logger.info(s"Initialize storage for BlockFlow")
     new BlockFlowImpl(
+      genesisBlocks,
       BlockChainWithState.fromGenesisUnsafe(storages),
       BlockChain.fromGenesisUnsafe(storages),
       BlockHeaderChain.fromGenesisUnsafe(storages)
     )
   }
 
-  def fromStorageUnsafe(storages: Storages)(implicit config: PlatformConfig): BlockFlow = {
+  def fromStorageUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
+    fromStorageUnsafe(storages, config.genesisBlocks)(config.broker,
+                                                      config.consensus,
+                                                      config.mempool)
+  }
+
+  def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(
+      implicit brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting,
+      memPoolSetting: MemPoolSetting): BlockFlow = {
     val blockflow = new BlockFlowImpl(
+      genesisBlocks,
       BlockChainWithState.fromStorageUnsafe(storages),
       BlockChain.fromStorageUnsafe(storages),
       BlockHeaderChain.fromStorageUnsafe(storages)
@@ -43,14 +63,17 @@ object BlockFlow extends StrictLogging {
   }
 
   class BlockFlowImpl(
-      val blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState,
-      val blockchainBuilder: ChainIndex                                   => BlockChain,
-      val blockheaderChainBuilder: ChainIndex                             => BlockHeaderChain
-  )(implicit val config: PlatformConfig)
+      val genesisBlocks: AVector[AVector[Block]],
+      val blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState,
+      val blockchainBuilder: Block                                   => BlockChain,
+      val blockheaderChainBuilder: BlockHeader                       => BlockHeaderChain
+  )(implicit val brokerConfig: BrokerConfig,
+    val consensusConfig: ConsensusSetting,
+    val mempoolSetting: MemPoolSetting)
       extends BlockFlow {
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
-      assert(index.relateTo(config.brokerInfo))
+      assume(index.relateTo(brokerConfig))
 
       cacheBlock(block)
       for {
@@ -62,7 +85,7 @@ object BlockFlow extends StrictLogging {
 
     def add(header: BlockHeader): IOResult[Unit] = {
       val index = header.chainIndex
-      assert(!index.relateTo(config.brokerInfo))
+      assume(!index.relateTo(brokerConfig))
 
       for {
         weight <- calWeight(header)
@@ -106,7 +129,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo = {
-      val (low, high) = brokerInfo.calIntersection(config.brokerInfo)
+      val (low, high) = brokerInfo.calIntersection(brokerConfig)
       assume(low < high)
 
       val blockTips = for {
@@ -126,7 +149,7 @@ object BlockFlow extends StrictLogging {
         to   <- 0 until groups
       } {
         val chain = getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
-        if (config.brokerInfo.containsRaw(to)) {
+        if (brokerConfig.containsRaw(to)) {
           blockTips = blockTips ++ chain.getAllTips
         } else {
           headerTips = headerTips ++ chain.getAllTips
@@ -145,7 +168,7 @@ object BlockFlow extends StrictLogging {
       val deps   = header.blockDeps
       if (header.isGenesis) {
         0 until groups foreach { k =>
-          if (k != from.value) rdeps(k) = config.genesisBlocks(k).head.hash
+          if (k != from.value) rdeps(k) = genesisBlocks(k).head.hash
         }
       } else {
         0 until groups foreach { k =>
@@ -159,7 +182,7 @@ object BlockFlow extends StrictLogging {
     private def isExtendingUnsafe(current: Hash, previous: Hash): Boolean = {
       val index1 = ChainIndex.from(current)
       val index2 = ChainIndex.from(previous)
-      assert(index1.from == index2.from)
+      assume(index1.from == index2.from)
 
       val chain = getHashChain(index2)
       if (index1.to == index2.to) Utils.unsafe(chain.isBefore(previous, current))
@@ -171,7 +194,7 @@ object BlockFlow extends StrictLogging {
 
     private def isCompatibleUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Boolean = {
       val newRtips = getRtipsUnsafe(tip, from)
-      assert(rtips.length == newRtips.length)
+      assume(rtips.length == newRtips.length)
       rtips.indices forall { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)
@@ -181,7 +204,7 @@ object BlockFlow extends StrictLogging {
 
     private def updateRtipsUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Unit = {
       val newRtips = getRtipsUnsafe(tip, from)
-      assert(rtips.length == newRtips.length)
+      assume(rtips.length == newRtips.length)
       rtips.indices foreach { k =>
         val t1 = rtips(k)
         val t2 = newRtips(k)
@@ -194,7 +217,7 @@ object BlockFlow extends StrictLogging {
     private def getGroupDepsUnsafe(tip: Hash, from: GroupIndex): AVector[Hash] = {
       val header = getBlockHeaderUnsafe(tip)
       if (header.isGenesis) {
-        config.genesisBlocks(from.value).map(_.hash)
+        genesisBlocks(from.value).map(_.hash)
       } else {
         header.outDeps
       }
@@ -244,7 +267,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def updateBestDepsUnsafe(): Unit =
-      brokerInfo.groupFrom until brokerInfo.groupUntil foreach { mainGroup =>
+      brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateMemPoolUnsafe(mainGroup, deps)
         updateBestDeps(mainGroup, deps)

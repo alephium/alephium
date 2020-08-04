@@ -1,6 +1,6 @@
 package org.alephium.appserver
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
@@ -11,13 +11,14 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
+import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
-import org.alephium.flow.platform.{Mode, PlatformConfig, PlatformConfigFixture}
+import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils
@@ -26,9 +27,10 @@ import org.alephium.util._
 
 trait ServerFixture
     extends InfoFixture
-    with PlatformConfigFixture
+    with AlephiumConfigFixture
     with StoragesFixture
     with NoIndexModelGeneratorsLike {
+  implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig).toOption.get
 
   val now = TimeStamp.now()
 
@@ -38,19 +40,18 @@ trait ServerFixture
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
-  lazy val dummyIntraCliqueInfo = genIntraCliqueInfo(config)
+  lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = SelfClique.from(dummyIntraCliqueInfo)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
   lazy val dummyBalance         = Balance(U64.Zero, 0)
   lazy val dummyGroup           = Group(0)
-  lazy val dummyKey             = "b4628b5e93e6356b8b2ce75174a57fbd2fe6907e6244d5ddfba78a94ebf9d7a5"
-  lazy val dummyKeyAddress      = "1EvRjvdiVH24YUgjfCA7RZVTWj4bKexks9iY33YbL14zt"
-  lazy val dummyToKey           = "3ec4489e0988fbe5ea1becd0804335cd78ae285883f4028009b0e69d0574cda9"
-  lazy val dummyToAddres        = "19kCCFBGJV76XjyzszeMGTbnDVkAYwhHtZGKEvc1JdJEG"
-  lazy val dummyPrivateKey      = "e89743f47eaef4d438b503e66de08f4eedd0d5d8c6ad9b9ff0177f081917ae1a"
-  lazy val dummyHashesAtHeight  = HashesAtHeight(Seq.empty)
-  lazy val dummyChainInfo       = ChainInfo(0)
+
+  lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
+  lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get
+
+  lazy val dummyHashesAtHeight = HashesAtHeight(Seq.empty)
+  lazy val dummyChainInfo      = ChainInfo(0)
   lazy val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
@@ -91,7 +92,7 @@ object ServerFixture {
                   block: Block,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
-                  storages: Storages)(implicit val config: PlatformConfig)
+                  storages: Storages)(implicit val config: AlephiumConfig)
       extends Node {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
@@ -121,7 +122,7 @@ object ServerFixture {
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),
                                                txHandler      = txHandler,
                                                blockHandlers  = Map.empty,
-                                               headerHandlers = Map.empty)
+                                               headerHandlers = Map.empty)(config.broker)
 
     val boostraperDummy                             = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val boostraper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
@@ -135,8 +136,10 @@ object ServerFixture {
   class BlockFlowDummy(block: Block,
                        blockFlowProbe: ActorRef,
                        dummyTx: Transaction,
-                       storages: Storages)(implicit val config: PlatformConfig)
+                       storages: Storages)(implicit val config: AlephiumConfig)
       extends BlockFlow {
+    override def genesisBlocks: AVector[AVector[Block]] = config.genesisBlocks
+
     override def getHeightedBlockHeaders(fromTs: TimeStamp,
                                          toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
       blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
@@ -159,11 +162,14 @@ object ServerFixture {
       Right(Some(dummyTx))
     }
 
-    def blockchainWithStateBuilder: (ChainIndex, BlockFlow.TrieUpdater) => BlockChainWithState =
+    implicit def brokerConfig    = config.broker
+    implicit def consensusConfig = config.consensus
+    implicit def mempoolSetting  = config.mempool
+    def blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState =
       BlockChainWithState.fromGenesisUnsafe(storages)
-    def blockchainBuilder: ChainIndex => BlockChain =
+    def blockchainBuilder: Block => BlockChain =
       BlockChain.fromGenesisUnsafe(storages)
-    def blockheaderChainBuilder: ChainIndex => BlockHeaderChain =
+    def blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
       BlockHeaderChain.fromGenesisUnsafe(storages)
 
     override def getHeight(hash: Hash): IOResult[Int]              = Right(1)
@@ -182,20 +188,5 @@ object ServerFixture {
     def updateBestDeps(): IOResult[Unit]         = ???
     def add(block: Block): IOResult[Unit]        = ???
     def add(header: BlockHeader): IOResult[Unit] = ???
-  }
-
-  class ModeDummy(intraCliqueInfo: IntraCliqueInfo,
-                  neighborCliques: NeighborCliques,
-                  block: Block,
-                  blockFlowProbe: ActorRef,
-                  dummyTx: Transaction,
-                  storages: Storages)(implicit val system: ActorSystem,
-                                      val config: PlatformConfig,
-                                      val executionContext: ExecutionContext)
-      extends Mode {
-    lazy val node =
-      new NodeDummy(intraCliqueInfo, neighborCliques, block, blockFlowProbe, dummyTx, storages)
-
-    override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
   }
 }

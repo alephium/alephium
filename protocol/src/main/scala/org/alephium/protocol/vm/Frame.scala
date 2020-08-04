@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.util.AVector
 
 class Frame[Ctx <: Context](var pc: Int,
@@ -135,7 +135,7 @@ object Frame {
 
   def externalMethodFrame[C <: StatefulContext](
       frame: Frame[C],
-      contractKey: ALF.Hash,
+      contractKey: Hash,
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {

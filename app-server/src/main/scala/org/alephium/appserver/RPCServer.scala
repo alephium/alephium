@@ -11,35 +11,35 @@ import io.circe._
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.flow.client.Miner
-import org.alephium.flow.core.{BlockFlow, TxHandler}
-import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.flow.platform.{Mode, PlatformConfig}
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, Service}
 
-class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
+class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
     implicit val system: ActorSystem,
-    val config: PlatformConfig,
+    val apiConfig: ApiConfig,
     val executionContext: ExecutionContext)
     extends RPCServerAbstract
     with Service {
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
-  implicit val apiConfig: ApiConfig = ApiConfig.load(config.aleph)
-  implicit val askTimeout: Timeout  = Timeout(apiConfig.askTimeout.asScala)
+  implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
   private implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
-  private val blockFlow: BlockFlow                    = mode.node.blockFlow
-  private val txHandler: ActorRefT[TxHandler.Command] = mode.node.allHandlers.txHandler
+  private val blockFlow: BlockFlow                    = node.blockFlow
+  private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
 
   def doBlockNotify(blockNotify: BlockNotify): Json =
     blockNotifyEncode(blockNotify)
@@ -49,7 +49,7 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
       withReqE[FetchRequest, FetchResponse](req)(ServerUtils.getBlockflow(blockFlow, _)))
 
   def doGetNeighborCliques(req: Request): FutureTry[NeighborCliques] =
-    mode.node.discoveryServer
+    node.discoveryServer
       .ask(DiscoveryServer.GetNeighborCliques)
       .mapTo[DiscoveryServer.NeighborCliques]
       .map { neighborCliques =>
@@ -57,16 +57,15 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
       }
 
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
-    mode.node.boostraper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
-      cliqueInfo =>
-        Right(SelfClique.from(cliqueInfo))
+    node.boostraper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map { cliqueInfo =>
+      Right(SelfClique.from(cliqueInfo))
     }
 
   def doGetSelfCliqueSynced(req: Request): FutureTry[Boolean] =
-    mode.node.cliqueManager.ask(CliqueManager.IsSelfCliqueSynced).mapTo[Boolean].map(Right(_))
+    node.cliqueManager.ask(CliqueManager.IsSelfCliqueSynced).mapTo[Boolean].map(Right(_))
 
   def doGetInterCliquePeerInfo(req: Request): FutureTry[Seq[InterCliquePeerInfo]] =
-    mode.node.cliqueManager
+    node.cliqueManager
       .ask(InterCliqueManager.GetSyncStatuses)
       .mapTo[Seq[InterCliqueManager.SyncStatus]]
       .map { syncedStatuses =>
@@ -105,12 +104,12 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     withReqF[SendTransaction, TxResult](req)(ServerUtils.sendTransaction(txHandler, _))
 
   val httpRoute: Route = routeHttp(miner)
-  val wsRoute: Route   = routeWs(mode.node.eventBus)
+  val wsRoute: Route   = routeWs(node.eventBus)
 
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
   private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
 
-  override def subServices: ArraySeq[Service] = ArraySeq(mode)
+  override def subServices: ArraySeq[Service] = ArraySeq(node)
 
   protected def startSelfOnce(): Future[Unit] = {
     for {
@@ -143,15 +142,15 @@ class RPCServer(mode: Mode, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 object RPCServer extends {
   import RPCServerAbstract._
 
-  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(
+  def apply(node: Node, miner: ActorRefT[Miner.Command])(
       implicit system: ActorSystem,
-      config: PlatformConfig,
+      apiConfig: ApiConfig,
       executionContext: ExecutionContext): RPCServer = {
     (for {
-      rpcPort <- mode.config.rpcPort
-      wsPort  <- mode.config.wsPort
+      rpcPort <- node.config.network.rpcPort
+      wsPort  <- node.config.network.wsPort
     } yield {
-      new RPCServer(mode, rpcPort, wsPort, miner)
+      new RPCServer(node, rpcPort, wsPort, miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")
@@ -192,6 +191,6 @@ object RPCServer extends {
     }
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: ConsensusConfig): Json =
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig): Json =
     BlockEntry.from(blockNotify).asJson
 }

@@ -8,10 +8,11 @@ import io.circe.syntax._
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
 import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.flow.core.{BlockFlow, TxHandler}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._
 import org.alephium.rpc.CirceUtils
@@ -21,7 +22,7 @@ import org.alephium.util.{ActorRefT, AVector, Hex, U64}
 
 object ServerUtils {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest)(
-      implicit cfg: ConsensusConfig): Try[FetchResponse] = {
+      implicit cfg: GroupConfig): Try[FetchResponse] = {
     val entriesEither = for {
       headers <- blockFlow.getHeightedBlockHeaders(fetchRequest.fromTs, fetchRequest.toTs)
     } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
@@ -43,7 +44,7 @@ object ServerUtils {
     } yield balance
 
   def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = {
-    Right(Group(query.address.groupIndex(blockFlow.config).value))
+    Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
   def createTransaction(blockFlow: BlockFlow,
@@ -80,8 +81,7 @@ object ServerUtils {
     }
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock)(
-      implicit cfg: ConsensusConfig): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
     for {
       _ <- checkChainIndex(blockFlow, query.hash)
       block <- blockFlow
@@ -158,8 +158,8 @@ object ServerUtils {
   }
 
   def checkGroup(blockFlow: BlockFlow, address: Address): Try[Unit] = {
-    val groupIndex = address.groupIndex(blockFlow.config)
-    if (blockFlow.config.brokerInfo.contains(groupIndex)) Right(())
+    val groupIndex = address.groupIndex(blockFlow.brokerConfig)
+    if (blockFlow.brokerConfig.contains(groupIndex)) Right(())
     else {
       val addressStr = CirceUtils.print(address.asJson)
       Left(Response.failed(s"Address $addressStr belongs to other groups"))
@@ -169,8 +169,8 @@ object ServerUtils {
   def checkChainIndex(blockFlow: BlockFlow, hash: Hash)(
       implicit groupConfig: GroupConfig): Try[Unit] = {
     val chainIndex = ChainIndex.from(hash)
-    if (blockFlow.config.brokerInfo.contains(chainIndex.from) || blockFlow.config.brokerInfo
-          .contains(chainIndex.to)) Right(())
+    if (blockFlow.brokerConfig.contains(chainIndex.from) ||
+        blockFlow.brokerConfig.contains(chainIndex.to)) Right(())
     else Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
   }
 

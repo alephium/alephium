@@ -1,13 +1,12 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.AlephiumSpec
 
-class GroupIndexSpec extends AlephiumSpec with ConsensusConfigFixture with ModelGenerators {
+class GroupIndexSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "equalize same values" in {
     forAll(groupIndexGen) { n =>
-      val groupIndex1 = GroupIndex.unsafe(n.value)(config)
-      val groupIndex2 = GroupIndex.unsafe(n.value)(config)
+      val groupIndex1 = GroupIndex.unsafe(n.value)(groupConfig)
+      val groupIndex2 = GroupIndex.unsafe(n.value)(groupConfig)
       groupIndex1 is groupIndex2
     }
 

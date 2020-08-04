@@ -5,7 +5,7 @@ import org.alephium.serde.RandomBytes
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
-  def relateTo(brokerInfo: BrokerInfo): Boolean = {
+  def relateTo(brokerInfo: BrokerGroupInfo): Boolean = {
     brokerInfo.contains(from) || brokerInfo.contains(to)
   }
 
@@ -58,7 +58,7 @@ object ChainIndex {
     val beforeLast = Bytes.toPosInt(bytes(bytes.length - 2))
     val last       = Bytes.toPosInt(bytes.last)
     val bigIndex   = beforeLast << 8 | last
-    assert(bigIndex >= 0)
+    assume(bigIndex >= 0)
 
     val index = bigIndex % config.chainNum
     ChainIndex.unsafe(index / config.groups, index % config.groups)

@@ -16,9 +16,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Span}
 
 import org.alephium.flow.client.Miner
-import org.alephium.flow.core.FlowHandler.BlockNotify
-import org.alephium.flow.platform.Mode
-import org.alephium.protocol.ALF.Hash
+import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
@@ -37,13 +36,15 @@ class RPCServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new ServerFixture {
-    val header =
-      BlockHeader(AVector(Hash.hash("foo")), Hash.hash("bar"), TimeStamp.zero, 1, 2)
+    val dep         = Hash.hash("foo")
+    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, 1, 2)
     val blockNotify = BlockNotify(header, 1)
+    val headerHash  = header.hash.toHexString
+    val chainIndex  = header.chainIndex
 
     val result = RPCServer.blockNotifyEncode(blockNotify)
 
-    show(result) is """{"hash":"9d131ee1587f668cebefa70937dd8a1b374463131b23411d9cf02d8462c38e6d","timestamp":0,"chainFrom":0,"chainTo":2,"height":1,"deps":["41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d"]}"""
+    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":["${dep.toHexString}"]}"""
   }
 
   it should "call mining_start" in new RouteHTTP {
@@ -103,7 +104,7 @@ class RPCServerSpec
 
   it should "call get_block" in new RouteHTTP {
     val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
-    if (config.brokerInfo.contains(chainIndex.from) || config.brokerInfo.contains(chainIndex.to)) {
+    if (brokerConfig.contains(chainIndex.from) || brokerConfig.contains(chainIndex.to)) {
       checkCallResult(
         "get_block",
         parse(s"""{"hash":"${dummyBlockHeader.hash.toHexString}"}""").toOption)(dummyBlockEntry)
@@ -131,7 +132,7 @@ class RPCServerSpec
 
   it should "reject when address belongs to other groups" in new RouteHTTP {
     override val configValues = Map(
-      ("alephium.broker.brokerId", 1)
+      ("alephium.broker.broker-id", 1)
     )
     checkFailCallResult("get_balance", parse(s"""{"address":"$dummyKeyAddress"}""").toOption)(
       "Server error")
@@ -157,26 +158,6 @@ class RPCServerSpec
   it should "run/stop the server" in new RouteHTTP {
     server.start().futureValue is (())
     server.stop().futureValue is (())
-  }
-
-  it should "make sure rps and ws port are provided" in new ServerFixture {
-    override val configValues = Map(
-      ("alephium.network.rpcPort", 0),
-      ("alephium.network.wsPort", 0)
-    )
-
-    val blockFlowProbe = TestProbe()
-
-    val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
-                                   dummyNeighborCliques,
-                                   dummyBlock,
-                                   blockFlowProbe.ref,
-                                   dummyTx,
-                                   storages)
-
-    assertThrows[RuntimeException] {
-      RPCServer(mode, ActorRefT(TestProbe().ref))
-    }
   }
 
   behavior of "companion object"
@@ -243,16 +224,14 @@ class RPCServerSpec
     val minerProbe = TestProbe()
     val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
-    val blockFlowProbe = TestProbe()
-
-    lazy val mode: Mode = new ModeDummy(dummyIntraCliqueInfo,
-                                        dummyNeighborCliques,
-                                        dummyBlock,
-                                        blockFlowProbe.ref,
-                                        dummyTx,
-                                        storages)
-
-    lazy val server: RPCServer = RPCServer(mode, miner)
+    lazy val blockFlowProbe = TestProbe()
+    lazy val node = new NodeDummy(dummyIntraCliqueInfo,
+                                  dummyNeighborCliques,
+                                  dummyBlock,
+                                  blockFlowProbe.ref,
+                                  dummyTx,
+                                  storages)
+    lazy val server: RPCServer = RPCServer(node, miner)
   }
 
   trait RouteHTTP extends RPCServerFixture {
@@ -290,7 +269,7 @@ class RPCServerSpec
 
     val blockNotify = BlockNotify(blockGen.sample.get.header, height = 0)
     def sendEventAndCheck: Assertion = {
-      mode.node.eventBus ! blockNotify
+      node.eventBus ! blockNotify
       val TextMessage.Strict(message) = client.expectMessage()
 
       val json         = parse(message).toOption.get

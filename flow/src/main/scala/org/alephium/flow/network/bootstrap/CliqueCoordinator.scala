@@ -4,12 +4,16 @@ import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object CliqueCoordinator {
-  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit config: PlatformConfig): Props =
+  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting,
+      discoveryConfig: DiscoveryConfig): Props =
     Props(new CliqueCoordinator(bootstrapper))
 
   sealed trait Event
@@ -21,7 +25,9 @@ object CliqueCoordinator {
 }
 
 class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
-    implicit val config: PlatformConfig)
+    implicit val brokerConfig: BrokerConfig,
+    val networkSetting: NetworkSetting,
+    val discoveryConfig: DiscoveryConfig)
     extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers
@@ -49,7 +55,7 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
   def awaitAck: Receive = {
     case BrokerConnector.Ack(id) =>
       log.debug(s"Broker $id is ready")
-      if (0 <= id && id < config.brokerNum) {
+      if (0 <= id && id < brokerConfig.brokerNum) {
         setReady(id)
         if (isAllReady) {
           log.debug("All the brokers are ready")

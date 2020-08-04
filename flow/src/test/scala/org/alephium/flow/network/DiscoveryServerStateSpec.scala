@@ -2,6 +2,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import akka.event.LoggingAdapter
@@ -10,7 +11,7 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
@@ -28,14 +29,15 @@ class DiscoveryServerStateSpec
     def scanFrequency: Duration = Duration.unsafe(500)
     val socketProbe             = TestProbe()
 
-    implicit val config: DiscoveryConfig =
-      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
+    implicit val config: DiscoveryConfig with CliqueConfig =
+      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
 
     val state = new DiscoveryServerState {
-      implicit def config: DiscoveryConfig = self.config
-      def log: LoggingAdapter              = system.log
+      implicit def groupConfig: GroupConfig         = self.config
+      implicit def discoveryConfig: DiscoveryConfig = self.config
+      def log: LoggingAdapter                       = system.log
 
-      def bootstrap: AVector[InetSocketAddress] = AVector.empty
+      def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
 
       def selfCliqueInfo: CliqueInfo =
         CliqueInfo.unsafe(CliqueId.generate,
@@ -48,11 +50,14 @@ class DiscoveryServerStateSpec
 
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
-        createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)
+        createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
       socketProbe.expectMsgPF() {
         case send: Udp.Send =>
           val message =
-            DiscoveryMessage.deserialize(CliqueId.generate, send.payload)(peerConfig).toOption.get
+            DiscoveryMessage
+              .deserialize(CliqueId.generate, send.payload)(peerConfig, peerConfig)
+              .toOption
+              .get
           message.payload is a[T]
       }
     }

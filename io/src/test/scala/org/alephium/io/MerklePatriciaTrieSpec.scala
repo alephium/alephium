@@ -6,7 +6,7 @@ import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{Keccak256 => Hash}
+import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -57,7 +57,7 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
   it should "encode flag correctly" in {
     def test(length: Int, isLeaf: Boolean, flag: Int): Assertion = {
-      assert(flag >= 0 && flag < 256)
+      assume(flag >= 0 && flag < 256)
       Node.SerdeNode.encodeFlag(length, isLeaf) is flag
       Node.SerdeNode.decodeFlag(flag) is ((length, isLeaf))
     }

@@ -7,7 +7,7 @@ import org.rocksdb.WriteOptions
 import org.alephium.io.{IOResult, KeyValueSource, RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.io.MerklePatriciaTrie.Node
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.AVector
@@ -19,12 +19,8 @@ object Storages {
   val heightPostfix: Byte        = 3
   val chainStatePostfix: Byte    = 4
 
-  trait Config {
-    def blockCacheCapacity: Int
-  }
-
   def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(
-      implicit config: GroupConfig with Config): Storages = {
+      implicit config: GroupConfig): Storages = {
     val db                = createRocksDBUnsafe(rootPath, dbFolder)
     val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)

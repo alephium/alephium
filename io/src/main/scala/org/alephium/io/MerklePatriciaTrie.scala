@@ -2,7 +2,7 @@ package org.alephium.io
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{Keccak256 => Hash}
+import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 
@@ -30,7 +30,7 @@ object MerklePatriciaTrie {
       BranchNode(prefix ++ path, children)
     }
     def preCut(n: Int): BranchNode = {
-      assert(n <= path.length)
+      assume(n <= path.length)
       BranchNode(path.drop(n), children)
     }
   }
@@ -39,7 +39,7 @@ object MerklePatriciaTrie {
       LeafNode(prefix ++ path, data)
     }
     def preCut(n: Int): LeafNode = {
-      assert(n <= path.length)
+      assume(n <= path.length)
       LeafNode(path.drop(n), data)
     }
   }
@@ -50,7 +50,7 @@ object MerklePatriciaTrie {
                node1: Node,
                nibble2: Int,
                node2: Node): BranchNode = {
-      assert(nibble1 != nibble2 && nibble1 < 16 && nibble2 < 16)
+      assume(nibble1 != nibble2 && nibble1 < 16 && nibble2 < 16)
       val array = Array.fill[Option[Hash]](16)(None)
       array(nibble1) = Some(node1.hash)
       array(nibble2) = Some(node2.hash)
@@ -59,7 +59,7 @@ object MerklePatriciaTrie {
 
     implicit object SerdeNode extends Serde[Node] {
       def encodeFlag(length: Int, isLeaf: Boolean): Int = {
-        assert(length >= 0)
+        assume(length >= 0)
         (length << 1) + (if (isLeaf) 0 else 1)
       }
 
@@ -76,12 +76,12 @@ object MerklePatriciaTrie {
       }
 
       def decodeFlag(flag: Int): (Int, Boolean) = {
-        assert(flag >= 0)
+        assume(flag >= 0)
         (flag >> 1, flag % 2 == 0)
       }
 
       def decodeNibbles(nibbles: ByteString, length: Int): ByteString = {
-        assert(nibbles.length * 2 >= length && nibbles.length * 2 <= length + 1)
+        assume(nibbles.length * 2 >= length && nibbles.length * 2 <= length + 1)
         val bytes = Array.tabulate(length) { i =>
           val byte = nibbles(i / 2)
           if (i % 2 == 0) getHighNibble(byte) else getLowNibble(byte)
@@ -161,7 +161,7 @@ object MerklePatriciaTrie {
   }
 
   def nibbles2Bytes(nibbles: ByteString): ByteString = {
-    assert(nibbles.length % 2 == 0)
+    assume(nibbles.length % 2 == 0)
     val bytes = Array.tabulate(nibbles.length / 2) { i =>
       val high = nibbles(2 * i)
       val low  = nibbles(2 * i + 1)
@@ -235,7 +235,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
   def getOpt(node: Node, nibbles: ByteString): IOResult[Option[ByteString]] = {
     node match {
       case BranchNode(path, children) =>
-        assert(nibbles.length > path.length)
+        assume(nibbles.length > path.length)
         if (path == nibbles.take(path.length)) {
           children(getNibble(nibbles, path.length)) match {
             case Some(childHash) =>
@@ -271,7 +271,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
   private def remove(hash: Hash, node: Node, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     node match {
       case node @ BranchNode(path, children) =>
-        assert(nibbles.length > path.length)
+        assume(nibbles.length > path.length)
         val nibble   = getNibble(nibbles, path.length)
         val childOpt = children(nibble)
         if (path == nibbles.take(path.length) && childOpt.nonEmpty) {
@@ -346,7 +346,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
                   nibbles: ByteString,
                   value: ByteString): IOResult[TrieUpdateActions] = {
     val path = node.path
-    assert(path.length <= nibbles.length)
+    assume(path.length <= nibbles.length)
     val branchIndex = node.path.indices.indexWhere(i => nibbles(i) != path(i))
     if (branchIndex == -1) {
       node match {
@@ -364,7 +364,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
               Right(TrieUpdateActions(Some(newBranch), AVector(hash), AVector(newBranch, newLeaf)))
           }
         case leaf: LeafNode =>
-          assert(path.length == nibbles.length)
+          assume(path.length == nibbles.length)
           val newLeaf = LeafNode(path, value)
           Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
       }
@@ -434,7 +434,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
           if (prefix.startsWith(n.path)) {
             val prefixRest = prefix.drop(n.path.length)
             val nibble     = prefixRest.head
-            assert(nibble >= 0 && nibble < 16)
+            assume(nibble >= 0 && nibble < 16)
             n.children(nibble.toInt) match {
               case Some(child) =>
                 getAllRaw(prefixRest.tail, child, acc ++ n.path ++ ByteString(nibble))

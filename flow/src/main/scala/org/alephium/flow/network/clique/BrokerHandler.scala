@@ -5,22 +5,22 @@ import java.net.InetSocketAddress
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import akka.actor.{Props, Timers}
+import akka.actor.Timers
 import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core._
-import org.alephium.flow.core.validation.Validation
+import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin._
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.platform.PlatformConfig
-import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.validation.Validation
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.{SerdeError, SerdeResult}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Forest, Random}
+import org.alephium.util._
 
 object BrokerHandler {
   sealed trait Command
@@ -52,32 +52,6 @@ object BrokerHandler {
     }
     iter(data, AVector.empty)
   }
-
-  trait Builder {
-    def createInboundBrokerHandler(
-        selfCliqueInfo: CliqueInfo,
-        remote: InetSocketAddress,
-        connection: ActorRefT[Tcp.Command],
-        blockHandlers: AllHandlers,
-        cliqueManager: ActorRefT[CliqueManager.Command]
-    )(implicit config: PlatformConfig): Props =
-      Props(
-        new InboundBrokerHandler(selfCliqueInfo, remote, connection, blockHandlers, cliqueManager))
-
-    def createOutboundBrokerHandler(
-        selfCliqueInfo: CliqueInfo,
-        remoteCliqueId: CliqueId,
-        remoteBroker: BrokerInfo,
-        blockHandlers: AllHandlers,
-        cliqueManager: ActorRefT[CliqueManager.Command]
-    )(implicit config: PlatformConfig): Props =
-      Props(
-        new OutboundBrokerHandler(selfCliqueInfo,
-                                  remoteCliqueId,
-                                  remoteBroker,
-                                  blockHandlers,
-                                  cliqueManager))
-  }
 }
 
 trait BrokerHandler extends HandShake with Relay with Sync {
@@ -89,7 +63,7 @@ trait BrokerHandler extends HandShake with Relay with Sync {
     startPingPong()
 
     val isSameClique  = remoteCliqueId == selfCliqueInfo.id
-    val isIntersected = remoteBrokerInfo.intersect(config.brokerInfo)
+    val isIntersected = remoteBrokerInfo.intersect(brokerConfig)
     if ((!isSameClique && isIntersected) || (isSameClique && !isIntersected)) {
       log.info(s"Start syncing with ${remoteBrokerInfo.address}")
       startSync()
@@ -112,7 +86,7 @@ trait ConnectionWriter extends BaseActor {
   private val messagesToSent = collection.mutable.Queue.empty[ByteString]
 
   private def send(message: ByteString): Unit = {
-    assert(!isWaitingAck)
+    assume(!isWaitingAck)
     isWaitingAck = true
     connection ! Tcp.Write(message, BrokerHandler.TcpAck)
   }
@@ -126,7 +100,7 @@ trait ConnectionWriter extends BaseActor {
   }
 
   def trySendBuffered(): Unit = {
-    assert(isWaitingAck)
+    assume(isWaitingAck)
     isWaitingAck = false
     if (messagesToSent.nonEmpty) {
       send(messagesToSent.dequeue())
@@ -140,7 +114,7 @@ trait ConnectionWriter extends BaseActor {
 }
 
 trait ConnectionReader extends BaseActor with ConnectionUtil {
-  implicit def config: GroupConfig
+  implicit def brokerConfig: BrokerConfig
 
   def remote: InetSocketAddress
 
@@ -179,11 +153,12 @@ trait ConnectionReaderWriter extends ConnectionReader with ConnectionWriter {
 }
 
 trait HandShake extends ConnectionReaderWriter {
-  def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
   def selfCliqueInfo: CliqueInfo
+  def selfBrokerInfo: BrokerInfo = selfCliqueInfo.selfBrokerInfo
 
   def handshakeOut(): Unit = {
-    sendPayload(Hello.unsafe(selfCliqueInfo.id, config.brokerInfo))
+    sendPayload(Hello.unsafe(selfCliqueInfo.id, selfBrokerInfo))
     setPayloadHandler(awaitHelloAck)
     context become handleReadWrite
   }
@@ -195,7 +170,7 @@ trait HandShake extends ConnectionReaderWriter {
 
   def awaitHello(payload: Payload): Unit = payload match {
     case hello: Hello =>
-      sendPayload(HelloAck.unsafe(selfCliqueInfo.id, config.brokerInfo))
+      sendPayload(HelloAck.unsafe(selfCliqueInfo.id, selfBrokerInfo))
       uponHandshaked(hello.cliqueId, hello.brokerInfo)
     case err =>
       log.info(s"Got ${err.getClass.getSimpleName}, expect Hello")
@@ -214,8 +189,6 @@ trait HandShake extends ConnectionReaderWriter {
 }
 
 trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
-  def config: PlatformConfig
-
   def connection: ActorRefT[Tcp.Command]
 
   private var pingNonce: Int = 0
@@ -251,12 +224,13 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
   def startPingPong(): Unit = {
     timers.startTimerWithFixedDelay(BrokerHandler.Timer,
                                     BrokerHandler.SendPing,
-                                    config.pingFrequency.asScala)
+                                    networkSetting.pingFrequency.asScala)
   }
 }
 
 trait MessageHandler extends ConnectionUtil {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
+
   def allHandlers: AllHandlers
   def remote: InetSocketAddress
   def remoteCliqueId: CliqueId
@@ -290,9 +264,9 @@ trait MessageHandler extends ConnectionUtil {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def handleNewBlocks(forest: Forest[Hash, Block]): Unit = {
-    assert(forest.nonEmpty)
+    assume(forest.nonEmpty)
     val chainIndex = forest.roots.head.value.chainIndex
-    if (chainIndex.relateTo(config.brokerInfo)) {
+    if (chainIndex.relateTo(brokerConfig)) {
       val handler = allHandlers.getBlockHandler(chainIndex)
       handler ! BlockChainHandler.AddBlocks(forest, origin)
     } else {
@@ -313,7 +287,7 @@ trait MessageHandler extends ConnectionUtil {
 
   private def handleNewHeader(header: BlockHeader): Unit = {
     val chainIndex = header.chainIndex
-    if (!chainIndex.relateTo(config.brokerInfo)) {
+    if (!chainIndex.relateTo(brokerConfig)) {
       val handler = allHandlers.getHeaderHandler(chainIndex)
       handler ! HeaderChainHandler.addOneHeader(header, origin)
     } else {
@@ -370,7 +344,7 @@ trait Sync extends P2PStage {
   private val blockNotifyList = scala.collection.mutable.HashSet.empty[ChainIndex]
 
   def startSync(): Unit = {
-    assert(!selfSynced)
+    assume(!selfSynced)
     flowHandler ! FlowHandler.GetSyncInfo(remoteBrokerInfo, isSameClique)
     setPayloadHandler(handleSyncPayload)
     context become (handleReadWrite orElse handleSyncEvents orElse handleCommonEvents)
@@ -381,7 +355,7 @@ trait Sync extends P2PStage {
   def uponSynced(): Unit
 
   private def checkRemoteSynced(numNewData: Int): Unit = {
-    assert(!remoteSynced)
+    assume(!remoteSynced)
     if (numNewData == 0) {
       remoteSynced = true
     }
@@ -389,7 +363,7 @@ trait Sync extends P2PStage {
   }
 
   private def checkSelfSynced(numNewData: Int): Unit = {
-    assert(!selfSynced)
+    assume(!selfSynced)
     if (numNewData == 0) {
       selfSynced = true
     }
@@ -415,7 +389,7 @@ trait Sync extends P2PStage {
       sendPayload(SyncResponse(blocks, headers)) // Note: send data even when both are empty
       checkRemoteSynced(blocks.length + headers.length)
     case BlockChainHandler.BlocksAdded(chainIndex) =>
-      assert(blockNotifyList.contains(chainIndex))
+      assume(blockNotifyList.contains(chainIndex))
       log.debug(s"all the blocks sent for $chainIndex are added")
       blockNotifyList -= chainIndex
       if (blockNotifyList.isEmpty) {
@@ -476,6 +450,8 @@ trait Relay extends P2PStage {
 }
 
 trait ConnectionUtil extends BaseActor {
+  implicit def networkSetting: NetworkSetting
+
   def connection: ActorRefT[Tcp.Command]
 
   def remote: InetSocketAddress

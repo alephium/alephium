@@ -3,7 +3,7 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.crypto.ED25519PublicKey
-import org.alephium.protocol.ALF.{Hash, HashSerde}
+import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._

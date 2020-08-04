@@ -6,11 +6,11 @@ import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature}
-import org.alephium.flow.core.FlowHandler.BlockNotify
+import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature, Sha256}
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -81,7 +81,6 @@ object ApiModel {
 
   final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
   object FetchRequest {
-    import TimeStampCodec._
     def decoder(implicit apiConfig: ApiConfig): Decoder[FetchRequest] =
       deriveDecoder[FetchRequest]
         .ensure(
@@ -326,17 +325,17 @@ object ApiModel {
     implicit val codec: Codec[MinerAction] = Codec.from(decoder, encoder)
   }
 
-  sealed abstract case class ApiKey private (val value: String) {
-    def hash: Hash = Hash.hash(value)
+  final case class ApiKey private (val value: String) {
+    def hash: Sha256 = Sha256.hash(value)
   }
 
   object ApiKey {
-    def unsafe(raw: String): ApiKey = new ApiKey(raw) {}
+    def unsafe(raw: String): ApiKey = new ApiKey(raw)
     def createApiKey(raw: String): Either[String, ApiKey] = {
       if (raw.length < 32) {
         Left("Api key must have at least 32 characters")
       } else {
-        Right(new ApiKey(raw) {})
+        Right(new ApiKey(raw))
       }
     }
 

@@ -30,27 +30,27 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def nonEmpty: Boolean = length > 0
 
   def head: A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
     elems(start)
   }
 
   def last: A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
     elems(end - 1)
   }
 
   def init: AVector[A] = {
-    assert(nonEmpty)
+    assume(nonEmpty)
     AVector.unsafe(elems, start, end - 1, false)
   }
 
   def tail: AVector[A] = {
-    assert(nonEmpty)
+    assume(nonEmpty)
     AVector.unsafe(elems, start + 1, end, appendable)
   }
 
   def apply(i: Int): A = {
-    assert(i >= 0 && i < length)
+    assume(i >= 0 && i < length)
 
     elems(start + i)
   }
@@ -60,7 +60,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   private[util] def ensureSize(n: Int): Unit = {
-    assert(n >= 0)
+    assume(n >= 0)
 
     val goal = start + n
     if (goal > capacity) {
@@ -160,7 +160,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def slice(from: Int, until: Int): AVector[A] = {
-    assert(from >= 0 && from <= until && until <= length)
+    assume(from >= 0 && from <= until && until <= length)
 
     val newAppendable = if (until == length) appendable else false
     AVector.unsafe(elems, start + from, start + until, newAppendable)
@@ -377,7 +377,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def reduceBy[B: ClassTag](f: A => B)(op: (B, B) => B): B = {
-    assert(nonEmpty)
+    assume(nonEmpty)
 
     var acc = f(elems(start))
     cfor(start + 1)(_ < end, _ + 1) { i =>
@@ -468,19 +468,19 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def max(implicit cmp: Ordering[A]): A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
 
     reduce((x, y) => if (cmp.gteq(x, y)) x else y)
   }
 
   def min(implicit cmp: Ordering[A]): A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
 
     reduce((x, y) => if (cmp.lteq(x, y)) x else y)
   }
 
   def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
 
     var maxA = head
     var maxB = f(maxA)
@@ -496,7 +496,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def minBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
-    assert(nonEmpty)
+    assume(nonEmpty)
 
     var minA = head
     var minB = f(minA)
@@ -536,7 +536,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def replace(i: Int, a: A): AVector[A] = {
-    assert(i >= 0 && i < length)
+    assume(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)
     System.arraycopy(elems, start, arr, 0, length)
     arr(i) = a
@@ -631,7 +631,7 @@ object AVector {
   }
 
   @inline def tabulate[@sp A: ClassTag](n: Int)(f: Int => A): AVector[A] = {
-    assert(n >= 0)
+    assume(n >= 0)
 
     val arr = new Array[A](n)
     cfor(0)(_ < n, _ + 1) { i =>
@@ -641,7 +641,7 @@ object AVector {
   }
 
   def tabulate[@sp A: ClassTag](n1: Int, n2: Int)(f: (Int, Int) => A): AVector[AVector[A]] = {
-    assert(n1 >= 0 && n2 >= 0)
+    assume(n1 >= 0 && n2 >= 0)
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
   }
 

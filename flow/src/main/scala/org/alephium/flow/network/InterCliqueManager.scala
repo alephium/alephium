@@ -6,17 +6,20 @@ import akka.actor.{ActorRef, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
-import org.alephium.flow.core.AllHandlers
+import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
-  def props(
-      selfCliqueInfo: CliqueInfo,
-      allHandlers: AllHandlers,
-      discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig): Props =
+  def props(selfCliqueInfo: CliqueInfo,
+            allHandlers: AllHandlers,
+            discoveryServer: ActorRefT[DiscoveryServer.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting,
+      discoverySetting: DiscoverySetting): Props =
     Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
 
   sealed trait Command              extends CliqueManager.Command
@@ -33,14 +36,18 @@ object InterCliqueManager {
   }
 }
 
-class InterCliqueManager(
-    selfCliqueInfo: CliqueInfo,
-    allHandlers: AllHandlers,
-    discoveryServer: ActorRefT[DiscoveryServer.Command])(implicit config: PlatformConfig)
+class InterCliqueManager(selfCliqueInfo: CliqueInfo,
+                         allHandlers: AllHandlers,
+                         discoveryServer: ActorRefT[DiscoveryServer.Command])(
+    implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting,
+    discoveryConfig: DiscoverySetting)
     extends BaseActor
     with InterCliqueManagerState {
   import InterCliqueManager._
   discoveryServer ! DiscoveryServer.GetNeighborCliques
+
+  val selfBrokerInfo: BrokerInfo = selfCliqueInfo.selfBrokerInfo
 
   override def receive: Receive = handleMessage orElse handleConnection orElse awaitNeighborCliques
 
@@ -51,7 +58,7 @@ class InterCliqueManager(
         neighborCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
       } else {
         // TODO: refine the condition, check the number of brokers for example
-        if (config.bootstrap.nonEmpty) {
+        if (discoveryConfig.bootstrap.nonEmpty) {
           scheduleOnce(discoveryServer.ref,
                        DiscoveryServer.GetNeighborCliques,
                        Duration.ofSecondsUnsafe(2))
@@ -73,7 +80,7 @@ class InterCliqueManager(
       ()
     case CliqueManager.Syncing(cliqueId, brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $cliqueId, $brokerInfo")
-      if (config.brokerInfo.intersect(brokerInfo)) {
+      if (brokerConfig.intersect(brokerInfo)) {
         addBroker(cliqueId, brokerInfo, sender())
       } else {
         context stop sender()
@@ -111,7 +118,7 @@ class InterCliqueManager(
 
   def connect(cliqueInfo: CliqueInfo): Unit = {
     cliqueInfo.brokers.foreach { brokerInfo =>
-      if (config.brokerInfo.intersect(brokerInfo)) {
+      if (brokerConfig.intersect(brokerInfo)) {
         log.debug(s"Try to connect to ${cliqueInfo.id} $brokerInfo")
         val remoteCliqueId = cliqueInfo.id
         val name =
@@ -137,7 +144,7 @@ trait InterCliqueManagerState {
   private val brokers = collection.mutable.HashMap.empty[(CliqueId, Int), BrokerState]
 
   def addBroker(cliqueId: CliqueId, brokerInfo: BrokerInfo, broker: ActorRef): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.id
+    val brokerKey = cliqueId -> brokerInfo.brokerId
     if (!brokers.contains(brokerKey)) {
       brokers += brokerKey -> BrokerState(brokerInfo, broker, isSynced = false)
     } else {
@@ -162,7 +169,7 @@ trait InterCliqueManagerState {
   }
 
   def setSynced(cliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.id
+    val brokerKey = cliqueId -> brokerInfo.brokerId
     brokers.get(brokerKey) match {
       case Some(state) => brokers(brokerKey) = state.setSynced()
       case None        => log.warning(s"Unexpected message Synced from $cliqueId")

@@ -6,7 +6,7 @@ import org.openjdk.jmh.annotations._
 
 import org.alephium.io.{KeyValueStorage, MerklePatriciaTrie, RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.io.MerklePatriciaTrie.Node
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -40,6 +40,6 @@ class TrieBench {
       key
     }
     keys.foreach(trie.removeRaw)
-    assert(trie.rootHash == genesisHash)
+    assume(trie.rootHash == genesisHash)
   }
 }

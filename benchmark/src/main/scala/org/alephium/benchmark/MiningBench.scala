@@ -4,24 +4,27 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.flow.core.validation.Validation
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.{AlephiumConfig, Platform}
+import org.alephium.flow.validation.Validation
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, Random}
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
+@SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class MiningBench {
 
-  implicit val config: PlatformConfig = PlatformConfig.loadDefault()
+  val config: AlephiumConfig            = AlephiumConfig.load(Platform.getRootPath()).toOption.get
+  implicit val groupConfig: GroupConfig = config.broker
 
   @Benchmark
   def mineGenesis(): Boolean = {
     val nonce = Random.source.nextInt()
-    val block = Block.genesis(AVector.empty, config.maxMiningTarget, BigInt(nonce))
-    val i     = Random.source.nextInt(config.groups)
-    val j     = Random.source.nextInt(config.groups)
+    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, BigInt(nonce))
+    val i     = Random.source.nextInt(groupConfig.groups)
+    val j     = Random.source.nextInt(groupConfig.groups)
     Validation.validateMined(block, ChainIndex.unsafe(i, j))
   }
 }

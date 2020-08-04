@@ -5,15 +5,14 @@ import scala.annotation.tailrec
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
 
   def genesisHash: Hash
 
@@ -89,7 +88,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getBestTipUnsafe: Hash = {
-    assert(tips.size != 0)
+    assume(tips.size != 0)
     val weighted = getAllTips.map { hash =>
       hash -> getWeightUnsafe(hash)
     }
@@ -221,8 +220,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def calHashDiffFromSameHeight(newHash: ALF.Hash,
-                                        oldHash: ALF.Hash): IOResult[ChainDiff] = {
+  private def calHashDiffFromSameHeight(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
     if (newHash == oldHash) Right(ChainDiff(AVector.empty, AVector.empty))
     else {
       for {

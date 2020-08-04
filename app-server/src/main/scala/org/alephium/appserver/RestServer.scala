@@ -16,28 +16,27 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.flow.client.Miner
-import org.alephium.flow.core.{BlockFlow, TxHandler}
-import org.alephium.flow.platform.{Mode, PlatformConfig}
+import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.TxHandler
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, Duration, Service}
 
 // scalastyle:off method.length
-class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
-    implicit config: PlatformConfig,
-    actorSystem: ActorSystem,
-    protected val executionContext: ExecutionContext)
+class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
+    implicit val apiConfig: ApiConfig,
+    val actorSystem: ActorSystem,
+    val executionContext: ExecutionContext)
     extends Endpoints
     with Service
     with StrictLogging {
 
-  private val blockFlow: BlockFlow                    = mode.node.blockFlow
-  private val txHandler: ActorRefT[TxHandler.Command] = mode.node.allHandlers.txHandler
+  private val blockFlow: BlockFlow                    = node.blockFlow
+  private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
-  implicit val apiConfig: ApiConfig     = ApiConfig.load(config.aleph)
-  implicit val groupConfig: GroupConfig = config
+  implicit val groupConfig: GroupConfig = node.config.broker
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
@@ -119,7 +118,7 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
 
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
 
-  override def subServices: ArraySeq[Service] = ArraySeq(mode)
+  override def subServices: ArraySeq[Service] = ArraySeq(node)
 
   protected def startSelfOnce(): Future[Unit] = {
     for {
@@ -142,14 +141,14 @@ class RestServer(mode: Mode, port: Int, miner: ActorRefT[Miner.Command])(
 }
 
 object RestServer {
-  def apply(mode: Mode, miner: ActorRefT[Miner.Command])(
+  def apply(node: Node, miner: ActorRefT[Miner.Command])(
       implicit system: ActorSystem,
-      config: PlatformConfig,
+      apiConfig: ApiConfig,
       executionContext: ExecutionContext): RestServer = {
     (for {
-      restPort <- mode.config.restPort
+      restPort <- node.config.network.restPort
     } yield {
-      new RestServer(mode, restPort, miner)
+      new RestServer(node, restPort, miner)
     }) match {
       case Some(server) => server
       case None         => throw new RuntimeException("rpc and ws ports are required")

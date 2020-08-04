@@ -2,7 +2,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -129,7 +129,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
     else Left(s"invalid HandShake: $message")
 }
 
-sealed abstract case class Hello(
+final case class Hello private (
     version: Int,
     timestamp: Long,
     cliqueId: CliqueId,
@@ -138,10 +138,10 @@ sealed abstract case class Hello(
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
   def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello =
-    new Hello(version, timestamp, cliqueId, brokerInfo) {}
+    new Hello(version, timestamp, cliqueId, brokerInfo)
 }
 
-sealed abstract case class HelloAck(
+final case class HelloAck private (
     version: Int,
     timestamp: Long,
     cliqueId: CliqueId,
@@ -150,7 +150,7 @@ sealed abstract case class HelloAck(
 
 object HelloAck extends HandShakeSerding[HelloAck] with Payload.Code {
   def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): HelloAck =
-    new HelloAck(version, timestamp, cliqueId, brokerInfo) {}
+    new HelloAck(version, timestamp, cliqueId, brokerInfo)
 }
 
 final case class Ping(nonce: Int, timestamp: Long) extends Payload

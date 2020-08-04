@@ -3,15 +3,15 @@ package org.alephium.flow.core
 import scala.reflect.ClassTag
 
 import org.alephium.flow.model.BlockState
-import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
-  implicit def config: PlatformConfig
+  implicit def brokerConfig: BrokerConfig
 
   def groups: Int
 

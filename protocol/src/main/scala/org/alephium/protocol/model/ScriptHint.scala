@@ -1,6 +1,6 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{Bytes, DjbHash}
 
@@ -12,7 +12,7 @@ class ScriptHint(val value: Int) extends AnyVal {
 }
 
 object ScriptHint {
-  def fromHash(hash: ALF.Hash): ScriptHint = {
+  def fromHash(hash: Hash): ScriptHint = {
     fromHash(DjbHash.intHash(hash.bytes))
   }
 

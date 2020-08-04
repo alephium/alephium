@@ -9,8 +9,8 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ED25519PublicKey, ED25519Signature}
-import org.alephium.protocol.ALF.Hash
+import org.alephium.crypto.{ED25519PublicKey, ED25519Signature, Sha256}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
@@ -35,7 +35,7 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
     ApiConfig(dummyAddress.getAddress,
               blockflowFetchMaxAge,
               askTimeout = Duration.zero,
-              apiKeyHash = Hash.hash(apiKey))
+              apiKeyHash = Sha256.hash(apiKey))
   implicit val fetchRequestCodec = FetchRequest.codec
 
   def generateKeyHash(): String = {

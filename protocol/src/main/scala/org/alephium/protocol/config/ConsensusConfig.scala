@@ -2,7 +2,7 @@ package org.alephium.protocol.config
 
 import org.alephium.util.Duration
 
-trait ConsensusConfig extends GroupConfig {
+trait ConsensusConfig {
 
   def numZerosAtLeastInHash: Int
   def maxMiningTarget: BigInt

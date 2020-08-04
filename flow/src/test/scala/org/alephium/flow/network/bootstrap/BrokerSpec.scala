@@ -18,10 +18,9 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     expectMsgType[Tcp.Bound]
 
     val broker = system.actorOf(
-      Broker.props(masterAddress,
-                   config.brokerInfo,
-                   config.retryTimeout,
-                   ActorRefT[Bootstrapper.Command](bootstrapper.ref)))
+      Broker.props(ActorRefT[Bootstrapper.Command](bootstrapper.ref))(
+        brokerConfig,
+        networkSetting.copy(masterAddress = masterAddress)))
     watch(broker)
 
     connection.expectMsgPF() {
@@ -41,7 +40,7 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
         BrokerConnector.deserializeTry[BrokerConnector.Ack](data) is Right(
-          Some((BrokerConnector.Ack(config.brokerInfo.id), ByteString.empty)))
+          Some((BrokerConnector.Ack(brokerConfig.brokerId), ByteString.empty)))
     }
 
     val ready = BrokerConnector.envelop(CliqueCoordinator.Ready).data

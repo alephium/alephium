@@ -3,7 +3,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.ED25519Signature
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
 import org.alephium.util.AVector
 
 trait ChainEnv

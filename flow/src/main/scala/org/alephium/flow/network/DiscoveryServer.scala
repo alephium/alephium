@@ -2,22 +2,28 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.collection.immutable.ArraySeq
+
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
 import org.alephium.flow.{TaskTrigger, Utils}
-import org.alephium.protocol.config.DiscoveryConfig
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
-  def props(bootstrap: AVector[InetSocketAddress])(implicit config: DiscoveryConfig): Props =
-    Props(new DiscoveryServer(bootstrap))
+  def props(publicAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
+      implicit groupConfig: GroupConfig,
+      discoveryConfig: DiscoveryConfig): Props =
+    Props(new DiscoveryServer(publicAddress, bootstrap))
 
-  def props(peers: InetSocketAddress*)(implicit config: DiscoveryConfig): Props = {
-    props(AVector.from(peers))
+  def props(publicAddress: InetSocketAddress, peers: InetSocketAddress*)(
+      implicit groupConfig: GroupConfig,
+      discoveryConfig: DiscoveryConfig): Props = {
+    props(publicAddress, ArraySeq.from(peers))
   }
 
   final case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
@@ -55,8 +61,10 @@ object DiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
-    implicit val config: DiscoveryConfig)
+class DiscoveryServer(val publicAddress: InetSocketAddress,
+                      val bootstrap: ArraySeq[InetSocketAddress])(
+    implicit val groupConfig: GroupConfig,
+    val discoveryConfig: DiscoveryConfig)
     extends BaseActor
     with Timers
     with DiscoveryServerState {
@@ -71,7 +79,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
-      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(config.publicAddress.getPort))
+      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(publicAddress.getPort))
       context become (binding orElse handleCommand)
   }
 
@@ -81,7 +89,7 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       setSocket(ActorRefT[Udp.Command](sender()))
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(tryPing)
-      scheduleOnce(self, Scan, config.scanFastFrequency)
+      scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
       context.become(ready)
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
@@ -112,8 +120,8 @@ class DiscoveryServer(val bootstrap: AVector[InetSocketAddress])(
       log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
       scan()
-      if (shouldScanFast()) scheduleOnce(self, Scan, config.scanFastFrequency)
-      else scheduleOnce(self, Scan, config.scanFrequency)
+      if (shouldScanFast()) scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
+      else scheduleOnce(self, Scan, discoveryConfig.scanFrequency)
       ()
     case GetSelfClique =>
       sender() ! selfCliqueInfo

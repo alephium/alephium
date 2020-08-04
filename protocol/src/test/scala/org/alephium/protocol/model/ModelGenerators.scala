@@ -11,8 +11,8 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
-import org.alephium.protocol.ALF.Hash
-import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigFixture, GroupConfig}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
@@ -21,7 +21,7 @@ import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U64}
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
 
-  implicit def config: GroupConfig
+  implicit def groupConfig: GroupConfig
 
   def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript] =
     for {
@@ -32,10 +32,21 @@ trait LockupScriptGenerators extends Generators {
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield ScriptPair(LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey), privateKey)
+
+  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript, ED25519PublicKey, ED25519PrivateKey)] =
+    for {
+      (privateKey, publicKey) <- keypairGen(groupIndex)
+    } yield (LockupScript.p2pkh(publicKey), publicKey, privateKey)
+
+  def addressStringGen(groupIndex: GroupIndex): Gen[(String, String, String)] =
+    addressGen(groupIndex).map {
+      case (script, publicKey, privateKey) =>
+        (script.toBase58, publicKey.toHexString, privateKey.toHexString)
+    }
 }
 
 trait TxInputGenerators extends Generators {
-  implicit def config: GroupConfig
+  implicit def groupConfig: GroupConfig
 
   def scriptHintGen(groupIndex: GroupIndex): Gen[ScriptHint] =
     Gen.choose(0, Int.MaxValue).map(ScriptHint.fromHash).retryUntil(_.groupIndex equals groupIndex)
@@ -312,15 +323,16 @@ trait TxGenerators
 // scalastyle:on parameter.number
 
 trait BlockGenerators extends TxGenerators {
-  implicit def config: ConsensusConfig
+  implicit def groupConfig: GroupConfig
+  implicit def consensusConfig: ConsensusConfig
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
     blockGenOf(chainIndex, AVector(Hash.zero))
 
-  def blockGenOf(broker: BrokerInfo): Gen[Block] =
+  def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)
 
-  def blockGenNotOf(broker: BrokerInfo): Gen[Block] =
+  def blockGenNotOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenNotRelatedTo(broker).flatMap(blockGen)
 
   def blockGenOf(group: GroupIndex): Gen[Block] =
@@ -329,7 +341,7 @@ trait BlockGenerators extends TxGenerators {
   private def gen(chainIndex: ChainIndex, deps: AVector[Hash], txs: AVector[Transaction]): Block = {
     @tailrec
     def iter(nonce: Long): Block = {
-      val block = Block.from(deps, txs, config.maxMiningTarget, nonce)
+      val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, nonce)
       if (block.chainIndex equals chainIndex) block else iter(nonce + 1)
     }
 
@@ -354,7 +366,7 @@ trait BlockGenerators extends TxGenerators {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
           val currentHeader = block.header
-          val deps          = AVector.fill(config.depsNum)(prevHash)
+          val deps          = AVector.fill(groupConfig.depsNum)(prevHash)
           val newHeader     = currentHeader.copy(blockDeps = deps)
           val newBlock      = block.copy(header = newHeader)
           acc :+ newBlock
@@ -365,7 +377,7 @@ trait BlockGenerators extends TxGenerators {
 trait ModelGenerators extends BlockGenerators
 
 trait NoIndexModelGeneratorsLike extends ModelGenerators {
-  implicit def config: ConsensusConfig
+  implicit def groupConfig: GroupConfig
 
   lazy val txInputGen: Gen[TxInput] = groupIndexGen.flatMap(txInputGen(_))
 
@@ -382,7 +394,10 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
     chainIndexGen.flatMap(chainGenOf(_, length))
 }
 
-trait NoIndexModelGenerators extends NoIndexModelGeneratorsLike with ConsensusConfigFixture
+trait NoIndexModelGenerators
+    extends NoIndexModelGeneratorsLike
+    with GroupConfigFixture.Default
+    with ConsensusConfigFixture
 
 object ModelGenerators {
   final case class ScriptPair(lockup: LockupScript,

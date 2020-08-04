@@ -5,13 +5,13 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.BaseActor
 
 object BrokerConnector {
   def props(connection: ActorRef, cliqueCoordinator: ActorRef)(
-      implicit config: PlatformConfig): Props =
+      implicit groupConfig: GroupConfig): Props =
     Props(new BrokerConnector(connection, cliqueCoordinator))
 
   sealed trait Event
@@ -40,7 +40,7 @@ object BrokerConnector {
 }
 
 class BrokerConnector(connection: ActorRef, cliqueCoordinator: ActorRef)(
-    implicit val config: PlatformConfig)
+    implicit val groupConfig: GroupConfig)
     extends BaseActor
     with SerdeUtils {
   import BrokerConnector._

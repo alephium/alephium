@@ -1,14 +1,13 @@
 package org.alephium.protocol.model
 
-import org.alephium.protocol.ALF
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
 final case class TxInput(outputRef: TxOutputRef, unlockScript: UnlockScript)
-    extends ALF.HashSerde[TxInput] {
+    extends HashSerde[TxInput] {
   def hash: Hash = _getHash
 
   def fromGroup(implicit config: GroupConfig): GroupIndex = outputRef.fromGroup
@@ -28,7 +27,7 @@ object TxInput {
 
 trait TxOutputRef {
   def hint: Hint
-  def key: ALF.Hash
+  def key: Hash
 
   def isAssetType: Boolean
   def isContractType: Boolean
@@ -36,30 +35,30 @@ trait TxOutputRef {
   def fromGroup(implicit config: GroupConfig): GroupIndex = hint.scriptHint.groupIndex
 }
 
-final case class AssetOutputRef private (hint: Hint, key: ALF.Hash) extends TxOutputRef {
+final case class AssetOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
   override def isAssetType: Boolean    = true
   override def isContractType: Boolean = false
 }
 object AssetOutputRef {
-  def unsafe(hint: Hint, key: ALF.Hash): AssetOutputRef = new AssetOutputRef(hint, key)
+  def unsafe(hint: Hint, key: Hash): AssetOutputRef = new AssetOutputRef(hint, key)
 
-  def from(scriptHint: ScriptHint, key: ALF.Hash): AssetOutputRef =
+  def from(scriptHint: ScriptHint, key: Hash): AssetOutputRef =
     unsafe(Hint.ofAsset(scriptHint), key)
 
-  def from(assetOutput: AssetOutput, key: ALF.Hash): AssetOutputRef = unsafe(assetOutput.hint, key)
+  def from(assetOutput: AssetOutput, key: Hash): AssetOutputRef = unsafe(assetOutput.hint, key)
 }
 
-final case class ContractOutputRef private (hint: Hint, key: ALF.Hash) extends TxOutputRef {
+final case class ContractOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
   override def isAssetType: Boolean    = false
   override def isContractType: Boolean = true
 }
 object ContractOutputRef {
-  def unsafe(hint: Hint, key: ALF.Hash): ContractOutputRef = new ContractOutputRef(hint, key)
+  def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 
-  def from(scriptHint: ScriptHint, key: ALF.Hash): ContractOutputRef =
+  def from(scriptHint: ScriptHint, key: Hash): ContractOutputRef =
     unsafe(Hint.ofContract(scriptHint), key)
 
-  def from(contractOutput: ContractOutput, key: ALF.Hash): ContractOutputRef =
+  def from(contractOutput: ContractOutput, key: Hash): ContractOutputRef =
     unsafe(contractOutput.hint, key)
 }
 
@@ -67,15 +66,15 @@ object TxOutputRef {
   implicit val serde: Serde[TxOutputRef] =
     Serde.forProduct2(TxOutputRef.from, t => (t.hint, t.key))
 
-  def from(hint: Hint, key: ALF.Hash): TxOutputRef = {
+  def from(hint: Hint, key: Hash): TxOutputRef = {
     if (hint.isAssetType) AssetOutputRef.unsafe(hint, key) else ContractOutputRef.unsafe(hint, key)
   }
 
   // Only use this to initialize Merkle tree of ouptuts
   def emptyTreeNode: TxOutputRef =
-    ContractOutputRef.unsafe(Hint.ofContract(ScriptHint.fromHash(0)), ALF.Hash.zero)
+    ContractOutputRef.unsafe(Hint.ofContract(ScriptHint.fromHash(0)), Hash.zero)
 
-  def key(tx: Transaction, outputIndex: Int): ALF.Hash = {
+  def key(tx: Transaction, outputIndex: Int): Hash = {
     Hash.hash(tx.hash.bytes ++ Bytes.toBytes(outputIndex))
   }
 

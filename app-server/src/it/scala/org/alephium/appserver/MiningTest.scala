@@ -32,12 +32,7 @@ class MiningTest extends AlephiumSpec {
     request[Balance](getBalance(address), rpcPort) is
       Balance(initialBalance.balance - transferAmount, 1)
 
-    val createTx =
-      request[CreateTransactionResult](
-        createTransaction(publicKey, transferAddress, transferAmount),
-        rpcPort)
-
-    val tx2 = request[TxResult](sendTransaction(createTx, privateKey), rpcPort)
+    val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)

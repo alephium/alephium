@@ -10,8 +10,8 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, NumericHelpers}
 
 trait Generators extends NumericHelpers {
-  lazy val hashGen: Gen[ALF.Hash] =
-    Gen.const(()).map(_ => ALF.Hash.generate)
+  lazy val hashGen: Gen[Hash] =
+    Gen.const(()).map(_ => Hash.generate)
 
   def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
     Gen.choose(0, config.groups - 1).map(GroupIndex.unsafe)
@@ -22,13 +22,16 @@ trait Generators extends NumericHelpers {
       to   <- Gen.choose(0, config.groups - 1)
     } yield ChainIndex.unsafe(from, to)
 
-  def chainIndexGenRelatedTo(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenRelatedTo(broker: BrokerGroupInfo)(
+      implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(_.relateTo(broker))
 
-  def chainIndexGenForBroker(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenForBroker(broker: BrokerGroupInfo)(
+      implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(index => broker.contains(index.from))
 
-  def chainIndexGenNotRelatedTo(broker: BrokerInfo)(implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenNotRelatedTo(broker: BrokerGroupInfo)(
+      implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(!_.relateTo(broker))
 
   def chainIndexFrom(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[ChainIndex] =

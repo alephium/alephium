@@ -17,7 +17,7 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
 
   def getUnsafe(k: K): V = {
     val v = m.get(k)
-    assert(v != null)
+    assume(v != null)
     v
   }
 

@@ -4,39 +4,40 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.{TaskTrigger, Utils}
-import org.alephium.flow.core.AllHandlers
-import org.alephium.flow.network.clique.BrokerHandler
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.handler.AllHandlers
+import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object IntraCliqueManager {
-  def props(
-      builder: BrokerHandler.Builder,
-      cliqueInfo: CliqueInfo,
-      allHandlers: AllHandlers,
-      cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig): Props =
-    Props(new IntraCliqueManager(builder, cliqueInfo, allHandlers, cliqueManager))
+  def props(cliqueInfo: CliqueInfo,
+            allHandlers: AllHandlers,
+            cliqueManager: ActorRefT[CliqueManager.Command])(
+      implicit brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting): Props =
+    Props(new IntraCliqueManager(cliqueInfo, allHandlers, cliqueManager))
 
   sealed trait Command    extends CliqueManager.Command
   final case object Ready extends Command
 }
 
-class IntraCliqueManager(
-    builder: BrokerHandler.Builder,
-    cliqueInfo: CliqueInfo,
-    allHandlers: AllHandlers,
-    cliqueManager: ActorRefT[CliqueManager.Command])(implicit config: PlatformConfig)
+class IntraCliqueManager(cliqueInfo: CliqueInfo,
+                         allHandlers: AllHandlers,
+                         cliqueManager: ActorRefT[CliqueManager.Command])(
+    implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting)
     extends BaseActor {
   cliqueInfo.brokers.foreach { remoteBroker =>
-    if (remoteBroker.id > config.brokerInfo.id) {
+    if (remoteBroker.brokerId > brokerConfig.brokerId) {
       val address = remoteBroker.address
       log.debug(s"Connect to broker $remoteBroker")
-      val props = builder.createOutboundBrokerHandler(cliqueInfo,
-                                                      cliqueInfo.id,
-                                                      remoteBroker,
-                                                      allHandlers,
-                                                      ActorRefT[CliqueManager.Command](self))
+      val props = OutboundBrokerHandler.props(cliqueInfo,
+                                              cliqueInfo.id,
+                                              remoteBroker,
+                                              allHandlers,
+                                              ActorRefT[CliqueManager.Command](self))
       context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
     }
   }
@@ -50,26 +51,26 @@ class IntraCliqueManager(
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connection from $remote")
       val index = cliqueInfo.peers.indexWhere(_ == remote)
-      if (index < config.brokerInfo.id) {
+      if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition
         log.debug(s"Inbound connection: $remote")
         val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
         val props =
-          builder.createInboundBrokerHandler(cliqueInfo,
-                                             remote,
-                                             ActorRefT[Tcp.Command](sender()),
-                                             allHandlers,
-                                             ActorRefT[CliqueManager.Command](self))
+          InboundBrokerHandler.props(cliqueInfo,
+                                     remote,
+                                     ActorRefT[Tcp.Command](sender()),
+                                     allHandlers,
+                                     ActorRefT[CliqueManager.Command](self))
         context.actorOf(props, name)
         ()
       }
     case CliqueManager.Syncing(cliqueId, broker) =>
       log.debug(s"Start syncing with intra-clique node: $cliqueId, $broker")
     case CliqueManager.Synced(cliqueId, brokerInfo) =>
-      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.id)) {
+      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()
-        val newBrokers = brokers + (brokerInfo.id -> (brokerInfo -> sender()))
+        val newBrokers = brokers + (brokerInfo.brokerId -> (brokerInfo -> sender()))
         checkAllSynced(newBrokers)
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
@@ -87,7 +88,7 @@ class IntraCliqueManager(
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
-      assert(block.chainIndex.relateTo(config.brokerInfo))
+      assume(block.chainIndex.relateTo(brokerConfig))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       // TODO: optimize this without using iteration
       brokers.foreach {

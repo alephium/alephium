@@ -1,12 +1,16 @@
 package org.alephium.flow.io
 
-import org.alephium.flow.platform.PlatformConfig
+import java.nio.file.{Files, Path}
+
 import org.alephium.io.RocksDBSource
-import org.alephium.protocol.ALF.Hash
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
 
 trait StoragesFixture {
-  implicit def config: PlatformConfig
-  lazy val storages = StoragesFixture.buildStorages
+  def rootPath: Path
+  implicit def groupConfig: GroupConfig
+
+  lazy val storages = StoragesFixture.buildStorages(rootPath)
 
   def cleanStorages(): Unit = {
     storages.dESTROYUnsafe()
@@ -14,11 +18,13 @@ trait StoragesFixture {
 }
 
 object StoragesFixture {
-  def buildStorages(implicit config: PlatformConfig): Storages = {
+  def buildStorages(rootPath: Path)(implicit groupConfig: GroupConfig): Storages = {
+    if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
+
     val postFix   = Hash.random.toHexString
     val dbFolders = s"db-$postFix"
     val storages: Storages =
-      Storages.createUnsafe(config.rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
+      Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
     storages
   }
 }

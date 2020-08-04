@@ -4,22 +4,23 @@ import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.core.{AllHandlers, BlockChainHandler, BlockFlow, TestUtils}
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, TestUtils}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.platform.PlatformConfig
+import org.alephium.flow.setting.MiningSetting
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, AVector, Random}
 
 class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
-  val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages)
-
   trait Fixture extends MinerState {
-    override implicit def config: PlatformConfig = Spec.config
-    val handlers: AllHandlers                    = TestUtils.createBlockHandlersProbe._1
-    val probes                                   = AVector.fill(config.groupNumPerBroker, config.groups)(TestProbe())
+    override implicit def brokerConfig: BrokerConfig  = config.broker
+    override implicit def miningConfig: MiningSetting = config.mining
+
+    val handlers: AllHandlers = TestUtils.createBlockHandlersProbe._1
+    val probes                = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
 
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
-      val index        = ChainIndex.unsafe(config.brokerInfo.groupFrom + fromShift, to)
+      val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
       BlockTemplate(flowTemplate.deps, flowTemplate.target, AVector.empty)
     }
@@ -33,12 +34,12 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "use correct collections" in new Fixture {
-    miningCounts.length is config.groupNumPerBroker
-    miningCounts.foreach(_.length is config.groups)
-    running.length is config.groupNumPerBroker
-    running.foreach(_.length is config.groups)
-    pendingTasks.length is config.groupNumPerBroker
-    pendingTasks.foreach(_.length is config.groups)
+    miningCounts.length is brokerConfig.groupNumPerBroker
+    miningCounts.foreach(_.length is brokerConfig.groups)
+    running.length is brokerConfig.groupNumPerBroker
+    running.foreach(_.length is brokerConfig.groups)
+    pendingTasks.length is brokerConfig.groupNumPerBroker
+    pendingTasks.foreach(_.length is brokerConfig.groups)
   }
 
   it should "start new tasks correctly" in new Fixture {
@@ -48,24 +49,24 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "handle mining counts correctly" in new Fixture {
-    forAll(Gen.choose(0, config.groupNumPerBroker - 1), Gen.choose(0, config.groups - 1)) {
-      (fromShift, to) =>
-        val oldCount   = getMiningCount(fromShift, to)
-        val countDelta = Random.source.nextInt(Integer.MAX_VALUE)
-        increaseCounts(fromShift, to, countDelta)
-        val newCount = getMiningCount(fromShift, to)
-        (newCount - oldCount) is countDelta
+    forAll(Gen.choose(0, brokerConfig.groupNumPerBroker - 1),
+           Gen.choose(0, brokerConfig.groups - 1)) { (fromShift, to) =>
+      val oldCount   = getMiningCount(fromShift, to)
+      val countDelta = Random.source.nextInt(Integer.MAX_VALUE)
+      increaseCounts(fromShift, to, countDelta)
+      val newCount = getMiningCount(fromShift, to)
+      (newCount - oldCount) is countDelta
     }
   }
 
   it should "pick up correct task" in new Fixture {
-    val fromShift = Random.source.nextInt(config.groupNumPerBroker)
-    val to        = Random.source.nextInt(config.groups)
-    (0 until config.groups).foreach { i =>
-      if (i != to) increaseCounts(fromShift, i, config.nonceStep + 1)
+    val fromShift = Random.source.nextInt(brokerConfig.groupNumPerBroker)
+    val to        = Random.source.nextInt(brokerConfig.groups)
+    (0 until brokerConfig.groups).foreach { i =>
+      if (i != to) increaseCounts(fromShift, i, miningConfig.nonceStep + 1)
     }
     startNewTasks()
-    (0 until config.groups).foreach { i =>
+    (0 until brokerConfig.groups).foreach { i =>
       if (i != to) probes(fromShift)(i).expectNoMessage()
       else probes(fromShift)(i).expectMsgType[BlockTemplate]
     }

@@ -12,13 +12,13 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec
     val bootstrapper = TestProbe()
     val coordinator  = system.actorOf(CliqueCoordinator.props(ActorRefT(bootstrapper.ref)))
 
-    val probs = (0 until config.brokerNum)
-      .filter(_ != config.brokerInfo.id)
+    val probs = (0 until brokerConfig.brokerNum)
+      .filter(_ != brokerConfig.brokerId)
       .map { i =>
         val probe   = TestProbe()
         val address = SocketUtil.temporaryServerAddress()
         val peerInfo = PeerInfo.unsafe(i,
-                                       config.groupNumPerBroker,
+                                       brokerConfig.groupNumPerBroker,
                                        address.getAddress,
                                        address.getPort,
                                        None,

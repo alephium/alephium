@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, sha3
+import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, hashlib
 
 port_start = 9973
 
@@ -78,7 +78,7 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def build(self):
-        run('sbt app/stage')
+        run('sbt app-server/stage')
 
     def test(self):
         run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
@@ -107,7 +107,7 @@ class AlephiumMake(object):
         deployedNodes = get_env_default_int('deployedNodes', 0)
 
         apiKey = secrets.token_urlsafe(32)
-        apiKeyHash = sha3.keccak_256(str.encode(apiKey)).hexdigest()
+        apiKeyHash = hashlib.sha256(str.encode(apiKey)).hexdigest()
         print("Api key: " + apiKey)
 
         for node in range(deployedNodes, deployedNodes + nodes):
@@ -121,16 +121,16 @@ class AlephiumMake(object):
             print("Starting a new node")
             print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
 
-            bootstrap = ""
+            bootstrap = "[]"
             if node // brokerNum > 0:
-                bootstrap = "localhost:" + str(9973 + node % brokerNum)
+                bootstrap = "[localhost:" + str(9973 + node % brokerNum) + "]"
 
             homedir = "{}/alephium/node-{}".format(tempdir, node)
 
             if not os.path.exists(homedir):
                 os.makedirs(homedir)
 
-            run('brokerNum={} brokerId={} publicAddress={} masterAddress={} rpcPort={} wsPort={} restPort={} bootstrap={} apiKeyHash={} ALEPHIUM_HOME={} nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
+            run('broker-num={} broker-id={} public-address={} master-address={} rpc-port={} ws-port={} rest-port={} bootstrap={} api-key-hash={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
 
     def rpc(self, params):
         method = params[0]
@@ -138,7 +138,7 @@ class AlephiumMake(object):
         rpc_call_all(method, args)
 
     def kill(self):
-        run("ps aux | grep -i org.alephium.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
+        run("ps aux | grep -i org.alephium.appserver.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
 
     def clean(self):
         run('sbt clean')
