@@ -9,11 +9,7 @@ class Hint(val value: Int) extends AnyVal {
 
   def isContractType: Boolean = (value & 1) == 0
 
-  def decode: (ScriptHint, Boolean) = {
-    val isAsset    = isAssetType
-    val scriptHint = if (isAsset) new ScriptHint(value) else new ScriptHint(value | 1)
-    (scriptHint, isAsset)
-  }
+  def decode: (ScriptHint, Boolean) = (scriptHint, isAssetType)
 
   def scriptHint: ScriptHint = new ScriptHint(value | 1)
 
