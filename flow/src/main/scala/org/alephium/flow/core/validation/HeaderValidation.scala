@@ -3,31 +3,29 @@ package org.alephium.flow.core.validation
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.{BlockHeader, FlowData}
 import org.alephium.util.TimeStamp
 
-object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
+trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
   import ValidationStatus._
 
-  def validate(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformConfig
-  ): IOResult[HeaderStatus] = {
-    convert(checkHeader(header, flow, isSyncing), ValidHeader)
+  def validate(header: BlockHeader, flow: BlockFlow)(
+      implicit config: PlatformConfig): IOResult[HeaderStatus] = {
+    convert(checkHeader(header, flow), ValidHeader)
   }
 
-  private[validation] def checkHeader(header: BlockHeader, flow: BlockFlow, isSyncing: Boolean)(
-      implicit config: PlatformConfig): HeaderValidationResult[Unit] = {
+  protected[validation] def checkHeader(header: BlockHeader, flow: BlockFlow)(
+      implicit config: ConsensusConfig): HeaderValidationResult[Unit] = {
     for {
-      _ <- checkHeaderUntilDependencies(header, flow, isSyncing)
+      _ <- checkHeaderUntilDependencies(header, flow)
       _ <- checkHeaderAfterDependencies(header, flow)
     } yield ()
   }
 
-  def validateUntilDependencies(header: BlockHeader,
-                                flow: BlockFlow,
-                                isSyncing: Boolean): IOResult[HeaderStatus] = {
-    convert(checkHeaderUntilDependencies(header, flow, isSyncing), ValidHeader)
+  def validateUntilDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: ConsensusConfig): IOResult[HeaderStatus] = {
+    convert(checkHeaderUntilDependencies(header, flow), ValidHeader)
   }
 
   def validateAfterDependencies(header: BlockHeader, flow: BlockFlow)(
@@ -35,36 +33,97 @@ object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
     convert(checkHeaderAfterDependencies(header, flow), ValidHeader)
   }
 
-  private[validation] def checkHeaderUntilDependencies(
-      header: BlockHeader,
-      flow: BlockFlow,
-      isSyncing: Boolean): HeaderValidationResult[Unit] = {
+  protected[validation] def checkHeaderUntilDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: ConsensusConfig): HeaderValidationResult[Unit] = {
     for {
-      _ <- checkTimeStamp(header, isSyncing)
-      _ <- checkWorkAmount(header)
-      _ <- checkDependencies(header, flow)
+      parent <- getParentHeader(flow, header)
+      _      <- checkTimeStampIncreasing(header, parent)
+      _      <- checkTimeStampDrift(header)
+      _      <- checkWorkAmount(header)
+      _      <- checkDependencies(header, flow)
     } yield ()
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private[validation] def checkTimeStamp(header: BlockHeader,
-                                         isSyncing: Boolean): HeaderValidationResult[Unit] = {
-    val now      = TimeStamp.now()
-    val headerTs = header.timestamp
-
-    val ok1 = headerTs < now.plusHoursUnsafe(1)
-    val ok2 = isSyncing || (headerTs > now.plusHoursUnsafe(-1)) // Note: now -1hour is always positive
-    if (ok1 && ok2) validHeader(()) else invalidHeader(InvalidTimeStamp)
+  protected[validation] def checkHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
+      implicit config: GroupConfig): HeaderValidationResult[Unit] = {
+    val headerChain = flow.getHeaderChain(header)
+    for {
+      _ <- checkWorkTarget(header, headerChain)
+    } yield ()
   }
 
-  private[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult[Unit] = {
+  protected[validation] def getParentHeader(blockFlow: BlockFlow, header: BlockHeader)(
+      implicit config: GroupConfig): HeaderValidationResult[BlockHeader]
+
+  // format off for the sake of reading and checking rules
+  // format: off
+  protected[validation] def checkGenesisTimeStamp(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkGenesisDependencies(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkGenesisWorkTarget(header: BlockHeader)(implicit config: ConsensusConfig): HeaderValidationResult[Unit]
+ 
+  protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkTimeStampDrift(header: BlockHeader)(implicit config: ConsensusConfig): HeaderValidationResult[Unit]
+  protected[validation] def checkWorkAmount[T <: FlowData](data: T): HeaderValidationResult[Unit]
+  protected[validation] def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
+  protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(implicit config: GroupConfig): HeaderValidationResult[Unit]
+  // format: on
+}
+
+object HeaderValidation extends HeaderValidation {
+  import ValidationStatus._
+
+  protected[validation] def checkGenesisTimeStamp(
+      header: BlockHeader): HeaderValidationResult[Unit] = {
+    if (header.timestamp != TimeStamp.zero) invalidHeader(InvalidGenesisTimeStamp)
+    else validHeader(())
+  }
+  protected[validation] def checkGenesisDependencies(
+      header: BlockHeader): HeaderValidationResult[Unit] = {
+    if (header.blockDeps.nonEmpty) invalidHeader(InvalidGenesisDeps)
+    else validHeader(())
+  }
+  protected[validation] def checkGenesisWorkAmount(
+      header: BlockHeader): HeaderValidationResult[Unit] = {
+    validHeader(()) // TODO: validate this when initial target is configurable
+  }
+  protected[validation] def checkGenesisWorkTarget(header: BlockHeader)(
+      implicit config: ConsensusConfig): HeaderValidationResult[Unit] = {
+    if (header.target != config.maxMiningTarget) invalidHeader(InvalidGenesisWorkTarget)
+    else validHeader(())
+  }
+
+  protected[validation] def getParentHeader(blockFlow: BlockFlow, header: BlockHeader)(
+      implicit config: GroupConfig): HeaderValidationResult[BlockHeader] = {
+    blockFlow.getBlockHeader(header.parentHash) match {
+      case Right(parent) => validHeader(parent)
+      case Left(error)   => invalidHeader(HeaderIOError(error))
+    }
+  }
+
+  protected[validation] def checkTimeStampIncreasing(
+      header: BlockHeader,
+      parent: BlockHeader): HeaderValidationResult[Unit] = {
+    if (header.timestamp <= parent.timestamp) invalidHeader(NoIncreasingTimeStamp)
+    else validHeader(())
+  }
+  protected[validation] def checkTimeStampDrift(header: BlockHeader)(
+      implicit config: ConsensusConfig): HeaderValidationResult[Unit] = {
+    if (TimeStamp.now() + config.maxHeaderTimeStampDrift <= header.timestamp)
+      invalidHeader(TooAdvancedTimeStamp)
+    else validHeader(())
+  }
+
+  protected[validation] def checkWorkAmount[T <: FlowData](
+      data: T): HeaderValidationResult[Unit] = {
     val current = BigInt(1, data.hash.bytes.toArray)
     assert(current >= 0)
     if (current <= data.target) validHeader(()) else invalidHeader(InvalidWorkAmount)
   }
 
-  private[validation] def checkDependencies(header: BlockHeader,
-                                            flow: BlockFlow): HeaderValidationResult[Unit] = {
+  // TODO: check algorithm validatity of dependencies
+  protected[validation] def checkDependencies(header: BlockHeader,
+                                              flow: BlockFlow): HeaderValidationResult[Unit] = {
     header.blockDeps.filterNotE(flow.contains) match {
       case Left(error) => Left(Left(error))
       case Right(missings) =>
@@ -72,15 +131,7 @@ object HeaderValidation extends Validation[BlockHeader, HeaderStatus]() {
     }
   }
 
-  private[validation] def checkHeaderAfterDependencies(header: BlockHeader, flow: BlockFlow)(
-      implicit config: PlatformConfig): HeaderValidationResult[Unit] = {
-    val headerChain = flow.getHeaderChain(header)
-    for {
-      _ <- checkWorkTarget(header, headerChain)
-    } yield ()
-  }
-
-  private[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(
+  protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain)(
       implicit config: GroupConfig): HeaderValidationResult[Unit] = {
     headerChain.getHashTarget(header.parentHash) match {
       case Left(error) => Left(Left(error))

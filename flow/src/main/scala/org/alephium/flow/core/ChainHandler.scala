@@ -64,7 +64,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
         removeTask(broker, data.hash, origin)
         handleReadies(broker, origin, pending => Right(pending.parentHash == data.hash))
       case Right(false) =>
-        validator.validate(data, blockFlow, origin.isSyncing) match {
+        validator.validate(data, blockFlow) match {
           case Left(e)                    => handleIOError(broker, e)
           case Right(MissingDeps(hashes)) => handleMissingDeps(data, hashes, broker, origin)
           case Right(x: InvalidStatus)    => handleInvalidData(broker, x)

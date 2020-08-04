@@ -4,20 +4,20 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.platform.PlatformConfig
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALF
+import org.alephium.protocol.config.ConsensusConfig
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
-object BlockValidation extends Validation[Block, BlockStatus]() {
+object BlockValidation extends Validation[Block, BlockStatus] {
   import ValidationStatus._
 
-  def validate(block: Block, flow: BlockFlow, isSyncing: Boolean)(
+  override def validate(block: Block, flow: BlockFlow)(
       implicit config: PlatformConfig): IOResult[BlockStatus] = {
-    convert(checkBlock(block, flow, isSyncing), ValidBlock)
+    convert(checkBlock(block, flow), ValidBlock)
   }
 
-  def validateUntilDependencies(block: Block,
-                                flow: BlockFlow,
-                                isSyncing: Boolean): IOResult[BlockStatus] = {
-    convert(checkBlockUntilDependencies(block, flow, isSyncing), ValidBlock)
+  override def validateUntilDependencies(block: Block, flow: BlockFlow)(
+      implicit config: ConsensusConfig): IOResult[BlockStatus] = {
+    convert(checkBlockUntilDependencies(block, flow), ValidBlock)
   }
 
   def validateAfterDependencies(block: Block, flow: BlockFlow)(
@@ -30,11 +30,9 @@ object BlockValidation extends Validation[Block, BlockStatus]() {
     convert(checkBlockAfterHeader(block, flow), ValidBlock)
   }
 
-  private[validation] def checkBlockUntilDependencies(
-      block: Block,
-      flow: BlockFlow,
-      isSyncing: Boolean): BlockValidationResult[Unit] = {
-    HeaderValidation.checkHeaderUntilDependencies(block.header, flow, isSyncing)
+  private[validation] def checkBlockUntilDependencies(block: Block, flow: BlockFlow)(
+      implicit config: ConsensusConfig): BlockValidationResult[Unit] = {
+    HeaderValidation.checkHeaderUntilDependencies(block.header, flow)
   }
 
   private[validation] def checkBlockAfterDependencies(block: Block, flow: BlockFlow)(
@@ -45,10 +43,10 @@ object BlockValidation extends Validation[Block, BlockStatus]() {
     } yield ()
   }
 
-  private[validation] def checkBlock(block: Block, flow: BlockFlow, isSyncing: Boolean)(
+  private[validation] def checkBlock(block: Block, flow: BlockFlow)(
       implicit config: PlatformConfig): BlockValidationResult[Unit] = {
     for {
-      _ <- HeaderValidation.checkHeader(block.header, flow, isSyncing)
+      _ <- HeaderValidation.checkHeader(block.header, flow)
       _ <- checkBlockAfterHeader(block, flow)
     } yield ()
   }
