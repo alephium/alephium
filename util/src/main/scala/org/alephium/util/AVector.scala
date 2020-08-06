@@ -134,6 +134,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     false
   }
 
+  def grouped(k: Int): AVector[AVector[A]] = {
+    assume(length % k == 0)
+    AVector.tabulate(length / k) { l =>
+      slice(k * l, k * (l + 1))
+    }
+  }
+
   def forall(f: A => Boolean): Boolean = {
     foreach { a =>
       if (!f(a)) { return false }
