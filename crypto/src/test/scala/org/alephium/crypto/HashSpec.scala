@@ -7,21 +7,7 @@ import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
 
 class HashSpec extends AlephiumSpec {
-  def check[T <: RandomBytes](provider: HashSchema[T], message: String, expected: ByteString)(
-      implicit serde: Serde[T]): Unit = {
-    provider.getClass.getSimpleName should "hash correctly" in {
-      val output = provider.hash(message)
-      expected is output.bytes
-    }
-
-    it should "serde correctly" in {
-      val input  = provider.hash(message)
-      val output = deserialize[T](serialize(input)).toOption.get
-      output is input
-    }
-  }
-
-  def check[T <: RandomBytes](provider: HashSchema[T], tests: Map[String, ByteString])(
+  def check[T <: RandomBytes](provider: HashSchema[T], tests: Seq[(String, ByteString)])(
       implicit serde: Serde[T]): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {
@@ -49,7 +35,7 @@ class HashSpec extends AlephiumSpec {
 
   check(
     Sha256,
-    Map(
+    Seq(
       "Hello World1" -> hex"6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A",
       "Hello World2" -> hex"0DE69F56365C10550D05E65AE8229DD0686F7894A807830DAEC8CAA879731F4D",
       "Hello World3" -> hex"DCE9D9544A7261B593A31C0C780BC2A4320D9E8D1CB98F02BAB71B722D741A99",
@@ -60,7 +46,7 @@ class HashSpec extends AlephiumSpec {
 
   check(
     Keccak256,
-    Map(
+    Seq(
       "Hello World1" -> hex"2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C",
       "Hello World2" -> hex"8143E0ED4DC593777C3E496013C8BE2D95875E9FCA46E81FC218CBA480E9A25F",
       "Hello World3" -> hex"1F92B7907A9564266AB8D351117090B96BE9D7B3C22172DA122106E253F61810",
@@ -71,7 +57,7 @@ class HashSpec extends AlephiumSpec {
 
   check(
     Blake2b,
-    Map(
+    Seq(
       "Hello World1" -> hex"8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a",
       "Hello World2" -> hex"4712c917c8ab6451d2c0adcc6af62926fec2d7ef1ee6a75282fca261b9a7b6a6",
       "Hello World3" -> hex"8f4c9c1048dc913ce1d3b031a7c52f108023385f2c240c390000b06c911064b6",

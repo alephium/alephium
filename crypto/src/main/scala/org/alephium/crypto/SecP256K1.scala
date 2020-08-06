@@ -1,0 +1,109 @@
+package org.alephium.crypto
+
+import java.math.BigInteger
+
+import akka.util.ByteString
+import org.bouncycastle.asn1.x9.X9ECParameters
+import org.bouncycastle.crypto.digests.SHA256Digest
+import org.bouncycastle.crypto.ec.CustomNamedCurves
+import org.bouncycastle.crypto.params._
+import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
+
+import org.alephium.serde.RandomBytes
+
+//scalastyle:off magic.number
+
+class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
+  lazy val bigInt = new BigInteger(1, bytes.toArray)
+
+  def publicKey: SecP256K1PublicKey = {
+    val rawPublicKey = SecP256K1.params.getG.multiply(bigInt).getEncoded(true)
+    new SecP256K1PublicKey(ByteString.fromArrayUnsafe(rawPublicKey))
+  }
+}
+
+object SecP256K1PrivateKey
+    extends RandomBytes.Companion[SecP256K1PrivateKey](bs => {
+      assume(bs.length == 32)
+      new SecP256K1PrivateKey(bs)
+    }, _.bytes) {
+  override def length: Int = 32
+}
+
+class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey
+
+object SecP256K1PublicKey
+    extends RandomBytes.Companion[SecP256K1PublicKey](bs => {
+      assume(bs.length == 33)
+      new SecP256K1PublicKey(bs)
+    }, _.bytes) {
+  override def length: Int = 33
+}
+
+class SecP256K1Signature(val bytes: ByteString) extends Signature
+
+object SecP256K1Signature
+    extends RandomBytes.Companion[SecP256K1Signature](bs => {
+      assume(bs.length == 64)
+      new SecP256K1Signature(bs)
+    }, _.bytes) {
+  override def length: Int = 64
+
+  protected[crypto] def from(r: BigInteger, s: BigInteger): SecP256K1Signature = {
+    val signature = Array.ofDim[Byte](length)
+    val rArray    = r.toByteArray.dropWhile(_ == 0.toByte)
+    val sArray    = s.toByteArray // s is canonical, so no need to drop the sign bit
+    System.arraycopy(rArray, 0, signature, 32 - rArray.length, rArray.length)
+    System.arraycopy(sArray, 0, signature, 64 - sArray.length, sArray.length)
+    SecP256K1Signature.unsafe(ByteString.fromArrayUnsafe(signature))
+  }
+
+  protected[crypto] def decode(signature: Array[Byte]): (BigInteger, BigInteger) = {
+    assume(signature.length == length)
+    val r = new BigInteger(1, signature.take(32))
+    val s = new BigInteger(1, signature.takeRight(32))
+    (r, s)
+  }
+}
+
+object SecP256K1
+    extends SignatureSchema[SecP256K1PrivateKey, SecP256K1PublicKey, SecP256K1Signature] {
+  val params: X9ECParameters = CustomNamedCurves.getByName("secp256k1")
+
+  val domain = new ECDomainParameters(params.getCurve, params.getG, params.getN, params.getH)
+
+  val halfCurveOrder: BigInteger = params.getN.shiftRight(1)
+
+  override def generatePriPub(): (SecP256K1PrivateKey, SecP256K1PublicKey) = {
+    val privateKey = SecP256K1PrivateKey.generate
+    (privateKey, privateKey.publicKey)
+  }
+
+  override def sign(message: Array[Byte], privateKey: Array[Byte]): SecP256K1Signature = {
+    val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()))
+    val d      = new BigInteger(1, privateKey)
+    signer.init(true, new ECPrivateKeyParameters(d, domain))
+    val Array(r, s) = signer.generateSignature(message)
+    SecP256K1Signature.from(r, canonicalize(s))
+  }
+
+  @inline private def isCanonical(s: BigInteger): Boolean = {
+    s.compareTo(halfCurveOrder) <= 0
+  }
+
+  @inline def canonicalize(s: BigInteger): BigInteger = {
+    if (isCanonical(s)) s else params.getN.subtract(s)
+  }
+
+  override def verify(message: Array[Byte],
+                      signature: Array[Byte],
+                      publicKey: Array[Byte]): Boolean = {
+    val (r, s) = SecP256K1Signature.decode(signature)
+    isCanonical(s) && {
+      val signer         = new ECDSASigner
+      val publicKeyPoint = params.getCurve.decodePoint(publicKey)
+      signer.init(false, new ECPublicKeyParameters(publicKeyPoint, domain))
+      signer.verifySignature(message, r, s)
+    }
+  }
+}
