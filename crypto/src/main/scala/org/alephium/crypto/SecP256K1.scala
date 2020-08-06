@@ -8,6 +8,7 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.ec.CustomNamedCurves
 import org.bouncycastle.crypto.params._
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
+import org.bouncycastle.math.ec.{ECCurve, ECPoint}
 
 import org.alephium.serde.RandomBytes
 
@@ -16,9 +17,20 @@ import org.alephium.serde.RandomBytes
 class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
   lazy val bigInt = new BigInteger(1, bytes.toArray)
 
+  def isZero: Boolean = bigInt == BigInteger.ZERO
+
   def publicKey: SecP256K1PublicKey = {
     val rawPublicKey = SecP256K1.params.getG.multiply(bigInt).getEncoded(true)
-    new SecP256K1PublicKey(ByteString.fromArrayUnsafe(rawPublicKey))
+    SecP256K1PublicKey.unsafe(ByteString.fromArrayUnsafe(rawPublicKey))
+  }
+
+  def add(that: SecP256K1PrivateKey): SecP256K1PrivateKey = {
+    val result =
+      this.bigInt.add(that.bigInt).mod(SecP256K1.params.getN).toByteArray.dropWhile(_ == 0.toByte)
+    assume(result.length <= SecP256K1PrivateKey.length)
+    val buffer = Array.ofDim[Byte](SecP256K1PrivateKey.length)
+    System.arraycopy(result, 0, buffer, buffer.length - result.length, result.length)
+    SecP256K1PrivateKey.unsafe(ByteString.fromArrayUnsafe(buffer))
   }
 }
 
@@ -30,7 +42,9 @@ object SecP256K1PrivateKey
   override def length: Int = 32
 }
 
-class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey
+class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
+  lazy val unsafePoint: ECPoint = SecP256K1.point(bytes)
+}
 
 object SecP256K1PublicKey
     extends RandomBytes.Companion[SecP256K1PublicKey](bs => {
@@ -70,9 +84,13 @@ object SecP256K1
     extends SignatureSchema[SecP256K1PrivateKey, SecP256K1PublicKey, SecP256K1Signature] {
   val params: X9ECParameters = CustomNamedCurves.getByName("secp256k1")
 
-  val domain = new ECDomainParameters(params.getCurve, params.getG, params.getN, params.getH)
+  val curve: ECCurve = params.getCurve
+
+  val domain = new ECDomainParameters(curve, params.getG, params.getN, params.getH)
 
   val halfCurveOrder: BigInteger = params.getN.shiftRight(1)
+
+  def point(bytes: ByteString): ECPoint = curve.decodePoint(bytes.toArray)
 
   override def generatePriPub(): (SecP256K1PrivateKey, SecP256K1PublicKey) = {
     val privateKey = SecP256K1PrivateKey.generate
@@ -101,7 +119,7 @@ object SecP256K1
     val (r, s) = SecP256K1Signature.decode(signature)
     isCanonical(s) && {
       val signer         = new ECDSASigner
-      val publicKeyPoint = params.getCurve.decodePoint(publicKey)
+      val publicKeyPoint = curve.decodePoint(publicKey)
       signer.init(false, new ECPublicKeyParameters(publicKeyPoint, domain))
       signer.verifySignature(message, r, s)
     }
