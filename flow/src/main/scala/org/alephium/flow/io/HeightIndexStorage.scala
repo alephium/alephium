@@ -25,5 +25,5 @@ class HeightIndexStorage(
   private val postFix =
     ByteString(chainIndex.from.value.toByte, chainIndex.to.value.toByte, Storages.heightPostfix)
 
-  override def storageKey(key: Int): ByteString = Bytes.toBytes(key) ++ postFix
+  override def storageKey(key: Int): ByteString = Bytes.from(key) ++ postFix
 }

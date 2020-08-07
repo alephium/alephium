@@ -46,8 +46,8 @@ object BIP32 {
 
     def derive(index: Int): Option[ExtendedPrivateKey] = {
       val i = {
-        if (isHardened(index)) ByteString(0) ++ privateKey.bytes ++ Bytes.toBytes(index)
-        else privateKey.publicKey.bytes ++ Bytes.toBytes(index)
+        if (isHardened(index)) ByteString(0) ++ privateKey.bytes ++ Bytes.from(index)
+        else privateKey.publicKey.bytes ++ Bytes.from(index)
       }
       val (il, ir) = hmacSha512(chainCode, i).splitAt(32)
       val p        = new BigInteger(1, il.toArray)
@@ -81,7 +81,7 @@ object BIP32 {
                                                         path: Seq[Int]) {
     def derive(index: Int): Option[ExtendedPublicKey] = {
       assume(!isHardened(index))
-      val i        = publicKey.bytes ++ Bytes.toBytes(index)
+      val i        = publicKey.bytes ++ Bytes.from(index)
       val (il, ir) = hmacSha512(chainCode, i).splitAt(32)
       val p        = new BigInteger(1, il.toArray)
       if (p.compareTo(SecP256K1.params.getN) >= 0) None

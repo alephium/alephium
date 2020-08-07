@@ -20,7 +20,7 @@ object Hint {
   // We don't use Serde[Int] here as the value of Hint is random, no need of serde optimization
   implicit val serde: Serde[Hint] = Serde
     .bytesSerde(4)
-    .xmap(bs => new Hint(Bytes.toIntUnsafe(bs)), hint => Bytes.toBytes(hint.value))
+    .xmap(bs => new Hint(Bytes.toIntUnsafe(bs)), hint => Bytes.from(hint.value))
 
   def ofAsset(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value)
 
