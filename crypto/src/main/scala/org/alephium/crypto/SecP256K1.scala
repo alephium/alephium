@@ -86,7 +86,8 @@ object SecP256K1
 
   val curve: ECCurve = params.getCurve
 
-  val domain = new ECDomainParameters(curve, params.getG, params.getN, params.getH)
+  val domain: ECDomainParameters =
+    new ECDomainParameters(curve, params.getG, params.getN, params.getH)
 
   val halfCurveOrder: BigInteger = params.getN.shiftRight(1)
 

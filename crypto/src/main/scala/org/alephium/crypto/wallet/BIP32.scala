@@ -98,6 +98,7 @@ object BIP32 {
 
     def derive(path: Seq[Int]): Option[ExtendedPublicKey] = {
       assume(path.forall(!isHardened(_)))
+      @tailrec
       def iter(acc: ExtendedPublicKey, i: Int): Option[ExtendedPublicKey] = {
         if (i == path.length) Some(acc)
         else {
