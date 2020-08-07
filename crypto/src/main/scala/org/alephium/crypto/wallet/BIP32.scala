@@ -1,6 +1,7 @@
 package org.alephium.crypto.wallet
 
 import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 import scala.annotation.tailrec
 
@@ -15,7 +16,7 @@ import org.alephium.util.Bytes
 //scalastyle:off magic.number
 object BIP32 {
   def masterKey(prefix: String, seed: ByteString): ExtendedPrivateKey = {
-    val i        = hmacSha512(ByteString.fromArrayUnsafe(prefix.getBytes("UTF-8")), seed)
+    val i        = hmacSha512(ByteString.fromArrayUnsafe(prefix.getBytes(StandardCharsets.UTF_8)), seed)
     val (il, ir) = i.splitAt(32)
     ExtendedPrivateKey(SecP256K1PrivateKey.unsafe(il), ir, Seq.empty)
   }

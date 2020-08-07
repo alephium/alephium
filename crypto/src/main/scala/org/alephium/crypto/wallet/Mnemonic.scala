@@ -1,5 +1,6 @@
 package org.alephium.crypto.wallet
 
+import java.nio.charset.StandardCharsets
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
@@ -15,7 +16,7 @@ import org.alephium.util.{AVector, Bits, Random}
 final case class Mnemonic(val words: Seq[String]) extends AnyVal {
   def toSeed(passphrase: String): ByteString = {
     val mnemonic     = words.mkString(" ").toCharArray
-    val extendedPass = s"mnemonic${passphrase}".getBytes("UTF-8")
+    val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
     val spec = new PBEKeySpec(
       mnemonic,
       extendedPass,

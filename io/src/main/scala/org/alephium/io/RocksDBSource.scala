@@ -1,5 +1,6 @@
 package org.alephium.io
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 
 import org.rocksdb._
@@ -135,7 +136,7 @@ object RocksDBSource {
 
     val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
     val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
-      new ColumnFamilyDescriptor(name.getBytes, columnOptions)
+      new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8), columnOptions)
     }
 
     val db = RocksDB.open(databaseOptions,
