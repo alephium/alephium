@@ -121,7 +121,7 @@ object Serde extends ProductSerde {
   private[serde] object IntSerde extends FixedSizeSerde[Int] {
     override val serdeSize: Int = java.lang.Integer.BYTES
 
-    override def serialize(input: Int): ByteString = Bytes.toBytes(input)
+    override def serialize(input: Int): ByteString = Bytes.from(input)
 
     override def deserialize(input: ByteString): SerdeResult[Int] =
       deserialize0(input, Bytes.toIntUnsafe)

@@ -7,7 +7,7 @@ object Bytes {
     byte & 0xFF
   }
 
-  def toBytes(value: Int): ByteString = {
+  def from(value: Int): ByteString = {
     ByteString((value >> 24).toByte, (value >> 16).toByte, (value >> 8).toByte, value.toByte)
   }
 

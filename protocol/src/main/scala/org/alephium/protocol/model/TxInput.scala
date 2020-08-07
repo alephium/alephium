@@ -75,7 +75,7 @@ object TxOutputRef {
     ContractOutputRef.unsafe(Hint.ofContract(ScriptHint.fromHash(0)), Hash.zero)
 
   def key(tx: Transaction, outputIndex: Int): Hash = {
-    Hash.hash(tx.hash.bytes ++ Bytes.toBytes(outputIndex))
+    Hash.hash(tx.hash.bytes ++ Bytes.from(outputIndex))
   }
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
