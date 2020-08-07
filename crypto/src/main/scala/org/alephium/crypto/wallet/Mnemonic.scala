@@ -32,9 +32,9 @@ object Mnemonic {
   val worldListSizes: Seq[Int] = Seq(12, 15, 18, 21, 24)
   val entropySizes: Seq[Int]   = Seq(16, 20, 24, 28, 32)
 
-  val pbkdf2Algorithm  = "PBKDF2WithHmacSHA512"
-  val pbkdf2Iterations = 2048
-  val pbkdf2KeyLength  = 512
+  val pbkdf2Algorithm: String = "PBKDF2WithHmacSHA512"
+  val pbkdf2Iterations: Int   = 2048
+  val pbkdf2KeyLength: Int    = 512
 
   lazy val englishWordlist: Seq[String] = {
     val stream = Mnemonic.getClass.getResourceAsStream("/bip39_english_wordlist.txt")
