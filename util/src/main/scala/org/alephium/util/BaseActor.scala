@@ -1,9 +1,12 @@
 package org.alephium.util
 
+import scala.language.implicitConversions
+
 import akka.actor._
 import org.slf4j.{Logger, LoggerFactory}
 
 trait BaseActor extends Actor with ActorLogging {
+  implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
 
   // Note: make sure that your child actors could ignore the exception and resume
   override val supervisorStrategy: SupervisorStrategy = {
@@ -14,10 +17,25 @@ trait BaseActor extends Actor with ActorLogging {
     log.warning(s"Unhandled message: $message")
   }
 
-  // Note: no periodic scheduler, use Akka Timers instead which could be cancelled automatically
-  def scheduleOnce(receiver: ActorRef, message: Any, delay: Duration): Unit = {
+  def scheduleCancellable(receiver: ActorRef, message: Any, delay: Duration): Cancellable = {
+    val delayScala = delay.asScala
+    context.system.scheduler
+      .scheduleWithFixedDelay(delayScala, delayScala, receiver, message)(context.dispatcher,
+                                                                         context.self)
+  }
+
+  def schedule(receiver: ActorRef, message: Any, delay: Duration): Unit = {
+    scheduleCancellable(receiver, message, delay)
+    ()
+  }
+
+  def scheduleCancellableOnce(receiver: ActorRef, message: Any, delay: Duration): Cancellable = {
     context.system.scheduler
       .scheduleOnce(delay.asScala, receiver, message)(context.dispatcher, context.self)
+  }
+
+  def scheduleOnce(receiver: ActorRef, message: Any, delay: Duration): Unit = {
+    scheduleCancellableOnce(receiver, message, delay)
     ()
   }
 }
