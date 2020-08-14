@@ -36,6 +36,12 @@ object ChainIndex {
     } else None
   }
 
+  def unsafe(index: Int)(implicit config: GroupConfig): ChainIndex = {
+    assume(index >= 0 && index < config.chainNum)
+    new ChainIndex(GroupIndex.unsafe(index / config.groups),
+                   GroupIndex.unsafe(index % config.groups))
+  }
+
   def unsafe(from: Int, to: Int)(implicit config: GroupConfig): ChainIndex = {
     assume(validate(from, to))
     new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to))

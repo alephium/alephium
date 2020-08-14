@@ -215,7 +215,7 @@ trait PingPong extends ConnectionReaderWriter with ConnectionUtil with Timers {
       log.debug("No Pong message received in time")
       stop()
     } else {
-      pingNonce = Random.source.nextInt()
+      pingNonce = Random.nextNonZeroInt()
       val timestamp = System.currentTimeMillis()
       sendPayload(Ping(pingNonce, timestamp))
     }

@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
@@ -118,6 +120,33 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
         }
       }
     }
+  }
+
+  def getSyncDataUnsafe(locators: AVector[Hash]): AVector[Hash] = {
+    val lastCanonicalIndex = locators.reverse.indexWhere(isCanonicalUnsafe)
+    if (lastCanonicalIndex == -1) {
+      AVector.empty // nothing in common
+    } else {
+      val lastCanonicalHash = locators(lastCanonicalIndex)
+      val heightFrom        = getHeightUnsafe(lastCanonicalHash)
+      val heightTo          = math.min(heightFrom + 1000, maxHeightUnsafe)
+      getSyncDataUnsafe(heightFrom, heightTo)
+    }
+  }
+
+  // heightFrom is exclusive, heightTo is inclusive
+  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
+    @tailrec
+    def iter(currentHeader: BlockHeader, currentHeight: Int, acc: AVector[Hash]): AVector[Hash] = {
+      if (currentHeight == heightFrom) acc
+      else {
+        val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
+        iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
+      }
+    }
+
+    val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
+    iter(startHeader, heightTo, AVector.empty)
   }
 }
 

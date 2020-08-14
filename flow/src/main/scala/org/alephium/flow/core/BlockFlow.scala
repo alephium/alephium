@@ -17,6 +17,64 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   def add(block: Block, weight: BigInt): IOResult[Unit] = ???
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
+
+  def historyLocators(): IOResult[HistoryLocators] = IOUtils.tryExecute {
+    val locators = AVector.tabulate(brokerConfig.chainNum) { index =>
+      val chain = getHeaderChain(ChainIndex.unsafe(index))
+      val hashes = HistoryLocators
+        .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
+        .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
+      ChainLocators.unsafe(hashes)
+    }
+    HistoryLocators.unsafe(locators)
+  }
+
+  def compare(historyLocators: HistoryLocators): IOResult[HistoryComparisonResult] =
+    IOUtils.tryExecute {
+      val hashes = AVector.tabulate(brokerConfig.chainNum) { index =>
+        val chain = getHeaderChain(ChainIndex.unsafe(index))
+        chain.compareUnsafe(historyLocators.hashes(index))
+      }
+      if (hashes.forall(_.isFixedPoint)) {
+        HistoryComparisonResult.Common(hashes.map(_.fixedPointUnsafe))
+      } else {
+        HistoryComparisonResult.Unsure(HistoryLocators.unsafe(hashes))
+      }
+    }
+
+  def getSyncInfo(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
+    val (groupFrom, groupTo) = brokerConfig.calIntersection(peerBrokerInfo)
+    AVector.tabulate((groupTo - groupFrom) * groups) { index =>
+      val offset    = index / groups
+      val fromGroup = groupFrom + offset
+      val toGroup   = index % groups
+      getSyncInfo(ChainIndex.unsafe(fromGroup, toGroup))
+    }
+  }
+
+  def getSyncInfo(): AVector[AVector[Hash]] = {
+    getSyncInfo(brokerConfig)
+  }
+
+  def getSyncInfo(chainIndex: ChainIndex): AVector[Hash] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      val chain = getHeaderChain(chainIndex)
+      HistoryLocators
+        .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
+        .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
+    } else AVector.empty
+  }
+
+  def getSyncDataUnsafe(locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
+    locators.map { locatorsPerChain =>
+      if (locatorsPerChain.isEmpty) AVector.empty[Hash]
+      else {
+        val chainIndex = ChainIndex.from(locatorsPerChain.head)
+        val chain      = getHeaderChain(chainIndex)
+        chain.getSyncDataUnsafe(locatorsPerChain)
+      }
+    }
+  }
 }
 
 object BlockFlow extends StrictLogging {
