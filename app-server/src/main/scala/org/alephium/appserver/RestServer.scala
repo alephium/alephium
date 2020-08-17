@@ -14,6 +14,7 @@ import sttp.tapir.docs.openapi.RichOpenAPIServerEndpoints
 import sttp.tapir.openapi.OpenAPI
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
+import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.{Miner, Node}
@@ -100,7 +101,7 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
     minerActionLogic
   ).toOpenAPI("Alephium BlockFlow API", "1.0")
 
-  private val getOpenapiRoute = getOpenapi.toRoute(_ => Future.successful(Right(docs.toYaml)))
+  private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
   val route: Route =
     cors()(
@@ -113,7 +114,7 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
         createTransactionLogic.toRoute ~
         sendTransactionLogic.toRoute ~
         minerActionLogic.toRoute ~
-        getOpenapiRoute
+        swaggerUIRoute
     )
 
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()

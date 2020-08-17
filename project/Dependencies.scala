@@ -35,9 +35,10 @@ object Dependencies {
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 
-  lazy val `tapir-core`          = "com.softwaremill.sttp.tapir" %% "tapir-core"               % Version.tapir
-  lazy val `tapir-circe`         = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"         % Version.tapir
-  lazy val `tapir-akka`          = "com.softwaremill.sttp.tapir" %% "tapir-akka-http-server"   % Version.tapir
-  lazy val `tapir-openapi`       = "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs"       % Version.tapir
-  lazy val `tapir-openapi-circe` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-circe-yaml" % Version.tapir
+  lazy val `tapir-core`          = "com.softwaremill.sttp.tapir" %% "tapir-core"                 % Version.tapir
+  lazy val `tapir-circe`         = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"           % Version.tapir
+  lazy val `tapir-akka`          = "com.softwaremill.sttp.tapir" %% "tapir-akka-http-server"     % Version.tapir
+  lazy val `tapir-openapi`       = "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs"         % Version.tapir
+  lazy val `tapir-openapi-circe` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-circe-yaml"   % Version.tapir
+  lazy val `tapir-swagger-ui`    = "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-akka-http" % Version.tapir
 }

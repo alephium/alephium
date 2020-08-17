@@ -116,9 +116,4 @@ trait Endpoints {
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
       .description("Execute an action on miners")
-
-  val getOpenapi =
-    baseEndpoint.get
-      .in("openapi.yaml")
-      .out(plainBody[String])
 }
