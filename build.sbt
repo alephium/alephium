@@ -100,7 +100,8 @@ lazy val `app-server` = mainProject("app-server")
       `tapir-circe`,
       `tapir-akka`,
       `tapir-openapi`,
-      `tapir-openapi-circe`
+      `tapir-openapi-circe`,
+      `tapir-swagger-ui`,
     )
   )
 

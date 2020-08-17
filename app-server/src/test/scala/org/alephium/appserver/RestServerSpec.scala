@@ -141,6 +141,15 @@ class RestServerSpec
     }
   }
 
+  it should "call GET /docs" in new RestServerFixture {
+    Get(s"/docs") ~> server.route ~> check {
+      status is StatusCodes.PermanentRedirect
+    }
+    Get(s"/docs/openapi.yaml") ~> server.route ~> check {
+      status is StatusCodes.OK
+    }
+  }
+
   trait RestServerFixture extends ServerFixture {
     lazy val minerProbe = TestProbe()
     lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
