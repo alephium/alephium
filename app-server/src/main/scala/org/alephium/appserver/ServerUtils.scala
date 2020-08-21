@@ -7,7 +7,7 @@ import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
@@ -126,10 +126,10 @@ object ServerUtils {
   }
 
   def prepareTransaction(blockFlow: BlockFlow,
-                         fromKey: ED25519PublicKey,
-                         toKey: ED25519PublicKey,
+                         fromKey: ALFPublicKey,
+                         toKey: ALFPublicKey,
                          value: U64,
-                         fromPrivateKey: ED25519PrivateKey): Try[Transaction] = {
+                         fromPrivateKey: ALFPrivateKey): Try[Transaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(toKey)
     val toLockupScript   = LockupScript.p2pkh(toKey)
@@ -141,7 +141,7 @@ object ServerUtils {
   }
 
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
-                                 fromKey: ED25519PublicKey,
+                                 fromKey: ALFPublicKey,
                                  toLockupScript: LockupScript,
                                  value: U64): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
@@ -153,7 +153,7 @@ object ServerUtils {
     }
   }
 
-  def checkGroup(blockFlow: BlockFlow, publicKey: ED25519PublicKey): Try[Unit] = {
+  def checkGroup(blockFlow: BlockFlow, publicKey: ALFPublicKey): Try[Unit] = {
     checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
   }
 

@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.ALFPublicKey
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -460,7 +460,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     tips ++ bestDeps
   }
 
-  def getBalance(blockFlow: BlockFlow, address: ED25519PublicKey): U64 = {
+  def getBalance(blockFlow: BlockFlow, address: ALFPublicKey): U64 = {
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUtxos(lockupScript)

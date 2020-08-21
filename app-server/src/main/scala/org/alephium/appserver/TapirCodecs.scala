@@ -6,7 +6,7 @@ import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.ALFPublicKey
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
@@ -25,8 +25,8 @@ object TapirCodecs {
   implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
     fromCirce[ApiKey]
 
-  implicit val publicKeyTapirCodec: Codec[String, ED25519PublicKey, TextPlain] =
-    fromCirce[ED25519PublicKey]
+  implicit val publicKeyTapirCodec: Codec[String, ALFPublicKey, TextPlain] =
+    fromCirce[ALFPublicKey]
 
   implicit val u64TapirCodec: Codec[String, U64, TextPlain] =
     fromCirce[U64]

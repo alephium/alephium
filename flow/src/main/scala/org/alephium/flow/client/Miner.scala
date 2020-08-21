@@ -6,7 +6,7 @@ import scala.util.{Failure, Random, Success}
 
 import akka.actor.Props
 
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.crypto.ALFPublicKey
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
@@ -33,7 +33,7 @@ object Miner {
     props(addresses, blockFlow, allHandlers)
   }
 
-  def props(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+  def props(addresses: AVector[ALFPublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,
       miningConfig: MiningSetting): Props = {
     require(addresses.length == brokerConfig.groups)
@@ -72,7 +72,7 @@ object Miner {
   }
 }
 
-class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+class Miner(addresses: AVector[ALFPublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
     val miningConfig: MiningSetting)
     extends BaseActor

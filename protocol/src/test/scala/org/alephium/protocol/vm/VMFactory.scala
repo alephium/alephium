@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm
 
-import org.alephium.crypto.ED25519Signature
+import org.alephium.crypto.ALFSignature
 import org.alephium.io.{MerklePatriciaTrie, StorageFixture}
 import org.alephium.protocol.Hash
 
@@ -16,7 +16,7 @@ trait VMFactory extends StorageFixture {
   }
 
   lazy val statelessContext: StatelessContext =
-    StatelessContext(Hash.zero, Stack.ofCapacity[ED25519Signature](0), cachedWorldState)
+    StatelessContext(Hash.zero, Stack.ofCapacity[ALFSignature](0), cachedWorldState)
 
   lazy val statefulContext: StatefulContext = StatefulContext(Hash.zero, cachedWorldState)
 }

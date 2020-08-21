@@ -19,7 +19,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
+import org.alephium.crypto.{ALFPrivateKey, ALFSignature, ALFSignatureSchema}
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
@@ -40,7 +40,7 @@ trait TestFixtureLike
   override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   def generateAccount: (String, String, String) = {
-    val (priKey, pubKey) = ED25519.generatePriPub()
+    val (priKey, pubKey) = ALFSignatureSchema.generatePriPub()
     (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
@@ -229,8 +229,9 @@ trait TestFixtureLike
   )
 
   def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
-    val signature: ED25519Signature = ED25519.sign(Hex.unsafe(createTransactionResult.hash),
-                                                   ED25519PrivateKey.unsafe(Hex.unsafe(privateKey)))
+    val signature: ALFSignature = ALFSignatureSchema.sign(
+      Hex.unsafe(createTransactionResult.hash),
+      ALFPrivateKey.unsafe(Hex.unsafe(privateKey)))
     jsonRpc(
       "send_transaction",
       s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""

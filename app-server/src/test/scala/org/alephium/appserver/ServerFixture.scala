@@ -8,7 +8,7 @@ import io.circe.Encoder
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ED25519, ED25519PrivateKey}
+import org.alephium.crypto.{ALFPrivateKey, ALFSignatureSchema}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
@@ -58,7 +58,8 @@ trait ServerFixture
     .sample
     .get
   lazy val dummySignature =
-    ED25519.sign(dummyTx.unsigned.hash.bytes, ED25519PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
+    ALFSignatureSchema.sign(dummyTx.unsigned.hash.bytes,
+                            ALFPrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
     dummyTx.hash.toHexString,
     dummyTx.fromGroup.value,
@@ -159,7 +160,7 @@ object ServerFixture {
                            fromUnlockScript: UnlockScript,
                            toLockupScript: LockupScript,
                            value: U64,
-                           fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] = {
+                           fromPrivateKey: ALFPrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }
 

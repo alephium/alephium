@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ED25519PublicKey, ED25519Signature, Sha256}
+import org.alephium.crypto.{ALFPublicKey, ALFSignature, Sha256}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
@@ -40,12 +40,12 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   implicit val fetchRequestCodec = FetchRequest.codec
 
   def generateKeyHash(): String = {
-    val address = ED25519PublicKey.generate
+    val address = ALFPublicKey.generate
     Hex.toHexString(address.bytes)
   }
 
   def generateP2pkh(): Address = {
-    LockupScript.p2pkh(ED25519PublicKey.generate)
+    LockupScript.p2pkh(ALFPublicKey.generate)
   }
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
@@ -158,8 +158,8 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode CreateTransaction" in {
-    val fromKey   = ED25519PublicKey.generate
-    val toKey     = ED25519PublicKey.generate
+    val fromKey   = ALFPublicKey.generate
+    val toKey     = ALFPublicKey.generate
     val toAddress = LockupScript.p2pkh(toKey)
     val transfer  = CreateTransaction(fromKey, toAddress, 1)
     val jsonRaw =
@@ -174,7 +174,7 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode SendTransaction" in {
-    val signature = ED25519Signature.generate
+    val signature = ALFSignature.generate
     val transfer  = SendTransaction("tx", signature)
     val jsonRaw =
       s"""{"tx":"tx","signature":"${signature.toHexString}"}"""

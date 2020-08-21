@@ -11,8 +11,8 @@ class GroupIndex(val value: Int) extends AnyVal {
   override def toString: String = s"GroupIndex($value)"
 
   @tailrec
-  final def generateKey(implicit config: GroupConfig): (ED25519PrivateKey, ED25519PublicKey) = {
-    val (privateKey, publicKey) = ED25519.generatePriPub()
+  final def generateKey(implicit config: GroupConfig): (ALFPrivateKey, ALFPublicKey) = {
+    val (privateKey, publicKey) = ALFSignatureSchema.generatePriPub()
     val lockupScript            = LockupScript.p2pkh(Hash.hash(publicKey.bytes))
     if (lockupScript.groupIndex == this) (privateKey, publicKey)
     else generateKey

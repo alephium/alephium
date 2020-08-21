@@ -3,7 +3,7 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.ED25519PrivateKey
+import org.alephium.crypto.ALFPrivateKey
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
@@ -385,7 +385,7 @@ trait BlockFlowState {
                 fromUnlockScript: UnlockScript,
                 toLockupScript: LockupScript,
                 value: U64,
-                fromPrivateKey: ED25519PrivateKey): IOResult[Option[Transaction]] =
+                fromPrivateKey: ALFPrivateKey): IOResult[Option[Transaction]] =
     prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value).map(_.map {
       unsigned =>
         Transaction.from(unsigned, fromPrivateKey)

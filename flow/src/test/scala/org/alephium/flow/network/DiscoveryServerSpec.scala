@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
-import org.alephium.crypto.ED25519
+import org.alephium.crypto.ALFSignatureSchema
 import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
@@ -22,7 +22,7 @@ object DiscoveryServerSpec {
     : (InetSocketAddress, DiscoveryConfig with CliqueConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
     val discoveryConfig = new DiscoveryConfig with CliqueConfig {
-      val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
+      val (discoveryPrivateKey, discoveryPublicKey) = ALFSignatureSchema.generatePriPub()
 
       val peersPerGroup: Int          = _peersPerGroup
       val scanMaxPerGroup: Int        = 1
