@@ -1,13 +1,13 @@
 package org.alephium.protocol.config
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey}
+import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey}
 import org.alephium.util.Duration
 
 // TODO: refactor this as two configs
 trait DiscoveryConfig {
-  def discoveryPrivateKey: ED25519PrivateKey
+  def discoveryPrivateKey: ALFPrivateKey
 
-  def discoveryPublicKey: ED25519PublicKey
+  def discoveryPublicKey: ALFPublicKey
 
   /* Maximum number of peers to track. */
   def peersPerGroup: Int

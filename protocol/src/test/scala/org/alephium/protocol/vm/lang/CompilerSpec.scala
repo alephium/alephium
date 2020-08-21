@@ -2,7 +2,7 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{Byte32, ED25519}
+import org.alephium.crypto.{ALFSignatureSchema, Byte32}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.vm._
 import org.alephium.serde._
@@ -238,9 +238,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val (priKey, pubKey) = ED25519.generatePriPub()
+    val (priKey, pubKey) = ALFSignatureSchema.generatePriPub()
     val pubKeyHash       = Hash.hash(pubKey.bytes)
-    val signature        = ED25519.sign(Hash.zero.bytes, priKey)
+    val signature        = ALFSignatureSchema.sign(Hash.zero.bytes, priKey)
 
     val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
     deserialize[StatelessScript](serialize(script)) isE script
