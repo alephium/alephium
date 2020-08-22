@@ -20,7 +20,7 @@ import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
-import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor, Utils}
+import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
@@ -180,8 +180,8 @@ trait TestFixtureLike
           for {
             _ <- server.stop()
             _ <- server.system.terminate()
-          } yield (()),
-          Utils.shutdownTimeout.asScala
+          } yield (),
+          FlowMonitor.shutdownTimeout.asScala
         )
       ),
       "GlobalStopper"

@@ -2,11 +2,13 @@ package org.alephium.flow
 
 import akka.actor.Props
 
-import org.alephium.util.BaseActor
+import org.alephium.util.{BaseActor, Duration}
 
 object FlowMonitor {
   sealed trait Command
   case object Shutdown extends Command
+
+  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
 
   def props(task: => Unit): Props = Props(new FlowMonitor(task))
 }

@@ -9,7 +9,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.{FlowMonitor, Utils}
+import org.alephium.flow.FlowMonitor
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.ActorRefT
 
@@ -31,7 +31,7 @@ object Boot extends App with StrictLogging {
     Await.result(for {
       _ <- server.stop()
       _ <- system.terminate()
-    } yield (()), Utils.shutdownTimeout.asScala)
+    } yield (), FlowMonitor.shutdownTimeout.asScala)
 
   server
     .start()
