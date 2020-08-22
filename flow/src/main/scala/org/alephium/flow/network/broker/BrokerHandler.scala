@@ -100,9 +100,7 @@ trait BrokerHandler extends BaseActor {
       case Received(SendBlocks(blocks)) =>
         log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
         blocks.foreach { block =>
-          val message = BlockChainHandler.addOneBlock(
-            block,
-            DataOrigin.InterClique(CliqueId.generate, remoteBrokerInfo, false))
+          val message = BlockChainHandler.addOneBlock(block, dataOrigin)
           allHandlers.getBlockHandler(block.chainIndex) ! message
         }
       case Received(GetBlocks(hashes)) =>
@@ -112,8 +110,15 @@ trait BrokerHandler extends BaseActor {
         brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
     }
 
-    if (remoteCliqueId == selfCliqueId) common orElse intraCliqueSyncing
+    if (isIntraCliqueBroker) common orElse intraCliqueSyncing
     else common orElse interCliqueSyncing
+  }
+
+  def isIntraCliqueBroker: Boolean = remoteCliqueId == selfCliqueId
+
+  def dataOrigin: DataOrigin = {
+    if (isIntraCliqueBroker) DataOrigin.IntraClique(remoteCliqueId, remoteBrokerInfo)
+    else DataOrigin.InterClique(remoteCliqueId, remoteBrokerInfo, false)
   }
 
   def intraCliqueSyncing: Receive = {
