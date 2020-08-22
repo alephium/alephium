@@ -2,8 +2,7 @@ package org.alephium.flow.network.broker
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Cancellable, Props}
-import akka.io.Tcp
+import akka.actor.Cancellable
 import akka.util.ByteString
 
 import org.alephium.flow.Utils
@@ -14,14 +13,10 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util._
 
 object BrokerHandler {
-  def props(cliqueInfo: CliqueInfo, connection: ActorRefT[Tcp.Command])(
-      implicit brokerConfig: BrokerConfig): Props =
-    Props(new Impl(cliqueInfo, connection))
-
   sealed trait Command
   case object HandShakeTimeout                                extends Command
   final case class Send(data: ByteString)                     extends Command
@@ -34,33 +29,6 @@ object BrokerHandler {
   case object BlockDownloadDone                               extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
-
-  class Impl(cliqueInfo: CliqueInfo, connection: ActorRefT[Tcp.Command])(
-      implicit val brokerConfig: BrokerConfig)
-      extends BrokerHandler {
-    override def handShakeDuration: Duration = Duration.ofMinutesUnsafe(1)
-
-    override val brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] = {
-      val actor = context.actorOf(BrokerConnectionHandler.props(connection))
-      ActorRefT(actor)
-    }
-
-    override def handShakeMessage: Payload = Hello.unsafe(cliqueInfo.id, cliqueInfo.selfBrokerInfo)
-
-    override def pingFrequency: Duration = ???
-
-    override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] = ???
-
-    override def blockflow: BlockFlow = ???
-
-    override def allHandlers: AllHandlers = ???
-
-    override def remoteAddress: InetSocketAddress = ???
-
-    override def selfCliqueId: CliqueId = ???
-
-    override def brokerManager: ActorRefT[BrokerManager.Command] = ???
-  }
 }
 
 trait BrokerHandler extends BaseActor {
@@ -99,7 +67,6 @@ trait BrokerHandler extends BaseActor {
         handleHandshakeInfo(hello.cliqueId, hello.brokerInfo)
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
-        blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(hello.brokerInfo)
         context become (exchanging orElse pingPong)
       case HandShakeTimeout =>
         log.debug(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
@@ -122,9 +89,7 @@ trait BrokerHandler extends BaseActor {
   }
 
   def exchanging: Receive = {
-    val nonSyncing: Receive = {
-      case Sync(locators) =>
-        send(SyncRequest0(locators))
+    val common: Receive = {
       case Received(SyncRequest0(locators)) =>
         val inventories = blockflow.getSyncDataUnsafe(locators)
         send(SyncResponse0(inventories))
@@ -147,8 +112,8 @@ trait BrokerHandler extends BaseActor {
         brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
     }
 
-    if (remoteCliqueId == selfCliqueId) nonSyncing orElse intraCliqueSyncing
-    else nonSyncing orElse interCliqueSyncing
+    if (remoteCliqueId == selfCliqueId) common orElse intraCliqueSyncing
+    else common orElse interCliqueSyncing
   }
 
   def intraCliqueSyncing: Receive = {
@@ -163,13 +128,18 @@ trait BrokerHandler extends BaseActor {
   }
 
   def interCliqueSyncing: Receive = {
-    case Sync(locators) =>
-      send(SyncRequest0(locators))
-    case Received(SyncRequest0(locators)) =>
-      val inventories = blockflow.getSyncDataUnsafe(locators)
-      send(SyncResponse0(inventories))
-    case Received(SyncResponse0(hashes)) =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+    blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(remoteBrokerInfo)
+
+    val receive: Receive = {
+      case Sync(locators) =>
+        send(SyncRequest0(locators))
+      case Received(SyncRequest0(locators)) =>
+        val inventories = blockflow.getSyncDataUnsafe(locators)
+        send(SyncResponse0(inventories))
+      case Received(SyncResponse0(hashes)) =>
+        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+    }
+    receive
   }
 
   def pingPong: Receive = {
