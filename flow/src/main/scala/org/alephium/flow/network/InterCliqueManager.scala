@@ -56,7 +56,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
-    discoveryConfig: DiscoverySetting)
+    discoverySetting: DiscoverySetting)
     extends BaseActor
     with InterCliqueManagerState {
   import InterCliqueManager._
@@ -73,7 +73,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         neighborCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
       } else {
         // TODO: refine the condition, check the number of brokers for example
-        if (discoveryConfig.bootstrap.nonEmpty) {
+        log.debug(s"Try to fetch peer brokers from discovery server")
+        if (discoverySetting.bootstrap.nonEmpty) {
           scheduleOnce(discoveryServer.ref,
                        DiscoveryServer.GetNeighborCliques,
                        Duration.ofSecondsUnsafe(2))
@@ -83,12 +84,13 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   }
 
   def handleConnection: Receive = {
-    case c: Tcp.Connected =>
-      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
+    case Tcp.Connected(remoteAddress, _) =>
+      log.debug(s"Connected to ${remoteAddress}")
+      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${remoteAddress}")
       val props =
         InboundBrokerHandler.props(
           selfCliqueInfo,
-          c.remoteAddress,
+          remoteAddress,
           ActorRefT[Tcp.Command](sender()),
           blockflow,
           allHandlers,

@@ -111,7 +111,7 @@ object ServerFixture {
     val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(system, Props(new BaseActor {
         override def receive: Receive = {
-          case CliqueManager.IsSelfCliqueSynced => sender() ! selfCliqueSynced
+          case CliqueManager.IsSelfCliqueReady => sender() ! selfCliqueSynced
         }
       }), "clique-manager")
 

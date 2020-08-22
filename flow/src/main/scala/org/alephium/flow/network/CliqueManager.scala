@@ -44,7 +44,7 @@ object CliqueManager {
       extends Command
   final case class SendAllHandlers(allHandlers: AllHandlers)              extends Command
   final case class HandShaked(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
-  final case object IsSelfCliqueSynced                                    extends Command
+  final case object IsSelfCliqueReady                                     extends Command
 }
 
 class CliqueManager(blockflow: BlockFlow,
@@ -60,7 +60,7 @@ class CliqueManager(blockflow: BlockFlow,
 
   type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
 
-  var selfCliqueSynced: Boolean = false
+  var selfCliqueReady: Boolean = false
 
   override def preStart(): Unit = {
     super.preStart()
@@ -102,7 +102,7 @@ class CliqueManager(blockflow: BlockFlow,
                                            brokerManager,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
-      selfCliqueSynced = true
+      selfCliqueReady = true
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)
@@ -125,6 +125,6 @@ class CliqueManager(blockflow: BlockFlow,
   }
 
   def isSelfCliqueSynced: Receive = {
-    case IsSelfCliqueSynced => sender() ! selfCliqueSynced
+    case IsSelfCliqueReady => sender() ! selfCliqueReady
   }
 }
