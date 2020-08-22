@@ -55,6 +55,8 @@ final case class NetworkSetting(
     restPort: Option[Int]
 ) {
   val isCoordinator: Boolean = publicAddress == masterAddress
+
+  def handshakeTimeout: Duration = retryTimeout
 }
 
 final case class DiscoverySetting(

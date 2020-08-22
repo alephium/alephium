@@ -15,6 +15,11 @@ final case class ActorRefT[T](ref: ActorRef) extends AnyVal {
 }
 
 object ActorRefT {
+  def build[T](system: ActorSystem, props: Props): ActorRefT[T] = {
+    val ref = system.actorOf(props)
+    ActorRefT[T](ref)
+  }
+
   def build[T](system: ActorSystem, props: Props, name: String): ActorRefT[T] = {
     val ref = system.actorOf(props, name)
     ActorRefT[T](ref)

@@ -4,8 +4,9 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
 import org.alephium.flow.{TaskTrigger, Utils}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.network.broker._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
@@ -13,19 +14,31 @@ import org.alephium.util.{ActorRefT, BaseActor}
 
 object IntraCliqueManager {
   def props(cliqueInfo: CliqueInfo,
+            blockflow: BlockFlow,
             allHandlers: AllHandlers,
-            cliqueManager: ActorRefT[CliqueManager.Command])(
+            cliqueManager: ActorRefT[CliqueManager.Command],
+            brokerManager: ActorRefT[BrokerManager.Command],
+            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting): Props =
-    Props(new IntraCliqueManager(cliqueInfo, allHandlers, cliqueManager))
+    Props(
+      new IntraCliqueManager(cliqueInfo,
+                             blockflow,
+                             allHandlers,
+                             cliqueManager,
+                             brokerManager,
+                             blockFlowSynchronizer))
 
   sealed trait Command    extends CliqueManager.Command
   final case object Ready extends Command
 }
 
 class IntraCliqueManager(cliqueInfo: CliqueInfo,
+                         blockflow: BlockFlow,
                          allHandlers: AllHandlers,
-                         cliqueManager: ActorRefT[CliqueManager.Command])(
+                         cliqueManager: ActorRefT[CliqueManager.Command],
+                         brokerManager: ActorRefT[BrokerManager.Command],
+                         blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor {
@@ -34,10 +47,12 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       val address = remoteBroker.address
       log.debug(s"Connect to broker $remoteBroker")
       val props = OutboundBrokerHandler.props(cliqueInfo,
-                                              cliqueInfo.id,
                                               remoteBroker,
+                                              blockflow,
                                               allHandlers,
-                                              ActorRefT[CliqueManager.Command](self))
+                                              ActorRefT[CliqueManager.Command](self),
+                                              brokerManager,
+                                              blockFlowSynchronizer)
       context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
     }
   }
@@ -59,14 +74,16 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
           InboundBrokerHandler.props(cliqueInfo,
                                      remote,
                                      ActorRefT[Tcp.Command](sender()),
+                                     blockflow,
                                      allHandlers,
-                                     ActorRefT[CliqueManager.Command](self))
+                                     ActorRefT[CliqueManager.Command](self),
+                                     brokerManager,
+                                     blockFlowSynchronizer)
         context.actorOf(props, name)
         ()
       }
-    case CliqueManager.Syncing(cliqueId, broker) =>
-      log.debug(s"Start syncing with intra-clique node: $cliqueId, $broker")
-    case CliqueManager.Synced(cliqueId, brokerInfo) =>
+    case CliqueManager.HandShaked(cliqueId, brokerInfo) =>
+      log.debug(s"Start syncing with intra-clique node: ${brokerInfo.address}")
       if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()

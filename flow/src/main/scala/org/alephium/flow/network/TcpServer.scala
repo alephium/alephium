@@ -26,7 +26,7 @@ class TcpServer(port: Int) extends BaseActor {
 
   def awaitStart: Receive = {
     case TcpServer.Start(bootstrapper) =>
-      IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port))
+      IO(Tcp) ! Tcp.Bind(self, new InetSocketAddress(port), pullMode = true)
       context.become(binding(bootstrapper))
   }
 

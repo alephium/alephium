@@ -217,6 +217,17 @@ object BlockFlow extends StrictLogging {
       SyncInfo(blockTips, headerTips)
     }
 
+    def getIntraCliqueSyncHashesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
+      AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
+        val k         = index / remoteBroker.groupNumPerBroker
+        val l         = index % remoteBroker.groupNumPerBroker
+        val fromGroup = brokerConfig.groupFrom + k
+        val toGroup   = remoteBroker.groupFrom + l
+        val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
+        chain.getLatestHashesUnsafe()
+      }
+    }
+
     // Rtips means tip representatives for all groups
     private def getRtipsUnsafe(tip: Hash, from: GroupIndex): Array[Hash] = {
       val rdeps = new Array[Hash](groups)

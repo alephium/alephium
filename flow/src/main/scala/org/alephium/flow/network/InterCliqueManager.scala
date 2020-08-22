@@ -6,21 +6,33 @@ import akka.actor.{ActorRef, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.network.broker._
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
+  // scalastyle:off parameter.number
   def props(selfCliqueInfo: CliqueInfo,
+            blockflow: BlockFlow,
             allHandlers: AllHandlers,
-            discoveryServer: ActorRefT[DiscoveryServer.Command])(
+            discoveryServer: ActorRefT[DiscoveryServer.Command],
+            brokerManager: ActorRefT[BrokerManager.Command],
+            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       discoverySetting: DiscoverySetting): Props =
-    Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
+    Props(
+      new InterCliqueManager(selfCliqueInfo,
+                             blockflow,
+                             allHandlers,
+                             discoveryServer,
+                             brokerManager,
+                             blockFlowSynchronizer))
+  //scalastyle:on
 
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
@@ -37,8 +49,11 @@ object InterCliqueManager {
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
+                         blockflow: BlockFlow,
                          allHandlers: AllHandlers,
-                         discoveryServer: ActorRefT[DiscoveryServer.Command])(
+                         discoveryServer: ActorRefT[DiscoveryServer.Command],
+                         brokerManager: ActorRefT[BrokerManager.Command],
+                         blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     discoveryConfig: DiscoverySetting)
@@ -71,23 +86,25 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case c: Tcp.Connected =>
       val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
       val props =
-        InboundBrokerHandler.props(selfCliqueInfo,
-                                   c.remoteAddress,
-                                   ActorRefT[Tcp.Command](sender()),
-                                   allHandlers,
-                                   ActorRefT[CliqueManager.Command](self))
+        InboundBrokerHandler.props(
+          selfCliqueInfo,
+          c.remoteAddress,
+          ActorRefT[Tcp.Command](sender()),
+          blockflow,
+          allHandlers,
+          ActorRefT[CliqueManager.Command](self),
+          brokerManager,
+          blockFlowSynchronizer
+        )
       context.actorOf(props, name)
       ()
-    case CliqueManager.Syncing(cliqueId, brokerInfo) =>
+    case CliqueManager.HandShaked(cliqueId, brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $cliqueId, $brokerInfo")
       if (brokerConfig.intersect(brokerInfo)) {
         addBroker(cliqueId, brokerInfo, sender())
       } else {
         context stop sender()
       }
-    case CliqueManager.Synced(cliqueId, brokerInfo) =>
-      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
-      setSynced(cliqueId, brokerInfo)
   }
 
   def handleMessage: Receive = {
@@ -125,10 +142,12 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
         val props =
           OutboundBrokerHandler.props(selfCliqueInfo,
-                                      remoteCliqueId,
                                       brokerInfo,
+                                      blockflow,
                                       allHandlers,
-                                      ActorRefT[CliqueManager.Command](self))
+                                      ActorRefT[CliqueManager.Command](self),
+                                      brokerManager,
+                                      blockFlowSynchronizer)
         context.actorOf(props, name)
       }
     }
