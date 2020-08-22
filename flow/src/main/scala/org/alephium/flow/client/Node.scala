@@ -6,7 +6,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
 
-import org.alephium.flow.Utils
+import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
@@ -34,7 +34,7 @@ trait Node extends Service {
   override protected def startSelfOnce(): Future[Unit] = Future.successful(())
 
   override protected def stopSelfOnce(): Future[Unit] = {
-    val timeout = Timeout(Utils.shutdownTimeout.asScala)
+    val timeout = Timeout(FlowMonitor.shutdownTimeout.asScala)
     monitor.ask(Node.Stop)(timeout).mapTo[Unit]
   }
 }
