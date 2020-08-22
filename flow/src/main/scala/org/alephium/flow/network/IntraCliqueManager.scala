@@ -42,21 +42,26 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor {
-  cliqueInfo.brokers.foreach { remoteBroker =>
-    if (remoteBroker.brokerId > brokerConfig.brokerId) {
-      val address = remoteBroker.address
-      log.debug(s"Connect to broker $remoteBroker")
-      val props = OutboundBrokerHandler.props(cliqueInfo,
-                                              remoteBroker,
-                                              blockflow,
-                                              allHandlers,
-                                              ActorRefT[CliqueManager.Command](self),
-                                              brokerManager,
-                                              blockFlowSynchronizer)
-      context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
+
+  override def preStart(): Unit = {
+    cliqueInfo.brokers.foreach { remoteBroker =>
+      if (remoteBroker.brokerId > brokerConfig.brokerId) {
+        val address = remoteBroker.address
+        log.debug(s"Connect to broker $remoteBroker")
+        val props = OutboundBrokerHandler.props(cliqueInfo,
+                                                remoteBroker,
+                                                blockflow,
+                                                allHandlers,
+                                                ActorRefT[CliqueManager.Command](self),
+                                                brokerManager,
+                                                blockFlowSynchronizer)
+        context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
+      }
     }
+
+    if (cliqueInfo.brokerNum == 1) context become handle(Map.empty)
+    else context become awaitBrokers(Map.empty)
   }
-  checkAllSynced(Map.empty)
 
   override def receive: Receive = awaitBrokers(Map.empty)
 
@@ -64,11 +69,11 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
     case Tcp.Connected(remote, _) =>
-      log.debug(s"Connection from $remote")
+      log.debug(s"Connected to $remote")
       val index = cliqueInfo.peers.indexWhere(_ == remote)
       if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition
-        log.debug(s"Inbound connection: $remote")
+        log.debug(s"The connection from $remote is incoming connection")
         val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
         val props =
           InboundBrokerHandler.props(cliqueInfo,
@@ -126,7 +131,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   def handleTerminated(actor: ActorRef, brokers: Map[Int, (BrokerInfo, ActorRef)]): Unit = {
     brokers.foreach {
       case (_, (info, broker)) if broker == actor =>
-        log.error(s"Clique node $info is not functioning")
+        log.error(s"Self clique node $info is not functioning, shutdown the system now")
         context.system.eventStream.publish(FlowMonitor.Shutdown)
       case _ => ()
     }
