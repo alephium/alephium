@@ -7,7 +7,7 @@ import scala.collection.immutable.ArraySeq
 import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
-import org.alephium.flow.{TaskTrigger, Utils}
+import org.alephium.flow.FlowMonitor
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
@@ -68,8 +68,9 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
     extends BaseActor
     with Timers
     with DiscoveryServerState {
-  import DiscoveryServer._
   import context.system
+
+  import DiscoveryServer._
 
   def receive: Receive = awaitCliqueInfo
 
@@ -94,9 +95,7 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
-      val globalStopper = context.actorSelection(Utils.globalStopper)
-      globalStopper ! TaskTrigger.Trigger
-      context stop self
+      context.system.eventStream.publish(FlowMonitor.Shutdown)
   }
 
   def ready: Receive = handleData orElse handleCommand

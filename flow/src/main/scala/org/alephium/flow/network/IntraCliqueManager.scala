@@ -3,7 +3,7 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
-import org.alephium.flow.{TaskTrigger, Utils}
+import org.alephium.flow.FlowMonitor
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.broker._
@@ -127,9 +127,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     brokers.foreach {
       case (_, (info, broker)) if broker == actor =>
         log.error(s"Clique node $info is not functioning")
-        val globalStopper = context.actorSelection(Utils.globalStopper)
-        globalStopper ! TaskTrigger.Trigger
-        context stop self
+        context.system.eventStream.publish(FlowMonitor.Shutdown)
       case _ => ()
     }
   }
