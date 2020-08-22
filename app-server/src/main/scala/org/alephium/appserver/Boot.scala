@@ -9,7 +9,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.{TaskTrigger, Utils}
+import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.ActorRefT
 
@@ -22,8 +22,8 @@ object Boot extends App with StrictLogging {
   implicit val system: ActorSystem                = ActorSystem("Root", Configs.parseConfig(rootPath))
   implicit val executionContext: ExecutionContext = system.dispatcher
 
-  val globalStopper: ActorRefT[TaskTrigger.Command] =
-    ActorRefT.build(system, TaskTrigger.props(stop()), "GlobalStopper")
+  val flowMonitor: ActorRefT[FlowMonitor.Command] =
+    ActorRefT.build(system, FlowMonitor.props(stop()), "FlowMonitor")
 
   val server: Server = new ServerImpl(rootPath)
 

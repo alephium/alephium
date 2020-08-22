@@ -20,7 +20,7 @@ import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
-import org.alephium.flow.{AlephiumFlowSpec, TaskTrigger, Utils}
+import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor, Utils}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
@@ -175,7 +175,7 @@ trait TestFixtureLike
     implicit val executionContext = server.system.dispatcher
     ActorRefT.build(
       server.system,
-      TaskTrigger.props(
+      FlowMonitor.props(
         Await.result(
           for {
             _ <- server.stop()
