@@ -4,19 +4,30 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.util.ByteString
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object CliqueManager {
-  def props(discoveryServer: ActorRefT[DiscoveryServer.Command])(
+  def props(blockflow: BlockFlow,
+            allHandlers: AllHandlers,
+            discoveryServer: ActorRefT[DiscoveryServer.Command],
+            brokerManager: ActorRefT[BrokerManager.Command],
+            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       discoverySetting: DiscoverySetting): Props =
-    Props(new CliqueManager(discoveryServer))
+    Props(
+      new CliqueManager(blockflow,
+                        allHandlers,
+                        discoveryServer,
+                        brokerManager,
+                        blockFlowSynchronizer))
 
   trait Command
   final case class Start(cliqueInfo: CliqueInfo) extends Command
@@ -31,13 +42,16 @@ object CliqueManager {
                                chainIndex: ChainIndex,
                                origin: DataOrigin)
       extends Command
-  final case class SendAllHandlers(allHandlers: AllHandlers)           extends Command
-  final case class Syncing(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
-  final case class Synced(cliqueId: CliqueId, brokerInfo: BrokerInfo)  extends Command
-  final case object IsSelfCliqueSynced                                 extends Command
+  final case class SendAllHandlers(allHandlers: AllHandlers)              extends Command
+  final case class HandShaked(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
+  final case object IsSelfCliqueSynced                                    extends Command
 }
 
-class CliqueManager(discoveryServer: ActorRefT[DiscoveryServer.Command])(
+class CliqueManager(blockflow: BlockFlow,
+                    allHandlers: AllHandlers,
+                    discoveryServer: ActorRefT[DiscoveryServer.Command],
+                    brokerManager: ActorRefT[BrokerManager.Command],
+                    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     discoverySetting: DiscoverySetting)
@@ -46,23 +60,27 @@ class CliqueManager(discoveryServer: ActorRefT[DiscoveryServer.Command])(
 
   type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
 
-  var allHandlers: AllHandlers  = _
   var selfCliqueSynced: Boolean = false
 
-  override def receive: Receive = awaitAllHandlers orElse isSelfCliqueSynced
-
-  def awaitAllHandlers: Receive = {
-    case SendAllHandlers(_allHandlers) =>
-      allHandlers = _allHandlers
-      context become (awaitStart(AVector.empty) orElse isSelfCliqueSynced)
+  override def preStart(): Unit = {
+    super.preStart()
+    require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
+    require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
   }
+
+  override def receive: Receive = awaitStart(AVector.empty) orElse isSelfCliqueSynced
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitStart(pool: ConnectionPool): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
-        context.actorOf(IntraCliqueManager.props(cliqueInfo, allHandlers, ActorRefT(self)),
+        context.actorOf(IntraCliqueManager.props(cliqueInfo,
+                                                 blockflow,
+                                                 allHandlers,
+                                                 ActorRefT(self),
+                                                 brokerManager,
+                                                 blockFlowSynchronizer),
                         "IntraCliqueManager")
       pool.foreach {
         case (connection, message) =>
@@ -77,7 +95,12 @@ class CliqueManager(discoveryServer: ActorRefT[DiscoveryServer.Command])(
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
     case IntraCliqueManager.Ready =>
       log.debug(s"Intra clique manager is ready")
-      val props              = InterCliqueManager.props(cliqueInfo, allHandlers, discoveryServer)
+      val props = InterCliqueManager.props(cliqueInfo,
+                                           blockflow,
+                                           allHandlers,
+                                           discoveryServer,
+                                           brokerManager,
+                                           blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueSynced = true
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)

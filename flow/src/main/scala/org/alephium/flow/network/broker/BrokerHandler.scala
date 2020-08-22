@@ -12,7 +12,7 @@ import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util._
@@ -36,10 +36,8 @@ object BrokerHandler {
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 
   class Impl(cliqueInfo: CliqueInfo, connection: ActorRefT[Tcp.Command])(
-      implicit brokerConfig: BrokerConfig)
+      implicit val brokerConfig: BrokerConfig)
       extends BrokerHandler {
-    override def brokerAlias: String = "brokerAlias"
-
     override def handShakeDuration: Duration = Duration.ofMinutesUnsafe(1)
 
     override val brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] = {
@@ -51,42 +49,40 @@ object BrokerHandler {
 
     override def pingFrequency: Duration = ???
 
-    override def connectionInfo: ConnectionInfo = ???
-
     override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] = ???
-
-    override def misBehavingHandler: ActorRefT[MisBehavingHandler.Command] = ???
 
     override def blockflow: BlockFlow = ???
 
-    override implicit def groupConfig: GroupConfig = ???
-
     override def allHandlers: AllHandlers = ???
+
+    override def remoteAddress: InetSocketAddress = ???
+
+    override def selfCliqueId: CliqueId = ???
+
+    override def brokerManager: ActorRefT[BrokerManager.Command] = ???
   }
 }
 
 trait BrokerHandler extends BaseActor {
   import BrokerHandler._
 
-  implicit def groupConfig: GroupConfig
+  implicit def brokerConfig: BrokerConfig
 
-  def connectionInfo: ConnectionInfo
+  def remoteAddress: InetSocketAddress
+  def brokerAlias: String = remoteAddress.toString
 
+  def selfCliqueId: CliqueId
+  var remoteCliqueId: CliqueId     = _
   var remoteBrokerInfo: BrokerInfo = _
-  def brokerAlias: String
 
   def handShakeDuration: Duration
-
-  override def preStart(): Unit = {
-    super.preStart()
-  }
 
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
 
   def brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command]
   def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
-  def misBehavingHandler: ActorRefT[MisBehavingHandler.Command]
+  def brokerManager: ActorRefT[BrokerManager.Command]
 
   override def receive: Receive = handShaking
 
@@ -100,18 +96,23 @@ trait BrokerHandler extends BaseActor {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         handshakeTimeoutTick.cancel()
-        remoteBrokerInfo = hello.brokerInfo
+        handleHandshakeInfo(hello.cliqueId, hello.brokerInfo)
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
         blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(hello.brokerInfo)
         context become (exchanging orElse pingPong)
       case HandShakeTimeout =>
         log.debug(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
-        misBehavingHandler ! MisBehavingHandler.RequestTimeout(connectionInfo)
+        brokerManager ! BrokerManager.RequestTimeout(remoteAddress)
       case Received(_) =>
-        misBehavingHandler ! MisBehavingHandler.Spamming(connectionInfo)
+        brokerManager ! BrokerManager.Spamming(remoteAddress)
     }
     receive
+  }
+
+  def handleHandshakeInfo(_remoteCliqueId: CliqueId, _remoteBrokerInfo: BrokerInfo): Unit = {
+    remoteCliqueId   = _remoteCliqueId
+    remoteBrokerInfo = _remoteBrokerInfo
   }
 
   @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit = f match {
@@ -121,6 +122,47 @@ trait BrokerHandler extends BaseActor {
   }
 
   def exchanging: Receive = {
+    val nonSyncing: Receive = {
+      case Sync(locators) =>
+        send(SyncRequest0(locators))
+      case Received(SyncRequest0(locators)) =>
+        val inventories = blockflow.getSyncDataUnsafe(locators)
+        send(SyncResponse0(inventories))
+      case Received(SyncResponse0(hashes)) =>
+        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+      case DownloadBlocks(hashes) =>
+        send(GetBlocks(hashes))
+      case Received(SendBlocks(blocks)) =>
+        log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
+        blocks.foreach { block =>
+          val message = BlockChainHandler.addOneBlock(
+            block,
+            DataOrigin.InterClique(CliqueId.generate, remoteBrokerInfo, false))
+          allHandlers.getBlockHandler(block.chainIndex) ! message
+        }
+      case Received(GetBlocks(hashes)) =>
+        val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
+        send(SendBlocks(blocks))
+      case Send(data) =>
+        brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
+    }
+
+    if (remoteCliqueId == selfCliqueId) nonSyncing orElse intraCliqueSyncing
+    else nonSyncing orElse interCliqueSyncing
+  }
+
+  def intraCliqueSyncing: Receive = {
+    val inventory = blockflow.getIntraCliqueSyncHashesUnsafe(remoteBrokerInfo)
+    send(SyncResponse0(inventory))
+
+    val receive: Receive = {
+      case Received(SyncResponse0(hashes)) =>
+        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+    }
+    receive
+  }
+
+  def interCliqueSyncing: Receive = {
     case Sync(locators) =>
       send(SyncRequest0(locators))
     case Received(SyncRequest0(locators)) =>
@@ -128,21 +170,6 @@ trait BrokerHandler extends BaseActor {
       send(SyncResponse0(inventories))
     case Received(SyncResponse0(hashes)) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
-    case DownloadBlocks(hashes) =>
-      send(GetBlocks(hashes))
-    case Received(SendBlocks(blocks)) =>
-      log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
-      blocks.foreach { block =>
-        val message = BlockChainHandler.addOneBlock(
-          block,
-          DataOrigin.InterClique(CliqueId.generate, remoteBrokerInfo, false))
-        allHandlers.getBlockHandler(block.chainIndex) ! message
-      }
-    case Received(GetBlocks(hashes)) =>
-      val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
-      send(SendBlocks(blocks))
-    case Send(data) =>
-      brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
   }
 
   def pingPong: Receive = {
@@ -159,7 +186,7 @@ trait BrokerHandler extends BaseActor {
   def sendPing(): Unit = {
     if (pingNonce != 0) {
       log.debug("No Pong message received in time")
-      misBehavingHandler ! MisBehavingHandler.RequestTimeout(connectionInfo)
+      brokerManager ! BrokerManager.RequestTimeout(remoteAddress)
       context stop self // stop it manually
     } else {
       pingNonce = Random.nextNonZeroInt()
@@ -169,7 +196,7 @@ trait BrokerHandler extends BaseActor {
 
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
-      misBehavingHandler ! MisBehavingHandler.InvalidPingPong(connectionInfo)
+      brokerManager ! BrokerManager.InvalidPingPong(remoteAddress)
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
@@ -184,7 +211,7 @@ trait BrokerHandler extends BaseActor {
     } else {
       log.debug(
         s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce")
-      misBehavingHandler ! MisBehavingHandler.InvalidPingPong(connectionInfo)
+      brokerManager ! BrokerManager.InvalidPingPong(remoteAddress)
     }
   }
 
@@ -192,11 +219,7 @@ trait BrokerHandler extends BaseActor {
     brokerConnectionHandler ! BrokerConnectionHandler.Send(Message.serialize(payload))
   }
 
-  def handleMisbehavior(behavior: MisBehavingHandler.MisBehavior): Unit = {
-    misBehavingHandler ! behavior
-  }
-
-  def stopPeer(): Unit = {
+  def stop(): Unit = {
     pingPongTickOpt.foreach(_.cancel())
     brokerConnectionHandler ! BrokerConnectionHandler.CloseConnection
   }

@@ -8,7 +8,7 @@ import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 
@@ -105,4 +105,6 @@ trait SyncUtils {
   def getInterCliqueSyncInfo(brokerConfig: BrokerInfo): SyncInfo
 
   def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo
+
+  def getIntraCliqueSyncHashesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]]
 }

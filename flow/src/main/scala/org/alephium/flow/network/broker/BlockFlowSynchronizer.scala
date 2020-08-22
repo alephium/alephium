@@ -2,31 +2,31 @@ package org.alephium.flow.network.broker
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Cancellable, Terminated}
+import akka.actor.{Cancellable, Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration}
 
 object BlockFlowSynchronizer {
+  def props(blockflow: BlockFlow, allHandlers: AllHandlers): Props =
+    Props(new BlockFlowSynchronizer(blockflow, allHandlers))
+
   sealed trait Command
   final case class HandShaked(brokerInfo: BrokerInfo)       extends Command
   final case class SyncData(hashes: AVector[AVector[Hash]]) extends Command
   case object Sync                                          extends Command
 }
 
-trait BlockFlowSynchronizer extends BaseActor with DownloadTracker with BrokerStatusTracker {
+class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
+    extends BaseActor
+    with DownloadTracker
+    with BrokerStatusTracker {
   import BlockFlowSynchronizer._
 
   var syncTick: Option[Cancellable] = None
-
-  implicit def groupConfig: GroupConfig
-
-  def blockflow: BlockFlow
-  def allHandlers: AllHandlers
 
   override def preStart(): Unit = {
     super.preStart()

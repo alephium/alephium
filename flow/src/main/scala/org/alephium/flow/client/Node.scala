@@ -11,6 +11,7 @@ import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
@@ -53,23 +54,32 @@ object Node {
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
     val server: ActorRefT[TcpServer.Command] =
-      ActorRefT.build[TcpServer.Command](system,
-                                         TcpServer.props(config.network.publicAddress.getPort),
-                                         "TcpServer")
+      ActorRefT
+        .build[TcpServer.Command](system, TcpServer.props(config.network.publicAddress.getPort))
 
     val eventBus: ActorRefT[EventBus.Message] =
-      ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
+      ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val discoveryProps: Props =
       DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
-      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
+      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
+
+    val brokerManager: ActorRefT[BrokerManager.Command] =
+      ActorRefT.build(system, BrokerManager.props())
+
+    val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
+
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
+      ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
     val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system, CliqueManager.props(discoveryServer), "CliqueManager")
-
-    val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
-
-    cliqueManager ! CliqueManager.SendAllHandlers(allHandlers)
+      ActorRefT.build(system,
+                      CliqueManager.props(blockFlow,
+                                          allHandlers,
+                                          discoveryServer,
+                                          brokerManager,
+                                          blockFlowSynchronizer),
+                      "CliqueManager")
 
     val boostraper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system,

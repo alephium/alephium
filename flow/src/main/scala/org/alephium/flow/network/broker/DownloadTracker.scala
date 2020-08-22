@@ -5,5 +5,5 @@ import scala.collection.mutable
 import org.alephium.protocol.Hash
 
 trait DownloadTracker {
-  def downloading: mutable.HashSet[Hash]
+  val downloading: mutable.HashSet[Hash] = mutable.HashSet.empty
 }

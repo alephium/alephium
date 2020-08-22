@@ -3,7 +3,6 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, EventBus}
@@ -30,31 +29,26 @@ final case class AllHandlers(
 }
 
 object AllHandlers {
-  def build(system: ActorSystem,
-            cliqueManager: ActorRefT[CliqueManager.Command],
-            blockFlow: BlockFlow,
-            eventBus: ActorRefT[EventBus.Message])(
+  def build(system: ActorSystem, blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
       implicit brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig): AllHandlers = {
     val flowProps   = FlowHandler.props(blockFlow, eventBus)
     val flowHandler = ActorRefT.build[FlowHandler.Command](system, flowProps, "FlowHandler")
-    buildWithFlowHandler(system, cliqueManager, blockFlow, flowHandler)
+    buildWithFlowHandler(system, blockFlow, flowHandler)
   }
   def buildWithFlowHandler(system: ActorSystem,
-                           cliqueManager: ActorRefT[CliqueManager.Command],
                            blockFlow: BlockFlow,
                            flowHandler: ActorRefT[FlowHandler.Command])(
       implicit brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig): AllHandlers = {
-    val txProps        = TxHandler.props(blockFlow, cliqueManager)
+    val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, "TxHandler")
-    val blockHandlers  = buildBlockHandlers(system, cliqueManager, blockFlow, flowHandler)
+    val blockHandlers  = buildBlockHandlers(system, blockFlow, flowHandler)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
     AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
   }
 
   private def buildBlockHandlers(system: ActorSystem,
-                                 cliqueManager: ActorRefT[CliqueManager.Command],
                                  blockFlow: BlockFlow,
                                  flowHandler: ActorRefT[FlowHandler.Command])(
       implicit brokerConfig: BrokerConfig,
@@ -67,7 +61,7 @@ object AllHandlers {
     } yield {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
-        BlockChainHandler.props(blockFlow, chainIndex, cliqueManager, flowHandler),
+        BlockChainHandler.props(blockFlow, chainIndex, flowHandler),
         s"BlockChainHandler-$from-$to")
       chainIndex -> handler
     }

@@ -19,10 +19,9 @@ import org.alephium.util.{ActorRefT, AVector, Forest}
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
-            cliqueManager: ActorRefT[CliqueManager.Command],
             flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
                                                          consensusConfig: ConsensusConfig): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, cliqueManager, flowHandler))
+    Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
     val forets = Forest.build[Hash, Block](block, _.hash)
@@ -45,7 +44,6 @@ object BlockChainHandler {
 
 class BlockChainHandler(blockFlow: BlockFlow,
                         chainIndex: ChainIndex,
-                        cliqueManager: ActorRefT[CliqueManager.Command],
                         flowHandler: ActorRefT[FlowHandler.Command])(
     implicit brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig)
@@ -82,7 +80,8 @@ class BlockChainHandler(blockFlow: BlockFlow,
     val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
     val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
     if (brokerConfig.contains(block.chainIndex.from)) {
-      cliqueManager ! CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
+      val event = CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin)
+      context.system.eventStream.publish(event)
     }
   }
 

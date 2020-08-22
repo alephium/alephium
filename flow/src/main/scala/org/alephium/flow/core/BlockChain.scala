@@ -5,7 +5,7 @@ import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
@@ -59,6 +59,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def calBlockDiffUnsafe(newTip: Hash, oldTip: Hash): ChainDiff = {
     val hashDiff = Utils.unsafe(calHashDiff(newTip, oldTip))
     ChainDiff(hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
+  }
+
+  def getLatestHashesUnsafe(): AVector[Hash] = {
+    val toHeight   = maxHeightUnsafe
+    val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 10)
+    (fromHeight to toHeight).foldLeft(AVector.empty[Hash]) {
+      case (acc, height) => acc ++ Utils.unsafe(getHashes(height))
+    }
   }
 }
 
