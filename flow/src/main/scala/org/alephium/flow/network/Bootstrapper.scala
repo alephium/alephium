@@ -93,6 +93,7 @@ class CliqueCoordinatorBootstrapper(val server: ActorRefT[TcpServer.Command],
 
   override def receive: Receive = {
     case c: Tcp.Connected =>
+      log.debug(s"Connected to ${c.remoteAddress}")
       cliqueCoordinator.forward(c)
     case Bootstrapper.ForwardConnection =>
       server ! TcpServer.WorkFor(cliqueManager.ref)

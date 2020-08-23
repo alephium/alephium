@@ -52,7 +52,7 @@ class InboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
   override def handShakeDuration: Duration = networkSetting.retryTimeout
 
   override val brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] =
-    context.actorOf(BrokerConnectionHandler.props(connection))
+    context.actorOf(BrokerConnectionHandler.clique(connection))
 
   override def handShakeMessage: Payload =
     Hello.unsafe(selfCliqueInfo.id, selfCliqueInfo.selfBrokerInfo)
