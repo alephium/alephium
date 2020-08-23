@@ -1,5 +1,7 @@
 package org.alephium.flow
 
+import scala.language.implicitConversions
+
 import akka.actor.ActorRef
 import org.scalatest.BeforeAndAfterAll
 

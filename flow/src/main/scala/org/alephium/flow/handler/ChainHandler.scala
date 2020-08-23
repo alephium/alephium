@@ -25,18 +25,12 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     with BaseActor {
   import ChainHandler.Event
 
+  // TODO: validate continuity
   def handleDatas(datas: Forest[Hash, T],
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
-    checkContinuity(datas, broker) match {
-      case Right(true) =>
-        addTasks(broker, datas)
-        handleReadies(broker, origin, t => blockFlow.contains(t.parentHash))
-      case Right(false) =>
-        handleMissingParent(datas, broker, origin)
-      case Left(error) =>
-        handleIOError(broker, error)
-    }
+    addTasks(broker, datas)
+    handleReadies(broker, origin, t => blockFlow.contains(t.parentHash))
   }
 
   def checkContinuity(datas: Forest[Hash, T],
@@ -113,7 +107,9 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"${data.shortHex} is validated")
     logInfo(data)
-    broadcast(data, origin)
+    if (blockFlow.isRecent(data)) {
+      broadcast(data, origin)
+    }
     addToFlowHandler(data, broker, origin)
   }
 

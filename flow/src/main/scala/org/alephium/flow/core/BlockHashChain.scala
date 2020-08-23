@@ -256,6 +256,14 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       }
     }
   }
+
+  def isRecent(hash: Hash): Boolean = {
+    val safeResult = for {
+      height     <- getHeight(hash)
+      _maxHeight <- maxHeight
+    } yield (height >= _maxHeight - 30)
+    safeResult.exists(identity)
+  }
 }
 // scalastyle:on number.of.methods
 

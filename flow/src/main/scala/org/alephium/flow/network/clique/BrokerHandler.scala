@@ -238,7 +238,7 @@ trait MessageHandler extends ConnectionUtil {
   def selfCliqueInfo: CliqueInfo
 
   def origin: FromClique = {
-    InterClique(remoteCliqueId, remoteBrokerInfo, isSyncing)
+    InterClique(remoteCliqueId, remoteBrokerInfo)
   }
 
   private var _isSyncing: Boolean = false
