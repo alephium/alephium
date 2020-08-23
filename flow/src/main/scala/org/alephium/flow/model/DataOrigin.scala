@@ -6,8 +6,6 @@ sealed trait DataOrigin {
   def isFrom(another: CliqueId): Boolean
 
   def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean
-
-  def isSyncing: Boolean
 }
 
 object DataOrigin {
@@ -15,8 +13,6 @@ object DataOrigin {
     override def isFrom(another: CliqueId): Boolean = false
 
     override def isFrom(cliqueId: CliqueId, brokerInfo: BrokerInfo): Boolean = false
-
-    override def isSyncing: Boolean = false
   }
 
   sealed trait FromClique extends DataOrigin {
@@ -28,9 +24,13 @@ object DataOrigin {
     override def isFrom(_cliqueId: CliqueId, _brokerInfo: BrokerInfo): Boolean =
       cliqueId == _cliqueId && _brokerInfo == brokerInfo
   }
-  final case class InterClique(cliqueId: CliqueId, brokerInfo: BrokerInfo, isSyncing: Boolean)
-      extends FromClique
-  final case class IntraClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique {
-    override def isSyncing: Boolean = false
+  final case class InterClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique
+  final case class IntraClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique
+
+  def from(selfCliqueId: CliqueId,
+           remoteCliqueId: CliqueId,
+           remoteBrokerInfo: BrokerInfo): FromClique = {
+    if (remoteCliqueId == selfCliqueId) IntraClique(remoteCliqueId, remoteBrokerInfo)
+    else InterClique(remoteCliqueId, remoteBrokerInfo)
   }
 }

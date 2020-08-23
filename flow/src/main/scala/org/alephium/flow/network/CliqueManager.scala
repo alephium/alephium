@@ -35,7 +35,8 @@ object CliqueManager {
       block: Block,
       blockMsg: ByteString,
       headerMsg: ByteString,
-      origin: DataOrigin
+      origin: DataOrigin,
+      isRecent: Boolean
   ) extends Command
   final case class BroadCastTx(tx: Transaction,
                                txMsg: ByteString,
@@ -111,7 +112,7 @@ class CliqueManager(blockflow: BlockFlow,
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
     case message: CliqueManager.BroadCastBlock =>
       intraCliqueManager ! message
-      if (!message.origin.isSyncing) {
+      if (message.isRecent) {
         interCliqueManager ! message
       }
     case message: CliqueManager.BroadCastTx =>

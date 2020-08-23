@@ -117,8 +117,7 @@ trait BrokerHandler extends BaseActor {
   def isIntraCliqueBroker: Boolean = remoteCliqueId == selfCliqueId
 
   def dataOrigin: DataOrigin = {
-    if (isIntraCliqueBroker) DataOrigin.IntraClique(remoteCliqueId, remoteBrokerInfo)
-    else DataOrigin.InterClique(remoteCliqueId, remoteBrokerInfo, false)
+    DataOrigin.from(selfCliqueId, remoteCliqueId, remoteBrokerInfo)
   }
 
   def intraCliqueSyncing: Receive = {

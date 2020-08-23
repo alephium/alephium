@@ -11,7 +11,7 @@ import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   def add(block: Block, weight: BigInt): IOResult[Unit] = ???
@@ -75,6 +75,15 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
       }
     }
   }
+
+  //scalastyle:off magic.number
+  def isRecent(data: FlowData): Boolean = {
+    (data.timestamp > TimeStamp.now().plusMinutesUnsafe(-30)) || {
+      val hashChain = getHashChain(data.hash)
+      hashChain.isRecent(data.hash)
+    }
+  }
+  //scalastyle:on
 }
 
 object BlockFlow extends StrictLogging {
