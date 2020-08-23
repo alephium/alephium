@@ -47,7 +47,8 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
       if (isBrokerInfoFull) {
         log.debug(s"Broadcast clique info")
         bootstrapper ! Bootstrapper.ForwardConnection
-        broadcast(Bootstrapper.SendIntraCliqueInfo(buildCliqueInfo))
+        val cliqueInfo = buildCliqueInfo
+        broadcast(BrokerConnector.Send(cliqueInfo))
         context become awaitAck
       }
   }

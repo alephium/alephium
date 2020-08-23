@@ -41,7 +41,7 @@ class BrokerConnectorSpec
     brokerConnector ! Bootstrapper.SendIntraCliqueInfo(randomCliqueInfo)
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        BrokerConnector.unwrap(IntraCliqueInfo._deserialize(data)) is Right(
+        SerdeUtils.unwrap(IntraCliqueInfo._deserialize(data)) is Right(
           Some((randomCliqueInfo, ByteString.empty)))
     }
 

@@ -1,6 +1,8 @@
 package org.alephium.util
 
-import akka.actor.ActorSystem
+import scala.language.implicitConversions
+
+import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestKitBase}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -12,6 +14,7 @@ trait AlephiumActorSpecLike
     with ImplicitSender
     with AlephiumSpec
     with BeforeAndAfterAll {
+  implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
 
   def name: String
 

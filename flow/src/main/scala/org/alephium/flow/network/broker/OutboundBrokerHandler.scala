@@ -65,7 +65,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
     case _: Tcp.Connected =>
       connection              = ActorRefT[Tcp.Command](sender())
-      brokerConnectionHandler = context.actorOf(BrokerConnectionHandler.props(connection))
+      brokerConnectionHandler = context.actorOf(BrokerConnectionHandler.clique(connection))
       context become handShaking
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
