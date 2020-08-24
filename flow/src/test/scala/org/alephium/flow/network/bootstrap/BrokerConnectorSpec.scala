@@ -7,7 +7,6 @@ import akka.util.ByteString
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.protocol.model.ModelGenerators
-import org.alephium.serde.Serde
 import org.alephium.util.Random
 
 class BrokerConnectorSpec
@@ -31,8 +30,7 @@ class BrokerConnectorSpec
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)
 
-    implicit val peerInfoSerde: Serde[PeerInfo] = PeerInfo._serde
-    val infoData                                = BrokerConnector.envelop(randomInfo).data
+    val infoData = Message.serialize(Message.Peer(randomInfo))
     brokerConnector ! Tcp.Received(infoData)
 
     cliqueCoordinator.expectMsgType[PeerInfo]
@@ -45,7 +43,7 @@ class BrokerConnectorSpec
           Some((randomCliqueInfo, ByteString.empty)))
     }
 
-    val ackData = BrokerConnector.envelop(BrokerConnector.Ack(randomId)).data
+    val ackData = Message.serialize(Message.Ack(randomId))
     brokerConnector ! Tcp.Received(ackData)
 
     brokerConnector ! CliqueCoordinator.Ready

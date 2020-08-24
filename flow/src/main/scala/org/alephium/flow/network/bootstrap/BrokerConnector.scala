@@ -1,6 +1,6 @@
 package org.alephium.flow.network.bootstrap
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 
@@ -18,13 +18,6 @@ object BrokerConnector {
   sealed trait Command
   final case class Received(message: Message)             extends Command
   final case class Send(intraCliqueInfo: IntraCliqueInfo) extends Command
-
-  sealed trait Event
-  final case class Ack(id: Int) extends Event
-
-  object Ack {
-    implicit val serde: Serde[Ack] = Serde.forProduct1(new Ack(_), _.id)
-  }
 
   def deserializeTry[T](input: ByteString)(
       implicit serde: Serde[T]): SerdeResult[Option[(T, ByteString)]] = {
@@ -64,6 +57,7 @@ class BrokerConnector(connection: ActorRefT[Tcp.Command], cliqueCoordinator: Act
 
   val connectionHandler: ActorRefT[BrokerConnectionHandler.Command] =
     context.actorOf(connectionProps(connection))
+  context watch connectionHandler.ref
 
   override def receive: Receive = {
     case Received(peer: Message.Peer) =>
@@ -88,7 +82,8 @@ class BrokerConnector(connection: ActorRefT[Tcp.Command], cliqueCoordinator: Act
     case CliqueCoordinator.Ready =>
       val data = Message.serialize(Message.Ready)
       connectionHandler ! BrokerConnectionHandler.Send(data)
-    case Tcp.PeerClosed =>
+    case Terminated(_) =>
+      log.debug(s"Connection to broker is closed")
       context stop self
   }
 

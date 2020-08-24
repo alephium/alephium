@@ -19,6 +19,8 @@ class FlowMonitor(shutdown: => Unit) extends BaseActor {
   }
 
   override def receive: Receive = {
-    case FlowMonitor.Shutdown => shutdown
+    case FlowMonitor.Shutdown =>
+      log.info(s"Shutdown the system")
+      shutdown
   }
 }

@@ -39,8 +39,8 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     broker.tell(Tcp.Received(infoData), connection.ref)
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        BrokerConnector.deserializeTry[BrokerConnector.Ack](data) is Right(
-          Some((BrokerConnector.Ack(brokerConfig.brokerId), ByteString.empty)))
+        Message.tryDeserialize(data) is Right(
+          Some((Message.Ack(brokerConfig.brokerId), ByteString.empty)))
     }
 
     val ready = BrokerConnector.envelop(CliqueCoordinator.Ready).data

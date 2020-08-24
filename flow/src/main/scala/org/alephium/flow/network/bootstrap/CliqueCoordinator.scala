@@ -49,19 +49,19 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
         bootstrapper ! Bootstrapper.ForwardConnection
         val cliqueInfo = buildCliqueInfo
         broadcast(BrokerConnector.Send(cliqueInfo))
-        context become awaitAck
+        context become awaitAck(cliqueInfo)
       }
   }
 
-  def awaitAck: Receive = {
-    case BrokerConnector.Ack(id) =>
+  def awaitAck(cliqueInfo: IntraCliqueInfo): Receive = {
+    case Message.Ack(id) =>
       log.debug(s"Broker $id is ready")
       if (0 <= id && id < brokerConfig.brokerNum) {
         setReady(id)
         if (isAllReady) {
           log.debug("All the brokers are ready")
           broadcast(CliqueCoordinator.Ready)
-          context become awaitTerminated(buildCliqueInfo)
+          context become awaitTerminated(cliqueInfo)
         }
       }
   }
