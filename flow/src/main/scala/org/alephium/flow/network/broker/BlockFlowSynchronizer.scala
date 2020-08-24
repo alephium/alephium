@@ -54,7 +54,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       brokerInfos -= ActorRefT(broker)
   }
 
-  // Only use it when receive messages from BrokerHandler
+  // Only use it when receive messages from inter clique BrokerHandler
   private def remoteAddress: InetSocketAddress = {
     brokerInfos(ActorRefT(sender())).address
   }

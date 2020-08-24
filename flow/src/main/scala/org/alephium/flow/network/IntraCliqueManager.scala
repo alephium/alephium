@@ -67,7 +67,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
 
   // TODO: replace Map with Array for performance
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
+  def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
       val index = cliqueInfo.peers.indexWhere(_ == remote)
@@ -92,13 +92,14 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()
-        val newBrokers = brokers + (brokerInfo.brokerId -> (brokerInfo -> sender()))
+        val brokerHandler = ActorRefT[BrokerHandler.Command](sender())
+        val newBrokers    = brokers + (brokerInfo.brokerId -> (brokerInfo -> brokerHandler))
         checkAllSynced(newBrokers)
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
   }
 
-  def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRef)]): Unit = {
+  def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
     if (newBrokers.size == cliqueInfo.peers.length - 1) {
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
@@ -108,7 +109,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     }
   }
 
-  def handle(brokers: Map[Int, (BrokerInfo, ActorRef)]): Receive = {
+  def handle(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin, _) =>
       assume(block.chainIndex.relateTo(brokerConfig))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
@@ -118,19 +119,20 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
           if (!origin.isFrom(cliqueInfo.id, info)) {
             if (block.chainIndex.relateTo(info)) {
               log.debug(s"Send block ${block.shortHex} to broker $info")
-              broker ! blockMsg
+              broker ! BrokerHandler.Send(blockMsg)
             } else {
               log.debug(s"Send header ${block.shortHex} to broker $info")
-              broker ! headerMsg
+              broker ! BrokerHandler.Send(headerMsg)
             }
           }
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
   }
 
-  def handleTerminated(actor: ActorRef, brokers: Map[Int, (BrokerInfo, ActorRef)]): Unit = {
+  def handleTerminated(actor: ActorRef,
+                       brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
     brokers.foreach {
-      case (_, (info, broker)) if broker == actor =>
+      case (_, (info, broker)) if broker == ActorRefT[BrokerHandler.Command](actor) =>
         log.error(s"Self clique node $info is not functioning, shutdown the system now")
         context.system.eventStream.publish(FlowMonitor.Shutdown)
       case _ => ()

@@ -34,7 +34,7 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec
 
     probs.foreach {
       case (id, p) =>
-        coordinator.tell(BrokerConnector.Ack(id), p.ref)
+        coordinator.tell(Message.Ack(id), p.ref)
     }
     probs.values.foreach(_.expectMsgType[CliqueCoordinator.Ready.type])
 

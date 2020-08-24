@@ -61,7 +61,9 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       log.debug(s"Connected to master: ${networkSetting.masterAddress}")
       val connection        = sender()
       val connectionHandler = context.actorOf(Broker.connectionProps(connection))
-      val message           = Message.serialize(Message.Peer(PeerInfo.self))
+      context watch connectionHandler.ref
+
+      val message = Message.serialize(Message.Peer(PeerInfo.self))
       connectionHandler ! BrokerConnectionHandler.Send(message)
       context become awaitCliqueInfo(connectionHandler)
 

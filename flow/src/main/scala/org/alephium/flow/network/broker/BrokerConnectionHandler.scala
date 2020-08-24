@@ -101,8 +101,14 @@ trait BrokerConnectionHandler[T] extends BaseActor {
       log.debug(s"Peer connection closed")
       context stop self
     case CloseConnection =>
-      writeAll()
-      context become closing
+      if (outMessageBuffer.nonEmpty) {
+        log.debug("Clear the buffer before closing the connection")
+        writeAll()
+        context become closing
+      } else {
+        log.debug("Close the connection")
+        connection ! Tcp.Close
+      }
   }
 
   def closing: Receive = {
@@ -116,7 +122,12 @@ trait BrokerConnectionHandler[T] extends BaseActor {
       }, discardOld = false)
     case Ack(ack) =>
       acknowledge(ack)
-      if (outMessageBuffer.isEmpty) connection ! Tcp.Close
+      if (outMessageBuffer.isEmpty) {
+        connection ! Tcp.Close
+      }
+    case _: Tcp.ConnectionClosed =>
+      log.debug(s"Peer connection closed")
+      context stop self
     case other: ByteString =>
       log.debug(s"Got $other in closing phase")
   }
@@ -177,7 +188,6 @@ trait BrokerConnectionHandler[T] extends BaseActor {
     for ((id, data) <- outMessageBuffer) {
       connection ! Tcp.Write(data, Ack(id))
     }
-    outMessageBuffer.clear()
   }
 
   def stopMaliciousPeer(): Unit = {

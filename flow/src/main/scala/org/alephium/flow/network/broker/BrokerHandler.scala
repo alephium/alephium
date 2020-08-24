@@ -94,7 +94,13 @@ trait BrokerHandler extends BaseActor {
         val inventories = blockflow.getSyncDataUnsafe(locators)
         send(SyncResponse0(inventories))
       case Received(SyncResponse0(hashes)) =>
-        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+        if (isIntraCliqueBroker) {
+          log.debug(s"Received sync response from intra clique broker")
+          val toDownload = hashes.flatMap(_.filter(!blockflow.containsUnsafe(_)))
+          send(GetBlocks(toDownload))
+        } else {
+          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+        }
       case DownloadBlocks(hashes) =>
         send(GetBlocks(hashes))
       case Received(SendBlocks(blocks)) =>

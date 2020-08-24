@@ -50,9 +50,12 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
     val networkSetting: NetworkSetting)
     extends BrokerHandler {
 
-  val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
+  override def preStart(): Unit = {
+    super.preStart()
+    IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress)
+  }
 
-  IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
+  val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
   var connection: ActorRefT[Tcp.Command]                                  = _
   var brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] = _
@@ -61,7 +64,7 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
 
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remoteBrokerInfo.address)
+      IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress)
 
     case _: Tcp.Connected =>
       connection              = ActorRefT[Tcp.Command](sender())
