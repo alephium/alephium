@@ -49,13 +49,13 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
     with SerdeUtils {
   def until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
-  IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress)
+  IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress, pullMode = true)
 
   override def receive: Receive = awaitMaster(until)
 
   def awaitMaster(until: TimeStamp): Receive = {
     case Broker.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress)
+      IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress, pullMode = true)
 
     case _: Tcp.Connected =>
       log.debug(s"Connected to master: ${networkSetting.masterAddress}")

@@ -45,6 +45,7 @@ object CliqueManager {
       extends Command
   final case class SendAllHandlers(allHandlers: AllHandlers)              extends Command
   final case class HandShaked(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
+  final case class Synced(cliqueId: CliqueId, brokerInfo: BrokerInfo)     extends Command
   final case object IsSelfCliqueReady                                     extends Command
 }
 

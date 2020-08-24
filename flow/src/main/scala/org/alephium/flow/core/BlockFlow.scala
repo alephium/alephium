@@ -43,8 +43,8 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     }
 
   def getSyncInfo(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
-    val (groupFrom, groupTo) = brokerConfig.calIntersection(peerBrokerInfo)
-    AVector.tabulate((groupTo - groupFrom) * groups) { index =>
+    val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
+    AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
       val offset    = index / groups
       val fromGroup = groupFrom + offset
       val toGroup   = index % groups
@@ -70,7 +70,7 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
       if (locatorsPerChain.isEmpty) AVector.empty[Hash]
       else {
         val chainIndex = ChainIndex.from(locatorsPerChain.head)
-        val chain      = getHeaderChain(chainIndex)
+        val chain      = getBlockChain(chainIndex)
         chain.getSyncDataUnsafe(locatorsPerChain)
       }
     }
