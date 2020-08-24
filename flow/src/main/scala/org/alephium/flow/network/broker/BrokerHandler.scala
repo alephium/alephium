@@ -2,7 +2,7 @@ package org.alephium.flow.network.broker
 
 import java.net.InetSocketAddress
 
-import akka.actor.Cancellable
+import akka.actor.{Cancellable, Terminated}
 import akka.util.ByteString
 
 import org.alephium.flow.Utils
@@ -24,9 +24,7 @@ object BrokerHandler {
   case object SendPing                                        extends Command
   final case class Sync(locators: AVector[AVector[Hash]])     extends Command
   final case class DownloadHeaders(fromHashes: AVector[Hash]) extends Command
-  case object HeaderDownloadDone                              extends Command
   final case class DownloadBlocks(hashes: AVector[Hash])      extends Command
-  case object BlockDownloadDone                               extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
@@ -177,5 +175,11 @@ trait BrokerHandler extends BaseActor {
   def stop(): Unit = {
     pingPongTickOpt.foreach(_.cancel())
     brokerConnectionHandler ! BrokerConnectionHandler.CloseConnection
+  }
+
+  override def unhandled(message: Any): Unit = message match {
+    case Terminated(_) =>
+      context stop self
+    case _ => super.unhandled(message)
   }
 }

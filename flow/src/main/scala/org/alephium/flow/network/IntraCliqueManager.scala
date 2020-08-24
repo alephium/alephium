@@ -60,8 +60,12 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       }
     }
 
-    if (cliqueInfo.brokerNum == 1) context become handle(Map.empty)
-    else context become awaitBrokers(Map.empty)
+    if (cliqueInfo.brokerNum == 1) {
+      cliqueManager ! IntraCliqueManager.Ready
+      context become handle(Map.empty)
+    } else {
+      context become awaitBrokers(Map.empty)
+    }
   }
 
   override def receive: Receive = awaitBrokers(Map.empty)

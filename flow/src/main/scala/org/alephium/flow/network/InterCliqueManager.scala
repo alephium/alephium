@@ -108,6 +108,9 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       } else {
         context stop sender()
       }
+    case CliqueManager.Synced(cliqueId, brokerInfo) =>
+      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
+      setSynced(cliqueId, brokerInfo)
   }
 
   def handleMessage: Receive = {

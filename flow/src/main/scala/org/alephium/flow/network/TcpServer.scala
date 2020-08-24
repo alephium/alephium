@@ -34,7 +34,7 @@ class TcpServer(port: Int) extends BaseActor {
   def binding(bootstrapper: ActorRef): Receive = {
     case Tcp.Bound(localAddress) =>
       log.debug(s"Server bound to $localAddress")
-      sender() ! Tcp.ResumeAccepting(batchSize = 1)
+      sender() ! Tcp.ResumeAccepting(batchSize = 10)
       context.become(workFor(bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
@@ -47,7 +47,7 @@ class TcpServer(port: Int) extends BaseActor {
   def workFor(actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
       actor.forward(c)
-      sender() ! Tcp.ResumeAccepting(batchSize = 1)
+      sender() ! Tcp.ResumeAccepting(batchSize = 10)
     case TcpServer.WorkFor(another) =>
       context become workFor(another)
   }

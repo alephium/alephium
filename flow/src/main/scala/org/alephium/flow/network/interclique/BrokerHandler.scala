@@ -27,7 +27,11 @@ trait BrokerHandler extends BaseBrokerHandler {
         val inventories = blockflow.getSyncDataUnsafe(locators)
         send(SyncResponse0(inventories))
       case BaseBrokerHandler.Received(SyncResponse0(hashes)) =>
-        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+        if (hashes.forall(_.isEmpty)) {
+          cliqueManager ! CliqueManager.Synced(remoteCliqueId, remoteBrokerInfo)
+        } else {
+          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+        }
     }
     receive
   }

@@ -21,7 +21,7 @@ trait OutboundBrokerHandler extends BrokerHandler {
 
   override def preStart(): Unit = {
     super.preStart()
-    IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress)
+    IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
   }
 
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
@@ -33,11 +33,15 @@ trait OutboundBrokerHandler extends BrokerHandler {
 
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress)
+      IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
 
     case _: Tcp.Connected =>
-      connection              = ActorRefT[Tcp.Command](sender())
-      brokerConnectionHandler = context.actorOf(BrokerConnectionHandler.clique(connection))
+      connection = ActorRefT[Tcp.Command](sender())
+      brokerConnectionHandler = {
+        val ref = context.actorOf(BrokerConnectionHandler.clique(connection))
+        context watch ref
+        ref
+      }
       context become handShaking
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>

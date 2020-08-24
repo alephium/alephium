@@ -123,11 +123,12 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   def getSyncDataUnsafe(locators: AVector[Hash]): AVector[Hash] = {
-    val lastCanonicalIndex = locators.reverse.indexWhere(isCanonicalUnsafe)
+    val reversed           = locators.reverse
+    val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
     if (lastCanonicalIndex == -1) {
       AVector.empty // nothing in common
     } else {
-      val lastCanonicalHash = locators(lastCanonicalIndex)
+      val lastCanonicalHash = reversed(lastCanonicalIndex)
       val heightFrom        = getHeightUnsafe(lastCanonicalHash)
       val heightTo          = math.min(heightFrom + 1000, maxHeightUnsafe)
       getSyncDataUnsafe(heightFrom, heightTo)
