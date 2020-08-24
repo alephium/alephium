@@ -26,11 +26,4 @@ object DataOrigin {
   }
   final case class InterClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique
   final case class IntraClique(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends FromClique
-
-  def from(selfCliqueId: CliqueId,
-           remoteCliqueId: CliqueId,
-           remoteBrokerInfo: BrokerInfo): FromClique = {
-    if (remoteCliqueId == selfCliqueId) IntraClique(remoteCliqueId, remoteBrokerInfo)
-    else InterClique(remoteCliqueId, remoteBrokerInfo)
-  }
 }
