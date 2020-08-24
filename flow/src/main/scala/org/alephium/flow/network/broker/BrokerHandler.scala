@@ -7,7 +7,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
@@ -39,7 +39,6 @@ trait BrokerHandler extends BaseActor {
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  def selfCliqueId: CliqueId
   var remoteCliqueId: CliqueId     = _
   var remoteBrokerInfo: BrokerInfo = _
 
@@ -88,69 +87,45 @@ trait BrokerHandler extends BaseActor {
       log.error(s"IO error in $action: $error")
   }
 
-  def exchanging: Receive = {
-    val common: Receive = {
-      case Received(SyncRequest0(locators)) =>
-        val inventories = blockflow.getSyncDataUnsafe(locators)
-        send(SyncResponse0(inventories))
-      case Received(SyncResponse0(hashes)) =>
-        if (isIntraCliqueBroker) {
-          log.debug(s"Received sync response from intra clique broker")
-          val toDownload = hashes.flatMap(_.filter(!blockflow.containsUnsafe(_)))
-          send(GetBlocks(toDownload))
-        } else {
-          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
-        }
-      case DownloadBlocks(hashes) =>
-        send(GetBlocks(hashes))
-      case Received(SendBlocks(blocks)) =>
-        log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
-        blocks.foreach { block =>
-          val message = BlockChainHandler.addOneBlock(block, dataOrigin)
-          allHandlers.getBlockHandler(block.chainIndex) ! message
-        }
-      case Received(GetBlocks(hashes)) =>
-        val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
-        send(SendBlocks(blocks))
-      case Send(data) =>
-        brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
-    }
+  def exchanging: Receive
 
-    if (isIntraCliqueBroker) common orElse intraCliqueSyncing
-    else common orElse interCliqueSyncing
+  def exchangingCommon: Receive = {
+    case DownloadBlocks(hashes) =>
+      send(GetBlocks(hashes))
+    case Received(SendBlocks(blocks)) =>
+      log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
+      blocks.foreach { block =>
+        val message = BlockChainHandler.addOneBlock(block, dataOrigin)
+        allHandlers.getBlockHandler(block.chainIndex) ! message
+      }
+    case Received(GetBlocks(hashes)) =>
+      val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
+      send(SendBlocks(blocks))
+    case Received(SendHeaders(headers)) =>
+      log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
+      headers.foreach { header =>
+        val message = HeaderChainHandler.addOneHeader(header, dataOrigin)
+        allHandlers.getHeaderHandler(header.chainIndex) ! message
+      }
+    case Received(GetHeaders(hashes)) =>
+      val headers = hashes.map(blockflow.getBlockHeaderUnsafe)
+      send(SendHeaders(headers))
+    case Send(data) =>
+      brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
   }
 
-  def isIntraCliqueBroker: Boolean = remoteCliqueId == selfCliqueId
-
-  def dataOrigin: DataOrigin = {
-    DataOrigin.from(selfCliqueId, remoteCliqueId, remoteBrokerInfo)
+  def flowEvents: Receive = {
+    case BlockChainHandler.BlocksAdded(chainIndex) =>
+      log.debug(s"All the blocks sent for $chainIndex are added")
+    case HeaderChainHandler.HeadersAdded(chainIndex) =>
+      log.debug(s"All the headers sent for $chainIndex are added")
+    case TxHandler.AddSucceeded(hash) =>
+      log.debug(s"Tx ${hash.shortHex} was added successfully")
+    case TxHandler.AddFailed(hash) =>
+      log.debug(s"Tx ${hash.shortHex} failed in adding")
   }
 
-  def intraCliqueSyncing: Receive = {
-    val inventory = blockflow.getIntraCliqueSyncHashesUnsafe(remoteBrokerInfo)
-    send(SyncResponse0(inventory))
-
-    val receive: Receive = {
-      case Received(SyncResponse0(hashes)) =>
-        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
-    }
-    receive
-  }
-
-  def interCliqueSyncing: Receive = {
-    blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(remoteBrokerInfo)
-
-    val receive: Receive = {
-      case Sync(locators) =>
-        send(SyncRequest0(locators))
-      case Received(SyncRequest0(locators)) =>
-        val inventories = blockflow.getSyncDataUnsafe(locators)
-        send(SyncResponse0(inventories))
-      case Received(SyncResponse0(hashes)) =>
-        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
-    }
-    receive
-  }
+  def dataOrigin: DataOrigin
 
   def pingPong: Receive = {
     case SendPing             => sendPing()
