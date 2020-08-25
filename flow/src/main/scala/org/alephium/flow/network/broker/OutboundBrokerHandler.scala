@@ -38,7 +38,7 @@ trait OutboundBrokerHandler extends BrokerHandler {
     case _: Tcp.Connected =>
       connection = ActorRefT[Tcp.Command](sender())
       brokerConnectionHandler = {
-        val ref = context.actorOf(BrokerConnectionHandler.clique(connection))
+        val ref = context.actorOf(BrokerConnectionHandler.clique(remoteAddress, connection))
         context watch ref
         ref
       }

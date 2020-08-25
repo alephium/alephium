@@ -85,7 +85,7 @@ class BlockChainHandler(blockFlow: BlockFlow,
                                                headerMessage,
                                                origin,
                                                blockFlow.isRecent(block))
-      context.system.eventStream.publish(event)
+      publishEvent(event)
     }
   }
 

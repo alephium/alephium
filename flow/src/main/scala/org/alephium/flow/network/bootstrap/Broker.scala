@@ -1,12 +1,14 @@
 package org.alephium.flow.network.bootstrap
 
+import java.net.InetSocketAddress
+
 import akka.actor.{Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.network.broker.BrokerConnectionHandler
+import org.alephium.flow.network.broker.{BrokerConnectionHandler, BrokerManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.serde.SerdeResult
@@ -22,11 +24,12 @@ object Broker {
   case object Retry                           extends Command
   final case class Received(message: Message) extends Command
 
-  def connectionProps(connection: ActorRefT[Tcp.Command])(
+  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
-    Props(new ConnectionHandler(connection))
+    Props(new ConnectionHandler(remoteAddress, connection))
 
-  class ConnectionHandler(val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+  class ConnectionHandler(val remoteAddress: InetSocketAddress,
+                          val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
       extends BrokerConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
       Message.tryDeserialize(data)
@@ -36,9 +39,9 @@ object Broker {
       context.parent ! Received(message)
     }
 
-    override def stopMaliciousPeer(): Unit = {
+    override def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
-      context.system.eventStream.publish(FlowMonitor.Shutdown)
+      publishEvent(FlowMonitor.Shutdown)
     }
   }
 }
@@ -49,18 +52,20 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
     with SerdeUtils {
   def until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
-  IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress, pullMode = true)
+  def remoteAddress: InetSocketAddress = networkSetting.masterAddress
+
+  IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
 
   override def receive: Receive = awaitMaster(until)
 
   def awaitMaster(until: TimeStamp): Receive = {
     case Broker.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(networkSetting.masterAddress, pullMode = true)
+      IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
 
     case _: Tcp.Connected =>
-      log.debug(s"Connected to master: ${networkSetting.masterAddress}")
+      log.debug(s"Connected to master: $remoteAddress")
       val connection        = sender()
-      val connectionHandler = context.actorOf(Broker.connectionProps(connection))
+      val connectionHandler = context.actorOf(Broker.connectionProps(remoteAddress, connection))
       context watch connectionHandler.ref
 
       val message = Message.serialize(Message.Peer(PeerInfo.self))
@@ -103,6 +108,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
-    context.system.eventStream.publish(FlowMonitor.Shutdown)
+    publishEvent(FlowMonitor.Shutdown)
   }
 }

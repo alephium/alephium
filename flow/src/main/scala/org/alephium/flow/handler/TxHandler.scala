@@ -65,7 +65,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
     log.info(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)))
     val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
-    context.system.eventStream.publish(event)
+    publishEvent(event)
     addSucceeded(tx)
   }
 

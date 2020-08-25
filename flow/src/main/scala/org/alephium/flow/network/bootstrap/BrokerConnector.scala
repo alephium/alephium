@@ -1,19 +1,22 @@
 package org.alephium.flow.network.bootstrap
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.network.broker.BrokerConnectionHandler
+import org.alephium.flow.network.broker.{BrokerConnectionHandler, BrokerManager}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object BrokerConnector {
-  def props(connection: ActorRefT[Tcp.Command], cliqueCoordinator: ActorRef)(
-      implicit groupConfig: GroupConfig): Props =
-    Props(new BrokerConnector(connection, cliqueCoordinator))
+  def props(remoteAddress: InetSocketAddress,
+            connection: ActorRefT[Tcp.Command],
+            cliqueCoordinator: ActorRef)(implicit groupConfig: GroupConfig): Props =
+    Props(new BrokerConnector(remoteAddress, connection, cliqueCoordinator))
 
   sealed trait Command
   final case class Received(message: Message)             extends Command
@@ -28,11 +31,12 @@ object BrokerConnector {
     Tcp.Write(serializer.serialize(input))
   }
 
-  def connectionProps(connection: ActorRefT[Tcp.Command])(
+  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
-    Props(new ConnectionHandler(connection))
+    Props(new ConnectionHandler(remoteAddress, connection))
 
-  class ConnectionHandler(val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+  class ConnectionHandler(val remoteAddress: InetSocketAddress,
+                          val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
       extends BrokerConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
       Message.tryDeserialize(data)
@@ -42,21 +46,22 @@ object BrokerConnector {
       context.parent ! Received(message)
     }
 
-    override def stopMaliciousPeer(): Unit = {
+    override def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
-      context.system.eventStream.publish(FlowMonitor.Shutdown)
+      publishEvent(FlowMonitor.Shutdown)
     }
   }
 }
 
-class BrokerConnector(connection: ActorRefT[Tcp.Command], cliqueCoordinator: ActorRef)(
-    implicit val groupConfig: GroupConfig)
+class BrokerConnector(remoteAddress: InetSocketAddress,
+                      connection: ActorRefT[Tcp.Command],
+                      cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig)
     extends BaseActor
     with SerdeUtils {
   import BrokerConnector._
 
   val connectionHandler: ActorRefT[BrokerConnectionHandler.Command] =
-    context.actorOf(connectionProps(connection))
+    context.actorOf(connectionProps(remoteAddress, connection))
   context watch connectionHandler.ref
 
   override def receive: Receive = {
@@ -89,6 +94,6 @@ class BrokerConnector(connection: ActorRefT[Tcp.Command], cliqueCoordinator: Act
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
-    context.system.eventStream.publish(FlowMonitor.Shutdown)
+    publishEvent(FlowMonitor.Shutdown)
   }
 }

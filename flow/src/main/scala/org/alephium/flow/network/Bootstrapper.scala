@@ -90,7 +90,6 @@ class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Co
   override def receive: Receive = awaitInfo
 }
 
-// TODO: close this properly
 trait BootstrapperHandler extends BaseActor {
   val tcpController: ActorRefT[TcpController.Command]
   val discoveryServer: ActorRefT[DiscoveryServer.Command]

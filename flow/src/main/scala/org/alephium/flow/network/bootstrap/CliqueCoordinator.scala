@@ -37,7 +37,7 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
       log.debug(s"Connected to $remote")
       val connection = sender()
       val name       = BaseActor.envalidActorName(s"Broker-$remote")
-      context.actorOf(BrokerConnector.props(connection, self), name)
+      context.actorOf(BrokerConnector.props(remote, connection, self), name)
       ()
     case info: PeerInfo =>
       log.debug(s"Received broker info from ${info.address} id: ${info.id}")

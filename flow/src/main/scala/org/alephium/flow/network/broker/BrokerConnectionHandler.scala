@@ -1,5 +1,7 @@
 package org.alephium.flow.network.broker
 
+import java.net.InetSocketAddress
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 
@@ -13,8 +15,9 @@ import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object BrokerConnectionHandler {
-  def clique(connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig): Props =
-    Props(new CliqueConnectionHander(connection))
+  def clique(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
+      implicit groupConfig: GroupConfig): Props =
+    Props(new CliqueConnectionHander(remoteAddress, connection))
 
   final case class Ack(id: Long) extends Tcp.Event
 
@@ -31,8 +34,9 @@ object BrokerConnectionHandler {
     }
   }
 
-  class CliqueConnectionHander(val connection: ActorRefT[Tcp.Command])(
-      implicit val groupConfig: GroupConfig)
+  class CliqueConnectionHander(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command])(implicit val groupConfig: GroupConfig)
       extends BrokerConnectionHandler[Payload] {
 
     val brokerHandler: ActorRefT[BrokerHandler.Command] = context.parent
@@ -49,6 +53,8 @@ object BrokerConnectionHandler {
 
 trait BrokerConnectionHandler[T] extends BaseActor {
   import BrokerConnectionHandler._
+
+  def remoteAddress: InetSocketAddress
 
   def connection: ActorRefT[Tcp.Command]
 
@@ -153,7 +159,7 @@ trait BrokerConnectionHandler[T] extends BaseActor {
       case Right(None) => ()
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
-        stopMaliciousPeer()
+        handleInvalidMessage(BrokerManager.InvalidMessage(remoteAddress))
     }
   }
 
@@ -190,8 +196,7 @@ trait BrokerConnectionHandler[T] extends BaseActor {
     }
   }
 
-  def stopMaliciousPeer(): Unit = {
-    // TODO: block the malicious peer
-    connection ! Tcp.Close
+  def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
+    publishEvent(message)
   }
 }

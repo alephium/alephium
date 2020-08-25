@@ -95,7 +95,7 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
-      context.system.eventStream.publish(FlowMonitor.Shutdown)
+      publishEvent(FlowMonitor.Shutdown)
   }
 
   def ready: Receive = handleData orElse handleCommand
