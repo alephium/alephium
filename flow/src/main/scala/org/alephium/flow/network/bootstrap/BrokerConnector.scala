@@ -85,6 +85,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
 
   def forwardReady: Receive = {
     case CliqueCoordinator.Ready =>
+      log.debug("Clique is ready")
       val data = Message.serialize(Message.Ready)
       connectionHandler ! BrokerConnectionHandler.Send(data)
     case Terminated(_) =>
@@ -94,6 +95,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
+    log.debug(s"Unexpected message, shutdown the system")
     publishEvent(FlowMonitor.Shutdown)
   }
 }

@@ -50,7 +50,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
                                                             networkSetting: NetworkSetting)
     extends BaseActor
     with SerdeUtils {
-  def until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
+  val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
   def remoteAddress: InetSocketAddress = networkSetting.masterAddress
 
@@ -78,14 +78,15 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
         scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(1))
         ()
       } else {
-        log.info(s"Cannot connect to ${c.remoteAddress}")
-        context stop self
+        log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the sytem")
+        publishEvent(FlowMonitor.Shutdown)
       }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitCliqueInfo(connectionHandler: ActorRefT[BrokerConnectionHandler.Command]): Receive = {
     case Broker.Received(clique: Message.Clique) =>
+      log.debug(s"Received clique info from master")
       val message = Message.serialize(Message.Ack(brokerConfig.brokerId))
       connectionHandler ! BrokerConnectionHandler.Send(message)
       context become awaitReady(connectionHandler, clique.info)
@@ -95,6 +96,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
   def awaitReady(connection: ActorRefT[BrokerConnectionHandler.Command],
                  cliqueInfo: IntraCliqueInfo): Receive = {
     case Broker.Received(Message.Ready) =>
+      log.debug(s"Clique is ready")
       connection ! BrokerConnectionHandler.CloseConnection
       context become awaitClose(cliqueInfo)
   }
@@ -108,6 +110,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
+    log.debug(s"Unexpected message, shutdown the system")
     publishEvent(FlowMonitor.Shutdown)
   }
 }
