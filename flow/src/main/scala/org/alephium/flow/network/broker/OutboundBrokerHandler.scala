@@ -26,8 +26,8 @@ trait OutboundBrokerHandler extends BrokerHandler {
 
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
-  var connection: ActorRefT[Tcp.Command]                                  = _
-  var brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] = _
+  var connection: ActorRefT[Tcp.Command]                            = _
+  var brokerConnectionHandler: ActorRefT[ConnectionHandler.Command] = _
 
   override def receive: Receive = connecting
 
@@ -38,7 +38,7 @@ trait OutboundBrokerHandler extends BrokerHandler {
     case _: Tcp.Connected =>
       connection = ActorRefT[Tcp.Command](sender())
       brokerConnectionHandler = {
-        val ref = context.actorOf(BrokerConnectionHandler.clique(remoteAddress, connection, self))
+        val ref = context.actorOf(ConnectionHandler.clique(remoteAddress, connection, self))
         context watch ref
         ref
       }

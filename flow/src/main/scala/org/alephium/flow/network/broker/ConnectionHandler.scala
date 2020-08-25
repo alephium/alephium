@@ -14,7 +14,7 @@ import org.alephium.protocol.message.{Message, Payload}
 import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{ActorRefT, BaseActor}
 
-object BrokerConnectionHandler {
+object ConnectionHandler {
   def clique(
       remoteAddress: InetSocketAddress,
       connection: ActorRefT[Tcp.Command],
@@ -40,7 +40,7 @@ object BrokerConnectionHandler {
       val remoteAddress: InetSocketAddress,
       val connection: ActorRefT[Tcp.Command],
       val brokerHandler: ActorRefT[BrokerHandler.Command])(implicit val groupConfig: GroupConfig)
-      extends BrokerConnectionHandler[Payload] {
+      extends ConnectionHandler[Payload] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Payload, ByteString)]] = {
       tryDeserializePayload(data)
     }
@@ -51,8 +51,8 @@ object BrokerConnectionHandler {
   }
 }
 
-trait BrokerConnectionHandler[T] extends BaseActor {
-  import BrokerConnectionHandler._
+trait ConnectionHandler[T] extends BaseActor {
+  import ConnectionHandler._
 
   def remoteAddress: InetSocketAddress
 

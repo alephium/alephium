@@ -3,12 +3,12 @@ package org.alephium.flow.network.broker
 import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 
-import org.alephium.flow.network.broker.BrokerConnectionHandler.Ack
+import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.message.{Message, Ping}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
-class BrokerConnectionHandlerSpec
+class ConnectionHandlerSpec
     extends AlephiumActorSpec("ConnectionHandler")
     with GroupConfigFixture.Default {
   trait Fixture {
@@ -16,8 +16,8 @@ class BrokerConnectionHandlerSpec
     val connection    = TestProbe()
     val brokerHandler = TestProbe()
 
-    val connectionHandler = TestActorRef[BrokerConnectionHandler.CliqueConnectionHandler](
-      BrokerConnectionHandler.clique(remoteAddress, connection.ref, brokerHandler.ref))
+    val connectionHandler = TestActorRef[ConnectionHandler.CliqueConnectionHandler](
+      ConnectionHandler.clique(remoteAddress, connection.ref, brokerHandler.ref))
     connection.expectMsgType[Tcp.Register]
     connection.expectMsg(Tcp.ResumeReading)
 
@@ -35,10 +35,10 @@ class BrokerConnectionHandlerSpec
   }
 
   it should "write data to connection" in new Fixture {
-    connectionHandler ! BrokerConnectionHandler.Send(messageBytes)
+    connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
 
-    connectionHandler ! BrokerConnectionHandler.Send(messageBytes)
+    connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectMsg(Tcp.Write(messageBytes, Ack(2)))
   }
 
@@ -46,7 +46,7 @@ class BrokerConnectionHandlerSpec
     connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(1)))
     connection.expectMsg(Tcp.ResumeWriting)
 
-    connectionHandler ! BrokerConnectionHandler.Send(messageBytes)
+    connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectNoMessage()
     connectionHandler.underlyingActor.outMessageBuffer.contains(1)
 
@@ -56,7 +56,7 @@ class BrokerConnectionHandlerSpec
 
   it should "close connection" in new Fixture {
     watch(connectionHandler)
-    connectionHandler ! BrokerConnectionHandler.CloseConnection
+    connectionHandler ! ConnectionHandler.CloseConnection
     connection.expectMsg(Tcp.Close)
     connectionHandler ! Tcp.Closed
     expectTerminated(connectionHandler)
