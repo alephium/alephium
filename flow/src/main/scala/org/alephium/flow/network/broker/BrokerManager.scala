@@ -5,13 +5,14 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.io.Tcp
 
+import org.alephium.flow.network.TcpServer
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object BrokerManager {
   def props(): Props = Props(new BrokerManager())
 
   sealed trait Command
-  final case class ConfirmConnection(remote: InetSocketAddress, connection: ActorRefT[Tcp.Command])
+  final case class ConfirmConnection(c: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class Remove(remote: InetSocketAddress) extends Command
 
@@ -42,9 +43,9 @@ class BrokerManager() extends BaseActor {
   }
 
   override def receive: Receive = {
-    case ConfirmConnection(remote, connection) =>
-      if (isBanned(remote)) sender() ! TcpController.ConnectionDenied(remote, connection)
-      else sender() ! TcpController.ConnectionConfirmed(remote, connection)
+    case ConfirmConnection(c, connection) =>
+      if (isBanned(c.remoteAddress)) sender() ! TcpServer.ConnectionDenied(c, connection)
+      else sender() ! TcpServer.ConnectionConfirmed(c, connection)
     case Remove(remote) =>
       remove(remote)
     case misBehavior: MisBehavior =>

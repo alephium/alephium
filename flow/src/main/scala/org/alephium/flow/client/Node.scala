@@ -53,9 +53,14 @@ object Node {
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
+    val brokerManager: ActorRefT[BrokerManager.Command] =
+      ActorRefT.build(system, BrokerManager.props())
+
     val server: ActorRefT[TcpServer.Command] =
       ActorRefT
-        .build[TcpServer.Command](system, TcpServer.props(config.network.publicAddress.getPort))
+        .build[TcpServer.Command](
+          system,
+          TcpServer.props(config.network.publicAddress.getPort, brokerManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
@@ -64,9 +69,6 @@ object Node {
       DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
-
-    val brokerManager: ActorRefT[BrokerManager.Command] =
-      ActorRefT.build(system, BrokerManager.props())
 
     val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
 
