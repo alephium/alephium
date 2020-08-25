@@ -101,7 +101,6 @@ class CliqueManager(blockflow: BlockFlow,
                                            blockflow,
                                            allHandlers,
                                            discoveryServer,
-                                           brokerManager,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
