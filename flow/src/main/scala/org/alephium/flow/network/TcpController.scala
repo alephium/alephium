@@ -12,9 +12,9 @@ import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.util.{ActorRefT, BaseActor}
 
-object TcpServer {
+object TcpController {
   def props(port: Int, brokerManager: ActorRefT[broker.BrokerManager.Command]): Props =
-    Props(new TcpServer(port, brokerManager))
+    Props(new TcpController(port, brokerManager))
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef)        extends Command
@@ -29,7 +29,7 @@ object TcpServer {
   case object Bound extends Event
 }
 
-class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) extends BaseActor {
+class TcpController(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) extends BaseActor {
   import context.system
 
   val tcpManager: ActorRef = IO(Tcp)
@@ -41,7 +41,7 @@ class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) exte
   override def receive: Receive = awaitStart
 
   def awaitStart: Receive = {
-    case TcpServer.Start(bootstrapper) =>
+    case TcpController.Start(bootstrapper) =>
       tcpManager ! Tcp.Bind(self, new InetSocketAddress(port), pullMode = true)
       context.become(binding(bootstrapper))
   }
@@ -55,7 +55,7 @@ class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) exte
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
       context.system.eventStream.publish(FlowMonitor.Shutdown)
-    case TcpServer.WorkFor(another) =>
+    case TcpController.WorkFor(another) =>
       context become binding(another)
   }
 
@@ -72,15 +72,15 @@ class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) exte
       pendingConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
       brokerManager ! BrokerManager.Remove(c.remoteAddress)
-    case TcpServer.ConnectionConfirmed(connected, connection) =>
+    case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
-    case TcpServer.ConnectionDenied(connected, connection) =>
+    case TcpController.ConnectionDenied(connected, connection) =>
       pendingConnections -= connected.remoteAddress
       connection ! Close
-    case TcpServer.ConnectTo(remote) =>
+    case TcpController.ConnectTo(remote) =>
       pendingConnections.addOne(remote)
       tcpManager ! Tcp.Connect(remote, pullMode = true)
-    case TcpServer.WorkFor(another) =>
+    case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
     case Terminated(connection) =>
       val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
