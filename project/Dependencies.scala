@@ -19,6 +19,7 @@ object Dependencies {
   lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
   lazy val `akka-stream-test` = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
 
+  lazy val `circe-core`    = "io.circe"                   %% "circe-core"      % Version.circe
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"    % Version.circe
   lazy val `circe-generic` = "io.circe"                   %% "circe-generic"   % Version.circe
   lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.13.0"
