@@ -37,6 +37,7 @@ object FlowHandler {
   case object UnRegister                                                extends Command
 
   sealed trait PendingData {
+    def hash: Hash
     def missingDeps: mutable.HashSet[Hash]
   }
   final case class PendingBlock(block: Block,
@@ -45,14 +46,18 @@ object FlowHandler {
                                 broker: ActorRefT[ChainHandler.Event],
                                 chainHandler: ActorRefT[BlockChainHandler.Command])
       extends PendingData
-      with Command
+      with Command {
+    override def hash: Hash = block.hash
+  }
   final case class PendingHeader(header: BlockHeader,
                                  missingDeps: mutable.HashSet[Hash],
                                  origin: DataOrigin,
                                  broker: ActorRefT[ChainHandler.Event],
                                  chainHandler: ActorRefT[HeaderChainHandler.Command])
       extends PendingData
-      with Command
+      with Command {
+    override def hash: Hash = header.hash
+  }
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
@@ -84,7 +89,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     with FlowHandlerState {
   import FlowHandler._
 
-  override def statusSizeLimit: Int = brokerConfig.brokerNum * 8
+  override def statusSizeLimit: Int = brokerConfig.brokerNum * 100
 
   override def receive: Receive = handleWith(None)
 
@@ -259,7 +264,8 @@ trait FlowHandlerState {
   def statusSizeLimit: Int
 
   var counter: Int  = 0
-  val pendingStatus = scala.collection.mutable.SortedMap.empty[Int, PendingData]
+  val pendingStatus = mutable.SortedMap.empty[Int, PendingData]
+  val pendingHashes = mutable.Set.empty[Hash]
 
   def increaseAndCounter(): Int = {
     counter += 1
@@ -267,8 +273,11 @@ trait FlowHandlerState {
   }
 
   def addStatus(pending: PendingData): Unit = {
-    pendingStatus.put(increaseAndCounter(), pending)
-    checkSizeLimit()
+    if (!pendingHashes.contains(pending.hash)) {
+      pendingStatus.put(increaseAndCounter(), pending)
+      pendingHashes.add(pending.hash)
+      checkSizeLimit()
+    }
   }
 
   def updateStatus(hash: Hash): IndexedSeq[PendingData] = {
@@ -276,17 +285,22 @@ trait FlowHandlerState {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts
     }
-    val blocks = toRemove.map(pendingStatus(_))
-    toRemove.foreach(pendingStatus.remove)
-    blocks.toIndexedSeq
+    val data = toRemove.map(pendingStatus(_))
+    toRemove.foreach(removeStatus)
+    data.toIndexedSeq
+  }
+
+  def removeStatus(id: Int): Unit = {
+    pendingStatus.remove(id).foreach { data =>
+      pendingHashes.remove(data.hash)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def checkSizeLimit(): Unit = {
     if (pendingStatus.size > statusSizeLimit) {
       val toRemove = pendingStatus.head._1
-      pendingStatus.remove(toRemove)
-      ()
+      removeStatus(toRemove)
     }
   }
 }

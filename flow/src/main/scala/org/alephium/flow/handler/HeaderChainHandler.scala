@@ -56,15 +56,6 @@ class HeaderChainHandler(blockFlow: BlockFlow,
     case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  override def handleMissingParent(headers: Forest[Hash, BlockHeader],
-                                   broker: ActorRefT[ChainHandler.Event],
-                                   origin: DataOrigin): Unit = {
-    assume(origin.isInstanceOf[DataOrigin.IntraClique])
-    log.warning(s"missing parent headers, might be bug or compromised node in the clique")
-    feedbackAndClear(broker, dataInvalid())
-  }
-
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
   override def addToFlowHandler(header: BlockHeader,

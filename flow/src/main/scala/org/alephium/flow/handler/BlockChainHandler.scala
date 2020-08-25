@@ -60,22 +60,6 @@ class BlockChainHandler(blockFlow: BlockFlow,
     case BlockAdded(block, broker, origin)      => handleDataAdded(block, broker, origin)
   }
 
-  override def handleMissingParent(blocks: Forest[Hash, Block],
-                                   broker: ActorRefT[ChainHandler.Event],
-                                   origin: DataOrigin): Unit = {
-    () // TODO: ignore this for the moment
-//    if (origin.isSyncing) {
-//      log.warning(s"missing parent blocks in syncing, might be DoS attack")
-//      feedbackAndClear(broker, dataInvalid())
-//    } else {
-//      // TODO: DoS prevention
-//      val rootHashes = Utils.showHashIter(blocks.roots.view.map(_.value))
-//      log.debug(s"missing parent blocks, root hashes: $rootHashes")
-//      val tips = headerChain.getAllTips
-//      sender() ! FetchSince(tips)
-//    }
-  }
-
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
     val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
     val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
