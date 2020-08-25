@@ -124,13 +124,13 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
 
   def handleSync: Receive = {
     case GetSyncLocators =>
-      val locators = blockFlow.getSyncInfoUnsafe()
+      val locators = blockFlow.getSyncLocatorsUnsafe()
       sender() ! SyncLocators(locators)
     case GetSyncInventories(locators) =>
-      val inventories = blockFlow.getSyncDataUnsafe(locators)
+      val inventories = blockFlow.getSyncInventoriesUnsafe(locators)
       sender() ! SyncInventories(inventories)
     case GetIntraSyncInventories(brokerInfo) =>
-      val inventories = blockFlow.getIntraCliqueSyncHashesUnsafe(brokerInfo)
+      val inventories = blockFlow.getIntraSyncInventoriesUnsafe(brokerInfo)
       sender() ! SyncInventories(inventories)
   }
 

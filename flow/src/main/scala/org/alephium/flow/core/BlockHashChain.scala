@@ -2,7 +2,6 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
-import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
@@ -241,24 +240,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
         oldParent <- getParentHash(oldHash)
         diff      <- calHashDiffFromSameHeight(newParent, oldParent)
       } yield ChainDiff(diff.toRemove :+ oldHash, diff.toAdd :+ newHash)
-    }
-  }
-
-  // try to find the latest common hash
-  def compareUnsafe(locators: ChainLocators): ChainLocators = {
-    assume(containsUnsafe(locators.hashes.head))
-    val unseenIndex = locators.hashes.indexWhere(!containsUnsafe(_))
-    if (unseenIndex == -1) ChainLocators.fixedPoint(locators.hashes.last)
-    else {
-      val lastSeenIndex = unseenIndex - 1
-      val lastSeenHash  = locators.hashes(lastSeenIndex)
-      if (locators.isForkLocated(lastSeenIndex)) ChainLocators.fixedPoint(lastSeenHash)
-      else {
-        val hashes = HistoryLocators
-          .sampleHeights(getHeightUnsafe(lastSeenHash), maxHeightUnsafe)
-          .map(height => Utils.unsafe(getHashes(height).map(_.head)))
-        ChainLocators.unsafe(hashes)
-      }
     }
   }
 

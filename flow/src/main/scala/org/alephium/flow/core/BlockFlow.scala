@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
-import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
@@ -18,31 +18,7 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
 
-  def historyLocators(): IOResult[HistoryLocators] = IOUtils.tryExecute {
-    val locators = AVector.tabulate(brokerConfig.chainNum) { index =>
-      val chain = getHeaderChain(ChainIndex.unsafe(index))
-      val hashes = HistoryLocators
-        .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
-        .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
-      ChainLocators.unsafe(hashes)
-    }
-    HistoryLocators.unsafe(locators)
-  }
-
-  def compare(historyLocators: HistoryLocators): IOResult[HistoryComparisonResult] =
-    IOUtils.tryExecute {
-      val hashes = AVector.tabulate(brokerConfig.chainNum) { index =>
-        val chain = getHeaderChain(ChainIndex.unsafe(index))
-        chain.compareUnsafe(historyLocators.hashes(index))
-      }
-      if (hashes.forall(_.isFixedPoint)) {
-        HistoryComparisonResult.Common(hashes.map(_.fixedPointUnsafe))
-      } else {
-        HistoryComparisonResult.Unsure(HistoryLocators.unsafe(hashes))
-      }
-    }
-
-  def getSyncInfoUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
+  private def getSyncInfoUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
     val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
     AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
       val offset    = index / groups
@@ -52,11 +28,11 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     }
   }
 
-  def getSyncInfoUnsafe(): AVector[AVector[Hash]] = {
+  override def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
     getSyncInfoUnsafe(brokerConfig)
   }
 
-  def getSyncInfoUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
+  private def getSyncInfoUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain = getHeaderChain(chainIndex)
       HistoryLocators
@@ -65,7 +41,8 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     } else AVector.empty
   }
 
-  def getSyncDataUnsafe(locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
+  override def getSyncInventoriesUnsafe(
+      locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
     locators.map { locatorsPerChain =>
       if (locatorsPerChain.isEmpty) AVector.empty[Hash]
       else {
@@ -195,38 +172,7 @@ object BlockFlow extends StrictLogging {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
-    def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo = {
-      val (low, high) = brokerInfo.calIntersection(brokerConfig)
-      assume(low < high)
-
-      val blockTips = for {
-        from <- low until high
-        to   <- 0 until groups
-      } yield getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to)).getAllTips
-
-      SyncInfo(blockTips.fold(AVector.empty[Hash])(_ ++ _), AVector.empty)
-    }
-
-    def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = {
-      var blockTips  = AVector.empty[Hash]
-      var headerTips = AVector.empty[Hash]
-
-      for {
-        from <- remoteBroker.groupFrom until remoteBroker.groupUntil
-        to   <- 0 until groups
-      } {
-        val chain = getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
-        if (brokerConfig.containsRaw(to)) {
-          blockTips = blockTips ++ chain.getAllTips
-        } else {
-          headerTips = headerTips ++ chain.getAllTips
-        }
-      }
-
-      SyncInfo(blockTips, headerTips)
-    }
-
-    def getIntraCliqueSyncHashesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
+    def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
       AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
         val k         = index / remoteBroker.groupNumPerBroker
         val l         = index % remoteBroker.groupNumPerBroker
