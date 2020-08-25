@@ -22,7 +22,6 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     //Peer connects
     bootstrapper ! connected
-    cliqueCoordinatorProbe.expectMsg(connected)
 
     //Broker info is full,
     cliqueManagerProbe.send(bootstrapper, Bootstrapper.ForwardConnection)
