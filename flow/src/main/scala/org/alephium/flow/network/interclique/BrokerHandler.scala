@@ -34,7 +34,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         if (hashes.forall(_.isEmpty)) {
           cliqueManager ! CliqueManager.Synced(remoteCliqueId, remoteBrokerInfo)
         } else {
-          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncData(hashes)
+          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
         }
     }
     receive
