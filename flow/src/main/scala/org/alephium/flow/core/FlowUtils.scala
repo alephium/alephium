@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
-import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
@@ -102,9 +102,9 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 }
 
 trait SyncUtils {
-  def getInterCliqueSyncInfo(brokerConfig: BrokerInfo): SyncInfo
+  def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]]
 
-  def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo
+  def getSyncLocatorsUnsafe(): AVector[AVector[Hash]]
 
-  def getIntraCliqueSyncHashesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]]
+  def getSyncInventoriesUnsafe(locators: AVector[AVector[Hash]]): AVector[AVector[Hash]]
 }
