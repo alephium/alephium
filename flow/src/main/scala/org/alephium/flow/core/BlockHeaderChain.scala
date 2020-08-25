@@ -43,13 +43,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
     for {
       parentState <- getState(parentHash)
-      _           <- addHeader(header)
-      _ <- addHash(header.hash,
-                   parentHash,
-                   parentState.height + 1,
-                   weight,
-                   parentState.chainWeight + header.target,
-                   header.timestamp)
+      chainWeight = parentState.chainWeight + header.target
+      height      = parentState.height + 1
+      _ <- addHeader(header)
+      _ <- reorderFor(header, chainWeight, height)
+      _ <- addHash(header.hash, parentHash, height, weight, chainWeight, header.timestamp)
     } yield ()
   }
 
@@ -59,6 +57,27 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       _ <- addHeader(header)
       _ <- addGenesis(header.hash)
     } yield ()
+  }
+
+  def reorderFor(header: BlockHeader, chainWeight: BigInt, height: Int): IOResult[Unit] = {
+    maxChainWeight.map(_ < chainWeight).flatMap {
+      case true  => reorderFrom(header.parentHash, height - 1)
+      case false => Right(())
+    }
+  }
+
+  final def reorderFrom(hash: Hash, height: Int): IOResult[Unit] = {
+    getHashes(height).flatMap { hashes =>
+      assume(hashes.contains(hash))
+      if (hashes.head == hash) Right(())
+      else {
+        for {
+          _      <- heightIndexStorage.put(height, hash +: hashes.filter(_ != hash))
+          parent <- getParentHash(hash)
+          _      <- reorderFrom(parent, height - 1)
+        } yield ()
+      }
+    }
   }
 
   override protected def loadFromStorage(): IOResult[Unit] = {
