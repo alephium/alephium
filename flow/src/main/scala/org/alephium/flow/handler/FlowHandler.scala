@@ -27,14 +27,14 @@ object FlowHandler {
       extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
-  final case class GetBlocks(locators: AVector[Hash])                           extends Command
-  final case class GetHeaders(locators: AVector[Hash])                          extends Command
-  final case class GetSyncInfo(remoteBroker: BrokerInfo, isSameClique: Boolean) extends Command
-  final case class GetSyncData(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
-      extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
-  final case class Register(miner: ActorRefT[Miner.Command]) extends Command
-  case object UnRegister                                     extends Command
+  final case class GetBlocks(locators: AVector[Hash])                   extends Command
+  final case class GetHeaders(locators: AVector[Hash])                  extends Command
+  case object GetSyncLocators                                           extends Command
+  final case class GetSyncInventories(locators: AVector[AVector[Hash]]) extends Command
+  final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)      extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)             extends Command
+  final case class Register(miner: ActorRefT[Miner.Command])            extends Command
+  case object UnRegister                                                extends Command
 
   sealed trait PendingData {
     def missingDeps: mutable.HashSet[Hash]
@@ -61,10 +61,9 @@ object FlowHandler {
                                      target: BigInt,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class BlocksLocated(blocks: AVector[Block])                           extends Event
-  final case class SyncData(blocks: AVector[Block], headers: AVector[BlockHeader]) extends Event
-  final case class SyncInfo(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
-      extends Event
+  final case class BlocksLocated(blocks: AVector[Block])           extends Event
+  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Event
+  final case class SyncLocators(hashes: AVector[AVector[Hash]])    extends Event
   final case class BlockAdded(block: Block,
                               broker: ActorRefT[ChainHandler.Event],
                               origin: DataOrigin)
@@ -119,23 +118,15 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def handleSync: Receive = {
-    case GetSyncInfo(remoteBroker, isSameClique) =>
-      val info = if (isSameClique) {
-        blockFlow.getIntraCliqueSyncInfo(remoteBroker)
-      } else {
-        blockFlow.getInterCliqueSyncInfo(remoteBroker)
-      }
-      sender() ! SyncInfo(info.blockLocators, info.headerLocators)
-
-    case GetSyncData(blockLocators, headerLocators) =>
-      val result = for {
-        blocks  <- blockLocators.flatMapE(blockFlow.getBlocksAfter)
-        headers <- headerLocators.flatMapE(blockFlow.getHeadersAfter)
-      } yield SyncData(blocks, headers)
-      result match {
-        case Left(error)     => handleIOError(error)
-        case Right(syncData) => sender() ! syncData
-      }
+    case GetSyncLocators =>
+      val locators = blockFlow.getSyncInfoUnsafe()
+      sender() ! SyncLocators(locators)
+    case GetSyncInventories(locators) =>
+      val inventories = blockFlow.getSyncDataUnsafe(locators)
+      sender() ! SyncInventories(inventories)
+    case GetIntraSyncInventories(brokerInfo) =>
+      val inventories = blockFlow.getIntraCliqueSyncHashesUnsafe(brokerInfo)
+      sender() ! SyncInventories(inventories)
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {

@@ -18,13 +18,13 @@ import org.alephium.util._
 
 object BrokerHandler {
   sealed trait Command
-  case object HandShakeTimeout                                extends Command
-  final case class Send(data: ByteString)                     extends Command
-  final case class Received(payload: Payload)                 extends Command
-  case object SendPing                                        extends Command
-  final case class Sync(locators: AVector[AVector[Hash]])     extends Command
-  final case class DownloadHeaders(fromHashes: AVector[Hash]) extends Command
-  final case class DownloadBlocks(hashes: AVector[Hash])      extends Command
+  case object HandShakeTimeout                                  extends Command
+  final case class Send(data: ByteString)                       extends Command
+  final case class Received(payload: Payload)                   extends Command
+  case object SendPing                                          extends Command
+  final case class SyncLocators(hashes: AVector[AVector[Hash]]) extends Command
+  final case class DownloadHeaders(fromHashes: AVector[Hash])   extends Command
+  final case class DownloadBlocks(hashes: AVector[Hash])        extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
