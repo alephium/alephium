@@ -17,7 +17,7 @@ import org.alephium.util.{ActorRefT, BaseActor}
 object BrokerConnectionHandler {
   def clique(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
-    Props(new CliqueConnectionHander(remoteAddress, connection))
+    Props(new CliqueConnectionHandler(remoteAddress, connection))
 
   final case class Ack(id: Long) extends Tcp.Event
 
@@ -34,7 +34,7 @@ object BrokerConnectionHandler {
     }
   }
 
-  class CliqueConnectionHander(
+  class CliqueConnectionHandler(
       val remoteAddress: InetSocketAddress,
       val connection: ActorRefT[Tcp.Command])(implicit val groupConfig: GroupConfig)
       extends BrokerConnectionHandler[Payload] {
