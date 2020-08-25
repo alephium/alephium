@@ -9,7 +9,6 @@ import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{
   BlockFlowSynchronizer,
-  BrokerManager,
   OutboundBrokerHandler => BaseOutboundBrokerHandler
 }
 import org.alephium.flow.setting.NetworkSetting
@@ -24,7 +23,6 @@ object OutboundBrokerHandler {
             blockflow: BlockFlow,
             allHandlers: AllHandlers,
             cliqueManager: ActorRefT[CliqueManager.Command],
-            brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting): Props =
@@ -34,7 +32,6 @@ object OutboundBrokerHandler {
                                 blockflow,
                                 allHandlers,
                                 cliqueManager,
-                                brokerManager,
                                 blockFlowSynchronizer))
   //scalastyle:on
 }
@@ -44,7 +41,6 @@ class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
                             val blockflow: BlockFlow,
                             val allHandlers: AllHandlers,
                             val cliqueManager: ActorRefT[CliqueManager.Command],
-                            val brokerManager: ActorRefT[BrokerManager.Command],
                             val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit val brokerConfig: BrokerConfig,
     val networkSetting: NetworkSetting)

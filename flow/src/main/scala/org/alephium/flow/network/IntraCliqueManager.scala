@@ -87,7 +87,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                                      blockflow,
                                      allHandlers,
                                      ActorRefT[CliqueManager.Command](self),
-                                     brokerManager,
                                      blockFlowSynchronizer)
         context.actorOf(props, name)
         ()

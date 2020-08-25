@@ -47,7 +47,6 @@ trait BrokerHandler extends BaseActor {
 
   def brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command]
   def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
-  def brokerManager: ActorRefT[BrokerManager.Command]
 
   override def receive: Receive = handShaking
 
@@ -67,9 +66,9 @@ trait BrokerHandler extends BaseActor {
         context become (exchanging orElse pingPong)
       case HandShakeTimeout =>
         log.debug(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
-        brokerManager ! BrokerManager.RequestTimeout(remoteAddress)
+        publishEvent(BrokerManager.RequestTimeout(remoteAddress))
       case Received(_) =>
-        brokerManager ! BrokerManager.Spamming(remoteAddress)
+        publishEvent(BrokerManager.Spamming(remoteAddress))
     }
     receive
   }
@@ -139,7 +138,7 @@ trait BrokerHandler extends BaseActor {
   def sendPing(): Unit = {
     if (pingNonce != 0) {
       log.debug("No Pong message received in time")
-      brokerManager ! BrokerManager.RequestTimeout(remoteAddress)
+      publishEvent(BrokerManager.RequestTimeout(remoteAddress))
       context stop self // stop it manually
     } else {
       pingNonce = Random.nextNonZeroInt()
@@ -149,7 +148,7 @@ trait BrokerHandler extends BaseActor {
 
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
-      brokerManager ! BrokerManager.InvalidPingPong(remoteAddress)
+      publishEvent(BrokerManager.InvalidPingPong(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
@@ -164,7 +163,7 @@ trait BrokerHandler extends BaseActor {
     } else {
       log.debug(
         s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce")
-      brokerManager ! BrokerManager.InvalidPingPong(remoteAddress)
+      publishEvent(BrokerManager.InvalidPingPong(remoteAddress))
     }
   }
 

@@ -32,6 +32,10 @@ object BrokerManager {
 class BrokerManager() extends BaseActor {
   import BrokerManager._
 
+  override def preStart(): Unit = {
+    require(context.system.eventStream.subscribe(self, classOf[BrokerManager.MisBehavior]))
+  }
+
   def isBanned(remote: InetSocketAddress): Boolean = {
     log.debug(s"Ban $remote")
     false

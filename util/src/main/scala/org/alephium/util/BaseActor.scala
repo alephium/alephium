@@ -14,6 +14,10 @@ trait BaseActor extends Actor with ActorLogging {
     new DefaultStrategy().create()
   }
 
+  def publishEvent(event: Any): Unit = {
+    context.system.eventStream.publish(event)
+  }
+
   override def unhandled(message: Any): Unit = {
     log.warning(s"Unhandled message: $message")
   }

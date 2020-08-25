@@ -8,7 +8,7 @@ import akka.io.Tcp
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
+import org.alephium.flow.network.broker.BlockFlowSynchronizer
 import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
@@ -21,7 +21,6 @@ object InterCliqueManager {
             blockflow: BlockFlow,
             allHandlers: AllHandlers,
             discoveryServer: ActorRefT[DiscoveryServer.Command],
-            brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
@@ -31,7 +30,6 @@ object InterCliqueManager {
                              blockflow,
                              allHandlers,
                              discoveryServer,
-                             brokerManager,
                              blockFlowSynchronizer))
   //scalastyle:on
 
@@ -53,7 +51,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          blockflow: BlockFlow,
                          allHandlers: AllHandlers,
                          discoveryServer: ActorRefT[DiscoveryServer.Command],
-                         brokerManager: ActorRefT[BrokerManager.Command],
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
@@ -96,7 +93,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           blockflow,
           allHandlers,
           ActorRefT[CliqueManager.Command](self),
-          brokerManager,
           blockFlowSynchronizer
         )
       context.actorOf(props, name)
@@ -152,7 +148,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                       blockflow,
                                       allHandlers,
                                       ActorRefT[CliqueManager.Command](self),
-                                      brokerManager,
                                       blockFlowSynchronizer)
         context.actorOf(props, name)
       }

@@ -160,6 +160,19 @@ trait TestFixtureLike
       implicit val config           = platformEnv.config
       implicit val apiConfig        = ApiConfig.load(platformEnv.newConfig).toOption.get
 
+      ActorRefT.build(
+        system,
+        FlowMonitor.props(
+          Await.result(
+            for {
+              _ <- this.stop()
+              _ <- this.system.terminate()
+            } yield (),
+            FlowMonitor.shutdownTimeout.asScala
+          )
+        )
+      )
+
       override val node: Node = Node.build(platformEnv.storages)
       lazy val miner: ActorRefT[Miner.Command] = {
         val props = Miner
@@ -171,21 +184,6 @@ trait TestFixtureLike
       lazy val rpcServer: RPCServer   = RPCServer(node, miner)
       lazy val restServer: RestServer = RestServer(node, miner)
     }
-
-    implicit val executionContext = server.system.dispatcher
-    ActorRefT.build(
-      server.system,
-      FlowMonitor.props(
-        Await.result(
-          for {
-            _ <- server.stop()
-            _ <- server.system.terminate()
-          } yield (),
-          FlowMonitor.shutdownTimeout.asScala
-        )
-      ),
-      "GlobalStopper"
-    )
 
     server
   }

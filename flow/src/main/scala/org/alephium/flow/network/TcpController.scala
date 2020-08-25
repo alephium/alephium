@@ -54,7 +54,7 @@ class TcpController(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) 
       context.become(workFor(sender(), bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
-      context.system.eventStream.publish(FlowMonitor.Shutdown)
+      publishEvent(FlowMonitor.Shutdown)
     case TcpController.WorkFor(another) =>
       context become binding(another)
   }
