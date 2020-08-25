@@ -4,7 +4,7 @@ import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandle}
-import org.alephium.protocol.message.{GetBlocks, SyncResponse0}
+import org.alephium.protocol.message.{GetBlocks, SyncResponse}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.ActorRefT
 
@@ -30,8 +30,8 @@ trait BrokerHandler extends BaseBrokerHandle {
 
     val receive: Receive = {
       case FlowHandler.SyncInventories(inventories) =>
-        send(SyncResponse0(inventories))
-      case BaseBrokerHandle.Received(SyncResponse0(hashes)) =>
+        send(SyncResponse(inventories))
+      case BaseBrokerHandle.Received(SyncResponse(hashes)) =>
         log.debug(s"Received sync response from intra clique broker")
         val toDownload = hashes.flatMap(_.filter(!blockflow.containsUnsafe(_)))
         send(GetBlocks(toDownload))
