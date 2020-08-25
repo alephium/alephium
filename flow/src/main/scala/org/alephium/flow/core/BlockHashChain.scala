@@ -64,6 +64,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     getWeight(hash).map(weight.max)
   }
 
+  def maxChainWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) {
+    (chainWeight, hash) =>
+      getChainWeight(hash).map(chainWeight.max)
+  }
+
   def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
     getHeight(hash).map(math.max(height, _))
   }
