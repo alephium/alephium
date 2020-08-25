@@ -10,7 +10,7 @@ import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
@@ -19,7 +19,7 @@ trait Node extends Service {
   implicit def config: AlephiumConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
-  def server: ActorRefT[TcpServer.Command]
+  def tcpController: ActorRefT[TcpController.Command]
   def discoveryServer: ActorRefT[DiscoveryServer.Command]
   def boostraper: ActorRefT[Bootstrapper.Command]
   def cliqueManager: ActorRefT[CliqueManager.Command]
@@ -56,11 +56,11 @@ object Node {
     val brokerManager: ActorRefT[BrokerManager.Command] =
       ActorRefT.build(system, BrokerManager.props())
 
-    val server: ActorRefT[TcpServer.Command] =
+    val tcpController: ActorRefT[TcpController.Command] =
       ActorRefT
-        .build[TcpServer.Command](
+        .build[TcpController.Command](
           system,
-          TcpServer.props(config.network.publicAddress.getPort, brokerManager))
+          TcpController.props(config.network.publicAddress.getPort, brokerManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
@@ -85,7 +85,7 @@ object Node {
 
     val boostraper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system,
-                      Bootstrapper.props(server, discoveryServer, cliqueManager),
+                      Bootstrapper.props(tcpController, discoveryServer, cliqueManager),
                       "Bootstrapper")
 
     val monitor: ActorRefT[Node.Command] =
@@ -117,7 +117,7 @@ object Node {
 
   class Monitor(node: Node) extends BaseActor {
     private val orderedActors = Seq(
-      node.server,
+      node.tcpController,
       node.discoveryServer,
       node.boostraper,
       node.cliqueManager,

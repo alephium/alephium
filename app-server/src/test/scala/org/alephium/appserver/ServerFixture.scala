@@ -14,7 +14,7 @@ import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.{BlockDeps, SyncInfo}
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
@@ -97,8 +97,8 @@ object ServerFixture {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
-    val serverProbe                          = TestProbe()
-    val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
+    val serverProbe                                     = TestProbe()
+    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(serverProbe.ref)
 
     val eventBus =
       ActorRefT
