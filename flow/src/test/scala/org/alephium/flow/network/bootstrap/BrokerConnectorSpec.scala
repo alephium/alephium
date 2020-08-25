@@ -17,7 +17,9 @@ class BrokerConnectorSpec
     val connection        = TestProbe()
     val cliqueCoordinator = TestProbe()
     val brokerConnector =
-      system.actorOf(BrokerConnector.props(connection.ref, cliqueCoordinator.ref))
+      system.actorOf(
+        BrokerConnector.props(socketAddressGen.sample.get, connection.ref, cliqueCoordinator.ref))
+
     val randomId      = Random.source.nextInt(brokerConfig.brokerNum)
     val randomAddress = socketAddressGen.sample.get
     val randomInfo = PeerInfo.unsafe(randomId,

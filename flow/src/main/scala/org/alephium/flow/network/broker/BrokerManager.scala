@@ -24,6 +24,7 @@ object BrokerManager {
   sealed trait Warning   extends MisBehavior
   sealed trait Uncertain extends MisBehavior
 
+  final case class InvalidMessage(remoteAddress: InetSocketAddress)  extends Critical
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Critical
   final case class Spamming(remoteAddress: InetSocketAddress)        extends Error
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain

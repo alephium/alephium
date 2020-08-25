@@ -138,7 +138,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     brokers.foreach {
       case (_, (info, broker)) if broker == ActorRefT[BrokerHandler.Command](actor) =>
         log.error(s"Self clique node $info is not functioning, shutdown the system now")
-        context.system.eventStream.publish(FlowMonitor.Shutdown)
+        publishEvent(FlowMonitor.Shutdown)
       case _ => ()
     }
   }
