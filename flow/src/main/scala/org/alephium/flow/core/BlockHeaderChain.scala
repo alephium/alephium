@@ -66,6 +66,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def reorderFrom(hash: Hash, height: Int): IOResult[Unit] = {
     getHashes(height).flatMap { hashes =>
       assume(hashes.contains(hash))
