@@ -1,5 +1,6 @@
 package org.alephium.flow.network.interclique
 
+import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerHandler => BaseBrokerHandler}
@@ -9,6 +10,8 @@ import org.alephium.util.ActorRefT
 
 trait BrokerHandler extends BaseBrokerHandler {
   def cliqueManager: ActorRefT[CliqueManager.Command]
+
+  def allHandlers: AllHandlers
 
   override def handleHandshakeInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
     super.handleHandshakeInfo(remoteCliqueId, remoteBrokerInfo)
@@ -21,10 +24,11 @@ trait BrokerHandler extends BaseBrokerHandler {
     blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(remoteBrokerInfo)
 
     val receive: Receive = {
-      case BaseBrokerHandler.Sync(locators) =>
+      case BaseBrokerHandler.SyncLocators(locators) =>
         send(SyncRequest0(locators))
       case BaseBrokerHandler.Received(SyncRequest0(locators)) =>
-        val inventories = blockflow.getSyncDataUnsafe(locators)
+        allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
+      case FlowHandler.SyncInventories(inventories) =>
         send(SyncResponse0(inventories))
       case BaseBrokerHandler.Received(SyncResponse0(hashes)) =>
         if (hashes.forall(_.isEmpty)) {

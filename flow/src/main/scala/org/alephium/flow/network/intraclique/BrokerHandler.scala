@@ -1,5 +1,6 @@
 package org.alephium.flow.network.intraclique
 
+import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandle}
@@ -25,10 +26,11 @@ trait BrokerHandler extends BaseBrokerHandle {
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
 
   def syncing: Receive = {
-    val inventory = blockflow.getIntraCliqueSyncHashesUnsafe(remoteBrokerInfo)
-    send(SyncResponse0(inventory))
+    allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories(remoteBrokerInfo)
 
     val receive: Receive = {
+      case FlowHandler.SyncInventories(inventories) =>
+        send(SyncResponse0(inventories))
       case BaseBrokerHandle.Received(SyncResponse0(hashes)) =>
         log.debug(s"Received sync response from intra clique broker")
         val toDownload = hashes.flatMap(_.filter(!blockflow.containsUnsafe(_)))

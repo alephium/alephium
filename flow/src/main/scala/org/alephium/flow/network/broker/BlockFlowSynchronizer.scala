@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Cancellable, Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.AllHandlers
+import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration}
@@ -43,8 +43,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       brokerInfos += ActorRefT[BrokerHandler.Command](sender()) -> remoteBrokerInfo
     case Sync =>
       log.debug(s"Send sync requests to the network")
-      val locators = blockflow.getSyncInfo()
-      samplePeers.foreach(_ ! BrokerHandler.Sync(locators))
+      allHandlers.flowHandler ! FlowHandler.GetSyncLocators
+    case FlowHandler.SyncLocators(locators) =>
+      samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
     case SyncData(hashes) =>
       log.debug(s"Received sync response from $remoteAddress")
       val toDownload = hashes.flatMap(_.filter(needToDownload))
