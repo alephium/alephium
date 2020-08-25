@@ -7,7 +7,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.network.broker.{BrokerConnectionHandler, BrokerManager}
+import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
@@ -33,11 +33,12 @@ object BrokerConnector {
 
   def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
-    Props(new ConnectionHandler(remoteAddress, connection))
+    Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class ConnectionHandler(val remoteAddress: InetSocketAddress,
-                          val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
-      extends BrokerConnectionHandler[Message] {
+  class MyConnectionHandler(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+      extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
       Message.tryDeserialize(data)
     }
@@ -60,7 +61,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
     with SerdeUtils {
   import BrokerConnector._
 
-  val connectionHandler: ActorRefT[BrokerConnectionHandler.Command] =
+  val connectionHandler: ActorRefT[ConnectionHandler.Command] =
     context.actorOf(connectionProps(remoteAddress, connection))
   context watch connectionHandler.ref
 
@@ -73,7 +74,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
   def forwardCliqueInfo: Receive = {
     case Send(cliqueInfo) =>
       val data = Message.serialize(Message.Clique(cliqueInfo))
-      connectionHandler ! BrokerConnectionHandler.Send(data)
+      connectionHandler ! ConnectionHandler.Send(data)
       context become awaitAck
   }
 
@@ -87,7 +88,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
     case CliqueCoordinator.Ready =>
       log.debug("Clique is ready")
       val data = Message.serialize(Message.Ready)
-      connectionHandler ! BrokerConnectionHandler.Send(data)
+      connectionHandler ! ConnectionHandler.Send(data)
     case Terminated(_) =>
       log.debug(s"Connection to broker is closed")
       context stop self

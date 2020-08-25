@@ -19,8 +19,8 @@ trait InboundBrokerHandler extends BrokerHandler {
 
   override def handShakeDuration: Duration = networkSetting.retryTimeout
 
-  override val brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command] = {
-    val ref = context.actorOf(BrokerConnectionHandler.clique(remoteAddress, connection, self))
+  override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command] = {
+    val ref = context.actorOf(ConnectionHandler.clique(remoteAddress, connection, self))
     context watch ref
     ref
   }

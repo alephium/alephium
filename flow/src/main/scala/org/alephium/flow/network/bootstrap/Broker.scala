@@ -8,7 +8,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.network.broker.{BrokerConnectionHandler, BrokerManager}
+import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.serde.SerdeResult
@@ -26,11 +26,12 @@ object Broker {
 
   def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
-    Props(new ConnectionHandler(remoteAddress, connection))
+    Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class ConnectionHandler(val remoteAddress: InetSocketAddress,
-                          val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
-      extends BrokerConnectionHandler[Message] {
+  class MyConnectionHandler(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+      extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
       Message.tryDeserialize(data)
     }
@@ -69,7 +70,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       context watch connectionHandler.ref
 
       val message = Message.serialize(Message.Peer(PeerInfo.self))
-      connectionHandler ! BrokerConnectionHandler.Send(message)
+      connectionHandler ! ConnectionHandler.Send(message)
       context become awaitCliqueInfo(connectionHandler)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -84,20 +85,20 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def awaitCliqueInfo(connectionHandler: ActorRefT[BrokerConnectionHandler.Command]): Receive = {
+  def awaitCliqueInfo(connectionHandler: ActorRefT[ConnectionHandler.Command]): Receive = {
     case Broker.Received(clique: Message.Clique) =>
       log.debug(s"Received clique info from master")
       val message = Message.serialize(Message.Ack(brokerConfig.brokerId))
-      connectionHandler ! BrokerConnectionHandler.Send(message)
+      connectionHandler ! ConnectionHandler.Send(message)
       context become awaitReady(connectionHandler, clique.info)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def awaitReady(connection: ActorRefT[BrokerConnectionHandler.Command],
+  def awaitReady(connection: ActorRefT[ConnectionHandler.Command],
                  cliqueInfo: IntraCliqueInfo): Receive = {
     case Broker.Received(Message.Ready) =>
       log.debug(s"Clique is ready")
-      connection ! BrokerConnectionHandler.CloseConnection
+      connection ! ConnectionHandler.CloseConnection
       context become awaitClose(cliqueInfo)
   }
 

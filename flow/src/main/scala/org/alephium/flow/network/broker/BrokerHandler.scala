@@ -45,7 +45,7 @@ trait BrokerHandler extends BaseActor {
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
 
-  def brokerConnectionHandler: ActorRefT[BrokerConnectionHandler.Command]
+  def brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
   def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 
   override def receive: Receive = handShaking
@@ -108,7 +108,7 @@ trait BrokerHandler extends BaseActor {
       val headers = hashes.map(blockflow.getBlockHeaderUnsafe)
       send(SendHeaders(headers))
     case Send(data) =>
-      brokerConnectionHandler ! BrokerConnectionHandler.Send(data)
+      brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
 
   def flowEvents: Receive = {
@@ -168,12 +168,12 @@ trait BrokerHandler extends BaseActor {
   }
 
   def send(payload: Payload): Unit = {
-    brokerConnectionHandler ! BrokerConnectionHandler.Send(Message.serialize(payload))
+    brokerConnectionHandler ! ConnectionHandler.Send(Message.serialize(payload))
   }
 
   def stop(): Unit = {
     pingPongTickOpt.foreach(_.cancel())
-    brokerConnectionHandler ! BrokerConnectionHandler.CloseConnection
+    brokerConnectionHandler ! ConnectionHandler.CloseConnection
   }
 
   override def unhandled(message: Any): Unit = message match {
