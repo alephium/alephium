@@ -15,9 +15,11 @@ import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object BrokerConnectionHandler {
-  def clique(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig): Props =
-    Props(new CliqueConnectionHandler(remoteAddress, connection))
+  def clique(
+      remoteAddress: InetSocketAddress,
+      connection: ActorRefT[Tcp.Command],
+      brokerHandler: ActorRefT[BrokerHandler.Command])(implicit groupConfig: GroupConfig): Props =
+    Props(new CliqueConnectionHandler(remoteAddress, connection, brokerHandler))
 
   final case class Ack(id: Long) extends Tcp.Event
 
@@ -36,11 +38,9 @@ object BrokerConnectionHandler {
 
   class CliqueConnectionHandler(
       val remoteAddress: InetSocketAddress,
-      val connection: ActorRefT[Tcp.Command])(implicit val groupConfig: GroupConfig)
+      val connection: ActorRefT[Tcp.Command],
+      val brokerHandler: ActorRefT[BrokerHandler.Command])(implicit val groupConfig: GroupConfig)
       extends BrokerConnectionHandler[Payload] {
-
-    val brokerHandler: ActorRefT[BrokerHandler.Command] = context.parent
-
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Payload, ByteString)]] = {
       tryDeserializePayload(data)
     }
@@ -72,6 +72,7 @@ trait BrokerConnectionHandler[T] extends BaseActor {
 
   def reading: Receive = {
     case Tcp.Received(data) =>
+      log.debug(s"Received data ${data.length} bytes from $remoteAddress")
       bufferInMessage(data)
       processInMessageBuffer()
       connection ! Tcp.ResumeReading
