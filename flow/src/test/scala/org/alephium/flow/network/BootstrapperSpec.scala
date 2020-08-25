@@ -14,10 +14,9 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       Bootstrapper.props(
         ActorRefT(serverProbe.ref),
         ActorRefT(discoveryServerProbe.ref),
-        ActorRefT(cliqueManagerProbe.ref),
-        (_, _) => cliqueCoordinatorProbe.ref,
-        (_, _) => TestProbe().ref
-      ))
+        ActorRefT(cliqueManagerProbe.ref)
+      )
+    )
 
     serverProbe.expectMsg(TcpController.Start(bootstrapper))
 
