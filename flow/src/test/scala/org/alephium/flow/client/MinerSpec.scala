@@ -18,6 +18,7 @@ class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
       AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref))
 
     val miner = system.actorOf(Miner.props(blockFlow, allHandlers))
+    system.eventStream.subscribe(cliqueManager.ref, classOf[CliqueManager.BroadCastBlock])
 
     miner ! Miner.Start
 

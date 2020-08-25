@@ -70,12 +70,8 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     }
   }
 
-  def handleMissingParent(datas: Forest[Hash, T],
-                          broker: ActorRefT[ChainHandler.Event],
-                          origin: DataOrigin): Unit
-
   def handlePending(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    assume(blockFlow.includes(data).map(!_).getOrElse(false))
+    assume(!blockFlow.containsUnsafe(data.hash))
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
     validationResult match {
       case Left(e)                      => handleIOError(broker, e)
