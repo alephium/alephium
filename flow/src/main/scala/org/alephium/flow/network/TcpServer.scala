@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.io.Tcp.Close
 
@@ -19,9 +19,9 @@ object TcpServer {
   sealed trait Command
   final case class Start(bootstrapper: ActorRef)        extends Command
   final case class ConnectTo(remote: InetSocketAddress) extends Command
-  final case class ConnectionConfirmed(c: Tcp.Connected, connection: ActorRefT[Tcp.Command])
+  final case class ConnectionConfirmed(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
-  final case class ConnectionDenied(c: Tcp.Connected, connection: ActorRefT[Tcp.Command])
+  final case class ConnectionDenied(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class WorkFor(another: ActorRef) extends Command
 
@@ -72,16 +72,19 @@ class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) exte
       pendingConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
       brokerManager ! BrokerManager.Remove(c.remoteAddress)
-    case TcpServer.ConnectionConfirmed(c, connection) =>
-      confirmConnection(actor, c, connection)
-    case TcpServer.ConnectionDenied(c, connection) =>
-      pendingConnections -= c.remoteAddress
+    case TcpServer.ConnectionConfirmed(connected, connection) =>
+      confirmConnection(actor, connected, connection)
+    case TcpServer.ConnectionDenied(connected, connection) =>
+      pendingConnections -= connected.remoteAddress
       connection ! Close
     case TcpServer.ConnectTo(remote) =>
       pendingConnections.addOne(remote)
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpServer.WorkFor(another) =>
       context become workFor(tcpListener, another)
+    case Terminated(connection) =>
+      val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
+      toRemove.foreach(confirmedConnections -= _)
   }
 
   def isOutgoing(remoteAddress: InetSocketAddress): Boolean = {
@@ -89,10 +92,11 @@ class TcpServer(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) exte
   }
 
   def confirmConnection(target: ActorRef,
-                        c: Tcp.Connected,
+                        connected: Tcp.Connected,
                         connection: ActorRefT[Tcp.Command]): Unit = {
-    pendingConnections -= c.remoteAddress
-    confirmedConnections += c.remoteAddress -> connection
-    target.tell(c, connection.ref)
+    pendingConnections -= connected.remoteAddress
+    confirmedConnections += connected.remoteAddress -> connection
+    context watch connection.ref
+    target.tell(connected, connection.ref)
   }
 }

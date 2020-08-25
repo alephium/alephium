@@ -12,7 +12,7 @@ object BrokerManager {
   def props(): Props = Props(new BrokerManager())
 
   sealed trait Command
-  final case class ConfirmConnection(c: Tcp.Connected, connection: ActorRefT[Tcp.Command])
+  final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class Remove(remote: InetSocketAddress) extends Command
 
@@ -43,9 +43,12 @@ class BrokerManager() extends BaseActor {
   }
 
   override def receive: Receive = {
-    case ConfirmConnection(c, connection) =>
-      if (isBanned(c.remoteAddress)) sender() ! TcpServer.ConnectionDenied(c, connection)
-      else sender() ! TcpServer.ConnectionConfirmed(c, connection)
+    case ConfirmConnection(connected, connection) =>
+      if (isBanned(connected.remoteAddress)) {
+        sender() ! TcpServer.ConnectionDenied(connected, connection)
+      } else {
+        sender() ! TcpServer.ConnectionConfirmed(connected, connection)
+      }
     case Remove(remote) =>
       remove(remote)
     case misBehavior: MisBehavior =>
