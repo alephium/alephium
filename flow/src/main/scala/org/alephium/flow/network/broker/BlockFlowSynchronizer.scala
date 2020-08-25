@@ -15,9 +15,10 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
-  final case class HandShaked(brokerInfo: BrokerInfo)       extends Command
-  final case class SyncData(hashes: AVector[AVector[Hash]]) extends Command
-  case object Sync                                          extends Command
+  final case class HandShaked(brokerInfo: BrokerInfo)              extends Command
+  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
+  final case class Downloaded(hashes: AVector[Hash])               extends Command
+  case object Sync                                                 extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
@@ -33,9 +34,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     syncTick = Some(scheduleCancellable(self, Sync, Duration.ofSecondsUnsafe(2)))
   }
 
-  def needToDownload(hash: Hash): Boolean =
-    !(blockflow.containsUnsafe(hash) && downloading.contains(hash))
-
   override def receive: Receive = {
     case HandShaked(remoteBrokerInfo) =>
       log.debug(s"HandShaked with ${remoteBrokerInfo.address}")
@@ -46,10 +44,11 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       allHandlers.flowHandler ! FlowHandler.GetSyncLocators
     case FlowHandler.SyncLocators(locators) =>
       samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
-    case SyncData(hashes) =>
+    case SyncInventories(hashes) =>
       log.debug(s"Received sync response from $remoteAddress")
-      val toDownload = hashes.flatMap(_.filter(needToDownload))
-      sender() ! BrokerHandler.DownloadBlocks(toDownload)
+      download(hashes)
+    case Downloaded(hashes) =>
+      downloaded(hashes)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)

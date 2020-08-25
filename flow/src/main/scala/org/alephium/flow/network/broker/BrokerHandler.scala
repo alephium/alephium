@@ -95,6 +95,7 @@ trait BrokerHandler extends BaseActor {
         val message = BlockChainHandler.addOneBlock(block, dataOrigin)
         allHandlers.getBlockHandler(block.chainIndex) ! message
       }
+      blockFlowSynchronizer ! BlockFlowSynchronizer.Downloaded(blocks.map(_.hash))
     case Received(GetBlocks(hashes)) =>
       val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
       send(SendBlocks(blocks))
