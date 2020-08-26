@@ -9,7 +9,7 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, GroupIndex, Transaction}
+import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex, GroupIndex, Transaction}
 import org.alephium.util.AVector
 
 trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
@@ -102,7 +102,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 }
 
 trait SyncUtils {
-  def getIntraSyncInventories(remoteBroker: BrokerInfo): IOResult[AVector[AVector[Hash]]] =
+  def getIntraSyncInventories(remoteBroker: BrokerGroupInfo): IOResult[AVector[AVector[Hash]]] =
     IOUtils.tryExecute(getIntraSyncInventoriesUnsafe(remoteBroker))
 
   def getSyncLocators(): IOResult[AVector[AVector[Hash]]] =
@@ -111,7 +111,7 @@ trait SyncUtils {
   def getSyncInventories(locators: AVector[AVector[Hash]]): IOResult[AVector[AVector[Hash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators))
 
-  protected def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]]
+  protected def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerGroupInfo): AVector[AVector[Hash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]]
 

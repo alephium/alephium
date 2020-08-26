@@ -282,6 +282,75 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
   }
 
+  behavior of "Sync"
+
+  it should "compute sync locators and inventories" in {
+    brokerConfig.groupNumPerBroker is 1 // the test only works in this case
+
+    (0 until brokerConfig.groups).foreach { testToGroup =>
+      val blockFlow0    = genesisBlockFlow()
+      val testFromGroup = brokerConfig.groupFrom
+      val blocks = (1 to 6).map { k =>
+        val block =
+          mine(blockFlow0, ChainIndex.unsafe(testFromGroup, testToGroup), onlyTxForIntra = true)
+        addAndCheck(blockFlow0, block, k)
+        block
+      }
+      val hashes0 = AVector.from(blocks.map(_.hash))
+      val locators0: AVector[AVector[Hash]] =
+        AVector.tabulate(groupConfig.groups) { group =>
+          if (group equals testToGroup)
+            AVector(config.genesisBlocks(testFromGroup)(testToGroup).hash,
+                    hashes0(0),
+                    hashes0(1),
+                    hashes0(3),
+                    hashes0(4),
+                    hashes0(5))
+          else AVector(config.genesisBlocks(testFromGroup)(group).hash)
+        }
+      blockFlow0.getSyncLocators() isE locators0
+
+      val blockFlow1 = genesisBlockFlow()
+      val locators1: AVector[AVector[Hash]] = AVector.tabulate(config.broker.groups) { group =>
+        AVector(config.genesisBlocks(testFromGroup)(group).hash)
+      }
+      blockFlow1.getSyncLocators() isE locators1
+
+      blockFlow0.getSyncInventories(locators0) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+      blockFlow0.getSyncInventories(locators1) isE
+        AVector.tabulate(groupConfig.groups) { group =>
+          if (group equals testToGroup) hashes0 else AVector.empty[Hash]
+        }
+      blockFlow1.getSyncInventories(locators0) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+      blockFlow1.getSyncInventories(locators1) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+
+      (0 until brokerConfig.brokerNum).foreach { id =>
+        val remoteBrokerInfo = new BrokerGroupInfo {
+          override def brokerId: Int          = id
+          override def groupNumPerBroker: Int = brokerConfig.groupNumPerBroker
+        }
+        blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
+          (if (remoteBrokerInfo.groupFrom equals testToGroup) AVector(hashes0)
+           else AVector(AVector.empty[Hash]))
+        blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[Hash])
+      }
+
+      val remoteBrokerInfo = new BrokerGroupInfo {
+        override def brokerId: Int          = 0
+        override def groupNumPerBroker: Int = brokerConfig.groups
+      }
+      blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
+        AVector.tabulate(brokerConfig.groups) { k =>
+          if (k equals testToGroup) hashes0 else AVector.empty[Hash]
+        }
+      blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE
+        AVector.fill(brokerConfig.groups)(AVector.empty[Hash])
+    }
+  }
+
   behavior of "Balance"
 
   it should "transfer token for inside a same group" in {

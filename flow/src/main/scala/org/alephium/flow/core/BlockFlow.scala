@@ -18,6 +18,10 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
 
+  override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
+    getSyncLocatorsUnsafe(brokerConfig)
+  }
+
   private def getSyncLocatorsUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
     val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
     AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
@@ -26,10 +30,6 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
       val toGroup   = index % groups
       getSyncLocatorsUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
     }
-  }
-
-  override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
-    getSyncLocatorsUnsafe(brokerConfig)
   }
 
   private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
@@ -54,8 +54,8 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   }
 
   override protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
-    AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
+      remoteBroker: BrokerGroupInfo): AVector[AVector[Hash]] = {
+    AVector.tabulate(brokerConfig.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
       val k         = index / remoteBroker.groupNumPerBroker
       val l         = index % remoteBroker.groupNumPerBroker
       val fromGroup = brokerConfig.groupFrom + k
