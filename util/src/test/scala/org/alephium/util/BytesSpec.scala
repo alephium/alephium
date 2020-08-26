@@ -17,11 +17,11 @@ class BytesSpec extends AlephiumSpec {
 
   it should "convert int to correct bytes" in {
     forAll { input: Int =>
-      val output   = Bytes.toBytes(input)
+      val output   = Bytes.from(input)
       val expected = ByteBuffer.allocate(4).putInt(input).array()
       output is ByteString.fromArrayUnsafe(expected)
 
-      Bytes.toIntUnsafe(Bytes.toBytes(input)) is input
+      Bytes.toIntUnsafe(Bytes.from(input)) is input
     }
   }
 
@@ -38,7 +38,7 @@ class BytesSpec extends AlephiumSpec {
   it should "compute correct xor byte for int" in {
     forAll { input: Int =>
       val output   = Bytes.xorByte(input)
-      val bytes    = Bytes.toBytes(input)
+      val bytes    = Bytes.from(input)
       val expected = bytes.tail.fold(bytes.head)(_ ^ _ toByte)
       output is expected
     }
