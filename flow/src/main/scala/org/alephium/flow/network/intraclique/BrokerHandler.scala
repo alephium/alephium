@@ -33,8 +33,10 @@ trait BrokerHandler extends BaseBrokerHandle {
         send(SyncResponse(inventories))
       case BaseBrokerHandle.Received(SyncResponse(hashes)) =>
         log.debug(s"Received sync response from intra clique broker")
-        val toDownload = hashes.flatMap(_.filter(!blockflow.containsUnsafe(_)))
-        send(GetBlocks(toDownload))
+        hashes.flatMapE(_.filterE(blockflow.contains(_).map(!_))) match {
+          case Left(error)       => log.debug(s"IO error in computing what to download: $error")
+          case Right(toDownload) => send(GetBlocks(toDownload))
+        }
     }
     receive
   }

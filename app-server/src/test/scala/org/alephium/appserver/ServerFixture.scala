@@ -176,10 +176,9 @@ object ServerFixture {
     override def getBlockHeader(hash: Hash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: Hash): IOResult[Block]             = Right(block)
 
-    def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]] = ???
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                 = ???
-    def getAllTips: AVector[Hash]                                                       = ???
-    def getBestTipUnsafe: Hash                                                          = ???
+    def calBestDepsUnsafe(group: GroupIndex): BlockDeps = ???
+    def getAllTips: AVector[Hash]                       = ???
+    def getBestTipUnsafe: Hash                          = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
             parentHash: Hash,
             weight: Int): IOResult[Unit]         = ???
