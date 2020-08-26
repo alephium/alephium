@@ -27,7 +27,6 @@ object Payload {
       case x: SendHeaders  => (SendHeaders, SendHeaders.serialize(x))
       case x: GetHeaders   => (GetHeaders, GetHeaders.serialize(x))
       case x: SendTxs      => (SendTxs, SendTxs.serialize(x))
-      case x: HashLocators => (HashLocators, HashLocators.serialize(x))
       case x: SyncRequest  => (SyncRequest, SyncRequest.serialize(x))
       case x: SyncResponse => (SyncResponse, SyncResponse.serialize(x))
     }
@@ -51,7 +50,6 @@ object Payload {
           case SendHeaders  => SendHeaders._deserialize(rest)
           case GetHeaders   => GetHeaders._deserialize(rest)
           case SendTxs      => SendTxs._deserialize(rest)
-          case HashLocators => HashLocators._deserialize(rest)
           case SyncRequest  => SyncRequest._deserialize(rest)
           case SyncResponse => SyncResponse._deserialize(rest)
         }
@@ -100,7 +98,6 @@ object Payload {
               SendHeaders,
               GetHeaders,
               SendTxs,
-              HashLocators,
               SyncRequest,
               SyncResponse)
 
@@ -196,12 +193,6 @@ final case class SendTxs(txs: AVector[Transaction]) extends Payload
 
 object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
-}
-
-final case class HashLocators(hashes: AVector[AVector[Hash]]) extends Payload
-
-object HashLocators extends Payload.Serding[HashLocators] with Payload.Code {
-  implicit val serde: Serde[HashLocators] = Serde.forProduct1(apply, p => p.hashes)
 }
 
 final case class SyncRequest(locators: AVector[AVector[Hash]]) extends Payload

@@ -16,6 +16,7 @@ import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
+import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
@@ -97,8 +98,8 @@ object ServerFixture {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
-    val serverProbe                                     = TestProbe()
-    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(serverProbe.ref)
+    val brokerManager: ActorRefT[BrokerManager.Command] = ActorRefT(TestProbe().ref)
+    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(TestProbe().ref)
 
     val eventBus =
       ActorRefT
@@ -124,8 +125,8 @@ object ServerFixture {
                                                blockHandlers  = Map.empty,
                                                headerHandlers = Map.empty)(config.broker)
 
-    val boostraperDummy                             = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
-    val boostraper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
+    val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
+    val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
 
     val monitorProbe                     = TestProbe()
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
