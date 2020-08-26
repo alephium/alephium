@@ -13,7 +13,7 @@ object Bootstrapper {
   def props(
       tcpController: ActorRefT[TcpController.Command],
       discoveryServer: ActorRefT[DiscoveryServer.Command],
-      cliqueManager: ActorRefT[CliqueManager.Command],
+      cliqueManager: ActorRefT[CliqueManager.Command]
   )(implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     discoveryConfig: DiscoveryConfig): Props = {
@@ -69,10 +69,8 @@ class BrokerBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
     val discoveryServer: ActorRefT[DiscoveryServer.Command],
     val cliqueManager: ActorRefT[CliqueManager.Command]
-)(
-    implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-) extends BootstrapperHandler {
+)(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
+    extends BootstrapperHandler {
   log.debug("Start as Broker")
   val broker: ActorRef = context.actorOf(Broker.props(self))
 

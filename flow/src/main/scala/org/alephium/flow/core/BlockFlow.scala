@@ -18,21 +18,21 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
 
-  private def getSyncInfoUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
+  private def getSyncLocatorsUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
     val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
     AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
       val offset    = index / groups
       val fromGroup = groupFrom + offset
       val toGroup   = index % groups
-      getSyncInfoUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
+      getSyncLocatorsUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
     }
   }
 
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
-    getSyncInfoUnsafe(brokerConfig)
+    getSyncLocatorsUnsafe(brokerConfig)
   }
 
-  private def getSyncInfoUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
+  private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain = getHeaderChain(chainIndex)
       HistoryLocators

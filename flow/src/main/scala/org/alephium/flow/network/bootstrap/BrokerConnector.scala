@@ -22,15 +22,6 @@ object BrokerConnector {
   final case class Received(message: Message)             extends Command
   final case class Send(intraCliqueInfo: IntraCliqueInfo) extends Command
 
-  def deserializeTry[T](input: ByteString)(
-      implicit serde: Serde[T]): SerdeResult[Option[(T, ByteString)]] = {
-    SerdeUtils.unwrap(serde._deserialize(input))
-  }
-
-  def envelop[T](input: T)(implicit serializer: Serializer[T]): Tcp.Write = {
-    Tcp.Write(serializer.serialize(input))
-  }
-
   def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
       implicit groupConfig: GroupConfig): Props =
     Props(new MyConnectionHandler(remoteAddress, connection))

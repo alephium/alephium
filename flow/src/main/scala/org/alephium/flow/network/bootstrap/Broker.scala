@@ -79,7 +79,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
         scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(1))
         ()
       } else {
-        log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the sytem")
+        log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the system")
         publishEvent(FlowMonitor.Shutdown)
       }
   }

@@ -57,8 +57,9 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
       }
 
   def doGetSelfClique(req: Request): FutureTry[SelfClique] =
-    node.boostraper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map { cliqueInfo =>
-      Right(SelfClique.from(cliqueInfo))
+    node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
+      cliqueInfo =>
+        Right(SelfClique.from(cliqueInfo))
     }
 
   def doGetSelfCliqueSynced(req: Request): FutureTry[Boolean] =

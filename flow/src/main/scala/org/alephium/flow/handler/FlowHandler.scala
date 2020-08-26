@@ -89,7 +89,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     with FlowHandlerState {
   import FlowHandler._
 
-  override def statusSizeLimit: Int = brokerConfig.brokerNum * 100
+  override def statusSizeLimit: Int = brokerConfig.brokerNum * 100 // TODO: config this
 
   override def receive: Receive = handleWith(None)
 

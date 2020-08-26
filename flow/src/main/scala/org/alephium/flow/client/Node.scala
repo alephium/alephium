@@ -19,9 +19,10 @@ trait Node extends Service {
   implicit def config: AlephiumConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
+  def brokerManager: ActorRefT[BrokerManager.Command]
   def tcpController: ActorRefT[TcpController.Command]
   def discoveryServer: ActorRefT[DiscoveryServer.Command]
-  def boostraper: ActorRefT[Bootstrapper.Command]
+  def bootstrapper: ActorRefT[Bootstrapper.Command]
   def cliqueManager: ActorRefT[CliqueManager.Command]
   def eventBus: ActorRefT[EventBus.Message]
   def allHandlers: AllHandlers
@@ -83,7 +84,7 @@ object Node {
                                           blockFlowSynchronizer),
                       "CliqueManager")
 
-    val boostraper: ActorRefT[Bootstrapper.Command] =
+    val bootstrapper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system,
                       Bootstrapper.props(tcpController, discoveryServer, cliqueManager),
                       "Bootstrapper")
@@ -117,9 +118,10 @@ object Node {
 
   class Monitor(node: Node) extends BaseActor {
     private val orderedActors = Seq(
+      node.brokerManager,
       node.tcpController,
       node.discoveryServer,
-      node.boostraper,
+      node.bootstrapper,
       node.cliqueManager,
       node.eventBus
     ) ++ node.allHandlers.orderedHandlers
