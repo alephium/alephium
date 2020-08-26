@@ -13,7 +13,7 @@ import org.alephium.util.{AVector, Bits, Random}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic(val words: Seq[String]) extends AnyVal {
+final case class Mnemonic(words: Seq[String]) extends AnyVal {
   def toSeed(passphrase: String): ByteString = {
     val mnemonic     = words.mkString(" ").toCharArray
     val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
@@ -41,7 +41,11 @@ object Mnemonic {
     Source.fromInputStream(stream, "UTF-8").getLines().toSeq
   }
 
-  def generate(size: Int): Mnemonic = {
+  def generate(size: Int): Option[Mnemonic] = {
+    Option.when(worldListSizes.contains(size))(generateUnsafe(size))
+  }
+
+  def generateUnsafe(size: Int): Mnemonic = {
     assume(worldListSizes.contains(size))
     val typeIndex   = worldListSizes.indexOf(size)
     val entropySize = entropySizes(typeIndex)
@@ -61,7 +65,7 @@ object Mnemonic {
   }
 
   def fromWords(words: Seq[String]): Option[Mnemonic] = {
-    if (validateWords(words)) Some(new Mnemonic(words)) else None
+    Option.when(validateWords(words))(new Mnemonic(words))
   }
 
   protected[wallet] def validateEntropy(entropy: ByteString): Boolean = {
@@ -84,6 +88,6 @@ object Mnemonic {
   }
 
   def from(entropy: ByteString): Option[Mnemonic] = {
-    if (validateEntropy(entropy)) Some(unsafe(entropy)) else None
+    Option.when(validateEntropy(entropy))(unsafe(entropy))
   }
 }
