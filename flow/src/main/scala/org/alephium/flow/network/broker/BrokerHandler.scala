@@ -5,7 +5,6 @@ import java.net.InetSocketAddress
 import akka.actor.{Cancellable, Terminated}
 import akka.util.ByteString
 
-import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
@@ -97,8 +96,9 @@ trait BrokerHandler extends BaseActor {
       }
       blockFlowSynchronizer ! BlockFlowSynchronizer.Downloaded(blocks.map(_.hash))
     case Received(GetBlocks(hashes)) =>
-      val blocks = hashes.map(hash => Utils.unsafe(blockflow.getBlock(hash)))
-      send(SendBlocks(blocks))
+      escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
+        send(SendBlocks(blocks))
+      }
     case Received(SendHeaders(headers)) =>
       log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
       headers.foreach { header =>
@@ -106,8 +106,9 @@ trait BrokerHandler extends BaseActor {
         allHandlers.getHeaderHandler(header.chainIndex) ! message
       }
     case Received(GetHeaders(hashes)) =>
-      val headers = hashes.map(blockflow.getBlockHeaderUnsafe)
-      send(SendHeaders(headers))
+      escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
+        send(SendHeaders(headers))
+      }
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }

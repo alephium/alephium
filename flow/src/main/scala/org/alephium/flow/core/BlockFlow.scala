@@ -28,7 +28,7 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     }
   }
 
-  override def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
+  override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
     getSyncInfoUnsafe(brokerConfig)
   }
 
@@ -41,7 +41,7 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     } else AVector.empty
   }
 
-  override def getSyncInventoriesUnsafe(
+  override protected def getSyncInventoriesUnsafe(
       locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
     locators.map { locatorsPerChain =>
       if (locatorsPerChain.isEmpty) AVector.empty[Hash]
@@ -50,6 +50,18 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
         val chain      = getBlockChain(chainIndex)
         chain.getSyncDataUnsafe(locatorsPerChain)
       }
+    }
+  }
+
+  override protected def getIntraSyncInventoriesUnsafe(
+      remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
+    AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
+      val k         = index / remoteBroker.groupNumPerBroker
+      val l         = index % remoteBroker.groupNumPerBroker
+      val fromGroup = brokerConfig.groupFrom + k
+      val toGroup   = remoteBroker.groupFrom + l
+      val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
+      chain.getLatestHashesUnsafe()
     }
   }
 
@@ -170,17 +182,6 @@ object BlockFlow extends StrictLogging {
 
     override def getAllTips: AVector[Hash] = {
       aggregateHash(_.getAllTips)(_ ++ _)
-    }
-
-    def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
-      AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
-        val k         = index / remoteBroker.groupNumPerBroker
-        val l         = index % remoteBroker.groupNumPerBroker
-        val fromGroup = brokerConfig.groupFrom + k
-        val toGroup   = remoteBroker.groupFrom + l
-        val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
-        chain.getLatestHashesUnsafe()
-      }
     }
 
     // Rtips means tip representatives for all groups

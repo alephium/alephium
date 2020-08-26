@@ -39,8 +39,6 @@ object CliqueId
 
   private val countLookUp = Array(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4)
 
-  1 +: Array(1, 2)
-
   def hammingDist(byte0: Byte, byte1: Byte): Int = {
     val xor = byte0 ^ byte1
     countLookUp(xor & 0x0F) + countLookUp((xor >> 4) & 0x0F)

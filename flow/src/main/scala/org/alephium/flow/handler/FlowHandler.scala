@@ -124,14 +124,17 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
 
   def handleSync: Receive = {
     case GetSyncLocators =>
-      val locators = blockFlow.getSyncLocatorsUnsafe()
-      sender() ! SyncLocators(locators)
+      escapeIOError(blockFlow.getSyncLocators()) { locators =>
+        sender() ! SyncLocators(locators)
+      }
     case GetSyncInventories(locators) =>
-      val inventories = blockFlow.getSyncInventoriesUnsafe(locators)
-      sender() ! SyncInventories(inventories)
+      escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>
+        sender() ! SyncInventories(inventories)
+      }
     case GetIntraSyncInventories(brokerInfo) =>
-      val inventories = blockFlow.getIntraSyncInventoriesUnsafe(brokerInfo)
-      sender() ! SyncInventories(inventories)
+      escapeIOError(blockFlow.getIntraSyncInventories(brokerInfo)) { inventories =>
+        sender() ! SyncInventories(inventories)
+      }
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
