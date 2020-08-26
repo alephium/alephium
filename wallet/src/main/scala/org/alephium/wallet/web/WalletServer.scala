@@ -4,22 +4,39 @@ import scala.concurrent.ExecutionContext
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import sttp.tapir.docs.openapi._
+import sttp.tapir.openapi.OpenAPI
+import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
+import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
 
+@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 class WalletServer(walletService: WalletService)(implicit executionContext: ExecutionContext)
     extends WalletEndpoints {
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+
+  private val docs: OpenAPI = List(
+    createWallet,
+    restoreWallet,
+    lockWallet,
+    unlockWallet,
+    getBalance,
+    transfer,
+    getAddress
+  ).toOpenAPI("Alephium Wallet", "1.0")
+
+  private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
+
   def route: Route =
     createWallet.toRoute(
       walletCreation =>
         walletService
           .createWallet(walletCreation.password,
-                        walletCreation.mnemonicSize.getOrElse(Mnemonic.worldListSizes.head),
+                        walletCreation.mnemonicSize.getOrElse(Mnemonic.worldListSizes.last),
                         walletCreation.mnemonicPassphrase)
           .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)))) ~
       restoreWallet.toRoute(
@@ -34,5 +51,6 @@ class WalletServer(walletService: WalletService)(implicit executionContext: Exec
       getBalance.toRoute(_              => walletService.getBalance()) ~
       getAddress.toRoute(_              => walletService.getAddress()) ~
       transfer.toRoute(tr =>
-        walletService.transfer(tr.address, tr.amount).map(_.map(model.Transfer.Result.apply)))
+        walletService.transfer(tr.address, tr.amount).map(_.map(model.Transfer.Result.apply))) ~
+      swaggerUIRoute
 }

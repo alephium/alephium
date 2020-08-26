@@ -147,6 +147,7 @@ lazy val wallet = project("wallet")
       `tapir-akka`,
       `tapir-openapi`,
       `tapir-openapi-circe`,
+      `tapir-swagger-ui`,
       `scala-logging`,
       logback,
     )
