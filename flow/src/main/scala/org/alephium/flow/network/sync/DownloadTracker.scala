@@ -13,7 +13,7 @@ trait DownloadTracker extends BaseActor {
   val downloading: mutable.HashSet[Hash] = mutable.HashSet.empty
 
   def needToDownload(hash: Hash): Boolean =
-    !(blockflow.containsUnsafe(hash) && downloading.contains(hash))
+    !(blockflow.containsUnsafe(hash) || downloading.contains(hash))
 
   def download(hashes: AVector[AVector[Hash]]): Unit = {
     val toDownload = hashes.flatMap(_.filter(needToDownload))
