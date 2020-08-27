@@ -3,7 +3,8 @@ package org.alephium.flow.network.interclique
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerHandler => BaseBrokerHandler}
+import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.message.{SyncRequest, SyncResponse}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.ActorRefT

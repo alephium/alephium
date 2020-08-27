@@ -8,6 +8,7 @@ import akka.util.ByteString
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig

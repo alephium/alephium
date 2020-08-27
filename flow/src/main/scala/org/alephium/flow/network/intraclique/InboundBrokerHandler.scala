@@ -8,10 +8,8 @@ import akka.io.Tcp
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{
-  BlockFlowSynchronizer,
-  InboundBrokerHandler => BaseInboundBrokerHandler
-}
+import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.CliqueInfo

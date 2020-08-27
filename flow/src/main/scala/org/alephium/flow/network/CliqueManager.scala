@@ -7,7 +7,8 @@ import akka.util.ByteString
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
+import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._

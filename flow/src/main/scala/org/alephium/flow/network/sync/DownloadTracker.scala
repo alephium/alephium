@@ -1,8 +1,9 @@
-package org.alephium.flow.network.broker
+package org.alephium.flow.network.sync
 
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.Hash
 import org.alephium.util.{AVector, BaseActor}
 
