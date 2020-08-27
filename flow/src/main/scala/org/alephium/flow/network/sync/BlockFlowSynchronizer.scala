@@ -1,4 +1,4 @@
-package org.alephium.flow.network.broker
+package org.alephium.flow.network.sync
 
 import java.net.InetSocketAddress
 
@@ -6,6 +6,7 @@ import akka.actor.{Cancellable, Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
+import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration}

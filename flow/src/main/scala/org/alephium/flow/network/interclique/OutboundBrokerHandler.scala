@@ -7,10 +7,8 @@ import akka.actor.Props
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{
-  BlockFlowSynchronizer,
-  OutboundBrokerHandler => BaseOutboundBrokerHandler
-}
+import org.alephium.flow.network.broker.{OutboundBrokerHandler => BaseOutboundBrokerHandler}
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}

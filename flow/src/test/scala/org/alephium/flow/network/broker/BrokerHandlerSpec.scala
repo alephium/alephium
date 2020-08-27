@@ -9,6 +9,7 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{Hello, Payload}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
