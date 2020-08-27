@@ -1,14 +1,16 @@
 package org.alephium.flow.network.intraclique
 
+import org.alephium.flow.Utils
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandle}
-import org.alephium.protocol.message.{GetBlocks, SyncResponse}
+import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.protocol.message.SyncResponse
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
 import org.alephium.util.ActorRefT
 
-trait BrokerHandler extends BaseBrokerHandle {
+trait BrokerHandler extends BaseBrokerHandler {
   def selfCliqueInfo: CliqueInfo
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
@@ -31,12 +33,10 @@ trait BrokerHandler extends BaseBrokerHandle {
     val receive: Receive = {
       case FlowHandler.SyncInventories(inventories) =>
         send(SyncResponse(inventories))
-      case BaseBrokerHandle.Received(SyncResponse(hashes)) =>
-        log.debug(s"Received sync response from intra clique broker")
-        hashes.flatMapE(_.filterE(blockflow.contains(_).map(!_))) match {
-          case Left(error)       => log.debug(s"IO error in computing what to download: $error")
-          case Right(toDownload) => send(GetBlocks(toDownload))
-        }
+      case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
+        log.debug(
+          s"Received sync response ${Utils.show(hashes.flatMap(identity))} from intra clique broker")
+        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
     }
     receive
   }

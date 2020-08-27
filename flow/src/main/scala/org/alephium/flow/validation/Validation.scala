@@ -18,7 +18,6 @@ abstract class Validation[T <: FlowData, S <: ValidationStatus] {
   def validateAfterDependencies(data: T, flow: BlockFlow): IOResult[S]
 }
 
-// scalastyle:off number.of.methods
 object Validation {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def validateFlowDAG[T <: FlowData](datas: AVector[T])(
@@ -38,4 +37,3 @@ object Validation {
     current <= data.target
   }
 }
-// scalastyle:on number.of.methods

@@ -53,10 +53,9 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
-    blockFlow.includes(data) match {
+    blockFlow.contains(data.hash) match {
       case Right(true) =>
         log.debug(s"Data for ${data.chainIndex} already exists") // TODO: DoS prevention
-        removeTask(broker, data.hash, origin)
         handleReadies(broker, origin, pending => Right(pending.parentHash == data.hash))
       case Right(false) =>
         validator.validate(data, blockFlow) match {
@@ -82,7 +81,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleIOError(broker: ActorRefT[ChainHandler.Event], error: IOError): Unit = {
-    log.debug(s"IO failed in block/header validation: ${error.toString}")
+    log.error(s"IO failed in block/header validation: ${error.toString}")
     feedbackAndClear(broker, dataAddingFailed())
   }
 
@@ -96,7 +95,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleInvalidData(broker: ActorRefT[ChainHandler.Event], status: InvalidStatus): Unit = {
-    log.debug(s"Failed in validation: $status")
+    log.error(s"Failed in validation: $status")
     feedbackAndClear(broker, dataInvalid())
   }
 

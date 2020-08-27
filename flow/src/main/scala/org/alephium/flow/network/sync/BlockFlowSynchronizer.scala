@@ -46,18 +46,12 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case FlowHandler.SyncLocators(locators) =>
       samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
     case SyncInventories(hashes) =>
-      log.debug(s"Received sync response from $remoteAddress")
       download(hashes)
     case Downloaded(hashes) =>
       downloaded(hashes)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
-  }
-
-  // Only use it when receive messages from inter clique BrokerHandler
-  private def remoteAddress: InetSocketAddress = {
-    brokerInfos(ActorRefT(sender())).address
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {

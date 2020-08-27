@@ -70,13 +70,13 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
 
   val resumeStrategy: OneForOneStrategy = OneForOneStrategy() {
     case e: Throwable =>
-      logger.error("Unhandled throwable", e)
+      logger.error("Unhandled throwable, resume the actor", e)
       SupervisorStrategy.Resume
   }
 
   val stopStrategy: OneForOneStrategy = OneForOneStrategy() {
     case e: Throwable =>
-      logger.error("Unhandled throwable", e)
+      logger.error("Unhandled throwable, stop the actor", e)
       SupervisorStrategy.Stop
   }
 }

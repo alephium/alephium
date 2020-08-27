@@ -2,15 +2,12 @@ package org.alephium.flow.core
 
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, FlowData}
+import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
 trait BlockPool extends BlockHashPool {
 
   def contains(block: Block): IOResult[Boolean] = contains(block.hash)
-
-  // TODO: refactor and merge contains and includes
-  def includes[T <: FlowData](data: T): IOResult[Boolean] = contains(data.hash)
 
   // Assuming the hash is in the pool
   def getBlock(hash: Hash): IOResult[Block]
