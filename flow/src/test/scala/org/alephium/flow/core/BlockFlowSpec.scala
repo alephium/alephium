@@ -1,7 +1,5 @@
 package org.alephium.flow.core
 
-import scala.annotation.tailrec
-
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -9,7 +7,6 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.Validation
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -397,58 +394,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val pubScript =
       block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
     checkBalance(blockFlow1, pubScript, 1)
-  }
-
-  def mine(blockFlow: BlockFlow,
-           chainIndex: ChainIndex,
-           onlyTxForIntra: Boolean                                      = false,
-           outputScriptOption: Option[(StatefulContract, AVector[Val])] = None,
-           txScriptOption: Option[StatefulScript]                       = None): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
-    val (_, toPublicKey) = chainIndex.to.generateKey
-    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
-    val transactions = {
-      if (brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
-        val mainGroup                  = chainIndex.from
-        val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val fromLockupScript           = LockupScript.p2pkh(publicKey)
-        val unlockScript               = UnlockScript.p2pkh(publicKey)
-        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-        val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.amount)
-        val (_, toPublicKey)           = chainIndex.to.generateKey
-        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
-        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-
-        val output0 = outputScriptOption match {
-          case Some((script, _)) => TxOutput.contract(1, height, toLockupScript, script)
-          case None              => TxOutput.asset(1, height, toLockupScript)
-        }
-        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
-        val outputs = AVector[TxOutput](output0, output1)
-        val unsignedTx = outputScriptOption match {
-          case Some((_, state)) =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector(state))
-          case None =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector.empty)
-        }
-        val transferTx = Transaction.from(unsignedTx, privateKey)
-        AVector(transferTx, coinbaseTx)
-      } else AVector(coinbaseTx)
-    }
-
-    @tailrec
-    def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
-      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
-    }
-
-    iter(0)
-  }
-
-  def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
-    blockFlow.add(block).isRight is true
-    blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * weightRatio
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
