@@ -5,15 +5,17 @@ import java.net.InetSocketAddress
 import akka.actor.{Cancellable, Terminated}
 import akka.util.ByteString
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.validation.Validation
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -86,14 +88,23 @@ trait BrokerHandler extends BaseActor {
 
   def exchanging: Receive
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
+      log.debug(s"Download blocks ${Utils.show(hashes)} from ${remoteBrokerInfo.address}")
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
-      log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
-      blocks.foreach { block =>
-        val message = BlockChainHandler.addOneBlock(block, dataOrigin)
-        allHandlers.getBlockHandler(block.chainIndex) ! message
+      log.debug(s"Received blocks ${Utils.showHash(blocks)} from ${remoteBrokerInfo.address}")
+      Validation.validateFlowDAG(blocks) match {
+        case Some(forests) =>
+          forests.foreach { forest =>
+            val chainIndex = ChainIndex.from(forest.roots.head.key)
+            val message    = BlockChainHandler.AddBlocks(forest, dataOrigin)
+            allHandlers.getBlockHandler(chainIndex) ! message
+          }
+        case None =>
+          log.warning(s"The blocks received do not form a proper flow DAG")
+          publishEvent(BrokerManager.InvalidDag(remoteAddress))
       }
       blockFlowSynchronizer ! BlockFlowSynchronizer.Downloaded(blocks.map(_.hash))
     case Received(GetBlocks(hashes)) =>
@@ -101,7 +112,7 @@ trait BrokerHandler extends BaseActor {
         send(SendBlocks(blocks))
       }
     case Received(SendHeaders(headers)) =>
-      log.debug(s"Received blocks from ${remoteBrokerInfo.address}")
+      log.debug(s"Received headers ${Utils.showHash(headers)} from ${remoteBrokerInfo.address}")
       headers.foreach { header =>
         val message = HeaderChainHandler.addOneHeader(header, dataOrigin)
         allHandlers.getHeaderHandler(header.chainIndex) ! message

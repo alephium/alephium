@@ -50,6 +50,10 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     expectMsg(BrokerHandler.DownloadBlocks(randomHashes))
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 
+    downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
+    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[Hash]))
+    downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
+
     downloadTrack ! BlockFlowSynchronizer.Downloaded(hashes)
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 

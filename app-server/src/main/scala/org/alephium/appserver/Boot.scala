@@ -19,7 +19,7 @@ object Boot extends App with StrictLogging {
   val typesafeConfig: Config                      = Configs.parseConfig(rootPath)
   implicit val config: AlephiumConfig             = AlephiumConfig.load(typesafeConfig).toOption.get
   implicit val apiConfig: ApiConfig               = ApiConfig.load(typesafeConfig).toOption.get
-  implicit val system: ActorSystem                = ActorSystem("Root", Configs.parseConfig(rootPath))
+  implicit val system: ActorSystem                = ActorSystem("Root", typesafeConfig)
   implicit val executionContext: ExecutionContext = system.dispatcher
 
   val flowMonitor: ActorRefT[FlowMonitor.Command] =

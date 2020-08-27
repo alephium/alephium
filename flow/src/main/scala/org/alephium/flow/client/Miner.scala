@@ -150,6 +150,7 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
       val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
+          log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
           val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
           blockHandler ! handlerMessage
           self ! Miner.MiningResult(Some(block), index, miningCount)

@@ -24,7 +24,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       request[Boolean](startMining, rpcPort(server.config.network.publicAddress.getPort)) is true
     }
 
-    blockNotifyProbe.receiveN(1, Duration.ofMinutesUnsafe(2).asScala)
+    blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
 
     clique1.foreach { server =>
       request[Boolean](stopMining, rpcPort(server.config.network.publicAddress.getPort)) is true

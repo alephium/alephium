@@ -1,5 +1,6 @@
 package org.alephium.flow.network.interclique
 
+import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
@@ -32,6 +33,8 @@ trait BrokerHandler extends BaseBrokerHandler {
       case FlowHandler.SyncInventories(inventories) =>
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
+        log.debug(
+          s"Received sync response ${Utils.show(hashes.flatMap(identity))} from $remoteAddress")
         if (hashes.forall(_.isEmpty)) {
           cliqueManager ! CliqueManager.Synced(remoteCliqueId, remoteBrokerInfo)
         } else {
