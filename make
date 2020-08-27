@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, multiprocessing, os, subprocess, sys, tempfile, secrets, hashlib
+import argparse, multiprocessing, os, pathlib, shutil, subprocess, sys, tempfile, secrets, hashlib
 
 port_start = 9973
 
@@ -97,6 +97,7 @@ class AlephiumMake(object):
 
     def run(self):
         tempdir = tempfile.gettempdir()
+        homedir = str(pathlib.Path.home())
         groups = get_env_int('GROUPS')
         brokerNum = get_env_default_int('BROKER_NUM', groups)
         nodes = get_env_int('NODES')
@@ -125,12 +126,14 @@ class AlephiumMake(object):
             if node // brokerNum > 0:
                 bootstrap = "localhost:" + str(9973 + node % brokerNum)
 
-            homedir = "{}/alephium/node-{}".format(tempdir, node)
+            nodedir = "{}/alephium/node-{}".format(tempdir, node)
 
-            if not os.path.exists(homedir):
-                os.makedirs(homedir)
+            if not os.path.exists(nodedir):
+                os.makedirs(nodedir)
 
-            run('BROKER_NUM={} BROKER_ID={} PUBLIC_ADDRESS={} MASTER_ADDRESS={} RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, homedir, homedir))
+            shutil.copy2(os.path.join(homedir, ".alephium", "user.conf"), nodedir)
+
+            run('BROKER_NUM={} BROKER_ID={} PUBLIC_ADDRESS={} MASTER_ADDRESS={} RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, nodedir, nodedir))
 
     def rpc(self, params):
         method = params[0]
