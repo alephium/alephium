@@ -1,6 +1,6 @@
 package org.alephium.flow.setting
 
-import java.nio.file.{Files => JFiles, Path}
+import java.nio.file.{Files => JFiles, Path, Paths}
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -13,7 +13,7 @@ object Platform extends StrictLogging {
   def getRootPath(env: Env): Path = {
     val rootPath = env match {
       case Env.Prod =>
-        Files.homeDir.resolve(".alephium")
+        sys.env.get("ALEPHIUM_HOME").fold[Path](Files.homeDir.resolve(".alephium"))(Paths.get(_))
       case Env.Debug =>
         Files.homeDir.resolve(s".alephium-${env.name}")
       case Env.Test =>
