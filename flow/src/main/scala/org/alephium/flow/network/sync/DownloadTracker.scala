@@ -21,7 +21,8 @@ trait DownloadTracker extends BaseActor {
     sender() ! BrokerHandler.DownloadBlocks(toDownload)
   }
 
-  def downloaded(hashes: AVector[Hash]): Unit = {
-    hashes.foreach(downloading.remove)
+  def finalized(hash: Hash): Unit = {
+    downloading.remove(hash)
+    ()
   }
 }

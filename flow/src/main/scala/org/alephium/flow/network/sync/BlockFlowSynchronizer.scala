@@ -17,9 +17,9 @@ object BlockFlowSynchronizer {
 
   sealed trait Command
   final case class HandShaked(brokerInfo: BrokerInfo)              extends Command
-  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
-  final case class Downloaded(hashes: AVector[Hash])               extends Command
   case object Sync                                                 extends Command
+  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
+  final case class BlockFinalized(hash: Hash)                      extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
@@ -45,10 +45,8 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       allHandlers.flowHandler ! FlowHandler.GetSyncLocators
     case FlowHandler.SyncLocators(locators) =>
       samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
-    case SyncInventories(hashes) =>
-      download(hashes)
-    case Downloaded(hashes) =>
-      downloaded(hashes)
+    case SyncInventories(hashes) => download(hashes)
+    case BlockFinalized(hash)    => finalized(hash)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)

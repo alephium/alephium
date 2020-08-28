@@ -106,7 +106,6 @@ trait BrokerHandler extends BaseActor {
           log.warning(s"The blocks received do not form a proper flow DAG")
           publishEvent(BrokerManager.InvalidDag(remoteAddress))
       }
-      blockFlowSynchronizer ! BlockFlowSynchronizer.Downloaded(blocks.map(_.hash))
     case Received(GetBlocks(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(SendBlocks(blocks))
@@ -126,10 +125,20 @@ trait BrokerHandler extends BaseActor {
   }
 
   def flowEvents: Receive = {
-    case BlockChainHandler.BlocksAdded(chainIndex) =>
-      log.debug(s"All the blocks sent for $chainIndex are added")
-    case HeaderChainHandler.HeadersAdded(chainIndex) =>
-      log.debug(s"All the headers sent for $chainIndex are added")
+    case BlockChainHandler.BlockAdded(hash) =>
+      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    case BlockChainHandler.BlockAddingFailed =>
+      log.debug(s"Failed in adding new block")
+    case BlockChainHandler.InvalidBlock(hash) =>
+      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+      publishEvent(BrokerManager.InvalidMessage(remoteAddress))
+    case HeaderChainHandler.HeaderAdded(_) =>
+      ()
+    case HeaderChainHandler.HeaderAddingFailed =>
+      log.debug(s"Failed in adding new header")
+    case HeaderChainHandler.InvalidHeader(hash) =>
+      log.debug(s"Invalid header received ${hash.shortHex}")
+      publishEvent(BrokerManager.InvalidMessage(remoteAddress))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
     case TxHandler.AddFailed(hash) =>

@@ -29,8 +29,8 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
       override def receive: Receive = {
         case BlockFlowSynchronizer.SyncInventories(hashes) =>
           download(hashes)
-        case BlockFlowSynchronizer.Downloaded(hashes) =>
-          downloaded(hashes)
+        case BlockFlowSynchronizer.BlockFinalized(hash) =>
+          finalized(hash)
       }
     }
 
@@ -54,10 +54,10 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[Hash]))
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 
-    downloadTrack ! BlockFlowSynchronizer.Downloaded(hashes)
+    hashes.foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 
-    downloadTrack ! BlockFlowSynchronizer.Downloaded(hashes ++ randomHashes)
+    (hashes ++ randomHashes).foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
     downloadTrack.underlyingActor.downloading.isEmpty is true
   }
 }
