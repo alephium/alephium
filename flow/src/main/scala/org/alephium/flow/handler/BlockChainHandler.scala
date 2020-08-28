@@ -5,7 +5,6 @@ import scala.collection.mutable
 import akka.actor.Props
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
-import org.alephium.flow.handler.FlowHandler.BlockAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.validation._
@@ -34,11 +33,10 @@ object BlockChainHandler {
                                    origin: DataOrigin)
       extends Command
 
-  sealed trait Event                                   extends ChainHandler.Event
-  final case class BlocksAdded(chainIndex: ChainIndex) extends Event
-  case object BlocksAddingFailed                       extends Event
-  case object InvalidBlocks                            extends Event
-  final case class FetchSince(tips: AVector[Hash])     extends Event
+  sealed trait Event                        extends ChainHandler.Event
+  final case class BlockAdded(hash: Hash)   extends Event
+  case object BlockAddingFailed             extends Event
+  final case class InvalidBlock(hash: Hash) extends Event
 }
 
 class BlockChainHandler(blockFlow: BlockFlow,
@@ -56,8 +54,8 @@ class BlockChainHandler(blockFlow: BlockFlow,
   override def receive: Receive = {
     case AddBlocks(blocks, origin) =>
       handleDatas(blocks, ActorRefT[ChainHandler.Event](sender()), origin)
-    case AddPendingBlock(block, broker, origin) => handlePending(block, broker, origin)
-    case BlockAdded(block, broker, origin)      => handleDataAdded(block, broker, origin)
+    case AddPendingBlock(block, broker, origin)        => handlePending(block, broker, origin)
+    case FlowHandler.BlockAdded(block, broker, origin) => handleDataAdded(block, broker, origin)
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
@@ -87,9 +85,9 @@ class BlockChainHandler(blockFlow: BlockFlow,
     flowHandler ! FlowHandler.PendingBlock(block, missings, origin, broker, self)
   }
 
-  override def dataAddedEvent(): Event = BlocksAdded(chainIndex)
+  override def dataAddedEvent(data: Block): Event = BlockAdded(data.hash)
 
-  override def dataAddingFailed(): Event = BlocksAddingFailed
+  override def dataAddingFailed(): Event = BlockAddingFailed
 
-  override def dataInvalid(): Event = InvalidBlocks
+  override def dataInvalid(data: Block): Event = InvalidBlock(data.hash)
 }

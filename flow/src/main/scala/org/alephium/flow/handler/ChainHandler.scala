@@ -61,7 +61,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
         validator.validate(data, blockFlow) match {
           case Left(e)                    => handleIOError(broker, e)
           case Right(MissingDeps(hashes)) => handleMissingDeps(data, hashes, broker, origin)
-          case Right(x: InvalidStatus)    => handleInvalidData(broker, x)
+          case Right(x: InvalidStatus)    => handleInvalidData(data, broker, x)
           case Right(_: ValidStatus)      => handleValidData(data, broker, origin)
           case Right(unexpected)          => log.warning(s"Unexpected pattern matching: $unexpected")
         }
@@ -74,7 +74,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
     validationResult match {
       case Left(e)                      => handleIOError(broker, e)
-      case Right(x: InvalidBlockStatus) => handleInvalidData(broker, x)
+      case Right(x: InvalidBlockStatus) => handleInvalidData(data, broker, x)
       case Right(_: ValidStatus)        => handleValidData(data, broker, origin)
       case Right(unexpected)            => log.debug(s"Unexpected pattern matching $unexpected")
     }
@@ -94,9 +94,11 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     pendingToFlowHandler(data, missings, broker, origin, ActorRefT[Command](self))
   }
 
-  def handleInvalidData(broker: ActorRefT[ChainHandler.Event], status: InvalidStatus): Unit = {
-    log.error(s"Failed in validation: $status")
-    feedbackAndClear(broker, dataInvalid())
+  def handleInvalidData(data: T,
+                        broker: ActorRefT[ChainHandler.Event],
+                        status: InvalidStatus): Unit = {
+    log.error(s"Failed in validate ${data.shortHex}: $status")
+    feedbackAndClear(broker, dataInvalid(data))
   }
 
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
@@ -109,7 +111,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleDataAdded(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    removeTask(broker, data.hash, origin)
+    removeTask(broker, data, origin)
     handleReadies(broker, origin, pending => Right(pending.parentHash == data.hash))
   }
 
@@ -133,11 +135,11 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
                            origin: DataOrigin,
                            self: ActorRefT[Command]): Unit
 
-  def dataAddedEvent(): Event
+  def dataAddedEvent(data: T): Event
 
   def dataAddingFailed(): Event
 
-  def dataInvalid(): Event
+  def dataInvalid(data: T): Event
 }
 
 abstract class ChainHandlerState[T <: FlowData: ClassTag] {
@@ -165,11 +167,11 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
     tasks.get(broker).exists(_.contains(task))
   }
 
-  def removeTask(broker: ActorRefT[ChainHandler.Event], hash: Hash, origin: DataOrigin): Unit = {
-    tasks(broker).removeRootNode(hash)
+  def removeTask(broker: ActorRefT[ChainHandler.Event], data: T, origin: DataOrigin): Unit = {
+    tasks(broker).removeRootNode(data.hash)
     if (tasks(broker).isEmpty) {
       origin match {
-        case _: DataOrigin.FromClique => feedbackAndClear(broker, dataAddedEvent())
+        case _: DataOrigin.FromClique => feedbackAndClear(broker, dataAddedEvent(data))
         case _                        => ()
       }
     }
@@ -182,5 +184,5 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
 
   def feedbackAndClear(broker: ActorRefT[ChainHandler.Event], event: Event): Unit
 
-  def dataAddedEvent(): Event
+  def dataAddedEvent(data: T): Event
 }
