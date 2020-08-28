@@ -45,10 +45,9 @@ object Miner {
   }
 
   sealed trait Command
-  case object Start                                   extends Command
-  case object Stop                                    extends Command
-  case object UpdateTemplate                          extends Command
-  final case class MinedBlockAdded(index: ChainIndex) extends Command
+  case object Start          extends Command
+  case object Stop           extends Command
+  case object UpdateTemplate extends Command
   final case class MiningResult(blockOpt: Option[Block],
                                 chainIndex: ChainIndex,
                                 miningCount: BigInt)
@@ -97,7 +96,7 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
     case Miner.Stop =>
       log.info("Stop mining")
       handlers.flowHandler ! FlowHandler.UnRegister
-      context become awaitStart
+      context become (awaitStart orElse handleMining)
   }
 
   def handleMining: Receive = {
@@ -119,9 +118,10 @@ class Miner(addresses: AVector[ED25519PublicKey], blockFlow: BlockFlow, allHandl
       }
     case Miner.UpdateTemplate =>
       updateTasks()
-    case Miner.MinedBlockAdded(chainIndex) =>
-      val fromShift = chainIndex.from.value - brokerConfig.groupFrom
-      val to        = chainIndex.to.value
+    case BlockChainHandler.BlockAdded(hash) =>
+      val chainIndex = ChainIndex.from(hash)
+      val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
+      val to         = chainIndex.to.value
       updateTasks()
       setIdle(fromShift, to)
       startNewTasks()
