@@ -180,8 +180,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
             sender() ! FlowHandler.BlockAdded(block, broker, origin)
             updateUponNewData(block.hash)
             origin match {
-              case DataOrigin.Local =>
-                minerOpt.foreach(_ ! Miner.MinedBlockAdded(block.chainIndex))
+              case DataOrigin.Local => ()
               case _: DataOrigin.FromClique =>
                 minerOpt.foreach(_ ! Miner.UpdateTemplate)
             }

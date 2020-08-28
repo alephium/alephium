@@ -111,7 +111,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   }
 
   def handleDataAdded(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    removeTask(broker, data, origin)
+    removeTask(broker, data)
     handleReadies(broker, origin, pending => Right(pending.parentHash == data.hash))
   }
 
@@ -167,13 +167,11 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
     tasks.get(broker).exists(_.contains(task))
   }
 
-  def removeTask(broker: ActorRefT[ChainHandler.Event], data: T, origin: DataOrigin): Unit = {
+  def removeTask(broker: ActorRefT[ChainHandler.Event], data: T): Unit = {
     tasks(broker).removeRootNode(data.hash)
+    broker ! dataAddedEvent(data)
     if (tasks(broker).isEmpty) {
-      origin match {
-        case _: DataOrigin.FromClique => feedbackAndClear(broker, dataAddedEvent(data))
-        case _                        => ()
-      }
+      remove(broker)
     }
   }
 
