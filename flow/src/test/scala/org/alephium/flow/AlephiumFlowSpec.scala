@@ -24,6 +24,12 @@ trait AlephiumFlowSpec
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)
 
+  def isolatedBlockFlow(): BlockFlow = {
+    val newStorages =
+      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
+  }
+
   def mine(blockFlow: BlockFlow,
            chainIndex: ChainIndex,
            onlyTxForIntra: Boolean                                      = false,
