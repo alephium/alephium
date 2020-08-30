@@ -19,6 +19,11 @@ alephium {
   network {
     ping-frequency = 300 second
     retry-timeout = 30 second
+
+    upnp {
+      enabled = false
+    }
+
     public-address = "localhost:9973"
     master-address = "localhost:9972"
     num-of-sync-blocks-limit = 4

@@ -41,7 +41,7 @@ trait CliqueCoordinatorState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  protected def buildCliqueInfo: IntraCliqueInfo = {
+  protected def buildCliqueInfo(): IntraCliqueInfo = {
     val infos = AVector.tabulate(brokerConfig.brokerNum) { i =>
       if (i == brokerConfig.brokerId) PeerInfo.self else brokerInfos(i).get
     }

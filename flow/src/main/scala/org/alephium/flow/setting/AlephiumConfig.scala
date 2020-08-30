@@ -12,6 +12,7 @@ import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
 import org.alephium.crypto.ED25519
+import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.LockupScript
@@ -47,8 +48,10 @@ final case class MiningSetting(nonceStep: BigInt)
 final case class NetworkSetting(
     pingFrequency: Duration,
     retryTimeout: Duration,
+    upnp: UpnpSettings,
     publicAddress: InetSocketAddress,
     masterAddress: InetSocketAddress,
+    declaredAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     rpcPort: Option[Int],
     wsPort: Option[Int],
@@ -57,7 +60,25 @@ final case class NetworkSetting(
   val isCoordinator: Boolean = publicAddress == masterAddress
 
   def handshakeTimeout: Duration = retryTimeout
+
+  val bindAddress: InetSocketAddress = publicAddress
+
+  val externalAddress: Option[InetSocketAddress] = declaredAddress match {
+    case Some(address) => Some(address)
+    case None =>
+      if (upnp.enabled) {
+        Upnp.getUpnpClient(upnp).map { client =>
+          val bindingPort = publicAddress.getPort
+          client.addPortMapping(bindingPort, bindingPort)
+          new InetSocketAddress(client.externalAddress, bindingPort)
+        }
+      } else None
+  }
 }
+
+final case class UpnpSettings(enabled: Boolean,
+                              httpTimeout: Option[Duration],
+                              discoveryTimeout: Option[Duration])
 
 final case class DiscoverySetting(
     bootstrap: ArraySeq[InetSocketAddress],

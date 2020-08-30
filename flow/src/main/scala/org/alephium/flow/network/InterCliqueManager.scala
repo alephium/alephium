@@ -13,7 +13,7 @@ import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrok
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueInfo, PeerId}
 import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
@@ -37,7 +37,7 @@ object InterCliqueManager {
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
 
-  final case class SyncStatus(cliqueId: CliqueId, address: InetSocketAddress, isSynced: Boolean)
+  final case class SyncStatus(peerId: PeerId, address: InetSocketAddress, isSynced: Boolean)
 
   final case class BrokerState(info: BrokerInfo,
                                actor: ActorRefT[BrokerHandler.Command],
@@ -71,7 +71,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case DiscoveryServer.NeighborCliques(neighborCliques) =>
       if (neighborCliques.nonEmpty) {
         log.debug(s"Got ${neighborCliques.length} from discovery server")
-        neighborCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
+        neighborCliques.foreach(connect)
       } else {
         // TODO: refine the condition, check the number of brokers for example
         log.debug(s"Try to fetch peer brokers from discovery server")
@@ -100,61 +100,62 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         )
       context.actorOf(props, name)
       ()
-    case CliqueManager.HandShaked(cliqueId, brokerInfo) =>
-      log.debug(s"Start syncing with inter-clique node: $cliqueId, $brokerInfo")
+    case CliqueManager.HandShaked(brokerInfo) =>
+      log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       if (brokerConfig.intersect(brokerInfo)) {
-        addBroker(cliqueId, brokerInfo, sender())
+        addBroker(brokerInfo, sender())
       } else {
         context stop sender()
       }
-    case CliqueManager.Synced(cliqueId, brokerInfo) =>
-      log.debug(s"Complete syncing with $cliqueId, $brokerInfo")
-      setSynced(cliqueId, brokerInfo)
+    case CliqueManager.Synced(brokerInfo) =>
+      log.debug(s"Complete syncing with $brokerInfo")
+      setSynced(brokerInfo)
   }
 
   def handleMessage: Receive = {
     case message: CliqueManager.BroadCastBlock =>
       val block = message.block
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
-      iterBrokers { (cliqueId, brokerState) =>
-        if (!message.origin.isFrom(cliqueId) && brokerState.readyFor(block.chainIndex)) {
-          log.debug(s"Send block to broker $cliqueId")
+      iterBrokers { (peerId, brokerState) =>
+        if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(block.chainIndex)) {
+          log.debug(s"Send block to broker $peerId")
           brokerState.actor ! BrokerHandler.Send(message.blockMsg)
         }
       }
     case message: CliqueManager.BroadCastTx =>
       log.debug(s"Broadcasting tx ${message.tx.shortHex} for ${message.chainIndex}")
-      iterBrokers { (cliqueId, brokerState) =>
-        if (!message.origin.isFrom(cliqueId) && brokerState.readyFor(message.chainIndex)) {
-          log.debug(s"Send tx to broker $cliqueId")
+      iterBrokers { (peerId, brokerState) =>
+        if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(message.chainIndex)) {
+          log.debug(s"Send tx to broker $peerId")
           brokerState.actor ! BrokerHandler.Send(message.txMsg)
         }
       }
 
     case GetSyncStatuses =>
-      val syncStatuses: Seq[SyncStatus] = mapBrokers { (cliqueId, brokerState) =>
-        SyncStatus(cliqueId, brokerState.info.address, brokerState.isSynced)
+      val syncStatuses: Seq[SyncStatus] = mapBrokers { (peerId, brokerState) =>
+        SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
       }
       sender() ! syncStatuses
   }
 
-  def connect(cliqueInfo: CliqueInfo): Unit = {
-    cliqueInfo.brokers.foreach { brokerInfo =>
-      if (brokerConfig.intersect(brokerInfo)) {
-        log.debug(s"Try to connect to ${cliqueInfo.id} $brokerInfo")
-        val remoteCliqueId = cliqueInfo.id
-        val name =
-          BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
-        val props =
-          OutboundBrokerHandler.props(selfCliqueInfo,
-                                      brokerInfo,
-                                      blockflow,
-                                      allHandlers,
-                                      ActorRefT[CliqueManager.Command](self),
-                                      blockFlowSynchronizer)
-        context.actorOf(props, name)
-      }
+  def connect(clique: CliqueInfo): Unit = {
+    clique.brokers.foreach { brokerInfo =>
+      if (brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo)) connect(brokerInfo)
     }
+  }
+
+  private def connect(brokerInfo: BrokerInfo): Unit = {
+    log.debug(s"Try to connect to $brokerInfo")
+    val name = BaseActor.envalidActorName(s"OutboundBrokerHandler-$brokerInfo")
+    val props =
+      OutboundBrokerHandler.props(selfCliqueInfo,
+                                  brokerInfo,
+                                  blockflow,
+                                  allHandlers,
+                                  self,
+                                  blockFlowSynchronizer)
+    context.actorOf(props, name)
+    ()
   }
 }
 
@@ -164,40 +165,38 @@ trait InterCliqueManagerState {
   def log: LoggingAdapter
 
   // The key is (CliqueId, BrokerId)
-  private val brokers = collection.mutable.HashMap.empty[(CliqueId, Int), BrokerState]
+  private val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
 
-  def addBroker(cliqueId: CliqueId,
-                brokerInfo: BrokerInfo,
-                broker: ActorRefT[BrokerHandler.Command]): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.brokerId
-    if (!brokers.contains(brokerKey)) {
-      brokers += brokerKey -> BrokerState(brokerInfo, broker, isSynced = false)
+  def addBroker(brokerInfo: BrokerInfo, broker: ActorRefT[BrokerHandler.Command]): Unit = {
+    val peerId = brokerInfo.peerId
+    if (!brokers.contains(peerId)) {
+      brokers += peerId -> BrokerState(brokerInfo, broker, isSynced = false)
     } else {
-      log.warning(s"Ignore another connection from $cliqueId")
+      log.warning(s"Ignore another connection from $peerId")
     }
   }
 
-  def containsBroker(clique: CliqueInfo): Boolean = {
-    brokers.keySet.exists(_._1 == clique.id)
+  def containsBroker(brokerInfo: BrokerInfo): Boolean = {
+    brokers.contains(brokerInfo.peerId)
   }
 
-  def iterBrokers(f: (CliqueId, BrokerState) => Unit): Unit = {
+  def iterBrokers(f: (PeerId, BrokerState) => Unit): Unit = {
     brokers.foreach {
-      case ((cliqueId, _), state) => f(cliqueId, state)
+      case (peerId, state) => f(peerId, state)
     }
   }
 
-  def mapBrokers[A](f: (CliqueId, BrokerState) => A): Seq[A] = {
-    brokers.toSeq.map {
-      case ((cliqueId, _), state) => f(cliqueId, state)
-    }
+  def mapBrokers[A](f: (PeerId, BrokerState) => A): Seq[A] = {
+    brokers.collect {
+      case (peerId, state) => f(peerId, state)
+    }.toSeq
   }
 
-  def setSynced(cliqueId: CliqueId, brokerInfo: BrokerInfo): Unit = {
-    val brokerKey = cliqueId -> brokerInfo.brokerId
-    brokers.get(brokerKey) match {
-      case Some(state) => brokers(brokerKey) = state.setSynced()
-      case None        => log.warning(s"Unexpected message Synced from $cliqueId")
+  def setSynced(brokerInfo: BrokerInfo): Unit = {
+    val peerId = brokerInfo.peerId
+    brokers.get(peerId) match {
+      case Some(state) => brokers(peerId) = state.setSynced()
+      case None        => log.warning(s"Unexpected message Synced from $peerId")
     }
   }
 }

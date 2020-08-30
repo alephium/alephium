@@ -44,10 +44,9 @@ object CliqueManager {
                                chainIndex: ChainIndex,
                                origin: DataOrigin)
       extends Command
-  final case class SendAllHandlers(allHandlers: AllHandlers)              extends Command
-  final case class HandShaked(cliqueId: CliqueId, brokerInfo: BrokerInfo) extends Command
-  final case class Synced(cliqueId: CliqueId, brokerInfo: BrokerInfo)     extends Command
-  final case object IsSelfCliqueReady                                     extends Command
+  final case class HandShaked(brokerInfo: BrokerInfo) extends Command
+  final case class Synced(brokerInfo: BrokerInfo)     extends Command
+  final case object IsSelfCliqueReady                 extends Command
 }
 
 class CliqueManager(blockflow: BlockFlow,
@@ -77,6 +76,8 @@ class CliqueManager(blockflow: BlockFlow,
   def awaitStart(pool: ConnectionPool): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
+      discoveryServer ! DiscoveryServer.SendCliqueInfo(cliqueInfo)
+
       val intraCliqueManager =
         context.actorOf(IntraCliqueManager.props(cliqueInfo,
                                                  blockflow,

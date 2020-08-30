@@ -52,9 +52,10 @@ trait Generators extends NumericHelpers {
 
   def brokerInfoGen(implicit config: CliqueConfig): Gen[BrokerInfo] =
     for {
-      id      <- Gen.choose(0, config.brokerNum - 1)
-      address <- socketAddressGen
-    } yield BrokerInfo.unsafe(id, config.groupNumPerBroker, address)
+      cliqueId <- cliqueIdGen
+      brokerId <- Gen.choose(0, config.brokerNum - 1)
+      address  <- socketAddressGen
+    } yield BrokerInfo.unsafe(cliqueId, brokerId, config.groupNumPerBroker, address)
 
   def cliqueInfoGen(implicit config: GroupConfig): Gen[CliqueInfo] =
     for {

@@ -15,15 +15,15 @@ import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
-  def props(publicAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
+  def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props =
-    Props(new DiscoveryServer(publicAddress, bootstrap))
+    Props(new DiscoveryServer(bindAddress, bootstrap))
 
-  def props(publicAddress: InetSocketAddress, peers: InetSocketAddress*)(
+  def props(bindAddress: InetSocketAddress, peers: InetSocketAddress*)(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props = {
-    props(publicAddress, ArraySeq.from(peers))
+    props(bindAddress, ArraySeq.from(peers))
   }
 
   final case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
@@ -61,7 +61,7 @@ object DiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class DiscoveryServer(val publicAddress: InetSocketAddress,
+class DiscoveryServer(val bindAddress: InetSocketAddress,
                       val bootstrap: ArraySeq[InetSocketAddress])(
     implicit val groupConfig: GroupConfig,
     val discoveryConfig: DiscoveryConfig)
@@ -80,7 +80,7 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
-      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(publicAddress.getPort))
+      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(bindAddress.getPort))
       context become (binding orElse handleCommand)
   }
 

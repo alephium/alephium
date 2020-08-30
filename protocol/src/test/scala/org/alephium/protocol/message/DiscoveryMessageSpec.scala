@@ -49,14 +49,16 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def groups: Int            = 4
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1
-    def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
+    def brokerInfo: BrokerInfo =
+      BrokerInfo.unsafe(CliqueId.generate, 0, groupNumPerBroker, publicAddress)
     def isCoordinator: Boolean = true
 
     val peerFixture = new DiscoveryConfigFixture {
       def groups: Int            = 4
       def brokerNum: Int         = 4
       def groupNumPerBroker: Int = 1
-      def brokerInfo: BrokerInfo = BrokerInfo.unsafe(0, groupNumPerBroker, publicAddress)
+      def brokerInfo: BrokerInfo =
+        BrokerInfo.unsafe(CliqueId.generate, 0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
     forAll(messageGen(peerFixture.discoveryConfig, peerFixture.groupConfig)) { msg =>

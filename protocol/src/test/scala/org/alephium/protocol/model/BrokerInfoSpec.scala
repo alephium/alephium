@@ -2,20 +2,11 @@ package org.alephium.protocol.model
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{DefaultGenerators, Generators}
+import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.util.AlephiumSpec
 
 class BrokerInfoSpec extends AlephiumSpec {
-  it should "check equality properly" in new DefaultGenerators {
-    forAll { (id: Int, groupNumPerBroker: Int) =>
-      val address = socketAddressGen.sample.get
-      val info0   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
-      val info1   = BrokerInfo.unsafe(id, groupNumPerBroker, address)
-      info0 is info1
-    }
-  }
-
   it should "check if group included" in {
     forAll(Gen.oneOf(2 to 1 << 4)) { _groups =>
       new Generators {
