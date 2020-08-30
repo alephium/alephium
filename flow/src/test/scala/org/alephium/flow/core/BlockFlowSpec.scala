@@ -285,7 +285,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     brokerConfig.groupNumPerBroker is 1 // the test only works in this case
 
     (0 until brokerConfig.groups).foreach { testToGroup =>
-      val blockFlow0    = genesisBlockFlow()
+      val blockFlow0    = isolatedBlockFlow()
       val testFromGroup = brokerConfig.groupFrom
       val blocks = (1 to 6).map { k =>
         val block =
@@ -307,7 +307,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         }
       blockFlow0.getSyncLocators() isE locators0
 
-      val blockFlow1 = genesisBlockFlow()
+      val blockFlow1 = isolatedBlockFlow()
       val locators1: AVector[AVector[Hash]] = AVector.tabulate(config.broker.groups) { group =>
         AVector(config.genesisBlocks(testFromGroup)(group).hash)
       }
