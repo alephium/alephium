@@ -15,7 +15,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -39,7 +39,6 @@ trait BrokerHandler extends BaseActor {
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteCliqueId: CliqueId     = _
   var remoteBrokerInfo: BrokerInfo = _
 
   def handShakeDuration: Duration
@@ -62,7 +61,7 @@ trait BrokerHandler extends BaseActor {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         handshakeTimeoutTick.cancel()
-        handleHandshakeInfo(hello.cliqueId, hello.brokerInfo)
+        handleHandshakeInfo(hello.brokerInfo)
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
         context become (exchanging orElse pingPong)
@@ -75,8 +74,7 @@ trait BrokerHandler extends BaseActor {
     receive
   }
 
-  def handleHandshakeInfo(_remoteCliqueId: CliqueId, _remoteBrokerInfo: BrokerInfo): Unit = {
-    remoteCliqueId   = _remoteCliqueId
+  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 

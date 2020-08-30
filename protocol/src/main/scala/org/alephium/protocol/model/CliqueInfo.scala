@@ -21,7 +21,7 @@ final case class CliqueInfo private (
 
   def brokers: AVector[BrokerInfo] = {
     peers.mapWithIndex { (address, index) =>
-      BrokerInfo.unsafe(index, groupNumPerBroker, address)
+      BrokerInfo.unsafe(id, index, groupNumPerBroker, address)
     }
   }
 
@@ -31,6 +31,8 @@ final case class CliqueInfo private (
 
   def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): BrokerInfo =
     brokers(brokerConfig.brokerId)
+
+  def brokerInfoUnsafe(brokerId: Int): BrokerInfo = brokers(brokerId)
 }
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {

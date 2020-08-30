@@ -61,6 +61,11 @@ alephium {
   network {
     ping-frequency = 300 second
     retry-timeout = 30 second
+
+    upnp {
+      enabled = false
+    }
+
     public-address = ${PUBLIC_ADDRESS}
     master-address = ${MASTER_ADDRESS}
     num-of-sync-blocks-limit = 128

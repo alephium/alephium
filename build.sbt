@@ -117,7 +117,8 @@ lazy val flow = project("flow")
       akka,
       `akka-slf4j`,
       logback,
-      `scala-logging`
+      `scala-logging`,
+      weupnp
     )
   )
   .dependsOn(protocol % "test->test;compile->compile")

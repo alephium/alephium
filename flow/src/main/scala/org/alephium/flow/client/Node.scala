@@ -68,7 +68,7 @@ object Node {
       ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val discoveryProps: Props =
-      DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
+      DiscoveryServer.props(networkSetting.bindAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
@@ -86,9 +86,7 @@ object Node {
                       "CliqueManager")
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
-      ActorRefT.build(system,
-                      Bootstrapper.props(tcpController, discoveryServer, cliqueManager),
-                      "Bootstrapper")
+      ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
 
     val monitor: ActorRefT[Node.Command] =
       ActorRefT.build(system, Monitor.props(this), "NodeMonitor")
