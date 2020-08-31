@@ -40,7 +40,7 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
       context.actorOf(BrokerConnector.props(remote, connection, self), name)
       ()
     case info: PeerInfo =>
-      log.debug(s"Received broker info from ${info.address} id: ${info.id}")
+      log.debug(s"Received broker info from ${info.publicAddress} id: ${info.id}")
       if (addBrokerInfo(info, sender())) {
         context watch sender()
       }

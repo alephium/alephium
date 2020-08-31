@@ -193,7 +193,8 @@ object ApiModel {
   object SelfClique {
     def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
       SelfClique(cliqueInfo.id,
-                 cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
+                 cliqueInfo.peers.map(peer =>
+                   PeerAddress(peer.publicAddress.getAddress, peer.rpcPort, peer.wsPort)),
                  cliqueInfo.groupNumPerBroker)
     }
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
