@@ -43,9 +43,9 @@ trait TestFixtureLike
     (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "164RM7TNkCW962cDTYY8R1rNmeaVNqXYNj23QxZ5SjCxp"
-  val publicKey               = "024e7d22d0421f69e3adfb3ce888d17b8a65935b6950a19fc3ce09411f3b03b4f1"
-  val privateKey              = "caac1023f2889e528874bcb371aea139c7597a05d2dcc06ef0fd69973aacde4a"
+  val address                 = "16xrcCkHtAcrgpcDkXSU2zvSWdRGtkjKzSaP1DxjcxKCe"
+  val publicKey               = "0269bd0589fd46f2303c1b2792b111c867d047b2b5b232916204121ea0115c6ea4"
+  val privateKey              = "f1d0a9e3256f1cb8137bd64a61345cfbe55ea91926395ea04c8d365d1d7c6f1c"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
