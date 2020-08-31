@@ -89,9 +89,8 @@ trait BootstrapperHandler extends BaseActor {
 
   def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
-      val cliqueInfo = intraCliqueInfo.cliqueInfo
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
-      cliqueManager ! CliqueManager.Start(cliqueInfo)
+      cliqueManager ! CliqueManager.Start(intraCliqueInfo.cliqueInfo)
 
       context become (ready(intraCliqueInfo) orElse forwardConnection)
   }

@@ -200,14 +200,13 @@ object ApiModel {
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
-  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends ApiModel
+  final case class NeighborCliques(cliques: AVector[InterCliqueInfo]) extends ApiModel
   object NeighborCliques {
-    implicit val cliqueEncoder: Encoder[CliqueInfo] =
-      Encoder.forProduct4("id", "externalAddresses", "internalAddresses", "groupNumPerBroker")(
-        info => (info.id, info.externalAddresses, info.internalAddresses, info.groupNumPerBroker))
-    implicit val cliqueDecoder: Decoder[CliqueInfo] =
-      Decoder.forProduct4("id", "externalAddresses", "internalAddresses", "groupNumPerBroker")(
-        CliqueInfo.unsafe)
+    implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
+      Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
+        (info.id, info.externalAddresses, info.groupNumPerBroker))
+    implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
+      Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
     implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 

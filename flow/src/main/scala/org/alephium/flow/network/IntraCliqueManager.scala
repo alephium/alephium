@@ -105,7 +105,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   }
 
   def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
-    if (newBrokers.size == cliqueInfo.internalAddresses.length - 1) {
+    if (newBrokers.size == cliqueInfo.brokerNum - 1) {
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
       context become handle(newBrokers)

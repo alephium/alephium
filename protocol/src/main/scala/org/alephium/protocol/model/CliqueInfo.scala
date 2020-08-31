@@ -15,18 +15,20 @@ final case class CliqueInfo private (
     internalAddresses: AVector[InetSocketAddress],
     groupNumPerBroker: Int
 ) { self =>
+  def brokerNum: Int = internalAddresses.length
+
   def cliqueConfig: CliqueConfig = new CliqueConfig {
-    val groups: Int    = internalAddresses.length * self.groupNumPerBroker
-    val brokerNum: Int = internalAddresses.length
+    val brokerNum: Int = self.brokerNum
+    val groups: Int    = self.brokerNum * self.groupNumPerBroker
   }
 
   def brokers: AVector[BrokerInfo] = {
-    internalAddresses.mapWithIndex { (address, index) =>
-      BrokerInfo.unsafe(id, index, groupNumPerBroker, address)
+    internalAddresses.mapWithIndex { (internalAddress, index) =>
+      val externalAddressesOpt = externalAddresses(index)
+      val brokerAddress        = externalAddressesOpt.fold(internalAddress)(identity)
+      BrokerInfo.unsafe(id, index, groupNumPerBroker, brokerAddress)
     }
   }
-
-  def brokerNum: Int = internalAddresses.length
 
   def masterAddress: InetSocketAddress = internalAddresses.head
 
@@ -34,22 +36,23 @@ final case class CliqueInfo private (
     brokers(brokerConfig.brokerId)
 
   def brokerInfoUnsafe(brokerId: Int): BrokerInfo = brokers(brokerId)
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def interCliqueInfo: Option[InterCliqueInfo] =
+    Option.when(externalAddresses.forall(_.nonEmpty))(
+      InterCliqueInfo.unsafe(id, externalAddresses.map(_.get), groupNumPerBroker)
+    )
 }
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
-  private implicit val peerSerde: Serde[AVector[InetSocketAddress]] =
-    avectorSerde[InetSocketAddress]
   val _serde: Serde[CliqueInfo] =
     Serde.forProduct4(unsafe,
                       t => (t.id, t.externalAddresses, t.internalAddresses, t.groupNumPerBroker))
 
   override def validate(info: CliqueInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    val peers             = info.internalAddresses
-    val groupNumPerBroker = info.groupNumPerBroker
-    if (peers.isEmpty) Left("Peers vector is empty")
-    else if (groupNumPerBroker < 0) Left("Group number per broker is not positive")
-    else if (peers.length * groupNumPerBroker != config.groups)
-      Left(s"Number of groups: got: ${peers.length * groupNumPerBroker} expect: ${config.groups}")
+    val cliqueGroups = info.brokerNum * info.groupNumPerBroker
+    if (cliqueGroups != config.groups)
+      Left(s"Number of groups: got: $cliqueGroups expect: ${config.groups}")
     else Right(())
   }
 
@@ -58,5 +61,38 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
              internalAddresses: AVector[InetSocketAddress],
              groupNumPerBroker: Int): CliqueInfo = {
     new CliqueInfo(id, externalAddresses, internalAddresses, groupNumPerBroker)
+  }
+}
+
+final case class InterCliqueInfo(
+    id: CliqueId,
+    externalAddresses: AVector[InetSocketAddress],
+    groupNumPerBroker: Int
+) {
+  def brokerNum: Int = externalAddresses.length
+
+  def brokers: AVector[BrokerInfo] = {
+    externalAddresses.mapWithIndex { (externalAddress, index) =>
+      BrokerInfo.unsafe(id, index, groupNumPerBroker, externalAddress)
+    }
+  }
+}
+
+object InterCliqueInfo extends SafeSerdeImpl[InterCliqueInfo, GroupConfig] {
+  val _serde: Serde[InterCliqueInfo] =
+    Serde.forProduct3(unsafe, t => (t.id, t.externalAddresses, t.groupNumPerBroker))
+
+  override def validate(info: InterCliqueInfo)(
+      implicit config: GroupConfig): Either[String, Unit] = {
+    val cliqueGroup = info.brokerNum * info.groupNumPerBroker
+    if (cliqueGroup != config.groups)
+      Left(s"Number of groups: got: $cliqueGroup expect: ${config.groups}")
+    else Right(())
+  }
+
+  def unsafe(id: CliqueId,
+             externalAddresses: AVector[InetSocketAddress],
+             groupNumPerBroker: Int): InterCliqueInfo = {
+    new InterCliqueInfo(id, externalAddresses, groupNumPerBroker)
   }
 }

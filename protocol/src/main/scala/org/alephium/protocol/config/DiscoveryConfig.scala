@@ -25,4 +25,6 @@ trait DiscoveryConfig {
 
   /** Duration we wait before considering a peer dead. **/
   def peersTimeout: Duration = scanFrequency.timesUnsafe(3)
+
+  def expireDuration: Duration = Duration.ofHoursUnsafe(1)
 }

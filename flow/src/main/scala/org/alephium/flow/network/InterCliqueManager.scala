@@ -13,7 +13,7 @@ import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrok
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueInfo, InterCliqueInfo, PeerId}
 import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
@@ -62,8 +62,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     with InterCliqueManagerState {
   import InterCliqueManager._
   discoveryServer ! DiscoveryServer.GetNeighborCliques
-
-  val selfBrokerInfo: BrokerInfo = selfCliqueInfo.selfBrokerInfo
 
   override def receive: Receive = handleMessage orElse handleConnection orElse awaitNeighborCliques
 
@@ -138,7 +136,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       sender() ! syncStatuses
   }
 
-  def connect(clique: CliqueInfo): Unit = {
+  def connect(clique: InterCliqueInfo): Unit = {
     clique.brokers.foreach { brokerInfo =>
       if (brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo)) connect(brokerInfo)
     }

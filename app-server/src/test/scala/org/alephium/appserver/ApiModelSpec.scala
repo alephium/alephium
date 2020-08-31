@@ -114,10 +114,10 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode NeighborCliques" in {
-    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo))
+    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo.interCliqueInfo.get))
     val cliqueIdString  = dummyCliqueInfo.id.toHexString
     def jsonRaw(cliqueId: String) =
-      s"""{"cliques":[{"id":"$cliqueId","externalAddresses":[{"addr":"127.0.0.1","port":9000}],"internalAddresses":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
+      s"""{"cliques":[{"id":"$cliqueId","externalAddresses":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
     checkData(neighborCliques, jsonRaw(cliqueIdString))
 
     parseFail[NeighborCliques](jsonRaw("OOPS")) is "invalid clique id"

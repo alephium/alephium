@@ -15,14 +15,14 @@ trait DiscoveryMessageGenerators extends Generators {
   } yield FindNode(target)
 
   def pingGen(implicit config: GroupConfig): Gen[Ping] =
-    cliqueInfoGen.map(Ping.apply)
+    interCliqueInfoGen.map(info => Ping.apply(Some(info)))
 
   def pongGen(implicit config: GroupConfig): Gen[Pong] =
-    cliqueInfoGen.map(Pong.apply)
+    interCliqueInfoGen.map(Pong.apply)
 
   def neighborsGen(implicit config: GroupConfig): Gen[Neighbors] =
     for {
-      infos <- Gen.listOf(cliqueInfoGen)
+      infos <- Gen.listOf(interCliqueInfoGen)
     } yield Neighbors(AVector.from(infos))
 
   def messageGen(implicit discoveryConfig: DiscoveryConfig,
