@@ -18,7 +18,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALFPrivateKey, ALFSignatureSchema, Hash}
+import org.alephium.protocol.{Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.rpc.CirceUtils
@@ -57,8 +57,8 @@ trait ServerFixture
     .sample
     .get
   lazy val dummySignature =
-    ALFSignatureSchema.sign(dummyTx.unsigned.hash.bytes,
-                            ALFPrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
+    SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
+                         PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
     dummyTx.hash.toHexString,
     dummyTx.fromGroup.value,
@@ -159,7 +159,7 @@ object ServerFixture {
                            fromUnlockScript: UnlockScript,
                            toLockupScript: LockupScript,
                            value: U64,
-                           fromPrivateKey: ALFPrivateKey): IOResult[Option[Transaction]] = {
+                           fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }
 

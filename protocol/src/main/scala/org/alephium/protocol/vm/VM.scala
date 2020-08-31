@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.{ALFSignature, Hash}
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
@@ -46,7 +46,7 @@ object StatelessVM extends VM[StatelessContext] {
                      txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signature: ALFSignature): ExeResult[WorldState] = {
+                     signature: Signature): ExeResult[WorldState] = {
     val context = StatelessContext(txHash, signature, worldState)
     val obj     = script.toObject
     execute(context, obj, 0, args).map(_ => context.worldState)
@@ -56,7 +56,7 @@ object StatelessVM extends VM[StatelessContext] {
                      txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signatures: Stack[ALFSignature]): ExeResult[WorldState] = {
+                     signatures: Stack[Signature]): ExeResult[WorldState] = {
     val context = StatelessContext(txHash, signatures, worldState)
     val obj     = script.toObject
     execute(context, obj, 0, args).map(_ => context.worldState)

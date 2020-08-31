@@ -9,7 +9,7 @@ import io.circe.{Codec, Encoder, Json, JsonObject}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.syntax._
 
-import org.alephium.protocol.{ALFPublicKey, ALFSignature}
+import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
@@ -22,7 +22,7 @@ trait BlockFlowClient {
       toAddress: String,
       value: Long): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
   def sendTransaction(tx: String,
-                      signature: ALFSignature): Future[Either[String, BlockFlowClient.TxResult]]
+                      signature: Signature): Future[Either[String, BlockFlowClient.TxResult]]
 }
 
 object BlockFlowClient {
@@ -84,7 +84,7 @@ object BlockFlowClient {
     def prepareTransaction(fromKey: String,
                            toAddress: String,
                            value: Long): Future[Either[String, CreateTransactionResult]] = {
-      Hex.from(fromKey).flatMap(ALFPublicKey.from).map(LockupScript.p2pkh) match {
+      Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
         case None => Future.successful(Left(s"Cannot decode $address"))
         case Some(lockupScript) =>
           val fromGroup = lockupScript.groupIndex.value
@@ -112,9 +112,8 @@ object BlockFlowClient {
       }
     }
 
-    def sendTransaction(
-        tx: String,
-        signature: ALFSignature): Future[Either[String, BlockFlowClient.TxResult]] = {
+    def sendTransaction(tx: String,
+                        signature: Signature): Future[Either[String, BlockFlowClient.TxResult]] = {
       request[SendTransaction, TxResult](SendTransaction(tx, signature.toHexString), address)
     }
 
