@@ -87,7 +87,7 @@ class AlephiumMake(object):
         run('sbt it:scalafmt it:scalastyle it:test')
 
     def package(self):
-        run('sbt app/universal:packageBin')
+        run('sbt app-server/universal:packageBin')
 
     def publish(self):
         run('sbt publishLocal')
