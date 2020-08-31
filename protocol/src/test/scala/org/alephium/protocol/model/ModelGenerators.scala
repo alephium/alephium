@@ -9,9 +9,7 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey, ALFSignatureSchema}
-import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
-import org.alephium.protocol.Hash
+import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}

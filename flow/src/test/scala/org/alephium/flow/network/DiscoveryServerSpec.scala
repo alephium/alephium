@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
-import org.alephium.crypto.ALFSignatureSchema
+import org.alephium.protocol.ALFSignatureSchema
 import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration}

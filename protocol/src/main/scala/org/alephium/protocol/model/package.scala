@@ -1,6 +1,6 @@
 package org.alephium.protocol
 
-import org.alephium.crypto.ALFPublicKey
+import org.alephium.protocol.ALFPublicKey
 
 package object model {
   val cliqueIdLength: Int = ALFPublicKey.length

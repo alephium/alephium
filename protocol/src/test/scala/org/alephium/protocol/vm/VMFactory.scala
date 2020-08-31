@@ -1,8 +1,7 @@
 package org.alephium.protocol.vm
 
-import org.alephium.crypto.ALFSignature
 import org.alephium.io.{MerklePatriciaTrie, StorageFixture}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFSignature, Hash}
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState = {

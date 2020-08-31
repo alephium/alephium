@@ -9,8 +9,8 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ALFPublicKey, ALFSignature, Sha256}
-import org.alephium.protocol.Hash
+import org.alephium.crypto.Sha256
+import org.alephium.protocol.{ALFPublicKey, ALFSignature, Hash}
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils

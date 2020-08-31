@@ -5,7 +5,7 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey}
+import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript

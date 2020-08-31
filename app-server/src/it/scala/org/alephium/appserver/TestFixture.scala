@@ -19,12 +19,11 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ALFPrivateKey, ALFSignature, ALFSignatureSchema}
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPrivateKey, ALFSignature, ALFSignatureSchema, Hash}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe

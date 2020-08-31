@@ -11,8 +11,8 @@ import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
-import org.alephium.crypto.ALFSignatureSchema
 import org.alephium.flow.network.nat.Upnp
+import org.alephium.protocol.ALFSignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.LockupScript

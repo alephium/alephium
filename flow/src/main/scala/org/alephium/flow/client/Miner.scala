@@ -6,14 +6,13 @@ import scala.util.{Failure, Random, Success}
 
 import akka.actor.Props
 
-import org.alephium.crypto.ALFPublicKey
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.flow.validation.Validation
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPublicKey, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript

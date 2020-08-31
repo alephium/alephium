@@ -2,8 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
-import org.alephium.crypto.ALFSignature
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFSignature, Hash}
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 

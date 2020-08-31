@@ -4,7 +4,7 @@ import scala.language.existentials
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ALFPublicKey, ALFSignature, ALFSignatureSchema}
+import org.alephium.protocol.{ALFPublicKey, ALFSignature, ALFSignatureSchema}
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.serde._

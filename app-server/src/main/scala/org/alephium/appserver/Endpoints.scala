@@ -9,8 +9,7 @@ import sttp.tapir.server.PartialServerEndpoint
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
-import org.alephium.crypto.ALFPublicKey
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPublicKey, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._

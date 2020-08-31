@@ -4,9 +4,9 @@ import java.nio.file.Path
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import org.alephium.crypto.ALFSignatureSchema
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.protocol.ALFSignatureSchema
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.storage.SecretStorage

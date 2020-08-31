@@ -2,8 +2,8 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
-import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey, ALFSignatureSchema}
 import org.alephium.macros.EnumerationMacros
+import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey, ALFSignatureSchema}
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}

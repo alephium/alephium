@@ -2,10 +2,9 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
-import org.alephium.crypto.{ALFSignature, ALFSignatureSchema}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, ALFSignature, ALFSignatureSchema, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._

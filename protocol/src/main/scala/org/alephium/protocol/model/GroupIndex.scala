@@ -2,8 +2,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 
-import org.alephium.crypto._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey, ALFSignatureSchema, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 
