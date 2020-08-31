@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.ALFPublicKey
+import org.alephium.protocol.PublicKey
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -14,7 +14,7 @@ object UnlockScript {
   implicit val serde: Serde[UnlockScript] = new Serde[UnlockScript] {
     override def serialize(input: UnlockScript): ByteString = {
       input match {
-        case ppkh: P2PKH => ByteString(0) ++ serdeImpl[ALFPublicKey].serialize(ppkh.publicKey)
+        case ppkh: P2PKH => ByteString(0) ++ serdeImpl[PublicKey].serialize(ppkh.publicKey)
         case psh: P2SH   => ByteString(1) ++ p2shSerde.serialize(psh)
         case ps: P2S     => ByteString(2) ++ p2sSerde.serialize(ps)
       }
@@ -23,7 +23,7 @@ object UnlockScript {
     override def _deserialize(input: ByteString): SerdeResult[(UnlockScript, ByteString)] = {
       byteSerde._deserialize(input).flatMap {
         case (0, content) =>
-          serdeImpl[ALFPublicKey]._deserialize(content).map(t => (new P2PKH(t._1), t._2))
+          serdeImpl[PublicKey]._deserialize(content).map(t => (new P2PKH(t._1), t._2))
         case (1, content) => p2shSerde._deserialize(content)
         case (2, content) => p2sSerde._deserialize(content)
         case (n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
@@ -31,11 +31,11 @@ object UnlockScript {
     }
   }
 
-  def p2pkh(publicKey: ALFPublicKey): P2PKH                     = P2PKH(publicKey)
+  def p2pkh(publicKey: PublicKey): P2PKH                        = P2PKH(publicKey)
   def p2sh(script: StatelessScript, params: AVector[Val]): P2SH = P2SH(script, params)
   def p2s(params: AVector[Val]): P2S                            = P2S(params)
 
-  final case class P2PKH(publicKey: ALFPublicKey)                          extends UnlockScript
+  final case class P2PKH(publicKey: PublicKey)                             extends UnlockScript
   final case class P2SH(script: StatelessScript, val params: AVector[Val]) extends UnlockScript
   final case class P2S(params: AVector[Val])                               extends UnlockScript
 }

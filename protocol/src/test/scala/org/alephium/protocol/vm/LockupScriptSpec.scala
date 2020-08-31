@@ -2,13 +2,13 @@ package org.alephium.protocol.vm
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol.ALFPublicKey
+import org.alephium.protocol.PublicKey
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Base58, Hex}
 
 class LockupScriptSpec extends AlephiumSpec {
   def test(address: String, publicKey: String): Assertion = {
-    val script = LockupScript.p2pkh(ALFPublicKey.unsafe(Hex.from(publicKey).get))
+    val script = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(publicKey).get))
     script.toBase58 is address
     deserialize[LockupScript](Base58.decode(address).get) isE script
   }

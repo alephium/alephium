@@ -6,7 +6,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.ALFSignatureSchema
+import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.storage.SecretStorage
@@ -93,7 +93,7 @@ object WalletService {
           case Left(error) => Future.successful(Left(error))
           case Right(createTxResult) =>
             val message   = Hex.unsafe(createTxResult.hash)
-            val signature = ALFSignatureSchema.sign(message, privateKey.privateKey)
+            val signature = SignatureSchema.sign(message, privateKey.privateKey)
             blockFlowClient
               .sendTransaction(createTxResult.unsignedTx, signature)
               .map(_.map(_.txId))

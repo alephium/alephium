@@ -12,7 +12,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.flow.validation.Validation
-import org.alephium.protocol.{ALFPublicKey, Hash}
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -32,7 +32,7 @@ object Miner {
     props(addresses, blockFlow, allHandlers)
   }
 
-  def props(addresses: AVector[ALFPublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+  def props(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,
       miningConfig: MiningSetting): Props = {
     require(addresses.length == brokerConfig.groups)
@@ -71,7 +71,7 @@ object Miner {
   }
 }
 
-class Miner(addresses: AVector[ALFPublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
     val miningConfig: MiningSetting)
     extends BaseActor

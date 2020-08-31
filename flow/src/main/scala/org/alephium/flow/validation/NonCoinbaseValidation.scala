@@ -4,7 +4,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, ALFSignature, ALFSignatureSchema, Hash}
+import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -209,7 +209,7 @@ object NonCoinbaseValidation {
         tx: Transaction,
         lockupScript: LockupScript,
         unlockScript: UnlockScript,
-        signatures: Stack[ALFSignature],
+        signatures: Stack[Signature],
         worldState: WorldState): TxValidationResult[Unit] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
@@ -223,17 +223,16 @@ object NonCoinbaseValidation {
       }
     }
 
-    protected[validation] def checkP2pkh(
-        tx: Transaction,
-        lock: LockupScript.P2PKH,
-        unlock: UnlockScript.P2PKH,
-        signatures: Stack[ALFSignature]): TxValidationResult[Unit] = {
+    protected[validation] def checkP2pkh(tx: Transaction,
+                                         lock: LockupScript.P2PKH,
+                                         unlock: UnlockScript.P2PKH,
+                                         signatures: Stack[Signature]): TxValidationResult[Unit] = {
       if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
         signatures.pop() match {
           case Right(signature) =>
-            if (!ALFSignatureSchema.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+            if (!SignatureSchema.verify(tx.hash.bytes, signature, unlock.publicKey)) {
               invalidTx(InvalidSignature)
             } else validTx(())
           case Left(_) => invalidTx(NotEnoughSignature)
@@ -244,7 +243,7 @@ object NonCoinbaseValidation {
     protected[validation] def checkP2SH(tx: Transaction,
                                         lock: LockupScript.P2SH,
                                         unlock: UnlockScript.P2SH,
-                                        signatures: Stack[ALFSignature],
+                                        signatures: Stack[Signature],
                                         worldState: WorldState): TxValidationResult[Unit] = {
       if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
         invalidTx(InvalidScriptHash)
@@ -256,7 +255,7 @@ object NonCoinbaseValidation {
     protected[validation] def checkP2S(tx: Transaction,
                                        lock: LockupScript.P2S,
                                        unlock: UnlockScript.P2S,
-                                       signatures: Stack[ALFSignature],
+                                       signatures: Stack[Signature],
                                        worldState: WorldState): TxValidationResult[Unit] = {
       checkScript(tx, lock.script, unlock.params, signatures, worldState)
     }
@@ -264,7 +263,7 @@ object NonCoinbaseValidation {
     protected[validation] def checkScript(tx: Transaction,
                                           script: StatelessScript,
                                           params: AVector[Val],
-                                          signatures: Stack[ALFSignature],
+                                          signatures: Stack[Signature],
                                           worldState: WorldState): TxValidationResult[Unit] = {
       StatelessVM.runAssetScript(worldState, tx.hash, script, params, signatures) match {
         case Right(_) => validTx(()) // TODO: handle returns

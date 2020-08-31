@@ -23,7 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.protocol.{ALFPrivateKey, ALFSignature, ALFSignatureSchema, Hash}
+import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -39,7 +39,7 @@ trait TestFixtureLike
   override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   def generateAccount: (String, String, String) = {
-    val (priKey, pubKey) = ALFSignatureSchema.generatePriPub()
+    val (priKey, pubKey) = SignatureSchema.generatePriPub()
     (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
@@ -228,9 +228,8 @@ trait TestFixtureLike
   )
 
   def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
-    val signature: ALFSignature = ALFSignatureSchema.sign(
-      Hex.unsafe(createTransactionResult.hash),
-      ALFPrivateKey.unsafe(Hex.unsafe(privateKey)))
+    val signature: Signature = SignatureSchema.sign(Hex.unsafe(createTransactionResult.hash),
+                                                    PrivateKey.unsafe(Hex.unsafe(privateKey)))
     jsonRpc(
       "send_transaction",
       s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""

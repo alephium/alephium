@@ -6,14 +6,14 @@ package object protocol {
   type Hash = Blake2b
   val Hash: Blake2b.type = Blake2b
 
-  type ALFPublicKey = SecP256K1PublicKey
-  val ALFPublicKey: SecP256K1PublicKey.type = SecP256K1PublicKey
+  type PublicKey = SecP256K1PublicKey
+  val PublicKey: SecP256K1PublicKey.type = SecP256K1PublicKey
 
-  type ALFPrivateKey = SecP256K1PrivateKey
-  val ALFPrivateKey: SecP256K1PrivateKey.type = SecP256K1PrivateKey
+  type PrivateKey = SecP256K1PrivateKey
+  val PrivateKey: SecP256K1PrivateKey.type = SecP256K1PrivateKey
 
-  type ALFSignature = SecP256K1Signature
-  val ALFSignature: SecP256K1Signature.type = SecP256K1Signature
+  type Signature = SecP256K1Signature
+  val Signature: SecP256K1Signature.type = SecP256K1Signature
 
-  val ALFSignatureSchema: SecP256K1.type = SecP256K1
+  val SignatureSchema: SecP256K1.type = SecP256K1
 }

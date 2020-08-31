@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{ALFPublicKey, Hash, HashSerde}
+import org.alephium.protocol.{Hash, HashSerde, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
@@ -48,7 +48,7 @@ object LockupScript {
     Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
   }
 
-  def p2pkh(key: ALFPublicKey): P2PKH   = p2pkh(Hash.hash(key.bytes))
+  def p2pkh(key: PublicKey): P2PKH      = p2pkh(Hash.hash(key.bytes))
   def p2pkh(pkHash: Hash): P2PKH        = new P2PKH(pkHash)
   def p2sh(scriptHash: Hash): P2SH      = new P2SH(scriptHash)
   def p2s(script: StatelessScript): P2S = new P2S(script)

@@ -5,7 +5,7 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey}
+import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
@@ -28,7 +28,7 @@ trait AlephiumConfigFixture {
   lazy val groupConfig: GroupConfig = new GroupConfig { override def groups: Int = groups0 }
 
   lazy val genesisBalances =
-    ArraySeq.tabulate[(ALFPrivateKey, ALFPublicKey, U64)](groups0) { i =>
+    ArraySeq.tabulate[(PrivateKey, PublicKey, U64)](groups0) { i =>
       val groupIndex              = GroupIndex.unsafe(i)(groupConfig)
       val (privateKey, publicKey) = groupIndex.generateKey(groupConfig)
       (privateKey, publicKey, genesisBalance)

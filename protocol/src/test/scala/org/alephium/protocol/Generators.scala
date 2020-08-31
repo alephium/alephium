@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey}
+import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, NumericHelpers}
@@ -38,10 +38,10 @@ trait Generators extends NumericHelpers {
     Gen.choose(0, config.groups - 1).map(ChainIndex.unsafe(groupIndex.value, _))
 
   def keypairGen(groupIndex: GroupIndex)(
-      implicit config: GroupConfig): Gen[(ALFPrivateKey, ALFPublicKey)] =
+      implicit config: GroupConfig): Gen[(PrivateKey, PublicKey)] =
     Gen.const(()).map(_ => groupIndex.generateKey)
 
-  def publicKeyGen(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[ALFPublicKey] =
+  def publicKeyGen(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PublicKey] =
     keypairGen(groupIndex).map(_._2)
 
   def cliqueIdGen: Gen[CliqueId] =

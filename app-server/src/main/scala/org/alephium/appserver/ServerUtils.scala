@@ -10,7 +10,7 @@ import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey, Hash}
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._
@@ -125,10 +125,10 @@ object ServerUtils {
   }
 
   def prepareTransaction(blockFlow: BlockFlow,
-                         fromKey: ALFPublicKey,
-                         toKey: ALFPublicKey,
+                         fromKey: PublicKey,
+                         toKey: PublicKey,
                          value: U64,
-                         fromPrivateKey: ALFPrivateKey): Try[Transaction] = {
+                         fromPrivateKey: PrivateKey): Try[Transaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(toKey)
     val toLockupScript   = LockupScript.p2pkh(toKey)
@@ -140,7 +140,7 @@ object ServerUtils {
   }
 
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
-                                 fromKey: ALFPublicKey,
+                                 fromKey: PublicKey,
                                  toLockupScript: LockupScript,
                                  value: U64): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
@@ -152,7 +152,7 @@ object ServerUtils {
     }
   }
 
-  def checkGroup(blockFlow: BlockFlow, publicKey: ALFPublicKey): Try[Unit] = {
+  def checkGroup(blockFlow: BlockFlow, publicKey: PublicKey): Try[Unit] = {
     checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
   }
 
