@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.scalacheck.Gen
 
-import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey}
+import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey}
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, NumericHelpers}

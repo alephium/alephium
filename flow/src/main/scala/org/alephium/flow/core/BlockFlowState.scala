@@ -3,11 +3,10 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.crypto.ALFPrivateKey
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPrivateKey, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._

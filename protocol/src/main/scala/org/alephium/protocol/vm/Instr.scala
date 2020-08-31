@@ -6,7 +6,7 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPublicKey, ALFSignatureSchema, Hash}
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}

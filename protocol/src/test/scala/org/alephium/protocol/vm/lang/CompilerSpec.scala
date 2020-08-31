@@ -2,8 +2,8 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{ALFSignatureSchema, Byte32}
-import org.alephium.protocol.Hash
+import org.alephium.crypto.Byte32
+import org.alephium.protocol.{ALFSignatureSchema, Hash}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._

@@ -7,11 +7,10 @@ import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
-import org.alephium.crypto.{ALFPrivateKey, ALFPublicKey}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPrivateKey, ALFPublicKey, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._

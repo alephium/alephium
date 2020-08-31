@@ -3,11 +3,10 @@ package org.alephium.flow.core
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.ALFPublicKey
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPublicKey, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler

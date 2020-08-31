@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.crypto.ALFPublicKey
+import org.alephium.protocol.ALFPublicKey
 import org.alephium.serde._
 import org.alephium.util.AVector
 

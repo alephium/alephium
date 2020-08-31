@@ -4,9 +4,9 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.{ALFSignature, ALFSignatureSchema}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.io.IOResult
+import org.alephium.protocol.{ALFSignature, ALFSignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 

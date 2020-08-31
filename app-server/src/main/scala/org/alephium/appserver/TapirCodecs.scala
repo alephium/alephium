@@ -6,8 +6,7 @@ import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.ALFPublicKey
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALFPublicKey, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.util.{TimeStamp, U64}

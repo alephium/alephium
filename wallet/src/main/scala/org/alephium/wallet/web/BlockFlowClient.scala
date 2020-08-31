@@ -9,7 +9,7 @@ import io.circe.{Codec, Encoder, Json, JsonObject}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.syntax._
 
-import org.alephium.crypto.{ALFPublicKey, ALFSignature}
+import org.alephium.protocol.{ALFPublicKey, ALFSignature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex

@@ -2,8 +2,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.crypto._
-import org.alephium.protocol.{ALF, Hash, HashSerde}
+import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
