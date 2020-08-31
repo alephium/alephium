@@ -11,7 +11,8 @@ import org.alephium.serde._
 final case class PeerInfo private (
     id: Int,
     groupNumPerBroker: Int,
-    publicAddress: InetSocketAddress,
+    externalAddress: Option[InetSocketAddress],
+    internalAddress: InetSocketAddress,
     rpcPort: Option[Int],
     wsPort: Option[Int]
 )
@@ -19,19 +20,22 @@ final case class PeerInfo private (
 object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
   def unsafe(id: Int,
              groupNumPerBroker: Int,
-             publicAddress: InetSocketAddress,
+             publicAddress: Option[InetSocketAddress],
+             privateAddress: InetSocketAddress,
              rpcPort: Option[Int],
              wsPort: Option[Int]): PeerInfo =
-    new PeerInfo(id, groupNumPerBroker, publicAddress, rpcPort, wsPort)
+    new PeerInfo(id, groupNumPerBroker, publicAddress, privateAddress, rpcPort, wsPort)
 
   val _serde: Serde[PeerInfo] =
-    Serde.forProduct5(unsafe,
-                      t => (t.id, t.groupNumPerBroker, t.publicAddress, t.rpcPort, t.wsPort))
+    Serde.forProduct6(
+      unsafe,
+      t => (t.id, t.groupNumPerBroker, t.externalAddress, t.internalAddress, t.rpcPort, t.wsPort))
 
   override def validate(info: PeerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     for {
       _ <- BrokerInfo.validate(info.id, info.groupNumPerBroker)
-      _ <- Configs.validatePort(info.publicAddress.getPort)
+      _ <- info.externalAddress.fold[Either[String, Unit]](Right(()))(address =>
+        Configs.validatePort(address.getPort))
       _ <- Configs.validatePort(info.rpcPort)
       _ <- Configs.validatePort(info.wsPort)
     } yield ()
@@ -41,7 +45,8 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
     new PeerInfo(
       brokerConfig.brokerId,
       brokerConfig.groupNumPerBroker,
-      networkSetting.publicAddress,
+      networkSetting.externalAddress,
+      networkSetting.bindAddress,
       networkSetting.rpcPort,
       networkSetting.wsPort
     )

@@ -76,7 +76,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
-      val index = cliqueInfo.peers.indexWhere(_ == remote)
+      val index = cliqueInfo.internalAddresses.indexWhere(_ == remote)
       if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition
         log.debug(s"The connection from $remote is incoming connection")
@@ -105,7 +105,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   }
 
   def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
-    if (newBrokers.size == cliqueInfo.peers.length - 1) {
+    if (newBrokers.size == cliqueInfo.internalAddresses.length - 1) {
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
       context become handle(newBrokers)

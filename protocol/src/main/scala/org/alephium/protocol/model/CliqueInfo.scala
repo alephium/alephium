@@ -11,23 +11,24 @@ import org.alephium.util.AVector
 // Assume the peers are ordered according to the groups they correspond to
 final case class CliqueInfo private (
     id: CliqueId,
-    peers: AVector[InetSocketAddress],
+    externalAddresses: AVector[Option[InetSocketAddress]],
+    internalAddresses: AVector[InetSocketAddress],
     groupNumPerBroker: Int
 ) { self =>
   def cliqueConfig: CliqueConfig = new CliqueConfig {
-    val groups: Int    = peers.length * self.groupNumPerBroker
-    val brokerNum: Int = peers.length
+    val groups: Int    = internalAddresses.length * self.groupNumPerBroker
+    val brokerNum: Int = internalAddresses.length
   }
 
   def brokers: AVector[BrokerInfo] = {
-    peers.mapWithIndex { (address, index) =>
+    internalAddresses.mapWithIndex { (address, index) =>
       BrokerInfo.unsafe(id, index, groupNumPerBroker, address)
     }
   }
 
-  def brokerNum: Int = peers.length
+  def brokerNum: Int = internalAddresses.length
 
-  def masterAddress: InetSocketAddress = peers.head
+  def masterAddress: InetSocketAddress = internalAddresses.head
 
   def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): BrokerInfo =
     brokers(brokerConfig.brokerId)
@@ -39,10 +40,11 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
   private implicit val peerSerde: Serde[AVector[InetSocketAddress]] =
     avectorSerde[InetSocketAddress]
   val _serde: Serde[CliqueInfo] =
-    Serde.forProduct3(unsafe, t => (t.id, t.peers, t.groupNumPerBroker))
+    Serde.forProduct4(unsafe,
+                      t => (t.id, t.externalAddresses, t.internalAddresses, t.groupNumPerBroker))
 
   override def validate(info: CliqueInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    val peers             = info.peers
+    val peers             = info.internalAddresses
     val groupNumPerBroker = info.groupNumPerBroker
     if (peers.isEmpty) Left("Peers vector is empty")
     else if (groupNumPerBroker < 0) Left("Group number per broker is not positive")
@@ -52,8 +54,9 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
   }
 
   def unsafe(id: CliqueId,
-             peers: AVector[InetSocketAddress],
+             externalAddresses: AVector[Option[InetSocketAddress]],
+             internalAddresses: AVector[InetSocketAddress],
              groupNumPerBroker: Int): CliqueInfo = {
-    new CliqueInfo(id, peers, groupNumPerBroker)
+    new CliqueInfo(id, externalAddresses, internalAddresses, groupNumPerBroker)
   }
 }
