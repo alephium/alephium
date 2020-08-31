@@ -12,7 +12,10 @@ final case class IntraCliqueInfo private (
     groupNumPerBroker: Int
 ) {
   def cliqueInfo: CliqueInfo = {
-    CliqueInfo.unsafe(id, peers.map(_.publicAddress), groupNumPerBroker)
+    CliqueInfo.unsafe(id,
+                      peers.map(_.externalAddress),
+                      peers.map(_.internalAddress),
+                      groupNumPerBroker)
   }
 }
 

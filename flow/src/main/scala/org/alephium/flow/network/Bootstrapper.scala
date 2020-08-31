@@ -6,7 +6,7 @@ import akka.io.Tcp
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.CliqueId
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Bootstrapper {
@@ -33,7 +33,6 @@ object Bootstrapper {
   sealed trait Command
   case object ForwardConnection                                          extends Command
   case object GetIntraCliqueInfo                                         extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                extends Command
   final case class SendIntraCliqueInfo(intraCliqueInfo: IntraCliqueInfo) extends Command
 }
 

@@ -43,8 +43,11 @@ class DiscoveryServerSpec
 
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
     val randomInfo = cliqueInfoGen(groupConfig).sample.get
-    val newPeers   = randomInfo.peers.replace(0, master)
-    val newInfo    = CliqueInfo.unsafe(randomInfo.id, newPeers, randomInfo.groupNumPerBroker)
+    val newPeers   = randomInfo.internalAddresses.replace(0, master)
+    val newInfo = CliqueInfo.unsafe(randomInfo.id,
+                                    newPeers.map(Option.apply),
+                                    newPeers,
+                                    randomInfo.groupNumPerBroker)
     newInfo.masterAddress is master
     newInfo
   }

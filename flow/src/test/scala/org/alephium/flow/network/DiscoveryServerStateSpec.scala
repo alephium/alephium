@@ -39,9 +39,11 @@ class DiscoveryServerStateSpec
 
       def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
 
-      def selfCliqueInfo: CliqueInfo =
+      lazy val peers = AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get)
+      lazy val selfCliqueInfo: CliqueInfo =
         CliqueInfo.unsafe(CliqueId.generate,
-                          AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get),
+                          peers.map(Option.apply),
+                          peers,
                           config.groupNumPerBroker)
 
       setSocket(ActorRefT[Udp.Command](socketProbe.ref))
