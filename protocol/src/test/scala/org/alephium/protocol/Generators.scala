@@ -68,6 +68,13 @@ trait Generators extends NumericHelpers {
                         AVector.from(peers),
                         groupNumPerBroker)
 
+  def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =
+    for {
+      groupNumPerBroker <- groupNumPerBrokerGen
+      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cid               <- cliqueIdGen
+    } yield InterCliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
+
   lazy val socketAddressGen: Gen[InetSocketAddress] =
     for {
       ip0  <- Gen.choose(0, 255)

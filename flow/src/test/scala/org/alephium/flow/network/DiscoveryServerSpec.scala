@@ -7,8 +7,8 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.ED25519
 import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, GroupConfigFixture}
-import org.alephium.protocol.model.{CliqueInfo, NoIndexModelGenerators}
-import org.alephium.util.{AlephiumActorSpec, Duration}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
+import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
 
 object DiscoveryServerSpec {
   def createAddr(port: Int): InetSocketAddress =
@@ -17,7 +17,8 @@ object DiscoveryServerSpec {
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
-                   _scanFrequency: Duration = Duration.unsafe(500))
+                   _scanFrequency: Duration  = Duration.unsafe(200),
+                   _expireDuration: Duration = Duration.ofHoursUnsafe(1))
     : (InetSocketAddress, DiscoveryConfig with CliqueConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
     val discoveryConfig = new DiscoveryConfig with CliqueConfig {
@@ -28,6 +29,8 @@ object DiscoveryServerSpec {
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
       val neighborsPerGroup: Int      = _peersPerGroup
+
+      override val expireDuration: Duration = _expireDuration
 
       val groups: Int    = groupSize
       val brokerNum: Int = groupSize
@@ -42,12 +45,11 @@ class DiscoveryServerSpec
   import DiscoveryServerSpec._
 
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
-    val randomInfo = cliqueInfoGen(groupConfig).sample.get
-    val newPeers   = randomInfo.internalAddresses.replace(0, master)
-    val newInfo = CliqueInfo.unsafe(randomInfo.id,
-                                    newPeers.map(Option.apply),
-                                    newPeers,
-                                    randomInfo.groupNumPerBroker)
+    val newInfo = CliqueInfo.unsafe(CliqueId.generate,
+                                    AVector(Option(master)),
+                                    AVector(master),
+                                    groupConfig.groups)
+    CliqueInfo.validate(newInfo)(groupConfig).isRight is true
     newInfo.masterAddress is master
     newInfo
   }
@@ -69,23 +71,22 @@ class DiscoveryServerSpec
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
 
-    Thread.sleep(2000)
+    Thread.sleep(1000)
 
     val probo0 = TestProbe()
     server0.tell(DiscoveryServer.GetNeighborCliques, probo0.ref)
     val probo1 = TestProbe()
     server1.tell(DiscoveryServer.GetNeighborCliques, probo1.ref)
 
-    val waitTime = Duration.ofSecondsUnsafe(40).asScala
-    probo0.expectMsgPF(waitTime) {
+    probo0.expectMsgPF() {
       case DiscoveryServer.NeighborCliques(peers) =>
         peers.length is 1
-        peers.head is cliqueInfo1
+        peers.head is cliqueInfo1.interCliqueInfo.get
     }
-    probo1.expectMsgPF(waitTime) {
+    probo1.expectMsgPF() {
       case DiscoveryServer.NeighborCliques(peers) =>
         peers.length is 1
-        peers.head is cliqueInfo0
+        peers.head is cliqueInfo0.interCliqueInfo.get
     }
   }
 }

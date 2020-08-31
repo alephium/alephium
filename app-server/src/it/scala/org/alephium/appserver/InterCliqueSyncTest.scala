@@ -9,7 +9,6 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
 class InterCliqueSyncTest extends AlephiumSpec {
-
   it should "boot and sync two cliques" in new TestFixture("2-cliques-of-2-nodses") {
     val fromTs = TimeStamp.now()
 
