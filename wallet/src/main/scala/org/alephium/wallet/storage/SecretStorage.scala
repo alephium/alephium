@@ -26,6 +26,10 @@ trait SecretStorage {
 
 object SecretStorage {
 
+  def fromFile(file: File, password: String): Either[String, SecretStorage] = {
+    seedFromFile(file, password).map(_ => new Impl(file))
+  }
+
   def apply(seed: ByteString, password: String, secretDir: Path): SecretStorage = {
 
     val encryption = AES.encrypt(seed, password)
@@ -53,16 +57,25 @@ object SecretStorage {
     }
 
     override def unlock(password: String): Either[String, Unit] = {
-      val rawFile = Source.fromFile(file).getLines().mkString
-      for {
-        encrypted <- decode[AES.Encrypted](rawFile).left.map(_.getMessage)
-        seed      <- AES.decrypt(encrypted, password).toEither.left.map(_.getMessage)
-      } yield {
+      seedFromFile(file, password).map { seed =>
         privateKey = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq)
       }
     }
 
     override def getPrivateKey(): Option[ExtendedPrivateKey] = privateKey
   }
+
+  private def seedFromFile(file: File, password: String): Either[String, ByteString] = {
+    val source = Source.fromFile(file)
+    val rawFile = source.getLines().mkString
+    for {
+      encrypted <- decode[AES.Encrypted](rawFile).left.map(_.getMessage)
+      seed      <- AES.decrypt(encrypted, password).toEither.left.map(_.getMessage)
+    } yield {
+      source.close()
+      seed
+    }
+  }
+
   implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
 }
