@@ -39,7 +39,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
                                  val executionContext: ExecutionContext)
     extends Server {
   private val storages: Storages = {
-    val postfix  = s"${config.broker.brokerId}-${config.network.publicAddress.getPort}"
+    val postfix  = s"${config.broker.brokerId}-${config.network.bindAddress.getPort}"
     val dbFolder = "db-" + postfix
 
     Storages.createUnsafe(rootPath, dbFolder, Settings.writeOptions)(config.broker)

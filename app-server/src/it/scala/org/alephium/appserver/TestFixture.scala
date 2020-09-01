@@ -112,9 +112,10 @@ trait TestFixtureLike
                bootstrap: Option[InetSocketAddress] = None) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
+        ("alephium.network.bind-address", s"localhost:$publicPort"),
+        ("alephium.network.internal-address", s"localhost:$publicPort"),
         ("alephium.network.master-address", s"localhost:$masterPort"),
-        ("alephium.network.public-address", s"localhost:$publicPort"),
-        ("alephium.network.declared-address", s"localhost:$publicPort"),
+        ("alephium.network.external-address", s"localhost:$publicPort"),
         ("alephium.network.rpc-port", publicPort - 100),
         ("alephium.network.ws-port", publicPort - 200),
         ("alephium.network.rest-port", publicPort - 300),

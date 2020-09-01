@@ -49,26 +49,25 @@ final case class NetworkSetting(
     pingFrequency: Duration,
     retryTimeout: Duration,
     upnp: UpnpSettings,
-    publicAddress: InetSocketAddress,
+    bindAddress: InetSocketAddress,
+    internalAddress: InetSocketAddress,
     masterAddress: InetSocketAddress,
-    declaredAddress: Option[InetSocketAddress],
+    externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     rpcPort: Option[Int],
     wsPort: Option[Int],
     restPort: Option[Int]
 ) {
-  val isCoordinator: Boolean = publicAddress == masterAddress
+  val isCoordinator: Boolean = internalAddress == masterAddress
 
   def handshakeTimeout: Duration = retryTimeout
 
-  val bindAddress: InetSocketAddress = publicAddress
-
-  val externalAddress: Option[InetSocketAddress] = declaredAddress match {
+  val externalAddressInferred: Option[InetSocketAddress] = externalAddress match {
     case Some(address) => Some(address)
     case None =>
       if (upnp.enabled) {
         Upnp.getUpnpClient(upnp).map { client =>
-          val bindingPort = publicAddress.getPort
+          val bindingPort = bindAddress.getPort
           client.addPortMapping(bindingPort, bindingPort)
           new InetSocketAddress(client.externalAddress, bindingPort)
         }

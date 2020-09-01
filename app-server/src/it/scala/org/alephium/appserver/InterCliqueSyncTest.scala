@@ -20,13 +20,13 @@ class InterCliqueSyncTest extends AlephiumSpec {
     startWS(wsPort(masterPortClique1))
 
     clique1.foreach { server =>
-      request[Boolean](startMining, rpcPort(server.config.network.publicAddress.getPort)) is true
+      request[Boolean](startMining, rpcPort(server.config.network.bindAddress.getPort)) is true
     }
 
     blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
 
     clique1.foreach { server =>
-      request[Boolean](stopMining, rpcPort(server.config.network.publicAddress.getPort)) is true
+      request[Boolean](stopMining, rpcPort(server.config.network.bindAddress.getPort)) is true
     }
 
     val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
@@ -43,12 +43,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
         eventually {
           val response =
             request[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo,
-                                              rpcPort(server.config.network.publicAddress.getPort))
+                                              rpcPort(server.config.network.bindAddress.getPort))
           response is Seq(
             InterCliquePeerInfo(selfClique1.cliqueId,
                                 index,
                                 new InetSocketAddress("localhost",
-                                                      remote.config.network.publicAddress.getPort),
+                                                      remote.config.network.bindAddress.getPort),
                                 true))
         }
     }

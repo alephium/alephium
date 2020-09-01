@@ -116,11 +116,11 @@ class AlephiumMake(object):
             rpcPort = port + 1000
             wsPort = port + 2000
             restPort = port + 3000
-            publicAddress = "localhost:" + str(port)
+            bindAddress = "localhost:" + str(port)
             masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
             print("Starting a new node")
-            print("node-{}: {} (master: {})".format(str(brokerId), publicAddress, masterAddress))
+            print("node-{}: {} (master: {})".format(str(brokerId), bindAddress, masterAddress))
 
             bootstrap = ""
             if node // brokerNum > 0:
@@ -133,7 +133,12 @@ class AlephiumMake(object):
 
             shutil.copy2(os.path.join(homedir, ".alephium", "user.conf"), nodedir)
 
-            run('BROKER_NUM={} BROKER_ID={} PUBLIC_ADDRESS={} MASTER_ADDRESS={} RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'.format(brokerNum, brokerId, publicAddress, masterAddress, rpcPort, wsPort, restPort, bootstrap, apiKeyHash, nodedir, nodedir))
+            run('BROKER_NUM={} BROKER_ID={} '\
+              'BIND_ADDRESS={} EXTERNAL_ADDRESS={} INTERNAL_ADDRESS={} MASTER_ADDRESS={} '\
+              'RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} '\
+              'nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'\
+              .format(brokerNum, brokerId, bindAddress, bindAddress, bindAddress, masterAddress,
+                rpcPort, wsPort, restPort, bootstrap, apiKeyHash, nodedir, nodedir))
 
     def rpc(self, params):
         method = params[0]
