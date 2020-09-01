@@ -7,7 +7,7 @@ import akka.actor.Props
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
-import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.io.IOUtils
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendHeaders}
@@ -85,7 +85,7 @@ object FlowHandler {
 class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     implicit brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig)
-    extends BaseActor
+    extends IOBaseActor
     with FlowHandlerState {
   import FlowHandler._
 
@@ -245,18 +245,6 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
     log.info(s"$index; total: $total; ${chain
       .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
-  }
-
-  // TODO: improve error handling
-  def handleIOError(error: IOError): Unit = {
-    log.debug(s"IO failed in flow handler: ${error.toString}")
-  }
-
-  def escapeIOError[T](result: IOResult[T])(f: T => Unit): Unit = {
-    result match {
-      case Right(t) => f(t)
-      case Left(e)  => handleIOError(e)
-    }
   }
 }
 

@@ -16,13 +16,13 @@ object BrokerManager {
       extends Command
   final case class Remove(remote: InetSocketAddress) extends Command
 
-  sealed trait MisBehavior extends Command {
+  sealed trait Misbehavior extends Command {
     def remoteAddress: InetSocketAddress
   }
-  sealed trait Critical  extends MisBehavior
-  sealed trait Error     extends MisBehavior
-  sealed trait Warning   extends MisBehavior
-  sealed trait Uncertain extends MisBehavior
+  sealed trait Critical  extends Misbehavior
+  sealed trait Error     extends Misbehavior
+  sealed trait Warning   extends Misbehavior
+  sealed trait Uncertain extends Misbehavior
 
   final case class InvalidMessage(remoteAddress: InetSocketAddress)  extends Critical
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Critical
@@ -31,15 +31,16 @@ object BrokerManager {
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
 }
 
+// TODO: use broker manager for real
 class BrokerManager() extends BaseActor {
   import BrokerManager._
 
   override def preStart(): Unit = {
-    require(context.system.eventStream.subscribe(self, classOf[BrokerManager.MisBehavior]))
+    require(context.system.eventStream.subscribe(self, classOf[BrokerManager.Misbehavior]))
   }
 
   def isBanned(remote: InetSocketAddress): Boolean = {
-    log.debug(s"Ban $remote")
+    log.debug(s"Check availability $remote")
     false
   }
 
@@ -57,7 +58,7 @@ class BrokerManager() extends BaseActor {
       }
     case Remove(remote) =>
       remove(remote)
-    case misBehavior: MisBehavior =>
-      log.debug(s"Misbehavior: $misBehavior")
+    case misbehavior: Misbehavior =>
+      log.debug(s"Misbehavior: $misbehavior")
   }
 }

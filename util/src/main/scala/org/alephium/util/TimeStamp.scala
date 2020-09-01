@@ -34,6 +34,9 @@ class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
   def -(duration: Duration): Option[TimeStamp] =
     TimeStamp.from(millis - duration.millis)
 
+  def minusUnsafe(duration: Duration): TimeStamp =
+    TimeStamp.unsafe(millis - duration.millis)
+
   def --(another: TimeStamp): Option[Duration] =
     Duration.from(millis - another.millis)
 

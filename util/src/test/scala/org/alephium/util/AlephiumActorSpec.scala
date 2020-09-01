@@ -34,7 +34,7 @@ object AlephiumActorSpec {
       |  loggers = ["akka.event.slf4j.Slf4jLogger"]
       |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
       |
-      |  // io.tcp.trace-logging = on
+      |  io.tcp.trace-logging = off
       |
       |  actor {
       |    debug {
