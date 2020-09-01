@@ -33,9 +33,18 @@ final case class BrokerInfo private (
     address: InetSocketAddress
 ) extends BrokerGroupInfo {
   def peerId: PeerId = PeerId(cliqueId, brokerId)
+
+  def interBrokerInfo: InterBrokerInfo =
+    InterBrokerInfo.unsafe(cliqueId, brokerId, groupNumPerBroker)
 }
 
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
+  def from(remoteAddress: InetSocketAddress, remoteBroker: InterBrokerInfo): BrokerInfo =
+    unsafe(remoteBroker.cliqueId,
+           remoteBroker.brokerId,
+           remoteBroker.groupNumPerBroker,
+           remoteAddress)
+
   val _serde: Serde[BrokerInfo] =
     Serde.forProduct4(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker, t.address))
 
@@ -69,5 +78,25 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   // Check if two segments intersect or not
   @inline def intersect(from0: Int, until0: Int, from1: Int, until1: Int): Boolean = {
     !(until0 <= from1 || until1 <= from0)
+  }
+}
+
+final case class InterBrokerInfo private (
+    cliqueId: CliqueId,
+    brokerId: Int,
+    groupNumPerBroker: Int
+) extends BrokerGroupInfo {
+  def peerId: PeerId = PeerId(cliqueId, brokerId)
+}
+
+object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
+  val _serde: Serde[InterBrokerInfo] =
+    Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker))
+
+  def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
+    new InterBrokerInfo(cliqueId, brokerId, groupNumPerBroker)
+
+  def validate(info: InterBrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
+    BrokerInfo.validate(info.brokerId, info.groupNumPerBroker)
   }
 }

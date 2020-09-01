@@ -22,20 +22,16 @@ final case class CliqueInfo private (
     val groups: Int    = self.brokerNum * self.groupNumPerBroker
   }
 
-  def brokers: AVector[BrokerInfo] = {
+  def intraBrokers: AVector[BrokerInfo] = {
     internalAddresses.mapWithIndex { (internalAddress, index) =>
-      val externalAddressesOpt = externalAddresses(index)
-      val brokerAddress        = externalAddressesOpt.fold(internalAddress)(identity)
-      BrokerInfo.unsafe(id, index, groupNumPerBroker, brokerAddress)
+      BrokerInfo.unsafe(id, index, groupNumPerBroker, internalAddress)
     }
   }
 
   def masterAddress: InetSocketAddress = internalAddresses.head
 
-  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): BrokerInfo =
-    brokers(brokerConfig.brokerId)
-
-  def brokerInfoUnsafe(brokerId: Int): BrokerInfo = brokers(brokerId)
+  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): InterBrokerInfo =
+    InterBrokerInfo.unsafe(id, brokerConfig.brokerId, groupNumPerBroker)
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def interCliqueInfo: Option[InterCliqueInfo] =
