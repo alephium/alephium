@@ -46,7 +46,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     extends BaseActor {
 
   override def preStart(): Unit = {
-    cliqueInfo.brokers.foreach { remoteBroker =>
+    cliqueInfo.intraBrokers.foreach { remoteBroker =>
       if (remoteBroker.brokerId > brokerConfig.brokerId) {
         val address = remoteBroker.address
         log.debug(s"Connect to broker $remoteBroker")

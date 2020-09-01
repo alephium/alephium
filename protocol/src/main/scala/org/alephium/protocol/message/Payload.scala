@@ -107,16 +107,16 @@ object Payload {
 sealed trait HandShake extends Payload {
   val version: Int
   val timestamp: Long
-  val brokerInfo: BrokerInfo
+  val brokerInfo: InterBrokerInfo
 }
 
 sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
-  def unsafe(version: Int, timestamp: Long, brokerInfo: BrokerInfo): T
+  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): T
 
-  def unsafe(brokerInfo: BrokerInfo): T =
+  def unsafe(brokerInfo: InterBrokerInfo): T =
     unsafe(Protocol.version, System.currentTimeMillis(), brokerInfo)
 
-  private implicit val brokerSerde: Serde[BrokerInfo] = BrokerInfo._serde
+  private implicit val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
     Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
 
@@ -128,11 +128,11 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 final case class Hello private (
     version: Int,
     timestamp: Long,
-    brokerInfo: BrokerInfo
+    brokerInfo: InterBrokerInfo
 ) extends HandShake
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
-  def unsafe(version: Int, timestamp: Long, brokerInfo: BrokerInfo): Hello =
+  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): Hello =
     new Hello(version, timestamp, brokerInfo)
 }
 
