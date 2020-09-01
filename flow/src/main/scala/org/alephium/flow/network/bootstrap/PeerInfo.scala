@@ -45,8 +45,8 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
     new PeerInfo(
       brokerConfig.brokerId,
       brokerConfig.groupNumPerBroker,
-      networkSetting.externalAddress,
-      networkSetting.bindAddress,
+      networkSetting.externalAddressInferred,
+      networkSetting.internalAddress,
       networkSetting.rpcPort,
       networkSetting.wsPort
     )

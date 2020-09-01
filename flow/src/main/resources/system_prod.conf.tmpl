@@ -66,8 +66,12 @@ alephium {
       enabled = false
     }
 
-    public-address = ${PUBLIC_ADDRESS}
-    master-address = ${MASTER_ADDRESS}
+    bind-address = "localhost:9973"
+    bind-address = ${?BIND_ADDRESS}
+    external-address = ${?EXTERNAL_ADDRESS}
+    internal-address = ${?EXTERNAL_ADDRESS}
+    internal-address = ${?INTERNAL_ADDRESS}
+    master-address = ${?MASTER_ADDRESS}
     num-of-sync-blocks-limit = 128
 
     rpc-port = 0
