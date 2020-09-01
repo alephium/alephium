@@ -14,20 +14,18 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       Bootstrapper.props(
         ActorRefT(serverProbe.ref),
         ActorRefT(discoveryServerProbe.ref),
-        ActorRefT(cliqueManagerProbe.ref),
-        (_, _) => cliqueCoordinatorProbe.ref,
-        (_, _) => TestProbe().ref
-      ))
+        ActorRefT(cliqueManagerProbe.ref)
+      )
+    )
 
-    serverProbe.expectMsg(TcpServer.Start(bootstrapper))
+    serverProbe.expectMsg(TcpController.Start(bootstrapper))
 
     //Peer connects
     bootstrapper ! connected
-    cliqueCoordinatorProbe.expectMsg(connected)
 
     //Broker info is full,
     cliqueManagerProbe.send(bootstrapper, Bootstrapper.ForwardConnection)
-    serverProbe.expectMsg(TcpServer.WorkFor(cliqueManagerProbe.ref))
+    serverProbe.expectMsg(TcpController.WorkFor(cliqueManagerProbe.ref))
 
     //CliqueManager is now responsible for new connection
     bootstrapper ! connected
@@ -52,7 +50,7 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       Bootstrapper.props(ActorRefT(serverProbe.ref),
                          ActorRefT(discoveryServerProbe.ref),
                          ActorRefT(cliqueManagerProbe.ref)))
-    serverProbe.expectMsg(TcpServer.Start(bootstrapper))
+    serverProbe.expectMsg(TcpController.Start(bootstrapper))
   }
 
   class MasterFixture(name: String) extends AlephiumFlowActorSpec(name) with InfoFixture {

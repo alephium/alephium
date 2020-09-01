@@ -63,9 +63,21 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     getWeight(hash).map(weight.max)
   }
 
-  def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, 0) { (height, hash) =>
+  def maxChainWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) {
+    (chainWeight, hash) =>
+      getChainWeight(hash).map(chainWeight.max)
+  }
+
+  def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
     getHeight(hash).map(math.max(height, _))
   }
+
+  def maxHeightUnsafe: Int = tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
+    math.max(getHeightUnsafe(hash), height)
+  }
+
+  // TODO: make canonical hash the first hash of the same height
+  def isCanonicalUnsafe(hash: Hash): Boolean = containsUnsafe(hash)
 
   def contains(hash: Hash): IOResult[Boolean]      = blockStateStorage.exists(hash)
   def containsUnsafe(hash: Hash): Boolean          = blockStateStorage.existsUnsafe(hash)
@@ -229,6 +241,14 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
         diff      <- calHashDiffFromSameHeight(newParent, oldParent)
       } yield ChainDiff(diff.toRemove :+ oldHash, diff.toAdd :+ newHash)
     }
+  }
+
+  def isRecent(hash: Hash): Boolean = {
+    val safeResult = for {
+      height     <- getHeight(hash)
+      _maxHeight <- maxHeight
+    } yield (height >= _maxHeight - 30)
+    safeResult.exists(identity)
   }
 }
 // scalastyle:on number.of.methods

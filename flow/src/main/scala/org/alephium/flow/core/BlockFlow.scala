@@ -4,19 +4,75 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
-import org.alephium.flow.model.{BlockDeps, SyncInfo}
+import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
   def add(block: Block, weight: BigInt): IOResult[Unit] = ???
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
+
+  private def getSyncLocatorsUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
+    val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
+    AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
+      val offset    = index / groups
+      val fromGroup = groupFrom + offset
+      val toGroup   = index % groups
+      getSyncLocatorsUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
+    }
+  }
+
+  override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
+    getSyncLocatorsUnsafe(brokerConfig)
+  }
+
+  private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      val chain = getHeaderChain(chainIndex)
+      HistoryLocators
+        .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
+        .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
+    } else AVector.empty
+  }
+
+  override protected def getSyncInventoriesUnsafe(
+      locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
+    locators.map { locatorsPerChain =>
+      if (locatorsPerChain.isEmpty) AVector.empty[Hash]
+      else {
+        val chainIndex = ChainIndex.from(locatorsPerChain.head)
+        val chain      = getBlockChain(chainIndex)
+        chain.getSyncDataUnsafe(locatorsPerChain)
+      }
+    }
+  }
+
+  override protected def getIntraSyncInventoriesUnsafe(
+      remoteBroker: BrokerInfo): AVector[AVector[Hash]] = {
+    AVector.tabulate(remoteBroker.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
+      val k         = index / remoteBroker.groupNumPerBroker
+      val l         = index % remoteBroker.groupNumPerBroker
+      val fromGroup = brokerConfig.groupFrom + k
+      val toGroup   = remoteBroker.groupFrom + l
+      val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
+      chain.getLatestHashesUnsafe()
+    }
+  }
+
+  //scalastyle:off magic.number
+  def isRecent(data: FlowData): Boolean = {
+    (data.timestamp > TimeStamp.now().plusMinutesUnsafe(-30)) || {
+      val hashChain = getHashChain(data.hash)
+      hashChain.isRecent(data.hash)
+    }
+  }
+  //scalastyle:on
 }
 
 object BlockFlow extends StrictLogging {
@@ -126,37 +182,6 @@ object BlockFlow extends StrictLogging {
 
     override def getAllTips: AVector[Hash] = {
       aggregateHash(_.getAllTips)(_ ++ _)
-    }
-
-    def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo = {
-      val (low, high) = brokerInfo.calIntersection(brokerConfig)
-      assume(low < high)
-
-      val blockTips = for {
-        from <- low until high
-        to   <- 0 until groups
-      } yield getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to)).getAllTips
-
-      SyncInfo(blockTips.fold(AVector.empty[Hash])(_ ++ _), AVector.empty)
-    }
-
-    def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = {
-      var blockTips  = AVector.empty[Hash]
-      var headerTips = AVector.empty[Hash]
-
-      for {
-        from <- remoteBroker.groupFrom until remoteBroker.groupUntil
-        to   <- 0 until groups
-      } {
-        val chain = getHashChain(GroupIndex.unsafe(from), GroupIndex.unsafe(to))
-        if (brokerConfig.containsRaw(to)) {
-          blockTips = blockTips ++ chain.getAllTips
-        } else {
-          headerTips = headerTips ++ chain.getAllTips
-        }
-      }
-
-      SyncInfo(blockTips, headerTips)
     }
 
     // Rtips means tip representatives for all groups

@@ -37,7 +37,7 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
       log.debug(s"Connected to $remote")
       val connection = sender()
       val name       = BaseActor.envalidActorName(s"Broker-$remote")
-      context.actorOf(BrokerConnector.props(connection, self), name)
+      context.actorOf(BrokerConnector.props(remote, connection, self), name)
       ()
     case info: PeerInfo =>
       log.debug(s"Received broker info from ${info.address} id: ${info.id}")
@@ -47,20 +47,21 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
       if (isBrokerInfoFull) {
         log.debug(s"Broadcast clique info")
         bootstrapper ! Bootstrapper.ForwardConnection
-        broadcast(Bootstrapper.SendIntraCliqueInfo(buildCliqueInfo))
-        context become awaitAck
+        val cliqueInfo = buildCliqueInfo
+        broadcast(BrokerConnector.Send(cliqueInfo))
+        context become awaitAck(cliqueInfo)
       }
   }
 
-  def awaitAck: Receive = {
-    case BrokerConnector.Ack(id) =>
+  def awaitAck(cliqueInfo: IntraCliqueInfo): Receive = {
+    case Message.Ack(id) =>
       log.debug(s"Broker $id is ready")
       if (0 <= id && id < brokerConfig.brokerNum) {
         setReady(id)
         if (isAllReady) {
           log.debug("All the brokers are ready")
           broadcast(CliqueCoordinator.Ready)
-          context become awaitTerminated(buildCliqueInfo)
+          context become awaitTerminated(cliqueInfo)
         }
       }
   }

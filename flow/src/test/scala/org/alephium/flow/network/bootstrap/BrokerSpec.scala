@@ -31,23 +31,19 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
 
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        PeerInfo._deserialize(data) isE (PeerInfo.self -> ByteString.empty)
+        Message.deserialize(data) isE (Message.Peer(PeerInfo.self) -> ByteString.empty)
     }
 
     val randomInfo = genIntraCliqueInfo
-    val infoData   = BrokerConnector.envelop(randomInfo).data
-    broker.tell(Tcp.Received(infoData), connection.ref)
+    broker.tell(Broker.Received(Message.Clique(randomInfo)), connection.ref)
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        BrokerConnector.deserializeTry[BrokerConnector.Ack](data) is Right(
-          Some((BrokerConnector.Ack(brokerConfig.brokerId), ByteString.empty)))
+        Message.deserialize(data) isE (Message.Ack(brokerConfig.brokerId) -> ByteString.empty)
     }
 
-    val ready = BrokerConnector.envelop(CliqueCoordinator.Ready).data
-    broker.tell(Tcp.Received(ready), connection.ref)
+    broker.tell(Broker.Received(Message.Ready), connection.ref)
     connection.expectMsg(Tcp.PeerClosed)
 
-    broker ! Tcp.ConfirmedClosed
     bootstrapper.expectMsg(Bootstrapper.SendIntraCliqueInfo(randomInfo))
     expectTerminated(broker)
   }

@@ -43,6 +43,8 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.pendingStatus.size is 1
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending0
+    state.pendingHashes.size is 1
+    state.pendingHashes.contains(pending0.hash) is true
     state.counter is 1
 
     val pending1 = genPending(mutable.HashSet.empty[Hash])
@@ -50,6 +52,8 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending0
     state.pendingStatus.last._2 is pending1
+    state.pendingHashes.size is 2
+    state.pendingHashes.contains(pending1.hash) is true
     state.counter is 2
 
     val pending2 = genPending(mutable.HashSet.empty[Hash])
@@ -57,6 +61,8 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending1
     state.pendingStatus.last._2 is pending2
+    state.pendingHashes.size is 2
+    state.pendingHashes.contains(pending2.hash) is true
     state.counter is 3
   }
 
@@ -70,18 +76,41 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.addStatus(pending0)
     state.pendingStatus.size is 1
     state.pendingStatus.head._2.missingDeps.size is 2
+    state.pendingHashes.size is 1
+    state.pendingHashes.contains(pending0.hash) is true
     state.counter is 1
 
     val readies1 = state.updateStatus(block1.hash)
     readies1.size is 0
     state.pendingStatus.size is 1
     state.pendingStatus.head._2.missingDeps.size is 1
+    state.pendingHashes.size is 1
+    state.pendingHashes.contains(pending0.hash) is true
     state.counter is 1
 
     val readies2 = state.updateStatus(block2.hash).toList
     readies2.size is 1
     readies2.head is pending0
     state.pendingStatus.size is 0
+    state.pendingHashes.size is 0
+    state.counter is 1
+  }
+
+  it should "not update duplicated pending" in {
+    val state = new FlowHandlerState { override def statusSizeLimit: Int = 3 }
+    val block = blockGen.sample.get
+
+    val pending = genPending(block, mutable.HashSet.empty[Hash])
+    state.addStatus(pending)
+    state.pendingStatus.size is 1
+    state.pendingHashes.size is 1
+    state.pendingHashes.contains(pending.hash) is true
+    state.counter is 1
+
+    state.addStatus(pending)
+    state.pendingStatus.size is 1
+    state.pendingHashes.size is 1
+    state.pendingHashes.contains(pending.hash) is true
     state.counter is 1
   }
 }

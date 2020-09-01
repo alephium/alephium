@@ -6,21 +6,32 @@ import akka.actor.{ActorRef, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.clique.{InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.network.broker.BlockFlowSynchronizer
+import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor, Duration}
 
 object InterCliqueManager {
+  // scalastyle:off parameter.number
   def props(selfCliqueInfo: CliqueInfo,
+            blockflow: BlockFlow,
             allHandlers: AllHandlers,
-            discoveryServer: ActorRefT[DiscoveryServer.Command])(
+            discoveryServer: ActorRefT[DiscoveryServer.Command],
+            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       discoverySetting: DiscoverySetting): Props =
-    Props(new InterCliqueManager(selfCliqueInfo, allHandlers, discoveryServer))
+    Props(
+      new InterCliqueManager(selfCliqueInfo,
+                             blockflow,
+                             allHandlers,
+                             discoveryServer,
+                             blockFlowSynchronizer))
+  //scalastyle:on
 
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
@@ -37,11 +48,13 @@ object InterCliqueManager {
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
+                         blockflow: BlockFlow,
                          allHandlers: AllHandlers,
-                         discoveryServer: ActorRefT[DiscoveryServer.Command])(
+                         discoveryServer: ActorRefT[DiscoveryServer.Command],
+                         blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
-    discoveryConfig: DiscoverySetting)
+    discoverySetting: DiscoverySetting)
     extends BaseActor
     with InterCliqueManagerState {
   import InterCliqueManager._
@@ -58,7 +71,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         neighborCliques.foreach(clique => if (!containsBroker(clique)) connect(clique))
       } else {
         // TODO: refine the condition, check the number of brokers for example
-        if (discoveryConfig.bootstrap.nonEmpty) {
+        log.debug(s"Try to fetch peer brokers from discovery server")
+        if (discoverySetting.bootstrap.nonEmpty) {
           scheduleOnce(discoveryServer.ref,
                        DiscoveryServer.GetNeighborCliques,
                        Duration.ofSecondsUnsafe(2))
@@ -68,17 +82,22 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   }
 
   def handleConnection: Receive = {
-    case c: Tcp.Connected =>
-      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${c.remoteAddress}")
+    case Tcp.Connected(remoteAddress, _) =>
+      log.debug(s"Connected to ${remoteAddress}")
+      val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${remoteAddress}")
       val props =
-        InboundBrokerHandler.props(selfCliqueInfo,
-                                   c.remoteAddress,
-                                   ActorRefT[Tcp.Command](sender()),
-                                   allHandlers,
-                                   ActorRefT[CliqueManager.Command](self))
+        InboundBrokerHandler.props(
+          selfCliqueInfo,
+          remoteAddress,
+          ActorRefT[Tcp.Command](sender()),
+          blockflow,
+          allHandlers,
+          ActorRefT[CliqueManager.Command](self),
+          blockFlowSynchronizer
+        )
       context.actorOf(props, name)
       ()
-    case CliqueManager.Syncing(cliqueId, brokerInfo) =>
+    case CliqueManager.HandShaked(cliqueId, brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $cliqueId, $brokerInfo")
       if (brokerConfig.intersect(brokerInfo)) {
         addBroker(cliqueId, brokerInfo, sender())
@@ -125,10 +144,11 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           BaseActor.envalidActorName(s"OutboundBrokerHandler-$remoteCliqueId-$brokerInfo")
         val props =
           OutboundBrokerHandler.props(selfCliqueInfo,
-                                      remoteCliqueId,
                                       brokerInfo,
+                                      blockflow,
                                       allHandlers,
-                                      ActorRefT[CliqueManager.Command](self))
+                                      ActorRefT[CliqueManager.Command](self),
+                                      blockFlowSynchronizer)
         context.actorOf(props, name)
       }
     }

@@ -13,7 +13,6 @@ trait AlephiumFlowSpec
     with StoragesFixture
     with BeforeAndAfterAll
     with NumericHelpers {
-
   lazy val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
 
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)

@@ -13,9 +13,10 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
-import org.alephium.flow.model.{BlockDeps, SyncInfo}
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.model.BlockDeps
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
+import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
@@ -97,8 +98,8 @@ object ServerFixture {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
-    val serverProbe                          = TestProbe()
-    val server: ActorRefT[TcpServer.Command] = ActorRefT(serverProbe.ref)
+    val brokerManager: ActorRefT[BrokerManager.Command] = ActorRefT(TestProbe().ref)
+    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(TestProbe().ref)
 
     val eventBus =
       ActorRefT
@@ -111,7 +112,7 @@ object ServerFixture {
     val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(system, Props(new BaseActor {
         override def receive: Receive = {
-          case CliqueManager.IsSelfCliqueSynced => sender() ! selfCliqueSynced
+          case CliqueManager.IsSelfCliqueReady => sender() ! selfCliqueSynced
         }
       }), "clique-manager")
 
@@ -124,8 +125,8 @@ object ServerFixture {
                                                blockHandlers  = Map.empty,
                                                headerHandlers = Map.empty)(config.broker)
 
-    val boostraperDummy                             = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
-    val boostraper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
+    val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
+    val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
 
     val monitorProbe                     = TestProbe()
     val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
@@ -176,11 +177,9 @@ object ServerFixture {
     override def getBlockHeader(hash: Hash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: Hash): IOResult[Block]             = Right(block)
 
-    def getInterCliqueSyncInfo(brokerInfo: BrokerInfo): SyncInfo   = ???
-    def getIntraCliqueSyncInfo(remoteBroker: BrokerInfo): SyncInfo = ???
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps            = ???
-    def getAllTips: AVector[Hash]                                  = ???
-    def getBestTipUnsafe: Hash                                     = ???
+    def calBestDepsUnsafe(group: GroupIndex): BlockDeps = ???
+    def getAllTips: AVector[Hash]                       = ???
+    def getBestTipUnsafe: Hash                          = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
             parentHash: Hash,
             weight: Int): IOResult[Unit]         = ???

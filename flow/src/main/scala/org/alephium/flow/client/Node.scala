@@ -6,11 +6,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
 
-import org.alephium.flow.Utils
+import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpServer}
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
+import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
@@ -18,9 +19,10 @@ trait Node extends Service {
   implicit def config: AlephiumConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
-  def server: ActorRefT[TcpServer.Command]
+  def brokerManager: ActorRefT[BrokerManager.Command]
+  def tcpController: ActorRefT[TcpController.Command]
   def discoveryServer: ActorRefT[DiscoveryServer.Command]
-  def boostraper: ActorRefT[Bootstrapper.Command]
+  def bootstrapper: ActorRefT[Bootstrapper.Command]
   def cliqueManager: ActorRefT[CliqueManager.Command]
   def eventBus: ActorRefT[EventBus.Message]
   def allHandlers: AllHandlers
@@ -33,7 +35,7 @@ trait Node extends Service {
   override protected def startSelfOnce(): Future[Unit] = Future.successful(())
 
   override protected def stopSelfOnce(): Future[Unit] = {
-    val timeout = Timeout(Utils.shutdownTimeout.asScala)
+    val timeout = Timeout(FlowMonitor.shutdownTimeout.asScala)
     monitor.ask(Node.Stop)(timeout).mapTo[Unit]
   }
 }
@@ -52,28 +54,39 @@ object Node {
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
-    val server: ActorRefT[TcpServer.Command] =
-      ActorRefT.build[TcpServer.Command](system,
-                                         TcpServer.props(config.network.publicAddress.getPort),
-                                         "TcpServer")
+    val brokerManager: ActorRefT[BrokerManager.Command] =
+      ActorRefT.build(system, BrokerManager.props())
+
+    val tcpController: ActorRefT[TcpController.Command] =
+      ActorRefT
+        .build[TcpController.Command](
+          system,
+          TcpController.props(config.network.publicAddress.getPort, brokerManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
-      ActorRefT.build[EventBus.Message](system, EventBus.props(), "EventBus")
+      ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val discoveryProps: Props =
       DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
-      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps, "DiscoveryServer")
+      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
+
+    val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
+
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
+      ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
     val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system, CliqueManager.props(discoveryServer), "CliqueManager")
-
-    val allHandlers: AllHandlers = AllHandlers.build(system, cliqueManager, blockFlow, eventBus)
-
-    cliqueManager ! CliqueManager.SendAllHandlers(allHandlers)
-
-    val boostraper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system,
-                      Bootstrapper.props(server, discoveryServer, cliqueManager),
+                      CliqueManager.props(blockFlow,
+                                          allHandlers,
+                                          discoveryServer,
+                                          brokerManager,
+                                          blockFlowSynchronizer),
+                      "CliqueManager")
+
+    val bootstrapper: ActorRefT[Bootstrapper.Command] =
+      ActorRefT.build(system,
+                      Bootstrapper.props(tcpController, discoveryServer, cliqueManager),
                       "Bootstrapper")
 
     val monitor: ActorRefT[Node.Command] =
@@ -105,9 +118,10 @@ object Node {
 
   class Monitor(node: Node) extends BaseActor {
     private val orderedActors = Seq(
-      node.server,
+      node.brokerManager,
+      node.tcpController,
       node.discoveryServer,
-      node.boostraper,
+      node.bootstrapper,
       node.cliqueManager,
       node.eventBus
     ) ++ node.allHandlers.orderedHandlers

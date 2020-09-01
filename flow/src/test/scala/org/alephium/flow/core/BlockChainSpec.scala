@@ -154,6 +154,19 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
   }
 
+  it should "reorder hashes when there are two branches" in new Fixture {
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val longChain  = chainGenOf(3, genesis).sample.get
+    val chain      = buildBlockChain()
+    addBlocks(chain, shortChain)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+    chain.maxChainWeight isE chain.getChainWeightUnsafe(shortChain.last.hash)
+    addBlocks(chain, longChain)
+    chain.maxChainWeight isE chain.getChainWeightUnsafe(longChain.last.hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain.last.hash)
+  }
+
   it should "compute correct weights for a single chain" in new Fixture {
     forAll(chainGenOf(5)) { blocks =>
       val chain = createBlockChain(blocks.init)

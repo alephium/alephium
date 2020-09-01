@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
@@ -41,13 +43,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
     for {
       parentState <- getState(parentHash)
-      _           <- addHeader(header)
-      _ <- addHash(header.hash,
-                   parentHash,
-                   parentState.height + 1,
-                   weight,
-                   parentState.chainWeight + header.target,
-                   header.timestamp)
+      chainWeight = parentState.chainWeight + header.target
+      height      = parentState.height + 1
+      _ <- addHeader(header)
+      _ <- reorderFor(header, chainWeight, height)
+      _ <- addHash(header.hash, parentHash, height, weight, chainWeight, header.timestamp)
     } yield ()
   }
 
@@ -57,6 +57,28 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       _ <- addHeader(header)
       _ <- addGenesis(header.hash)
     } yield ()
+  }
+
+  def reorderFor(header: BlockHeader, chainWeight: BigInt, height: Int): IOResult[Unit] = {
+    maxChainWeight.map(_ < chainWeight).flatMap {
+      case true  => reorderFrom(header.parentHash, height - 1)
+      case false => Right(())
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  final def reorderFrom(hash: Hash, height: Int): IOResult[Unit] = {
+    getHashes(height).flatMap { hashes =>
+      assume(hashes.contains(hash))
+      if (hashes.head == hash) Right(())
+      else {
+        for {
+          _      <- heightIndexStorage.put(height, hash +: hashes.filter(_ != hash))
+          parent <- getParentHash(hash)
+          _      <- reorderFrom(parent, height - 1)
+        } yield ()
+      }
+    }
   }
 
   override protected def loadFromStorage(): IOResult[Unit] = {
@@ -118,6 +140,34 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
         }
       }
     }
+  }
+
+  def getSyncDataUnsafe(locators: AVector[Hash]): AVector[Hash] = {
+    val reversed           = locators.reverse
+    val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
+    if (lastCanonicalIndex == -1) {
+      AVector.empty // nothing in common
+    } else {
+      val lastCanonicalHash = reversed(lastCanonicalIndex)
+      val heightFrom        = getHeightUnsafe(lastCanonicalHash)
+      val heightTo          = math.min(heightFrom + 1000, maxHeightUnsafe)
+      getSyncDataUnsafe(heightFrom, heightTo)
+    }
+  }
+
+  // heightFrom is exclusive, heightTo is inclusive
+  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
+    @tailrec
+    def iter(currentHeader: BlockHeader, currentHeight: Int, acc: AVector[Hash]): AVector[Hash] = {
+      if (currentHeight == heightFrom) acc
+      else {
+        val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
+        iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
+      }
+    }
+
+    val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
+    iter(startHeader, heightTo, AVector.empty)
   }
 }
 

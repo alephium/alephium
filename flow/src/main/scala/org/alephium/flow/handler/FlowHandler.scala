@@ -27,16 +27,17 @@ object FlowHandler {
       extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
-  final case class GetBlocks(locators: AVector[Hash])                           extends Command
-  final case class GetHeaders(locators: AVector[Hash])                          extends Command
-  final case class GetSyncInfo(remoteBroker: BrokerInfo, isSameClique: Boolean) extends Command
-  final case class GetSyncData(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
-      extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)  extends Command
-  final case class Register(miner: ActorRefT[Miner.Command]) extends Command
-  case object UnRegister                                     extends Command
+  final case class GetBlocks(locators: AVector[Hash])                   extends Command
+  final case class GetHeaders(locators: AVector[Hash])                  extends Command
+  case object GetSyncLocators                                           extends Command
+  final case class GetSyncInventories(locators: AVector[AVector[Hash]]) extends Command
+  final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)      extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)             extends Command
+  final case class Register(miner: ActorRefT[Miner.Command])            extends Command
+  case object UnRegister                                                extends Command
 
   sealed trait PendingData {
+    def hash: Hash
     def missingDeps: mutable.HashSet[Hash]
   }
   final case class PendingBlock(block: Block,
@@ -45,14 +46,18 @@ object FlowHandler {
                                 broker: ActorRefT[ChainHandler.Event],
                                 chainHandler: ActorRefT[BlockChainHandler.Command])
       extends PendingData
-      with Command
+      with Command {
+    override def hash: Hash = block.hash
+  }
   final case class PendingHeader(header: BlockHeader,
                                  missingDeps: mutable.HashSet[Hash],
                                  origin: DataOrigin,
                                  broker: ActorRefT[ChainHandler.Event],
                                  chainHandler: ActorRefT[HeaderChainHandler.Command])
       extends PendingData
-      with Command
+      with Command {
+    override def hash: Hash = header.hash
+  }
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
@@ -61,10 +66,9 @@ object FlowHandler {
                                      target: BigInt,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class BlocksLocated(blocks: AVector[Block])                           extends Event
-  final case class SyncData(blocks: AVector[Block], headers: AVector[BlockHeader]) extends Event
-  final case class SyncInfo(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
-      extends Event
+  final case class BlocksLocated(blocks: AVector[Block])           extends Event
+  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Event
+  final case class SyncLocators(hashes: AVector[AVector[Hash]])    extends Event
   final case class BlockAdded(block: Block,
                               broker: ActorRefT[ChainHandler.Event],
                               origin: DataOrigin)
@@ -85,7 +89,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     with FlowHandlerState {
   import FlowHandler._
 
-  override def statusSizeLimit: Int = brokerConfig.brokerNum * 8
+  override def statusSizeLimit: Int = brokerConfig.brokerNum * 100 // TODO: config this
 
   override def receive: Receive = handleWith(None)
 
@@ -119,22 +123,17 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   }
 
   def handleSync: Receive = {
-    case GetSyncInfo(remoteBroker, isSameClique) =>
-      val info = if (isSameClique) {
-        blockFlow.getIntraCliqueSyncInfo(remoteBroker)
-      } else {
-        blockFlow.getInterCliqueSyncInfo(remoteBroker)
+    case GetSyncLocators =>
+      escapeIOError(blockFlow.getSyncLocators()) { locators =>
+        sender() ! SyncLocators(locators)
       }
-      sender() ! SyncInfo(info.blockLocators, info.headerLocators)
-
-    case GetSyncData(blockLocators, headerLocators) =>
-      val result = for {
-        blocks  <- blockLocators.flatMapE(blockFlow.getBlocksAfter)
-        headers <- headerLocators.flatMapE(blockFlow.getHeadersAfter)
-      } yield SyncData(blocks, headers)
-      result match {
-        case Left(error)     => handleIOError(error)
-        case Right(syncData) => sender() ! syncData
+    case GetSyncInventories(locators) =>
+      escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>
+        sender() ! SyncInventories(inventories)
+      }
+    case GetIntraSyncInventories(brokerInfo) =>
+      escapeIOError(blockFlow.getIntraSyncInventories(brokerInfo)) { inventories =>
+        sender() ! SyncInventories(inventories)
       }
   }
 
@@ -268,7 +267,8 @@ trait FlowHandlerState {
   def statusSizeLimit: Int
 
   var counter: Int  = 0
-  val pendingStatus = scala.collection.mutable.SortedMap.empty[Int, PendingData]
+  val pendingStatus = mutable.SortedMap.empty[Int, PendingData]
+  val pendingHashes = mutable.Set.empty[Hash]
 
   def increaseAndCounter(): Int = {
     counter += 1
@@ -276,8 +276,11 @@ trait FlowHandlerState {
   }
 
   def addStatus(pending: PendingData): Unit = {
-    pendingStatus.put(increaseAndCounter(), pending)
-    checkSizeLimit()
+    if (!pendingHashes.contains(pending.hash)) {
+      pendingStatus.put(increaseAndCounter(), pending)
+      pendingHashes.add(pending.hash)
+      checkSizeLimit()
+    }
   }
 
   def updateStatus(hash: Hash): IndexedSeq[PendingData] = {
@@ -285,17 +288,22 @@ trait FlowHandlerState {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts
     }
-    val blocks = toRemove.map(pendingStatus(_))
-    toRemove.foreach(pendingStatus.remove)
-    blocks.toIndexedSeq
+    val data = toRemove.map(pendingStatus(_))
+    toRemove.foreach(removeStatus)
+    data.toIndexedSeq
+  }
+
+  def removeStatus(id: Int): Unit = {
+    pendingStatus.remove(id).foreach { data =>
+      pendingHashes.remove(data.hash)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def checkSizeLimit(): Unit = {
     if (pendingStatus.size > statusSizeLimit) {
       val toRemove = pendingStatus.head._1
-      pendingStatus.remove(toRemove)
-      ()
+      removeStatus(toRemove)
     }
   }
 }

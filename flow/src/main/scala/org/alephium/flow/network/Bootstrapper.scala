@@ -1,6 +1,6 @@
 package org.alephium.flow.network
 
-import akka.actor.{ActorContext, ActorRef, Props}
+import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
@@ -11,26 +11,9 @@ import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Bootstrapper {
   def props(
-      server: ActorRefT[TcpServer.Command],
+      tcpController: ActorRefT[TcpController.Command],
       discoveryServer: ActorRefT[DiscoveryServer.Command],
       cliqueManager: ActorRefT[CliqueManager.Command]
-  )(implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-    discoveryConfig: DiscoveryConfig): Props =
-    props(
-      server,
-      discoveryServer,
-      cliqueManager,
-      Builder.cliqueCoordinator,
-      Builder.broker
-    )
-
-  def props(
-      server: ActorRefT[TcpServer.Command],
-      discoveryServer: ActorRefT[DiscoveryServer.Command],
-      cliqueManager: ActorRefT[CliqueManager.Command],
-      cliqueCoordinatorBuilder: (ActorContext, ActorRef) => ActorRef,
-      brokerBuilder: (ActorContext, ActorRef)            => ActorRef
   )(implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     discoveryConfig: DiscoveryConfig): Props = {
@@ -41,36 +24,14 @@ object Bootstrapper {
       val intraCliqueInfo =
         IntraCliqueInfo.unsafe(cliqueId, peerInfos, brokerConfig.groupNumPerBroker)
       Props(
-        new SingleNodeCliqueBootstrapper(server, discoveryServer, cliqueManager, intraCliqueInfo))
+        new SingleNodeCliqueBootstrapper(tcpController,
+                                         discoveryServer,
+                                         cliqueManager,
+                                         intraCliqueInfo))
     } else if (networkSetting.isCoordinator) {
-      Props(
-        new CliqueCoordinatorBootstrapper(server,
-                                          discoveryServer,
-                                          cliqueManager,
-                                          cliqueCoordinatorBuilder))
+      Props(new CliqueCoordinatorBootstrapper(tcpController, discoveryServer, cliqueManager))
     } else {
-      Props(new BrokerBootstrapper(server, discoveryServer, cliqueManager, brokerBuilder))
-    }
-  }
-
-  object Builder {
-    def cliqueCoordinator(
-        implicit brokerConfig: BrokerConfig,
-        networkSetting: NetworkSetting,
-        discoveryConfig: DiscoveryConfig): (ActorContext, ActorRef) => ActorRef = {
-      (actorContext, bootstrapper) =>
-        actorContext.actorOf(
-          CliqueCoordinator.props(ActorRefT[Bootstrapper.Command](bootstrapper)),
-          "CliqueCoordinator"
-        )
-    }
-    def broker(implicit brokerConfig: BrokerConfig,
-               networkSetting: NetworkSetting): (ActorContext, ActorRef) => ActorRef = {
-      (actorContext, bootstrapper) =>
-        actorContext.actorOf(
-          Broker.props(ActorRefT[Bootstrapper.Command](bootstrapper)),
-          "Broker"
-        )
+      Props(new BrokerBootstrapper(tcpController, discoveryServer, cliqueManager))
     }
   }
 
@@ -81,37 +42,42 @@ object Bootstrapper {
   final case class SendIntraCliqueInfo(intraCliqueInfo: IntraCliqueInfo) extends Command
 }
 
-class CliqueCoordinatorBootstrapper(val server: ActorRefT[TcpServer.Command],
-                                    val discoveryServer: ActorRefT[DiscoveryServer.Command],
-                                    val cliqueManager: ActorRefT[CliqueManager.Command],
-                                    cliqueCoordinatorBuilder: (ActorContext, ActorRef) => ActorRef)
-    extends BootstrapperHandler {
-
+class CliqueCoordinatorBootstrapper(
+    val tcpController: ActorRefT[TcpController.Command],
+    val discoveryServer: ActorRefT[DiscoveryServer.Command],
+    val cliqueManager: ActorRefT[CliqueManager.Command]
+)(
+    implicit brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting,
+    discoveryConfig: DiscoveryConfig
+) extends BootstrapperHandler {
   log.debug("Start as CliqueCoordinator")
 
-  val cliqueCoordinator: ActorRef = cliqueCoordinatorBuilder(context, self)
+  val cliqueCoordinator: ActorRef = context.actorOf(CliqueCoordinator.props(self))
 
   override def receive: Receive = {
     case c: Tcp.Connected =>
+      log.debug(s"Connected to ${c.remoteAddress}")
       cliqueCoordinator.forward(c)
     case Bootstrapper.ForwardConnection =>
-      server ! TcpServer.WorkFor(cliqueManager.ref)
+      tcpController ! TcpController.WorkFor(cliqueManager.ref)
       context become (awaitInfo orElse forwardConnection)
   }
 }
 
-class BrokerBootstrapper(val server: ActorRefT[TcpServer.Command],
-                         val discoveryServer: ActorRefT[DiscoveryServer.Command],
-                         val cliqueManager: ActorRefT[CliqueManager.Command],
-                         brokerBuilder: (ActorContext, ActorRef) => ActorRef)
+class BrokerBootstrapper(
+    val tcpController: ActorRefT[TcpController.Command],
+    val discoveryServer: ActorRefT[DiscoveryServer.Command],
+    val cliqueManager: ActorRefT[CliqueManager.Command]
+)(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BootstrapperHandler {
   log.debug("Start as Broker")
-  brokerBuilder(context, self)
+  val broker: ActorRef = context.actorOf(Broker.props(self))
 
   override def receive: Receive = awaitInfo
 }
 
-class SingleNodeCliqueBootstrapper(val server: ActorRefT[TcpServer.Command],
+class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Command],
                                    val discoveryServer: ActorRefT[DiscoveryServer.Command],
                                    val cliqueManager: ActorRefT[CliqueManager.Command],
                                    intraCliqueInfo: IntraCliqueInfo)
@@ -122,18 +88,19 @@ class SingleNodeCliqueBootstrapper(val server: ActorRefT[TcpServer.Command],
   override def receive: Receive = awaitInfo
 }
 
-// TODO: close this properly
 trait BootstrapperHandler extends BaseActor {
-  server ! TcpServer.Start(self)
-
-  val server: ActorRefT[TcpServer.Command]
+  val tcpController: ActorRefT[TcpController.Command]
   val discoveryServer: ActorRefT[DiscoveryServer.Command]
   val cliqueManager: ActorRefT[CliqueManager.Command]
+
+  override def preStart(): Unit = {
+    tcpController ! TcpController.Start(self)
+  }
 
   def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
       val cliqueInfo = intraCliqueInfo.cliqueInfo
-      server ! TcpServer.WorkFor(cliqueManager.ref)
+      tcpController ! TcpController.WorkFor(cliqueManager.ref)
       cliqueManager ! CliqueManager.Start(cliqueInfo)
       discoveryServer ! DiscoveryServer.SendCliqueInfo(cliqueInfo)
 

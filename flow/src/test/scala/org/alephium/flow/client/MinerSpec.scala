@@ -15,12 +15,10 @@ class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
     val flowHandler          = TestProbe("flowHandler")
     val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val allHandlers: AllHandlers =
-      AllHandlers.buildWithFlowHandler(system,
-                                       ActorRefT(cliqueManager.ref),
-                                       blockFlow,
-                                       ActorRefT(flowHandler.ref))
+      AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref))
 
     val miner = system.actorOf(Miner.props(blockFlow, allHandlers))
+    system.eventStream.subscribe(cliqueManager.ref, classOf[CliqueManager.BroadCastBlock])
 
     miner ! Miner.Start
 

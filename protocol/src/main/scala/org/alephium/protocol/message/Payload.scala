@@ -195,16 +195,14 @@ object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }
 
-final case class SyncRequest(blockLocators: AVector[Hash], headerLocators: AVector[Hash])
-    extends Payload
+final case class SyncRequest(locators: AVector[AVector[Hash]]) extends Payload
 
 object SyncRequest extends Payload.Serding[SyncRequest] with Payload.Code {
-  implicit val serde: Serde[SyncRequest] =
-    Serde.forProduct2(apply, p => (p.blockLocators, p.headerLocators))
+  implicit val serde: Serde[SyncRequest] = Serde.forProduct1(apply, p => p.locators)
 }
 
-final case class SyncResponse(blocks: AVector[Block], headers: AVector[BlockHeader]) extends Payload
+final case class SyncResponse(hashes: AVector[AVector[Hash]]) extends Payload
 
 object SyncResponse extends Payload.Serding[SyncResponse] with Payload.Code {
-  implicit val serde: Serde[SyncResponse] = Serde.forProduct2(apply, p => (p.blocks, p.headers))
+  implicit val serde: Serde[SyncResponse] = Serde.forProduct1(apply, p => p.hashes)
 }
