@@ -47,6 +47,7 @@ class TimeStampSpec extends AlephiumSpec {
         val dt = Duration.unsafe(l1 / 2)
         (ts + dt).millis is ts.millis + dt.millis
         (ts - dt).get.millis is ts.millis - dt.millis
+        (ts minusUnsafe dt).millis is ts.millis - dt.millis
 
         val ts0 = TimeStamp.unsafe(l0)
         val ts1 = TimeStamp.unsafe(l1)

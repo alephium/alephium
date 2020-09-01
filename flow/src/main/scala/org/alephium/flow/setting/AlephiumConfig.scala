@@ -41,6 +41,11 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val diffAdjustUpMax: Int    = 8
   val timeSpanMin: Duration   = (expectedTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
   val timeSpanMax: Duration   = (expectedTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
+
+  //scalastyle:off magic.number
+  val recentBlockHeightDiff: Int         = 30
+  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
+  //scalastyle:on
 }
 
 final case class MiningSetting(nonceStep: BigInt)

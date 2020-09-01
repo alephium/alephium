@@ -22,7 +22,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     val chainIndex: ChainIndex,
     validator: Validation[T, S])(implicit brokerConfig: BrokerConfig)
     extends ChainHandlerState[T]
-    with BaseActor {
+    with IOBaseActor {
   import ChainHandler.Event
 
   // TODO: validate continuity
@@ -104,10 +104,12 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"${data.shortHex} is validated")
     logInfo(data)
-    if (blockFlow.isRecent(data)) {
-      broadcast(data, origin)
+    escapeIOError(blockFlow.isRecent(data)) { isRecent =>
+      if (isRecent) {
+        broadcast(data, origin)
+      }
+      addToFlowHandler(data, broker, origin)
     }
-    addToFlowHandler(data, broker, origin)
   }
 
   def handleDataAdded(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
