@@ -5,6 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
+import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
@@ -45,13 +46,17 @@ object Node {
   def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
       _config: AlephiumConfig
-  ): Node = new Node {
+  ): Node = new Node with StrictLogging {
     implicit val system          = actorSystem
     val config                   = _config
     implicit val brokerConfig    = config.broker
     implicit val consensusConfig = config.consensus
     implicit val networkSetting  = config.network
     implicit val discoveryConfig = config.discovery
+
+    networkSetting.externalAddressInferred.foreach { address =>
+      logger.info(s"The node is using this external address: $address")
+    }
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
