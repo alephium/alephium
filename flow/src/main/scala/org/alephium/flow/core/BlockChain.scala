@@ -63,7 +63,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getLatestHashesUnsafe(): AVector[Hash] = {
     val toHeight   = maxHeightUnsafe
-    val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 10)
+    val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 100)
     (fromHeight to toHeight).foldLeft(AVector.empty[Hash]) {
       case (acc, height) => acc ++ Utils.unsafe(getHashes(height))
     }

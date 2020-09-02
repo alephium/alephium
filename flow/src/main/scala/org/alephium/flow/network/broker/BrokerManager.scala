@@ -26,7 +26,8 @@ object BrokerManager {
 
   final case class InvalidMessage(remoteAddress: InetSocketAddress)  extends Critical
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Critical
-  final case class Spamming(remoteAddress: InetSocketAddress)        extends Error
+  final case class InvalidDag(remoteAddress: InetSocketAddress)      extends Critical
+  final case class Spamming(remoteAddress: InetSocketAddress)        extends Warning
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
 }
 

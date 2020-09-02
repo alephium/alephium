@@ -2,14 +2,15 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.broker.BlockFlowSynchronizer
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, CliqueInfo}
@@ -38,7 +39,9 @@ object InterCliqueManager {
 
   final case class SyncStatus(cliqueId: CliqueId, address: InetSocketAddress, isSynced: Boolean)
 
-  final case class BrokerState(info: BrokerInfo, actor: ActorRef, isSynced: Boolean) {
+  final case class BrokerState(info: BrokerInfo,
+                               actor: ActorRefT[BrokerHandler.Command],
+                               isSynced: Boolean) {
     def setSynced(): BrokerState = BrokerState(info, actor, isSynced = true)
 
     def readyFor(chainIndex: ChainIndex): Boolean = {
@@ -116,7 +119,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       iterBrokers { (cliqueId, brokerState) =>
         if (!message.origin.isFrom(cliqueId) && brokerState.readyFor(block.chainIndex)) {
           log.debug(s"Send block to broker $cliqueId")
-          brokerState.actor ! message.blockMsg
+          brokerState.actor ! BrokerHandler.Send(message.blockMsg)
         }
       }
     case message: CliqueManager.BroadCastTx =>
@@ -124,7 +127,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       iterBrokers { (cliqueId, brokerState) =>
         if (!message.origin.isFrom(cliqueId) && brokerState.readyFor(message.chainIndex)) {
           log.debug(s"Send tx to broker $cliqueId")
-          brokerState.actor ! message.txMsg
+          brokerState.actor ! BrokerHandler.Send(message.txMsg)
         }
       }
 
@@ -163,7 +166,9 @@ trait InterCliqueManagerState {
   // The key is (CliqueId, BrokerId)
   private val brokers = collection.mutable.HashMap.empty[(CliqueId, Int), BrokerState]
 
-  def addBroker(cliqueId: CliqueId, brokerInfo: BrokerInfo, broker: ActorRef): Unit = {
+  def addBroker(cliqueId: CliqueId,
+                brokerInfo: BrokerInfo,
+                broker: ActorRefT[BrokerHandler.Command]): Unit = {
     val brokerKey = cliqueId -> brokerInfo.brokerId
     if (!brokers.contains(brokerKey)) {
       brokers += brokerKey -> BrokerState(brokerInfo, broker, isSynced = false)

@@ -1,4 +1,4 @@
-package org.alephium.flow.network.broker
+package org.alephium.flow.network.sync
 
 import java.net.InetSocketAddress
 
@@ -6,6 +6,7 @@ import akka.actor.{Cancellable, Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
+import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration}
@@ -16,9 +17,9 @@ object BlockFlowSynchronizer {
 
   sealed trait Command
   final case class HandShaked(brokerInfo: BrokerInfo)              extends Command
-  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
-  final case class Downloaded(hashes: AVector[Hash])               extends Command
   case object Sync                                                 extends Command
+  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
+  final case class BlockFinalized(hash: Hash)                      extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
@@ -44,19 +45,11 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       allHandlers.flowHandler ! FlowHandler.GetSyncLocators
     case FlowHandler.SyncLocators(locators) =>
       samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
-    case SyncInventories(hashes) =>
-      log.debug(s"Received sync response from $remoteAddress")
-      download(hashes)
-    case Downloaded(hashes) =>
-      downloaded(hashes)
+    case SyncInventories(hashes) => download(hashes)
+    case BlockFinalized(hash)    => finalized(hash)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
-  }
-
-  // Only use it when receive messages from inter clique BrokerHandler
-  private def remoteAddress: InetSocketAddress = {
-    brokerInfos(ActorRefT(sender())).address
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {

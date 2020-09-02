@@ -11,7 +11,8 @@ import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
-import org.alephium.flow.network.broker.{BlockFlowSynchronizer, BrokerManager}
+import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 

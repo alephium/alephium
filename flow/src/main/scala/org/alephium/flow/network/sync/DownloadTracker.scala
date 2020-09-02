@@ -1,8 +1,9 @@
-package org.alephium.flow.network.broker
+package org.alephium.flow.network.sync
 
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.Hash
 import org.alephium.util.{AVector, BaseActor}
 
@@ -12,7 +13,7 @@ trait DownloadTracker extends BaseActor {
   val downloading: mutable.HashSet[Hash] = mutable.HashSet.empty
 
   def needToDownload(hash: Hash): Boolean =
-    !(blockflow.containsUnsafe(hash) && downloading.contains(hash))
+    !(blockflow.containsUnsafe(hash) || downloading.contains(hash))
 
   def download(hashes: AVector[AVector[Hash]]): Unit = {
     val toDownload = hashes.flatMap(_.filter(needToDownload))
@@ -20,7 +21,8 @@ trait DownloadTracker extends BaseActor {
     sender() ! BrokerHandler.DownloadBlocks(toDownload)
   }
 
-  def downloaded(hashes: AVector[Hash]): Unit = {
-    hashes.foreach(downloading.remove)
+  def finalized(hash: Hash): Unit = {
+    downloading.remove(hash)
+    ()
   }
 }

@@ -5,7 +5,6 @@ import scala.collection.mutable
 import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.FlowHandler.HeaderAdded
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.protocol.Hash
@@ -32,10 +31,10 @@ object HeaderChainHandler {
                                     origin: DataOrigin)
       extends Command
 
-  sealed trait Event                                    extends ChainHandler.Event
-  final case class HeadersAdded(chainIndex: ChainIndex) extends Event
-  case object HeadersAddingFailed                       extends Event
-  case object InvalidHeaders                            extends Event
+  sealed trait Event                         extends ChainHandler.Event
+  final case class HeaderAdded(hash: Hash)   extends Event
+  case object HeaderAddingFailed             extends Event
+  final case class InvalidHeader(hash: Hash) extends Event
 }
 
 class HeaderChainHandler(blockFlow: BlockFlow,
@@ -52,8 +51,8 @@ class HeaderChainHandler(blockFlow: BlockFlow,
   override def receive: Receive = {
     case AddHeaders(headers, origin) =>
       handleDatas(headers, ActorRefT[ChainHandler.Event](sender()), origin)
-    case AddPendingHeader(header, broker, origin) => handlePending(header, broker, origin)
-    case HeaderAdded(header, broker, origin)      => handleDataAdded(header, broker, origin)
+    case AddPendingHeader(header, broker, origin)        => handlePending(header, broker, origin)
+    case FlowHandler.HeaderAdded(header, broker, origin) => handleDataAdded(header, broker, origin)
   }
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
@@ -72,9 +71,9 @@ class HeaderChainHandler(blockFlow: BlockFlow,
     flowHandler ! FlowHandler.PendingHeader(header, missings, origin, broker, self)
   }
 
-  override def dataAddedEvent(): Event = HeadersAdded(chainIndex)
+  override def dataAddedEvent(data: BlockHeader): Event = HeaderAdded(data.hash)
 
-  override def dataAddingFailed(): Event = HeadersAddingFailed
+  override def dataAddingFailed(): Event = HeaderAddingFailed
 
-  override def dataInvalid(): Event = InvalidHeaders
+  override def dataInvalid(data: BlockHeader): Event = InvalidHeader(data.hash)
 }

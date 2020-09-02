@@ -1,7 +1,5 @@
 package org.alephium.flow.core
 
-import scala.annotation.tailrec
-
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -9,7 +7,6 @@ import org.alephium.crypto.ED25519PublicKey
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.Validation
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -282,6 +279,75 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
   }
 
+  behavior of "Sync"
+
+  it should "compute sync locators and inventories" in {
+    brokerConfig.groupNumPerBroker is 1 // the test only works in this case
+
+    (0 until brokerConfig.groups).foreach { testToGroup =>
+      val blockFlow0    = isolatedBlockFlow()
+      val testFromGroup = brokerConfig.groupFrom
+      val blocks = (1 to 6).map { k =>
+        val block =
+          mine(blockFlow0, ChainIndex.unsafe(testFromGroup, testToGroup), onlyTxForIntra = true)
+        addAndCheck(blockFlow0, block, k)
+        block
+      }
+      val hashes0 = AVector.from(blocks.map(_.hash))
+      val locators0: AVector[AVector[Hash]] =
+        AVector.tabulate(groupConfig.groups) { group =>
+          if (group equals testToGroup)
+            AVector(config.genesisBlocks(testFromGroup)(testToGroup).hash,
+                    hashes0(0),
+                    hashes0(1),
+                    hashes0(3),
+                    hashes0(4),
+                    hashes0(5))
+          else AVector(config.genesisBlocks(testFromGroup)(group).hash)
+        }
+      blockFlow0.getSyncLocators() isE locators0
+
+      val blockFlow1 = isolatedBlockFlow()
+      val locators1: AVector[AVector[Hash]] = AVector.tabulate(config.broker.groups) { group =>
+        AVector(config.genesisBlocks(testFromGroup)(group).hash)
+      }
+      blockFlow1.getSyncLocators() isE locators1
+
+      blockFlow0.getSyncInventories(locators0) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+      blockFlow0.getSyncInventories(locators1) isE
+        AVector.tabulate(groupConfig.groups) { group =>
+          if (group equals testToGroup) hashes0 else AVector.empty[Hash]
+        }
+      blockFlow1.getSyncInventories(locators0) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+      blockFlow1.getSyncInventories(locators1) isE
+        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+
+      (0 until brokerConfig.brokerNum).foreach { id =>
+        val remoteBrokerInfo = new BrokerGroupInfo {
+          override def brokerId: Int          = id
+          override def groupNumPerBroker: Int = brokerConfig.groupNumPerBroker
+        }
+        blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
+          (if (remoteBrokerInfo.groupFrom equals testToGroup) AVector(hashes0)
+           else AVector(AVector.empty[Hash]))
+        blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[Hash])
+      }
+
+      val remoteBrokerInfo = new BrokerGroupInfo {
+        override def brokerId: Int          = 0
+        override def groupNumPerBroker: Int = brokerConfig.groups
+      }
+      blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
+        AVector.tabulate(brokerConfig.groups) { k =>
+          if (k equals testToGroup) hashes0 else AVector.empty[Hash]
+        }
+      blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE
+        AVector.fill(brokerConfig.groups)(AVector.empty[Hash])
+    }
+  }
+
   behavior of "Balance"
 
   it should "transfer token for inside a same group" in {
@@ -328,58 +394,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val pubScript =
       block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
     checkBalance(blockFlow1, pubScript, 1)
-  }
-
-  def mine(blockFlow: BlockFlow,
-           chainIndex: ChainIndex,
-           onlyTxForIntra: Boolean                                      = false,
-           outputScriptOption: Option[(StatefulContract, AVector[Val])] = None,
-           txScriptOption: Option[StatefulScript]                       = None): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
-    val (_, toPublicKey) = chainIndex.to.generateKey
-    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
-    val transactions = {
-      if (brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
-        val mainGroup                  = chainIndex.from
-        val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
-        val fromLockupScript           = LockupScript.p2pkh(publicKey)
-        val unlockScript               = UnlockScript.p2pkh(publicKey)
-        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-        val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.amount)
-        val (_, toPublicKey)           = chainIndex.to.generateKey
-        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
-        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-
-        val output0 = outputScriptOption match {
-          case Some((script, _)) => TxOutput.contract(1, height, toLockupScript, script)
-          case None              => TxOutput.asset(1, height, toLockupScript)
-        }
-        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
-        val outputs = AVector[TxOutput](output0, output1)
-        val unsignedTx = outputScriptOption match {
-          case Some((_, state)) =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector(state))
-          case None =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector.empty)
-        }
-        val transferTx = Transaction.from(unsignedTx, privateKey)
-        AVector(transferTx, coinbaseTx)
-      } else AVector(coinbaseTx)
-    }
-
-    @tailrec
-    def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
-      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
-    }
-
-    iter(0)
-  }
-
-  def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
-    blockFlow.add(block).isRight is true
-    blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * weightRatio
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
