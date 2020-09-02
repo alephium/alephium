@@ -194,6 +194,7 @@ val commonSettings = Seq(
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard"
   ),
+  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   wartremoverErrors in (Compile, compile) := Warts.allBut(wartsCompileExcludes: _*),
   wartremoverErrors in (Test, test) := Warts.allBut(wartsTestExcludes: _*),
   wartremoverErrors in (IntegrationTest, test) := Warts.allBut(wartsTestExcludes: _*),
