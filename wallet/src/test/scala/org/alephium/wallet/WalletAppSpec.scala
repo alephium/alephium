@@ -48,7 +48,7 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
-  val password                 = "password"
+  val password                 = Hash.generate.toHexString
   var mnemonic: model.Mnemonic = model.Mnemonic(Seq.empty)
   var address                  = ""
   val transferAddress          = Hash.generate.toHexString

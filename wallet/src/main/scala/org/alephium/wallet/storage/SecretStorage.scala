@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path}
 import java.util.UUID
 
 import scala.io.Source
+import scala.util.Using
 
 import akka.util.ByteString
 import io.circe.Codec
@@ -30,22 +31,26 @@ object SecretStorage {
     seedFromFile(file, password).map(_ => new Impl(file))
   }
 
-  def apply(seed: ByteString, password: String, secretDir: Path): SecretStorage = {
+  def apply(seed: ByteString, password: String, secretDir: Path): Either[String, SecretStorage] = {
 
     val encryption = AES.encrypt(seed, password)
 
     val uuid = UUID.nameUUIDFromBytes(encryption.encrypted.toArray)
 
-    Files.createDirectories(secretDir)
-    val file      = new File(s"$secretDir/$uuid.json")
-    val outWriter = new PrintWriter(file)
+    Using
+      .Manager { use =>
+        Files.createDirectories(secretDir)
+        val file      = new File(s"$secretDir/$uuid.json")
+        val outWriter = use(new PrintWriter(file))
 
-    // scalastyle:off regex
-    outWriter.write(encryption.asJson.noSpaces)
-    // scalastyle:on
-    outWriter.close()
-
-    new Impl(file)
+        // scalastyle:off regex
+        outWriter.write(encryption.asJson.noSpaces)
+        // scalastyle:on
+        new Impl(file)
+      }
+      .toEither
+      .left
+      .map(_.getMessage)
   }
 
   private class Impl(file: File) extends SecretStorage {
@@ -57,8 +62,14 @@ object SecretStorage {
     }
 
     override def unlock(password: String): Either[String, Unit] = {
-      seedFromFile(file, password).map { seed =>
-        privateKey = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq)
+      for {
+        seed <- seedFromFile(file, password)
+        priKey <- BIP32
+          .btcMasterKey(seed)
+          .derive(Constants.path.toSeq)
+          .toRight(s"Cannot derive key from path ${Constants.pathStr}")
+      } yield {
+        privateKey = Some(priKey)
       }
     }
 
@@ -66,15 +77,16 @@ object SecretStorage {
   }
 
   private def seedFromFile(file: File, password: String): Either[String, ByteString] = {
-    val source = Source.fromFile(file)
-    val rawFile = source.getLines().mkString
-    for {
-      encrypted <- decode[AES.Encrypted](rawFile).left.map(_.getMessage)
-      seed      <- AES.decrypt(encrypted, password).toEither.left.map(_.getMessage)
-    } yield {
-      source.close()
-      seed
-    }
+    Using(Source.fromFile(file)) { source =>
+      val rawFile = source.getLines().mkString
+      for {
+        encrypted <- decode[AES.Encrypted](rawFile).left.map(_.getMessage)
+        seed      <- AES.decrypt(encrypted, password).toEither.left.map(_.getMessage)
+      } yield {
+        source.close()
+        seed
+      }
+    }.toEither.left.map(_.getMessage).flatten
   }
 
   implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
