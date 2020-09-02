@@ -13,7 +13,7 @@ import org.alephium.util.{AVector, Bits, Random}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic(words: Seq[String]) extends AnyVal {
+final case class Mnemonic private (words: Seq[String]) extends AnyVal {
   def toSeed(passphrase: String): ByteString = {
     val mnemonic     = words.mkString(" ").toCharArray
     val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
