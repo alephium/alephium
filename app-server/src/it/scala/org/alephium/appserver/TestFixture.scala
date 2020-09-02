@@ -19,12 +19,11 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519Signature}
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -40,13 +39,13 @@ trait TestFixtureLike
   override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   def generateAccount: (String, String, String) = {
-    val (priKey, pubKey) = ED25519.generatePriPub()
+    val (priKey, pubKey) = SignatureSchema.generatePriPub()
     (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "1BHhKnn8moe8GsELAUQZKBhTeDTbPBmLXTCANkZ6eAHdK"
-  val publicKey               = "e7599ec69d841b61fe316d6d5ea8702263ecaa8ac883e04edcc021dbd1c33776"
-  val privateKey              = "4449039341f7a2b435b7ea87a65b53284bffd82b41c574a0fd3eb27968634ffa"
+  val address                 = "16xrcCkHtAcrgpcDkXSU2zvSWdRGtkjKzSaP1DxjcxKCe"
+  val publicKey               = "0269bd0589fd46f2303c1b2792b111c867d047b2b5b232916204121ea0115c6ea4"
+  val privateKey              = "f1d0a9e3256f1cb8137bd64a61345cfbe55ea91926395ea04c8d365d1d7c6f1c"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
@@ -229,8 +228,8 @@ trait TestFixtureLike
   )
 
   def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
-    val signature: ED25519Signature = ED25519.sign(Hex.unsafe(createTransactionResult.hash),
-                                                   ED25519PrivateKey.unsafe(Hex.unsafe(privateKey)))
+    val signature: Signature = SignatureSchema.sign(Hex.unsafe(createTransactionResult.hash),
+                                                    PrivateKey.unsafe(Hex.unsafe(privateKey)))
     jsonRpc(
       "send_transaction",
       s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""

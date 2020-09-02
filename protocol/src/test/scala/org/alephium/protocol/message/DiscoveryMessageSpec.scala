@@ -2,8 +2,8 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
 import org.alephium.macros.EnumerationMacros
+import org.alephium.protocol.{PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
@@ -32,9 +32,9 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     }
 
     implicit val discoveryConfig: DiscoveryConfig = new DiscoveryConfig {
-      val (privateKey, publicKey)                = ED25519.generatePriPub()
-      def discoveryPrivateKey: ED25519PrivateKey = privateKey
-      def discoveryPublicKey: ED25519PublicKey   = publicKey
+      val (privateKey, publicKey)         = SignatureSchema.generatePriPub()
+      def discoveryPrivateKey: PrivateKey = privateKey
+      def discoveryPublicKey: PublicKey   = publicKey
 
       val peersPerGroup: Int          = 1
       val scanMaxPerGroup: Int        = 1

@@ -1,9 +1,9 @@
 package org.alephium.protocol
 
-import org.alephium.crypto.ED25519PublicKey
+import org.alephium.protocol.PublicKey
 
 package object model {
-  val cliqueIdLength: Int = ED25519PublicKey.length
+  val cliqueIdLength: Int = PublicKey.length
 
   type TokenId = Hash
 }

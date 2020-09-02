@@ -4,7 +4,7 @@ import scala.language.existentials
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, ED25519Signature}
+import org.alephium.protocol.{PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -22,9 +22,9 @@ object DiscoveryMessage {
     DiscoveryMessage(header, payload)
   }
 
-  final case class Header(version: Int, publicKey: ED25519PublicKey, cliqueId: CliqueId)
+  final case class Header(version: Int, publicKey: PublicKey, cliqueId: CliqueId)
   object Header {
-    private val serde = Serde.tuple3[Int, ED25519PublicKey, CliqueId]
+    private val serde = Serde.tuple3[Int, PublicKey, CliqueId]
 
     def serialize(header: Header): ByteString =
       serde.serialize((header.version, header.publicKey, header.cliqueId))
@@ -161,7 +161,7 @@ object DiscoveryMessage {
   def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
     val headerBytes  = Header.serialize(message.header)
     val payloadBytes = Payload.serialize(message.payload)
-    val signature    = ED25519.sign(payloadBytes, config.discoveryPrivateKey)
+    val signature    = SignatureSchema.sign(payloadBytes, config.discoveryPrivateKey)
     headerBytes ++ signature.bytes ++ payloadBytes
   }
 
@@ -172,11 +172,11 @@ object DiscoveryMessage {
       headerPair <- Header._deserialize(myCliqueId, input)
       header = headerPair._1
       rest1  = headerPair._2
-      signaturePair <- serdeImpl[ED25519Signature]._deserialize(rest1)
+      signaturePair <- serdeImpl[Signature]._deserialize(rest1)
       signature = signaturePair._1
       rest2     = signaturePair._2
       payload <- Payload.deserialize(rest2).flatMap { payload =>
-        if (ED25519.verify(rest2, signature, header.publicKey)) Right(payload)
+        if (SignatureSchema.verify(rest2, signature, header.publicKey)) Right(payload)
         else Left(SerdeError.validation(s"Invalid signature"))
       }
     } yield DiscoveryMessage(header, payload)

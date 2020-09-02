@@ -5,13 +5,13 @@ import akka.util.ByteString
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
-trait PrivateKey extends RandomBytes
+private[crypto] trait PrivateKey extends RandomBytes
 
-trait PublicKey extends RandomBytes
+private[crypto] trait PublicKey extends RandomBytes
 
-trait Signature extends RandomBytes
+private[crypto] trait Signature extends RandomBytes
 
-trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Signature] {
+private[crypto] trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Signature] {
 
   def generatePriPub(): (D, Q)
 

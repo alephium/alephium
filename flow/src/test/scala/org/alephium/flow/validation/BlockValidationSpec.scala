@@ -4,9 +4,9 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.{ED25519, ED25519Signature}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.io.IOResult
+import org.alephium.protocol.{Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
@@ -46,17 +46,17 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   it should "validate coinbase transaction" in new Fixture {
-    val (privateKey, publicKey) = ED25519.generatePriPub()
+    val (privateKey, publicKey) = SignatureSchema.generatePriPub()
     val block0                  = Block.from(AVector.empty, AVector.empty, consensusConfig.maxMiningTarget, 0)
 
     val input0          = txInputGen.sample.get
     val output0         = txOutputGen.sample.get
     val emptyInputs     = AVector.empty[TxInput]
     val emptyOutputs    = AVector.empty[TxOutput]
-    val emptySignatures = AVector.empty[ED25519Signature]
+    val emptySignatures = AVector.empty[Signature]
 
     val coinbase1     = Transaction.coinbase(publicKey, 0, ByteString.empty)
-    val testSignature = AVector(ED25519.sign(coinbase1.unsigned.hash.bytes, privateKey))
+    val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
     passCheck(checkCoinbase(block1))
 

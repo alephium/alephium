@@ -5,10 +5,9 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.ED25519Signature
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, ContractInfo, TxInputStateInfo}
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
@@ -363,7 +362,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         }
 
         {
-          val signature        = ED25519Signature.generate
+          val signature        = Signature.generate
           val (sampleIndex, _) = tx.signatures.sampleWithIndex()
           val signaturesNew    = tx.signatures.replace(sampleIndex, signature)
           val txNew            = tx.copy(signatures = signaturesNew)

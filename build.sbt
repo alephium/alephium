@@ -20,7 +20,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(macros, util, serde, io, crypto, rpc, `app-server`, benchmark, flow, protocol)
+  .aggregate(macros, util, serde, io, crypto, rpc, `app-server`, benchmark, flow, protocol, wallet)
 
 def mainProject(id: String): Project =
   project(id).enablePlugins(JavaAppPackaging).dependsOn(flow)
@@ -129,6 +129,27 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       fastparse,
       pureconfig
+    )
+  )
+
+lazy val wallet = project("wallet")
+  .dependsOn(crypto, util % "test->test", protocol % "compile->compile;test->test")
+  .settings(
+    libraryDependencies ++= Seq(
+      `akka-http`,
+      `akka-http-circe`,
+      `akka-http-test`,
+      `scala-logging`,
+      `circe-core`,
+      `circe-generic`,
+      `tapir-core`,
+      `tapir-circe`,
+      `tapir-akka`,
+      `tapir-openapi`,
+      `tapir-openapi-circe`,
+      `tapir-swagger-ui`,
+      `scala-logging`,
+      logback,
     )
   )
 

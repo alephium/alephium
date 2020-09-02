@@ -9,8 +9,7 @@ import sttp.tapir.server.PartialServerEndpoint
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs._
 import org.alephium.appserver.TapirSchemas._
-import org.alephium.crypto.ED25519PublicKey
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
@@ -94,10 +93,10 @@ trait Endpoints {
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
 
-  val createTransaction: BaseEndpoint[(ED25519PublicKey, Address, U64), CreateTransactionResult] =
+  val createTransaction: BaseEndpoint[(PublicKey, Address, U64), CreateTransactionResult] =
     baseEndpoint.get
       .in("unsigned-transactions")
-      .in(query[ED25519PublicKey]("fromKey"))
+      .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
       .in(query[U64]("value"))
       .out(jsonBody[CreateTransactionResult])

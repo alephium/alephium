@@ -2,8 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.crypto.ED25519Signature
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.util.AVector
 
 trait ChainEnv
@@ -13,7 +12,7 @@ trait ContractEnv
 
 trait Context {
   def txHash: Hash
-  def signatures: Stack[ED25519Signature]
+  def signatures: Stack[Signature]
   def worldState: WorldState
 
   def updateWorldState(newWorldState: WorldState): Unit
@@ -30,24 +29,22 @@ trait Context {
 }
 
 class StatelessContext(val txHash: Hash,
-                       val signatures: Stack[ED25519Signature],
+                       val signatures: Stack[Signature],
                        var worldState: WorldState)
     extends Context {
   override def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
 }
 
 object StatelessContext {
-  def apply(txHash: Hash, signature: ED25519Signature, worldState: WorldState): StatelessContext = {
-    val stack = Stack.unsafe[ED25519Signature](ArrayBuffer(signature), 1)
+  def apply(txHash: Hash, signature: Signature, worldState: WorldState): StatelessContext = {
+    val stack = Stack.unsafe[Signature](ArrayBuffer(signature), 1)
     apply(txHash, stack, worldState)
   }
 
   def apply(txHash: Hash, worldState: WorldState): StatelessContext =
-    apply(txHash, Stack.ofCapacity[ED25519Signature](0), worldState)
+    apply(txHash, Stack.ofCapacity[Signature](0), worldState)
 
-  def apply(txHash: Hash,
-            signatures: Stack[ED25519Signature],
-            worldState: WorldState): StatelessContext =
+  def apply(txHash: Hash, signatures: Stack[Signature], worldState: WorldState): StatelessContext =
     new StatelessContext(txHash, signatures, worldState)
 }
 

@@ -9,9 +9,7 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{ED25519, ED25519PrivateKey, ED25519PublicKey}
-import org.alephium.protocol.{ALF, DefaultGenerators, Generators}
-import org.alephium.protocol.Hash
+import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
@@ -33,7 +31,7 @@ trait LockupScriptGenerators extends Generators {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield ScriptPair(LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey), privateKey)
 
-  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript, ED25519PublicKey, ED25519PrivateKey)] =
+  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript, PublicKey, PrivateKey)] =
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield (LockupScript.p2pkh(publicKey), publicKey, privateKey)
@@ -73,7 +71,7 @@ trait TxInputGenerators extends Generators {
     } yield {
       val hint      = if (isAsset) Hint.ofAsset(scriptHint) else Hint.ofContract(scriptHint)
       val outputRef = TxOutputRef.from(hint, hash)
-      TxInput(outputRef, UnlockScript.p2pkh(ED25519PublicKey.zero))
+      TxInput(outputRef, UnlockScript.p2pkh(PublicKey.zero))
     }
 }
 
@@ -292,8 +290,9 @@ trait TxGenerators
                                               Gen.const(contractInfos),
                                               issueNewToken,
                                               lockupGen)
-      signatures = assetInfos.map(info => ED25519.sign(unsignedTx.hash.bytes, info.privateKey)) ++
-        contractInfos.map(info => ED25519.sign(unsignedTx.hash.bytes, info.privateKey))
+      signatures = assetInfos.map(info =>
+        SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey)) ++
+        contractInfos.map(info => SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
     } yield {
       val tx = Transaction(unsignedTx, AVector.empty, signatures)
       val preOutput = assetInfos.map[TxInputStateInfo](identity) ++ contractInfos
@@ -400,9 +399,7 @@ trait NoIndexModelGenerators
     with ConsensusConfigFixture
 
 object ModelGenerators {
-  final case class ScriptPair(lockup: LockupScript,
-                              unlock: UnlockScript,
-                              privateKey: ED25519PrivateKey)
+  final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)
 
   final case class Balances(alfAmount: U64, tokens: Map[TokenId, U64]) {
     def toOutput(createdHeight: Int, lockupScript: LockupScript, data: ByteString): AssetOutput = {
@@ -415,15 +412,13 @@ object ModelGenerators {
     def referredOutput: TxOutput
   }
 
-  case class AssetInputInfo(txInput: TxInput,
-                            referredOutput: AssetOutput,
-                            privateKey: ED25519PrivateKey)
+  case class AssetInputInfo(txInput: TxInput, referredOutput: AssetOutput, privateKey: PrivateKey)
       extends TxInputStateInfo
 
   case class ContractInfo(txInput: TxInput,
                           referredOutput: ContractOutput,
                           state: AVector[Val],
-                          privateKey: ED25519PrivateKey)
+                          privateKey: PrivateKey)
       extends TxInputStateInfo
 }
 

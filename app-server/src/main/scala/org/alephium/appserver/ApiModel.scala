@@ -6,11 +6,11 @@ import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.crypto.{ED25519PrivateKey, ED25519PublicKey, ED25519Signature, Sha256}
+import org.alephium.crypto.Sha256
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -36,16 +36,16 @@ object ApiModel {
       } yield key
       keyOpt.toRight(s"Unable to decode key from $input")
     }
-  implicit val publicKeyEncoder: Encoder[ED25519PublicKey] = bytesEncoder
-  implicit val publicKeyDecoder: Decoder[ED25519PublicKey] = bytesDecoder(ED25519PublicKey.from)
-  implicit val publicKeyCodec: Codec[ED25519PublicKey] =
+  implicit val publicKeyEncoder: Encoder[PublicKey] = bytesEncoder
+  implicit val publicKeyDecoder: Decoder[PublicKey] = bytesDecoder(PublicKey.from)
+  implicit val publicKeyCodec: Codec[PublicKey] =
     Codec.from(publicKeyDecoder, publicKeyEncoder)
 
-  implicit val privateKeyEncoder: Encoder[ED25519PrivateKey] = bytesEncoder
-  implicit val privateKeyDecoder: Decoder[ED25519PrivateKey] = bytesDecoder(ED25519PrivateKey.from)
+  implicit val privateKeyEncoder: Encoder[PrivateKey] = bytesEncoder
+  implicit val privateKeyDecoder: Decoder[PrivateKey] = bytesDecoder(PrivateKey.from)
 
-  implicit val signatureEncoder: Encoder[ED25519Signature] = bytesEncoder
-  implicit val signatureDecoder: Decoder[ED25519Signature] = bytesDecoder(ED25519Signature.from)
+  implicit val signatureEncoder: Encoder[Signature] = bytesEncoder
+  implicit val signatureDecoder: Decoder[Signature] = bytesDecoder(Signature.from)
 
   implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
   implicit val hashDecoder: Decoder[Hash] =
@@ -234,7 +234,7 @@ object ApiModel {
   }
 
   final case class CreateTransaction(
-      fromKey: ED25519PublicKey,
+      fromKey: PublicKey,
       toAddress: Address,
       value: U64
   ) extends ApiModel {
@@ -253,7 +253,7 @@ object ApiModel {
                               Hex.toHexString(unsignedTx.hash.bytes))
   }
 
-  final case class SendTransaction(tx: String, signature: ED25519Signature) extends ApiModel
+  final case class SendTransaction(tx: String, signature: Signature) extends ApiModel
   object SendTransaction {
     implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
   }

@@ -6,7 +6,7 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -1152,8 +1152,9 @@ case object CheckSignature extends Signature with InstrCompanion0 {
       rawPublicKey <- frame.popT[Val.Byte32]()
       signature    <- signatures.pop()
       _ <- {
-        val publicKey = ED25519PublicKey.unsafe(rawPublicKey.v.bytes)
-        if (ED25519.verify(rawData, signature, publicKey)) Right(()) else Left(VerificationFailed)
+        val publicKey = PublicKey.unsafe(rawPublicKey.v.bytes)
+        if (SignatureSchema.verify(rawData, signature, publicKey)) Right(())
+        else Left(VerificationFailed)
       }
     } yield ()
   }

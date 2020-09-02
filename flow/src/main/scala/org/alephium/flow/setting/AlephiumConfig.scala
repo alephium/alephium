@@ -11,8 +11,8 @@ import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
-import org.alephium.crypto.ED25519
 import org.alephium.flow.network.nat.Upnp
+import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.LockupScript
@@ -90,7 +90,7 @@ final case class DiscoverySetting(
     scanFastFrequency: Duration,
     neighborsPerGroup: Int
 ) extends DiscoveryConfig {
-  val (discoveryPrivateKey, discoveryPublicKey) = ED25519.generatePriPub()
+  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 }
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
