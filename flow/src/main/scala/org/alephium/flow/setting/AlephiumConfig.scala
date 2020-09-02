@@ -67,16 +67,14 @@ final case class NetworkSetting(
 
   def handshakeTimeout: Duration = retryTimeout
 
-  val externalAddressInferred: Option[InetSocketAddress] = externalAddress match {
-    case Some(address) => Some(address)
-    case None =>
-      if (upnp.enabled) {
-        Upnp.getUpnpClient(upnp).map { client =>
-          val bindingPort = bindAddress.getPort
-          client.addPortMapping(bindingPort, bindingPort)
-          new InetSocketAddress(client.externalAddress, bindingPort)
-        }
-      } else None
+  val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
+    if (upnp.enabled) {
+      Upnp.getUpnpClient(upnp).map { client =>
+        val bindingPort = bindAddress.getPort
+        client.addPortMapping(bindingPort, bindingPort)
+        new InetSocketAddress(client.externalAddress, bindingPort)
+      }
+    } else None
   }
 }
 
