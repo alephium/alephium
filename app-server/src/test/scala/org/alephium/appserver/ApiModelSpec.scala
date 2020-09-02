@@ -24,8 +24,9 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
 
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString), None)
-  val dummyAddress    = new InetSocketAddress("127.0.0.1", 9000)
-  val dummyCliqueInfo = CliqueInfo.unsafe(CliqueId.generate, AVector(dummyAddress), 1)
+  val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
+  val dummyCliqueInfo =
+    CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
@@ -113,10 +114,10 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode NeighborCliques" in {
-    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo))
+    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo.interCliqueInfo.get))
     val cliqueIdString  = dummyCliqueInfo.id.toHexString
     def jsonRaw(cliqueId: String) =
-      s"""{"cliques":[{"id":"$cliqueId","peers":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
+      s"""{"cliques":[{"id":"$cliqueId","externalAddresses":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
     checkData(neighborCliques, jsonRaw(cliqueIdString))
 
     parseFail[NeighborCliques](jsonRaw("OOPS")) is "invalid clique id"

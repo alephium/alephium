@@ -26,8 +26,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
     connectionHandler.expectMsgType[ConnectionHandler.Send]
     brokerHandler.underlyingActor.pingPongTickOpt is None
 
-    val brokerInfo = BrokerInfo.unsafe(0, 1, new InetSocketAddress("localhost", 0))
-    val hello      = Hello.unsafe(CliqueId.generate, brokerInfo)
+    val brokerInfo =
+      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
+    val hello = Hello.unsafe(brokerInfo.interBrokerInfo)
     brokerHandler ! BrokerHandler.Received(hello)
     brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
   }
@@ -51,9 +52,9 @@ class TestBrokerHandler(val brokerConnectionHandler: ActorRefT[ConnectionHandler
 
   override def allHandlers: AllHandlers = ???
 
-  val brokerInfo = BrokerInfo.unsafe(0, 1, new InetSocketAddress("localhost", 0))
+  val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
 
-  override val handShakeMessage: Payload = Hello.unsafe(CliqueId.generate, brokerInfo)
+  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo)
 
   override def exchanging: Receive = exchangingCommon
 

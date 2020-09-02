@@ -11,7 +11,7 @@ import akka.io.Udp
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 trait DiscoveryServerState {
@@ -21,6 +21,9 @@ trait DiscoveryServerState {
 
   def bootstrap: ArraySeq[InetSocketAddress]
   def selfCliqueInfo: CliqueInfo
+  def selfCliqueId: CliqueId = selfCliqueInfo.id
+
+  lazy val selfInterCliqueInfoOpt: Option[InterCliqueInfo] = selfCliqueInfo.interCliqueInfo
 
   import DiscoveryServer._
 
@@ -33,17 +36,18 @@ trait DiscoveryServerState {
     socket = s
   }
 
-  def getActivePeers: AVector[CliqueInfo] = {
+  def getActivePeers: AVector[InterCliqueInfo] = {
     AVector.from(table.values.map(_.info))
   }
 
   def getPeersNum: Int = table.size
 
-  def getNeighbors(target: CliqueId): AVector[CliqueInfo] = {
-    val candidates = if (target == selfCliqueInfo.id) {
+  def getNeighbors(target: CliqueId): AVector[InterCliqueInfo] = {
+    val candidates = if (target == selfCliqueId) {
       AVector.from(table.values.map(_.info))
     } else {
-      AVector.from(table.values.map(_.info).filter(_.id != target)) :+ selfCliqueInfo
+      val neighbors = AVector.from(table.values.map(_.info).filter(_.id != target))
+      selfInterCliqueInfoOpt.fold(neighbors)(neighbors :+ _)
     }
     candidates
       .sortBy(info => target.hammingDist(info.id))
@@ -62,7 +66,7 @@ trait DiscoveryServerState {
 
   def isPendingAvailable: Boolean = pendings.size < pendingMax
 
-  def getPeer(cliqueId: CliqueId): Option[CliqueInfo] = {
+  def getPeer(cliqueId: CliqueId): Option[InterCliqueInfo] = {
     table.get(cliqueId).map(_.info)
   }
 
@@ -84,11 +88,11 @@ trait DiscoveryServerState {
 
   def cleanup(): Unit = {
     val now = TimeStamp.now()
-    val toRemove = table.values
-      .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.peersTimeout))
+    val expired = table.values
+      .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.expireDuration))
       .map(_.info.id)
       .toSet
-    table --= toRemove
+    table --= expired
 
     val deadPendings = pendings.collect {
       case (cliqueId, status) if (now -- status.pingAt).exists(_ >= discoveryConfig.peersTimeout) =>
@@ -97,15 +101,16 @@ trait DiscoveryServerState {
     pendings --= deadPendings
   }
 
-  private def appendPeer(cliqueInfo: CliqueInfo): Unit = {
-    log.debug(s"Adding a new peer: $cliqueInfo")
+  private def appendPeer(cliqueInfo: InterCliqueInfo): Unit = {
+    log.debug(s"Adding a new clique: $cliqueInfo")
     table += cliqueInfo.id -> PeerStatus.fromInfo(cliqueInfo)
     fetchNeighbors(cliqueInfo)
   }
 
+  // TODO: improve scan algorithm
   def scan(): Unit = {
     val sortedNeighbors =
-      AVector.from(table.values).sortBy(status => selfCliqueInfo.id.hammingDist(status.info.id))
+      AVector.from(table.values).sortBy(status => selfCliqueId.hammingDist(status.info.id))
     sortedNeighbors
       .takeUpto(discoveryConfig.scanMaxPerGroup)
       .foreach(status => fetchNeighbors(status.info))
@@ -118,33 +123,34 @@ trait DiscoveryServerState {
     table.isEmpty
   }
 
-  def fetchNeighbors(info: CliqueInfo): Unit = {
-    fetchNeighbors(info.masterAddress)
+  def fetchNeighbors(info: InterCliqueInfo): Unit = {
+    fetchNeighbors(info.externalAddresses.sample())
   }
 
   def fetchNeighbors(remote: InetSocketAddress): Unit = {
-    send(remote, FindNode(selfCliqueInfo.id))
+    send(remote, FindNode(selfCliqueId))
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
-    val message = DiscoveryMessage.from(selfCliqueInfo.id, payload)
+    val message = DiscoveryMessage.from(selfCliqueId, payload)
     socket ! Udp.Send(DiscoveryMessage.serialize(message), remote)
   }
 
-  def tryPing(cliqueInfo: CliqueInfo): Unit = {
+  def tryPing(cliqueInfo: InterCliqueInfo): Unit = {
     if (isUnknown(cliqueInfo.id) && isPendingAvailable) {
       log.info(s"Sending Ping to $cliqueInfo")
-      send(cliqueInfo.masterAddress, Ping(selfCliqueInfo)) // TODO: don't use masterAddress
-      pendings += (cliqueInfo.id -> AwaitPong(cliqueInfo.masterAddress, TimeStamp.now()))
+      val remoteAddress = cliqueInfo.externalAddresses.sample()
+      send(remoteAddress, Ping(selfInterCliqueInfoOpt))
+      pendings += (cliqueInfo.id -> AwaitPong(remoteAddress, TimeStamp.now()))
     }
   }
 
   def tryPing(remote: InetSocketAddress): Unit = {
     log.debug(s"Sending Ping to $remote")
-    send(remote, Ping(selfCliqueInfo))
+    send(remote, Ping(selfInterCliqueInfoOpt))
   }
 
-  def handlePong(cliqueInfo: CliqueInfo): Unit = {
+  def handlePong(cliqueInfo: InterCliqueInfo): Unit = {
     val cliqueId = cliqueInfo.id
     pendings.get(cliqueId) match {
       case Some(AwaitPong(_, _)) =>
@@ -160,8 +166,8 @@ trait DiscoveryServerState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def tryInsert(cliqueInfo: CliqueInfo): Unit = {
-    val myself   = selfCliqueInfo.id
+  private def tryInsert(cliqueInfo: InterCliqueInfo): Unit = {
+    val myself   = selfCliqueId
     val furthest = table.keys.maxBy(myself.hammingDist)
     if (myself.hammingDist(cliqueInfo.id) < myself.hammingDist(furthest)) {
       table -= furthest

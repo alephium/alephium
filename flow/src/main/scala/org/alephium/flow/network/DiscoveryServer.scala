@@ -11,24 +11,24 @@ import org.alephium.flow.FlowMonitor
 import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
-  def props(publicAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
+  def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props =
-    Props(new DiscoveryServer(publicAddress, bootstrap))
+    Props(new DiscoveryServer(bindAddress, bootstrap))
 
-  def props(publicAddress: InetSocketAddress, peers: InetSocketAddress*)(
+  def props(bindAddress: InetSocketAddress, peers: InetSocketAddress*)(
       implicit groupConfig: GroupConfig,
       discoveryConfig: DiscoveryConfig): Props = {
-    props(publicAddress, ArraySeq.from(peers))
+    props(bindAddress, ArraySeq.from(peers))
   }
 
-  final case class PeerStatus(info: CliqueInfo, updateAt: TimeStamp)
+  final case class PeerStatus(info: InterCliqueInfo, updateAt: TimeStamp)
   object PeerStatus {
-    def fromInfo(info: CliqueInfo): PeerStatus = {
+    def fromInfo(info: InterCliqueInfo): PeerStatus = {
       PeerStatus(info, TimeStamp.now())
     }
   }
@@ -45,7 +45,7 @@ object DiscoveryServer {
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
 
   sealed trait Event
-  final case class NeighborCliques(peers: AVector[CliqueInfo]) extends Event
+  final case class NeighborCliques(peers: AVector[InterCliqueInfo]) extends Event
 }
 
 /*
@@ -61,7 +61,7 @@ object DiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class DiscoveryServer(val publicAddress: InetSocketAddress,
+class DiscoveryServer(val bindAddress: InetSocketAddress,
                       val bootstrap: ArraySeq[InetSocketAddress])(
     implicit val groupConfig: GroupConfig,
     val discoveryConfig: DiscoveryConfig)
@@ -80,7 +80,7 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
-      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(publicAddress.getPort))
+      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(bindAddress.getPort))
       context become (binding orElse handleCommand)
   }
 
@@ -133,9 +133,9 @@ class DiscoveryServer(val publicAddress: InetSocketAddress,
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
-      case Ping(cliqueInfo) =>
-        send(remote, Pong(selfCliqueInfo))
-        tryPing(cliqueInfo)
+      case Ping(cliqueInfoOpt) =>
+        selfInterCliqueInfoOpt.foreach(info => send(remote, Pong(info)))
+        cliqueInfoOpt.foreach(tryPing) // ping back when cliqueInfo is not empty
       case Pong(cliqueInfo) =>
         handlePong(cliqueInfo)
       case FindNode(targetId) =>

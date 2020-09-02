@@ -12,6 +12,7 @@ import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
 import org.alephium.crypto.ED25519
+import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.LockupScript
@@ -40,6 +41,11 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val diffAdjustUpMax: Int    = 8
   val timeSpanMin: Duration   = (expectedTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
   val timeSpanMax: Duration   = (expectedTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
+
+  //scalastyle:off magic.number
+  val recentBlockHeightDiff: Int         = 30
+  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
+  //scalastyle:on
 }
 
 final case class MiningSetting(nonceStep: BigInt)
@@ -47,17 +53,34 @@ final case class MiningSetting(nonceStep: BigInt)
 final case class NetworkSetting(
     pingFrequency: Duration,
     retryTimeout: Duration,
-    publicAddress: InetSocketAddress,
+    upnp: UpnpSettings,
+    bindAddress: InetSocketAddress,
+    internalAddress: InetSocketAddress,
     masterAddress: InetSocketAddress,
+    externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     rpcPort: Option[Int],
     wsPort: Option[Int],
     restPort: Option[Int]
 ) {
-  val isCoordinator: Boolean = publicAddress == masterAddress
+  val isCoordinator: Boolean = internalAddress == masterAddress
 
   def handshakeTimeout: Duration = retryTimeout
+
+  val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
+    if (upnp.enabled) {
+      Upnp.getUpnpClient(upnp).map { client =>
+        val bindingPort = bindAddress.getPort
+        client.addPortMapping(bindingPort, bindingPort)
+        new InetSocketAddress(client.externalAddress, bindingPort)
+      }
+    } else None
+  }
 }
+
+final case class UpnpSettings(enabled: Boolean,
+                              httpTimeout: Option[Duration],
+                              discoveryTimeout: Option[Duration])
 
 final case class DiscoverySetting(
     bootstrap: ArraySeq[InetSocketAddress],

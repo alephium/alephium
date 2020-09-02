@@ -9,7 +9,6 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
 class InterCliqueSyncTest extends AlephiumSpec {
-
   it should "boot and sync two cliques" in new TestFixture("2-cliques-of-2-nodses") {
     val fromTs = TimeStamp.now()
 
@@ -21,13 +20,13 @@ class InterCliqueSyncTest extends AlephiumSpec {
     startWS(wsPort(masterPortClique1))
 
     clique1.foreach { server =>
-      request[Boolean](startMining, rpcPort(server.config.network.publicAddress.getPort)) is true
+      request[Boolean](startMining, rpcPort(server.config.network.bindAddress.getPort)) is true
     }
 
     blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
 
     clique1.foreach { server =>
-      request[Boolean](stopMining, rpcPort(server.config.network.publicAddress.getPort)) is true
+      request[Boolean](stopMining, rpcPort(server.config.network.bindAddress.getPort)) is true
     }
 
     val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
@@ -39,16 +38,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     Future.sequence(clique2.map(_.start())).futureValue
 
-    clique2.zip(clique1).foreach {
-      case (server, remote) =>
+    clique2.zip(clique1).zipWithIndex.foreach {
+      case ((server, remote), index) =>
         eventually {
           val response =
             request[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo,
-                                              rpcPort(server.config.network.publicAddress.getPort))
+                                              rpcPort(server.config.network.bindAddress.getPort))
           response is Seq(
             InterCliquePeerInfo(selfClique1.cliqueId,
+                                index,
                                 new InetSocketAddress("localhost",
-                                                      remote.config.network.publicAddress.getPort),
+                                                      remote.config.network.bindAddress.getPort),
                                 true))
         }
     }

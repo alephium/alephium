@@ -5,6 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
+import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
@@ -45,13 +46,17 @@ object Node {
   def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
       _config: AlephiumConfig
-  ): Node = new Node {
+  ): Node = new Node with StrictLogging {
     implicit val system          = actorSystem
     val config                   = _config
     implicit val brokerConfig    = config.broker
     implicit val consensusConfig = config.consensus
     implicit val networkSetting  = config.network
     implicit val discoveryConfig = config.discovery
+
+    networkSetting.externalAddressInferred.foreach { address =>
+      logger.info(s"The node is using this external address: $address")
+    }
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -62,13 +67,13 @@ object Node {
       ActorRefT
         .build[TcpController.Command](
           system,
-          TcpController.props(config.network.publicAddress.getPort, brokerManager))
+          TcpController.props(config.network.bindAddress.getPort, brokerManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val discoveryProps: Props =
-      DiscoveryServer.props(config.network.publicAddress, config.discovery.bootstrap)
+      DiscoveryServer.props(networkSetting.bindAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
@@ -86,9 +91,7 @@ object Node {
                       "CliqueManager")
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
-      ActorRefT.build(system,
-                      Bootstrapper.props(tcpController, discoveryServer, cliqueManager),
-                      "Bootstrapper")
+      ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
 
     val monitor: ActorRefT[Node.Command] =
       ActorRefT.build(system, Monitor.props(this), "NodeMonitor")

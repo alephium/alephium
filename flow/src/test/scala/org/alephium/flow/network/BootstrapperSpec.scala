@@ -6,17 +6,10 @@ import akka.testkit.TestProbe
 import org.alephium.flow._
 import org.alephium.flow.network.bootstrap.InfoFixture
 import org.alephium.protocol.model.NoIndexModelGeneratorsLike
-import org.alephium.util.ActorRefT
 
 class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   it should "bootstrap a master" in new MasterFixture("BootstrapperSpec-master") {
-    val bootstrapper = system.actorOf(
-      Bootstrapper.props(
-        ActorRefT(serverProbe.ref),
-        ActorRefT(discoveryServerProbe.ref),
-        ActorRefT(cliqueManagerProbe.ref)
-      )
-    )
+    val bootstrapper = system.actorOf(Bootstrapper.props(serverProbe.ref, cliqueManagerProbe.ref))
 
     serverProbe.expectMsg(TcpController.Start(bootstrapper))
 
@@ -30,11 +23,12 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     //CliqueManager is now responsible for new connection
     bootstrapper ! connected
     cliqueManagerProbe.expectMsg(connected)
+    expectMsgType[Tcp.Register]
+    expectMsg(Tcp.ResumeReading)
 
     //Receiving IntraCliqueInfo
     bootstrapper ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
     cliqueManagerProbe.expectMsg(CliqueManager.Start(cliqueInfo))
-    discoveryServerProbe.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
     //Answering IntraCliqueInfo request
     bootstrapper ! Bootstrapper.GetIntraCliqueInfo
@@ -42,21 +36,18 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "bootstrap a peer" in new AlephiumFlowActorSpec("BootstrapperSpec") {
-    val serverProbe          = TestProbe()
-    val discoveryServerProbe = TestProbe()
-    val cliqueManagerProbe   = TestProbe()
+    val serverProbe        = TestProbe()
+    val cliqueManagerProbe = TestProbe()
 
-    val bootstrapper = system.actorOf(
-      Bootstrapper.props(ActorRefT(serverProbe.ref),
-                         ActorRefT(discoveryServerProbe.ref),
-                         ActorRefT(cliqueManagerProbe.ref)))
+    val bootstrapper = system.actorOf(Bootstrapper.props(serverProbe.ref, cliqueManagerProbe.ref))
     serverProbe.expectMsg(TcpController.Start(bootstrapper))
   }
 
   class MasterFixture(name: String) extends AlephiumFlowActorSpec(name) with InfoFixture {
     override val configValues = Map(
+      ("alephium.network.internal-address", s"localhost:9972"),
       ("alephium.network.master-address", s"localhost:9972"),
-      ("alephium.network.public-address", s"localhost:9972")
+      ("alephium.network.external-address", s"localhost:9972")
     )
 
     val connected =

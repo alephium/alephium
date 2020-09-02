@@ -62,12 +62,11 @@ class BlockChainHandler(blockFlow: BlockFlow,
     val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
     val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
     if (brokerConfig.contains(block.chainIndex.from)) {
-      val event = CliqueManager.BroadCastBlock(block,
-                                               blockMessage,
-                                               headerMessage,
-                                               origin,
-                                               blockFlow.isRecent(block))
-      publishEvent(event)
+      escapeIOError(blockFlow.isRecent(block)) { isRecent =>
+        val event =
+          CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin, isRecent)
+        publishEvent(event)
+      }
     }
   }
 

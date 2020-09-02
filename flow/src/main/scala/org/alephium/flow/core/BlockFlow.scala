@@ -65,14 +65,14 @@ trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
     }
   }
 
-  //scalastyle:off magic.number
-  def isRecent(data: FlowData): Boolean = {
-    (data.timestamp > TimeStamp.now().plusMinutesUnsafe(-30)) || {
+  def isRecent(data: FlowData): IOResult[Boolean] = {
+    if (data.timestamp > TimeStamp.now().minusUnsafe(consensusConfig.recentBlockTimestampDiff)) {
+      Right(true)
+    } else {
       val hashChain = getHashChain(data.hash)
       hashChain.isRecent(data.hash)
     }
   }
-  //scalastyle:on
 }
 
 object BlockFlow extends StrictLogging {

@@ -23,14 +23,15 @@ class DiscoveryServerStateSpec
   import DiscoveryServerSpec._
 
   trait Fixture { self =>
-    def groupSize: Int          = 3
-    val udpPort: Int            = SocketUtil.temporaryLocalPort(udp = true)
-    def peersPerGroup: Int      = 1
-    def scanFrequency: Duration = Duration.unsafe(500)
-    val socketProbe             = TestProbe()
+    def groupSize: Int           = 3
+    val udpPort: Int             = SocketUtil.temporaryLocalPort(udp = true)
+    def peersPerGroup: Int       = 1
+    def scanFrequency: Duration  = Duration.unsafe(500)
+    def expireDuration: Duration = Duration.ofHoursUnsafe(1)
+    val socketProbe              = TestProbe()
 
-    implicit val config: DiscoveryConfig with CliqueConfig =
-      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
+    implicit lazy val config: DiscoveryConfig with CliqueConfig =
+      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency, expireDuration)._2
 
     val state = new DiscoveryServerState {
       implicit def groupConfig: GroupConfig         = self.config
@@ -39,9 +40,11 @@ class DiscoveryServerStateSpec
 
       def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
 
-      def selfCliqueInfo: CliqueInfo =
+      lazy val peers = AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get)
+      lazy val selfCliqueInfo: CliqueInfo =
         CliqueInfo.unsafe(CliqueId.generate,
-                          AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get),
+                          peers.map(Option.apply),
+                          peers,
                           config.groupNumPerBroker)
 
       setSocket(ActorRefT[Udp.Command](socketProbe.ref))
@@ -63,9 +66,9 @@ class DiscoveryServerStateSpec
     }
 
     def addToTable(cliqueInfo: CliqueInfo): Assertion = {
-      state.tryPing(cliqueInfo)
+      state.tryPing(cliqueInfo.interCliqueInfo.get)
       state.isPending(cliqueInfo.id) is true
-      state.handlePong(cliqueInfo)
+      state.handlePong(cliqueInfo.interCliqueInfo.get)
       state.isInTable(cliqueInfo.id) is true
     }
   }
@@ -75,20 +78,20 @@ class DiscoveryServerStateSpec
     state.isUnknown(peerClique.id) is true
     state.isPending(peerClique.id) is false
     state.isPendingAvailable is true
-    state.tryPing(peerClique)
+    state.tryPing(peerClique.interCliqueInfo.get)
     expectPayload[Ping]
     state.isUnknown(peerClique.id) is false
     state.isPending(peerClique.id) is true
   }
 
   trait PingedFixture extends Fixture {
-    state.tryPing(peerClique)
+    state.tryPing(peerClique.interCliqueInfo.get)
     expectPayload[Ping]
     state.isInTable(peerClique.id) is false
   }
 
   it should "remove peer from pending list when received pong back" in new PingedFixture {
-    state.handlePong(peerClique)
+    state.handlePong(peerClique.interCliqueInfo.get)
     expectPayload[FindNode]
     state.isUnknown(peerClique.id) is false
     state.isPending(peerClique.id) is false
@@ -96,11 +99,12 @@ class DiscoveryServerStateSpec
   }
 
   it should "clean up everything if timeout is zero" in new Fixture {
-    override def scanFrequency: Duration = Duration.unsafe(0)
+    override def scanFrequency: Duration  = Duration.unsafe(0)
+    override def expireDuration: Duration = Duration.unsafe(0)
 
     addToTable(peerClique)
     val peer0 = cliqueInfoGen.sample.get
-    state.tryPing(peer0)
+    state.tryPing(peer0.interCliqueInfo.get)
     state.isPending(peer0.id) is true
     state.cleanup()
     state.isInTable(peerClique.id) is false

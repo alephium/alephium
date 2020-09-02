@@ -15,7 +15,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -39,7 +39,6 @@ trait BrokerHandler extends BaseActor {
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteCliqueId: CliqueId     = _
   var remoteBrokerInfo: BrokerInfo = _
 
   def handShakeDuration: Duration
@@ -62,7 +61,7 @@ trait BrokerHandler extends BaseActor {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         handshakeTimeoutTick.cancel()
-        handleHandshakeInfo(hello.cliqueId, hello.brokerInfo)
+        handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo))
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
         context become (exchanging orElse pingPong)
@@ -75,8 +74,7 @@ trait BrokerHandler extends BaseActor {
     receive
   }
 
-  def handleHandshakeInfo(_remoteCliqueId: CliqueId, _remoteBrokerInfo: BrokerInfo): Unit = {
-    remoteCliqueId   = _remoteCliqueId
+  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 
@@ -91,10 +89,10 @@ trait BrokerHandler extends BaseActor {
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
-      log.debug(s"Download blocks ${Utils.show(hashes)} from ${remoteBrokerInfo.address}")
+      log.debug(s"Download blocks ${Utils.show(hashes)} from $remoteAddress")
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
-      log.debug(s"Received blocks ${Utils.showHash(blocks)} from ${remoteBrokerInfo.address}")
+      log.debug(s"Received blocks ${Utils.showHash(blocks)} from $remoteAddress")
       Validation.validateFlowDAG(blocks) match {
         case Some(forests) =>
           forests.foreach { forest =>
@@ -111,7 +109,7 @@ trait BrokerHandler extends BaseActor {
         send(SendBlocks(blocks))
       }
     case Received(SendHeaders(headers)) =>
-      log.debug(s"Received headers ${Utils.showHash(headers)} from ${remoteBrokerInfo.address}")
+      log.debug(s"Received headers ${Utils.showHash(headers)} from $remoteAddress")
       headers.foreach { header =>
         val message = HeaderChainHandler.addOneHeader(header, dataOrigin)
         allHandlers.getHeaderHandler(header.chainIndex) ! message

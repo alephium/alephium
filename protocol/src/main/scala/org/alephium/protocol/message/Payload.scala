@@ -19,7 +19,6 @@ object Payload {
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello        => (Hello, Hello.serialize(x))
-      case x: HelloAck     => (HelloAck, HelloAck.serialize(x))
       case x: Ping         => (Ping, Ping.serialize(x))
       case x: Pong         => (Pong, Pong.serialize(x))
       case x: SendBlocks   => (SendBlocks, SendBlocks.serialize(x))
@@ -42,7 +41,6 @@ object Payload {
       case (code, rest) =>
         code match {
           case Hello        => Hello._deserialize(rest)
-          case HelloAck     => HelloAck._deserialize(rest)
           case Ping         => Ping._deserialize(rest)
           case Pong         => Pong._deserialize(rest)
           case SendBlocks   => SendBlocks._deserialize(rest)
@@ -90,7 +88,6 @@ object Payload {
   object Code {
     private[message] val values: AVector[Code] =
       AVector(Hello,
-              HelloAck,
               Ping,
               Pong,
               SendBlocks,
@@ -110,19 +107,18 @@ object Payload {
 sealed trait HandShake extends Payload {
   val version: Int
   val timestamp: Long
-  val cliqueId: CliqueId
-  val brokerInfo: BrokerInfo
+  val brokerInfo: InterBrokerInfo
 }
 
 sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
-  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): T
+  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): T
 
-  def unsafe(cliqueId: CliqueId, brokerInfo: BrokerInfo): T =
-    unsafe(Protocol.version, System.currentTimeMillis(), cliqueId, brokerInfo)
+  def unsafe(brokerInfo: InterBrokerInfo): T =
+    unsafe(Protocol.version, System.currentTimeMillis(), brokerInfo)
 
-  private implicit val brokerSerde: Serde[BrokerInfo] = BrokerInfo._serde
+  private implicit val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
-    Serde.forProduct4(unsafe, t => (t.version, t.timestamp, t.cliqueId, t.brokerInfo))
+    Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
 
   def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
     if (message.version == Protocol.version && message.timestamp > 0) Right(())
@@ -132,25 +128,12 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 final case class Hello private (
     version: Int,
     timestamp: Long,
-    cliqueId: CliqueId,
-    brokerInfo: BrokerInfo
+    brokerInfo: InterBrokerInfo
 ) extends HandShake
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
-  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): Hello =
-    new Hello(version, timestamp, cliqueId, brokerInfo)
-}
-
-final case class HelloAck private (
-    version: Int,
-    timestamp: Long,
-    cliqueId: CliqueId,
-    brokerInfo: BrokerInfo
-) extends HandShake
-
-object HelloAck extends HandShakeSerding[HelloAck] with Payload.Code {
-  def unsafe(version: Int, timestamp: Long, cliqueId: CliqueId, brokerInfo: BrokerInfo): HelloAck =
-    new HelloAck(version, timestamp, cliqueId, brokerInfo)
+  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): Hello =
+    new Hello(version, timestamp, brokerInfo)
 }
 
 final case class Ping(nonce: Int, timestamp: Long) extends Payload

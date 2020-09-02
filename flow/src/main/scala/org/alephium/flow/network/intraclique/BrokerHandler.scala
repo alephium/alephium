@@ -7,7 +7,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.message.SyncResponse
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.ActorRefT
 
 trait BrokerHandler extends BaseBrokerHandler {
@@ -15,10 +15,10 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
-  override def handleHandshakeInfo(remoteCliqueId: CliqueId, remoteBrokerInfo: BrokerInfo): Unit = {
-    if (remoteCliqueId == selfCliqueInfo.id) {
-      super.handleHandshakeInfo(remoteCliqueId, remoteBrokerInfo)
-      cliqueManager ! CliqueManager.HandShaked(remoteCliqueId, remoteBrokerInfo)
+  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
+    if (remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
+      super.handleHandshakeInfo(remoteBrokerInfo)
+      cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo)
     } else {
       log.warning(s"Invalid intra cliqueId")
       context stop self
@@ -41,5 +41,5 @@ trait BrokerHandler extends BaseBrokerHandler {
     receive
   }
 
-  override def dataOrigin: DataOrigin = DataOrigin.IntraClique(remoteCliqueId, remoteBrokerInfo)
+  override def dataOrigin: DataOrigin = DataOrigin.IntraClique(remoteBrokerInfo)
 }

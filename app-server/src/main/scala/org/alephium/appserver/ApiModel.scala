@@ -65,6 +65,17 @@ object ApiModel {
     }
   implicit val addressCodec: Codec[Address] = Codec.from(addressDecoder, addressEncoder)
 
+  private def createCliqueId(s: String): Either[String, CliqueId] = {
+    Hex.from(s).flatMap(CliqueId.from) match {
+      case Some(id) => Right(id)
+      case None     => Left("invalid clique id")
+    }
+  }
+
+  implicit val cliqueIdEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
+  implicit val cliqueIdDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createCliqueId)
+  implicit val cliqueIdCodec: Codec[CliqueId]     = Codec.from(cliqueIdDecoder, cliqueIdEncoder)
+
   trait PerChain {
     val fromGroup: Int
     val toGroup: Int
@@ -182,21 +193,20 @@ object ApiModel {
   object SelfClique {
     def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
       SelfClique(cliqueInfo.id,
-                 cliqueInfo.peers.map(peer => PeerAddress(peer.address, peer.rpcPort, peer.wsPort)),
+                 cliqueInfo.peers.map(peer =>
+                   PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.wsPort)),
                  cliqueInfo.groupNumPerBroker)
     }
-    import CliqueIdCodec._
     implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
   }
 
-  final case class NeighborCliques(cliques: AVector[CliqueInfo]) extends ApiModel
+  final case class NeighborCliques(cliques: AVector[InterCliqueInfo]) extends ApiModel
   object NeighborCliques {
-    import CliqueIdCodec._
-    implicit val cliqueEncoder: Encoder[CliqueInfo] =
-      Encoder.forProduct3("id", "peers", "groupNumPerBroker")(info =>
-        (info.id, info.peers, info.groupNumPerBroker))
-    implicit val cliqueDecoder: Decoder[CliqueInfo] =
-      Decoder.forProduct3("id", "peers", "groupNumPerBroker")(CliqueInfo.unsafe)
+    implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
+      Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
+        (info.id, info.externalAddresses, info.groupNumPerBroker))
+    implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
+      Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
     implicit val codec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
   }
 
@@ -254,13 +264,15 @@ object ApiModel {
   }
 
   final case class InterCliquePeerInfo(cliqueId: CliqueId,
+                                       brokerId: Int,
                                        address: InetSocketAddress,
                                        isSynced: Boolean)
       extends ApiModel
   object InterCliquePeerInfo {
-    def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo =
-      InterCliquePeerInfo(syncStatus.cliqueId, syncStatus.address, syncStatus.isSynced)
-    import CliqueIdCodec._
+    def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
+      val peerId = syncStatus.peerId
+      InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
+    }
     implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
       deriveCodec[InterCliquePeerInfo]
   }
@@ -290,19 +302,6 @@ object ApiModel {
   final case class GetBlock(hash: Hash) extends ApiModel
   object GetBlock {
     implicit val codec: Codec[GetBlock] = deriveCodec[GetBlock]
-  }
-
-  object CliqueIdCodec {
-    def createId(s: String): Either[String, CliqueId] = {
-      Hex.from(s).flatMap(CliqueId.from) match {
-        case Some(id) => Right(id)
-        case None     => Left("invalid clique id")
-      }
-    }
-
-    implicit val idEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
-    implicit val idDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createId)
-    implicit val codec: Codec[CliqueId]       = Codec.from(idDecoder, idEncoder)
   }
 
   sealed trait MinerAction

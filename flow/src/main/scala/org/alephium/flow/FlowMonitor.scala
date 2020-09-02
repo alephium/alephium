@@ -10,7 +10,7 @@ object FlowMonitor {
 
   val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
 
-  def props(task: => Unit): Props = Props(new FlowMonitor(task))
+  def props(shutdown: => Unit): Props = Props(new FlowMonitor(shutdown))
 }
 
 class FlowMonitor(shutdown: => Unit) extends BaseActor {

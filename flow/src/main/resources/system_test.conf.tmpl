@@ -19,7 +19,14 @@ alephium {
   network {
     ping-frequency = 300 second
     retry-timeout = 30 second
-    public-address = "localhost:9973"
+
+    upnp {
+      enabled = false
+    }
+
+    bind-address = "localhost:9973"
+    external-address = "localhost:9973"
+    internal-address = "localhost:9973"
     master-address = "localhost:9972"
     num-of-sync-blocks-limit = 4
 

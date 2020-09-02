@@ -76,24 +76,37 @@ object DiscoveryMessage {
     }
   }
 
-  final case class Ping(cliqueInfo: CliqueInfo) extends Payload
+  final case class Ping(cliqueInfoOpt: Option[InterCliqueInfo]) extends Payload
   object Ping extends Code[Ping] {
-    def serialize(ping: Ping): ByteString = CliqueInfo.serialize(ping.cliqueInfo)
+    private val serde: Serde[Option[InterCliqueInfo]] =
+      optionSerde[InterCliqueInfo](InterCliqueInfo._serde)
+
+    def serialize(ping: Ping): ByteString = serde.serialize(ping.cliqueInfoOpt)
 
     def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
                                        groupConfig: GroupConfig): SerdeResult[Ping] = {
-      CliqueInfo.deserialize(input).map(Ping.apply)
+      serde
+        .deserialize(input)
+        .flatMap {
+          case Some(info) =>
+            InterCliqueInfo.validate(info) match {
+              case Right(_)       => Right(Some(info))
+              case Left(errorMsg) => Left(SerdeError.validation(errorMsg))
+            }
+          case None => Right(None)
+        }
+        .map(Ping.apply)
     }
   }
 
-  final case class Pong(cliqueInfo: CliqueInfo) extends Payload
+  final case class Pong(cliqueInfo: InterCliqueInfo) extends Payload
   object Pong extends Code[Pong] {
     def serialize(pong: Pong): ByteString =
-      CliqueInfo.serialize(pong.cliqueInfo)
+      InterCliqueInfo.serialize(pong.cliqueInfo)
 
     def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
                                        groupConfig: GroupConfig): SerdeResult[Pong] = {
-      CliqueInfo.deserialize(input).map(Pong.apply)
+      InterCliqueInfo.deserialize(input).map(Pong.apply)
     }
   }
 
@@ -109,18 +122,18 @@ object DiscoveryMessage {
       serde.deserialize(input).map(FindNode(_))
   }
 
-  final case class Neighbors(peers: AVector[CliqueInfo]) extends Payload
+  final case class Neighbors(peers: AVector[InterCliqueInfo]) extends Payload
   object Neighbors extends Code[Neighbors] {
-    private val serializer = avectorSerializer[CliqueInfo]
+    private val serializer = avectorSerializer[InterCliqueInfo]
 
     def serialize(data: Neighbors): ByteString = serializer.serialize(data.peers)
 
-    private implicit val infoDeserializer = CliqueInfo._serde
-    private val deserializer              = avectorDeserializer[CliqueInfo]
+    private implicit val infoDeserializer = InterCliqueInfo._serde
+    private val deserializer              = avectorDeserializer[InterCliqueInfo]
     def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
                                        groupConfig: GroupConfig): SerdeResult[Neighbors] = {
       deserializer.deserialize(input).flatMap { peers =>
-        peers.foreachE(CliqueInfo.validate) match {
+        peers.foreachE(InterCliqueInfo.validate) match {
           case Right(_)    => Right(Neighbors(peers))
           case Left(error) => Left(SerdeError.validation(error))
         }

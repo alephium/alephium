@@ -1,7 +1,5 @@
 package org.alephium.flow.network.bootstrap
 
-import java.net.InetSocketAddress
-
 import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
@@ -14,8 +12,10 @@ final case class IntraCliqueInfo private (
     groupNumPerBroker: Int
 ) {
   def cliqueInfo: CliqueInfo = {
-    val addresses = peers.map(info => new InetSocketAddress(info.address, info.tcpPort))
-    CliqueInfo.unsafe(id, addresses, groupNumPerBroker)
+    CliqueInfo.unsafe(id,
+                      peers.map(_.externalAddress),
+                      peers.map(_.internalAddress),
+                      groupNumPerBroker)
   }
 }
 

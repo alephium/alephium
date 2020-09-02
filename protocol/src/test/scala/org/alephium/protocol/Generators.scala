@@ -52,16 +52,28 @@ trait Generators extends NumericHelpers {
 
   def brokerInfoGen(implicit config: CliqueConfig): Gen[BrokerInfo] =
     for {
-      id      <- Gen.choose(0, config.brokerNum - 1)
-      address <- socketAddressGen
-    } yield BrokerInfo.unsafe(id, config.groupNumPerBroker, address)
+      cliqueId <- cliqueIdGen
+      brokerId <- Gen.choose(0, config.brokerNum - 1)
+      address  <- socketAddressGen
+    } yield BrokerInfo.unsafe(cliqueId, brokerId, config.groupNumPerBroker, address)
 
   def cliqueInfoGen(implicit config: GroupConfig): Gen[CliqueInfo] =
     for {
       groupNumPerBroker <- groupNumPerBrokerGen
       peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
       cid               <- cliqueIdGen
-    } yield CliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
+    } yield
+      CliqueInfo.unsafe(cid,
+                        AVector.from(peers.map(Option.apply)),
+                        AVector.from(peers),
+                        groupNumPerBroker)
+
+  def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =
+    for {
+      groupNumPerBroker <- groupNumPerBrokerGen
+      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cid               <- cliqueIdGen
+    } yield InterCliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
 
   lazy val socketAddressGen: Gen[InetSocketAddress] =
     for {

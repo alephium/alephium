@@ -46,7 +46,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     extends BaseActor {
 
   override def preStart(): Unit = {
-    cliqueInfo.brokers.foreach { remoteBroker =>
+    cliqueInfo.intraBrokers.foreach { remoteBroker =>
       if (remoteBroker.brokerId > brokerConfig.brokerId) {
         val address = remoteBroker.address
         log.debug(s"Connect to broker $remoteBroker")
@@ -76,7 +76,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
-      val index = cliqueInfo.peers.indexWhere(_ == remote)
+      val index = cliqueInfo.internalAddresses.indexWhere(_ == remote)
       if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition
         log.debug(s"The connection from $remote is incoming connection")
@@ -92,9 +92,9 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
         context.actorOf(props, name)
         ()
       }
-    case CliqueManager.HandShaked(cliqueId, brokerInfo) =>
+    case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with intra-clique node: ${brokerInfo.address}")
-      if (cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
+      if (brokerInfo.cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
         context watch sender()
         val brokerHandler = ActorRefT[BrokerHandler.Command](sender())
@@ -105,7 +105,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   }
 
   def checkAllSynced(newBrokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
-    if (newBrokers.size == cliqueInfo.peers.length - 1) {
+    if (newBrokers.size == cliqueInfo.brokerNum - 1) {
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
       context become handle(newBrokers)
@@ -121,7 +121,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       // TODO: optimize this without using iteration
       brokers.foreach {
         case (_, (info, broker)) =>
-          if (!origin.isFrom(cliqueInfo.id, info)) {
+          if (!origin.isFrom(info)) {
             if (block.chainIndex.relateTo(info)) {
               log.debug(s"Send block ${block.shortHex} to broker $info")
               broker ! BrokerHandler.Send(blockMsg)

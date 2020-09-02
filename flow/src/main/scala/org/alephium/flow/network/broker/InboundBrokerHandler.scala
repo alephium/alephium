@@ -25,8 +25,7 @@ trait InboundBrokerHandler extends BrokerHandler {
     ref
   }
 
-  override def handShakeMessage: Payload =
-    Hello.unsafe(selfCliqueInfo.id, selfCliqueInfo.selfBrokerInfo)
+  override def handShakeMessage: Payload = Hello.unsafe(selfCliqueInfo.selfBrokerInfo)
 
   override def pingFrequency: Duration = networkSetting.pingFrequency
 }

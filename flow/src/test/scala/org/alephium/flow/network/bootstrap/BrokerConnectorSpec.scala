@@ -21,12 +21,13 @@ class BrokerConnectorSpec
 
     val randomId      = Random.source.nextInt(brokerConfig.brokerNum)
     val randomAddress = socketAddressGen.sample.get
-    val randomInfo = PeerInfo.unsafe(randomId,
-                                     brokerConfig.groupNumPerBroker,
-                                     randomAddress.getAddress,
-                                     randomAddress.getPort,
-                                     None,
-                                     None)
+    val randomInfo =
+      PeerInfo.unsafe(randomId,
+                      brokerConfig.groupNumPerBroker,
+                      Some(randomAddress),
+                      randomAddress,
+                      None,
+                      None)
 
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)

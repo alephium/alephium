@@ -6,13 +6,12 @@ import akka.io.Tcp
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.CliqueId
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 object Bootstrapper {
   def props(
       tcpController: ActorRefT[TcpController.Command],
-      discoveryServer: ActorRefT[DiscoveryServer.Command],
       cliqueManager: ActorRefT[CliqueManager.Command]
   )(implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
@@ -23,28 +22,22 @@ object Bootstrapper {
       val peerInfos = AVector(PeerInfo.self)
       val intraCliqueInfo =
         IntraCliqueInfo.unsafe(cliqueId, peerInfos, brokerConfig.groupNumPerBroker)
-      Props(
-        new SingleNodeCliqueBootstrapper(tcpController,
-                                         discoveryServer,
-                                         cliqueManager,
-                                         intraCliqueInfo))
+      Props(new SingleNodeCliqueBootstrapper(tcpController, cliqueManager, intraCliqueInfo))
     } else if (networkSetting.isCoordinator) {
-      Props(new CliqueCoordinatorBootstrapper(tcpController, discoveryServer, cliqueManager))
+      Props(new CliqueCoordinatorBootstrapper(tcpController, cliqueManager))
     } else {
-      Props(new BrokerBootstrapper(tcpController, discoveryServer, cliqueManager))
+      Props(new BrokerBootstrapper(tcpController, cliqueManager))
     }
   }
 
   sealed trait Command
   case object ForwardConnection                                          extends Command
   case object GetIntraCliqueInfo                                         extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                extends Command
   final case class SendIntraCliqueInfo(intraCliqueInfo: IntraCliqueInfo) extends Command
 }
 
 class CliqueCoordinatorBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
-    val discoveryServer: ActorRefT[DiscoveryServer.Command],
     val cliqueManager: ActorRefT[CliqueManager.Command]
 )(
     implicit brokerConfig: BrokerConfig,
@@ -67,7 +60,6 @@ class CliqueCoordinatorBootstrapper(
 
 class BrokerBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
-    val discoveryServer: ActorRefT[DiscoveryServer.Command],
     val cliqueManager: ActorRefT[CliqueManager.Command]
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BootstrapperHandler {
@@ -78,7 +70,6 @@ class BrokerBootstrapper(
 }
 
 class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Command],
-                                   val discoveryServer: ActorRefT[DiscoveryServer.Command],
                                    val cliqueManager: ActorRefT[CliqueManager.Command],
                                    intraCliqueInfo: IntraCliqueInfo)
     extends BootstrapperHandler {
@@ -90,7 +81,6 @@ class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Co
 
 trait BootstrapperHandler extends BaseActor {
   val tcpController: ActorRefT[TcpController.Command]
-  val discoveryServer: ActorRefT[DiscoveryServer.Command]
   val cliqueManager: ActorRefT[CliqueManager.Command]
 
   override def preStart(): Unit = {
@@ -99,10 +89,8 @@ trait BootstrapperHandler extends BaseActor {
 
   def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
-      val cliqueInfo = intraCliqueInfo.cliqueInfo
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
-      cliqueManager ! CliqueManager.Start(cliqueInfo)
-      discoveryServer ! DiscoveryServer.SendCliqueInfo(cliqueInfo)
+      cliqueManager ! CliqueManager.Start(intraCliqueInfo.cliqueInfo)
 
       context become (ready(intraCliqueInfo) orElse forwardConnection)
   }
