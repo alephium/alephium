@@ -43,14 +43,14 @@ object WalletService {
                      mnemonicSize: Int,
                      mnemonicPassphrase: Option[String]): Future[Either[String, Mnemonic]] =
       Future.successful(
-        Mnemonic
-          .generate(mnemonicSize)
-          .toRight("Cannot generate mnemonic")
-          .map { mnemonic =>
-            val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-            maybeSecretStorage = Option(SecretStorage(seed, password, secretDir))
-            mnemonic
-          }
+        for {
+          mnemonic <- Mnemonic.generate(mnemonicSize).toRight("Cannot generate mnemonic")
+          seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
+          storage <- SecretStorage(seed, password, secretDir)
+        } yield {
+          maybeSecretStorage = Option(storage)
+          mnemonic
+        }
       )
 
     def restoreWallet(password: String,
@@ -60,8 +60,9 @@ object WalletService {
         val words = mnemonic.split(' ').toSeq
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
-            maybeSecretStorage = Option(SecretStorage(seed, password, secretDir))
-            Right(())
+            SecretStorage(seed, password, secretDir).map { storage =>
+              maybeSecretStorage = Option(storage)
+            }
           case None =>
             Left(s"Invalid mnemonic: $mnemonic")
         }

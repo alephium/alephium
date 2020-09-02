@@ -13,11 +13,11 @@ object AES {
 
   final case class Encrypted(encrypted: ByteString, salt: ByteString, iv: ByteString)
 
-  private val saltByteLength       = 32
+  private val saltByteLength       = 64
   private val ivByteLength         = 64
   private val authTagLength        = 128
   private val keyAlgorithm         = "PBKDF2WithHmacSHA256"
-  private val iterationCount       = 2048
+  private val iterationCount       = 10000
   private val keyLength            = 256
   private val cipherAlgorithm      = "AES"
   private val cipherTransformation = s"$cipherAlgorithm/GCM/NoPadding"

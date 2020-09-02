@@ -21,7 +21,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
       case (seed, password, wrongPassword) =>
-        val secretStorage = SecretStorage(seed, password, secretDir)
+        val secretStorage = SecretStorage(seed, password, secretDir).toOption.get
         val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
 
         secretStorage.getPrivateKey() is None
@@ -39,17 +39,19 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   it should "create secret storage from a file" in {
 
-    val password = "9Ep4UxpYDXRXDdGH"
+    val password = "36ae0b75ef06d2e902e473c879c6e853193760ffa5dc29dc8da76133149e0892"
 
+    // scan pause slender around cube flavor neck shrug gadget ramp rude lend capable tone nose unhappy gift across cluster minor tragic fever detail script
     val seed = Hex.unsafe(
-      "da3af395823fc57e33232d7cd14526f79f0531d46ab7d2f87f49745d503717f48380b85a83596b51542622ce300fc69006da60985bbda4186ec8c0c22bd790da")
+      "f585d130dd79d3b5bd63aa99d9bc6e6107cfbbe393b86d70e865f6e75c60a37496afc1b25cd4d1ab3b82d9b41f469c6c112a9f310e441814147ff27a5d65882b"
+    )
 
     val rawFile =
       """
       {
-        "encrypted": "6a84a9d77f4e97af228ae4e4c4419393a8e4bb36a8e1eeef5d6aedb3b0634cd499afcca1650ecb38adabef1378a76521029d808f16e77da7929895ec21eb17ef09b78370a32537aa14131c36e7af5ffe",
-        "salt":"8f0e02ba4b13680740235e930989b8efc2e1dd614b92a81f472f2d9c9be775b8",
-        "iv":"a694f00c92f7ef56f5664289f8f83ed06faa7c3859a21bbb45de07ff4ce3d3776d0b700eb11a45a9371f444324d73dfb140cdcf52940e92cf8614fe9e7b1a22d"
+        "encrypted":"27adda4459431e84d208b4f7ad9d347facc3f9483cef87a867976dd9952262af3bd6d1562e879b31fceb814212fd3fb1aa778c03ee487ced705fa8c6005a86cf57f887994db994ad2957b4955a1e092c",
+        "salt":"a65767906fed48ccb2c40f08f4c344d5bb7a912bf2eb5a726b7276b224cc50e88cdc9c0ef212d1fd5c079a57a7ff12c8a7edbdad8ccf80d1c5e32fcc32e251c9",
+        "iv":"bddac30c9be7af09a0ede16a5f4ca2c439491781275901fc2ad1e2d465c203bc635b83314b396a4b7d6385539aa10cbd6d8579c0d22a7307fa7867a41eb51adc"
       }
       """
 
@@ -67,5 +69,14 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     secretStorage.getPrivateKey() is Option(privateKey)
   }
 
+  it should "fail to load an non existing file" in {
+    val fileName        = scala.util.Random.nextString(10)
+    val nonExistingFile = new File(fileName)
+    SecretStorage
+      .fromFile(nonExistingFile, "password")
+      .swap
+      .toOption
+      .get is s"$fileName (No such file or directory)"
+  }
   secretDir.toFile.listFiles.foreach(_.deleteOnExit())
 }
