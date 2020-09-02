@@ -42,6 +42,7 @@ trait Node extends Service {
   }
 }
 
+// scalastyle:off method.length
 object Node {
   def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
