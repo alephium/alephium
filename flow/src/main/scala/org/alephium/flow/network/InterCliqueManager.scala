@@ -106,7 +106,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         context stop sender()
       }
     case CliqueManager.Synced(brokerInfo) =>
-      log.debug(s"Complete syncing with $brokerInfo")
+      log.debug(s"No new blocks from $brokerInfo")
       setSynced(brokerInfo)
   }
 
