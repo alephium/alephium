@@ -19,7 +19,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
     fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
-    fastparse.parse(s"@$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(Hex.asBuffer(byte32).get)
+    fastparse.parse(s"@$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
+      Hex.asArraySeq(byte32).get)
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
