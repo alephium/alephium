@@ -2,7 +2,7 @@ package org.alephium
 
 import java.net.{InetAddress, InetSocketAddress, UnknownHostException}
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import akka.util.ByteString
@@ -71,17 +71,17 @@ package object serde {
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     Serde.avectorSerde[T](serde)
 
-  implicit val boolBufferSerde: Serde[ArrayBuffer[Boolean]] = arrayBufferSerde[Boolean]
-  implicit val byteBufferSerde: Serde[ArrayBuffer[Byte]]    = arrayBufferSerde[Byte]
-  implicit val intBufferSerde: Serde[ArrayBuffer[Int]]      = arrayBufferSerde[Int]
-  implicit val longBufferSerde: Serde[ArrayBuffer[Long]]    = arrayBufferSerde[Long]
-  implicit val i64BufferSerde: Serde[ArrayBuffer[I64]]      = arrayBufferSerde[I64]
-  implicit val u64BufferSerde: Serde[ArrayBuffer[U64]]      = arrayBufferSerde[U64]
-  implicit val i256BufferSerde: Serde[ArrayBuffer[I256]]    = arrayBufferSerde[I256]
-  implicit val u256BufferSerde: Serde[ArrayBuffer[U256]]    = arrayBufferSerde[U256]
+  implicit val boolArraySeqSerde: Serde[mutable.ArraySeq[Boolean]] = arraySeqSerde[Boolean]
+  implicit val byteArraySeqSerde: Serde[mutable.ArraySeq[Byte]]    = arraySeqSerde[Byte]
+  implicit val intArraySeqSerde: Serde[mutable.ArraySeq[Int]]      = arraySeqSerde[Int]
+  implicit val longArraySeqSerde: Serde[mutable.ArraySeq[Long]]    = arraySeqSerde[Long]
+  implicit val i64ArraySeqSerde: Serde[mutable.ArraySeq[I64]]      = arraySeqSerde[I64]
+  implicit val u64ArraySeqSerde: Serde[mutable.ArraySeq[U64]]      = arraySeqSerde[U64]
+  implicit val i256ArraySeqSerde: Serde[mutable.ArraySeq[I256]]    = arraySeqSerde[I256]
+  implicit val u256ArraySeqSerde: Serde[mutable.ArraySeq[U256]]    = arraySeqSerde[U256]
 
-  implicit def arrayBufferSerde[T: ClassTag](implicit serde: Serde[T]): Serde[ArrayBuffer[T]] =
-    dynamicSizeSerde(serde, ArrayBuffer.newBuilder)
+  implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[mutable.ArraySeq[T]] =
+    dynamicSizeSerde(serde, mutable.ArraySeq.newBuilder)
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))

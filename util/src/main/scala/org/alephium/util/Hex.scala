@@ -1,6 +1,6 @@
 package org.alephium.util
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
@@ -19,9 +19,9 @@ object Hex {
       case _: Throwable => None
     }
 
-  def asBuffer(s: String): Option[ArrayBuffer[Byte]] =
+  def asArraySeq(s: String): Option[mutable.ArraySeq[Byte]] =
     try {
-      Some(ArrayBuffer.from(BHex.decode(s)))
+      Some(mutable.ArraySeq.make(BHex.decode(s)))
     } catch {
       case _: Throwable => None
     }
