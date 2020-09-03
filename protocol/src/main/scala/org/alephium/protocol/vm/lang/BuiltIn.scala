@@ -40,25 +40,23 @@ object BuiltIn {
         case Type.U64         => Seq(CheckEqU64)
         case Type.I256        => Seq(CheckEqI256)
         case Type.U256        => Seq(CheckEqU256)
-        case Type.Byte32      => Seq(CheckEqByte32)
         case Type.BoolVec     => Seq(CheckEqBoolVec)
         case Type.ByteVec     => Seq(CheckEqByteVec)
         case Type.I64Vec      => Seq(CheckEqI64Vec)
         case Type.U64Vec      => Seq(CheckEqU64Vec)
         case Type.I256Vec     => Seq(CheckEqI256Vec)
         case Type.U256Vec     => Seq(CheckEqU256Vec)
-        case Type.Byte32Vec   => Seq(CheckEqByte32Vec)
-        case _: Type.Contract => Seq(CheckEqByte32)
+        case _: Type.Contract => Seq(CheckEqByteVec)
       }
     }
   }
 
   val blake2b: SimpleBuiltIn =
-    SimpleBuiltIn("blake2b", Seq(Type.Byte32), Seq(Type.Byte32), Blake2bByte32)
+    SimpleBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
   val keccak256: SimpleBuiltIn =
-    SimpleBuiltIn("keccak256", Seq(Type.Byte32), Seq(Type.Byte32), Keccak256Byte32)
+    SimpleBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
   val checkSignature: SimpleBuiltIn =
-    SimpleBuiltIn("checkSignature", Seq(Type.Byte32), Seq(), CheckSignature)
+    SimpleBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
     import ConversionBuiltIn.validTypes

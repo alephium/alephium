@@ -1,5 +1,6 @@
 package org.alephium.serde
 
+import scala.collection.mutable
 import scala.reflect.runtime.universe.TypeTag
 
 import akka.util.ByteString
@@ -49,6 +50,14 @@ object RandomBytes {
     lazy val zero: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0)))
 
     def length: Int
+
+    def from(bytes: mutable.IndexedSeq[Byte]): Option[T] = {
+      if (bytes.length == length) {
+        Some(unsafe(ByteString.fromArrayUnsafe(bytes.toArray)))
+      } else {
+        None
+      }
+    }
 
     def from(bytes: ByteString): Option[T] = {
       if (bytes.nonEmpty && bytes.length == length) {

@@ -65,7 +65,7 @@ object Instr {
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I64Const, U64Const, I256Const, U256Const,
-    Byte32Const,
+    BytesConst,
     LoadLocal, StoreLocal, LoadField, StoreField,
     Pop, Pop2, Dup, Dup2, Swap,
     I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
@@ -85,9 +85,9 @@ object Instr {
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
     IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
     CallLocal, Return,
-    CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByte32,
-    CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec, CheckEqByte32Vec,
-    Blake2bByte32, Blake2bByteVec, Keccak256Byte32, Keccak256ByteVec, CheckSignature
+    CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByteVec,
+    CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec,
+    Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++ ArraySeq(CallExternal)
   // format: on
@@ -279,11 +279,11 @@ final case class U256Const(const: Val.U256) extends ConstInstr1[Val.U256] {
 }
 object U256Const extends InstrCompanion1[Val.U256]
 
-final case class Byte32Const(const: Val.Byte32) extends ConstInstr1[Val.Byte32] {
+final case class BytesConst(const: Val.ByteVec) extends ConstInstr1[Val.ByteVec] {
   override def serialize(): ByteString =
-    ByteString(Byte32Const.code) ++ serdeImpl[Byte32].serialize(const.v)
+    ByteString(BytesConst.code) ++ serdeImpl[Val.ByteVec].serialize(const)
 }
-object Byte32Const extends InstrCompanion1[Val.Byte32]
+object BytesConst extends InstrCompanion1[Val.ByteVec]
 
 // Note: 0 <= index <= 0xFF
 final case class LoadLocal(index: Byte) extends OperandStackInstr {
@@ -1036,7 +1036,8 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      contractKey <- frame.popT[Val.Byte32]().map(byte32 => Hash.unsafe(byte32.v.bytes))
+      byteVec     <- frame.popT[Val.ByteVec]()
+      contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
       newFrame    <- Frame.externalMethodFrame(frame, contractKey, Bytes.toPosInt(index))
       _           <- newFrame.execute()
     } yield ()
@@ -1075,20 +1076,18 @@ sealed trait CheckEqT[T <: Val] extends CryptoInstr with InstrCompanion0 {
   }
 }
 
-case object CheckEqBool      extends CheckEqT[Val.Bool]
-case object CheckEqByte      extends CheckEqT[Val.Byte]
-case object CheckEqI64       extends CheckEqT[Val.I64]
-case object CheckEqU64       extends CheckEqT[Val.U64]
-case object CheckEqI256      extends CheckEqT[Val.I256]
-case object CheckEqU256      extends CheckEqT[Val.U256]
-case object CheckEqByte32    extends CheckEqT[Val.Byte32]
-case object CheckEqBoolVec   extends CheckEqT[Val.BoolVec]
-case object CheckEqByteVec   extends CheckEqT[Val.ByteVec]
-case object CheckEqI64Vec    extends CheckEqT[Val.I64Vec]
-case object CheckEqU64Vec    extends CheckEqT[Val.U64Vec]
-case object CheckEqI256Vec   extends CheckEqT[Val.I256Vec]
-case object CheckEqU256Vec   extends CheckEqT[Val.U256Vec]
-case object CheckEqByte32Vec extends CheckEqT[Val.Byte32Vec]
+case object CheckEqBool    extends CheckEqT[Val.Bool]
+case object CheckEqByte    extends CheckEqT[Val.Byte]
+case object CheckEqI64     extends CheckEqT[Val.I64]
+case object CheckEqU64     extends CheckEqT[Val.U64]
+case object CheckEqI256    extends CheckEqT[Val.I256]
+case object CheckEqU256    extends CheckEqT[Val.U256]
+case object CheckEqBoolVec extends CheckEqT[Val.BoolVec]
+case object CheckEqByteVec extends CheckEqT[Val.ByteVec]
+case object CheckEqI64Vec  extends CheckEqT[Val.I64Vec]
+case object CheckEqU64Vec  extends CheckEqT[Val.U64Vec]
+case object CheckEqI256Vec extends CheckEqT[Val.I256Vec]
+case object CheckEqU256Vec extends CheckEqT[Val.U256Vec]
 
 sealed abstract class HashAlg[T <: Val, H <: RandomBytes] extends CryptoInstr with InstrCompanion0 {
   def convert(t: T): ByteString
@@ -1098,16 +1097,12 @@ sealed abstract class HashAlg[T <: Val, H <: RandomBytes] extends CryptoInstr wi
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.popT[T]().flatMap { value =>
       val bs = convert(value)
-      frame.push(Val.Byte32.from(hash(bs)))
+      frame.push(Val.ByteVec.from(hash(bs)))
     }
   }
 }
 
 object HashAlg {
-  trait Byte32Convertor {
-    def convert(t: Val.Byte32): ByteString = t.v.bytes
-  }
-
   trait ByteVecConvertor {
     def convert(t: Val.ByteVec): ByteString =
       ByteString.fromArrayUnsafe(t.a.toArray)
@@ -1121,17 +1116,6 @@ object HashAlg {
     def hash(bs: ByteString): Keccak256 = Keccak256.hash(bs)
   }
 }
-
-case object Blake2bByte32
-    extends HashAlg[Val.Byte32, Blake2b]
-    with HashAlg.Byte32Convertor
-    with HashAlg.Blake2bHash
-
-// TODO: maybe remove Keccak from the VM
-case object Keccak256Byte32
-    extends HashAlg[Val.Byte32, Keccak256]
-    with HashAlg.Byte32Convertor
-    with HashAlg.Keccak256Hash
 
 case object Blake2bByteVec
     extends HashAlg[Val.ByteVec, Blake2b]
@@ -1149,10 +1133,10 @@ case object CheckSignature extends Signature with InstrCompanion0 {
     val rawData    = frame.ctx.txHash.bytes
     val signatures = frame.ctx.signatures
     for {
-      rawPublicKey <- frame.popT[Val.Byte32]()
+      rawPublicKey <- frame.popT[Val.ByteVec]()
+      publicKey    <- PublicKey.from(rawPublicKey.a).toRight(InvalidPublicKey)
       signature    <- signatures.pop()
       _ <- {
-        val publicKey = PublicKey.unsafe(rawPublicKey.v.bytes)
         if (SignatureSchema.verify(rawData, signature, publicKey)) Right(())
         else Left(VerificationFailed)
       }
