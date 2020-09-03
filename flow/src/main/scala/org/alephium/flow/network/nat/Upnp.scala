@@ -2,6 +2,7 @@ package org.alephium.flow.network.nat
 
 import java.net.InetAddress
 
+import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters.MapHasAsScala
 
 import com.typesafe.scalalogging.StrictLogging
@@ -10,8 +11,10 @@ import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
 import org.alephium.flow.setting.UpnpSettings
 
 object Upnp extends StrictLogging {
-  val protocol    = "TCP"
-  val description = "Aelphium"
+  val tcp                         = "TCP"
+  val udp                         = "UDP"
+  val protocols: ArraySeq[String] = ArraySeq(tcp, udp)
+  val description                 = "Alephium"
 
   def getUpnpClient(setting: UpnpSettings): Option[UpnpClient] =
     try {
@@ -41,11 +44,13 @@ class UpnpClient(gateway: GatewayDevice) extends StrictLogging {
 
   def addPortMapping(externalPort: Int, internalPort: Int): Boolean = {
     try {
-      gateway.addPortMapping(externalPort,
-                             internalPort,
-                             localAddress.getHostAddress,
-                             Upnp.protocol,
-                             Upnp.description)
+      Upnp.protocols.forall {
+        gateway.addPortMapping(externalPort,
+                               internalPort,
+                               localAddress.getHostAddress,
+                               _,
+                               Upnp.description)
+      }
     } catch {
       case t: Throwable =>
         logger.error(
@@ -58,7 +63,9 @@ class UpnpClient(gateway: GatewayDevice) extends StrictLogging {
 
   def deletePortMapping(externalPort: Int): Boolean = {
     try {
-      gateway.deletePortMapping(externalPort, Upnp.protocol)
+      Upnp.protocols.forall {
+        gateway.deletePortMapping(externalPort, _)
+      }
     } catch {
       case t: Throwable =>
         logger.error(s"Unable to delete upnp external port $externalPort", t)
