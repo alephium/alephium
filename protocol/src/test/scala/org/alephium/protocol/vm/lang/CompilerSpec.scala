@@ -19,8 +19,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
     fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
-    fastparse.parse(s"@$byte32", Lexer.byte32(_)).get.value is Val.Byte32(
-      Byte32.unsafe(Hex.from(byte32).get))
+    fastparse.parse(s"@$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(Hex.asBuffer(byte32).get)
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
@@ -225,11 +224,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          AVector(Val.U64(U64.One)))
   }
 
-  it should "verify signature" ignore {
+  it should "verify signature" in {
     def input(hash: Hash) =
       s"""
          |AssetScript P2PKH {
-         |  fn verify(pk: Byte32) -> () {
+         |  fn verify(pk: ByteVec) -> () {
          |    let hash = @${hash.toHexString}
          |    checkEq!(hash, blake2b!(pk))
          |    checkSignature!(pk)
@@ -246,8 +245,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     deserialize[StatelessScript](serialize(script)) isE script
 
     //FIXME: `SecP256K1` don't have a `toByte32` function
-    //val args = AVector[Val](Val.Byte32(pubKey.toByte32))
-    val args = AVector.empty[Val]
+    val args = AVector[Val](Val.ByteVec.from(pubKey))
     StatelessVM
       .runAssetScript(cachedWorldState, Hash.zero, script, args, signature)
       .isRight is true

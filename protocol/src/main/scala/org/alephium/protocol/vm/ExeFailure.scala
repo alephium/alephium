@@ -32,3 +32,4 @@ case object InvalidReturnType                                  extends ExeFailur
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class IOErrorUpdateState(error: IOError)            extends ExeFailure
 final case class IOErrorLoadContract(error: IOError)           extends ExeFailure
+case object InvalidContractAddress                             extends ExeFailure
