@@ -11,10 +11,10 @@ import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueInfo, InterCliqueInfo, PeerId}
-import org.alephium.util.{ActorRefT, BaseActor, Duration}
+import org.alephium.protocol.model._
+import org.alephium.util.{ActorRefT, BaseActor}
 
 object InterCliqueManager {
   // scalastyle:off parameter.number
@@ -24,8 +24,7 @@ object InterCliqueManager {
             discoveryServer: ActorRefT[DiscoveryServer.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting,
-      discoverySetting: DiscoverySetting): Props =
+      networkSetting: NetworkSetting): Props =
     Props(
       new InterCliqueManager(selfCliqueInfo,
                              blockflow,
@@ -56,30 +55,21 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                          discoveryServer: ActorRefT[DiscoveryServer.Command],
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-    discoverySetting: DiscoverySetting)
+    networkSetting: NetworkSetting)
     extends BaseActor
     with InterCliqueManagerState {
   import InterCliqueManager._
-  discoveryServer ! DiscoveryServer.GetNeighborCliques
 
-  override def receive: Receive = handleMessage orElse handleConnection orElse awaitNeighborCliques
+  override def preStart(): Unit = {
+    super.preStart()
+    discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
+    require(context.system.eventStream.subscribe(self, classOf[DiscoveryServer.NewClique]))
+  }
 
-  def awaitNeighborCliques: Receive = {
-    case DiscoveryServer.NeighborCliques(neighborCliques) =>
-      if (neighborCliques.nonEmpty) {
-        log.debug(s"Got ${neighborCliques.length} from discovery server")
-        neighborCliques.foreach(connect)
-      } else {
-        // TODO: refine the condition, check the number of brokers for example
-        log.debug(s"Try to fetch peer brokers from discovery server")
-        if (discoverySetting.bootstrap.nonEmpty) {
-          scheduleOnce(discoveryServer.ref,
-                       DiscoveryServer.GetNeighborCliques,
-                       Duration.ofSecondsUnsafe(2))
-          ()
-        }
-      }
+  override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
+
+  def handleNewClique: Receive = {
+    case DiscoveryServer.NewClique(cliqueInfo) => connect(cliqueInfo)
   }
 
   def handleConnection: Receive = {
@@ -170,7 +160,7 @@ trait InterCliqueManagerState {
     if (!brokers.contains(peerId)) {
       brokers += peerId -> BrokerState(brokerInfo, broker, isSynced = false)
     } else {
-      log.warning(s"Ignore another connection from $peerId")
+      log.debug(s"Ignore another connection from $peerId")
     }
   }
 
