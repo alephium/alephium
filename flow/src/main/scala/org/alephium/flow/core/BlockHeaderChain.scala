@@ -45,9 +45,15 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       parentState <- getState(parentHash)
       chainWeight = parentState.chainWeight + header.target
       height      = parentState.height + 1
-      _ <- addHeader(header)
-      _ <- reorderFor(header, chainWeight, height)
-      _ <- addHash(header.hash, parentHash, height, weight, chainWeight, header.timestamp)
+      _           <- addHeader(header)
+      isCanonical <- reorgFor(header, chainWeight, height)
+      _ <- addHash(header.hash,
+                   parentHash,
+                   height,
+                   weight,
+                   chainWeight,
+                   header.timestamp,
+                   isCanonical)
     } yield ()
   }
 
@@ -59,15 +65,15 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  def reorderFor(header: BlockHeader, chainWeight: BigInt, height: Int): IOResult[Unit] = {
+  def reorgFor(header: BlockHeader, chainWeight: BigInt, height: Int): IOResult[Boolean] = {
     maxChainWeight.map(_ < chainWeight).flatMap {
-      case true  => reorderFrom(header.parentHash, height - 1)
-      case false => Right(())
+      case true  => reorgFrom(header.parentHash, height - 1).map(_ => true)
+      case false => Right(false)
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def reorderFrom(hash: Hash, height: Int): IOResult[Unit] = {
+  final def reorgFrom(hash: Hash, height: Int): IOResult[Unit] = {
     getHashes(height).flatMap { hashes =>
       assume(hashes.contains(hash))
       if (hashes.head == hash) Right(())
@@ -75,7 +81,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
         for {
           _      <- heightIndexStorage.put(height, hash +: hashes.filter(_ != hash))
           parent <- getParentHash(hash)
-          _      <- reorderFrom(parent, height - 1)
+          _      <- reorgFrom(parent, height - 1)
         } yield ()
       }
     }
