@@ -13,8 +13,9 @@ import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object TcpController {
-  def props(port: Int, brokerManager: ActorRefT[broker.BrokerManager.Command]): Props =
-    Props(new TcpController(port, brokerManager))
+  def props(bindAddress: InetSocketAddress,
+            brokerManager: ActorRefT[broker.BrokerManager.Command]): Props =
+    Props(new TcpController(bindAddress, brokerManager))
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef)        extends Command
@@ -29,7 +30,8 @@ object TcpController {
   case object Bound extends Event
 }
 
-class TcpController(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) extends BaseActor {
+class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[BrokerManager.Command])
+    extends BaseActor {
   import context.system
 
   val tcpManager: ActorRef = IO(Tcp)
@@ -42,7 +44,7 @@ class TcpController(port: Int, brokerManager: ActorRefT[BrokerManager.Command]) 
 
   def awaitStart: Receive = {
     case TcpController.Start(bootstrapper) =>
-      tcpManager ! Tcp.Bind(self, new InetSocketAddress(port), pullMode = true)
+      tcpManager ! Tcp.Bind(self, bindAddress, pullMode = true)
       context.become(binding(bootstrapper))
   }
 
