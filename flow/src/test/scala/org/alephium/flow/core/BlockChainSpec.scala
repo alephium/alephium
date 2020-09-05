@@ -167,6 +167,25 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
   }
 
+  it should "check reorg" in new Fixture {
+    val longChain  = chainGenOf(3, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+
+    val chain = buildBlockChain()
+    addBlocks(chain, shortChain)
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+
+    addBlocks(chain, longChain.take(2))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+
+    addBlocks(chain, longChain.drop(2))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+  }
+
   it should "test chain diffs with two chains of blocks" in new Fixture {
     forAll(chainGenOf(4, genesis)) { longChain =>
       forAll(chainGenOf(3, genesis)) { shortChain =>
