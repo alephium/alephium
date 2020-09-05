@@ -136,6 +136,37 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
   }
 
+  it should "check isCanonical" in new Fixture {
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+
+    val chain = buildBlockChain()
+    addBlocks(chain, shortChain)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+    longChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+
+    addBlocks(chain, longChain.init)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+    longChain.init.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+    chain.isCanonicalUnsafe(longChain.last.hash) is false
+
+    chain.add(longChain.last, longChain.length)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+    longChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+  }
+
   it should "test chain diffs with two chains of blocks" in new Fixture {
     forAll(chainGenOf(4, genesis)) { longChain =>
       forAll(chainGenOf(3, genesis)) { shortChain =>
