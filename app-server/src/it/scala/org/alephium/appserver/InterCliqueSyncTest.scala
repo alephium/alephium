@@ -38,18 +38,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     Future.sequence(clique2.map(_.start())).futureValue
 
-    clique2.zip(clique1).zipWithIndex.foreach {
-      case ((server, remote), index) =>
+    clique2.zipWithIndex.foreach {
+      case (server, index) =>
         eventually {
           val response =
-            request[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo,
-                                              rpcPort(server.config.network.bindAddress.getPort))
-          response is Seq(
-            InterCliquePeerInfo(selfClique1.cliqueId,
-                                index,
-                                new InetSocketAddress("localhost",
-                                                      remote.config.network.bindAddress.getPort),
-                                true))
+            request[Seq[InterCliquePeerInfo]](
+              getInterCliquePeerInfo,
+              rpcPort(server.config.network.bindAddress.getPort)).head
+
+          response.cliqueId is selfClique1.cliqueId
+          response.brokerId is index
+          response.isSynced is true
         }
     }
 

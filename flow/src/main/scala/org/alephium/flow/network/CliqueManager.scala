@@ -62,12 +62,6 @@ class CliqueManager(blockflow: BlockFlow,
 
   var selfCliqueReady: Boolean = false
 
-  override def preStart(): Unit = {
-    super.preStart()
-    require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
-    require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
-  }
-
   override def receive: Receive = awaitStart(AVector.empty) orElse isSelfCliqueSynced
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -102,6 +96,8 @@ class CliqueManager(blockflow: BlockFlow,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
+      require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
+      require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)

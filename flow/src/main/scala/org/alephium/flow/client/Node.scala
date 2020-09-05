@@ -71,7 +71,7 @@ object Node {
       ActorRefT
         .build[TcpController.Command](
           system,
-          TcpController.props(config.network.bindAddress.getPort, brokerManager))
+          TcpController.props(config.network.bindAddress, brokerManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())

@@ -11,7 +11,7 @@ import org.alephium.util._
 class ShutdownTest extends AlephiumSpec {
   it should "shutdown the node when Tcp port is used" in new TestFixture("1-node") {
     val connection = TestProbe()
-    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress(defaultMasterPort))
+    IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress("localhost", defaultMasterPort))
 
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server.system.whenTerminated.futureValue is a[Terminated]
