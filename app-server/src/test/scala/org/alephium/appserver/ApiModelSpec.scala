@@ -168,8 +168,8 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode CreateTransactionResult" in {
-    val result  = CreateTransactionResult("tx", "txHash")
-    val jsonRaw = """{"unsignedTx":"tx","hash":"txHash"}"""
+    val result  = CreateTransactionResult("tx", "txHash", 1, 2)
+    val jsonRaw = """{"unsignedTx":"tx","hash":"txHash","fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }
 

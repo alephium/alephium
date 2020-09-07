@@ -1,6 +1,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript, Val}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
@@ -20,6 +21,26 @@ final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
                                      states: AVector[AVector[Val]])
     extends HashSerde[UnsignedTransaction] {
   override lazy val hash: Hash = _getHash
+
+  // this might only works for validated tx
+  def fromGroup(implicit config: GroupConfig): GroupIndex = {
+    inputs.head.fromGroup
+  }
+
+  // this might only works for validated tx
+  def toGroup(implicit config: GroupConfig): GroupIndex = {
+    val from    = fromGroup
+    val outputs = fixedOutputs
+    if (outputs.isEmpty) from
+    else {
+      val index = outputs.indexWhere(_.toGroup != from)
+      if (index == -1) from
+      else outputs(index).toGroup
+    }
+  }
+
+  // this might only works for validated tx
+  def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 }
 
 object UnsignedTransaction {
