@@ -15,21 +15,10 @@ final case class Transaction(unsigned: UnsignedTransaction,
   override val hash: Hash = unsigned.hash
 
   // this might only works for validated tx
-  def fromGroup(implicit config: GroupConfig): GroupIndex = {
-    unsigned.inputs.head.fromGroup
-  }
+  def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
 
   // this might only works for validated tx
-  def toGroup(implicit config: GroupConfig): GroupIndex = {
-    val from    = fromGroup
-    val outputs = unsigned.fixedOutputs
-    if (outputs.isEmpty) from
-    else {
-      val index = outputs.indexWhere(_.toGroup != from)
-      if (index == -1) from
-      else outputs(index).toGroup
-    }
-  }
+  def toGroup(implicit config: GroupConfig): GroupIndex = unsigned.toGroup
 
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
