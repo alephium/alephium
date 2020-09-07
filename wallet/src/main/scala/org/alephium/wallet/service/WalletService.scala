@@ -96,7 +96,7 @@ object WalletService {
             val message   = Hex.unsafe(createTxResult.hash)
             val signature = SignatureSchema.sign(message, privateKey.privateKey)
             blockFlowClient
-              .sendTransaction(createTxResult.unsignedTx, signature)
+              .sendTransaction(createTxResult.unsignedTx, signature, createTxResult.fromGroup)
               .map(_.map(_.txId))
         }
       }
