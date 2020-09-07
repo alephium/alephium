@@ -17,7 +17,10 @@ import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.protocol.Hash
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.TxGenerators
+import org.alephium.serde.serialize
+import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
 
 class WalletAppSpec
@@ -31,11 +34,14 @@ class WalletAppSpec
   val blockFlowPort          = SocketUtil.temporaryLocalPort(SocketUtil.Both)
   val walletPort             = SocketUtil.temporaryLocalPort(SocketUtil.Both)
 
+  val groupNum = 4
+
+  implicit val groupConfig: GroupConfig = new GroupConfig {
+    override def groups: Int = groupNum
+  }
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort)
   val blockflowBinding = blockFlowMock.server.futureValue
-
-  val groups = 4
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
@@ -43,7 +49,7 @@ class WalletAppSpec
   val walletApp: WalletApp =
     new WalletApp(walletPort,
                   Uri(s"http://${localhost.getHostAddress}:$blockFlowPort"),
-                  groups,
+                  groupNum,
                   tempSecretDir)
 
   val routes: Route = walletApp.routes
@@ -168,8 +174,10 @@ object WalletAppSpec {
       } yield jsonRpc
   }
 
-  class BlockFlowServerMock(address: InetAddress, port: Int)(implicit system: ActorSystem)
-      extends FailFastCirceSupport {
+  class BlockFlowServerMock(address: InetAddress, port: Int)(implicit val groupConfig: GroupConfig,
+                                                             system: ActorSystem)
+      extends FailFastCirceSupport
+      with TxGenerators {
 
     private val peer = PeerAddress(address, Some(port), None)
 
@@ -181,8 +189,14 @@ object WalletAppSpec {
           case GetBalance(_) =>
             complete(Result(Balance(42, 1)))
           case CreateTransaction(_, _, _) =>
+            val unsignedTx = transactionGen().sample.get.unsigned
             complete(
-              Result(CreateTransactionResult(Hash.generate.toHexString, Hash.generate.toHexString)))
+              Result(
+                CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
+                                        Hex.toHexString(unsignedTx.hash.bytes),
+                                        unsignedTx.fromGroup.value,
+                                        unsignedTx.toGroup.value)
+              ))
           case SendTransaction(_, _) =>
             complete(Result(TxResult("txId", 0, 0)))
         }

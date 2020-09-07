@@ -11,6 +11,7 @@ import io.circe.syntax._
 
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.circe.inetAddressCodec
@@ -22,7 +23,8 @@ trait BlockFlowClient {
       toAddress: String,
       value: Long): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
   def sendTransaction(tx: String,
-                      signature: Signature): Future[Either[String, BlockFlowClient.TxResult]]
+                      signature: Signature,
+                      fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]]
 }
 
 object BlockFlowClient {
@@ -44,10 +46,8 @@ object BlockFlowClient {
           s"""{"jsonrpc":"2.0","id": 0,"method":"${jsonRpc.method}","params":${jsonRpc.asJson}}""")
       )
 
-    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-    private def request[P <: JsonRpc: Encoder, R: Codec](
-        params: P,
-        uri: Uri = address): Future[Either[String, R]] = {
+    private def request[P <: JsonRpc: Encoder, R: Codec](params: P,
+                                                         uri: Uri): Future[Either[String, R]] = {
       httpClient
         .request[Result[R]](
           rpcRequest(uri, params)
@@ -55,71 +55,68 @@ object BlockFlowClient {
         .map(_.map(_.result))
     }
 
+    private def requestFromGroup[P <: JsonRpc: Encoder, R: Codec](
+        fromGroup: GroupIndex,
+        params: P
+    ): Future[Either[String, R]] =
+      uriFromGroup(fromGroup).flatMap {
+        _.fold(
+          error => Future.successful(Left(error)),
+          uri   => request[P, R](params, uri)
+        )
+      }
+
+    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, Uri]] =
+      getSelfClique().map { selfCliqueEither =>
+        for {
+          selfClique <- selfCliqueEither
+          index      <- selfClique.index(fromGroup.value)
+          peerPort <- selfClique.peers
+            .lift(index)
+            .flatMap(peer => peer.rpcPort.map(rpcPort => (peer.address, rpcPort)))
+            .toRight(s"cannot find peer for group ${fromGroup.value} (peers: ${selfClique.peers})")
+        } yield {
+          val (peerAddress, rpcPort) = peerPort
+          Uri(s"http://${peerAddress.getHostAddress}:${rpcPort}")
+        }
+      }
+
     def getBalance(address: String): Future[Either[String, Long]] =
       LockupScript.fromBase58(address) match {
         case None => Future.successful(Left(s"Cannot decode $address"))
         case Some(lockupScript) =>
-          val fromGroup = lockupScript.groupIndex.value
-          getSelfClique().flatMap {
-            case Left(error) => Future.successful(Left(error))
-            case Right(selfClique) =>
-              selfClique
-                .index(fromGroup) match {
-                case Left(error) => Future.successful(Left(error))
-                case Right(index) =>
-                  selfClique.peers
-                    .lift(index)
-                    .flatMap(peer => peer.rpcPort.map(rpcPort => (peer.address, rpcPort))) match {
-                    case None =>
-                      Future.successful(
-                        Left(s"cannot find peer for group $fromGroup (peers: ${selfClique.peers})"))
-                    case Some((peerAddress, rpcPort)) =>
-                      val uri = Uri(s"http://${peerAddress.getHostAddress}:${rpcPort}")
-                      request[GetBalance, Balance](GetBalance(address), uri).map(_.map(_.balance))
-                  }
-              }
-          }
+          requestFromGroup[GetBalance, Balance](
+            lockupScript.groupIndex,
+            GetBalance(address)
+          ).map(_.map(_.balance))
       }
 
     def prepareTransaction(fromKey: String,
                            toAddress: String,
                            value: Long): Future[Either[String, CreateTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
-        case None => Future.successful(Left(s"Cannot decode $address"))
+        case None => Future.successful(Left(s"Cannot decode key $fromKey"))
         case Some(lockupScript) =>
-          val fromGroup = lockupScript.groupIndex.value
-          getSelfClique().flatMap {
-            case Left(error) => Future.successful(Left(error))
-            case Right(selfClique) =>
-              selfClique
-                .index(fromGroup) match {
-                case Left(error) => Future.successful(Left(error))
-                case Right(index) =>
-                  selfClique.peers
-                    .lift(index)
-                    .flatMap(peer => peer.rpcPort.map(rpcPort => (peer.address, rpcPort))) match {
-                    case None =>
-                      Future.successful(
-                        Left(s"cannot find peer for group $fromGroup (peers: ${selfClique.peers})"))
-                    case Some((peerAddress, rpcPort)) =>
-                      val uri = Uri(s"http://${peerAddress.getHostAddress}:${rpcPort}")
-                      request[CreateTransaction, CreateTransactionResult](
-                        CreateTransaction(fromKey, toAddress, value),
-                        uri)
-                  }
-              }
-          }
+          requestFromGroup[CreateTransaction, CreateTransactionResult](
+            lockupScript.groupIndex,
+            CreateTransaction(fromKey, toAddress, value)
+          )
       }
     }
 
     def sendTransaction(tx: String,
-                        signature: Signature): Future[Either[String, BlockFlowClient.TxResult]] = {
-      request[SendTransaction, TxResult](SendTransaction(tx, signature.toHexString), address)
+                        signature: Signature,
+                        fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]] = {
+      requestFromGroup[SendTransaction, TxResult](
+        GroupIndex.unsafe(fromGroup),
+        SendTransaction(tx, signature.toHexString)
+      )
     }
 
     private def getSelfClique(): Future[Either[String, SelfClique]] =
       request[GetSelfClique.type, SelfClique](
-        GetSelfClique
+        GetSelfClique,
+        address
       )
   }
 
@@ -162,7 +159,10 @@ object BlockFlowClient {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
   }
 
-  final case class CreateTransactionResult(unsignedTx: String, hash: String)
+  final case class CreateTransactionResult(unsignedTx: String,
+                                           hash: String,
+                                           fromGroup: Int,
+                                           toGroup: Int)
   object CreateTransactionResult {
     implicit val codec: Codec[CreateTransactionResult] = deriveCodec[CreateTransactionResult]
   }
