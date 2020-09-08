@@ -46,8 +46,8 @@ object ServerUtils {
     Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
-  def createTransaction(blockFlow: BlockFlow,
-                        query: CreateTransaction): Try[CreateTransactionResult] = {
+  def createTransaction(blockFlow: BlockFlow, query: CreateTransaction)(
+      implicit groupConfig: GroupConfig): Try[CreateTransactionResult] = {
     val resultEither = for {
       _ <- checkGroup(blockFlow, query.fromKey)
       unsignedTx <- prepareUnsignedTransaction(blockFlow,

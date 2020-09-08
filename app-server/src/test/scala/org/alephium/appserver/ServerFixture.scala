@@ -66,7 +66,9 @@ trait ServerFixture
   )
   lazy val dummyCreateTransactionResult = CreateTransactionResult(
     Hex.toHexString(serialize(dummyTx.unsigned)),
-    dummyTx.unsigned.hash.toHexString
+    dummyTx.unsigned.hash.toHexString,
+    dummyTx.unsigned.fromGroup.value,
+    dummyTx.unsigned.toGroup.value
   )
 }
 

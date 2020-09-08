@@ -244,13 +244,20 @@ object ApiModel {
     implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
   }
 
-  final case class CreateTransactionResult(unsignedTx: String, hash: String) extends ApiModel
+  final case class CreateTransactionResult(unsignedTx: String,
+                                           hash: String,
+                                           fromGroup: Int,
+                                           toGroup: Int)
+      extends ApiModel
   object CreateTransactionResult {
     implicit val codec: Codec[CreateTransactionResult] = deriveCodec[CreateTransactionResult]
 
-    def from(unsignedTx: UnsignedTransaction): CreateTransactionResult =
+    def from(unsignedTx: UnsignedTransaction)(
+        implicit groupConfig: GroupConfig): CreateTransactionResult =
       CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                              Hex.toHexString(unsignedTx.hash.bytes))
+                              Hex.toHexString(unsignedTx.hash.bytes),
+                              unsignedTx.fromGroup.value,
+                              unsignedTx.toGroup.value)
   }
 
   final case class SendTransaction(tx: String, signature: Signature) extends ApiModel
