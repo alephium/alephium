@@ -84,7 +84,7 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
     existsInCache(key) || genValue
   }
 
-  private def getInCache(key: K): Option[V] = readOnly {
+  def getInCache(key: K): Option[V] = readOnly {
     Option(m.get(key))
   }
 

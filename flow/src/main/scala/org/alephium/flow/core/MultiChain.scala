@@ -137,6 +137,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(ChainIndex.from(hash))
   }
 
+  def getBlockUnsafe(hash: Hash): Block = {
+    getBlockChain(hash).getBlockUnsafe(hash)
+  }
+
   def getBlock(hash: Hash): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
   }

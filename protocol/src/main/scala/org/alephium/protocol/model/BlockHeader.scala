@@ -26,7 +26,7 @@ final case class BlockHeader(
     ChainIndex.from(hash)
   }
 
-  def isGenesis: Boolean = timestamp == TimeStamp.zero
+  def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
   def parentHash(implicit config: GroupConfig): Hash = {
     uncleHash(chainIndex.to)

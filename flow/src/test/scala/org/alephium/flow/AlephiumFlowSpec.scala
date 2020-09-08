@@ -8,18 +8,17 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.Validation
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, StatefulScript, UnlockScript, Val}
-import org.alephium.util.{AlephiumActorSpec, AlephiumSpec, AVector, NumericHelpers, U64}
+import org.alephium.protocol.vm._
+import org.alephium.util._
 
-trait AlephiumFlowSpec
+trait FlowFixture
     extends AlephiumSpec
     with AlephiumConfigFixture
     with StoragesFixture
-    with BeforeAndAfterAll
     with NumericHelpers {
-  lazy val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
+  lazy val blockFlow: BlockFlow = genesisBlockFlow()
 
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)
@@ -82,6 +81,65 @@ trait AlephiumFlowSpec
     blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * weightRatio
   }
 
+  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
+    blockFlow.add(header).isRight is true
+    blockFlow.getWeight(header) isE consensusConfig.maxMiningTarget * weightFactor
+  }
+
+  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
+    val address   = genesisBalances(groupIndex)._2
+    val pubScript = LockupScript.p2pkh(address)
+    blockFlow
+      .getUtxos(pubScript)
+      .toOption
+      .get
+      .sumBy(_._2.amount.v) is expected.v
+  }
+
+  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
+    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
+  }
+
+  def show(blockFlow: BlockFlow): String = {
+    val tips = blockFlow.getAllTips
+      .map { tip =>
+        val weight = blockFlow.getWeightUnsafe(tip)
+        val header = blockFlow.getBlockHeaderUnsafe(tip)
+        val index  = header.chainIndex
+        val deps   = header.blockDeps.map(_.shortHex).mkString("-")
+        s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
+      }
+      .mkString("", "\n", "\n")
+    val bestDeps = (brokerConfig.groupFrom until brokerConfig.groupUntil)
+      .map { group =>
+        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
+        val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
+        s"group $group, bestDeps: $bestDepsStr"
+      }
+      .mkString("", "\n", "\n")
+    tips ++ bestDeps
+  }
+
+  def getBalance(blockFlow: BlockFlow, address: PublicKey): U64 = {
+    val lockupScript = LockupScript.p2pkh(address)
+    brokerConfig.contains(lockupScript.groupIndex) is true
+    val query = blockFlow.getUtxos(lockupScript)
+    query.toOption.get.sumBy(_._2.amount.v)
+  }
+
+  def showBalances(blockFlow: BlockFlow): Unit = {
+    def show(txOutput: TxOutput): String = {
+      s"${txOutput.scriptHint}:${txOutput.amount}"
+    }
+
+    val address   = genesisBalances(brokerConfig.brokerId)._2
+    val pubScript = LockupScript.p2pkh(address)
+    val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
+    print(txOutputs.map(show).mkString("", ";", "\n"))
+  }
+}
+
+trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
   override def afterAll(): Unit = {
     cleanStorages()
   }

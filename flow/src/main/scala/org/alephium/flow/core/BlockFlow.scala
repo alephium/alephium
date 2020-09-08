@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
@@ -13,7 +15,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
 
-trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils {
+trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils with ConflictedBlocks {
   def add(block: Block, weight: BigInt): IOResult[Unit] = ???
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
@@ -159,12 +161,18 @@ object BlockFlow extends StrictLogging {
     }
 
     private def calWeightUnsafe(header: BlockHeader): BigInt = {
-      if (header.isGenesis) ALF.GenesisWeight
+      if (header.isGenesis) ALF.GenesisWeight * (2 * groups - 1)
       else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
         val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
         weight1 + weight2 + header.target
       }
+    }
+
+    private def calWeightUnsafe(flowTips: FlowTips): BigInt = {
+      val weight1 = flowTips.inTips.sumBy(calGroupWeightUnsafe)
+      val weight2 = flowTips.outTips.sumBy(getChainWeightUnsafe)
+      weight1 + weight2
     }
 
     private def calGroupWeightUnsafe(hash: Hash): BigInt = {
@@ -184,27 +192,96 @@ object BlockFlow extends StrictLogging {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
-    // Rtips means tip representatives for all groups
-    private def getRtipsUnsafe(tip: Hash, from: GroupIndex): Array[Hash] = {
-      val rdeps = new Array[Hash](groups)
-      rdeps(from.value) = tip
-
+    private[core] def getFlowTipsUnsafe(tip: Hash, targetGroup: GroupIndex): FlowTips = {
       val header = getBlockHeaderUnsafe(tip)
-      val deps   = header.blockDeps
-      if (header.isGenesis) {
-        0 until groups foreach { k =>
-          if (k != from.value) rdeps(k) = genesisBlocks(k).head.hash
-        }
-      } else {
-        0 until groups foreach { k =>
-          if (k < from.value) rdeps(k) = deps(k)
-          else if (k > from.value) rdeps(k) = deps(k - 1)
-        }
-      }
-      rdeps
+      getFlowTipsUnsafe(header, targetGroup)
     }
 
-    private def isExtendingUnsafe(current: Hash, previous: Hash): Boolean = {
+    private[core] def getFlowTipsUnsafe(header: BlockHeader, targetGroup: GroupIndex): FlowTips = {
+      val FlowTips.Light(inTips, targetTip) = getLightTipsUnsafe(header, targetGroup)
+      val targetTips                        = getOutTipsUnsafe(targetTip)
+
+      FlowTips(targetGroup, inTips, targetTips)
+    }
+
+    private[core] def getLightTipsUnsafe(tip: Hash, targetGroup: GroupIndex): FlowTips.Light = {
+      val header = getBlockHeaderUnsafe(tip)
+      getLightTipsUnsafe(header, targetGroup)
+    }
+
+    private[core] def getLightTipsUnsafe(header: BlockHeader,
+                                         targetGroup: GroupIndex): FlowTips.Light = {
+      if (header.isGenesis) {
+        val inTips = AVector.tabulate(groups - 1) { i =>
+          val g = if (i < targetGroup.value) i else i + 1
+          genesisBlocks(g)(g).hash
+        }
+        val targetTip = genesisBlocks(targetGroup.value)(targetGroup.value).hash
+        FlowTips.Light(inTips, targetTip)
+      } else {
+        val inTips = AVector.tabulate(groups - 1) { i =>
+          val g = if (i < targetGroup.value) i else i + 1
+          getInTip(header, GroupIndex.unsafe(g))
+        }
+        val targetTip = getInTip(header, targetGroup)
+        FlowTips.Light(inTips, targetTip)
+      }
+    }
+
+    private[core] def tryMergeUnsafe(flowTips: FlowTips,
+                                     tip: Hash,
+                                     targetGroup: GroupIndex): Option[FlowTips] = {
+      tryMergeUnsafe(flowTips, getLightTipsUnsafe(tip, targetGroup))
+    }
+
+    private[core] def tryMergeUnsafe(flowTips: FlowTips,
+                                     newTips: FlowTips.Light): Option[FlowTips] = {
+      for {
+        newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
+        newOutTips <- mergeOutTips(flowTips.outTips, newTips.outTip)
+      } yield FlowTips(flowTips.targetGroup, newInTips, newOutTips)
+    }
+
+    private[core] def merge(tip1: Hash, tip2: Hash): Option[Hash] = {
+      if (isExtendingUnsafe(tip1, tip2)) Some(tip1)
+      else if (isExtendingUnsafe(tip2, tip1)) Some(tip2)
+      else None
+    }
+
+    private[core] def mergeTips(tips1: AVector[Hash],
+                                tips2: AVector[Hash]): Option[AVector[Hash]] = {
+      assume(tips1.length == tips2.length)
+
+      @tailrec
+      def iter(acc: AVector[Hash], g: Int): Option[AVector[Hash]] = {
+        if (g == tips1.length) Some(acc)
+        else {
+          merge(tips1(g), tips2(g)) match {
+            case Some(merged) => iter(acc :+ merged, g + 1)
+            case None         => None
+          }
+        }
+      }
+
+      iter(AVector.ofSize(tips1.length), 0)
+    }
+
+    private[core] def mergeInTips(inTips1: AVector[Hash],
+                                  inTips2: AVector[Hash]): Option[AVector[Hash]] = {
+      mergeTips(inTips1, inTips2)
+    }
+
+    private[core] def mergeOutTips(outTips: AVector[Hash], newTip: Hash): Option[AVector[Hash]] = {
+      assume(outTips.length == groups)
+      val newOutTips = getOutTipsUnsafe(newTip)
+
+      mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
+        val diffs = getTipsDiffUnsafe(mergedDeps, outTips)
+        Option.when(diffs.isEmpty || (!isConflicted(newTip, diffs, getBlockUnsafe)))(mergedDeps)
+      }
+    }
+
+    private[core] def isExtendingUnsafe(current: Hash, previous: Hash): Boolean = {
       val index1 = ChainIndex.from(current)
       val index2 = ChainIndex.from(previous)
       assume(index1.from == index2.from)
@@ -212,83 +289,76 @@ object BlockFlow extends StrictLogging {
       val chain = getHashChain(index2)
       if (index1.to == index2.to) Utils.unsafe(chain.isBefore(previous, current))
       else {
-        val groupDeps = getGroupDepsUnsafe(current, index1.from)
+        val groupDeps = getOutTipsUnsafe(current, index1.from)
         Utils.unsafe(chain.isBefore(previous, groupDeps(index2.to.value)))
       }
     }
 
-    private def isCompatibleUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Boolean = {
-      val newRtips = getRtipsUnsafe(tip, from)
-      assume(rtips.length == newRtips.length)
-      rtips.indices forall { k =>
-        val t1 = rtips(k)
-        val t2 = newRtips(k)
-        isExtendingUnsafe(t1, t2) || isExtendingUnsafe(t2, t1)
-      }
-    }
-
-    private def updateRtipsUnsafe(rtips: Array[Hash], tip: Hash, from: GroupIndex): Unit = {
-      val newRtips = getRtipsUnsafe(tip, from)
-      assume(rtips.length == newRtips.length)
-      rtips.indices foreach { k =>
-        val t1 = rtips(k)
-        val t2 = newRtips(k)
-        if (isExtendingUnsafe(t2, t1)) {
-          rtips(k) = t2
-        }
-      }
-    }
-
-    private def getGroupDepsUnsafe(tip: Hash, from: GroupIndex): AVector[Hash] = {
+    private[core] def getOutTipsUnsafe(tip: Hash, targetGroup: GroupIndex): AVector[Hash] = {
       val header = getBlockHeaderUnsafe(tip)
-      if (header.isGenesis) {
-        genesisBlocks(from.value).map(_.hash)
-      } else {
-        header.outDeps
-      }
+      getOutTipsUnsafe(header, targetGroup)
+    }
+
+    private[core] def getOutTipsUnsafe(tip: Hash): AVector[Hash] = {
+      val header = getBlockHeaderUnsafe(tip)
+      getOutTips(header, inclusive = true)
+    }
+
+    private[core] def getOutTipsUnsafe(header: BlockHeader,
+                                       targetGroup: GroupIndex): AVector[Hash] = {
+      val index = header.chainIndex
+      if (index.from == targetGroup) getOutTips(header, inclusive = true)
+      else getOutTipsUnsafe(getInTip(header, targetGroup))
+    }
+
+    private[core] def getInTip(header: BlockHeader, targetGroup: GroupIndex): Hash = {
+      val from = header.chainIndex.from
+      if (targetGroup.value < from.value) header.blockDeps(targetGroup.value)
+      else if (targetGroup.value > from.value) header.blockDeps(targetGroup.value - 1)
+      else header.hash
+    }
+
+    def tryExtend(tipsCur: FlowTips,
+                  weightCur: BigInt,
+                  group: GroupIndex,
+                  toTry: AVector[Hash]): (FlowTips, BigInt) = {
+      toTry
+        .fold[(FlowTips, BigInt)](tipsCur -> weightCur) {
+          case ((maxTips, maxWeight), tip) =>
+            tryMergeUnsafe(tipsCur, tip, group) match {
+              case Some(merged) =>
+                val weight = calWeightUnsafe(merged)
+                if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
+              case None => (maxTips, maxWeight)
+            }
+        }
     }
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
       val bestTip   = getBestTipUnsafe
       val bestIndex = ChainIndex.from(bestTip)
-      val rtips     = getRtipsUnsafe(bestTip, bestIndex.from)
-      val deps1 = (0 until groups)
+      val flowTips0 = getFlowTipsUnsafe(bestTip, group)
+      val weight0   = calWeightUnsafe(flowTips0)
+      val (flowTips1, weight1) = (0 until groups).foldLeft(flowTips0 -> weight0) {
+        case ((tipsCur, weightCur), _r) =>
+          val r     = GroupIndex.unsafe(_r)
+          val chain = getHashChain(group, r)
+          tryExtend(tipsCur, weightCur, group, chain.getAllTips)
+      }
+      val (flowTips2, _) = (0 until groups)
         .filter(_ != group.value)
-        .foldLeft(AVector.empty[Hash]) {
-          case (deps, _k) =>
-            val k = GroupIndex.unsafe(_k)
-            if (k == bestIndex.from) deps :+ bestTip
-            else {
-              val toTries = (0 until groups).foldLeft(AVector.empty[Hash]) { (acc, _l) =>
-                val l = GroupIndex.unsafe(_l)
-                acc ++ getHashChain(k, l).getAllTips
+        .foldLeft(flowTips1 -> weight1) {
+          case ((tipsCur, weightCur), _l) =>
+            val l = GroupIndex.unsafe(_l)
+            if (l != bestIndex.from) {
+              val toTry = (0 until groups).foldLeft(AVector.empty[Hash]) { (acc, _r) =>
+                val r = GroupIndex.unsafe(_r)
+                acc ++ getHashChain(l, r).getAllTips
               }
-              val validTries = toTries.filter(tip => isCompatibleUnsafe(rtips, tip, k))
-              if (validTries.isEmpty) deps :+ rtips(k.value)
-              else {
-                val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: improve
-                updateRtipsUnsafe(rtips, bestTry, k)
-                deps :+ bestTry
-              }
-            }
+              tryExtend(tipsCur, weightCur, group, toTry)
+            } else (tipsCur, weightCur)
         }
-      val groupTip  = rtips(group.value)
-      val groupDeps = getGroupDepsUnsafe(groupTip, group)
-      val deps2 = (0 until groups)
-        .foldLeft(deps1) {
-          case (deps, _l) =>
-            val l       = GroupIndex.unsafe(_l)
-            val chain   = getHashChain(group, l)
-            val toTries = chain.getAllTips
-            val validTries =
-              toTries.filter(tip => Utils.unsafe(chain.isBefore(groupDeps(l.value), tip)))
-            if (validTries.isEmpty) deps :+ groupDeps(l.value)
-            else {
-              val bestTry = validTries.maxBy(getWeightUnsafe) // TODO: use better selection function
-              deps :+ bestTry
-            }
-        }
-      BlockDeps(deps2)
+      flowTips2.toBlockDeps
     }
 
     def updateBestDepsUnsafe(): Unit =

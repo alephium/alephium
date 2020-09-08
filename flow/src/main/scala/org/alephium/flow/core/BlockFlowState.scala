@@ -3,6 +3,7 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
+import org.alephium.flow.Utils
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
@@ -147,6 +148,10 @@ trait BlockFlowState {
     intraGroupChains(group.value - brokerConfig.groupFrom)
   }
 
+  def getHeaderChain(hash: Hash): BlockHeaderChain
+
+  def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain
+
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain = {
     blockHeaderChains(from.value)(to.value)
   }
@@ -256,7 +261,11 @@ trait BlockFlowState {
   }
 
   def getTipsDiff(newTip: Hash, oldTip: Hash): IOResult[AVector[Hash]] = {
-    getBlockChain(oldTip).getBlockHashesBetween(newTip, oldTip)
+    getHeaderChain(oldTip).getBlockHashesBetween(newTip, oldTip)
+  }
+
+  protected def getTipsDiffUnsafe(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
+    Utils.unsafe(getTipsDiff(newTips, oldTips))
   }
 
   protected def getTipsDiff(newTips: AVector[Hash],
