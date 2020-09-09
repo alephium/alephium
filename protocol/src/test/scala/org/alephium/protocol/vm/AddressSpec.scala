@@ -1,16 +1,17 @@
-package org.alephium.protocol.vm
+package org.alephium.protocol.model
 
 import org.scalatest.Assertion
 
 import org.alephium.protocol.PublicKey
-import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, Base58, Hex}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AlephiumSpec, Hex}
 
-class LockupScriptSpec extends AlephiumSpec {
+class AddressSpec extends AlephiumSpec {
   def test(address: String, publicKey: String): Assertion = {
-    val script = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(publicKey).get))
-    script.toBase58 is address
-    deserialize[LockupScript](Base58.decode(address).get) isE script
+    val networkType = NetworkType.Mainnet
+    val script      = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(publicKey).get))
+    Address(script).toBase58(networkType) is address
+    Address.fromBase58(address, networkType).get.lockupScript is script
   }
 
   it should "encode and decode p2pkh address to and from Base58" in {
