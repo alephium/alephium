@@ -7,7 +7,7 @@ import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.TapirCodecs._
+import org.alephium.appserver.TapirCodecs
 import org.alephium.appserver.TapirSchemas._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
@@ -15,7 +15,7 @@ import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{TimeStamp, U64}
 
-trait Endpoints {
+trait Endpoints extends ApiModelCodec with TapirCodecs {
 
   implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig

@@ -23,7 +23,7 @@ import org.alephium.rpc.{CirceUtils, JsonRPCHandler}
 import org.alephium.rpc.model.JsonRPC.{Handler, Notification, Request, Response}
 import org.alephium.util.{ActorRefT, EventBus}
 
-trait RPCServerAbstract extends StrictLogging {
+trait RPCServerAbstract extends ApiModelCodec with StrictLogging {
   import RPCServerAbstract._
 
   implicit def system: ActorSystem

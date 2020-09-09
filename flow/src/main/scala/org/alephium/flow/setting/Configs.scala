@@ -12,6 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde.deserialize
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))

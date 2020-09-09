@@ -3,7 +3,6 @@ package org.alephium.appserver
 import scala.concurrent._
 
 import akka.util.Timeout
-import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
@@ -12,9 +11,8 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
+import org.alephium.protocol.model.{Address, ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._
-import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
 import org.alephium.util.{ActorRefT, AVector, Hex, U64}
@@ -160,8 +158,9 @@ object ServerUtils {
     val groupIndex = address.groupIndex(blockFlow.brokerConfig)
     if (blockFlow.brokerConfig.contains(groupIndex)) Right(())
     else {
-      val addressStr = CirceUtils.print(address.asJson)
-      Left(Response.failed(s"Address $addressStr belongs to other groups"))
+      //TODO add `address.toBase58` to message
+      //it require to have an `implicit ChainsConfig`
+      Left(Response.failed(s"Address belongs to other groups"))
     }
   }
 

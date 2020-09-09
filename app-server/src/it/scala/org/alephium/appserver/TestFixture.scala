@@ -34,6 +34,8 @@ class TestFixture(val name: String) extends TestFixtureLike
 trait TestFixtureLike
     extends AlephiumActorSpecLike
     with AlephiumFlowSpec
+    with AlephiumConfigFixture
+    with ApiModelCodec
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))

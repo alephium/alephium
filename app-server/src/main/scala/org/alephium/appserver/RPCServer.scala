@@ -32,11 +32,10 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   import RPCServerAbstract.FutureTry
 
   implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val networkType: NetworkType = node.config.chains.networkType
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
-
-  private implicit val fetchRequestDecoder: Decoder[FetchRequest] = FetchRequest.decoder
 
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
@@ -140,7 +139,7 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   }
 }
 
-object RPCServer extends {
+object RPCServer {
   import RPCServerAbstract._
 
   def apply(node: Node, miner: ActorRefT[Miner.Command])(
@@ -192,6 +191,7 @@ object RPCServer extends {
     }
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig): Json =
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig,
+                                                  encoder: Encoder[BlockEntry]): Json =
     BlockEntry.from(blockNotify).asJson
 }

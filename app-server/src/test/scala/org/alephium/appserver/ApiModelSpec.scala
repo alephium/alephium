@@ -11,13 +11,13 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey, Signature}
-import org.alephium.protocol.model.{CliqueId, CliqueInfo}
+import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
-import org.alephium.serde.serialize
+import org.alephium.rpc.CirceUtils._
 import org.alephium.util._
 
-class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
+class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
     CirceUtils.print(t.asJson)
   }
@@ -37,7 +37,8 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
               blockflowFetchMaxAge,
               askTimeout = Duration.zero,
               apiKeyHash = Sha256.hash(apiKey))
-  implicit val fetchRequestCodec = FetchRequest.codec
+
+  val networkType = NetworkType.Mainnet
 
   def generateKeyHash(): String = {
     val address = PublicKey.generate
@@ -63,7 +64,6 @@ class ApiModelSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode TimeStamp" in {
-    import TimeStampCodec._
 
     checkData(TimeStamp.unsafe(0), "0")
 

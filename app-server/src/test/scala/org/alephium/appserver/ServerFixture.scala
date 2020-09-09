@@ -27,10 +27,12 @@ import org.alephium.util._
 
 trait ServerFixture
     extends InfoFixture
+    with ApiModelCodec
     with AlephiumConfigFixture
     with StoragesFixture
     with NoIndexModelGeneratorsLike {
-  implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val networkType: NetworkType = config.chains.networkType
 
   val now = TimeStamp.now()
 

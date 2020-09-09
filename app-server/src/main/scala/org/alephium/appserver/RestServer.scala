@@ -38,6 +38,7 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
   implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val networkType: NetworkType = node.config.chains.networkType
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
