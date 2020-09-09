@@ -11,7 +11,7 @@ import io.circe.syntax._
 
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.circe.inetAddressCodec
@@ -28,11 +28,11 @@ trait BlockFlowClient {
 }
 
 object BlockFlowClient {
-  def apply(httpClient: HttpClient, address: Uri, groupNum: Int)(
+  def apply(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): BlockFlowClient =
-    new Impl(httpClient, address, groupNum)
+    new Impl(httpClient, address, groupNum, networkType)
 
-  private class Impl(httpClient: HttpClient, address: Uri, groupNum: Int)(
+  private class Impl(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
       implicit executionContext: ExecutionContext)
       extends BlockFlowClient {
 
@@ -82,7 +82,7 @@ object BlockFlowClient {
       }
 
     def getBalance(address: String): Future[Either[String, Long]] =
-      LockupScript.fromBase58(address) match {
+      Address.fromBase58(address, networkType) match {
         case None => Future.successful(Left(s"Cannot decode $address"))
         case Some(lockupScript) =>
           requestFromGroup[GetBalance, Balance](

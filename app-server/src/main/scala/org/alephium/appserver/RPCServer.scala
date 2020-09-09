@@ -18,7 +18,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{ChainIndex, NetworkType}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, Service}
 

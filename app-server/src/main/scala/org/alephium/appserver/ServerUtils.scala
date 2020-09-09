@@ -34,7 +34,7 @@ object ServerUtils {
     for {
       _ <- checkGroup(blockFlow, balanceRequest.address)
       balance <- blockFlow
-        .getBalance(balanceRequest.address)
+        .getBalance(balanceRequest.address.lockupScript)
         .map(Balance(_))
         .left
         .flatMap(_ => failedInIO)
@@ -50,7 +50,7 @@ object ServerUtils {
       _ <- checkGroup(blockFlow, query.fromKey)
       unsignedTx <- prepareUnsignedTransaction(blockFlow,
                                                query.fromKey,
-                                               query.toAddress,
+                                               query.toAddress.lockupScript,
                                                query.value)
     } yield {
       CreateTransactionResult.from(unsignedTx)
@@ -151,7 +151,7 @@ object ServerUtils {
   }
 
   def checkGroup(blockFlow: BlockFlow, publicKey: PublicKey): Try[Unit] = {
-    checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
+    checkGroup(blockFlow, Address(LockupScript.p2pkh(publicKey)))
   }
 
   def checkGroup(blockFlow: BlockFlow, address: Address): Try[Unit] = {

@@ -24,9 +24,13 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
   val httpClient: HttpClient = HttpClient(512, OverflowStrategy.fail)
 
   val blockFlowClient: BlockFlowClient =
-    BlockFlowClient.apply(httpClient, config.blockflow.uri, config.blockflow.groups)
+    BlockFlowClient.apply(httpClient,
+                          config.blockflow.uri,
+                          config.blockflow.groups,
+                          config.networkType)
 
-  val walletService: WalletService = WalletService.apply(blockFlowClient, config.secretDir)
+  val walletService: WalletService =
+    WalletService.apply(blockFlowClient, config.secretDir, config.networkType)
 
   val walletServer: WalletServer = new WalletServer(walletService)
 

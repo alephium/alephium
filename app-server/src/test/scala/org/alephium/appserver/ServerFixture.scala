@@ -151,7 +151,7 @@ object ServerFixture {
       Right(AVector((block.header, 1)))
     }
 
-    override def getBalance(address: Address): IOResult[(U64, Int)] = Right((U64.Zero, 0))
+    override def getBalance(lockupScript: LockupScript): IOResult[(U64, Int)] = Right((U64.Zero, 0))
 
     override def prepareUnsignedTx(fromLockupScript: LockupScript,
                                    fromUnlockScript: UnlockScript,

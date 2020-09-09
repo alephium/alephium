@@ -18,7 +18,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.TxGenerators
+import org.alephium.protocol.model.{NetworkType, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
@@ -47,9 +47,12 @@ class WalletAppSpec
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
 
+  val networkType = NetworkType.Mainnet
+
   val config = WalletConfig(
     walletPort,
     tempSecretDir,
+    networkType,
     WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum))
 
   val walletApp: WalletApp =

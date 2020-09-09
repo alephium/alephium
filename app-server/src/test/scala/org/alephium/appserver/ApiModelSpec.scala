@@ -46,7 +46,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   def generateP2pkh(): Address = {
-    LockupScript.p2pkh(PublicKey.generate)
+    Address(LockupScript.p2pkh(PublicKey.generate))
   }
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
@@ -125,7 +125,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "encode/decode GetBalance" in {
     val address    = generateP2pkh()
-    val addressStr = Base58.encode(serialize(address))
+    val addressStr = address.toBase58(networkType)
     val request    = GetBalance(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
@@ -133,7 +133,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "encode/decode GetGroup" in {
     val address    = generateP2pkh()
-    val addressStr = Base58.encode(serialize(address))
+    val addressStr = address.toBase58(networkType)
     val request    = GetGroup(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
@@ -160,10 +160,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode CreateTransaction" in {
     val fromKey   = PublicKey.generate
     val toKey     = PublicKey.generate
-    val toAddress = LockupScript.p2pkh(toKey)
+    val toAddress = Address(LockupScript.p2pkh(toKey))
     val transfer  = CreateTransaction(fromKey, toAddress, 1)
     val jsonRaw =
-      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
+      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58(networkType)}","value":1}"""
     checkData(transfer, jsonRaw)
   }
 

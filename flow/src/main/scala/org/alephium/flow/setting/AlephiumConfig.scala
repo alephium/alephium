@@ -126,20 +126,6 @@ object AlephiumConfig {
   }
 
   def load(rootPath: Path): Result[AlephiumConfig] = {
-    load(rootPath, None)
-  }
-
-  def load(rootPath: Path,
-           genesisBalances: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] =
-    build(Configs.parseConfig(rootPath), genesisBalances)
-
-  def build(config: Config,
-            genesisBalancesOpt: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] = {
-    load(config).map { settings =>
-      genesisBalancesOpt match {
-        case Some(balances) => settings.copy(genesis = GenesisSetting(balances))
-        case None           => settings
-      }
-    }
+    load(Configs.parseConfig(rootPath))
   }
 }

@@ -7,6 +7,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.storage.SecretStorage
@@ -30,13 +31,13 @@ trait WalletService {
 
 object WalletService {
 
-  def apply(blockFlowClient: BlockFlowClient, secretDir: Path)(
+  def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): WalletService =
-    new Impl(blockFlowClient, secretDir)
+    new Impl(blockFlowClient, secretDir, networkType)
 
   private var maybeSecretStorage: Option[SecretStorage] = None
 
-  private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path)(
+  private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext)
       extends WalletService {
     def createWallet(password: String,
@@ -118,7 +119,8 @@ object WalletService {
 
     private def withAddress[A](f: String => Future[Either[String, A]]): Future[Either[String, A]] =
       withPrivateKey { privateKey =>
-        val address = LockupScript.p2pkh(privateKey.extendedPublicKey.publicKey).toBase58
+        val address = Address(LockupScript.p2pkh(privateKey.extendedPublicKey.publicKey))
+          .toBase58(networkType)
         f(address)
       }
   }

@@ -371,7 +371,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         ("alephium.broker.broker-id", anotherBroker)
       )
 
-      override lazy val genesisBalances = Test.genesisBalances
+      override lazy val genesisKeys = Test.genesisKeys
     }
     Test.genesisBalance is newConfigFixture.genesisBalance
 
@@ -414,7 +414,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   }
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
-    val address   = genesisBalances(groupIndex)._2
+    val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
       .getUtxos(pubScript)
@@ -471,7 +471,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       s"${txOutput.scriptHint}:${txOutput.amount}"
     }
 
-    val address   = genesisBalances(brokerConfig.brokerId)._2
+    val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
     val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))

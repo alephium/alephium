@@ -70,14 +70,15 @@ object Configs extends StrictLogging {
       val left  = raw.take(splitIndex)
       val right = raw.drop(splitIndex + 1)
       for {
-        address    <- LockupScript.fromBase58(left)
-        rawBalance <- allCatch.opt(BigInt(right).underlying())
-        balance    <- U64.from(rawBalance)
-      } yield (address, balance)
+        bytestring   <- Hex.from(left)
+        lockupScript <- deserialize[LockupScript](bytestring).toOption
+        rawBalance   <- allCatch.opt(BigInt(right).underlying())
+        balance      <- U64.from(rawBalance)
+      } yield (lockupScript, balance)
     }
   }
 
-  def loadBlockFlow(balances: AVector[(LockupScript, U64)])(
+  def loadBlockFlow(balances: AVector[(Address, U64)])(
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) {

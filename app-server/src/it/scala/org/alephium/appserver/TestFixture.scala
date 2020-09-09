@@ -24,6 +24,7 @@ import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -38,11 +39,15 @@ trait TestFixtureLike
     with ApiModelCodec
     with ScalaFutures
     with Eventually {
-  override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
+  override implicit val patienceConfig       = PatienceConfig(timeout = Span(1, Minutes))
+  lazy implicit val apiConfig                = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val networkType: NetworkType = config.chains.networkType
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
-    (LockupScript.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+    (Address(LockupScript.p2pkh(pubKey)).toBase58(networkType),
+     pubKey.toHexString,
+     priKey.toHexString)
   }
 
   val address                 = "1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3"
@@ -125,7 +130,7 @@ trait TestFixtureLike
         ("alephium.api.api-key-hash", apiKeyHash.toHexString)
       )
       override implicit lazy val config = {
-        val tmp = AlephiumConfig.build(newConfig, None).toOption.get
+        val tmp = AlephiumConfig.load(newConfig).toOption.get
         bootstrap match {
           case Some(address) =>
             tmp.copy(discovery = tmp.discovery.copy(bootstrap = ArraySeq(address)))
@@ -154,14 +159,14 @@ trait TestFixtureLike
                brokerNum: Int                       = 2,
                masterPort: Int                      = defaultMasterPort,
                bootstrap: Option[InetSocketAddress] = None): Server = {
-    val platformEnv = buildEnv(publicPort, masterPort, brokerId, brokerNum, bootstrap)
+    val platformEnv        = buildEnv(publicPort, masterPort, brokerId, brokerNum, bootstrap)
+    implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
         ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
       implicit val config           = platformEnv.config
-      implicit val apiConfig        = ApiConfig.load(platformEnv.newConfig).toOption.get
 
       ActorRefT.build(
         system,

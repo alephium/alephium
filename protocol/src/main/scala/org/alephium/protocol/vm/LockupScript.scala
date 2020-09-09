@@ -6,7 +6,7 @@ import org.alephium.protocol.{Hash, HashSerde, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{Base58, Bytes}
+import org.alephium.util.Bytes
 
 sealed trait LockupScript extends HashSerde[LockupScript] {
   override lazy val hash: Hash = _getHash
@@ -16,11 +16,25 @@ sealed trait LockupScript extends HashSerde[LockupScript] {
   def assetHintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
-
-  def toBase58: String = Base58.encode(serialize(this))
 }
 
 object LockupScript {
+
+  def withPrefix(data: ByteString)(f: Byte => Byte): ByteString = {
+    data.headOption match {
+      case Some(prefix) =>
+        ByteString.fromArrayUnsafe(data.updated(0, f(prefix).toByte).toArray)
+      case None => data
+    }
+  }
+
+  def withoutPrefix(data: ByteString, byte: Byte): ByteString = {
+    data.headOption match {
+      case Some(addressType) =>
+        ByteString.fromArrayUnsafe(data.updated(0, (addressType - byte).toByte).toArray)
+      case None => data
+    }
+  }
   implicit val serde: Serde[LockupScript] = new Serde[LockupScript] {
     override def serialize(input: LockupScript): ByteString = {
       input match {
@@ -42,10 +56,6 @@ object LockupScript {
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
       }
     }
-  }
-
-  def fromBase58(input: String): Option[LockupScript] = {
-    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
   }
 
   def p2pkh(key: PublicKey): P2PKH      = p2pkh(Hash.hash(key.bytes))
