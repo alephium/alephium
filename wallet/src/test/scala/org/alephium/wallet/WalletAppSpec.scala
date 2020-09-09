@@ -22,6 +22,7 @@ import org.alephium.protocol.model.TxGenerators
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
+import org.alephium.wallet.config.WalletConfig
 
 class WalletAppSpec
     extends AlephiumSpec
@@ -46,11 +47,13 @@ class WalletAppSpec
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
 
+  val config = WalletConfig(
+    walletPort,
+    tempSecretDir,
+    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum))
+
   val walletApp: WalletApp =
-    new WalletApp(walletPort,
-                  Uri(s"http://${localhost.getHostAddress}:$blockFlowPort"),
-                  groupNum,
-                  tempSecretDir)
+    new WalletApp(config)
 
   val routes: Route = walletApp.routes
 
