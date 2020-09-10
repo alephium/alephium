@@ -245,7 +245,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
     deserialize[StatelessScript](serialize(script)) isE script
 
-    //FIXME: `SecP256K1` don't have a `toByte32` function
     val args = AVector[Val](Val.ByteVec.from(pubKey))
     StatelessVM
       .runAssetScript(cachedWorldState, Hash.zero, script, args, signature)
