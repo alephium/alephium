@@ -10,7 +10,7 @@ import io.circe.{Codec, Decoder, Encoder, Json, JsonObject}
 import io.circe.generic.semiauto.{deriveCodec, deriveDecoder, deriveEncoder}
 import io.circe.syntax._
 
-import org.alephium.protocol.{PublicKey, Signature}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
@@ -153,7 +153,7 @@ object BlockFlowClient {
     val method: String = "send_transaction"
   }
 
-  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int)
+  final case class TxResult(txId: Hash, fromGroup: Int, toGroup: Int)
 
   final case class PeerAddress(address: InetAddress, rpcPort: Option[Int], wsPort: Option[Int])
 

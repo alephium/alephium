@@ -2,6 +2,7 @@ package org.alephium.wallet.circe
 
 import io.circe._
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, NetworkType}
 
 trait ProtocolCodecs extends UtilCodecs {
@@ -17,4 +18,9 @@ trait ProtocolCodecs extends UtilCodecs {
         .toRight(s"Unable to decode address from $input")
     }
   implicit lazy val addressCodec: Codec[Address] = Codec.from(addressDecoder, addressEncoder)
+
+  implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
+  implicit val hashDecoder: Decoder[Hash] =
+    byteStringDecoder.emap(Hash.from(_).toRight("cannot decode hash"))
+  implicit val hashCodec: Codec[Hash] = Codec.from(hashDecoder, hashEncoder)
 }

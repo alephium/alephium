@@ -140,7 +140,7 @@ class WalletAppSpec
 
     transfer(10) ~> check {
       status is StatusCodes.OK
-      responseAs[model.Transfer.Result] is model.Transfer.Result("txId")
+      responseAs[model.Transfer.Result]
     }
 
     val negAmount = -10
@@ -207,7 +207,7 @@ object WalletAppSpec extends {
                                         unsignedTx.toGroup.value)
               ))
           case SendTransaction(_, _) =>
-            complete(Result(TxResult("txId", 0, 0)))
+            complete(Result(TxResult(Hash.generate, 0, 0)))
         }
       }
 

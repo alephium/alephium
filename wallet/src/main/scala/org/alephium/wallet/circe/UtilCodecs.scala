@@ -15,7 +15,7 @@ trait UtilCodecs {
   private val byteStringEncoder: Encoder[ByteString] =
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))
 
-  private val byteStringDecoder: Decoder[ByteString] =
+  val byteStringDecoder: Decoder[ByteString] =
     (c: HCursor) => c.as[String].map(Hex.unsafe)
 
   implicit val byteStringCodec: Codec[ByteString] =
