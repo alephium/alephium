@@ -27,10 +27,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
                         height: Int,
                         weight: BigInt,
                         chainWeight: BigInt,
-                        timestamp: TimeStamp): IOResult[Unit] = {
+                        timestamp: TimeStamp,
+                        isCanonical: Boolean): IOResult[Unit] = {
     for {
       _ <- blockStateStorage.put(hash, BlockState(height, weight, chainWeight))
-      _ <- updateHeightIndex(hash, height)
+      _ <- updateHeightIndex(hash, height, isCanonical)
       _ <- updateState(hash, timestamp, parentHash)
     } yield ()
   }
@@ -40,7 +41,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight)
     for {
       _ <- blockStateStorage.put(genesisHash, genesisState)
-      _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight)
+      _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight, true)
       _ <- setGenesisState(genesisHash, ALF.GenesisTimestamp)
     } yield ()
   }
@@ -50,10 +51,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @inline
-  private def updateHeightIndex(hash: Hash, height: Int): IOResult[Unit] = {
+  private def updateHeightIndex(hash: Hash, height: Int, isCanonical: Boolean): IOResult[Unit] = {
     heightIndexStorage.getOpt(height).flatMap {
-      case Some(hashes) => heightIndexStorage.put(height, hashes :+ hash)
-      case None         => heightIndexStorage.put(height, AVector(hash))
+      case Some(hashes) =>
+        if (isCanonical) {
+          heightIndexStorage.put(height, hash +: hashes)
+        } else {
+          heightIndexStorage.put(height, hashes :+ hash)
+        }
+      case None => heightIndexStorage.put(height, AVector(hash))
     }
   }
 
@@ -76,8 +82,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     math.max(getHeightUnsafe(hash), height)
   }
 
-  // TODO: make canonical hash the first hash of the same height
-  def isCanonicalUnsafe(hash: Hash): Boolean = containsUnsafe(hash)
+  def isCanonicalUnsafe(hash: Hash): Boolean = {
+    blockStateStorage.getOptUnsafe(hash).exists { state =>
+      val hashes = getHashesUnsafe(state.height)
+      hashes.head == hash // .head is safe here
+    }
+  }
 
   def contains(hash: Hash): IOResult[Boolean]      = blockStateStorage.exists(hash)
   def containsUnsafe(hash: Hash): Boolean          = blockStateStorage.existsUnsafe(hash)
@@ -92,11 +102,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def isTip(hash: Hash): Boolean = tips.contains(hash)
 
+  def getHashesUnsafe(height: Int): AVector[Hash] = {
+    heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
+  }
+
   def getHashes(height: Int): IOResult[AVector[Hash]] = {
-    heightIndexStorage.getOpt(height).map {
-      case Some(hashes) => hashes
-      case None         => AVector.empty
-    }
+    heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
   }
 
   def getBestTipUnsafe: Hash = {

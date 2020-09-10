@@ -9,7 +9,7 @@ import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.flow.setting.{DiscoverySetting, NetworkSetting}
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
@@ -21,8 +21,7 @@ object CliqueManager {
             brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting,
-      discoverySetting: DiscoverySetting): Props =
+      networkSetting: NetworkSetting): Props =
     Props(
       new CliqueManager(blockflow,
                         allHandlers,
@@ -55,8 +54,7 @@ class CliqueManager(blockflow: BlockFlow,
                     brokerManager: ActorRefT[BrokerManager.Command],
                     blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-    discoverySetting: DiscoverySetting)
+    networkSetting: NetworkSetting)
     extends BaseActor {
   import CliqueManager._
 
@@ -64,20 +62,12 @@ class CliqueManager(blockflow: BlockFlow,
 
   var selfCliqueReady: Boolean = false
 
-  override def preStart(): Unit = {
-    super.preStart()
-    require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
-    require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
-  }
-
   override def receive: Receive = awaitStart(AVector.empty) orElse isSelfCliqueSynced
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitStart(pool: ConnectionPool): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
-      discoveryServer ! DiscoveryServer.SendCliqueInfo(cliqueInfo)
-
       val intraCliqueManager =
         context.actorOf(IntraCliqueManager.props(cliqueInfo,
                                                  blockflow,
@@ -106,6 +96,8 @@ class CliqueManager(blockflow: BlockFlow,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
+      require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
+      require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)

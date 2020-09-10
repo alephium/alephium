@@ -13,7 +13,7 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 class DiscoveryServerStateSpec
@@ -39,6 +39,8 @@ class DiscoveryServerStateSpec
       def log: LoggingAdapter                       = system.log
 
       def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
+
+      override def publishNewClique(cliqueInfo: InterCliqueInfo): Unit = ()
 
       lazy val peers = AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get)
       lazy val selfCliqueInfo: CliqueInfo =

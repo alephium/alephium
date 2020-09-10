@@ -136,6 +136,56 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
   }
 
+  it should "check isCanonical" in new Fixture {
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+
+    val chain = buildBlockChain()
+    addBlocks(chain, shortChain)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+    longChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+
+    addBlocks(chain, longChain.init)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+    longChain.init.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+    chain.isCanonicalUnsafe(longChain.last.hash) is false
+
+    chain.add(longChain.last, longChain.length)
+    shortChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is false
+    }
+    longChain.foreach { block =>
+      chain.isCanonicalUnsafe(block.hash) is true
+    }
+  }
+
+  it should "check reorg" in new Fixture {
+    val longChain  = chainGenOf(3, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+
+    val chain = buildBlockChain()
+    addBlocks(chain, shortChain)
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+
+    addBlocks(chain, longChain.take(2))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+
+    addBlocks(chain, longChain.drop(2))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+  }
+
   it should "test chain diffs with two chains of blocks" in new Fixture {
     forAll(chainGenOf(4, genesis)) { longChain =>
       forAll(chainGenOf(3, genesis)) { shortChain =>

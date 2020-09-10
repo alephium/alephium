@@ -105,7 +105,10 @@ trait DiscoveryServerState {
     log.debug(s"Adding a new clique: $cliqueInfo")
     table += cliqueInfo.id -> PeerStatus.fromInfo(cliqueInfo)
     fetchNeighbors(cliqueInfo)
+    publishNewClique(cliqueInfo)
   }
+
+  def publishNewClique(cliqueInfo: InterCliqueInfo): Unit
 
   // TODO: improve scan algorithm
   def scan(): Unit = {

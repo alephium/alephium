@@ -17,7 +17,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
 
     val bindAddress = SocketUtil.temporaryServerAddress()
     val controller =
-      TestActorRef[TcpController](TcpController.props(bindAddress.getPort, brokerManager.ref))
+      TestActorRef[TcpController](TcpController.props(bindAddress, brokerManager.ref))
     val controllerActor = controller.underlyingActor
 
     controller ! TcpController.Start(bootstrapper.ref)

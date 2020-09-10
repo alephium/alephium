@@ -38,7 +38,6 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetSelfClique                               extends Command
   case object GetNeighborCliques                          extends Command
   final case class Disable(cliqueId: CliqueId)            extends Command
   case object Scan                                        extends Command
@@ -46,6 +45,7 @@ object DiscoveryServer {
 
   sealed trait Event
   final case class NeighborCliques(peers: AVector[InterCliqueInfo]) extends Event
+  final case class NewClique(info: InterCliqueInfo)                 extends Event
 }
 
 /*
@@ -122,8 +122,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       if (shouldScanFast()) scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
       else scheduleOnce(self, Scan, discoveryConfig.scanFrequency)
       ()
-    case GetSelfClique =>
-      sender() ! selfCliqueInfo
     case GetNeighborCliques =>
       sender() ! NeighborCliques(getActivePeers)
     case Disable(peerId) =>
@@ -144,4 +142,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       case Neighbors(peers) =>
         peers.foreach(tryPing)
     }
+
+  override def publishNewClique(cliqueInfo: InterCliqueInfo): Unit = {
+    publishEvent(NewClique(cliqueInfo))
+  }
 }
