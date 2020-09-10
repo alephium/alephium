@@ -14,7 +14,7 @@ import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.Hex
+import org.alephium.util.{Hex, U64}
 import org.alephium.wallet.circe.ProtocolCodecs
 
 trait BlockFlowClient {
@@ -22,7 +22,7 @@ trait BlockFlowClient {
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
-      value: Long): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
+      value: U64): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
   def sendTransaction(tx: String,
                       signature: Signature,
                       fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]]
@@ -90,7 +90,7 @@ object BlockFlowClient {
 
     def prepareTransaction(fromKey: String,
                            toAddress: Address,
-                           value: Long): Future[Either[String, CreateTransactionResult]] = {
+                           value: U64): Future[Either[String, CreateTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
         case None => Future.successful(Left(s"Cannot decode key $fromKey"))
         case Some(lockupScript) =>
@@ -139,7 +139,7 @@ object BlockFlowClient {
   final case class CreateTransaction(
       fromKey: String,
       toAddress: Address,
-      value: Long
+      value: U64
   ) extends JsonRpc {
     val method: String = "create_transaction"
   }

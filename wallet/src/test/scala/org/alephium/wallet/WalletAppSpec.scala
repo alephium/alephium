@@ -23,8 +23,8 @@ import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
-import org.alephium.wallet.api.model
 import org.alephium.wallet.api.WalletApiError
+import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfig
 
@@ -72,18 +72,18 @@ class WalletAppSpec
   val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
   val amount                   = 10
 
-  def creationJson(size: Int) = s"""{"password":"$password","mnemonicSize":$size}"""
-  val unlockJson              = s"""{"password":"$password"}"""
-  val transferJson            = s"""{"address":"$transferAddress","amount":$amount}"""
-  lazy val restoreJson        = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
+  val unlockJson                = s"""{"password":"$password"}"""
+  def transferJson(amount: Int) = s"""{"address":"$transferAddress","amount":$amount}"""
+  lazy val restoreJson          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
-  def create(size: Int) = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
-  def unlock()          = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
-  def lock()            = Post(s"/wallet/lock") ~> routes
-  def getBalance()      = Get(s"/wallet/balance") ~> routes
-  def getAddress()      = Get(s"/wallet/address") ~> routes
-  def transfer()        = Post(s"/wallet/transfer", entity(transferJson)) ~> routes
-  def restore()         = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
+  def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
+  def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
+  def lock()                = Post(s"/wallet/lock") ~> routes
+  def getBalance()          = Get(s"/wallet/balance") ~> routes
+  def getAddress()          = Get(s"/wallet/address") ~> routes
+  def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
+  def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -122,7 +122,7 @@ class WalletAppSpec
       status is StatusCodes.Unauthorized
     }
 
-    transfer() ~> check {
+    transfer(10) ~> check {
       status is StatusCodes.Unauthorized
     }
 
@@ -138,9 +138,16 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    transfer() ~> check {
+    transfer(10) ~> check {
       status is StatusCodes.OK
       responseAs[model.Transfer.Result] is model.Transfer.Result("txId")
+    }
+
+    val negAmount = -10
+    transfer(negAmount) ~> check {
+      val error = responseAs[WalletApiError]
+      error.detail is s"""Invalid value for: body (Invalid U64: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
+      status is StatusCodes.BadRequest
     }
 
     restore() ~> check {

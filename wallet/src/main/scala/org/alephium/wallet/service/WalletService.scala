@@ -9,6 +9,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.util.Hex
+import org.alephium.util.{Hex, U64}
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -27,7 +28,7 @@ trait WalletService {
   def unlockWallet(password: String): Future[Either[WalletError, Unit]]
   def getBalance(): Future[Either[WalletError, Long]]
   def getAddress(): Future[Either[WalletError, Address]]
-  def transfer(address: Address, amount: Long): Future[Either[WalletError, String]]
+  def transfer(address: Address, amount: U64): Future[Either[WalletError, String]]
 }
 
 object WalletService {
@@ -121,7 +122,7 @@ object WalletService {
         Future.successful(Right(address))
       }
 
-    def transfer(address: Address, amount: Long): Future[Either[WalletError, String]] = {
+    def transfer(address: Address, amount: U64): Future[Either[WalletError, String]] = {
       withPrivateKey { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
