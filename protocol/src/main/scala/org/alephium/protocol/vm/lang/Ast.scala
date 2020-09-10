@@ -31,20 +31,18 @@ object Ast {
     // TODO: support constants for all values
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       v match {
-        case Val.Bool(b)      => Seq(if (b) BoolConstTrue else BoolConstFalse)
-        case _: Val.Byte      => ???
-        case v: Val.I64       => Seq(ConstInstr.i64(v))
-        case v: Val.U64       => Seq(ConstInstr.u64(v))
-        case v: Val.I256      => Seq(ConstInstr.i256(v))
-        case v: Val.U256      => Seq(ConstInstr.u256(v))
-        case v: Val.Byte32    => Seq(Byte32Const(v))
-        case _: Val.BoolVec   => ???
-        case _: Val.ByteVec   => ???
-        case _: Val.I64Vec    => ???
-        case _: Val.U64Vec    => ???
-        case _: Val.I256Vec   => ???
-        case _: Val.U256Vec   => ???
-        case _: Val.Byte32Vec => ???
+        case Val.Bool(b)    => Seq(if (b) BoolConstTrue else BoolConstFalse)
+        case _: Val.Byte    => ???
+        case v: Val.I64     => Seq(ConstInstr.i64(v))
+        case v: Val.U64     => Seq(ConstInstr.u64(v))
+        case v: Val.I256    => Seq(ConstInstr.i256(v))
+        case v: Val.U256    => Seq(ConstInstr.u256(v))
+        case _: Val.BoolVec => ???
+        case v: Val.ByteVec => Seq(BytesConst(v))
+        case _: Val.I64Vec  => ???
+        case _: Val.U64Vec  => ???
+        case _: Val.I256Vec => ???
+        case _: Val.U256Vec => ???
       }
     }
   }
@@ -81,7 +79,7 @@ object Ast {
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      if (address.getType(state) != Seq(Type.Byte32)) {
+      if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       } else Seq(Type.Contract.stack(contractType))
     }

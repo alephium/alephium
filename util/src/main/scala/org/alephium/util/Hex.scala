@@ -1,5 +1,6 @@
 package org.alephium.util
 
+import scala.collection.mutable
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
@@ -14,6 +15,13 @@ object Hex {
   def from(s: String): Option[ByteString] =
     try {
       Some(unsafe(s))
+    } catch {
+      case _: Throwable => None
+    }
+
+  def asArraySeq(s: String): Option[mutable.ArraySeq[Byte]] =
+    try {
+      Some(mutable.ArraySeq.make(BHex.decode(s)))
     } catch {
       case _: Throwable => None
     }

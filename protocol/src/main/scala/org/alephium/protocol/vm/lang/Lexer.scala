@@ -5,8 +5,8 @@ import java.math.BigInteger
 import fastparse._
 import fastparse.NoWhitespace._
 
-import org.alephium.crypto.Byte32
 import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -73,17 +73,14 @@ object Lexer {
           }
       }
 
-  def byte32Internal[_: P]: P[Val] = P(hex).!.map { hexString =>
-    val byte32Opt = for {
-      hex    <- Hex.from(hexString)
-      byte32 <- Byte32.from(hex)
-    } yield byte32
-    byte32Opt match {
-      case Some(byte32) => Val.Byte32(byte32)
-      case None         => throw Compiler.Error(s"Invalid Byte32 value: $hexString")
+  def bytesInternal[_: P]: P[Val] = P(hex).!.map { hexString =>
+    val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
+    byteVecOpt match {
+      case Some(byteVec) => byteVec
+      case None          => throw Compiler.Error(s"Invalid Byte32 value: $hexString")
     }
   }
-  def byte32[_: P]: P[Val] = P("@" ~ byte32Internal)
+  def bytes[_: P]: P[Val] = P("@" ~ bytesInternal)
 
   def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
     case "true" => Val.Bool(true)

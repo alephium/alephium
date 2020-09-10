@@ -2,7 +2,7 @@ package org.alephium.serde
 
 import java.net.InetSocketAddress
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 import akka.util.ByteString
 import org.scalacheck.Gen
@@ -161,8 +161,8 @@ class SerdeSpec extends AlephiumSpec {
   "Serde for sequence" should "serde correctly" in {
     forAll { input: AVector[Byte] =>
       deserialize[AVector[Byte]](serialize(input)) isE input
-      val buffer = ArrayBuffer.from(input.toIterable)
-      deserialize[ArrayBuffer[Byte]](serialize(buffer)) isE buffer
+      val seq = mutable.ArraySeq.from(input.toIterable)
+      deserialize[mutable.ArraySeq[Byte]](serialize(seq)) isE seq
     }
   }
 
