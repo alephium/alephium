@@ -143,7 +143,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
         peers.foreach(tryPing)
     }
 
-  override def publishNewPeer(cliqueInfo: InterCliqueInfo): Unit = {
+  override def publishNewClique(cliqueInfo: InterCliqueInfo): Unit = {
     publishEvent(NewClique(cliqueInfo))
   }
 }

@@ -40,7 +40,7 @@ class DiscoveryServerStateSpec
 
       def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
 
-      override def publishNewPeer(cliqueInfo: InterCliqueInfo): Unit = ()
+      override def publishNewClique(cliqueInfo: InterCliqueInfo): Unit = ()
 
       lazy val peers = AVector.tabulate(config.brokerNum)(_ => socketAddressGen.sample.get)
       lazy val selfCliqueInfo: CliqueInfo =
