@@ -20,7 +20,8 @@ import org.alephium.wallet.service.WalletService._
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     implicit executionContext: ExecutionContext)
-    extends WalletEndpoints {
+    extends WalletEndpoints
+    with AkkaDecodeFailureHandler {
   import WalletServer.toApiError
 
   private val docs: OpenAPI = List(
