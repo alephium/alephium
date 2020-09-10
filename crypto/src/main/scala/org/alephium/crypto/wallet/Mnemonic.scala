@@ -29,8 +29,16 @@ final case class Mnemonic private (words: Seq[String]) extends AnyVal {
 }
 
 object Mnemonic {
-  val worldListSizes: Seq[Int] = Seq(12, 15, 18, 21, 24)
-  val entropySizes: Seq[Int]   = Seq(16, 20, 24, 28, 32)
+  final case class Size private (value: Int) extends AnyVal
+  object Size {
+    val list: Seq[Size] = Seq(new Size(12), new Size(15), new Size(18), new Size(21), new Size(24))
+
+    def apply(size: Int): Option[Size] =
+      Option.when(validate(size))(new Size(size))
+
+    def validate(size: Int): Boolean = list.contains(new Size(size))
+  }
+  val entropySizes: Seq[Int] = Seq(16, 20, 24, 28, 32)
 
   val pbkdf2Algorithm: String = "PBKDF2WithHmacSHA512"
   val pbkdf2Iterations: Int   = 2048
@@ -41,13 +49,11 @@ object Mnemonic {
     Source.fromInputStream(stream, "UTF-8").getLines().toSeq
   }
 
-  def generate(size: Int): Option[Mnemonic] = {
-    Option.when(worldListSizes.contains(size))(generateUnsafe(size))
-  }
+  def generate(size: Int): Option[Mnemonic] =
+    Size(size).map(generate)
 
-  def generateUnsafe(size: Int): Mnemonic = {
-    assume(worldListSizes.contains(size))
-    val typeIndex   = worldListSizes.indexOf(size)
+  def generate(size: Size): Mnemonic = {
+    val typeIndex   = Size.list.indexOf(size)
     val entropySize = entropySizes(typeIndex)
     val rawEntropy  = Array.ofDim[Byte](entropySize)
     Random.source.nextBytes(rawEntropy)
@@ -56,12 +62,7 @@ object Mnemonic {
   }
 
   protected[wallet] def validateWords(words: Seq[String]): Boolean = {
-    worldListSizes.contains(words.length) && words.forall(englishWordlist.contains)
-  }
-
-  def fromWordsUnsafe(words: Seq[String]): Mnemonic = {
-    assume(validateWords(words))
-    new Mnemonic(words)
+    Size.validate(words.length) && words.forall(englishWordlist.contains)
   }
 
   def fromWords(words: Seq[String]): Option[Mnemonic] = {
