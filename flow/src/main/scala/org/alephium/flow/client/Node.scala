@@ -56,10 +56,6 @@ object Node {
     implicit val networkSetting  = config.network
     implicit val discoveryConfig = config.discovery
 
-    networkSetting.externalAddressInferred.foreach { address =>
-      logger.info(s"The node is using this external address: $address")
-    }
-
     logConfig(logger, config)
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
@@ -103,6 +99,10 @@ object Node {
 
   def logConfig(logger: Logger, config: AlephiumConfig): Unit = {
     logger.info(s"Zeros: ${config.consensus.numZerosAtLeastInHash}")
+
+    config.network.externalAddressInferred.foreach { address =>
+      logger.info(s"The node is using this external address: $address")
+    }
   }
 
   def logGenesis(logger: Logger, genesis: AVector[AVector[Block]]): Unit = {

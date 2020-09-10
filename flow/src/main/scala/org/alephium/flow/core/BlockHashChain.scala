@@ -103,17 +103,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def isTip(hash: Hash): Boolean = tips.contains(hash)
 
   def getHashesUnsafe(height: Int): AVector[Hash] = {
-    heightIndexStorage.getOptUnsafe(height) match {
-      case Some(hashes) => hashes
-      case None         => AVector.empty
-    }
+    heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
   }
 
   def getHashes(height: Int): IOResult[AVector[Hash]] = {
-    heightIndexStorage.getOpt(height).map {
-      case Some(hashes) => hashes
-      case None         => AVector.empty
-    }
+    heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
   }
 
   def getBestTipUnsafe: Hash = {
