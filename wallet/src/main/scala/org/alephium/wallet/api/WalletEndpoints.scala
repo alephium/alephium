@@ -1,5 +1,6 @@
 package org.alephium.wallet.api
 
+import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 
@@ -10,53 +11,55 @@ import org.alephium.wallet.tapir
 
 trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Codecs {
 
-  val createWallet: Endpoint[WalletCreation, String, Mnemonic, Nothing] =
-    endpoint.post
+  private val baseEndpoint = endpoint.errorOut(
+    oneOf[WalletApiError](
+      statusMapping(StatusCode.BadRequest,
+                    jsonBody[WalletApiError.BadRequest].description("Bad request")),
+      statusMapping(StatusCode.Unauthorized,
+                    jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+    )
+  )
+
+  val createWallet: Endpoint[WalletCreation, WalletApiError, Mnemonic, Nothing] =
+    baseEndpoint.post
       .in("wallet")
       .in("create")
       .in(jsonBody[WalletCreation])
       .out(jsonBody[Mnemonic])
-      .errorOut(plainBody[String])
 
-  val restoreWallet: Endpoint[WalletRestore, String, Unit, Nothing] =
-    endpoint.post
+  val restoreWallet: Endpoint[WalletRestore, WalletApiError, Unit, Nothing] =
+    baseEndpoint.post
       .in("wallet")
       .in("restore")
       .in(jsonBody[WalletRestore])
-      .errorOut(plainBody[String])
 
-  val lockWallet: Endpoint[Unit, String, Unit, Nothing] =
-    endpoint.post
+  val lockWallet: Endpoint[Unit, WalletApiError, Unit, Nothing] =
+    baseEndpoint.post
       .in("wallet")
       .in("lock")
-      .errorOut(plainBody[String])
 
-  val unlockWallet: Endpoint[WalletUnlock, String, Unit, Nothing] =
-    endpoint.post
+  val unlockWallet: Endpoint[WalletUnlock, WalletApiError, Unit, Nothing] =
+    baseEndpoint.post
       .in("wallet")
       .in("unlock")
       .in(jsonBody[WalletUnlock])
-      .errorOut(plainBody[String])
 
-  val getBalance: Endpoint[Unit, String, Long, Nothing] =
-    endpoint.get
+  val getBalance: Endpoint[Unit, WalletApiError, Long, Nothing] =
+    baseEndpoint.get
       .in("wallet")
       .in("balance")
       .out(jsonBody[Long])
-      .errorOut(plainBody[String])
 
-  val transfer: Endpoint[Transfer, String, Transfer.Result, Nothing] =
-    endpoint.post
+  val transfer: Endpoint[Transfer, WalletApiError, Transfer.Result, Nothing] =
+    baseEndpoint.post
       .in("wallet")
       .in("transfer")
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
-      .errorOut(plainBody[String])
 
-  val getAddress: Endpoint[Unit, String, Address, Nothing] =
-    endpoint.get
+  val getAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
+    baseEndpoint.get
       .in("wallet")
       .in("address")
       .out(jsonBody[Address])
-      .errorOut(plainBody[String])
 }

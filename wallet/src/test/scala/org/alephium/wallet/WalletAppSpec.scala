@@ -108,15 +108,15 @@ class WalletAppSpec
     }
 
     getBalance() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     getAddress() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     transfer() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     unlock()
@@ -141,7 +141,7 @@ class WalletAppSpec
     }
 
     getAddress() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     unlock()
