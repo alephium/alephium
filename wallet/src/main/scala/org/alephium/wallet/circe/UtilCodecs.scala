@@ -1,4 +1,4 @@
-package org.alephium.wallet
+package org.alephium.wallet.circe
 
 import java.net.InetAddress
 
@@ -9,7 +9,7 @@ import akka.util.ByteString
 
 import org.alephium.util.Hex
 
-package object circe {
+trait UtilCodecs {
 
   private val byteStringEncoder: Encoder[ByteString] =
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))

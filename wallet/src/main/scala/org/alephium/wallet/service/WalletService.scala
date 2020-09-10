@@ -24,8 +24,8 @@ trait WalletService {
   def lockWallet(): Future[Either[String, Unit]]
   def unlockWallet(password: String): Future[Either[String, Unit]]
   def getBalance(): Future[Either[String, Long]]
-  def getAddress(): Future[Either[String, String]]
-  def transfer(address: String, amount: Long): Future[Either[String, String]]
+  def getAddress(): Future[Either[String, Address]]
+  def transfer(address: Address, amount: Long): Future[Either[String, String]]
 }
 
 object WalletService {
@@ -81,12 +81,12 @@ object WalletService {
         blockFlowClient.getBalance(address)
       }
 
-    def getAddress(): Future[Either[String, String]] =
+    def getAddress(): Future[Either[String, Address]] =
       withAddress { address =>
         Future.successful(Right(address))
       }
 
-    def transfer(address: String, amount: Long): Future[Either[String, String]] = {
+    def transfer(address: Address, amount: Long): Future[Either[String, String]] = {
       withPrivateKey { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
@@ -115,9 +115,9 @@ object WalletService {
         case Some(privateKey) => f(privateKey)
       })
 
-    private def withAddress[A](f: String => Future[Either[String, A]]): Future[Either[String, A]] =
+    private def withAddress[A](f: Address => Future[Either[String, A]]): Future[Either[String, A]] =
       withPrivateKey { privateKey =>
-        val address = Address.p2pkh(networkType, privateKey.publicKey).toBase58
+        val address = Address.p2pkh(networkType, privateKey.publicKey)
         f(address)
       }
   }

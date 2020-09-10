@@ -15,13 +15,13 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
-import org.alephium.wallet.circe.inetAddressCodec
+import org.alephium.wallet.circe.ProtocolCodecs
 
 trait BlockFlowClient {
-  def getBalance(address: String): Future[Either[String, Long]]
+  def getBalance(address: Address): Future[Either[String, Long]]
   def prepareTransaction(
       fromKey: String,
-      toAddress: String,
+      toAddress: Address,
       value: Long): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
   def sendTransaction(tx: String,
                       signature: Signature,
@@ -33,9 +33,12 @@ object BlockFlowClient {
       implicit executionContext: ExecutionContext): BlockFlowClient =
     new Impl(httpClient, address, groupNum, networkType)
 
-  private class Impl(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
-      implicit executionContext: ExecutionContext)
-      extends BlockFlowClient {
+  private class Impl(httpClient: HttpClient,
+                     address: Uri,
+                     groupNum: Int,
+                     val networkType: NetworkType)(implicit executionContext: ExecutionContext)
+      extends BlockFlowClient
+      with Codecs {
 
     implicit private val groupConfig: GroupConfig = new GroupConfig { val groups = groupNum }
     private def rpcRequest[P <: JsonRpc: Encoder](uri: Uri, jsonRpc: P): HttpRequest =
@@ -79,18 +82,14 @@ object BlockFlowClient {
         }
       }
 
-    def getBalance(address: String): Future[Either[String, Long]] =
-      Address.fromBase58(address, networkType) match {
-        case None => Future.successful(Left(s"Cannot decode $address"))
-        case Some(lockupScript) =>
-          requestFromGroup[GetBalance, Balance](
-            lockupScript.groupIndex,
-            GetBalance(address)
-          ).map(_.map(_.balance))
-      }
+    def getBalance(address: Address): Future[Either[String, Long]] =
+      requestFromGroup[GetBalance, Balance](
+        address.groupIndex,
+        GetBalance(address)
+      ).map(_.map(_.balance))
 
     def prepareTransaction(fromKey: String,
-                           toAddress: String,
+                           toAddress: Address,
                            value: Long): Future[Either[String, CreateTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
         case None => Future.successful(Left(s"Cannot decode key $fromKey"))
@@ -119,9 +118,6 @@ object BlockFlowClient {
   }
 
   final case class Result[A: Codec](result: A)
-  object Result {
-    implicit def codec[A: Codec]: Codec[Result[A]] = deriveCodec[Result[A]]
-  }
 
   sealed trait JsonRpc {
     def method: String
@@ -134,63 +130,59 @@ object BlockFlowClient {
     }
   }
 
-  final case class GetBalance(address: String) extends JsonRpc {
+  final case class GetBalance(address: Address) extends JsonRpc {
     val method: String = "get_balance"
-  }
-  object GetBalance {
-    implicit val codec: Codec[GetBalance] = deriveCodec[GetBalance]
   }
 
   final case class Balance(balance: Long, utxoNum: Int)
-  object Balance {
-    implicit val codec: Codec[Balance] = deriveCodec[Balance]
-  }
 
   final case class CreateTransaction(
       fromKey: String,
-      toAddress: String,
+      toAddress: Address,
       value: Long
   ) extends JsonRpc {
     val method: String = "create_transaction"
-  }
-  object CreateTransaction {
-    implicit val codec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
   }
 
   final case class CreateTransactionResult(unsignedTx: String,
                                            hash: String,
                                            fromGroup: Int,
                                            toGroup: Int)
-  object CreateTransactionResult {
-    implicit val codec: Codec[CreateTransactionResult] = deriveCodec[CreateTransactionResult]
-  }
 
   final case class SendTransaction(tx: String, signature: String) extends JsonRpc {
     val method: String = "send_transaction"
   }
-  object SendTransaction {
-    implicit val codec: Codec[SendTransaction] = deriveCodec[SendTransaction]
-  }
 
   final case class TxResult(txId: String, fromGroup: Int, toGroup: Int)
-  object TxResult {
-    implicit val codec: Codec[TxResult] = deriveCodec[TxResult]
-  }
+
   final case class PeerAddress(address: InetAddress, rpcPort: Option[Int], wsPort: Option[Int])
-  object PeerAddress {
-    implicit val codec: Codec[PeerAddress] = deriveCodec[PeerAddress]
-  }
 
   final case class SelfClique(peers: ArraySeq[PeerAddress], groupNumPerBroker: Int) {
     def peer(groupIndex: GroupIndex): PeerAddress =
       peers((groupIndex.value / groupNumPerBroker) % peers.length)
   }
-  object SelfClique {
-    val encoder: Encoder[SelfClique] = deriveEncoder[SelfClique]
-    val decoder: Decoder[SelfClique] =
+
+  trait Codecs extends ProtocolCodecs {
+
+    def networkType: NetworkType
+
+    implicit def resultCodec[A: Codec]: Codec[Result[A]] = deriveCodec[Result[A]]
+
+    implicit lazy val balanceCodec: Codec[Balance] = deriveCodec[Balance]
+    implicit lazy val createTransactionCodec: Codec[CreateTransaction] =
+      deriveCodec[CreateTransaction]
+    implicit lazy val createTransactionResultCodec: Codec[CreateTransactionResult] =
+      deriveCodec[CreateTransactionResult]
+    implicit lazy val getBalanceCodec: Codec[GetBalance]     = deriveCodec[GetBalance]
+    implicit lazy val peerAddressCodec: Codec[PeerAddress]   = deriveCodec[PeerAddress]
+    implicit lazy val selfCliqueEncoder: Encoder[SelfClique] = deriveEncoder[SelfClique]
+    implicit lazy val selfCliqueDecoder: Decoder[SelfClique] =
       deriveDecoder[SelfClique]
         .ensure(_.groupNumPerBroker > 0, "Non-positve groupNumPerBroker")
         .ensure(_.peers.nonEmpty, "Zero number of peers")
-    implicit val codec: Codec[SelfClique] = Codec.from(decoder, encoder)
+    implicit lazy val selfCliqueCodec: Codec[SelfClique] =
+      Codec.from(selfCliqueDecoder, selfCliqueEncoder)
+    implicit lazy val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
+    implicit lazy val txResultCodec: Codec[TxResult]               = deriveCodec[TxResult]
   }
 }

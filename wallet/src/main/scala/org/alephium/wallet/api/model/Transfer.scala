@@ -1,15 +1,9 @@
 package org.alephium.wallet.api.model
 
-import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
+import org.alephium.protocol.model.Address
 
-final case class Transfer(address: String, amount: Long)
+final case class Transfer(address: Address, amount: Long)
 
 object Transfer {
-  implicit val codec: Codec[Transfer] = deriveCodec[Transfer]
-
   final case class Result(txId: String)
-  object Result {
-    implicit val codec: Codec[Result] = deriveCodec[Result]
-  }
 }

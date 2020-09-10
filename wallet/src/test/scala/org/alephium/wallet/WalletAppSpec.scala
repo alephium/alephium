@@ -19,14 +19,17 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{NetworkType, TxGenerators}
+import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
+import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfig
 
 class WalletAppSpec
     extends AlephiumSpec
+    with ModelCodecs
     with ScalatestRouteTest
     with FailFastCirceSupport
     with ScalaFutures {
@@ -41,14 +44,15 @@ class WalletAppSpec
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = groupNum
   }
+
+  val networkType = NetworkType.Mainnet
+
   val blockFlowMock =
-    new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort)
+    new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
   val blockflowBinding = blockFlowMock.server.futureValue
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
-
-  val networkType = NetworkType.Mainnet
 
   val config = WalletConfig(
     walletPort,
@@ -64,7 +68,7 @@ class WalletAppSpec
   val password                 = Hash.generate.toHexString
   var mnemonic: model.Mnemonic = model.Mnemonic(Seq.empty)
   var address                  = ""
-  val transferAddress          = Hash.generate.toHexString
+  val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
   val amount                   = 10
 
   val creationJson     = s"""{"password":"$password"}"""
@@ -160,31 +164,15 @@ class WalletAppSpec
   }
 }
 
-object WalletAppSpec {
+object WalletAppSpec extends {
   import org.alephium.wallet.web.BlockFlowClient._
 
-  implicit val jsonRpcDecoder: Decoder[JsonRpc] = new Decoder[JsonRpc] {
-    def decode(c: HCursor, method: String, params: Json): Decoder.Result[JsonRpc] = {
-      method match {
-        case "send_transaction"   => params.as[SendTransaction]
-        case "create_transaction" => params.as[CreateTransaction]
-        case "get_balance"        => params.as[GetBalance]
-        case "self_clique"        => Right(GetSelfClique)
-        case _                    => Left(DecodingFailure(s"$method not supported", c.history))
-      }
-    }
-    final def apply(c: HCursor): Decoder.Result[JsonRpc] =
-      for {
-        method  <- c.downField("method").as[String]
-        params  <- c.downField("params").as[Json]
-        jsonRpc <- decode(c, method, params)
-      } yield jsonRpc
-  }
-
-  class BlockFlowServerMock(address: InetAddress, port: Int)(implicit val groupConfig: GroupConfig,
-                                                             system: ActorSystem)
+  class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(
+      implicit val groupConfig: GroupConfig,
+      system: ActorSystem)
       extends FailFastCirceSupport
-      with TxGenerators {
+      with TxGenerators
+      with Codecs {
 
     private val peer = PeerAddress(address, Some(port), None)
 
@@ -210,5 +198,23 @@ object WalletAppSpec {
       }
 
     val server = Http().bindAndHandle(routes, address.getHostAddress, port)
+
+    implicit val jsonRpcDecoder: Decoder[JsonRpc] = new Decoder[JsonRpc] {
+      def decode(c: HCursor, method: String, params: Json): Decoder.Result[JsonRpc] = {
+        method match {
+          case "send_transaction"   => params.as[SendTransaction]
+          case "create_transaction" => params.as[CreateTransaction]
+          case "get_balance"        => params.as[GetBalance]
+          case "self_clique"        => Right(GetSelfClique)
+          case _                    => Left(DecodingFailure(s"$method not supported", c.history))
+        }
+      }
+      final def apply(c: HCursor): Decoder.Result[JsonRpc] =
+        for {
+          method  <- c.downField("method").as[String]
+          params  <- c.downField("params").as[Json]
+          jsonRpc <- decode(c, method, params)
+        } yield jsonRpc
+    }
   }
 }

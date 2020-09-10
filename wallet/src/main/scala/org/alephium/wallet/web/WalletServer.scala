@@ -11,12 +11,14 @@ import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.protocol.model.NetworkType
 import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
 
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-class WalletServer(walletService: WalletService)(implicit executionContext: ExecutionContext)
+class WalletServer(walletService: WalletService, val networkType: NetworkType)(
+    implicit executionContext: ExecutionContext)
     extends WalletEndpoints {
 
   private val docs: OpenAPI = List(

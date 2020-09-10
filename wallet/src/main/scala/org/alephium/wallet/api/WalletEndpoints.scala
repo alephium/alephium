@@ -3,9 +3,13 @@ package org.alephium.wallet.api
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 
+import org.alephium.protocol.model.Address
 import org.alephium.wallet.api.model._
+import org.alephium.wallet.circe
+import org.alephium.wallet.tapir
 
-trait WalletEndpoints {
+trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Codecs {
+
   val createWallet: Endpoint[WalletCreation, String, Mnemonic, Nothing] =
     endpoint.post
       .in("wallet")
@@ -49,10 +53,10 @@ trait WalletEndpoints {
       .out(jsonBody[Transfer.Result])
       .errorOut(plainBody[String])
 
-  val getAddress: Endpoint[Unit, String, String, Nothing] =
+  val getAddress: Endpoint[Unit, String, Address, Nothing] =
     endpoint.get
       .in("wallet")
       .in("address")
-      .out(jsonBody[String])
+      .out(jsonBody[Address])
       .errorOut(plainBody[String])
 }

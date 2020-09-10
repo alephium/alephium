@@ -17,7 +17,7 @@ import org.alephium.crypto.AES
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.wallet.Constants
-import org.alephium.wallet.circe.byteStringCodec
+import org.alephium.wallet.circe.UtilCodecs
 
 trait SecretStorage {
   def lock(): Unit
@@ -25,7 +25,7 @@ trait SecretStorage {
   def getPrivateKey(): Option[ExtendedPrivateKey]
 }
 
-object SecretStorage {
+object SecretStorage extends UtilCodecs {
 
   def fromFile(file: File, password: String): Either[String, SecretStorage] = {
     seedFromFile(file, password).map(_ => new Impl(file))
