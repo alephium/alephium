@@ -24,6 +24,7 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
+import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfig
 
@@ -71,18 +72,18 @@ class WalletAppSpec
   val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
   val amount                   = 10
 
-  val creationJson     = s"""{"password":"$password"}"""
-  val unlockJson       = s"""{"password":"$password"}"""
-  val transferJson     = s"""{"address":"$transferAddress","amount":$amount}"""
-  lazy val restoreJson = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def creationJson(size: Int) = s"""{"password":"$password","mnemonicSize":$size}"""
+  val unlockJson              = s"""{"password":"$password"}"""
+  val transferJson            = s"""{"address":"$transferAddress","amount":$amount}"""
+  lazy val restoreJson        = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
-  def create()     = Post(s"/wallet/create", entity(creationJson)) ~> routes
-  def unlock()     = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
-  def lock()       = Post(s"/wallet/lock") ~> routes
-  def getBalance() = Get(s"/wallet/balance") ~> routes
-  def getAddress() = Get(s"/wallet/address") ~> routes
-  def transfer()   = Post(s"/wallet/transfer", entity(transferJson)) ~> routes
-  def restore()    = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
+  def create(size: Int) = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
+  def unlock()          = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
+  def lock()            = Post(s"/wallet/lock") ~> routes
+  def getBalance()      = Get(s"/wallet/balance") ~> routes
+  def getAddress()      = Get(s"/wallet/address") ~> routes
+  def transfer()        = Post(s"/wallet/transfer", entity(transferJson)) ~> routes
+  def restore()         = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -91,7 +92,13 @@ class WalletAppSpec
       status is StatusCodes.BadRequest
     }
 
-    create() ~> check {
+    create(2) ~> check {
+      val error = responseAs[WalletApiError]
+      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: DownField(mnemonicSize): {"password":"$password","mnemonicSize":2})"""
+      status is StatusCodes.BadRequest
+    }
+
+    create(24) ~> check {
       mnemonic = responseAs[model.Mnemonic]
       status is StatusCodes.OK
     }

@@ -40,7 +40,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     createWallet.toRoute { walletCreation =>
       walletService
         .createWallet(walletCreation.password,
-                      walletCreation.mnemonicSize.getOrElse(Mnemonic.worldListSizes.last),
+                      walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
                       walletCreation.mnemonicPassphrase)
         .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)).left.map(toApiError))
     } ~
@@ -79,7 +79,6 @@ object WalletServer {
     val unauthorized = Unauthorized(walletError.message)
 
     walletError match {
-      case _: InvalidMnemonicSize       => badRequest
       case _: InvalidMnemonic           => badRequest
       case _: CannotCreateEncryptedFile => badRequest
       case _: BlockFlowClientError      => badRequest

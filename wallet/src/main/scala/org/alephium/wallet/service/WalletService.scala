@@ -16,7 +16,7 @@ trait WalletService {
   import WalletService._
 
   def createWallet(password: String,
-                   mnemonicSize: Int,
+                   mnemonicSize: Mnemonic.Size,
                    mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]]
 
   def restoreWallet(password: String,
@@ -34,11 +34,6 @@ object WalletService {
 
   sealed trait WalletError {
     def message: String
-  }
-
-  final case class InvalidMnemonicSize(size: Int) extends WalletError {
-    val message: String =
-      s"Invalid mnemonic size: $size, expected: ${Mnemonic.worldListSizes.mkString(", ")}"
   }
 
   final case class InvalidMnemonic(words: String) extends WalletError {
@@ -74,11 +69,11 @@ object WalletService {
       implicit executionContext: ExecutionContext)
       extends WalletService {
     def createWallet(password: String,
-                     mnemonicSize: Int,
+                     mnemonicSize: Mnemonic.Size,
                      mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]] =
       Future.successful(
         for {
-          mnemonic <- Mnemonic.generate(mnemonicSize).toRight(InvalidMnemonicSize(mnemonicSize))
+          mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
           storage <- SecretStorage(seed, password, secretDir).left
             .map(CannotCreateEncryptedFile(secretDir, _))

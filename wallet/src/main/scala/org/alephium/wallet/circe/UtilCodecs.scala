@@ -7,6 +7,7 @@ import scala.util.Try
 import _root_.io.circe._
 import akka.util.ByteString
 
+import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.util.Hex
 
 trait UtilCodecs {
@@ -23,6 +24,17 @@ trait UtilCodecs {
   implicit val inetAddressCodec: Codec[InetAddress] = {
     codecXemap[String, InetAddress](parseInetAddress, _.getHostAddress)
   }
+
+  implicit val mnemonicSizeEncoder: Encoder[Mnemonic.Size] =
+    Encoder.encodeInt.contramap[Mnemonic.Size](_.value)
+  implicit val mnemonicSizeDecoder: Decoder[Mnemonic.Size] = Decoder.decodeInt.emap { size =>
+    Mnemonic
+      .Size(size)
+      .toRight(
+        s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}")
+  }
+  implicit val mnemonicSizeCodec: Codec[Mnemonic.Size] =
+    Codec.from(mnemonicSizeDecoder, mnemonicSizeEncoder)
 
   private def parseInetAddress(inetAddressStr: String): Either[String, InetAddress] =
     Try(InetAddress.getByName(inetAddressStr)).toEither.left.map(_.getMessage)
