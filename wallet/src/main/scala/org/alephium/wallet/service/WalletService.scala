@@ -28,6 +28,7 @@ trait WalletService {
   def getBalance(): Future[Either[WalletError, Long]]
   def getAddress(): Future[Either[WalletError, Address]]
   def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]]
+  def deriveNextAddress(): Future[Either[WalletError, Address]]
 }
 
 object WalletService {
@@ -55,6 +56,10 @@ object WalletService {
 
   case object InvalidPassword extends WalletError {
     val message: String = s"Invalid password"
+  }
+
+  case object CannotDeriveNewAddress extends WalletError {
+    val message: String = s"Cannot derive new address"
   }
 
   final case class BlockFlowClientError(message: String) extends WalletError
@@ -133,6 +138,23 @@ object WalletService {
               .sendTransaction(createTxResult.unsignedTx, signature, createTxResult.fromGroup)
               .map(_.map(_.txId))
               .map(_.left.map(BlockFlowClientError))
+        }
+      }
+    }
+
+    def deriveNextAddress(): Future[Either[WalletError, Address]] = {
+      withWallet { secretStorage =>
+        Future.successful {
+          secretStorage
+            .deriveNextKey()
+            .left
+            .map {
+              case SecretStorage.Locked          => WalletLocked: WalletError
+              case SecretStorage.CannotDeriveKey => CannotDeriveNewAddress: WalletError
+            }
+            .map { privateKey =>
+              Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
+            }
         }
       }
     }

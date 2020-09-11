@@ -84,6 +84,7 @@ class WalletAppSpec
   def getAddress()          = Get(s"/wallet/address") ~> routes
   def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
   def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
+  def deriveNextAddress()   = Post(s"/wallet/deriveNextAddress") ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -159,6 +160,11 @@ class WalletAppSpec
     }
 
     unlock()
+
+    deriveNextAddress() ~> check {
+      address = responseAs[String]
+      status is StatusCodes.OK
+    }
 
     getAddress() ~> check {
       responseAs[String] is address

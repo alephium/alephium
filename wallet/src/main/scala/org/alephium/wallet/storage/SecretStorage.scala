@@ -23,9 +23,15 @@ trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[String, Unit]
   def getPrivateKey(): Option[ExtendedPrivateKey]
+  def deriveNextKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
 }
 
 object SecretStorage extends UtilCodecs {
+
+  sealed trait SecretStorageError
+
+  case object Locked          extends SecretStorageError
+  case object CannotDeriveKey extends SecretStorageError
 
   def fromFile(file: File, password: String): Either[String, SecretStorage] = {
     seedFromFile(file, password).map(_ => new Impl(file))
@@ -53,27 +59,49 @@ object SecretStorage extends UtilCodecs {
       .map(_.getMessage)
   }
 
+  private final case class State(seed: ByteString, privateKey: ExtendedPrivateKey)
+
   private class Impl(file: File) extends SecretStorage {
 
-    private var privateKey: Option[ExtendedPrivateKey] = None
+    private var state: Option[State] = None
 
     override def lock(): Unit = {
-      privateKey = None
+      state = None
     }
 
     override def unlock(password: String): Either[String, Unit] = {
       for {
         seed <- seedFromFile(file, password)
-        priKey <- BIP32
+        privateKey <- BIP32
           .btcMasterKey(seed)
           .derive(Constants.path.toSeq)
           .toRight(s"Cannot derive key from path ${Constants.pathStr}")
       } yield {
-        privateKey = Some(priKey)
+        state = Some(State(seed, privateKey))
       }
     }
 
-    override def getPrivateKey(): Option[ExtendedPrivateKey] = privateKey
+    override def getPrivateKey(): Option[ExtendedPrivateKey] = state.map(_.privateKey)
+
+    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    override def deriveNextKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
+      state.toRight(Locked).flatMap {
+        case State(seed, privateKey) =>
+          val currentIndex = privateKey.path.last
+
+          val maybeNewPrivateKey = for {
+            parent <- BIP32.btcMasterKey(seed).derive(Constants.path.toSeq.init)
+            child  <- parent.derive(currentIndex + 1)
+          } yield child
+
+          maybeNewPrivateKey
+            .toRight(CannotDeriveKey)
+            .map { newPrivateKey =>
+              state = Some(State(seed, newPrivateKey))
+              newPrivateKey
+            }
+      }
+    }
   }
 
   private def seedFromFile(file: File, password: String): Either[String, ByteString] = {
