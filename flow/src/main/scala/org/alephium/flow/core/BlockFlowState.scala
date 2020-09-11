@@ -3,7 +3,6 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.flow.Utils
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
@@ -14,7 +13,7 @@ import org.alephium.protocol.vm._
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-trait BlockFlowState {
+trait BlockFlowState extends FlowTipsUtil {
   import BlockFlowState._
 
   implicit def brokerConfig: BrokerConfig
@@ -148,8 +147,6 @@ trait BlockFlowState {
     intraGroupChains(group.value - brokerConfig.groupFrom)
   }
 
-  def getHeaderChain(hash: Hash): BlockHeaderChain
-
   def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain
 
   protected def getHeaderChain(from: GroupIndex, to: GroupIndex): BlockHeaderChain = {
@@ -210,70 +207,6 @@ trait BlockFlowState {
     assume(brokerConfig.containsRaw(mainGroup))
     val groupShift = mainGroup - brokerConfig.groupFrom
     bestDeps(groupShift) = deps
-  }
-
-  def getBlockHeader(hash: Hash): IOResult[BlockHeader]
-
-  def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[Hash] = {
-    val index = header.chainIndex
-    if (header.isGenesis) {
-      genesisBlocks(index.from.value).map(_.hash)
-    } else {
-      if (inclusive) {
-        header.outDeps.replace(index.to.value, header.hash)
-      } else {
-        header.outDeps
-      }
-    }
-  }
-
-  def getInTip(dep: Hash, currentGroup: GroupIndex): IOResult[Hash] = {
-    getBlockHeader(dep).map { header =>
-      val from = header.chainIndex.from
-      if (header.isGenesis) genesisBlocks(from.value)(currentGroup.value).hash
-      else {
-        if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
-      }
-    }
-  }
-
-  // if inclusive is true, the current header would be included
-  def getInOutTips(header: BlockHeader,
-                   currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[Hash]] = {
-    if (header.isGenesis) {
-      val inTips = AVector.tabulate(groups - 1) { i =>
-        if (i < currentGroup.value) genesisBlocks(i)(currentGroup.value).hash
-        else genesisBlocks(i + 1)(currentGroup.value).hash
-      }
-      val outTips = genesisBlocks(currentGroup.value).map(_.hash)
-      Right(inTips ++ outTips)
-    } else {
-      val outTips = getOutTips(header, inclusive)
-      header.inDeps.mapE(getInTip(_, currentGroup)).map(_ ++ outTips)
-    }
-  }
-
-  def getInOutTips(hash: Hash,
-                   currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[Hash]] = {
-    getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup, inclusive))
-  }
-
-  def getTipsDiff(newTip: Hash, oldTip: Hash): IOResult[AVector[Hash]] = {
-    getHeaderChain(oldTip).getBlockHashesBetween(newTip, oldTip)
-  }
-
-  protected def getTipsDiffUnsafe(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
-    Utils.unsafe(getTipsDiff(newTips, oldTips))
-  }
-
-  protected def getTipsDiff(newTips: AVector[Hash],
-                            oldTips: AVector[Hash]): IOResult[AVector[Hash]] = {
-    assume(newTips.length == oldTips.length)
-    EitherF.foldTry(newTips.indices, AVector.empty[Hash]) { (acc, i) =>
-      getTipsDiff(newTips(i), oldTips(i)).map(acc ++ _)
-    }
   }
 
   protected def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
