@@ -4,15 +4,18 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.flow.core.ConflictedBlocks.GroupCache
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex, TxOutputRef}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ConflictedBlocks {
   implicit def brokerConfig: BrokerConfig
+  def consensusConfig: ConsensusSetting
 
-  lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(ConflictedBlocks.emptyCache)
+  lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
+    ConflictedBlocks.emptyCache(consensusConfig.conflictCacheKeepDuration))
 
   def getCache(block: Block): GroupCache =
     caches(block.chainIndex.from.value - brokerConfig.groupFrom)
@@ -28,7 +31,8 @@ trait ConflictedBlocks {
 }
 
 object ConflictedBlocks {
-  final case class GroupCache(blockCache: mutable.HashMap[Hash, Block],
+  final case class GroupCache(keepDuration: Duration,
+                              blockCache: mutable.HashMap[Hash, Block],
                               txCache: mutable.HashMap[TxOutputRef, ArrayBuffer[Hash]],
                               conflictedBlocks: mutable.HashMap[Hash, ArrayBuffer[Hash]]) {
     def isBlockCached(block: Block): Boolean = isBlockCached(block.hash)
@@ -54,13 +58,15 @@ object ConflictedBlocks {
 
       if (conflicts.nonEmpty) {
         conflictedBlocks += block.hash -> ArrayBuffer.from(conflicts)
-        conflicts.foreach { hash =>
+        conflicts.foreach[Unit] { hash =>
           conflictedBlocks.get(hash) match {
             case Some(conflicts) => conflicts.addOne(block.hash)
             case None            => conflictedBlocks += hash -> ArrayBuffer(block.hash)
           }
         }
       }
+
+      uncacheOldTips(keepDuration)
     }
 
     def remove(block: Block): Unit = if (isBlockCached(block)) {
@@ -77,27 +83,32 @@ object ConflictedBlocks {
         }
       }
 
-      conflictedBlocks.get(block.hash) match {
-        case Some(conflicts) =>
-          conflicts.foreach { hash =>
-            val conflicts = conflictedBlocks(hash)
-            conflicts.subtractOne(block.hash)
-            if (conflicts.isEmpty) conflictedBlocks.subtractOne(hash)
-          }
-          conflictedBlocks.subtractOne(block.hash)
-        case None => ()
+      conflictedBlocks.get(block.hash).foreach { conflicts =>
+        conflicts.foreach { hash =>
+          val conflicts = conflictedBlocks(hash)
+          conflicts.subtractOne(block.hash)
+          if (conflicts.isEmpty) conflictedBlocks.subtractOne(hash)
+        }
+        conflictedBlocks.subtractOne(block.hash)
       }
     }
 
     def isConflicted(hash: Hash, newDeps: AVector[Hash], getBlock: Hash => Block): Boolean = {
+      if (!isBlockCached(hash)) add(getBlock(hash))
       newDeps.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
       conflictedBlocks.get(hash).exists { conflicts =>
         val depsSet = newDeps.toSet
         conflicts.exists(hash => depsSet.contains(hash))
       }
     }
+
+    def uncacheOldTips(duration: Duration): Unit = {
+      val earliestTs = TimeStamp.now().minusUnsafe(duration)
+      val toRemove   = blockCache.values.filter(_.timestamp < earliestTs)
+      toRemove.foreach(block => blockCache.remove(block.hash))
+    }
   }
 
-  def emptyCache: GroupCache =
-    GroupCache(mutable.HashMap.empty, mutable.HashMap.empty, mutable.HashMap.empty)
+  def emptyCache(keepDuration: Duration): GroupCache =
+    GroupCache(keepDuration, mutable.HashMap.empty, mutable.HashMap.empty, mutable.HashMap.empty)
 }

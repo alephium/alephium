@@ -343,14 +343,6 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     def withFilter(q: A => Boolean): WithFilter = new WithFilter(elem => p(elem) && q(elem))
   }
 
-  def collect[B: ClassTag](pf: PartialFunction[A, B], sizeHint: Int = length): AVector[B] = {
-    var res = AVector.ofSize[B](sizeHint)
-    cfor(start)(_ < end, _ + 1) { i =>
-      pf.lift(elems(i)).foreach(b => res = res :+ b)
-    }
-    res
-  }
-
   def fold[B](zero: B)(f: (B, A) => B): B = {
     var res = zero
     cfor(start)(_ < end, _ + 1) { i =>

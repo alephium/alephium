@@ -47,6 +47,11 @@ final case class BlockHeader(
     blockDeps.takeRight(config.groups)
   }
 
+  def intraDep(implicit config: GroupConfig): Hash = {
+    assume(!isGenesis)
+    blockDeps.takeRight(config.groups)(chainIndex.from.value)
+  }
+
   def outTips(implicit config: GroupConfig): AVector[Hash] = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)

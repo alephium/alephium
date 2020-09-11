@@ -13,7 +13,12 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
 
-trait BlockFlow extends MultiChain with BlockFlowState with FlowUtils with ConflictedBlocks {
+trait BlockFlow
+    extends MultiChain
+    with BlockFlowState
+    with FlowUtils
+    with ConflictedBlocks
+    with BlockFlowValidation {
   def add(block: Block, weight: BigInt): IOResult[Unit] = ???
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
@@ -132,6 +137,9 @@ object BlockFlow extends StrictLogging {
       assume(index.relateTo(brokerConfig))
 
       cacheBlock(block)
+      if (brokerConfig.contains(block.chainIndex.from)) {
+        cacheForConflicts(block)
+      }
       for {
         weight <- calWeight(block)
         _      <- getBlockChain(index).add(block, weight)

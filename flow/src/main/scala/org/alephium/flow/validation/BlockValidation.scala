@@ -58,6 +58,7 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
       _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
       _ <- checkNonCoinbases(block, flow)
+      _ <- checkFlow(block, flow)
     } yield ()
   }
 
@@ -112,6 +113,15 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
         }
       }
     }
+  }
+
+  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(
+      implicit brokerConfig: BrokerConfig): BlockValidationResult[Unit] = {
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      ValidationStatus.from[InvalidBlockStatus, Boolean](blockFlow.checkFlow(block)).flatMap { ok =>
+        if (ok) validBlock(()) else invalidBlock(InvalidFlowStructure)
+      }
+    } else validBlock(())
   }
 }
 

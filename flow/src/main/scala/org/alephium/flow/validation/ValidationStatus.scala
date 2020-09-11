@@ -35,6 +35,7 @@ final case object EmptyTransactionList              extends InvalidBlockStatus
 final case object InvalidCoinbase                   extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
+final case object InvalidFlowStructure              extends InvalidBlockStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

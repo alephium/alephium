@@ -24,8 +24,8 @@ trait BlockFlowState extends FlowTipsUtil {
   private val bestDeps = Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
     val mainGroup = brokerConfig.groupFrom + fromShift
     val deps1 = AVector.tabulate(groups - 1) { i =>
-      if (i < mainGroup) genesisBlocks(i).head.hash
-      else genesisBlocks(i + 1).head.hash
+      if (i < mainGroup) genesisBlocks(i)(i).hash
+      else genesisBlocks(i + 1)(i + 1).hash
     }
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps(deps1 ++ deps2)

@@ -45,6 +45,8 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
   //scalastyle:on
+
+  val conflictCacheKeepDuration: Duration = expectedTimeSpan timesUnsafe 20
 }
 
 final case class MiningSetting(nonceStep: BigInt)

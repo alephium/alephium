@@ -5,7 +5,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Random}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Random}
 
 class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with GroupConfigFixture {
   val groups   = 3
@@ -30,7 +30,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
                  Random.nextNonZeroInt())
     }
 
-    val cache = ConflictedBlocks.emptyCache
+    val cache = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(10))
   }
 
   it should "add block into cache" in new Fixture {
@@ -109,5 +109,11 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     blocks.foreach(block => cache.isBlockCached(block) is false)
     cache.txCache.size is 0
     cache.conflictedBlocks.size is 0
+  }
+
+  it should "cache nothing when keep duration is 0" in new Fixture1 {
+    val cache0 = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(0))
+    blocks.foreach(cache0.add)
+    blocks.foreach(block => cache0.isBlockCached(block) is false)
   }
 }
