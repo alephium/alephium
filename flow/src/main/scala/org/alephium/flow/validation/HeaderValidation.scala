@@ -47,6 +47,7 @@ trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
     val headerChain = flow.getHeaderChain(header)
     for {
       _ <- checkWorkTarget(header, headerChain)
+      _ <- checkFlow(header, flow)
     } yield ()
   }
 
@@ -66,6 +67,7 @@ trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
   protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain): HeaderValidationResult[Unit]
+  protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   // format: on
 }
 
@@ -100,10 +102,7 @@ object HeaderValidation {
     protected[validation] def getParentHeader(
         blockFlow: BlockFlow,
         header: BlockHeader): HeaderValidationResult[BlockHeader] = {
-      blockFlow.getBlockHeader(header.parentHash) match {
-        case Right(parent) => validHeader(parent)
-        case Left(error)   => invalidHeader(HeaderIOError(error))
-      }
+      ValidationStatus.from(blockFlow.getBlockHeader(header.parentHash))
     }
 
     protected[validation] def checkTimeStampIncreasing(
@@ -126,20 +125,27 @@ object HeaderValidation {
     // TODO: check algorithm validatity of dependencies
     protected[validation] def checkDependencies(header: BlockHeader,
                                                 flow: BlockFlow): HeaderValidationResult[Unit] = {
-      header.blockDeps.filterNotE(flow.contains) match {
-        case Left(error) => Left(Left(error))
-        case Right(missings) =>
-          if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
+      ValidationStatus.from(header.blockDeps.filterNotE(flow.contains)).flatMap { missings =>
+        if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
       }
     }
 
     protected[validation] def checkWorkTarget(
         header: BlockHeader,
         headerChain: BlockHeaderChain): HeaderValidationResult[Unit] = {
-      headerChain.getHashTarget(header.parentHash) match {
-        case Left(error) => Left(Left(error))
-        case Right(target) =>
-          if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
+      ValidationStatus.from(headerChain.getHashTarget(header.parentHash)).flatMap { target =>
+        if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
+      }
+    }
+
+    protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(
+        implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit] = {
+      if (!brokerConfig.contains(header.chainIndex.from)) {
+        ValidationStatus.from(flow.checkFlowHeader(header)).flatMap { ok =>
+          if (ok) validHeader(()) else invalidHeader(InvalidHeaderFlow)
+        }
+      } else {
+        validHeader(())
       }
     }
   }

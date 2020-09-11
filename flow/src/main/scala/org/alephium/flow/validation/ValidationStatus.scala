@@ -29,13 +29,14 @@ final case object TooAdvancedTimeStamp              extends InvalidHeaderStatus
 final case object InvalidTimeStamp                  extends InvalidHeaderStatus
 final case object InvalidWorkAmount                 extends InvalidHeaderStatus
 final case object InvalidWorkTarget                 extends InvalidHeaderStatus
+final case object InvalidHeaderFlow                 extends InvalidHeaderStatus
 final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
 final case class HeaderIOError(e: IOError)          extends InvalidHeaderStatus
 final case object EmptyTransactionList              extends InvalidBlockStatus
 final case object InvalidCoinbase                   extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
-final case object InvalidFlowStructure              extends InvalidBlockStatus
+final case object InvalidBlockFlow                  extends InvalidBlockStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

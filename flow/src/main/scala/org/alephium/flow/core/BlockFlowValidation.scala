@@ -4,32 +4,42 @@ import scala.annotation.tailrec
 
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
   def getBlockUnsafe(hash: Hash): Block
 
-  def checkFlow(block: Block): IOResult[Boolean] = IOUtils.tryExecute(checkFlowUnsafe(block))
+  def checkFlowBlock(block: Block): IOResult[Boolean] =
+    IOUtils.tryExecute(checkFlowUnsafe(block))
+
+  def checkFlowHeader(header: BlockHeader): IOResult[Boolean] =
+    IOUtils.tryExecute(checkFlowUnsafe(header))
 
   def checkFlowUnsafe(block: Block): Boolean = {
     assume(!block.isGenesis)
 
-    checkFlowDepsUnsafe(block) && checkFlowTxsUnsafe(block)
+    checkFlowDepsUnsafe(block.header, checkTxConflicts = true) && checkFlowTxsUnsafe(block)
   }
 
-  def checkFlowDepsUnsafe(block: Block): Boolean = {
-    val targetGroup = block.chainIndex.from
-    assume(brokerConfig.contains(targetGroup))
+  def checkFlowUnsafe(header: BlockHeader): Boolean = {
+    assume(!header.isGenesis)
 
-    val blockDeps   = block.header.blockDeps
+    checkFlowDepsUnsafe(header, checkTxConflicts = false)
+  }
+
+  def checkFlowDepsUnsafe(header: BlockHeader, checkTxConflicts: Boolean): Boolean = {
+    val targetGroup = header.chainIndex.from
+    assume(!(checkTxConflicts ^ brokerConfig.contains(targetGroup)))
+
+    val blockDeps   = header.blockDeps
     val initialTips = getFlowTipsUnsafe(blockDeps.head, targetGroup)
 
     @tailrec
     def iter(currentTips: FlowTips, tips: AVector[Hash]): Option[FlowTips] = {
       if (tips.isEmpty) Some(currentTips)
       else {
-        tryMergeUnsafe(currentTips, tips.head, targetGroup) match {
+        tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts) match {
           case Some(merged) => iter(merged, tips.tail)
           case None         => None
         }

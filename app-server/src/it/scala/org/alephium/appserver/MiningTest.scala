@@ -5,8 +5,6 @@ import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
   it should "work with 2 nodes" in new TestFixture("2-nodes") {
-    val fromTs = TimeStamp.now()
-
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
@@ -41,13 +39,10 @@ class MiningTest extends AlephiumSpec {
       request[Boolean](stopMining, peer.rpcPort.get) is true
     }
 
-    request[Balance](getBalance(address), rpcPort) is
-      Balance(initialBalance.balance - (2 * transferAmount), 1)
-
-    val toTs = TimeStamp.now()
-
-    //TODO Find a better assertion
-    request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort).blocks.size should be > 16
+    eventually {
+      request[Balance](getBalance(address), rpcPort) is
+        Balance(initialBalance.balance - (2 * transferAmount), 1)
+    }
 
     server1.stop()
     server0.stop()

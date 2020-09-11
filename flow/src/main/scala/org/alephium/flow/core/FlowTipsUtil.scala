@@ -148,15 +148,17 @@ trait FlowTipsUtil {
 
   private[core] def tryMergeUnsafe(flowTips: FlowTips,
                                    tip: Hash,
-                                   targetGroup: GroupIndex): Option[FlowTips] = {
-    tryMergeUnsafe(flowTips, getLightTipsUnsafe(tip, targetGroup))
+                                   targetGroup: GroupIndex,
+                                   checkTxConflicts: Boolean): Option[FlowTips] = {
+    tryMergeUnsafe(flowTips, getLightTipsUnsafe(tip, targetGroup), checkTxConflicts)
   }
 
   private[core] def tryMergeUnsafe(flowTips: FlowTips,
-                                   newTips: FlowTips.Light): Option[FlowTips] = {
+                                   newTips: FlowTips.Light,
+                                   checkTxConflicts: Boolean): Option[FlowTips] = {
     for {
       newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
-      newOutTips <- mergeOutTips(flowTips.outTips, newTips.outTip)
+      newOutTips <- mergeOutTips(flowTips.outTips, newTips.outTip, checkTxConflicts)
     } yield FlowTips(flowTips.targetGroup, newInTips, newOutTips)
   }
 
@@ -188,13 +190,19 @@ trait FlowTipsUtil {
     mergeTips(inTips1, inTips2)
   }
 
-  private[core] def mergeOutTips(outTips: AVector[Hash], newTip: Hash): Option[AVector[Hash]] = {
+  private[core] def mergeOutTips(outTips: AVector[Hash],
+                                 newTip: Hash,
+                                 checkTxConflicts: Boolean): Option[AVector[Hash]] = {
     assume(outTips.length == groups)
     val newOutTips = getOutTipsUnsafe(newTip)
 
-    mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
-      val diffs = getTipsDiffUnsafe(mergedDeps, outTips)
-      Option.when(diffs.isEmpty || (!isConflicted(newTip, diffs, getBlockUnsafe)))(mergedDeps)
+    if (checkTxConflicts) {
+      mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
+        val diffs = getTipsDiffUnsafe(mergedDeps, outTips)
+        Option.when(diffs.isEmpty || (!isConflicted(newTip, diffs, getBlockUnsafe)))(mergedDeps)
+      }
+    } else {
+      mergeTips(outTips, newOutTips)
     }
   }
 
