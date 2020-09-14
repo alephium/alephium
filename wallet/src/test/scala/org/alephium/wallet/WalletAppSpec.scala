@@ -3,6 +3,7 @@ package org.alephium.wallet
 import java.net.InetAddress
 import java.nio.file.Files
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration._
 
 import akka.actor.ActorSystem
@@ -191,7 +192,7 @@ object WalletAppSpec {
       post {
         entity(as[JsonRpc]) {
           case GetSelfClique =>
-            complete(Result(SelfClique(Seq(peer, peer), 2)))
+            complete(Result(SelfClique(ArraySeq(peer, peer), 2)))
           case GetBalance(_) =>
             complete(Result(Balance(42, 1)))
           case CreateTransaction(_, _, _) =>
