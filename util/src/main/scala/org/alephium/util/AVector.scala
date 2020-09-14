@@ -34,9 +34,17 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     elems(start)
   }
 
+  def headOption: Option[A] = {
+    get(start)
+  }
+
   def last: A = {
     assume(nonEmpty)
     elems(end - 1)
+  }
+
+  def lastOption: Option[A] = {
+    get(end - 1)
   }
 
   def init: AVector[A] = {

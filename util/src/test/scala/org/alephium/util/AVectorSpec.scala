@@ -118,7 +118,9 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       whenever(xs.nonEmpty) {
         val vc = AVector.from(xs)
         vc.head is xs.head
+        vc.headOption is xs.headOption
         vc.last is xs.last
+        vc.lastOption is xs.lastOption
         checkEq(vc.init, xs.init)
         checkEq(vc.tail, xs.tail)
       }
