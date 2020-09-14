@@ -25,7 +25,6 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -40,19 +39,17 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig       = PatienceConfig(timeout = Span(1, Minutes))
-  lazy implicit val apiConfig                = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.chains.networkType
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
-    (Address(LockupScript.p2pkh(pubKey)).toBase58(networkType),
-     pubKey.toHexString,
-     priKey.toHexString)
+    (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3"
-  val publicKey               = "02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10"
-  val privateKey              = "bdfccc9df4df10eb2d2c6e6a28e3a037de05c92b2a0808c5284786053c0d8e89"
+  val address                 = "T1J9XcQ5FsFfihNYMzdYKXoiZBTzsHQifzu7CKQfZPbwt1"
+  val publicKey               = "02f363a2a97f4f62e387c2ef2d8e2d9e9259f2724383c2ad7a7d156ea813b7faf3"
+  val privateKey              = "39e8746b56393787e9dce167f242f37509c960c3930436fb290f0af34532ca51"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString

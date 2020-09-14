@@ -1,36 +1,27 @@
 package org.alephium.protocol.model
 
-import akka.util.ByteString
-
+import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.Base58
 
-final case class Address(lockupScript: LockupScript) extends AnyVal {
-
-  def toBase58(networkType: NetworkType): String =
-    Base58.encode(
-      LockupScript.withPrefix(serialize(lockupScript))(b => (b + networkType.prefix).toByte))
+final case class Address(networkType: NetworkType, lockupScript: LockupScript) {
+  def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
 object Address {
-  def fromBase58(input: String, networkType: NetworkType): Option[Address] = {
-    Base58
-      .decode(input)
-      .flatMap(data =>
-        deserialize[LockupScript](withPrefix(data)(b => (b - networkType.prefix).toByte)).toOption)
-      .map(Address(_))
+  def fromBase58(input: String, expected: NetworkType): Option[Address] = {
+    for {
+      (networkType, lockupScriptBase58) <- NetworkType.decode(input)
+      if networkType == expected
+      lockupScriptRaw <- Base58.decode(lockupScriptBase58)
+      lockupScript    <- deserialize[LockupScript](lockupScriptRaw).toOption
+    } yield Address(networkType, lockupScript)
   }
 
-  private def withPrefix(data: ByteString)(f: Byte => Byte): ByteString = {
-    data.headOption match {
-      case Some(prefix) =>
-        ByteString.fromArrayUnsafe(data.updated(0, f(prefix).toByte).toArray)
-      case None => data
-    }
-  }
+  def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address =
+    Address(networkType, LockupScript.p2pkh(publicKey))
 }

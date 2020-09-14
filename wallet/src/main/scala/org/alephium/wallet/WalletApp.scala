@@ -53,7 +53,6 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
     }
 }
 
-@SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Main extends App {
   implicit val system: ActorSystem                = ActorSystem("wallet-app")
   implicit val executionContext: ExecutionContext = system.dispatcher
@@ -61,9 +60,13 @@ object Main extends App {
   val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
 
   val walletConfig: WalletConfig =
-    ConfigSource.fromConfig(typesafeConfig).load[WalletConfig].toOption.get
+    ConfigSource
+      .fromConfig(typesafeConfig)
+      .load[WalletConfig]
+      .getOrElse(throw new RuntimeException(s"Cannot load wallet config"))
 
   val walletApp: WalletApp = new WalletApp(walletConfig)
+
   scala.sys.addShutdownHook(Await.result(walletApp.stop(), Duration.ofSecondsUnsafe(10).asScala))
 }
 // scalastyle:on magic.number

@@ -13,7 +13,8 @@ import pureconfig.generic.auto._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
-import org.alephium.protocol.model.{Address, Block, NetworkType}
+import org.alephium.protocol.model.{Block, NetworkType}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U64}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
@@ -93,19 +94,21 @@ final case class DiscoverySetting(
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
-final case class ChainsSetting(networkType: NetworkType, genesisBalances: AVector[(Address, U64)])
-    extends ChainsConfig
+final case class ChainsSetting(
+    networkType: NetworkType,
+    genesisBalances: AVector[(LockupScript, U64)]
+) extends ChainsConfig
 
 final case class AlephiumConfig(
+    chains: ChainsSetting,
     broker: BrokerSetting,
     consensus: ConsensusSetting,
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
-    mempool: MemPoolSetting,
-    chains: ChainsSetting
+    mempool: MemPoolSetting
 ) {
-  val genesisBlocks: AVector[AVector[Block]] =
+  lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(chains.genesisBalances)(broker, consensus)
 }
 

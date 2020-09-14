@@ -363,7 +363,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "transfer token for inter-group transactions" in {
-
     val anotherBroker = (brokerConfig.brokerId + 1 + Random.source.nextInt(
       brokerConfig.brokerNum - 1)) % brokerConfig.brokerNum
     val newConfigFixture = new AlephiumConfigFixture {

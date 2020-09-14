@@ -78,7 +78,7 @@ object Configs extends StrictLogging {
     }
   }
 
-  def loadBlockFlow(balances: AVector[(Address, U64)])(
+  def loadBlockFlow(balances: AVector[(LockupScript, U64)])(
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) {

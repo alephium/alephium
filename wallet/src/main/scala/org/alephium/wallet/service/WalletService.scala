@@ -8,7 +8,6 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -30,7 +29,6 @@ trait WalletService {
 }
 
 object WalletService {
-
   def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): WalletService =
     new Impl(blockFlowClient, secretDir, networkType)
@@ -90,7 +88,7 @@ object WalletService {
 
     def transfer(address: String, amount: Long): Future[Either[String, String]] = {
       withPrivateKey { privateKey =>
-        val pubKey = privateKey.extendedPublicKey.publicKey
+        val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(error))
           case Right(createTxResult) =>
@@ -119,8 +117,7 @@ object WalletService {
 
     private def withAddress[A](f: String => Future[Either[String, A]]): Future[Either[String, A]] =
       withPrivateKey { privateKey =>
-        val address = Address(LockupScript.p2pkh(privateKey.extendedPublicKey.publicKey))
-          .toBase58(networkType)
+        val address = Address.p2pkh(networkType, privateKey.publicKey).toBase58
         f(address)
       }
   }

@@ -17,7 +17,7 @@ import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model.{ChainIndex, NetworkType}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, Service}
@@ -31,9 +31,10 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
   import RPCServer._
   import RPCServerAbstract.FutureTry
 
-  implicit val groupConfig: GroupConfig = node.config.broker
-  implicit val networkType: NetworkType = node.config.chains.networkType
-  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
+  implicit val groupConfig: GroupConfig   = node.config.broker
+  implicit val chainsConfig: ChainsConfig = node.config.chains
+  implicit val networkType: NetworkType   = node.config.chains.networkType
+  implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 

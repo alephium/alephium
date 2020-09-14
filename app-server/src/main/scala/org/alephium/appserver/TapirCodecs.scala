@@ -12,7 +12,6 @@ import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.{TimeStamp, U64}
 
 trait TapirCodecs extends ApiModelCodec {
-
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
     Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe(_))(_.millis)
 

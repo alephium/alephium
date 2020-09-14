@@ -10,8 +10,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ChainIndex, Transaction, UnsignedTransaction}
+import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
+import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
@@ -32,7 +32,7 @@ object ServerUtils {
 
   def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] =
     for {
-      _ <- checkGroup(blockFlow, balanceRequest.address)
+      _ <- checkGroup(blockFlow, balanceRequest.address.lockupScript)
       balance <- blockFlow
         .getBalance(balanceRequest.address.lockupScript)
         .map(Balance(_))
@@ -78,7 +78,8 @@ object ServerUtils {
     }
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig,
+                                                      chainsConfig: ChainsConfig): Try[BlockEntry] =
     for {
       _ <- checkChainIndex(blockFlow, query.hash)
       block <- blockFlow
@@ -151,11 +152,11 @@ object ServerUtils {
   }
 
   def checkGroup(blockFlow: BlockFlow, publicKey: PublicKey): Try[Unit] = {
-    checkGroup(blockFlow, Address(LockupScript.p2pkh(publicKey)))
+    checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
   }
 
-  def checkGroup(blockFlow: BlockFlow, address: Address): Try[Unit] = {
-    val groupIndex = address.groupIndex(blockFlow.brokerConfig)
+  def checkGroup(blockFlow: BlockFlow, lockupScript: LockupScript): Try[Unit] = {
+    val groupIndex = lockupScript.groupIndex(blockFlow.brokerConfig)
     if (blockFlow.brokerConfig.contains(groupIndex)) Right(())
     else {
       //TODO add `address.toBase58` to message

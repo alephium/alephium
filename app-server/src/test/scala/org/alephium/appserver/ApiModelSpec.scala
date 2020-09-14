@@ -12,7 +12,6 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.CirceUtils._
 import org.alephium.util._
@@ -45,9 +44,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     Hex.toHexString(address.bytes)
   }
 
-  def generateP2pkh(): Address = {
-    Address(LockupScript.p2pkh(PublicKey.generate))
-  }
+  def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
   def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
     val json = parse(jsonRaw).toOption.get
@@ -64,7 +61,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode TimeStamp" in {
-
     checkData(TimeStamp.unsafe(0), "0")
 
     forAll(Gen.posNum[Long]) { long =>
@@ -124,16 +120,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode GetBalance" in {
-    val address    = generateP2pkh()
-    val addressStr = address.toBase58(networkType)
+    val address    = generateAddress()
+    val addressStr = address.toBase58
     val request    = GetBalance(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
   }
 
   it should "encode/decode GetGroup" in {
-    val address    = generateP2pkh()
-    val addressStr = address.toBase58(networkType)
+    val address    = generateAddress()
+    val addressStr = address.toBase58
     val request    = GetGroup(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
@@ -160,10 +156,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode CreateTransaction" in {
     val fromKey   = PublicKey.generate
     val toKey     = PublicKey.generate
-    val toAddress = Address(LockupScript.p2pkh(toKey))
+    val toAddress = Address.p2pkh(networkType, toKey)
     val transfer  = CreateTransaction(fromKey, toAddress, 1)
     val jsonRaw =
-      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58(networkType)}","value":1}"""
+      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
     checkData(transfer, jsonRaw)
   }
 

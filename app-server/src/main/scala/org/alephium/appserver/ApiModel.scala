@@ -11,7 +11,7 @@ import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.CirceUtils._
@@ -49,8 +49,10 @@ object ApiModel {
 
   final case class Output(amount: Long, createdHeight: Int, address: Address)
   object Output {
-    def from(output: TxOutput): Output =
-      Output(output.amount.v.longValue, output.createdHeight, Address(output.lockupScript))
+    def from(output: TxOutput, networkType: NetworkType): Output =
+      Output(output.amount.v.longValue,
+             output.createdHeight,
+             Address(networkType, output.lockupScript))
   }
 
   final case class Tx(
@@ -59,10 +61,11 @@ object ApiModel {
       outputs: AVector[Output]
   )
   object Tx {
-    def from(tx: Transaction): Tx = Tx(
+    def from(tx: Transaction, networkType: NetworkType): Tx = Tx(
       tx.hash.toHexString,
       tx.unsigned.inputs.map(Input.from),
-      tx.unsigned.fixedOutputs.map(Output.from) ++ tx.generatedOutputs.map(Output.from)
+      tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
+        tx.generatedOutputs.map(Output.from(_, networkType))
     )
   }
 
@@ -89,8 +92,10 @@ object ApiModel {
       )
     }
 
-    def from(block: Block, height: Int)(implicit config: GroupConfig): BlockEntry =
-      from(block.header, height).copy(transactions = Some(block.transactions.map(Tx.from)))
+    def from(block: Block, height: Int)(implicit config: GroupConfig,
+                                        chainsConfig: ChainsConfig): BlockEntry =
+      from(block.header, height)
+        .copy(transactions = Some(block.transactions.map(Tx.from(_, chainsConfig.networkType))))
 
     def from(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
       from(blockNotify.header, blockNotify.height)
@@ -113,7 +118,6 @@ object ApiModel {
   }
 
   final case class NeighborCliques(cliques: AVector[InterCliqueInfo]) extends ApiModel
-  object NeighborCliques {}
 
   final case class GetBalance(address: Address) extends ApiModel
 
@@ -133,7 +137,8 @@ object ApiModel {
       toAddress: Address,
       value: U64
   ) extends ApiModel {
-    def fromAddress: Address = Address(LockupScript.p2pkh(fromKey))
+    def fromAddress(networkType: NetworkType): Address =
+      Address(networkType, LockupScript.p2pkh(fromKey))
   }
 
   final case class CreateTransactionResult(unsignedTx: String,
@@ -200,7 +205,6 @@ object ApiModel {
         Right(new ApiKey(raw))
       }
     }
-
   }
 }
 
@@ -231,7 +235,7 @@ trait ApiModelCodec {
   implicit val hashCodec: Codec[Hash] = Codec.from(hashDecoder, hashEncoder)
 
   lazy val addressEncoder: Encoder[Address] =
-    Encoder.encodeString.contramap[Address](_.toBase58(networkType))
+    Encoder.encodeString.contramap[Address](_.toBase58)
   lazy val addressDecoder: Decoder[Address] =
     Decoder.decodeString.emap { input =>
       Address

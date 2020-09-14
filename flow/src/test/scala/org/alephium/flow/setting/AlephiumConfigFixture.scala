@@ -6,7 +6,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Env, U64}
 
@@ -39,10 +39,11 @@ trait AlephiumConfigFixture {
       .toOption
       .get
 
-    tmp.copy(
-      chains = ChainsSetting(tmp.chains.networkType,
-                             genesisKeys.map(p => (Address(LockupScript.p2pkh(p._2)), p._3))))
+    val newChains =
+      tmp.chains.copy(genesisBalances = genesisKeys.map(p => (LockupScript.p2pkh(p._2), p._3)))
+    tmp.copy(chains = newChains)
   }
+
   implicit lazy val brokerConfig     = config.broker
   implicit lazy val consensusConfig  = config.consensus
   implicit lazy val networkSetting   = config.network
