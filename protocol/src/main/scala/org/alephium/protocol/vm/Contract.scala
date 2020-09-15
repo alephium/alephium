@@ -105,7 +105,7 @@ sealed trait ContractObj[Ctx <: Context] {
                  args: AVector[Val],
                  returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
     for {
-      method <- getMethod(methodIndex).toRight(InvalidMethodIndex(methodIndex))
+      method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
     } yield Frame.build(ctx, this, method, args, returnTo)
   }

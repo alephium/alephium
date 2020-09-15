@@ -137,6 +137,18 @@ trait FlowFixture
     val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
+
+  def checkState(blockFlow: BlockFlow,
+                 chainIndex: ChainIndex,
+                 key: Hash,
+                 expected: AVector[Val]): Assertion = {
+    blockFlow
+      .getBestPersistedTrie(chainIndex.from)
+      .toOption
+      .get
+      .getContractState(key)
+      .map(_.fields) isE expected
+  }
 }
 
 trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
