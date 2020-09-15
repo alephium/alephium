@@ -86,10 +86,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
   }
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
-    P(Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
+    P(
+      Lexer.keyword("public").?.! ~ Lexer
+        .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map {
-        case (funcId, params, returnType, statement) =>
-          Ast.FuncDef(funcId, params, returnType, statement)
+        case (accessFlag, funcId, params, returnType, statement) =>
+          val isPublic = accessFlag.nonEmpty
+          Ast.FuncDef(funcId, isPublic, params, returnType, statement)
       }
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }

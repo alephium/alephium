@@ -96,10 +96,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "parse functions" in {
-    fastparse
+    val parsed0 = fastparse
       .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
              StatelessParser.func(_))
-      .isSuccess is true
+      .get
+      .value
+    parsed0.id is Ast.FuncId("add", false)
+    parsed0.isPublic is false
+    parsed0.args.size is 2
+    parsed0.rtypes is Seq(Type.U64, Type.U64)
+
+    val parsed1 = fastparse
+      .parse("public fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+             StatelessParser.func(_))
+      .get
+      .value
+    parsed1.id is Ast.FuncId("add", false)
+    parsed1.isPublic is true
+    parsed1.args.size is 2
+    parsed1.rtypes is Seq(Type.U64, Type.U64)
   }
 
   it should "parse asset script" in {

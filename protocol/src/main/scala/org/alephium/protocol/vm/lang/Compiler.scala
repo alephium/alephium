@@ -46,6 +46,7 @@ object Compiler {
 
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
+    def isPublic: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
     def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]]
@@ -64,6 +65,7 @@ object Compiler {
   final case class VarInfo(tpe: Type, isMutable: Boolean, index: Byte)
   class SimpleFunc[Ctx <: StatelessContext](
       val id: Ast.FuncId,
+      val isPublic: Boolean,
       argsType: Seq[Type],
       val returnType: Seq[Type],
       index: Byte
@@ -80,14 +82,18 @@ object Compiler {
     }
 
     override def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]] = {
-      Seq(CallExternal(index))
+      if (isPublic) Seq(CallExternal(index)) else throw Error(s"Call external private function")
     }
   }
   object SimpleFunc {
     def from[Ctx <: StatelessContext](funcs: Seq[Ast.FuncDef[Ctx]]): Seq[SimpleFunc[Ctx]] = {
       funcs.view.zipWithIndex.map {
         case (func, index) =>
-          new SimpleFunc[Ctx](func.id, func.args.map(_.tpe), func.rtypes, index.toByte)
+          new SimpleFunc[Ctx](func.id,
+                              func.isPublic,
+                              func.args.map(_.tpe),
+                              func.rtypes,
+                              index.toByte)
       }.toSeq
     }
   }

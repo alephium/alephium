@@ -7,6 +7,7 @@ import org.alephium.serde._
 import org.alephium.util.AVector
 
 final case class Method[Ctx <: Context](
+    isPublic: Boolean,
     localsType: AVector[Val.Type],
     returnType: AVector[Val.Type],
     instrs: AVector[Instr[Ctx]]
@@ -22,26 +23,19 @@ final case class Method[Ctx <: Context](
 
 object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct3(Method[StatelessContext], t => (t.localsType, t.returnType, t.instrs))
+    Serde.forProduct4(Method[StatelessContext],
+                      t => (t.isPublic, t.localsType, t.returnType, t.instrs))
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct3(Method[StatefulContext], t => (t.localsType, t.returnType, t.instrs))
+    Serde.forProduct4(Method[StatefulContext],
+                      t => (t.isPublic, t.localsType, t.returnType, t.instrs))
 
-  // TODO: make this fail based on genesis height
   def forMPT: Method[StatefulContext] =
-    Method[StatefulContext](AVector.empty, AVector.empty, AVector(Pop))
+    Method[StatefulContext](isPublic = false, AVector.empty, AVector.empty, AVector(Pop))
 }
 
 sealed trait Contract[Ctx <: Context] {
   def fields: AVector[Val.Type]
   def methods: AVector[Method[Ctx]]
-
-  def startFrame(ctx: Ctx,
-                 obj: ContractObj[Ctx],
-                 methodIndex: Int,
-                 args: AVector[Val],
-                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
-    Frame.build(ctx, obj, methodIndex, args: AVector[Val], returnTo)
-  }
 }
 
 object Contract {
@@ -64,9 +58,6 @@ final case class StatelessScript(methods: AVector[Method[StatelessContext]])
 object StatelessScript {
   implicit val serde: Serde[StatelessScript] =
     Serde.forProduct1(StatelessScript.apply, _.methods)
-
-  val failure: StatelessScript = StatelessScript(
-    AVector(Method[StatelessContext](AVector.empty, AVector.empty, AVector(Pop))))
 }
 
 final case class StatefulScript(methods: AVector[Method[StatefulContext]])
@@ -112,8 +103,11 @@ sealed trait ContractObj[Ctx <: Context] {
   def startFrame(ctx: Ctx,
                  methodIndex: Int,
                  args: AVector[Val],
-                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
-    Frame.build(ctx, this, methodIndex, args: AVector[Val], returnTo)
+                 returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+    for {
+      method <- getMethod(methodIndex).toRight(InvalidMethodIndex(methodIndex))
+      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+    } yield Frame.build(ctx, this, method, args, returnTo)
   }
 }
 

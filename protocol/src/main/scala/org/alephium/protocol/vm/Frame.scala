@@ -108,26 +108,20 @@ class Frame[Ctx <: Context](var pc: Int,
 
 object Frame {
   def build[Ctx <: Context](ctx: Ctx,
-                            obj: ScriptObj[Ctx],
-                            args: AVector[Val],
-                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] =
-    build(ctx, obj, 0, args: AVector[Val], returnTo)
-
-  def build[Ctx <: Context](ctx: Ctx,
                             obj: ContractObj[Ctx],
                             methodIndex: Int,
                             args: AVector[Val],
-                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
-    val method = obj.code.methods(methodIndex)
-    build(ctx, obj, method, args, returnTo)
+                            returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+    for {
+      method <- obj.getMethod(methodIndex).toRight(InvalidMethodIndex(methodIndex))
+    } yield build(ctx, obj, method, args, returnTo)
   }
 
-  private[Frame] def build[Ctx <: Context](
-      ctx: Ctx,
-      obj: ContractObj[Ctx],
-      method: Method[Ctx],
-      args: AVector[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
+  def build[Ctx <: Context](ctx: Ctx,
+                            obj: ContractObj[Ctx],
+                            method: Method[Ctx],
+                            args: AVector[Val],
+                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
     new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
@@ -144,6 +138,7 @@ object Frame {
         .left
         .map[ExeFailure](IOErrorLoadContract)
       method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
+      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
       args   <- frame.opStack.pop(method.localsType.length)
       _      <- method.check(args)
     } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack.push)

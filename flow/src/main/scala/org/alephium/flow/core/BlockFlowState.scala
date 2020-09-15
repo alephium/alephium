@@ -455,7 +455,8 @@ object BlockFlowState {
         StatefulVM.runTxScript(worldState, tx.hash, script) match {
           case Right(worldState)               => Right(worldState)
           case Left(IOErrorUpdateState(error)) => Left(error)
-          case _                               => throw new RuntimeException(s"Updating world state for invalid tx")
+          case Left(error) =>
+            throw new RuntimeException(s"Updating world state for invalid tx: $error")
         }
       case None => Right(worldState)
     }

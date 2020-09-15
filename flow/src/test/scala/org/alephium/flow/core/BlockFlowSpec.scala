@@ -73,7 +73,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val input0 =
       s"""
          |TxContract Foo(mut x: U64) {
-         |  fn add(a: U64) -> () {
+         |  public fn add(a: U64) -> () {
          |    x = x + a
          |    return
          |  }
@@ -94,14 +94,14 @@ class BlockFlowSpec extends AlephiumSpec {
     val input1 =
       s"""
          |TxContract Foo(mut x: U64) {
-         |  fn add(a: U64) -> () {
+         |  public fn add(a: U64) -> () {
          |    x = x + a
          |    return
          |  }
          |}
          |
          |TxScript Bar {
-         |  fn call() -> () {
+         |  public fn call() -> () {
          |    let foo = Foo(@${contractKey0.toHexString})
          |    foo.add(1)
          |    return
