@@ -24,14 +24,14 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
         val secretStorage = SecretStorage(seed, password, secretDir).toOption.get
         val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
 
-        secretStorage.getPrivateKey() is None
+        secretStorage.getPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(password) is Right(())
 
-        secretStorage.getPrivateKey() is Option(privateKey)
+        secretStorage.getPrivateKey() isE privateKey
 
         secretStorage.lock()
-        secretStorage.getPrivateKey() is None
+        secretStorage.getPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(wrongPassword).isLeft is true
     }
@@ -49,10 +49,11 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     val rawFile =
       """
       {
-        "encrypted":"27adda4459431e84d208b4f7ad9d347facc3f9483cef87a867976dd9952262af3bd6d1562e879b31fceb814212fd3fb1aa778c03ee487ced705fa8c6005a86cf57f887994db994ad2957b4955a1e092c",
-        "salt":"a65767906fed48ccb2c40f08f4c344d5bb7a912bf2eb5a726b7276b224cc50e88cdc9c0ef212d1fd5c079a57a7ff12c8a7edbdad8ccf80d1c5e32fcc32e251c9",
-        "iv":"bddac30c9be7af09a0ede16a5f4ca2c439491781275901fc2ad1e2d465c203bc635b83314b396a4b7d6385539aa10cbd6d8579c0d22a7307fa7867a41eb51adc"
+        "encrypted":"406f80e352e5830468fb4fb27c9c334b0e258496b43daae48761d335f6d75fc654b5af0c66bdaa853576ab07da3284308251619743b2dfc918f993c6141a6d652630217651d08d0324aecfe27f1d17324f6f9d1e0f9ff502",
+        "salt":"64c3552142ef024ed543a87dbc898f1f71299b8650fdadf24d101f36d6608d81500799e96c00ed04baf077a4b7ac33793e9a75ba3880f499d3507de2832d177f",
+        "iv":"d468cdbc9a706d0d53fd061595ccb1c3b2424c239e7f62d56de9d3fca6a2b4d4ab0604789f55771f7ff3eb1398f3fbb85da762b9b77a10ea80ced885c731f007"
       }
+
       """
 
     val privateKey = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
@@ -66,7 +67,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
     secretStorage.unlock(password) is Right(())
 
-    secretStorage.getPrivateKey() is Option(privateKey)
+    secretStorage.getPrivateKey() isE privateKey
   }
 
   it should "fail to load an non existing file" in {
@@ -76,7 +77,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       .fromFile(nonExistingFile, "password")
       .swap
       .toOption
-      .get is s"$fileName (No such file or directory)"
+      .get is SecretStorage.SecretFileError
   }
   secretDir.toFile.listFiles.foreach(_.deleteOnExit())
 }

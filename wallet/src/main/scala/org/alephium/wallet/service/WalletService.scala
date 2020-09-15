@@ -41,9 +41,8 @@ object WalletService {
     val message: String = s"Invalid mnemonic: $words"
   }
 
-  final case class CannotCreateEncryptedFile(directory: Path, storageMessage: String)
-      extends WalletError {
-    val message: String = s"Cannot create encrypted file at $directory ($storageMessage)"
+  final case class CannotCreateEncryptedFile(directory: Path) extends WalletError {
+    val message: String = s"Cannot create encrypted file at $directory"
   }
 
   case object NoWalletLoaded extends WalletError {
@@ -81,7 +80,7 @@ object WalletService {
           mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
           storage <- SecretStorage(seed, password, secretDir).left
-            .map(CannotCreateEncryptedFile(secretDir, _))
+            .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
           maybeSecretStorage = Option(storage)
           mnemonic
@@ -100,7 +99,7 @@ object WalletService {
                 maybeSecretStorage = Option(storage)
               }
               .left
-              .map(CannotCreateEncryptedFile(secretDir, _))
+              .map(_ => CannotCreateEncryptedFile(secretDir))
           case None =>
             Left(InvalidMnemonic(mnemonic))
         }
@@ -151,6 +150,8 @@ object WalletService {
             .map {
               case SecretStorage.Locked          => WalletLocked: WalletError
               case SecretStorage.CannotDeriveKey => CannotDeriveNewAddress: WalletError
+              case SecretStorage.SecretFileError => CannotDeriveNewAddress: WalletError
+              case _                             => CannotDeriveNewAddress: WalletError
             }
             .map { privateKey =>
               Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
@@ -169,8 +170,8 @@ object WalletService {
     private def withPrivateKey[A](
         f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
       withWallet(_.getPrivateKey() match {
-        case None             => Future.successful(Left(WalletLocked))
-        case Some(privateKey) => f(privateKey)
+        case Left(_)           => Future.successful(Left(WalletLocked))
+        case Right(privateKey) => f(privateKey)
       })
 
     private def withAddress[A](
