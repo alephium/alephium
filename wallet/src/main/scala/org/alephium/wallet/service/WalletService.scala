@@ -26,7 +26,7 @@ trait WalletService {
   def lockWallet(): Future[Either[WalletError, Unit]]
   def unlockWallet(password: String): Future[Either[WalletError, Unit]]
   def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]]
-  def getAddresses(): Future[Either[WalletError, AVector[Address]]]
+  def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]]
   def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]]
   def deriveNextAddress(): Future[Either[WalletError, Address]]
 }
@@ -119,15 +119,16 @@ object WalletService {
         Future.successful(secretStorage.unlock(password).left.map(_ => InvalidPassword)))
 
     override def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]] =
-      withAddresses { addresses =>
-        Future
-          .sequence(
-            addresses.toSeq.map(getBalance)
-          )
-          .map(AVector.from(_).mapE(identity))
+      withAddresses {
+        case (_, addresses) =>
+          Future
+            .sequence(
+              addresses.toSeq.map(getBalance)
+            )
+            .map(AVector.from(_).mapE(identity))
       }
 
-    override def getAddresses(): Future[Either[WalletError, AVector[Address]]] =
+    override def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]] =
       withAddresses { addresses =>
         Future.successful(Right(addresses))
       }
@@ -188,19 +189,22 @@ object WalletService {
         case Right(privateKey) => f(privateKey)
       })
 
-    private def withPrivateKeys[A](f: AVector[ExtendedPrivateKey] => Future[Either[WalletError, A]])
+    private def withPrivateKeys[A](
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]])
       : Future[Either[WalletError, A]] =
       withWallet(_.getAllPrivateKeys() match {
-        case Left(_)           => Future.successful(Left(WalletLocked))
-        case Right(privateKey) => f(privateKey)
+        case Left(_)            => Future.successful(Left(WalletLocked))
+        case Right(privateKeys) => f(privateKeys)
       })
 
-    private def withAddresses[A](
-        f: AVector[Address] => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withPrivateKeys { privateKeys =>
-        val addresses =
-          privateKeys.map(privateKey => Address.p2pkh(networkType, privateKey.publicKey))
-        f(addresses)
+    private def withAddresses[A](f: ((Address, AVector[Address])) => Future[Either[WalletError, A]])
+      : Future[Either[WalletError, A]] =
+      withPrivateKeys {
+        case (active, privateKeys) =>
+          val activeAddress = Address.p2pkh(networkType, active.publicKey)
+          val addresses =
+            privateKeys.map(privateKey => Address.p2pkh(networkType, privateKey.publicKey))
+          f((activeAddress, addresses))
       }
   }
 }

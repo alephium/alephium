@@ -38,6 +38,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
 
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
+  // scalastyle:off method.length
   def route: Route =
     createWallet.toRoute { walletCreation =>
       walletService
@@ -73,7 +74,12 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
           })
       } ~
       getAddresses.toRoute { _ =>
-        walletService.getAddresses().map(_.left.map(toApiError))
+        walletService
+          .getAddresses()
+          .map(_.map {
+            case (active, addresses) =>
+              model.Addresses(active, addresses)
+          }.left.map(toApiError))
       } ~
       transfer.toRoute { tr =>
         walletService

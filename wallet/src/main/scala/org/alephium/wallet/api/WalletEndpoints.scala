@@ -5,7 +5,6 @@ import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 
 import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.circe
 import org.alephium.wallet.tapir
@@ -58,11 +57,11 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
 
-  val getAddresses: Endpoint[Unit, WalletApiError, AVector[Address], Nothing] =
+  val getAddresses: Endpoint[Unit, WalletApiError, Addresses, Nothing] =
     baseEndpoint.get
       .in("wallet")
       .in("addresses")
-      .out(jsonBody[AVector[Address]])
+      .out(jsonBody[Addresses])
 
   val deriveNextAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
     baseEndpoint.post

@@ -25,7 +25,8 @@ trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.SecretStorageError, Unit]
   def getCurrentPrivateKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
-  def getAllPrivateKeys(): Either[SecretStorage.SecretStorageError, AVector[ExtendedPrivateKey]]
+  def getAllPrivateKeys()
+    : Either[SecretStorage.SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
 }
 
@@ -108,11 +109,12 @@ object SecretStorage extends UtilCodecs {
     }
 
     def getAllPrivateKeys()
-      : Either[SecretStorage.SecretStorageError, AVector[ExtendedPrivateKey]] = {
+      : Either[SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])] = {
       for {
-        state <- maybeState.toRight(Locked)
+        state  <- maybeState.toRight(Locked: SecretStorageError)
+        active <- state.privateKeys.lastOption.toRight(InvalidState)
       } yield {
-        state.privateKeys
+        (active, state.privateKeys)
       }
     }
     override def deriveNextKey(): Either[SecretStorageError, ExtendedPrivateKey] = {

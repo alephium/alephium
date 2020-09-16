@@ -65,14 +65,14 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
-  val password                    = Hash.generate.toHexString
-  var mnemonic: model.Mnemonic    = model.Mnemonic(Seq.empty)
-  var addresses: AVector[Address] = _
-  var address: Address            = _
-  val (_, transferPublicKey)      = SignatureSchema.generatePriPub()
-  val transferAddress             = Address.p2pkh(networkType, transferPublicKey).toBase58
-  val transferAmount              = 10
-  val balanceAmount               = U64.unsafe(42)
+  val password                   = Hash.generate.toHexString
+  var mnemonic: model.Mnemonic   = model.Mnemonic(Seq.empty)
+  var addresses: model.Addresses = _
+  var address: Address           = _
+  val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
+  val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
+  val transferAmount             = 10
+  val balanceAmount              = U64.unsafe(42)
 
   def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
   val unlockJson                = s"""{"password":"$password"}"""
@@ -132,8 +132,8 @@ class WalletAppSpec
     unlock()
 
     getAddresses() ~> check {
-      addresses = responseAs[AVector[Address]]
-      address   = addresses.last
+      addresses = responseAs[model.Addresses]
+      address   = addresses.activeAddress
       status is StatusCodes.OK
     }
 
@@ -168,12 +168,12 @@ class WalletAppSpec
 
     deriveNextAddress() ~> check {
       address   = responseAs[Address]
-      addresses = addresses :+ address
+      addresses = model.Addresses(address, addresses.addresses :+ address)
       status is StatusCodes.OK
     }
 
     getAddresses() ~> check {
-      responseAs[AVector[Address]] is addresses
+      responseAs[model.Addresses] is addresses
       status is StatusCodes.OK
     }
 

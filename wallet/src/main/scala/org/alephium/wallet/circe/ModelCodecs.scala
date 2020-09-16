@@ -7,6 +7,8 @@ import org.alephium.wallet.api.model._
 
 trait ModelCodecs extends ProtocolCodecs {
 
+  implicit val addressesCodec: Codec[Addresses] = deriveCodec[Addresses]
+
   implicit val addressBalanceCodec: Codec[Balances.AddressBalance] =
     deriveCodec[Balances.AddressBalance]
 
