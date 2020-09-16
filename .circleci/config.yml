@@ -1,0 +1,88 @@
+# Scala CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/sample-config/ for more details
+#
+jobs:
+  test:
+    docker:
+      - image: circleci/openjdk:11-jdk
+    resource_class: medium
+
+    working_directory: ~/repo
+
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+
+    steps:
+      - run:
+          command: |
+            sudo apt-get update
+            sudo apt-get dist-upgrade
+            sudo apt-get install python3 rng-tools haveged
+            sudo haveged
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "build.sbt" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run: cat /dev/null | ./make build
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies--{{ checksum "build.sbt" }}
+
+      # run tests!
+      - run: cat /dev/null | ps aux | grep haveged
+      - run: cat /dev/null | ./make test
+      - run: cat /dev/null | ./make ittest
+      - slack/status:
+          fail_only: false
+
+  release:
+    docker:
+      - image: circleci/openjdk:10-jdk
+
+    working_directory: ~/repo
+
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+    steps:
+      - run:
+          command: |
+            sudo apt-get update
+            sudo apt-get dist-upgrade
+            sudo apt-get install python3
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "build.sbt" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run: cat /dev/null | git clone git@github.com:alephium/alephium-gpg-keys.git
+      - run: cat /dev/null | sbt publishLocal
+
+orbs:
+  slack: circleci/slack@3.4.2
+version: 2.1
+workflows:
+  integration:
+    jobs:
+      - test
+      - release:
+          requires:
+            - test
+          filters:
+            branches:
+              only: master
