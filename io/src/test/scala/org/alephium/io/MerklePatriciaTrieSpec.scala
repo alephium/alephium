@@ -163,11 +163,13 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
 
     keys.map { key =>
       trie.getOptRaw(key).map(_.nonEmpty) isE true
+      trie.existRaw(key) isE true
     }
 
     keys.map { key =>
       trie = trie.removeRaw(key).toOption.get
       trie.getOptRaw(key).map(_.isEmpty) isE true
+      trie.existRaw(key) isE false
     }
 
     trie.rootHash is genesisNode.hash

@@ -4,11 +4,11 @@ import java.util.InputMismatchException
 
 import akka.util.ByteString
 
-import org.alephium.io.{IOError, IOResult, KeyValueStorage, MerklePatriciaTrie}
+import org.alephium.io._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.serde.Serde
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.AVector
 
 sealed abstract class WorldState {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
@@ -53,9 +53,10 @@ sealed abstract class WorldState {
 }
 
 object WorldState {
-  final case class Persisted(outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
-                             contractState: MerklePatriciaTrie[Hash, ContractState])
-      extends WorldState {
+  final case class Persisted(
+      outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
+      contractState: MerklePatriciaTrie[Hash, ContractState]
+  ) extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
     }
@@ -104,77 +105,62 @@ object WorldState {
 
     override def persist: IOResult[WorldState.Persisted] = Right(this)
 
+    def cached: WorldState.Cached = {
+      val outputStateCache    = CachedTrie.from(outputState)
+      val contractOutputCache = CachedTrie.from(contractState)
+      Cached(outputStateCache, contractOutputCache)
+    }
+
     def toHashes: WorldState.Hashes =
       WorldState.Hashes(outputState.rootHash, contractState.rootHash)
   }
 
-  /**
-    * TODO: add cache for initialState; and make this mutable for performance
-    *
-    * @param initialState the initial persisted WorldState
-    * @param outputStateDeletes the outputs to be deleted from the persisted WorldState
-    *                           all the outputs should exist in the persisted WorldState
-    * @param outputStateAdditions the outputs to be added into the persisted WorldState
-    * @param contractStateChanges the outputs to be updated for the persisted WorldState
-    *                             there might be new contracts
-    */
-  final case class Cached(initialState: Persisted,
-                          outputStateDeletes: Set[TxOutputRef],
-                          outputStateAdditions: Map[TxOutputRef, TxOutput],
-                          contractStateChanges: Map[Hash, ContractState])
-      extends WorldState {
+  final case class Cached(
+      outputState: CachedTrie[TxOutputRef, TxOutput],
+      contractState: CachedTrie[Hash, ContractState]
+  ) extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
-      if (outputStateAdditions.contains(outputRef)) Right(outputStateAdditions(outputRef))
-      else if (outputStateDeletes.contains(outputRef)) Left(IOError.KeyNotFound(outputRef))
-      else initialState.getOutput(outputRef)
+      outputState.get(outputRef)
     }
 
     override protected[vm] def getContractState(key: Hash): IOResult[ContractState] = {
-      contractStateChanges.get(key) match {
-        case Some(state) => Right(state)
-        case None        => initialState.getContractState(key)
-      }
+      contractState.get(key)
     }
 
     override def addAsset(outputRef: AssetOutputRef, output: AssetOutput): IOResult[Cached] = {
-      Right(this.copy(outputStateAdditions = outputStateAdditions + (outputRef -> output)))
+      outputState.put(outputRef, output).map(_ => this)
     }
 
     override def addContract(outputRef: ContractOutputRef,
                              output: ContractOutput,
                              fields: AVector[Val]): IOResult[WorldState] = {
       val state = ContractState(outputRef.hint, fields)
-      Right(
-        this.copy(outputStateAdditions = outputStateAdditions + (outputRef     -> output),
-                  contractStateChanges = contractStateChanges + (outputRef.key -> state)))
+      for {
+        _ <- outputState.put(outputRef, output)
+        _ <- contractState.put(outputRef.key, state)
+      } yield this
     }
 
     override def updateContract(key: Hash, state: ContractState): IOResult[Cached] = {
-      Right(this.copy(contractStateChanges = contractStateChanges + (key -> state)))
+      contractState.put(key, state).map(_ => this)
     }
 
-    // Note: we don't check if the output exist. This is fine as we only use it to remove validated tx input
     override def remove(outputRef: TxOutputRef): IOResult[Cached] = {
-      if (outputStateAdditions.contains(outputRef)) {
-        Right(this.copy(outputStateAdditions = outputStateAdditions - outputRef))
+      if (outputRef.isAssetType) {
+        outputState.remove(outputRef).map(_ => this)
       } else {
-        Right(this.copy(outputStateDeletes = outputStateDeletes + outputRef))
+        for {
+          _ <- outputState.remove(outputRef)
+          _ <- contractState.remove(outputRef.key)
+        } yield this
       }
     }
 
     override def persist: IOResult[Persisted] = {
       for {
-        state0 <- EitherF.foldTry(contractStateChanges, initialState) {
-          case (worldState, (key, contractState)) =>
-            worldState.updateContract(key, contractState)
-        }
-        state1 <- EitherF.foldTry(outputStateDeletes, state0) {
-          case (worldState, outputRef) => worldState.remove(outputRef)
-        }
-        state2 <- EitherF.foldTry(outputStateAdditions, state1) {
-          case (worldState, (outputRef, output)) => worldState.putOutput(outputRef, output)
-        }
-      } yield state2
+        outputStateNew   <- outputState.persist()
+        contractStateNew <- contractState.persist()
+      } yield Persisted(outputStateNew, contractStateNew)
     }
   }
 
@@ -188,8 +174,7 @@ object WorldState {
   }
 
   def emptyCached(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
-    val persisted = emptyPersisted(storage)
-    Cached(persisted, Set.empty, Map.empty, Map.empty)
+    emptyPersisted(storage).cached
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash) {
@@ -202,7 +187,7 @@ object WorldState {
 
     def toCachedWorldState(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
       val initialState = toPersistedWorldState(storage)
-      Cached(initialState, Set.empty, Map.empty, Map.empty)
+      initialState.cached
     }
   }
   object Hashes {

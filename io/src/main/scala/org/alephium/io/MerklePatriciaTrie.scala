@@ -251,6 +251,14 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
 
   def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
 
+  def exist(key: K): IOResult[Boolean] = {
+    existRaw(serialize[K](key))
+  }
+
+  def existRaw(key: ByteString): IOResult[Boolean] = {
+    getOptRaw(key).map(_.nonEmpty)
+  }
+
   def remove(key: K): IOResult[MerklePatriciaTrie[K, V]] = {
     removeRaw(serialize[K](key))
   }
