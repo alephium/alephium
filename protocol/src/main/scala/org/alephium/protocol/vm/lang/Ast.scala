@@ -3,6 +3,7 @@ package org.alephium.protocol.vm.lang
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.util.AVector
 
+// scalastyle:off number.of.methods
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -96,16 +97,40 @@ object Ast {
       args.flatMap(_.genCode(state)) ++ state.getFunc(id).genCode(args.flatMap(_.getType(state)))
     }
   }
-  final case class ContractCallExpr(objId: Ident, callId: FuncId, args: Seq[Expr[StatefulContext]])
-      extends Expr[StatefulContext] {
-    override protected def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
-      val funcInfo = state.getFunc(objId, callId)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
-    }
 
+  trait ContractCallBase {
+    def obj: Expr[StatefulContext]
+    def callId: FuncId
+    def args: Seq[Expr[StatefulContext]]
+
+    def _getTypeBase(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      val objType = obj.getType(state)
+      if (objType.length != 1) {
+        throw Compiler.Error(s"Expect single type from $obj")
+      } else {
+        objType(0) match {
+          case contract: Type.Contract =>
+            val funcInfo = state.getFunc(contract.id, callId)
+            funcInfo.getReturnType(args.flatMap(_.getType(state)))
+          case _ =>
+            throw Compiler.Error(s"Expect contract for $callId of $obj")
+        }
+      }
+    }
+  }
+  final case class ContractCallExpr(obj: Expr[StatefulContext],
+                                    callId: FuncId,
+                                    args: Seq[Expr[StatefulContext]])
+      extends Expr[StatefulContext]
+      with ContractCallBase {
+    override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] =
+      _getTypeBase(state)
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      args.flatMap(_.genCode(state)) ++ Seq(LoadLocal(state.getVariable(objId).index)) ++
-        state.getFunc(objId, callId).genCode(objId)
+      val contract = obj.getType(state)(0).asInstanceOf[Type.Contract]
+      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+        state.getFunc(contract.id, callId).genExternalCallCode(contract.id)
     }
   }
   final case class ParenExpr[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Expr[Ctx] {
@@ -192,20 +217,25 @@ object Ast {
       args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
-  final case class ContractCall(objId: Ident, callId: FuncId, args: Seq[Expr[StatefulContext]])
-      extends Statement[StatefulContext] {
+  final case class ContractCall(obj: Expr[StatefulContext],
+                                callId: FuncId,
+                                args: Seq[Expr[StatefulContext]])
+      extends Statement[StatefulContext]
+      with ContractCallBase {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
-      val funcInfo = state.getFunc(objId, callId)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      _getTypeBase(state)
       ()
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val func       = state.getFunc(objId, callId)
+      val contract   = obj.getType(state)(0).asInstanceOf[Type.Contract]
+      val func       = state.getFunc(contract.id, callId)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ Seq(LoadLocal(state.getVariable(objId).index)) ++
-        func.genCode(objId) ++ Seq.fill[Instr[StatefulContext]](returnType.length)(Pop)
+      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+        func.genExternalCallCode(contract.id) ++
+        Seq.fill[Instr[StatefulContext]](returnType.length)(Pop)
     }
   }
   final case class IfElse[Ctx <: StatelessContext](condition: Expr[Ctx],

@@ -141,13 +141,14 @@ object StatefulParser extends Parser[StatefulContext] {
   def atom[_: P]: P[Ast.Expr[StatefulContext]] =
     P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
 
-  def contractCallExpr[_: P]: P[Ast.ContractCallExpr] = P(Lexer.ident ~ "." ~ callAbs).map {
-    case (objId, (callId, exprs)) => Ast.ContractCallExpr(objId, callId, exprs)
-  }
+  def contractCallExpr[_: P]: P[Ast.ContractCallExpr] =
+    P((contractConv | variable) ~ "." ~ callAbs).map {
+      case (obj, (callId, exprs)) => Ast.ContractCallExpr(obj, callId, exprs)
+    }
 
   def contractCall[_: P]: P[Ast.ContractCall] =
-    P(Lexer.ident ~ "." ~ callAbs)
-      .map { case (objId, (callId, exprs)) => Ast.ContractCall(objId, callId, exprs) }
+    P((contractConv | variable) ~ "." ~ callAbs)
+      .map { case (obj, (callId, exprs)) => Ast.ContractCall(obj, callId, exprs) }
 
   def statement[_: P]: P[Ast.Statement[StatefulContext]] =
     P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)

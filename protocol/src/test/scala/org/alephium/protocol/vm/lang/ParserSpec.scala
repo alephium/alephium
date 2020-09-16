@@ -1,7 +1,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.crypto.Byte32
-import org.alephium.protocol.vm.{StatelessContext, Val}
+import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.util.{AlephiumSpec, Hex, I256, I64, U256, U64}
 
 class ParserSpec extends AlephiumSpec {
@@ -71,6 +71,18 @@ class ParserSpec extends AlephiumSpec {
                  List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
         CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
+    fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        Variable(Ident("x")),
+        FuncId("bar", false),
+        List(Variable(Ident("x")))
+      )
+    fastparse.parse("Foo(x).bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
+        FuncId("bar", false),
+        List(Variable(Ident("x")))
+      )
   }
 
   it should "parse return" in {
@@ -85,6 +97,7 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
+    fastparse.parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true

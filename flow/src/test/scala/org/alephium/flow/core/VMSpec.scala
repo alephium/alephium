@@ -1,6 +1,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{ChainIndex, ContractOutputRef, TxOutputRef}
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.lang.Compiler
@@ -46,6 +47,7 @@ class VMSpec extends AlephiumSpec {
       mine(blockFlow, chainIndex, outputScriptOption = Some(script0 -> initialState))
     lazy val contractOutputRef0 = TxOutputRef.unsafe(block0.transactions.head, 0)
     lazy val contractKey0       = contractOutputRef0.key
+
     lazy val input1 =
       s"""
          |TxContract Foo(mut x: U64) {
@@ -97,5 +99,96 @@ class VMSpec extends AlephiumSpec {
     val block2    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block2, 3)
     checkState(blockFlow, chainIndex, contractKey0, newState2)
+  }
+
+  it should "use latest worldstate when call external functions" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    def createContract(input: String): Hash = {
+      val script       = Compiler.compileContract(input).toOption.get
+      val initialState = AVector[Val](Val.U64(U64.Zero))
+
+      val block =
+        mine(blockFlow, chainIndex, outputScriptOption = Some(script -> initialState))
+      val contractOutputRef = TxOutputRef.unsafe(block.transactions.head, 0)
+      val contractKey       = contractOutputRef.key
+
+      contractOutputRef is a[ContractOutputRef]
+      blockFlow.add(block).isRight is true
+      checkState(blockFlow, chainIndex, contractKey, initialState)
+      contractKey
+    }
+
+    val input0 =
+      s"""
+         |TxContract Foo(mut x: U64) {
+         |  pub fn get() -> (U64) {
+         |    return x
+         |  }
+         |  
+         |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
+         |    x = x + 10
+         |    x = Bar(bar).bar(foo)
+         |    return
+         |  }
+         |}
+         |
+         |TxContract Bar(mut x: U64) {
+         |  pub fn bar(foo: ByteVec) -> (U64) {
+         |    return Foo(foo).get() + 100
+         |  }
+         |}
+         |""".stripMargin
+    val contractKey0 = createContract(input0)
+
+    val input1 =
+      s"""
+         |TxContract Bar(mut x: U64) {
+         |  pub fn bar(foo: ByteVec) -> (U64) {
+         |    return Foo(foo).get() + 100
+         |  }
+         |}
+         |
+         |TxContract Foo(mut x: U64) {
+         |  pub fn get() -> (U64) {
+         |    return x
+         |  }
+         |  
+         |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
+         |    x = x + 10
+         |    x = Bar(bar).bar(foo)
+         |    return
+         |  }
+         |}
+         |
+         |""".stripMargin
+    val contractKey1 = createContract(input1)
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(@${contractKey0.toHexString})
+         |    foo.foo(@${contractKey0.toHexString}, @${contractKey1.toHexString})
+         |  }
+         |}
+         |
+         |TxContract Foo(mut x: U64) {
+         |  pub fn get() -> (U64) {
+         |    return x
+         |  }
+         |  
+         |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
+         |    x = x + 10
+         |    x = Bar(bar).bar(foo)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val script   = Compiler.compileTxScript(main).toOption.get
+    val newState = AVector[Val](Val.U64(U64.unsafe(110)))
+    val block    = mine(blockFlow, chainIndex, txScriptOption = Some(script))
+    blockFlow.add(block).isRight is true
+    checkState(blockFlow, chainIndex, contractKey0, newState)
   }
 }

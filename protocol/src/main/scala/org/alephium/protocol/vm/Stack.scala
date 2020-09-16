@@ -77,8 +77,9 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
   }
 
   def pop(n: Int): ExeResult[AVector[T]] = {
-    assume(n > 0)
-    if (n <= size) {
+    if (n == 0) {
+      Right(AVector.ofSize(0))
+    } else if (n <= size) {
       val start = currentIndex - n
       val elems = AVector.tabulate(n) { k =>
         underlying(start + k)
