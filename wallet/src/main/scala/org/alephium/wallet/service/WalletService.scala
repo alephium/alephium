@@ -29,6 +29,7 @@ trait WalletService {
   def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]]
   def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]]
   def deriveNextAddress(): Future[Either[WalletError, Address]]
+  def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]]
 }
 
 object WalletService {
@@ -43,6 +44,10 @@ object WalletService {
 
   final case class CannotCreateEncryptedFile(directory: Path) extends WalletError {
     val message: String = s"Cannot create encrypted file at $directory"
+  }
+
+  final case class UnknownAddress(address: Address) extends WalletError {
+    val message: String = s"Unknown address: ${address.toBase58}"
   }
 
   case object NoWalletLoaded extends WalletError {
@@ -163,6 +168,21 @@ object WalletService {
             }
             .map { privateKey =>
               Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
+            }
+        }
+      }
+    }
+
+    override def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]] = {
+      withWallet { secretStorage =>
+        withPrivateKeys {
+          case (_, privateKeys) =>
+            Future.successful {
+              (for {
+                privateKey <- privateKeys.find(privateKey =>
+                  Address.p2pkh(networkType, privateKey.publicKey) == address)
+                _ <- secretStorage.changeActiveKey(privateKey).toOption
+              } yield (())).toRight(UnknownAddress(address): WalletError)
             }
         }
       }

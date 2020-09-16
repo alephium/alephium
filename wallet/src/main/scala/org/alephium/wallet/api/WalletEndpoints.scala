@@ -68,4 +68,11 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in("wallet")
       .in("deriveNextAddress")
       .out(jsonBody[Address])
+
+  val changeActiveAddress: Endpoint[ChangeActiveAddress, WalletApiError, Unit, Nothing] =
+    baseEndpoint.post
+      .in("wallet")
+      .in("changeActiveAddress")
+      .in(jsonBody[ChangeActiveAddress])
+
 }

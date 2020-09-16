@@ -74,10 +74,11 @@ class WalletAppSpec
   val transferAmount             = 10
   val balanceAmount              = U64.unsafe(42)
 
-  def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
-  val unlockJson                = s"""{"password":"$password"}"""
-  def transferJson(amount: Int) = s"""{"address":"$transferAddress","amount":$amount}"""
-  lazy val restoreJson          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def creationJson(size: Int)                   = s"""{"password":"$password","mnemonicSize":$size}"""
+  val unlockJson                                = s"""{"password":"$password"}"""
+  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
+  def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
+  lazy val restoreJson                          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
   def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
   def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
@@ -87,6 +88,8 @@ class WalletAppSpec
   def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
   def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
   def deriveNextAddress()   = Post(s"/wallet/deriveNextAddress") ~> routes
+  def changeActiveAddress(address: Address) =
+    Post(s"/wallet/changeActiveAddress", entity(changeActiveAddressJson(address))) ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -172,6 +175,17 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
+    getAddresses() ~> check {
+      responseAs[model.Addresses] is addresses
+      status is StatusCodes.OK
+    }
+
+    address   = addresses.addresses.head
+    addresses = addresses.copy(activeAddress = address)
+
+    changeActiveAddress(address) ~> check {
+      status is StatusCodes.OK
+    }
     getAddresses() ~> check {
       responseAs[model.Addresses] is addresses
       status is StatusCodes.OK

@@ -33,7 +33,8 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     getBalances,
     transfer,
     getAddresses,
-    deriveNextAddress
+    deriveNextAddress,
+    changeActiveAddress
   ).toOpenAPI("Alephium Wallet", "1.0")
 
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
@@ -91,6 +92,11 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
           .deriveNextAddress()
           .map(_.left.map(toApiError))
       } ~
+      changeActiveAddress.toRoute { change =>
+        walletService
+          .changeActiveAddress(change.address)
+          .map(_.left.map(toApiError))
+      } ~
       swaggerUIRoute
 }
 
@@ -105,6 +111,7 @@ object WalletServer {
       case _: InvalidMnemonic           => badRequest
       case _: CannotCreateEncryptedFile => badRequest
       case _: BlockFlowClientError      => badRequest
+      case _: UnknownAddress            => badRequest
       case NoWalletLoaded               => badRequest
       case CannotDeriveNewAddress       => badRequest
 

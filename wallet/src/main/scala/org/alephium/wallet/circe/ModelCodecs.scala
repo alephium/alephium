@@ -14,6 +14,9 @@ trait ModelCodecs extends ProtocolCodecs {
 
   implicit val balancesCodec: Codec[Balances] = deriveCodec[Balances]
 
+  implicit val changeActiveAddressCodec: Codec[ChangeActiveAddress] =
+    deriveCodec[ChangeActiveAddress]
+
   implicit val transferCodec: Codec[Transfer] = deriveCodec[Transfer]
 
   implicit val transferResultCodec: Codec[Transfer.Result] = deriveCodec[Transfer.Result]

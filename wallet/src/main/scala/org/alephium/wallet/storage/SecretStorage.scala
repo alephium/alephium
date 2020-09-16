@@ -28,6 +28,7 @@ trait SecretStorage {
   def getAllPrivateKeys()
     : Either[SecretStorage.SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
+  def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.SecretStorageError, Unit]
 }
 
 object SecretStorage extends UtilCodecs {
@@ -41,16 +42,19 @@ object SecretStorage extends UtilCodecs {
   case object InvalidState        extends SecretStorageError
   case object SecretDirError      extends SecretStorageError
   case object SecretFileError     extends SecretStorageError
+  case object UnknownKey          extends SecretStorageError
 
-  final case class StoredState(seed: ByteString, numberOfAddresses: Int)
+  final case class StoredState(seed: ByteString, numberOfAddresses: Int, activeAddressIndex: Int)
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
-      Serde.forProduct2(apply, state => (state.seed, state.numberOfAddresses))
+      Serde.forProduct3(apply,
+                        state => (state.seed, state.numberOfAddresses, state.activeAddressIndex))
   }
 
   private final case class State(seed: ByteString,
                                  password: String,
+                                 activeKey: ExtendedPrivateKey,
                                  privateKeys: AVector[ExtendedPrivateKey])
 
   implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
@@ -75,7 +79,9 @@ object SecretStorage extends UtilCodecs {
     } else {
       for {
         _ <- Try(Files.createDirectories(secretDir)).toEither.left.map(_ => SecretDirError)
-        _ <- storeStateToFile(file, StoredState(seed, numberOfAddresses = 1), password)
+        _ <- storeStateToFile(file,
+                              StoredState(seed, numberOfAddresses = 1, activeAddressIndex = 0),
+                              password)
       } yield {
         new Impl(file)
       }
@@ -101,32 +107,47 @@ object SecretStorage extends UtilCodecs {
 
     override def getCurrentPrivateKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
       for {
-        state      <- maybeState.toRight(Locked: SecretStorageError)
-        privateKey <- state.privateKeys.lastOption.toRight(InvalidState: SecretStorageError)
+        state <- maybeState.toRight(Locked: SecretStorageError)
       } yield {
-        privateKey
+        state.activeKey
       }
     }
 
     def getAllPrivateKeys()
       : Either[SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])] = {
       for {
-        state  <- maybeState.toRight(Locked: SecretStorageError)
-        active <- state.privateKeys.lastOption.toRight(InvalidState)
+        state <- maybeState.toRight(Locked: SecretStorageError)
       } yield {
-        (active, state.privateKeys)
+        (state.activeKey, state.privateKeys)
       }
     }
     override def deriveNextKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
       for {
-        state             <- maybeState.toRight(Locked)
-        currentPrivateKey <- state.privateKeys.lastOption.toRight(InvalidState)
-        newPrivateKey     <- deriveNextPrivateKey(state.seed, currentPrivateKey)
+        state         <- maybeState.toRight(Locked)
+        latestKey     <- state.privateKeys.lastOption.toRight(InvalidState)
+        newPrivateKey <- deriveNextPrivateKey(state.seed, latestKey)
         keys = state.privateKeys :+ newPrivateKey
-        _ <- storeStateToFile(file, StoredState(state.seed, keys.length), state.password)
+        _ <- storeStateToFile(file,
+                              StoredState(state.seed, keys.length, keys.length - 1),
+                              state.password)
       } yield {
-        maybeState = Some(State(state.seed, state.password, keys))
+        maybeState = Some(State(state.seed, state.password, newPrivateKey, keys))
         newPrivateKey
+      }
+    }
+
+    override def changeActiveKey(
+        key: ExtendedPrivateKey): Either[SecretStorage.SecretStorageError, Unit] = {
+      for {
+        state <- maybeState.toRight(Locked)
+        index = state.privateKeys.indexWhere(_.privateKey == key.privateKey)
+        _ <- Either.cond(index >= 0, (), UnknownKey)
+        _ <- storeStateToFile(file,
+                              StoredState(state.seed, state.privateKeys.length, index),
+                              state.password)
+      } yield {
+        maybeState = Some(state.copy(activeKey = key))
+        ()
       }
     }
   }
@@ -139,8 +160,9 @@ object SecretStorage extends UtilCodecs {
         stateBytes  <- AES.decrypt(encrypted, password).toEither.left.map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses)
+        active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
-        State(state.seed, password, privateKeys)
+        State(state.seed, password, active, privateKeys)
       }
     }.toEither.left.map(_ => SecretFileError).flatten
   }
