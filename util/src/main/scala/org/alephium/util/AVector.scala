@@ -455,6 +455,14 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(arr)
   }
 
+  def find(f: A => Boolean): Option[A] = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      if (f(elem)) return Some(elem)
+    }
+    None
+  }
+
   def indexWhere(f: A => Boolean): Int = {
     cfor(start)(_ < end, _ + 1) { i =>
       if (f(elems(i))) return i - start

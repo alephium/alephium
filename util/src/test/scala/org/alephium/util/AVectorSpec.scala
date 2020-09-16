@@ -331,11 +331,22 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "find" in new Fixture {
+    forAll(vectorGen) { vc =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.find(_ equals elem) is arr.find(_ equals elem)
+        vc.find(_ => false) is arr.find(_ => false)
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
         vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
+        vc.indexWhere(_ => false) is arr.indexWhere(_ => false)
       }
     }
   }
