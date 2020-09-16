@@ -24,7 +24,8 @@ import org.alephium.wallet.circe.UtilCodecs
 trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.SecretStorageError, Unit]
-  def getPrivateKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
+  def getCurrentPrivateKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
+  def getAllPrivateKeys(): Either[SecretStorage.SecretStorageError, AVector[ExtendedPrivateKey]]
   def deriveNextKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
 }
 
@@ -97,7 +98,7 @@ object SecretStorage extends UtilCodecs {
       }
     }
 
-    override def getPrivateKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
+    override def getCurrentPrivateKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
       for {
         state      <- maybeState.toRight(Locked: SecretStorageError)
         privateKey <- state.privateKeys.lastOption.toRight(InvalidState: SecretStorageError)
@@ -106,6 +107,14 @@ object SecretStorage extends UtilCodecs {
       }
     }
 
+    def getAllPrivateKeys()
+      : Either[SecretStorage.SecretStorageError, AVector[ExtendedPrivateKey]] = {
+      for {
+        state <- maybeState.toRight(Locked)
+      } yield {
+        state.privateKeys
+      }
+    }
     override def deriveNextKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
       for {
         state             <- maybeState.toRight(Locked)

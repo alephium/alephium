@@ -17,12 +17,11 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
@@ -66,11 +65,14 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
-  val password                 = Hash.generate.toHexString
-  var mnemonic: model.Mnemonic = model.Mnemonic(Seq.empty)
-  var address                  = ""
-  val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
-  val amount                   = 10
+  val password                    = Hash.generate.toHexString
+  var mnemonic: model.Mnemonic    = model.Mnemonic(Seq.empty)
+  var addresses: AVector[Address] = _
+  var address: Address            = _
+  val (_, transferPublicKey)      = SignatureSchema.generatePriPub()
+  val transferAddress             = Address.p2pkh(networkType, transferPublicKey).toBase58
+  val transferAmount              = 10
+  val balanceAmount               = U64.unsafe(42)
 
   def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
   val unlockJson                = s"""{"password":"$password"}"""
@@ -80,8 +82,8 @@ class WalletAppSpec
   def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
   def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
   def lock()                = Post(s"/wallet/lock") ~> routes
-  def getBalance()          = Get(s"/wallet/balance") ~> routes
-  def getAddress()          = Get(s"/wallet/address") ~> routes
+  def getBalance()          = Get(s"/wallet/balances") ~> routes
+  def getAddresses()        = Get(s"/wallet/addresses") ~> routes
   def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
   def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
   def deriveNextAddress()   = Post(s"/wallet/deriveNextAddress") ~> routes
@@ -119,27 +121,30 @@ class WalletAppSpec
       status is StatusCodes.Unauthorized
     }
 
-    getAddress() ~> check {
+    getAddresses() ~> check {
       status is StatusCodes.Unauthorized
     }
 
-    transfer(10) ~> check {
+    transfer(transferAmount) ~> check {
       status is StatusCodes.Unauthorized
     }
 
     unlock()
 
+    getAddresses() ~> check {
+      addresses = responseAs[AVector[Address]]
+      address   = addresses.last
+      status is StatusCodes.OK
+    }
+
     getBalance() ~> check {
-      responseAs[Long] is 42
+      responseAs[model.Balances] is model.Balances(
+        balanceAmount,
+        AVector(model.Balances.AddressBalance(address, balanceAmount)))
       status is StatusCodes.OK
     }
 
-    getAddress() ~> check {
-      address = responseAs[String]
-      status is StatusCodes.OK
-    }
-
-    transfer(10) ~> check {
+    transfer(transferAmount) ~> check {
       status is StatusCodes.OK
       responseAs[model.Transfer.Result]
     }
@@ -155,19 +160,20 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    getAddress() ~> check {
+    getAddresses() ~> check {
       status is StatusCodes.Unauthorized
     }
 
     unlock()
 
     deriveNextAddress() ~> check {
-      address = responseAs[String]
+      address   = responseAs[Address]
+      addresses = addresses :+ address
       status is StatusCodes.OK
     }
 
-    getAddress() ~> check {
-      responseAs[String] is address
+    getAddresses() ~> check {
+      responseAs[AVector[Address]] is addresses
       status is StatusCodes.OK
     }
 

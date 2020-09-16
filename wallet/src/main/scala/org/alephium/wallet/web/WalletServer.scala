@@ -12,6 +12,7 @@ import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.NetworkType
+import org.alephium.util.U64
 import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
@@ -29,9 +30,9 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     restoreWallet,
     lockWallet,
     unlockWallet,
-    getBalance,
+    getBalances,
     transfer,
-    getAddress,
+    getAddresses,
     deriveNextAddress
   ).toOpenAPI("Alephium Wallet", "1.0")
 
@@ -58,11 +59,21 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
       unlockWallet.toRoute { walletUnlock =>
         walletService.unlockWallet(walletUnlock.password).map(_.left.map(toApiError))
       } ~
-      getBalance.toRoute { _ =>
-        walletService.getBalance().map(_.left.map(toApiError))
+      getBalances.toRoute { _ =>
+        walletService
+          .getBalances()
+          .map(_.left.map(toApiError).map { balances =>
+            val totalBalance = balances.map { case (_, amount) => amount }.fold(U64.Zero) {
+              case (acc, u64) => acc.addUnsafe(u64)
+            }
+            val balancesPerAddress = balances.map {
+              case (address, amount) => model.Balances.AddressBalance(address, amount)
+            }
+            model.Balances(totalBalance, balancesPerAddress)
+          })
       } ~
-      getAddress.toRoute { _ =>
-        walletService.getAddress().map(_.left.map(toApiError))
+      getAddresses.toRoute { _ =>
+        walletService.getAddresses().map(_.left.map(toApiError))
       } ~
       transfer.toRoute { tr =>
         walletService

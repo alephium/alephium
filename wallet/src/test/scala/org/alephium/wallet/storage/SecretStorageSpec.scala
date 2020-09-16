@@ -24,14 +24,14 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
         val secretStorage = SecretStorage(seed, password, secretDir).toOption.get
         val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
 
-        secretStorage.getPrivateKey() is Left(SecretStorage.Locked)
+        secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(password) is Right(())
 
-        secretStorage.getPrivateKey() isE privateKey
+        secretStorage.getCurrentPrivateKey() isE privateKey
 
         secretStorage.lock()
-        secretStorage.getPrivateKey() is Left(SecretStorage.Locked)
+        secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(wrongPassword).isLeft is true
     }
@@ -67,7 +67,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
     secretStorage.unlock(password) is Right(())
 
-    secretStorage.getPrivateKey() isE privateKey
+    secretStorage.getCurrentPrivateKey() isE privateKey
   }
 
   it should "fail to load an non existing file" in {

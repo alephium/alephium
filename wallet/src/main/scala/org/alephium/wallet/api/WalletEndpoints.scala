@@ -5,6 +5,7 @@ import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 
 import org.alephium.protocol.model.Address
+import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.circe
 import org.alephium.wallet.tapir
@@ -44,11 +45,11 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in("unlock")
       .in(jsonBody[WalletUnlock])
 
-  val getBalance: Endpoint[Unit, WalletApiError, Long, Nothing] =
+  val getBalances: Endpoint[Unit, WalletApiError, Balances, Nothing] =
     baseEndpoint.get
       .in("wallet")
-      .in("balance")
-      .out(jsonBody[Long])
+      .in("balances")
+      .out(jsonBody[Balances])
 
   val transfer: Endpoint[Transfer, WalletApiError, Transfer.Result, Nothing] =
     baseEndpoint.post
@@ -57,11 +58,11 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
 
-  val getAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
+  val getAddresses: Endpoint[Unit, WalletApiError, AVector[Address], Nothing] =
     baseEndpoint.get
       .in("wallet")
-      .in("address")
-      .out(jsonBody[Address])
+      .in("addresses")
+      .out(jsonBody[AVector[Address]])
 
   val deriveNextAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
     baseEndpoint.post

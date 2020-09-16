@@ -2,16 +2,26 @@ package org.alephium.wallet.circe
 
 import java.net.InetAddress
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
 import _root_.io.circe._
 import akka.util.ByteString
 
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.util.{Hex, U64}
+import org.alephium.util.{AVector, Hex, U64}
 
 trait UtilCodecs {
 
+  implicit def avectorEncoder[A: ClassTag](implicit encoder: Encoder[A]): Encoder[AVector[A]] =
+    (as: AVector[A]) => Json.fromValues(as.toIterable.map(encoder.apply))
+
+  implicit def avectorDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[AVector[A]] =
+    Decoder.decodeArray[A].map(AVector.unsafe)
+  implicit def avectorCodec[A: ClassTag](implicit encoder: Encoder[A],
+                                         decoder: Decoder[A]): Codec[AVector[A]] = {
+    Codec.from(avectorDecoder[A], avectorEncoder[A])
+  }
   private val byteStringEncoder: Encoder[ByteString] =
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))
 
