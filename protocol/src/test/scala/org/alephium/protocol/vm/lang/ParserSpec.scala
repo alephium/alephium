@@ -102,7 +102,7 @@ class ParserSpec extends AlephiumSpec {
     parsed0.rtypes is Seq(Type.U64, Type.U64)
 
     val parsed1 = fastparse
-      .parse("public fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+      .parse("pub fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
              StatelessParser.func(_))
       .get
       .value

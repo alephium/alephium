@@ -87,7 +87,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
-      Lexer.keyword("public").?.! ~ Lexer
+      Lexer.keyword("pub").?.! ~ Lexer
         .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map {
         case (accessFlag, funcId, params, returnType, statement) =>

@@ -14,7 +14,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |AssetScript Foo {
-         |  fn bar(a: U256, b: U256) -> (U256) {
+         |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
          |}
@@ -27,7 +27,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |TxScript Foo {
-         |  fn bar(a: U256, b: U256) -> (U256) {
+         |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
          |}
@@ -41,7 +41,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |// comment
          |TxContract Foo(mut x: U64, mut y: U64, c: U64) {
          |  // comment
-         |  fn add0(a: U64, b: U64) -> (U64) {
+         |  pub fn add0(a: U64, b: U64) -> (U64) {
          |    return (a + b)
          |  }
          |
@@ -73,7 +73,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val contract =
         s"""
          |TxContract Foo($xMut x: U64) {
-         |  fn add($a: $aType, $b: $bType) -> ($rType) {
+         |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
          |    x = a + b
          |    return (a - b)
          |  }
@@ -105,7 +105,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return bar.foo()
          |  }
          |
-         |  fn bar() -> () {
+         |  pub fn bar() -> () {
          |    return
          |  }
          |}
@@ -115,7 +115,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return foo.bar()
          |  }
          |
-         |  fn foo() -> () {
+         |  pub fn foo() -> () {
          |    return
          |  }
          |}
@@ -142,7 +142,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Foo(x: U64) {
          |
-         |  fn add(a: U64) -> (U64) {
+         |  pub fn add(a: U64) -> (U64) {
          |    return square(x) + square(a)
          |  }
          |
@@ -162,7 +162,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def input(hash: Hash) =
       s"""
          |AssetScript P2PKH {
-         |  fn verify(pk: ByteVec) -> () {
+         |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = @${hash.toHexString}
          |    checkEq!(hash, blake2b!(pk))
          |    checkSignature!(pk)
@@ -188,7 +188,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Conversion() {
-         |  fn main() -> () {
+         |  pub fn main() -> () {
          |    let mut x = 5u
          |    x = u64!(5i)
          |    x = u64!(5I)
@@ -205,7 +205,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract While() {
-         |  fn main() -> (U64) {
+         |  pub fn main() -> (U64) {
          |    let mut x = 5
          |    let mut done = false
          |    while !done {
@@ -226,7 +226,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Main() {
          |
-         |  fn main() -> () {
+         |  pub fn main() -> () {
          |    let an_i64 = 5i // Suffix annotation
          |    let an_u64 = 5u
          |    let an_i256 = 5I
@@ -258,7 +258,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Fibonacci() {
-         |  fn f(n: I64) -> (I64) {
+         |  pub fn f(n: I64) -> (I64) {
          |    if n < 2i {
          |      return n
          |    } else {
@@ -274,7 +274,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Fibonacci() {
-         |  fn f(n: U64) -> (U64) {
+         |  pub fn f(n: U64) -> (U64) {
          |    if n < 2 {
          |      return n
          |    } else {
@@ -290,7 +290,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Fibonacci() {
-         |  fn f(n: I256) -> (I256) {
+         |  pub fn f(n: I256) -> (I256) {
          |    if n < 2I {
          |      return n
          |    } else {
@@ -306,7 +306,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Fibonacci() {
-         |  fn f(n: U256) -> (U256) {
+         |  pub fn f(n: U256) -> (U256) {
          |    if n < 2U {
          |      return n
          |    } else {
@@ -322,7 +322,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Test() {
-         |  fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
+         |  pub fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
          |    let b0 = 1 == 1
          |    let b1 = 1 == 2
          |    let b2 = 1 != 2
@@ -357,7 +357,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Foo() {
-         |  fn f(mut n: U64) -> (U64) {
+         |  pub fn f(mut n: U64) -> (U64) {
          |    if n < 2 {
          |      n = n + 1
          |    }
@@ -377,7 +377,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  mut alfReserve: U64,
          |  mut btcReserve: U64
          |) {
-         |  fn exchange(alfAmount: U64) -> (U64) {
+         |  pub fn exchange(alfAmount: U64) -> (U64) {
          |    let tokenAmount = u64!(u256!(btcReserve) * u256!(alfAmount) / u256!(alfReserve + alfAmount))
          |    alfReserve = alfReserve + alfAmount
          |    btcReserve = btcReserve - tokenAmount
@@ -406,7 +406,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val contract =
       s"""
          |TxContract Operator() {
-         |  fn main() -> (U64, Bool, Bool) {
+         |  pub fn main() -> (U64, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
          |    let y = 1 < 2 <= 2 < 3
          |    let z = !false && false || false

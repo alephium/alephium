@@ -49,7 +49,7 @@ class VMSpec extends AlephiumSpec {
     lazy val input1 =
       s"""
          |TxContract Foo(mut x: U64) {
-         |  public fn add(a: U64) -> () {
+         |  pub fn add(a: U64) -> () {
          |    x = x + a
          |    if (a > 0) {
          |      add(a - 1)
@@ -59,7 +59,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |TxScript Bar {
-         |  public fn call() -> () {
+         |  pub fn call() -> () {
          |    let foo = Foo(@${contractKey0.toHexString})
          |    foo.add(4)
          |    return
@@ -81,7 +81,7 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "handle contract states" in new CallFixture {
-    val access: String = "public"
+    val access: String = "pub"
 
     contractOutputRef0 is a[ContractOutputRef]
     addAndCheck(blockFlow, block0, 1)
