@@ -1,6 +1,6 @@
 package org.alephium.protocol.vm
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.util.AVector
@@ -37,7 +37,7 @@ class StatelessContext(val txHash: Hash,
 
 object StatelessContext {
   def apply(txHash: Hash, signature: Signature, worldState: WorldState): StatelessContext = {
-    val stack = Stack.unsafe[Signature](ArrayBuffer(signature), 1)
+    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
     apply(txHash, stack, worldState)
   }
 

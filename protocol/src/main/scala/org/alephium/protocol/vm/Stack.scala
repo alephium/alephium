@@ -1,37 +1,31 @@
 package org.alephium.protocol.vm
 
 import scala.{specialized => sp}
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.util.AVector
 
 object Stack {
-  @inline private def newBuffer[T: ClassTag] = new ArrayBuffer[T](4)
-
   def ofCapacity[T: ClassTag](capacity: Int): Stack[T] = {
-    val underlying = newBuffer[T]
+    val underlying = mutable.ArraySeq.make(new Array[T](capacity))
     new Stack(underlying, 0, capacity, 0)
-  }
-
-  def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
-    unsafe(elems, elems.length)
   }
 
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
-    val underlying = ArrayBuffer.from(elems.toIterable)
+    val underlying = mutable.ArraySeq.make(elems.toArray)
     unsafe(underlying, maxSize)
   }
 
-  def unsafe[T: ClassTag](elems: ArrayBuffer[T], maxSize: Int): Stack[T] = {
+  def unsafe[T: ClassTag](elems: mutable.ArraySeq[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
     new Stack(elems, 0, maxSize, elems.length)
   }
 }
 
 // Note: current place at underlying is empty
-class Stack[@sp T: ClassTag](val underlying: ArrayBuffer[T],
+class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
                              val offset: Int,
                              val capacity: Int,
                              var currentIndex: Int) {
@@ -45,14 +39,9 @@ class Stack[@sp T: ClassTag](val underlying: ArrayBuffer[T],
     underlying(currentIndex - 1)
   }
 
-  @inline private def push(elem: T, index: Int): Unit = {
-    if (index < underlying.length) underlying(index) = elem
-    else underlying.append(elem)
-  }
-
   def push(elem: T): ExeResult[Unit] = {
     if (currentIndex < maxIndex) {
-      push(elem, currentIndex)
+      underlying(currentIndex) = elem
       currentIndex += 1
       Right(())
     } else {
@@ -62,7 +51,7 @@ class Stack[@sp T: ClassTag](val underlying: ArrayBuffer[T],
 
   def push(elems: AVector[T]): ExeResult[Unit] = {
     if (currentIndex + elems.length <= maxIndex) {
-      elems.foreachWithIndex((elem, index) => push(elem, currentIndex + index))
+      elems.foreachWithIndex((elem, index) => underlying(currentIndex + index) = elem)
       currentIndex += elems.length
       Right(())
     } else Left(StackOverflow)
