@@ -125,7 +125,7 @@ class VMSpec extends AlephiumSpec {
          |  pub fn get() -> (U64) {
          |    return x
          |  }
-         |  
+         |
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)
@@ -153,7 +153,7 @@ class VMSpec extends AlephiumSpec {
          |  pub fn get() -> (U64) {
          |    return x
          |  }
-         |  
+         |
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)
@@ -177,7 +177,7 @@ class VMSpec extends AlephiumSpec {
          |  pub fn get() -> (U64) {
          |    return x
          |  }
-         |  
+         |
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)

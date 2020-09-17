@@ -33,11 +33,23 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
   private def executeFrames(): ExeResult[Unit] = {
     if (frameStack.nonEmpty) {
       val currentFrame = frameStack.topUnsafe
-      if (currentFrame.isComplete) {
-        frameStack.pop()
-        executeFrames()
-      } else {
-        currentFrame.execute()
+      val frameResult = for {
+        newFrameOpt <- currentFrame.execute()
+        _ <- newFrameOpt match {
+          case Some(frame) => frameStack.push(frame)
+          case None =>
+            for {
+              _ <- frameStack.pop()
+              _ <- frameStack.top match {
+                case Some(frame) => frame.reloadFields()
+                case None        => Right(())
+              }
+            } yield ()
+        }
+      } yield ()
+      frameResult match {
+        case Right(_)    => executeFrames()
+        case Left(error) => Left(error)
       }
     } else {
       Right(())
@@ -56,22 +68,20 @@ final class StatefulVM(ctx: StatefulContext,
     extends VM(ctx, frameStack, operandStack)
 
 object StatelessVM {
-  def runAssetScript(worldState: WorldState,
-                     txHash: Hash,
+  def runAssetScript(txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
                      signature: Signature): ExeResult[Unit] = {
-    val context = StatelessContext(txHash, signature, worldState)
+    val context = StatelessContext(txHash, signature)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def runAssetScript(worldState: WorldState,
-                     txHash: Hash,
+  def runAssetScript(txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
                      signatures: Stack[Signature]): ExeResult[Unit] = {
-    val context = StatelessContext(txHash, signatures, worldState)
+    val context = StatelessContext(txHash, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }

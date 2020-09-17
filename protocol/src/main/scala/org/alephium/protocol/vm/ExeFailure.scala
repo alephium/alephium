@@ -29,6 +29,7 @@ case object InvalidMethodParamsType                            extends ExeFailur
 case object PrivateExternalMethodCall                          extends ExeFailure
 case object EqualityFailed                                     extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
+case object PcOverflow                                         extends ExeFailure
 case object InvalidReturnType                                  extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure

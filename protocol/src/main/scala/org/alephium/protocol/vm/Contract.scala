@@ -96,9 +96,19 @@ sealed trait ContractObj[Ctx <: Context] {
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
 
+  def reloadFields(ctx: Ctx): ExeResult[Unit]
+  def commitFields(ctx: Ctx): ExeResult[Unit]
+
   def getMethod(index: Int): Option[Method[Ctx]] = {
     code.methods.get(index)
   }
+
+  def buildFrame(ctx: Ctx,
+                 obj: ContractObj[Ctx],
+                 method: Method[Ctx],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx]
 
   def startFrame(ctx: Ctx,
                  methodIndex: Int,
@@ -108,7 +118,13 @@ sealed trait ContractObj[Ctx <: Context] {
       method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
     } yield
-      Frame.build(ctx, this, method, args, operandStack, _ => Left(NonEmptyReturnForMainFunction))
+      buildFrame(
+        ctx,
+        this,
+        method,
+        args,
+        operandStack,
+        returns => if (returns.nonEmpty) Left(NonEmptyReturnForMainFunction) else Right(()))
   }
 
   def startFrameWithOutputs(ctx: Ctx,
@@ -119,7 +135,7 @@ sealed trait ContractObj[Ctx <: Context] {
     for {
       method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-    } yield Frame.build(ctx, this, method, args, operandStack, returnTo)
+    } yield buildFrame(ctx, this, method, args, operandStack, returnTo)
   }
 }
 
@@ -128,14 +144,59 @@ sealed trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
   val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
 
-final case class StatelessScriptObject(val code: StatelessScript)
-    extends ScriptObj[StatelessContext]
+final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext] {
+  def commitFields(ctx: StatelessContext): ExeResult[Unit] = Right(())
+  def reloadFields(ctx: StatelessContext): ExeResult[Unit] = Right(())
 
-final case class StatefulScriptObject(val code: StatefulScript) extends ScriptObj[StatefulContext]
+  def buildFrame(ctx: StatelessContext,
+                 obj: ContractObj[StatelessContext],
+                 method: Method[StatelessContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] =
+    Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
+}
 
-final case class StatefulContractObject(val code: StatefulContract,
-                                        val fields: mutable.ArraySeq[Val],
-                                        val address: Hash)
+final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext] {
+  def commitFields(ctx: StatefulContext): ExeResult[Unit] = Right(())
+  def reloadFields(ctx: StatefulContext): ExeResult[Unit] = Right(())
+
+  def buildFrame(ctx: StatefulContext,
+                 obj: ContractObj[StatefulContext],
+                 method: Method[StatefulContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
+    Frame.stateful(ctx, obj, method, args, operandStack, returnTo)
+}
+
+final case class StatefulContractObject(code: StatefulContract,
+                                        fields: mutable.ArraySeq[Val],
+                                        address: Hash)
     extends ContractObj[StatefulContext] {
   override def addressOpt: Option[Hash] = Some(address)
+
+  def commitFields(ctx: StatefulContext): ExeResult[Unit] = {
+    ctx.updateState(address, AVector.from(fields))
+  }
+
+  def reloadFields(ctx: StatefulContext): ExeResult[Unit] = {
+    ctx.worldState.getContractState(address) match {
+      case Right(state) =>
+        assume(state.fields.length == fields.length)
+        fields.indices.foreach { i =>
+          fields(i) = state.fields(i)
+        }
+        Right(())
+      case Left(error) => Left(IOErrorLoadContract(error))
+    }
+  }
+
+  def buildFrame(ctx: StatefulContext,
+                 obj: ContractObj[StatefulContext],
+                 method: Method[StatefulContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
+    Frame.stateful(ctx, obj, method, args, operandStack, returnTo)
 }

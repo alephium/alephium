@@ -180,7 +180,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val args = AVector[Val](Val.ByteVec.from(pubKey))
     StatelessVM
-      .runAssetScript(cachedWorldState, Hash.zero, script, args, signature)
+      .runAssetScript(Hash.zero, script, args, signature)
       .isRight is true
   }
 

@@ -37,6 +37,8 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
 
   def size: Int = currentIndex - offset
 
+  def top: Option[T] = Option.when(currentIndex >= 1)(underlying(currentIndex - 1))
+
   def topUnsafe: T = {
     underlying(currentIndex - 1)
   }
