@@ -13,8 +13,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val contract = StatefulContract(AVector.empty, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, 0, AVector(Val.U64(U64.Two))) is Left(
-      PrivateExternalMethodCall)
+    StatefulVM.execute(context, obj, AVector(Val.U64(U64.Two))) is Left(PrivateExternalMethodCall)
   }
 
   it should "execute the following script" in {
@@ -27,8 +26,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val](Val.U64(U64.Zero), Val.U64(U64.One)))
-    StatefulVM.execute(context, obj, 0, AVector(Val.U64(U64.Two))) isE AVector[Val](
-      Val.U64(U64.unsafe(8)))
+    StatefulVM.executeWithOutputs(context, obj, AVector(Val.U64(U64.Two))) isE
+      AVector[Val](Val.U64(U64.unsafe(8)))
   }
 
   it should "call method" in {
@@ -43,7 +42,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
     val script = StatelessScript(methods = AVector(method0, method1))
     val obj    = script.toObject
-    StatelessVM.execute(statelessContext, obj, 0, AVector(Val.U64(U64.Two))) isE
+    StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U64(U64.Two))) isE
       AVector[Val](Val.U64(U64.unsafe(3)))
   }
 

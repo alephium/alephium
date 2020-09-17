@@ -86,7 +86,7 @@ class Frame[Ctx <: Context](var pc: Int,
       method <- getMethod(index)
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.build(ctx, obj, method, args, opStack.push)
+    } yield Frame.build(ctx, obj, method, args, opStack, opStack.push)
   }
 
   @tailrec
@@ -111,20 +111,22 @@ object Frame {
                             obj: ContractObj[Ctx],
                             methodIndex: Int,
                             args: AVector[Val],
+                            operandStack: Stack[Val],
                             returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
     for {
       method <- obj.getMethod(methodIndex).toRight(InvalidMethodIndex(methodIndex))
-    } yield build(ctx, obj, method, args, returnTo)
+    } yield build(ctx, obj, method, args, operandStack, returnTo)
   }
 
   def build[Ctx <: Context](ctx: Ctx,
                             obj: ContractObj[Ctx],
                             method: Method[Ctx],
                             args: AVector[Val],
+                            operandStack: Stack[Val],
                             returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
+    new Frame[Ctx](0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
   }
 
   def externalMethodFrame[C <: StatefulContext](
@@ -141,6 +143,6 @@ object Frame {
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
       args   <- frame.opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack.push)
+    } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack, frame.opStack.push)
   }
 }

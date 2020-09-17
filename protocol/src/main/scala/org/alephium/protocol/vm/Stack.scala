@@ -33,6 +33,8 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
 
   def isEmpty: Boolean = currentIndex == offset
 
+  def nonEmpty: Boolean = currentIndex != offset
+
   def size: Int = currentIndex - offset
 
   def topUnsafe: T = {

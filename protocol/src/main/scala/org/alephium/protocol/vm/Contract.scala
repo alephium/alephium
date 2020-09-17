@@ -103,11 +103,23 @@ sealed trait ContractObj[Ctx <: Context] {
   def startFrame(ctx: Ctx,
                  methodIndex: Int,
                  args: AVector[Val],
-                 returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+                 operandStack: Stack[Val]): ExeResult[Frame[Ctx]] = {
     for {
       method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-    } yield Frame.build(ctx, this, method, args, returnTo)
+    } yield
+      Frame.build(ctx, this, method, args, operandStack, _ => Left(NonEmptyReturnForMainFunction))
+  }
+
+  def startFrameWithOutputs(ctx: Ctx,
+                            methodIndex: Int,
+                            args: AVector[Val],
+                            operandStack: Stack[Val],
+                            returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+    for {
+      method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
+      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+    } yield Frame.build(ctx, this, method, args, operandStack, returnTo)
   }
 }
 
