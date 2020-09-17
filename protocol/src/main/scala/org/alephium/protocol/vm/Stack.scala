@@ -11,7 +11,7 @@ object Stack {
 
   def ofCapacity[T: ClassTag](capacity: Int): Stack[T] = {
     val underlying = newBuffer[T]
-    new Stack(underlying, capacity, 0)
+    new Stack(underlying, 0, capacity, 0)
   }
 
   def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
@@ -21,22 +21,25 @@ object Stack {
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
     val underlying = ArrayBuffer.from(elems.toIterable)
-    new Stack(underlying, maxSize, elems.length)
+    unsafe(underlying, maxSize)
   }
 
   def unsafe[T: ClassTag](elems: ArrayBuffer[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
-    new Stack(elems, maxSize, elems.length)
+    new Stack(elems, 0, maxSize, elems.length)
   }
 }
 
 // Note: current place at underlying is empty
-class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
-                                      val capacity: Int,
-                                      var currentIndex: Int) {
-  def isEmpty: Boolean = currentIndex == 0
+class Stack[@sp T: ClassTag](val underlying: ArrayBuffer[T],
+                             val offset: Int,
+                             val capacity: Int,
+                             var currentIndex: Int) {
+  val maxIndex: Int = offset + capacity
 
-  def size: Int = currentIndex
+  def isEmpty: Boolean = currentIndex == offset
+
+  def size: Int = currentIndex - offset
 
   def topUnsafe: T = {
     underlying(currentIndex - 1)
@@ -48,7 +51,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
   }
 
   def push(elem: T): ExeResult[Unit] = {
-    if (currentIndex < capacity) {
+    if (currentIndex < maxIndex) {
       push(elem, currentIndex)
       currentIndex += 1
       Right(())
@@ -58,7 +61,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
   }
 
   def push(elems: AVector[T]): ExeResult[Unit] = {
-    if (size + elems.length <= capacity) {
+    if (currentIndex + elems.length <= maxIndex) {
       elems.foreachWithIndex((elem, index) => push(elem, currentIndex + index))
       currentIndex += elems.length
       Right(())
@@ -67,7 +70,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
 
   def pop(): ExeResult[T] = {
     val elemIndex = currentIndex - 1
-    if (elemIndex >= 0) {
+    if (elemIndex >= offset) {
       val elem = underlying(elemIndex)
       currentIndex = elemIndex
       Right(elem)
@@ -80,7 +83,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
     if (n == 0) {
       Right(AVector.ofSize(0))
     } else if (n <= size) {
-      val start = currentIndex - n
+      val start = currentIndex - n // always >= offset
       val elems = AVector.tabulate(n) { k =>
         underlying(start + k)
       }
@@ -102,7 +105,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
     val elemIndex = currentIndex - index
     if (index < 1) {
       Left(StackOverflow)
-    } else if (elemIndex < 0) {
+    } else if (elemIndex < offset) {
       Left(StackUnderflow)
     } else {
       Right(underlying(elemIndex))
@@ -120,7 +123,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
     val toIndex   = currentIndex - index
     if (index <= 1) {
       Left(StackOverflow)
-    } else if (toIndex < 0) {
+    } else if (toIndex < offset) {
       Left(StackUnderflow)
     } else {
       val tmp = underlying(fromIndex)
@@ -129,4 +132,7 @@ class Stack[@sp T: ClassTag] private (val underlying: ArrayBuffer[T],
       Right(())
     }
   }
+
+  def subStack(): Stack[T] =
+    new Stack[T](underlying, currentIndex, maxIndex - currentIndex, currentIndex)
 }
