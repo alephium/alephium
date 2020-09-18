@@ -1,0 +1,23 @@
+dist: bionic
+language: scala
+
+scala:
+  - 2.13.3
+
+jdk:
+  - openjdk11
+
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt/boot
+    - $HOME/.coursier
+
+install:
+  - sudo apt-get install python3.6 rng-tools haveged
+  - sudo haveged
+
+script:
+  - ps aux | grep haveged
+  - ./make test
+  - ./make itest
