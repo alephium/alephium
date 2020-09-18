@@ -3,6 +3,7 @@ package org.alephium.crypto
 import scala.util.Random
 
 import akka.util.ByteString
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.TryValues
 
@@ -11,7 +12,7 @@ import org.alephium.util.AlephiumSpec
 class AESSpec() extends AlephiumSpec with TryValues {
 
   val dataGen: Gen[ByteString] =
-    Gen.nonEmptyListOf(Gen.posNum[Byte]).map(bytes => ByteString.fromArrayUnsafe(bytes.toArray))
+    Gen.nonEmptyListOf(arbitrary[Byte]).map(bytes => ByteString.fromArrayUnsafe(bytes.toArray))
   val passwordGen: Gen[String] = Gen.nonEmptyListOf(Gen.alphaNumChar).map(_.toString)
 
   it should "encrypt/decrypt correct data" in {
@@ -23,12 +24,14 @@ class AESSpec() extends AlephiumSpec with TryValues {
   }
 
   it should "fail to decrypt corrupted data" in {
-    forAll(dataGen, passwordGen, Gen.posNum[Byte]) {
-      case (data, password, byte) =>
-        val encrypted = AES.encrypt(data, password)
-        val index     = Random.nextInt(encrypted.encrypted.length)
+    forAll(dataGen, passwordGen) {
+      case (data, password) =>
+        val encrypted    = AES.encrypt(data, password)
+        val index        = Random.nextInt(encrypted.encrypted.length)
+        val targetByte   = encrypted.encrypted(index)
+        val modifiedByte = (targetByte + 1).toByte
         val corruptedData =
-          ByteString.fromArrayUnsafe(encrypted.encrypted.updated(index, byte).toArray)
+          ByteString.fromArrayUnsafe(encrypted.encrypted.updated(index, modifiedByte).toArray)
         val corrupted = encrypted.copy(encrypted = corruptedData)
 
         AES.decrypt(corrupted, password).failure.exception.getMessage is "Tag mismatch!"
@@ -38,8 +41,10 @@ class AESSpec() extends AlephiumSpec with TryValues {
   it should "fail to decrypt with wrong password " in {
     forAll(dataGen, passwordGen, passwordGen) {
       case (data, password, wrongPassword) =>
-        val encrypted = AES.encrypt(data, password)
-        AES.decrypt(encrypted, wrongPassword).failure.exception.getMessage is "Tag mismatch!"
+        whenever(wrongPassword != password) {
+          val encrypted = AES.encrypt(data, password)
+          AES.decrypt(encrypted, wrongPassword).failure.exception.getMessage is "Tag mismatch!"
+        }
     }
   }
 }
