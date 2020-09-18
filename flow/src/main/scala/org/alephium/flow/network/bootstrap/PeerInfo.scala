@@ -13,8 +13,8 @@ final case class PeerInfo private (
     groupNumPerBroker: Int,
     externalAddress: Option[InetSocketAddress],
     internalAddress: InetSocketAddress,
-    rpcPort: Option[Int],
-    wsPort: Option[Int]
+    rpcPort: Int,
+    wsPort: Int
 )
 
 object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
@@ -22,8 +22,8 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
              groupNumPerBroker: Int,
              publicAddress: Option[InetSocketAddress],
              privateAddress: InetSocketAddress,
-             rpcPort: Option[Int],
-             wsPort: Option[Int]): PeerInfo =
+             rpcPort: Int,
+             wsPort: Int): PeerInfo =
     new PeerInfo(id, groupNumPerBroker, publicAddress, privateAddress, rpcPort, wsPort)
 
   val _serde: Serde[PeerInfo] =

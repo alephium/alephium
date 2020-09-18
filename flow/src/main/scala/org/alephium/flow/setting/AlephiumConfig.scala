@@ -60,9 +60,9 @@ final case class NetworkSetting(
     masterAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
-    rpcPort: Option[Int],
-    wsPort: Option[Int],
-    restPort: Option[Int]
+    rpcPort: Int,
+    wsPort: Int,
+    restPort: Int
 ) {
   val isCoordinator: Boolean = internalAddress == masterAddress
 
