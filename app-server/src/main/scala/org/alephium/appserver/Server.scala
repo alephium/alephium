@@ -12,6 +12,8 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, BrokerSetting}
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}
+import org.alephium.wallet.WalletApp
+import org.alephium.wallet.config.WalletConfig
 
 trait Server extends Service {
   def config: AlephiumConfig
@@ -22,9 +24,15 @@ trait Server extends Service {
   def rpcServer: RPCServer
   def restServer: RestServer
   def miner: ActorRefT[Miner.Command]
+  def wallet: WalletApp
 
-  override def subServices: ArraySeq[Service] = ArraySeq(rpcServer, restServer, node)
-
+  override lazy val subServices: ArraySeq[Service] = {
+    if (config.network.isCoordinator) {
+      ArraySeq(rpcServer, restServer, wallet, node)
+    } else {
+      ArraySeq(rpcServer, restServer, node)
+    }
+  }
   override protected def startSelfOnce(): Future[Unit] =
     Future.successful(())
 
@@ -58,4 +66,16 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
   implicit def brokerConfig: BrokerSetting = config.broker
   lazy val rpcServer: RPCServer            = RPCServer(node, miner)
   lazy val restServer: RestServer          = RestServer(node, miner)
+
+  val walletConfig: WalletConfig = WalletConfig(
+    config.wallet.port,
+    config.wallet.secretDir,
+    config.chains.networkType,
+    WalletConfig.BlockFlow(
+      apiConfig.networkInterface.getHostAddress,
+      config.network.rpcPort,
+      config.broker.groups
+    )
+  )
+  lazy val wallet: WalletApp = new WalletApp(walletConfig)
 }

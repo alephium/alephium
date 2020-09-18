@@ -101,6 +101,11 @@ final case class ChainsSetting(
     genesisBalances: AVector[(LockupScript, U64)]
 ) extends ChainsConfig
 
+final case class WalletSetting(port: Int, secretDir: Path)
+
+object WalletSetting {
+  final case class BlockFlow(host: String, port: Int, groups: Int)
+}
 final case class AlephiumConfig(
     chains: ChainsSetting,
     broker: BrokerSetting,
@@ -108,7 +113,8 @@ final case class AlephiumConfig(
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
-    mempool: MemPoolSetting
+    mempool: MemPoolSetting,
+    wallet: WalletSetting
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(chains.genesisBalances)(broker, consensus)

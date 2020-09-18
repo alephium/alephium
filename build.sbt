@@ -91,7 +91,7 @@ lazy val rpc = project("rpc")
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val `app-server` = mainProject("app-server")
-  .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test")
+  .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
   .settings(
     libraryDependencies ++= Seq(
       `akka-http-cors`,

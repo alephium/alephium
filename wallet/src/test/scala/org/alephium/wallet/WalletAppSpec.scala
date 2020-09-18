@@ -199,7 +199,6 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    walletApp.stop().futureValue
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
   }
 }
