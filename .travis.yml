@@ -1,6 +1,13 @@
 dist: bionic
 language: scala
 
+notifications:
+  slack:
+    rooms:
+      - secure: "bRcP7w0xQyCfxkgGDklboRp1okD84z0aofkRT7YAiDIFEORAkYEpzlQ5ALar/D62fda52DiF4bBi9xmxySevZagYq2fCqJFuYNRb+sV/GuOBU/PWQMl78s26F1PEhmlTY/j7AX1ceju+x10QAGrvZbSGJQX2YHVSQkDoSjFG0RsialZPVtYXlvAVZnf8Zmri8jhtM7hVeI/XuIaaln7mecCsNXCcWYTH5Jz+0JytbWcZv+ZTKJJP9q7HiyKDcHaj9lVtF0yHiigO4yiqzAX3w+/t1fYpls9fo4nx1TdywRzFPQW/sZ6jjK/8mBCxswNZ5haBWZoPC0f739SclvXTp94rTKOaGz1YPSItRo5Rrc38uU5mosD/zYcij1HuApCzBu+oal19MC6EGM5580LlAZrspyOdyUbyMOqg7BOLZ+SI44FPTrkNJSunSUUZyqbCzl+vH4bqVaWfRWir5iIvkgKicM+X4mb5gYFHJ7/ilXFOqV7m2NZrZkBhB/OYVxonkLrVspj//ZwierZ/D2ckqV1ulM97D8IPKj97JvouWoEWk8zoSc8aZdk5XeUWIbtfa8vzEaz/pGJXHn58/LqNkDctJUDDMVWFbtUPEOtiRcEgTtRnStKUXZXfVDAxfrEtKAQkI0YEvNFatQ3L5CgYmqEGUwrvN6AAd/cxAB0lZ/A="
+    on_success: always
+    on_failure: always
+
 scala:
   - 2.13.3
 
@@ -29,6 +36,10 @@ jobs:
         - ps aux | grep haveged
         - ./make test
         - ./make itest
+
+branches:
+  only:
+  - master
 
 stages:
   - test
