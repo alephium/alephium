@@ -84,6 +84,8 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
+    case Tcp.Closed =>
+      ()
     case Terminated(connection) =>
       val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
       toRemove.foreach(confirmedConnections -= _)
