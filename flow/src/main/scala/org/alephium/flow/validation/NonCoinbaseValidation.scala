@@ -48,7 +48,7 @@ trait NonCoinbaseValidation {
       preOutputs <- getPreOutputs(tx, worldState)
       _          <- checkAlfBalance(tx, preOutputs)
       _          <- checkTokenBalance(tx, preOutputs)
-      _          <- checkWitnesses(tx, preOutputs, worldState)
+      _          <- checkWitnesses(tx, preOutputs)
     } yield ()
   }
 
@@ -67,7 +67,7 @@ trait NonCoinbaseValidation {
 
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], worldState: WorldState): TxValidationResult[Unit]
+  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   // format: on
 }
 
@@ -194,14 +194,14 @@ object NonCoinbaseValidation {
       }
 
     // TODO: signatures might not be 1-to-1 mapped to inputs
-    protected[validation] def checkWitnesses(tx: Transaction,
-                                             preOutputs: AVector[TxOutput],
-                                             worldState: WorldState): TxValidationResult[Unit] = {
+    protected[validation] def checkWitnesses(
+        tx: Transaction,
+        preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
       assume(tx.unsigned.inputs.length == preOutputs.length)
       val signatures = Stack.unsafe(tx.signatures.reverse, tx.signatures.length)
       EitherF.foreachTry(preOutputs.indices) { idx =>
         val unlockScript = tx.unsigned.inputs(idx).unlockScript
-        checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signatures, worldState)
+        checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signatures)
       }
     }
 
@@ -209,15 +209,14 @@ object NonCoinbaseValidation {
         tx: Transaction,
         lockupScript: LockupScript,
         unlockScript: UnlockScript,
-        signatures: Stack[Signature],
-        worldState: WorldState): TxValidationResult[Unit] = {
+        signatures: Stack[Signature]): TxValidationResult[Unit] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
           checkP2pkh(tx, lock, unlock, signatures)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-          checkP2SH(tx, lock, unlock, signatures, worldState)
+          checkP2SH(tx, lock, unlock, signatures)
         case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
-          checkP2S(tx, lock, unlock, signatures, worldState)
+          checkP2S(tx, lock, unlock, signatures)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -243,29 +242,27 @@ object NonCoinbaseValidation {
     protected[validation] def checkP2SH(tx: Transaction,
                                         lock: LockupScript.P2SH,
                                         unlock: UnlockScript.P2SH,
-                                        signatures: Stack[Signature],
-                                        worldState: WorldState): TxValidationResult[Unit] = {
+                                        signatures: Stack[Signature]): TxValidationResult[Unit] = {
       if (Hash.hash(serialize(unlock.script)) != lock.scriptHash) {
         invalidTx(InvalidScriptHash)
       } else {
-        checkScript(tx, unlock.script, unlock.params, signatures, worldState)
+        checkScript(tx, unlock.script, unlock.params, signatures)
       }
     }
 
     protected[validation] def checkP2S(tx: Transaction,
                                        lock: LockupScript.P2S,
                                        unlock: UnlockScript.P2S,
-                                       signatures: Stack[Signature],
-                                       worldState: WorldState): TxValidationResult[Unit] = {
-      checkScript(tx, lock.script, unlock.params, signatures, worldState)
+                                       signatures: Stack[Signature]): TxValidationResult[Unit] = {
+      checkScript(tx, lock.script, unlock.params, signatures)
     }
 
-    protected[validation] def checkScript(tx: Transaction,
-                                          script: StatelessScript,
-                                          params: AVector[Val],
-                                          signatures: Stack[Signature],
-                                          worldState: WorldState): TxValidationResult[Unit] = {
-      StatelessVM.runAssetScript(worldState, tx.hash, script, params, signatures) match {
+    protected[validation] def checkScript(
+        tx: Transaction,
+        script: StatelessScript,
+        params: AVector[Val],
+        signatures: Stack[Signature]): TxValidationResult[Unit] = {
+      StatelessVM.runAssetScript(tx.hash, script, params, signatures) match {
         case Right(_) => validTx(()) // TODO: handle returns
         case Left(e)  => invalidTx(InvalidUnlockScript(e))
       }

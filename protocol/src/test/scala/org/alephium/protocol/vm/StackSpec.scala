@@ -37,6 +37,13 @@ class StackSpec extends AlephiumSpec {
     stack.isEmpty
   }
 
+  it should "push many elements than initial capacity of underlying array buffer" in {
+    val n     = 6
+    val stack = Stack.ofCapacity[Int](6)
+    (0 until n).foreach(stack.push(_) isE ())
+    stack.push(n).isLeft is true
+  }
+
   it should "pop a number of elements" in {
     val stack = Stack.unsafe(AVector(1, 2, 3), 3)
     stack.pop(4).left.value is StackUnderflow
@@ -65,5 +72,28 @@ class StackSpec extends AlephiumSpec {
     stack.remove(4).left.value is StackUnderflow
     stack.remove(3).isRight is true
     stack.isEmpty is true
+  }
+
+  it should "create sub stack" in {
+    val n     = 6
+    val stack = Stack.ofCapacity[Int](n)
+
+    (0 until n) foreach { k =>
+      stack.push(k) isE ()
+      val subStack = stack.subStack()
+      subStack.capacity is (n - k - 1)
+    }
+    stack.size is n
+    stack.remove(n) isE ()
+    stack.size is 0
+
+    (0 until n).foldLeft(stack.subStack()) {
+      case (subStack, k) =>
+        subStack.currentIndex is k
+        subStack.push(k) isE ()
+        subStack.size is 1
+        subStack.subStack()
+    }
+    stack.size is 0
   }
 }

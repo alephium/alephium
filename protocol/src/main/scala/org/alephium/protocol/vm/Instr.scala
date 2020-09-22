@@ -6,7 +6,7 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.serde._
 import org.alephium.util
 import org.alephium.util.{Bytes, Collection}
@@ -1015,31 +1015,20 @@ sealed trait CallInstr
 final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr {
   override def serialize(): ByteString = ByteString(CallLocal.code, index)
 
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      newFrame <- frame.methodFrame(Bytes.toPosInt(index))
-      _        <- newFrame.execute()
-    } yield ()
-  }
+  // Implemented in frame instead
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallLocal extends StatelessInstrCompanion1[Byte]
 final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr {
   override def serialize(): ByteString = ByteString(CallExternal.code, index)
 
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      byteVec     <- frame.popT[Val.ByteVec]()
-      contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
-      newFrame    <- Frame.externalMethodFrame(frame, contractKey, Bytes.toPosInt(index))
-      _           <- newFrame.execute()
-    } yield ()
-  }
+  // Implemented in frame instead
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
 sealed trait ReturnInstr extends StatelessInstr
 case object Return extends ReturnInstr with InstrCompanion0 {
-
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val returnType = frame.method.returnType
     for {

@@ -6,37 +6,50 @@ import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
-class Runtime[Ctx <: Context](val stack: Stack[Frame[Ctx]], var returnTo: AVector[Val])
-
-object Runtime {
-  def apply[Ctx <: Context](stack: Stack[Frame[Ctx]]): Runtime[Ctx] =
-    new Runtime(stack, AVector.ofSize(0))
-}
-
-sealed trait VM[Ctx <: Context] {
-  def execute(ctx: Ctx,
-              obj: ContractObj[Ctx],
-              methodIndex: Int,
-              args: AVector[Val]): ExeResult[AVector[Val]] = {
-    val stack = Stack.ofCapacity[Frame[Ctx]](frameStackMaxSize)
-    val rt    = Runtime[Ctx](stack)
-
+sealed abstract class VM[Ctx <: Context](ctx: Ctx,
+                                         frameStack: Stack[Frame[Ctx]],
+                                         operandStack: Stack[Val]) {
+  def execute(obj: ContractObj[Ctx], methodIndex: Int, args: AVector[Val]): ExeResult[Unit] = {
     for {
-      startFrame <- obj.startFrame(ctx, methodIndex, args, value => Right(rt.returnTo = value))
-      _          <- stack.push(startFrame)
-      _          <- execute(stack)
-    } yield rt.returnTo
+      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack)
+      _          <- frameStack.push(startFrame)
+      _          <- executeFrames()
+    } yield ()
+  }
+
+  def executeWithOutputs(obj: ContractObj[Ctx],
+                         methodIndex: Int,
+                         args: AVector[Val]): ExeResult[AVector[Val]] = {
+    var outputs: AVector[Val] = AVector.ofSize(0)
+    val returnTo: AVector[Val] => ExeResult[Unit] = returns => { outputs = returns; Right(()) }
+    for {
+      startFrame <- obj.startFrameWithOutputs(ctx, methodIndex, args, operandStack, returnTo)
+      _          <- frameStack.push(startFrame)
+      _          <- executeFrames()
+    } yield outputs
   }
 
   @tailrec
-  private def execute(stack: Stack[Frame[Ctx]]): ExeResult[Unit] = {
-    if (!stack.isEmpty) {
-      val currentFrame = stack.topUnsafe
-      if (currentFrame.isComplete) {
-        stack.pop()
-        execute(stack)
-      } else {
-        currentFrame.execute()
+  private def executeFrames(): ExeResult[Unit] = {
+    if (frameStack.nonEmpty) {
+      val currentFrame = frameStack.topUnsafe
+      val frameResult = for {
+        newFrameOpt <- currentFrame.execute()
+        _ <- newFrameOpt match {
+          case Some(frame) => frameStack.push(frame)
+          case None =>
+            for {
+              _ <- frameStack.pop()
+              _ <- frameStack.top match {
+                case Some(frame) => frame.reloadFields()
+                case None        => Right(())
+              }
+            } yield ()
+        }
+      } yield ()
+      frameResult match {
+        case Right(_)    => executeFrames()
+        case Left(error) => Left(error)
       }
     } else {
       Right(())
@@ -44,29 +57,55 @@ sealed trait VM[Ctx <: Context] {
   }
 }
 
-object StatelessVM extends VM[StatelessContext] {
-  def runAssetScript(worldState: WorldState,
-                     txHash: Hash,
+final class StatelessVM(ctx: StatelessContext,
+                        frameStack: Stack[Frame[StatelessContext]],
+                        operandStack: Stack[Val])
+    extends VM(ctx, frameStack, operandStack)
+
+final class StatefulVM(ctx: StatefulContext,
+                       frameStack: Stack[Frame[StatefulContext]],
+                       operandStack: Stack[Val])
+    extends VM(ctx, frameStack, operandStack)
+
+object StatelessVM {
+  def runAssetScript(txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signature: Signature): ExeResult[WorldState] = {
-    val context = StatelessContext(txHash, signature, worldState)
+                     signature: Signature): ExeResult[Unit] = {
+    val context = StatelessContext(txHash, signature)
     val obj     = script.toObject
-    execute(context, obj, 0, args).map(_ => context.worldState)
+    execute(context, obj, args)
   }
 
-  def runAssetScript(worldState: WorldState,
-                     txHash: Hash,
+  def runAssetScript(txHash: Hash,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signatures: Stack[Signature]): ExeResult[WorldState] = {
-    val context = StatelessContext(txHash, signatures, worldState)
+                     signatures: Stack[Signature]): ExeResult[Unit] = {
+    val context = StatelessContext(txHash, signatures)
     val obj     = script.toObject
-    execute(context, obj, 0, args).map(_ => context.worldState)
+    execute(context, obj, args)
+  }
+
+  def execute(context: StatelessContext,
+              obj: ContractObj[StatelessContext],
+              args: AVector[Val]): ExeResult[Unit] = {
+    val vm = new StatelessVM(context,
+                             Stack.ofCapacity(frameStackMaxSize),
+                             Stack.ofCapacity(opStackMaxSize))
+    vm.execute(obj, 0, args)
+  }
+
+  def executeWithOutputs(context: StatelessContext,
+                         obj: ContractObj[StatelessContext],
+                         args: AVector[Val]): ExeResult[AVector[Val]] = {
+    val vm = new StatelessVM(context,
+                             Stack.ofCapacity(frameStackMaxSize),
+                             Stack.ofCapacity(opStackMaxSize))
+    vm.executeWithOutputs(obj, 0, args)
   }
 }
 
-object StatefulVM extends VM[StatefulContext] {
+object StatefulVM {
   def runTxScripts(worldState: WorldState, block: Block): ExeResult[WorldState] = {
     block.transactions.foldE(worldState) {
       case (worldState, tx) =>
@@ -82,6 +121,22 @@ object StatefulVM extends VM[StatefulContext] {
                   script: StatefulScript): ExeResult[WorldState] = {
     val context = StatefulContext(txHash, worldState)
     val obj     = script.toObject
-    execute(context, obj, 0, AVector.empty).map(_ => context.worldState)
+    execute(context, obj, AVector.empty).map(_ => context.worldState)
+  }
+
+  def execute(context: StatefulContext,
+              obj: ContractObj[StatefulContext],
+              args: AVector[Val]): ExeResult[WorldState] = {
+    val vm =
+      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    vm.execute(obj, 0, args).map(_ => context.worldState)
+  }
+
+  def executeWithOutputs(context: StatefulContext,
+                         obj: ContractObj[StatefulContext],
+                         args: AVector[Val]): ExeResult[AVector[Val]] = {
+    val vm =
+      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    vm.executeWithOutputs(obj, 0, args)
   }
 }

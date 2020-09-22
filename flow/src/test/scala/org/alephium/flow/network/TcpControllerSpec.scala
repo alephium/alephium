@@ -21,6 +21,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
     val controllerActor = controller.underlyingActor
 
     controller ! TcpController.Start(bootstrapper.ref)
+    Thread.sleep(200) // wait for tcp controller to be bounded
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)

@@ -49,7 +49,7 @@ object Compiler {
     def isPublic: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
-    def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]]
+    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
   final case class Error(message: String) extends Exception(message)
@@ -81,8 +81,9 @@ object Compiler {
       Seq(CallLocal(index))
     }
 
-    override def genCode(objId: Ast.Ident): Seq[Instr[StatefulContext]] = {
-      if (isPublic) Seq(CallExternal(index)) else throw Error(s"Call external private function")
+    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+      if (isPublic) Seq(CallExternal(index))
+      else throw Error(s"Call external private function of $typeId")
     }
   }
   object SimpleFunc {
@@ -188,10 +189,9 @@ object Compiler {
       }
     }
 
-    def getFunc(objId: Ast.Ident, callId: Ast.FuncId): FuncInfo[Ctx] = {
-      val contract = getContract(objId)
-      contractTable(contract)
-        .getOrElse(callId, throw Error(s"Function ${objId.name}.${callId.name} does not exist"))
+    def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): FuncInfo[Ctx] = {
+      contractTable(typeId)
+        .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
     }
 
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx]

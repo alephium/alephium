@@ -3,16 +3,18 @@ package org.alephium.protocol.vm
 import scala.annotation.tailrec
 
 import org.alephium.protocol.Hash
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Bytes}
 
-class Frame[Ctx <: Context](var pc: Int,
-                            obj: ContractObj[Ctx],
-                            val opStack: Stack[Val],
-                            val method: Method[Ctx],
-                            locals: Array[Val],
-                            val returnTo: AVector[Val] => ExeResult[Unit],
-                            val ctx: Ctx) {
-  def currentInstr: Option[Instr[Ctx]] = method.instrs.get(pc)
+abstract class Frame[Ctx <: Context] {
+  var pc: Int
+  def obj: ContractObj[Ctx]
+  def opStack: Stack[Val]
+  def method: Method[Ctx]
+  def locals: Array[Val]
+  def returnTo: AVector[Val] => ExeResult[Unit]
+  def ctx: Ctx
+
+  def pcMax: Int = method.instrs.length
 
   def advancePC(): Unit = pc += 1
 
@@ -59,6 +61,8 @@ class Frame[Ctx <: Context](var pc: Int,
     if (fields.isDefinedAt(index)) Right(fields(index)) else Left(InvalidFieldIndex)
   }
 
+  def reloadFields(): ExeResult[Unit] = obj.reloadFields(ctx)
+
   def setField(index: Int, v: Val): ExeResult[Unit] = {
     val fields = obj.fields
     if (!fields.isDefinedAt(index)) {
@@ -70,77 +74,157 @@ class Frame[Ctx <: Context](var pc: Int,
     }
   }
 
-  def updateState(): ExeResult[Unit] = {
-    obj.addressOpt match {
-      case Some(address) => ctx.updateState(address, AVector.from(obj.fields))
-      case None          => Right(())
-    }
-  }
-
-  private def getMethod(index: Int): ExeResult[Method[Ctx]] = {
+  protected def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     obj.getMethod(index).toRight(InvalidMethodIndex(index))
   }
 
-  def methodFrame(index: Int): ExeResult[Frame[Ctx]] = {
+  def methodFrame(index: Int): ExeResult[Frame[Ctx]]
+
+  def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]]
+
+  def execute(): ExeResult[Option[Frame[Ctx]]]
+}
+
+final class StatelessFrame(
+    var pc: Int,
+    val obj: ContractObj[StatelessContext],
+    val opStack: Stack[Val],
+    val method: Method[StatelessContext],
+    val locals: Array[Val],
+    val returnTo: AVector[Val] => ExeResult[Unit],
+    val ctx: StatelessContext
+) extends Frame[StatelessContext] {
+  def methodFrame(index: Int): ExeResult[Frame[StatelessContext]] = {
     for {
       method <- getMethod(index)
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.build(ctx, obj, method, args, opStack.push)
+    } yield Frame.stateless(ctx, obj, method, args, opStack, opStack.push)
   }
+
+  // Should not be used in stateless context
+  def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]] = ???
 
   @tailrec
-  final def execute(): ExeResult[Unit] = {
-    currentInstr match {
-      case Some(instr) =>
-        // No flatMap for tailrec
-        instr.runWith(this) match {
-          case Right(_) =>
-            advancePC()
-            execute()
-          case Left(e) => Left(e)
-        }
-      case None =>
-        updateState()
+  override def execute(): ExeResult[Option[Frame[StatelessContext]]] = {
+    if (pc < pcMax) {
+      method.instrs(pc) match {
+        case CallLocal(index) =>
+          advancePC()
+          methodFrame(Bytes.toPosInt(index)).map(Some.apply)
+        case Return =>
+          runReturn()
+        case instr =>
+          // No flatMap for tailrec
+          instr.runWith(this) match {
+            case Right(_) =>
+              advancePC()
+              execute()
+            case Left(e) => Left(e)
+          }
+      }
+    } else if (pc == pcMax) {
+      runReturn()
+    } else {
+      Left(PcOverflow)
     }
   }
+
+  private def runReturn(): ExeResult[Option[Frame[StatelessContext]]] =
+    Return.runWith(this).map(_ => None)
 }
 
-object Frame {
-  def build[Ctx <: Context](ctx: Ctx,
-                            obj: ContractObj[Ctx],
-                            methodIndex: Int,
-                            args: AVector[Val],
-                            returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+final class StatefulFrame(
+    var pc: Int,
+    val obj: ContractObj[StatefulContext],
+    val opStack: Stack[Val],
+    val method: Method[StatefulContext],
+    val locals: Array[Val],
+    val returnTo: AVector[Val] => ExeResult[Unit],
+    val ctx: StatefulContext
+) extends Frame[StatefulContext] {
+  override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
-      method <- obj.getMethod(methodIndex).toRight(InvalidMethodIndex(methodIndex))
-    } yield build(ctx, obj, method, args, returnTo)
+      method <- getMethod(index)
+      args   <- opStack.pop(method.localsType.length)
+      _      <- method.check(args)
+    } yield Frame.stateful(ctx, obj, method, args, opStack, opStack.push)
   }
 
-  def build[Ctx <: Context](ctx: Ctx,
-                            obj: ContractObj[Ctx],
-                            method: Method[Ctx],
-                            args: AVector[Val],
-                            returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx] = {
-    val locals = method.localsType.mapToArray(_.default)
-    args.foreachWithIndex((v, index) => locals(index) = v)
-    new Frame[Ctx](0, obj, Stack.ofCapacity(opStackMaxSize), method, locals, returnTo, ctx)
-  }
-
-  def externalMethodFrame[C <: StatefulContext](
-      frame: Frame[C],
-      contractKey: Hash,
-      index: Int
-  ): ExeResult[Frame[StatefulContext]] = {
+  override def externalMethodFrame(contractKey: Hash,
+                                   index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj <- frame.ctx.worldState
+      contractObj <- ctx.worldState
         .getContractObj(contractKey)
         .left
         .map[ExeFailure](IOErrorLoadContract)
       method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-      args   <- frame.opStack.pop(method.localsType.length)
+      args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.build(frame.ctx, contractObj, method, args, frame.opStack.push)
+    } yield Frame.stateful(ctx, contractObj, method, args, opStack, opStack.push)
+  }
+
+  @tailrec
+  override def execute(): ExeResult[Option[Frame[StatefulContext]]] = {
+    if (pc < pcMax) {
+      method.instrs(pc) match {
+        case CallLocal(index) =>
+          advancePC()
+          methodFrame(Bytes.toPosInt(index)).map(Some.apply)
+        case CallExternal(index) =>
+          advancePC()
+          for {
+            _           <- obj.commitFields(ctx)
+            byteVec     <- popT[Val.ByteVec]()
+            contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
+            newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
+          } yield Some(newFrame)
+        case Return =>
+          runReturn()
+        case instr =>
+          // No flatMap for tailrec
+          instr.runWith(this) match {
+            case Right(_) =>
+              advancePC()
+              execute()
+            case Left(e) => Left(e)
+          }
+      }
+    } else if (pc == pcMax) {
+      runReturn()
+    } else {
+      Left(PcOverflow)
+    }
+  }
+
+  private def runReturn(): ExeResult[Option[Frame[StatefulContext]]] =
+    for {
+      _ <- Return.runWith(this)
+      _ <- obj.commitFields(ctx)
+    } yield None
+}
+
+object Frame {
+  def stateless(ctx: StatelessContext,
+                obj: ContractObj[StatelessContext],
+                method: Method[StatelessContext],
+                args: AVector[Val],
+                operandStack: Stack[Val],
+                returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] = {
+    val locals = method.localsType.mapToArray(_.default)
+    args.foreachWithIndex((v, index) => locals(index) = v)
+    new StatelessFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
+  }
+
+  def stateful(ctx: StatefulContext,
+               obj: ContractObj[StatefulContext],
+               method: Method[StatefulContext],
+               args: AVector[Val],
+               operandStack: Stack[Val],
+               returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] = {
+    val locals = method.localsType.mapToArray(_.default)
+    args.foreachWithIndex((v, index) => locals(index) = v)
+    new StatefulFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
   }
 }

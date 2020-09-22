@@ -349,7 +349,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
         {
           val txNew = tx.copy(signatures = tx.signatures.init)
-          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), NotEnoughSignature)
+          failCheck(checkWitnesses(txNew, inputsState), NotEnoughSignature)
           failCheck(checkBlockTx(txNew, preparedWorldState), NotEnoughSignature)
         }
 
@@ -358,7 +358,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val inputNew              = sample.copy(unlockScript = unlock)
           val inputsNew             = inputs.replace(sampleIndex, inputNew)
           val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
-          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), InvalidPublicKeyHash)
+          failCheck(checkWitnesses(txNew, inputsState), InvalidPublicKeyHash)
         }
 
         {
@@ -366,7 +366,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val (sampleIndex, _) = tx.signatures.sampleWithIndex()
           val signaturesNew    = tx.signatures.replace(sampleIndex, signature)
           val txNew            = tx.copy(signatures = signaturesNew)
-          failCheck(checkWitnesses(txNew, inputsState, cachedWorldState), InvalidSignature)
+          failCheck(checkWitnesses(txNew, inputsState), InvalidSignature)
           failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
         }
     }

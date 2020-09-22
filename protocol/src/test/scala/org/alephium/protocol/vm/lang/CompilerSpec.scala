@@ -133,7 +133,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
-      StatefulVM.execute(context, obj, 0, args) isE output
+      StatefulVM.executeWithOutputs(context, obj, args) isE output
     }
   }
 
@@ -180,7 +180,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val args = AVector[Val](Val.ByteVec.from(pubKey))
     StatelessVM
-      .runAssetScript(cachedWorldState, Hash.zero, script, args, signature)
+      .runAssetScript(Hash.zero, script, args, signature)
       .isRight is true
   }
 

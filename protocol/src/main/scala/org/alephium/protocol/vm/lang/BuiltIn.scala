@@ -10,8 +10,8 @@ object BuiltIn {
 
     override def isPublic: Boolean = true
 
-    override def genCode(contract: Ast.Ident): Seq[Instr[StatelessContext]] = {
-      throw Compiler.Error(s"Built-in function $name does not belong to contract ${contract.name}")
+    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+      throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")
     }
   }
   final case class SimpleBuiltIn(name: String,
