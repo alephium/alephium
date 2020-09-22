@@ -42,7 +42,7 @@ trait AlephiumFlowSpec
     val transactions = {
       if (brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
-        val (privateKey, publicKey, _) = genesisBalances(mainGroup.value)
+        val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
         val fromLockupScript           = LockupScript.p2pkh(publicKey)
         val unlockScript               = UnlockScript.p2pkh(publicKey)
         val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get

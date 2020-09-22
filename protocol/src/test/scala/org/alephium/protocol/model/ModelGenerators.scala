@@ -39,7 +39,9 @@ trait LockupScriptGenerators extends Generators {
   def addressStringGen(groupIndex: GroupIndex): Gen[(String, String, String)] =
     addressGen(groupIndex).map {
       case (script, publicKey, privateKey) =>
-        (script.toBase58, publicKey.toHexString, privateKey.toHexString)
+        (Address(NetworkType.Devnet, script).toBase58,
+         publicKey.toHexString,
+         privateKey.toHexString)
     }
 }
 

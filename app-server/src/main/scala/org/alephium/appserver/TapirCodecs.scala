@@ -8,10 +8,10 @@ import sttp.tapir.CodecFormat.TextPlain
 import org.alephium.appserver.ApiModel._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.{TimeStamp, U64}
 
-object TapirCodecs {
+trait TapirCodecs extends ApiModelCodec {
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
     Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe(_))(_.millis)
 
@@ -50,5 +50,4 @@ object TapirCodecs {
           DecodeResult.Error(raw, new IllegalArgumentException(error.getMessage))
       }
     }(_.asJson.toString)
-
 }

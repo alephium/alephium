@@ -41,8 +41,10 @@ object BIP32 {
   final case class ExtendedPrivateKey protected[wallet] (privateKey: SecP256K1PrivateKey,
                                                          chainCode: ByteString,
                                                          path: Seq[Int]) {
+    def publicKey: SecP256K1PublicKey = privateKey.publicKey
+
     def extendedPublicKey: ExtendedPublicKey =
-      new ExtendedPublicKey(privateKey.publicKey, chainCode, path)
+      ExtendedPublicKey(privateKey.publicKey, chainCode, path)
 
     def derive(index: Int): Option[ExtendedPrivateKey] = {
       val i = {

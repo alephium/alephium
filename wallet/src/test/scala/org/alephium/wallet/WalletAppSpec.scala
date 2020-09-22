@@ -3,6 +3,7 @@ package org.alephium.wallet
 import java.net.InetAddress
 import java.nio.file.Files
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration._
 
 import akka.actor.ActorSystem
@@ -18,10 +19,11 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.TxGenerators
+import org.alephium.protocol.model.{NetworkType, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
 import org.alephium.wallet.api.model
+import org.alephium.wallet.config.WalletConfig
 
 class WalletAppSpec
     extends AlephiumSpec
@@ -46,11 +48,16 @@ class WalletAppSpec
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
 
+  val networkType = NetworkType.Mainnet
+
+  val config = WalletConfig(
+    walletPort,
+    tempSecretDir,
+    networkType,
+    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum))
+
   val walletApp: WalletApp =
-    new WalletApp(walletPort,
-                  Uri(s"http://${localhost.getHostAddress}:$blockFlowPort"),
-                  groupNum,
-                  tempSecretDir)
+    new WalletApp(config)
 
   val routes: Route = walletApp.routes
 
@@ -185,7 +192,7 @@ object WalletAppSpec {
       post {
         entity(as[JsonRpc]) {
           case GetSelfClique =>
-            complete(Result(SelfClique(Seq(peer, peer), 2)))
+            complete(Result(SelfClique(ArraySeq(peer, peer), 2)))
           case GetBalance(_) =>
             complete(Result(Balance(42, 1)))
           case CreateTransaction(_, _, _) =>

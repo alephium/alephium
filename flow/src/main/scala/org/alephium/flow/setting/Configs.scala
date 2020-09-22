@@ -12,6 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde.deserialize
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -69,10 +70,11 @@ object Configs extends StrictLogging {
       val left  = raw.take(splitIndex)
       val right = raw.drop(splitIndex + 1)
       for {
-        address    <- LockupScript.fromBase58(left)
-        rawBalance <- allCatch.opt(BigInt(right).underlying())
-        balance    <- U64.from(rawBalance)
-      } yield (address, balance)
+        bytestring   <- Hex.from(left)
+        lockupScript <- deserialize[LockupScript](bytestring).toOption
+        rawBalance   <- allCatch.opt(BigInt(right).underlying())
+        balance      <- U64.from(rawBalance)
+      } yield (lockupScript, balance)
     }
   }
 

@@ -108,8 +108,7 @@ object Transaction {
 
   def genesis(balances: AVector[(LockupScript, U64)]): Transaction = {
     val outputs = balances.map[TxOutput] {
-      case (lockupScript, value) =>
-        TxOutput.genesis(value, lockupScript)
+      case (lockupScript, value) => TxOutput.genesis(value, lockupScript)
     }
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)

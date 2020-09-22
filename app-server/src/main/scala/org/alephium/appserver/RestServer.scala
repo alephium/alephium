@@ -20,7 +20,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, Duration, Service}
 
@@ -37,8 +37,10 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
 
-  implicit val groupConfig: GroupConfig = node.config.broker
-  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
+  implicit val groupConfig: GroupConfig   = node.config.broker
+  implicit val chainsConfig: ChainsConfig = node.config.chains
+  implicit val networkType: NetworkType   = node.config.chains.networkType
+  implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
 
   private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
     Future.successful(

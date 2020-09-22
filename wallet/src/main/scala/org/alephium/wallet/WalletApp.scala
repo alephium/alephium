@@ -1,32 +1,36 @@
 package org.alephium.wallet
 
-import java.nio.file.{Path, Paths}
-
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.server.Route
 import akka.stream.OverflowStrategy
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import org.alephium.util.Duration
+import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.web._
 
 // scalastyle:off magic.number
-class WalletApp(walletPort: Int, blockFlowUri: Uri, groupNum: Int, secretDir: Path)(
-    implicit actorSystem: ActorSystem,
-    executionContext: ExecutionContext)
+class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
+                                      executionContext: ExecutionContext)
     extends StrictLogging {
 
   val httpClient: HttpClient = HttpClient(512, OverflowStrategy.fail)
 
-  val blockFlowClient: BlockFlowClient = BlockFlowClient.apply(httpClient, blockFlowUri, groupNum)
+  val blockFlowClient: BlockFlowClient =
+    BlockFlowClient.apply(httpClient,
+                          config.blockflow.uri,
+                          config.blockflow.groups,
+                          config.networkType)
 
-  val walletService: WalletService = WalletService.apply(blockFlowClient, secretDir)
+  val walletService: WalletService =
+    WalletService.apply(blockFlowClient, config.secretDir, config.networkType)
 
   val walletServer: WalletServer = new WalletServer(walletService)
 
@@ -35,7 +39,7 @@ class WalletApp(walletPort: Int, blockFlowUri: Uri, groupNum: Int, secretDir: Pa
   private val bindingPromise: Promise[Http.ServerBinding] = Promise()
 
   for {
-    binding <- Http().bindAndHandle(routes, "localhost", walletPort)
+    binding <- Http().bindAndHandle(routes, "localhost", config.port)
   } yield {
     bindingPromise.success(binding)
     logger.info(s"Listening wallet http request on $binding")
@@ -53,21 +57,15 @@ object Main extends App {
   implicit val system: ActorSystem                = ActorSystem("wallet-app")
   implicit val executionContext: ExecutionContext = system.dispatcher
 
-  val config: Config = ConfigFactory.load()
+  val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
 
-  val blockflowUri: Uri = {
-    val host = config.getString("blockflow.host")
-    val port = config.getInt("blockflow.port")
-    Uri(s"http://$host:$port")
-  }
+  val walletConfig: WalletConfig =
+    ConfigSource
+      .fromConfig(typesafeConfig)
+      .load[WalletConfig]
+      .getOrElse(throw new RuntimeException(s"Cannot load wallet config"))
 
-  val groupNum: Int = config.getInt("blockflow.groupNum")
-
-  val walletPort: Int = config.getInt("wallet.port")
-
-  val walletSecretDir: Path = Paths.get(config.getString("wallet.secretDir"))
-
-  val walletApp: WalletApp = new WalletApp(walletPort, blockflowUri, groupNum, walletSecretDir)
+  val walletApp: WalletApp = new WalletApp(walletConfig)
 
   scala.sys.addShutdownHook(Await.result(walletApp.stop(), Duration.ofSecondsUnsafe(10).asScala))
 }

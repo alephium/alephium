@@ -2,16 +2,17 @@ package org.alephium.wallet.web
 
 import java.net.InetAddress
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, Uri}
-import io.circe.{Codec, Encoder, Json, JsonObject}
-import io.circe.generic.semiauto.deriveCodec
+import io.circe.{Codec, Decoder, Encoder, Json, JsonObject}
+import io.circe.generic.semiauto.{deriveCodec, deriveDecoder, deriveEncoder}
 import io.circe.syntax._
 
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.Hex
 import org.alephium.wallet.circe.inetAddressCodec
@@ -28,11 +29,11 @@ trait BlockFlowClient {
 }
 
 object BlockFlowClient {
-  def apply(httpClient: HttpClient, address: Uri, groupNum: Int)(
+  def apply(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): BlockFlowClient =
-    new Impl(httpClient, address, groupNum)
+    new Impl(httpClient, address, groupNum, networkType)
 
-  private class Impl(httpClient: HttpClient, address: Uri, groupNum: Int)(
+  private class Impl(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
       implicit executionContext: ExecutionContext)
       extends BlockFlowClient {
 
@@ -70,19 +71,16 @@ object BlockFlowClient {
       getSelfClique().map { selfCliqueEither =>
         for {
           selfClique <- selfCliqueEither
-          index      <- selfClique.index(fromGroup.value)
-          peerPort <- selfClique.peers
-            .lift(index)
-            .flatMap(peer => peer.rpcPort.map(rpcPort => (peer.address, rpcPort)))
-            .toRight(s"cannot find peer for group ${fromGroup.value} (peers: ${selfClique.peers})")
+          peer = selfClique.peer(fromGroup)
+          rpcPort <- peer.rpcPort.toRight(
+            s"No rpc port for group ${fromGroup.value} (peers: ${selfClique.peers})")
         } yield {
-          val (peerAddress, rpcPort) = peerPort
-          Uri(s"http://${peerAddress.getHostAddress}:${rpcPort}")
+          Uri(s"http://${peer.address.getHostAddress}:$rpcPort")
         }
       }
 
     def getBalance(address: String): Future[Either[String, Long]] =
-      LockupScript.fromBase58(address) match {
+      Address.fromBase58(address, networkType) match {
         case None => Future.successful(Left(s"Cannot decode $address"))
         case Some(lockupScript) =>
           requestFromGroup[GetBalance, Balance](
@@ -183,15 +181,16 @@ object BlockFlowClient {
     implicit val codec: Codec[PeerAddress] = deriveCodec[PeerAddress]
   }
 
-  final case class SelfClique(peers: Seq[PeerAddress], groupNumPerBroker: Int) {
-    def index(group: Int): Either[String, Int] =
-      if (groupNumPerBroker <= 0) {
-        Left(s"SelfClique.groupNumPerBroker ($groupNumPerBroker) cannot be less or equal to zero")
-      } else {
-        Right(group / groupNumPerBroker)
-      }
+  final case class SelfClique(peers: ArraySeq[PeerAddress], groupNumPerBroker: Int) {
+    def peer(groupIndex: GroupIndex): PeerAddress =
+      peers((groupIndex.value / groupNumPerBroker) % peers.length)
   }
   object SelfClique {
-    implicit val codec: Codec[SelfClique] = deriveCodec[SelfClique]
+    val encoder: Encoder[SelfClique] = deriveEncoder[SelfClique]
+    val decoder: Decoder[SelfClique] =
+      deriveDecoder[SelfClique]
+        .ensure(_.groupNumPerBroker > 0, "Non-positve groupNumPerBroker")
+        .ensure(_.peers.nonEmpty, "Zero number of peers")
+    implicit val codec: Codec[SelfClique] = Codec.from(decoder, encoder)
   }
 }

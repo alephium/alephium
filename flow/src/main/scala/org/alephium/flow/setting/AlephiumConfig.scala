@@ -8,13 +8,12 @@ import scala.collection.immutable.ArraySeq
 import com.typesafe.config.Config
 import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
-import pureconfig.error.CannotConvert
 import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
+import org.alephium.protocol.model.{Block, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U64}
 
@@ -95,29 +94,33 @@ final case class DiscoverySetting(
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
-final case class GenesisSetting(balances: ArraySeq[(LockupScript, U64)])
+final case class ChainsSetting(
+    networkType: NetworkType,
+    genesisBalances: AVector[(LockupScript, U64)]
+) extends ChainsConfig
 
 final case class AlephiumConfig(
+    chains: ChainsSetting,
     broker: BrokerSetting,
     consensus: ConsensusSetting,
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
-    mempool: MemPoolSetting,
-    genesis: GenesisSetting
+    mempool: MemPoolSetting
 ) {
-  val genesisBlocks: AVector[AVector[Block]] =
-    Configs.loadBlockFlow(AVector.from(genesis.balances))(broker, consensus)
+  lazy val genesisBlocks: AVector[AVector[Block]] =
+    Configs.loadBlockFlow(chains.genesisBalances)(broker, consensus)
 }
 
 object AlephiumConfig {
   import PureConfigUtils._
 
-  type Balance = (LockupScript, U64)
-  implicit val balanceConfig: ConfigReader[Balance] =
-    ConfigReader[String].emap { input =>
-      Configs.splitBalance(input).toRight(CannotConvert(input, "Balance", "oops"))
-    }
+  private final case class TempChainsSetting(networkType: NetworkType) {
+    val chainsSetting: ChainsSetting = ChainsSetting(networkType, Genesis(networkType))
+  }
+
+  implicit val chainsSettingReader: ConfigReader[ChainsSetting] =
+    ConfigReader[TempChainsSetting].map(_.chainsSetting)
 
   def load(config: Config): Result[AlephiumConfig] = {
     val path          = "alephium"
@@ -126,20 +129,6 @@ object AlephiumConfig {
   }
 
   def load(rootPath: Path): Result[AlephiumConfig] = {
-    load(rootPath, None)
-  }
-
-  def load(rootPath: Path,
-           genesisBalances: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] =
-    build(Configs.parseConfig(rootPath), genesisBalances)
-
-  def build(config: Config,
-            genesisBalancesOpt: Option[ArraySeq[(LockupScript, U64)]]): Result[AlephiumConfig] = {
-    load(config).map { settings =>
-      genesisBalancesOpt match {
-        case Some(balances) => settings.copy(genesis = GenesisSetting(balances))
-        case None           => settings
-      }
-    }
+    load(Configs.parseConfig(rootPath))
   }
 }
