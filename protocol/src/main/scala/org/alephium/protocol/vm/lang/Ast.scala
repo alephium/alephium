@@ -50,9 +50,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val varInfo = state.getVariable(id)
-      if (state.isField(id)) Seq(LoadField(varInfo.index))
-      else Seq(LoadLocal(varInfo.index))
+      Seq(state.genLoadCode(id))
     }
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
@@ -144,7 +142,7 @@ object Ast {
       state.addVariable(ident, value.getType(state), isMutable)
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.genCode(state) :+ state.genCode(ident)
+      value.genCode(state) :+ state.genStoreCode(ident)
     }
   }
   final case class FuncDef[Ctx <: StatelessContext](id: FuncId,
@@ -175,7 +173,7 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      rhs.genCode(state) :+ state.genCode(target)
+      rhs.genCode(state) :+ state.genStoreCode(target)
     }
   }
   final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])

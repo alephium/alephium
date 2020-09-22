@@ -21,6 +21,9 @@ object Compiler {
       case e: Error => Left(e)
     }
 
+  def compileTxScript(input: String): Either[Error, StatefulScript] =
+    compileTxScript(input, 0)
+
   def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
     compileStateful(input, _.genStatefulScript(index))
 
@@ -159,11 +162,9 @@ object Compiler {
       varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
     }
 
-    def genCode(ident: Ast.Ident): Instr[StatelessContext] = {
-      val varInfo = getVariable(ident)
-      if (isField(ident)) StoreField(varInfo.index.toByte)
-      else StoreLocal(varInfo.index.toByte)
-    }
+    def genLoadCode(ident: Ast.Ident): Instr[Ctx]
+
+    def genStoreCode(ident: Ast.Ident): Instr[Ctx]
 
     def isField(ident: Ast.Ident): Boolean = varTable.contains(ident.name)
 
@@ -222,6 +223,18 @@ object Compiler {
       BuiltIn.funcs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
+
+    def genLoadCode(ident: Ast.Ident): Instr[StatelessContext] = {
+      val varInfo = getVariable(ident)
+      if (isField(ident)) throw Error(s"Loading state by ${ident.name} in a stateless context")
+      else LoadLocal(varInfo.index)
+    }
+
+    def genStoreCode(ident: Ast.Ident): Instr[StatelessContext] = {
+      val varInfo = getVariable(ident)
+      if (isField(ident)) throw Error(s"Storing state by ${ident.name} in a stateless context")
+      else StoreLocal(varInfo.index)
+    }
   }
 
   final case class StateForContract(
@@ -235,6 +248,18 @@ object Compiler {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
       BuiltIn.funcs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
+    }
+
+    def genLoadCode(ident: Ast.Ident): Instr[StatefulContext] = {
+      val varInfo = getVariable(ident)
+      if (isField(ident)) LoadField(varInfo.index)
+      else LoadLocal(varInfo.index)
+    }
+
+    def genStoreCode(ident: Ast.Ident): Instr[StatefulContext] = {
+      val varInfo = getVariable(ident)
+      if (isField(ident)) StoreField(varInfo.index)
+      else StoreLocal(varInfo.index)
     }
   }
 }

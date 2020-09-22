@@ -102,6 +102,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .isSuccess is true
   }
 
+  it should "parse asset script" in {
+    val script =
+      s"""
+         |// comment
+         |AssetScript Foo {
+         |  fn bar(a: U256, b: U256) -> (U256) {
+         |    return (a + b)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileAssetScript(script).isRight is true
+  }
+
+  it should "parse tx script" in {
+    val script =
+      s"""
+         |// comment
+         |TxScript Foo {
+         |  fn bar(a: U256, b: U256) -> (U256) {
+         |    return (a + b)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(script).isRight is true
+  }
+
   it should "parse contracts" in {
     val contract =
       s"""
