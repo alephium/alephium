@@ -21,8 +21,11 @@ sealed trait VM[Ctx <: Context] {
     val stack = Stack.ofCapacity[Frame[Ctx]](frameStackMaxSize)
     val rt    = Runtime[Ctx](stack)
 
-    stack.push(obj.startFrame(ctx, methodIndex, args, value => Right(rt.returnTo = value)))
-    execute(stack).map(_ => rt.returnTo)
+    for {
+      startFrame <- obj.startFrame(ctx, methodIndex, args, value => Right(rt.returnTo = value))
+      _          <- stack.push(startFrame)
+      _          <- execute(stack)
+    } yield rt.returnTo
   }
 
   @tailrec

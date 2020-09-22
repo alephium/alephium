@@ -4,9 +4,23 @@ import org.alephium.serde._
 import org.alephium.util._
 
 class VMSpec extends AlephiumSpec with ContextGenerators {
+  it should "not call from private function" in {
+    val method =
+      Method[StatefulContext](isPublic   = false,
+                              localsType = AVector.empty,
+                              returnType = AVector.empty,
+                              instrs     = AVector.empty)
+    val contract = StatefulContract(AVector.empty, methods = AVector(method))
+    val (obj, context) =
+      prepareContract(contract, AVector[Val]())
+    StatefulVM.execute(context, obj, 0, AVector(Val.U64(U64.Two))) is Left(
+      PrivateExternalMethodCall)
+  }
+
   it should "execute the following script" in {
     val method =
       Method[StatefulContext](
+        isPublic   = true,
         localsType = AVector(Val.U64),
         returnType = AVector(Val.U64),
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return))
@@ -18,11 +32,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "call method" in {
-    val method0 = Method[StatelessContext](localsType = AVector(Val.U64),
+    val method0 = Method[StatelessContext](isPublic = true,
+                                           localsType = AVector(Val.U64),
                                            returnType = AVector(Val.U64),
                                            instrs     = AVector(LoadLocal(0), CallLocal(1), Return))
     val method1 =
-      Method[StatelessContext](localsType = AVector(Val.U64),
+      Method[StatelessContext](isPublic   = false,
+                               localsType = AVector(Val.U64),
                                returnType = AVector(Val.U64),
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
     val script = StatelessScript(methods = AVector(method0, method1))
@@ -42,6 +58,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "serde script" in {
     val method =
       Method[StatefulContext](
+        isPublic   = true,
         localsType = AVector(Val.U64),
         returnType = AVector.empty,
         instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const1, U64Add, StoreField(1)))

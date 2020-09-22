@@ -8,6 +8,8 @@ object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
 
+    override def isPublic: Boolean = true
+
     override def genCode(contract: Ast.Ident): Seq[Instr[StatelessContext]] = {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${contract.name}")
     }

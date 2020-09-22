@@ -146,6 +146,7 @@ object Ast {
     }
   }
   final case class FuncDef[Ctx <: StatelessContext](id: FuncId,
+                                                    isPublic: Boolean,
                                                     args: Seq[Argument],
                                                     rtypes: Seq[Type],
                                                     body: Seq[Statement[Ctx]]) {
@@ -162,7 +163,7 @@ object Ast {
       val localsType = localVars.map(_.tpe.toVal)
       val returnType = AVector.from(rtypes.view.map(_.toVal))
       val instrs     = body.flatMap(_.genCode(state))
-      Method[Ctx](AVector.from(localsType), returnType, AVector.from(instrs))
+      Method[Ctx](isPublic, AVector.from(localsType), returnType, AVector.from(instrs))
     }
   }
   // TODO: handle multiple returns
