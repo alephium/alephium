@@ -44,7 +44,11 @@ def rpc_call_all(method, params):
         print(result.stdout.decode('utf-8'))
 
 def run(cmd):
-    os.system(cmd)
+    return os.system(cmd)
+
+def run_exit(cmd):
+    status = run(cmd)
+    sys.exit(status > 0)
 
 def run_capture(args):
     return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -78,22 +82,22 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def build(self):
-        run('sbt app-server/stage')
+        run_exit('sbt app-server/stage')
 
     def test(self):
-        run('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
+        run_exit('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
 
     def itest(self):
-        run('sbt it:scalafmt it:scalastyle it:test')
+        run_exit('sbt it:scalafmt it:scalastyle it:test')
 
     def package(self):
-        run('sbt app-server/universal:packageBin')
+        run_exit('sbt app-server/universal:packageBin')
 
     def publish(self):
-        run('sbt publishLocal')
+        run_exit('sbt publishLocal')
 
     def benchmark(self):
-        run('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
+        run_exit('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
 
     def run(self):
         tempdir = tempfile.gettempdir()
