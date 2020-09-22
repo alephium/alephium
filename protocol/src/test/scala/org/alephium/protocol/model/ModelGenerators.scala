@@ -65,6 +65,12 @@ trait TxInputGenerators extends Generators {
     } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), hash)
   }
 
+  lazy val txInputGen: Gen[TxInput] =
+    for {
+      index   <- groupIndexGen
+      txInput <- txInputGen(index)
+    } yield txInput
+
   def txInputGen(groupIndex: GroupIndex): Gen[TxInput] =
     for {
       scriptHint <- scriptHintGen(groupIndex)
@@ -379,8 +385,6 @@ trait ModelGenerators extends BlockGenerators
 
 trait NoIndexModelGeneratorsLike extends ModelGenerators {
   implicit def groupConfig: GroupConfig
-
-  lazy val txInputGen: Gen[TxInput] = groupIndexGen.flatMap(txInputGen(_))
 
   lazy val blockGen: Gen[Block] =
     chainIndexGen.flatMap(blockGen(_))

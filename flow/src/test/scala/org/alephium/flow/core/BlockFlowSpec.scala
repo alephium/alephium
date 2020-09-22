@@ -3,19 +3,17 @@ package org.alephium.flow.core
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AVector, Random, U64}
+import org.alephium.util.{AlephiumSpec, AVector, Random, U64}
 
-class BlockFlowSpec extends AlephiumFlowSpec { Test =>
-  it should "compute correct blockflow height" in {
-    val blockFlow = genesisBlockFlow()
-
+class BlockFlowSpec extends AlephiumSpec {
+  it should "compute correct blockflow height" in new FlowFixture {
     config.genesisBlocks.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block.hash) isE 0
     }
@@ -23,10 +21,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow, brokerConfig.groupFrom, genesisBalance)
   }
 
-  it should "work for at least 2 user group when adding blocks sequentially" in {
+  it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
-      val blockFlow = genesisBlockFlow()
-
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = mine(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block1, 1)
@@ -53,8 +49,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     }
   }
 
-  it should "compute cached blocks" in {
-    val blockFlow = genesisBlockFlow()
+  it should "compute cached blocks" in new FlowFixture {
     val newBlocks = for {
       i <- 0 to 1
       j <- 0 to 1
@@ -74,7 +69,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     cache0.contains(newBlocks(1).hash) is true
   }
 
-  it should "handle contract states" in {
+  it should "handle contract states" in new FlowFixture {
     val input0 =
       s"""
          |TxContract Foo(mut x: U64) {
@@ -88,7 +83,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     val initialState = AVector[Val](Val.U64(U64.Zero))
 
     val chainIndex         = ChainIndex.unsafe(0, 0)
-    val blockFlow          = genesisBlockFlow()
     val block0             = mine(blockFlow, chainIndex, outputScriptOption = Some(script0 -> initialState))
     val contractOutputRef0 = TxOutputRef.unsafe(block0.transactions.head, 0)
     val contractKey0       = contractOutputRef0.key
@@ -126,7 +120,10 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkState(blockFlow, chainIndex, contractKey0, newState2)
   }
 
-  it should "work for at least 2 user group when adding blocks in parallel" in {
+  it should "work for at least 2 user group when adding blocks in parallel" in new FlowFixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1)
+    )
     if (brokerConfig.groups >= 2) {
       val blockFlow = genesisBlockFlow()
 
@@ -135,13 +132,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks1.foreach { block =>
-        val index = block.chainIndex
-        if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block, 1)
-          blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
-        } else {
-          addAndCheck(blockFlow, block.header, 1)
-        }
+        addAndCheck(blockFlow, block, 1)
+        blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - 1)
@@ -152,13 +144,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks2.foreach { block =>
-        val index = block.chainIndex
-        if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block, 4)
-          blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
-        } else {
-          addAndCheck(blockFlow, block.header, 4)
-        }
+        addAndCheck(blockFlow, block, 4)
+        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - 2)
@@ -169,13 +156,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
         j <- 0 to 1
       } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
       newBlocks3.foreach { block =>
-        val index = block.chainIndex
-        if (index.relateTo(GroupIndex.unsafe(0))) {
-          addAndCheck(blockFlow, block, 8)
-          blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
-        } else {
-          addAndCheck(blockFlow, block.header, 8)
-        }
+        addAndCheck(blockFlow, block, 8)
+        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - 3)
@@ -183,10 +165,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     }
   }
 
-  it should "work for 2 user group when there is a fork" in {
+  it should "work for 2 user group when there is a fork" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
-      val blockFlow = genesisBlockFlow()
-
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block11     = mine(blockFlow, chainIndex1)
       val block12     = mine(blockFlow, chainIndex1)
@@ -216,7 +196,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     }
   }
 
-  it should "update mempool correctly" in {
+  it should "update mempool correctly" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
       forAll(Gen.choose(brokerConfig.groupFrom, brokerConfig.groupUntil - 1)) { mainGroup =>
         val blockFlow = genesisBlockFlow()
@@ -240,20 +220,16 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     }
   }
 
-  it should "reload blockflow properly from storage" in {
-    val blockFlow0 = genesisBlockFlow()
+  it should "reload blockflow properly from storage" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    val blockFlow0            = genesisBlockFlow()
 
     val newBlocks1 = for {
       i <- 0 to 1
       j <- 0 to 1
     } yield mine(blockFlow0, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
     newBlocks1.foreach { block =>
-      val index = block.chainIndex
-      if (index.relateTo(GroupIndex.unsafe(0))) {
-        addAndCheck(blockFlow0, block, 1)
-      } else {
-        addAndCheck(blockFlow0, block.header, 1)
-      }
+      addAndCheck(blockFlow0, block, 1)
     }
     newBlocks1.map(_.hash).diff(blockFlow0.getAllTips.toArray).isEmpty is true
 
@@ -265,13 +241,8 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       j <- 0 to 1
     } yield mine(blockFlow1, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
     newBlocks2.foreach { block =>
-      val index = block.chainIndex
-      if (index.relateTo(GroupIndex.unsafe(0))) {
-        addAndCheck(blockFlow1, block, 4)
-        blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
-      } else {
-        addAndCheck(blockFlow1, block.header, 4)
-      }
+      addAndCheck(blockFlow1, block, 4)
+      blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
     }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - 2)
@@ -280,7 +251,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   behavior of "Sync"
 
-  it should "compute sync locators and inventories" in {
+  it should "compute sync locators and inventories" in new FlowFixture {
     brokerConfig.groupNumPerBroker is 1 // the test only works in this case
 
     (0 until brokerConfig.groups).foreach { testToGroup =>
@@ -349,8 +320,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
   behavior of "Balance"
 
-  it should "transfer token for inside a same group" in {
-    val blockFlow = genesisBlockFlow()
+  it should "transfer token for inside a same group" in new FlowFixture {
     val testGroup = Random.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
     val block     = mine(blockFlow, ChainIndex.unsafe(testGroup, testGroup), onlyTxForIntra = true)
     block.nonCoinbase.nonEmpty is true
@@ -362,7 +332,7 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     checkBalance(blockFlow, testGroup, genesisBalance - 1)
   }
 
-  it should "transfer token for inter-group transactions" in {
+  it should "transfer token for inter-group transactions" in new FlowFixture { Test =>
     val anotherBroker = (brokerConfig.brokerId + 1 + Random.source.nextInt(
       brokerConfig.brokerNum - 1)) % brokerConfig.brokerNum
     val newConfigFixture = new AlephiumConfigFixture {
@@ -372,7 +342,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
 
       override lazy val genesisKeys = Test.genesisKeys
     }
-    Test.genesisBalance is newConfigFixture.genesisBalance
 
     val anotherConfig   = newConfigFixture.config
     val anotherStorages = StoragesFixture.buildStorages(newConfigFixture.rootPath)
@@ -407,25 +376,6 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
     } is true
   }
 
-  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
-    blockFlow.add(header).isRight is true
-    blockFlow.getWeight(header) isE consensusConfig.maxMiningTarget * weightFactor
-  }
-
-  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
-    val address   = genesisKeys(groupIndex)._2
-    val pubScript = LockupScript.p2pkh(address)
-    blockFlow
-      .getUtxos(pubScript)
-      .toOption
-      .get
-      .sumBy(_._2.amount.v) is expected.v
-  }
-
-  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
-  }
-
   def checkState(blockFlow: BlockFlow,
                  chainIndex: ChainIndex,
                  key: Hash,
@@ -436,43 +386,5 @@ class BlockFlowSpec extends AlephiumFlowSpec { Test =>
       .get
       .getContractState(key)
       .map(_.fields) isE expected
-  }
-
-  def show(blockFlow: BlockFlow): String = {
-    val tips = blockFlow.getAllTips
-      .map { tip =>
-        val weight = blockFlow.getWeightUnsafe(tip)
-        val header = blockFlow.getBlockHeaderUnsafe(tip)
-        val index  = header.chainIndex
-        val deps   = header.blockDeps.map(_.shortHex).mkString("-")
-        s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
-      }
-      .mkString("", "\n", "\n")
-    val bestDeps = (brokerConfig.groupFrom until brokerConfig.groupUntil)
-      .map { group =>
-        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
-        val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
-        s"group $group, bestDeps: $bestDepsStr"
-      }
-      .mkString("", "\n", "\n")
-    tips ++ bestDeps
-  }
-
-  def getBalance(blockFlow: BlockFlow, address: PublicKey): U64 = {
-    val lockupScript = LockupScript.p2pkh(address)
-    brokerConfig.contains(lockupScript.groupIndex) is true
-    val query = blockFlow.getUtxos(lockupScript)
-    query.toOption.get.sumBy(_._2.amount.v)
-  }
-
-  def showBalances(blockFlow: BlockFlow): Unit = {
-    def show(txOutput: TxOutput): String = {
-      s"${txOutput.scriptHint}:${txOutput.amount}"
-    }
-
-    val address   = genesisKeys(brokerConfig.brokerId)._2
-    val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
-    print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 }

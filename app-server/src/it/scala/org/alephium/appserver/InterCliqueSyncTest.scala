@@ -54,7 +54,9 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     val toTs = TimeStamp.now()
 
-    request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique1)).blocks.size is
-      request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique2)).blocks.size
+    eventually {
+      request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique1)).blocks.toSet is
+        request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique2)).blocks.toSet
+    }
   }
 }

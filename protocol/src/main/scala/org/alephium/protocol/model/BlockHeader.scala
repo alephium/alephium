@@ -26,7 +26,7 @@ final case class BlockHeader(
     ChainIndex.from(hash)
   }
 
-  def isGenesis: Boolean = timestamp == TimeStamp.zero
+  def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
   def parentHash(implicit config: GroupConfig): Hash = {
     uncleHash(chainIndex.to)
@@ -45,6 +45,11 @@ final case class BlockHeader(
   def outDeps(implicit config: GroupConfig): AVector[Hash] = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups)
+  }
+
+  def intraDep(implicit config: GroupConfig): Hash = {
+    assume(!isGenesis)
+    blockDeps.takeRight(config.groups)(chainIndex.from.value)
   }
 
   def outTips(implicit config: GroupConfig): AVector[Hash] = {
