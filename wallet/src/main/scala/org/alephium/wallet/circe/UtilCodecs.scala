@@ -16,7 +16,9 @@ trait UtilCodecs {
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))
 
   val byteStringDecoder: Decoder[ByteString] =
-    (c: HCursor) => c.as[String].map(Hex.unsafe)
+    Decoder.decodeString.emap { bs =>
+      Hex.from(bs).toRight(s"Invalid hex string: $bs")
+    }
 
   implicit val byteStringCodec: Codec[ByteString] =
     Codec.from(byteStringDecoder, byteStringEncoder)
@@ -25,9 +27,12 @@ trait UtilCodecs {
     codecXemap[String, InetAddress](parseInetAddress, _.getHostAddress)
   }
 
-  implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
-  implicit val u64Decoder: Decoder[U64] =
-    Decoder.decodeLong.emap(value => U64.from(value).toRight(s"Invalid amount: $value"))
+  implicit val u64Encoder: Encoder[U64] = Encoder.encodeJavaBigInteger.contramap[U64](_.toBigInt)
+
+  implicit val u64Decoder: Decoder[U64] = Decoder.decodeJavaBigInteger.emap { u64 =>
+    U64.from(u64).toRight(s"Invalid U64: $u64")
+  }
+
   implicit val u64Codec: Codec[U64] = Codec.from(u64Decoder, u64Encoder)
 
   implicit val mnemonicSizeEncoder: Encoder[Mnemonic.Size] =

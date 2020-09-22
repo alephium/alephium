@@ -214,9 +214,11 @@ trait ApiModelCodec {
   implicit def apiConfig: ApiConfig
   implicit def networkType: NetworkType
 
-  implicit val u64Encoder: Encoder[U64] = Encoder.encodeLong.contramap[U64](_.v)
-  implicit val u64Decoder: Decoder[U64] = Decoder.decodeLong.map(U64.unsafe)
-  implicit val u64Codec: Codec[U64]     = Codec.from(u64Decoder, u64Encoder)
+  implicit val u64Encoder: Encoder[U64] = Encoder.encodeJavaBigInteger.contramap[U64](_.toBigInt)
+  implicit val u64Decoder: Decoder[U64] = Decoder.decodeJavaBigInteger.emap { u64 =>
+    U64.from(u64).toRight(s"Invalid U64: $u64")
+  }
+  implicit val u64Codec: Codec[U64] = Codec.from(u64Decoder, u64Encoder)
 
   implicit val publicKeyEncoder: Encoder[PublicKey] = bytesEncoder
   implicit val publicKeyDecoder: Decoder[PublicKey] = bytesDecoder(PublicKey.from)
