@@ -87,7 +87,7 @@ trait FlowFixture
   }
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
-    val address   = genesisBalances(groupIndex)._2
+    val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
       .getUtxos(pubScript)
@@ -132,7 +132,7 @@ trait FlowFixture
       s"${txOutput.scriptHint}:${txOutput.amount}"
     }
 
-    val address   = genesisBalances(brokerConfig.brokerId)._2
+    val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
     val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
