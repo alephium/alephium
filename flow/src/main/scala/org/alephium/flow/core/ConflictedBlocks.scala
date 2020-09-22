@@ -74,11 +74,9 @@ object ConflictedBlocks {
 
       block.transactions.foreach { tx =>
         tx.unsigned.inputs.foreach { input =>
-          txCache.get(input.outputRef) match {
-            case Some(blockHashes) =>
-              blockHashes.subtractOne(block.hash)
-              if (blockHashes.isEmpty) txCache.subtractOne(input.outputRef)
-            case None => ()
+          txCache.get(input.outputRef).foreach { blockHashes =>
+            blockHashes.subtractOne(block.hash)
+            if (blockHashes.isEmpty) txCache.subtractOne(input.outputRef)
           }
         }
       }
