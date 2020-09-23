@@ -153,7 +153,18 @@ lazy val wallet = project("wallet")
     )
   )
 
-val commonSettings = Seq(
+val publishSettings = Seq(
+  publishMavenStyle := true,
+  publishArtifact in Test := false,
+  publishTo in ThisBuild := sonatypePublishToBundle.value
+)
+
+val releaseSettings =
+  releaseProcess := Seq[ReleaseStep](
+    releaseStepCommandAndRemaining("publishLocalSigned")
+  )
+
+val commonSettings = publishSettings ++ releaseSettings ++ Seq(
   organization := "org.alephium",
   version := "0.3.1-SNAPSHOT",
   scalaVersion := "2.13.3",
