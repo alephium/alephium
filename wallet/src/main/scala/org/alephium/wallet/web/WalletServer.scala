@@ -64,7 +64,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
       getBalances.toRoute { _ =>
         walletService
           .getBalances()
-          .map(_.left.map(toApiError).map { balances =>
+          .map(_.map { balances =>
             val totalBalance = balances.map { case (_, amount) => amount }.fold(U64.Zero) {
               case (acc, u64) => acc.addUnsafe(u64)
             }
@@ -72,7 +72,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
               case (address, amount) => model.Balances.AddressBalance(address, amount)
             }
             model.Balances(totalBalance, balancesPerAddress)
-          })
+          }.left.map(toApiError))
       } ~
       getAddresses.toRoute { _ =>
         walletService

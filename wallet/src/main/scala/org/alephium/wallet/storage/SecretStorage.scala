@@ -2,7 +2,6 @@ package org.alephium.wallet.storage
 
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Path}
-import java.util.UUID
 
 import scala.io.Source
 import scala.util.{Try, Using}
@@ -13,7 +12,7 @@ import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 
-import org.alephium.crypto.AES
+import org.alephium.crypto.{AES, Sha256}
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.serde.{deserialize, serialize, Serde}
@@ -23,26 +22,27 @@ import org.alephium.wallet.circe.UtilCodecs
 
 trait SecretStorage {
   def lock(): Unit
-  def unlock(password: String): Either[SecretStorage.SecretStorageError, Unit]
-  def getCurrentPrivateKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
+  def unlock(password: String): Either[SecretStorage.Error, Unit]
+  def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
-    : Either[SecretStorage.SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
-  def deriveNextKey(): Either[SecretStorage.SecretStorageError, ExtendedPrivateKey]
-  def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.SecretStorageError, Unit]
+    : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
+  def deriveNextKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
+  def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit]
 }
 
 object SecretStorage extends UtilCodecs {
 
-  sealed trait SecretStorageError
+  sealed trait Error
 
-  case object Locked              extends SecretStorageError
-  case object CannotDeriveKey     extends SecretStorageError
-  case object CannotParseFile     extends SecretStorageError
-  case object CannotDecryptSecret extends SecretStorageError
-  case object InvalidState        extends SecretStorageError
-  case object SecretDirError      extends SecretStorageError
-  case object SecretFileError     extends SecretStorageError
-  case object UnknownKey          extends SecretStorageError
+  case object Locked                  extends Error
+  case object CannotDeriveKey         extends Error
+  case object CannotParseFile         extends Error
+  case object CannotDecryptSecret     extends Error
+  case object InvalidState            extends Error
+  case object SecretDirError          extends Error
+  case object SecretFileError         extends Error
+  case object SecretFileAlreadyExists extends Error
+  case object UnknownKey              extends Error
 
   final case class StoredState(seed: ByteString, numberOfAddresses: Int, activeAddressIndex: Int)
 
@@ -59,23 +59,20 @@ object SecretStorage extends UtilCodecs {
 
   implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
 
-  def fromFile(file: File, password: String): Either[SecretStorageError, SecretStorage] = {
-    for {
-      _ <- stateFromFile(file, password)
-    } yield {
-      new Impl(file)
-    }
+  def load(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
+    withFileOrCreate(seed, password, secretDir)(file => fromFile(file, password))
   }
 
-  def apply(seed: ByteString,
-            password: String,
-            secretDir: Path): Either[SecretStorageError, SecretStorage] = {
+  def create(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
+    withFileOrCreate(seed, password, secretDir)(_ => Left(SecretFileAlreadyExists))
+  }
 
-    val uuid = UUID.nameUUIDFromBytes(seed.toArray)
-    val file = new File(s"$secretDir/$uuid.json")
-
+  private def withFileOrCreate(seed: ByteString, password: String, secretDir: Path)(
+      onFileExist: File => Either[Error, SecretStorage]): Either[Error, SecretStorage] = {
+    val name = Sha256.hash(Sha256.hash(seed)).shortHex
+    val file = new File(s"$secretDir/$name.json")
     if (file.exists) {
-      fromFile(file, password)
+      onFileExist(file)
     } else {
       for {
         _ <- Try(Files.createDirectories(secretDir)).toEither.left.map(_ => SecretDirError)
@@ -88,6 +85,14 @@ object SecretStorage extends UtilCodecs {
     }
   }
 
+  private[storage] def fromFile(file: File, password: String): Either[Error, SecretStorage] = {
+    for {
+      _ <- stateFromFile(file, password)
+    } yield {
+      new Impl(file)
+    }
+  }
+
   //TODO add some `synchronized` for the state
   private class Impl(file: File) extends SecretStorage {
 
@@ -97,7 +102,7 @@ object SecretStorage extends UtilCodecs {
       maybeState = None
     }
 
-    override def unlock(password: String): Either[SecretStorageError, Unit] = {
+    override def unlock(password: String): Either[Error, Unit] = {
       for {
         state <- stateFromFile(file, password)
       } yield {
@@ -105,25 +110,24 @@ object SecretStorage extends UtilCodecs {
       }
     }
 
-    override def getCurrentPrivateKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
+    override def getCurrentPrivateKey(): Either[Error, ExtendedPrivateKey] = {
       for {
-        state <- maybeState.toRight(Locked: SecretStorageError)
+        state <- getState
       } yield {
         state.activeKey
       }
     }
 
-    def getAllPrivateKeys()
-      : Either[SecretStorageError, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])] = {
+    def getAllPrivateKeys(): Either[Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])] = {
       for {
-        state <- maybeState.toRight(Locked: SecretStorageError)
+        state <- getState
       } yield {
         (state.activeKey, state.privateKeys)
       }
     }
-    override def deriveNextKey(): Either[SecretStorageError, ExtendedPrivateKey] = {
+    override def deriveNextKey(): Either[Error, ExtendedPrivateKey] = {
       for {
-        state         <- maybeState.toRight(Locked)
+        state         <- getState
         latestKey     <- state.privateKeys.lastOption.toRight(InvalidState)
         newPrivateKey <- deriveNextPrivateKey(state.seed, latestKey)
         keys = state.privateKeys :+ newPrivateKey
@@ -136,10 +140,9 @@ object SecretStorage extends UtilCodecs {
       }
     }
 
-    override def changeActiveKey(
-        key: ExtendedPrivateKey): Either[SecretStorage.SecretStorageError, Unit] = {
+    override def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit] = {
       for {
-        state <- maybeState.toRight(Locked)
+        state <- getState
         index = state.privateKeys.indexWhere(_.privateKey == key.privateKey)
         _ <- Either.cond(index >= 0, (), UnknownKey)
         _ <- storeStateToFile(file,
@@ -150,9 +153,11 @@ object SecretStorage extends UtilCodecs {
         ()
       }
     }
+
+    private def getState: Either[Error, State] = maybeState.toRight(Locked)
   }
 
-  private def stateFromFile(file: File, password: String): Either[SecretStorageError, State] = {
+  private def stateFromFile(file: File, password: String): Either[Error, State] = {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
@@ -168,7 +173,7 @@ object SecretStorage extends UtilCodecs {
   }
 
   private def deriveKeys(seed: ByteString,
-                         number: Int): Either[SecretStorageError, AVector[ExtendedPrivateKey]] = {
+                         number: Int): Either[Error, AVector[ExtendedPrivateKey]] = {
     if (number <= 0) {
       Right(AVector.empty)
     } else {
@@ -196,7 +201,7 @@ object SecretStorage extends UtilCodecs {
 
   private def deriveNextPrivateKey(
       seed: ByteString,
-      privateKey: ExtendedPrivateKey): Either[SecretStorageError, ExtendedPrivateKey] =
+      privateKey: ExtendedPrivateKey): Either[Error, ExtendedPrivateKey] =
     (for {
       index  <- privateKey.path.lastOption.map(_ + 1)
       parent <- BIP32.btcMasterKey(seed).derive(Constants.path.dropRight(1).toSeq)
@@ -205,7 +210,7 @@ object SecretStorage extends UtilCodecs {
 
   private def storeStateToFile(file: File,
                                storedState: StoredState,
-                               password: String): Either[SecretStorageError, Unit] = {
+                               password: String): Either[Error, Unit] = {
     Using
       .Manager { use =>
         val outWriter = use(new PrintWriter(file))

@@ -86,7 +86,9 @@ object WalletService {
         for {
           mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-          storage <- SecretStorage(seed, password, secretDir).left
+          storage <- SecretStorage
+            .create(seed, password, secretDir)
+            .left
             .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
           maybeSecretStorage = Option(storage)
@@ -102,7 +104,8 @@ object WalletService {
         val words = mnemonic.split(' ').toSeq
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
-            SecretStorage(seed, password, secretDir)
+            SecretStorage
+              .load(seed, password, secretDir)
               .map { storage =>
                 maybeSecretStorage = Option(storage)
               }

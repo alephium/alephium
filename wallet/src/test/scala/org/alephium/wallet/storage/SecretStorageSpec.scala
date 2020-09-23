@@ -21,7 +21,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
       case (seed, password, wrongPassword) =>
-        val secretStorage = SecretStorage(seed, password, secretDir).toOption.get
+        val secretStorage = SecretStorage.create(seed, password, secretDir).toOption.get
         val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
 
         secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
