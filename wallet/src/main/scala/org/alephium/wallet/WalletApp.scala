@@ -32,7 +32,7 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
   val walletService: WalletService =
     WalletService.apply(blockFlowClient, config.secretDir, config.networkType)
 
-  val walletServer: WalletServer = new WalletServer(walletService)
+  val walletServer: WalletServer = new WalletServer(walletService, config.networkType)
 
   val routes: Route = walletServer.route
 

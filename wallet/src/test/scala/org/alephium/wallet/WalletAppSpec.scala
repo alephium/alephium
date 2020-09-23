@@ -19,14 +19,18 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{NetworkType, TxGenerators}
+import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
+import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfig
 
 class WalletAppSpec
     extends AlephiumSpec
+    with ModelCodecs
     with ScalatestRouteTest
     with FailFastCirceSupport
     with ScalaFutures {
@@ -41,14 +45,15 @@ class WalletAppSpec
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = groupNum
   }
+
+  val networkType = NetworkType.Mainnet
+
   val blockFlowMock =
-    new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort)
+    new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
   val blockflowBinding = blockFlowMock.server.futureValue
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
-
-  val networkType = NetworkType.Mainnet
 
   val config = WalletConfig(
     walletPort,
@@ -64,21 +69,21 @@ class WalletAppSpec
   val password                 = Hash.generate.toHexString
   var mnemonic: model.Mnemonic = model.Mnemonic(Seq.empty)
   var address                  = ""
-  val transferAddress          = Hash.generate.toHexString
+  val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
   val amount                   = 10
 
-  val creationJson     = s"""{"password":"$password"}"""
-  val unlockJson       = s"""{"password":"$password"}"""
-  val transferJson     = s"""{"address":"$transferAddress","amount":$amount}"""
-  lazy val restoreJson = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
+  val unlockJson                = s"""{"password":"$password"}"""
+  def transferJson(amount: Int) = s"""{"address":"$transferAddress","amount":$amount}"""
+  lazy val restoreJson          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
-  def create()     = Post(s"/wallet/create", entity(creationJson)) ~> routes
-  def unlock()     = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
-  def lock()       = Post(s"/wallet/lock") ~> routes
-  def getBalance() = Get(s"/wallet/balance") ~> routes
-  def getAddress() = Get(s"/wallet/address") ~> routes
-  def transfer()   = Post(s"/wallet/transfer", entity(transferJson)) ~> routes
-  def restore()    = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
+  def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
+  def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
+  def lock()                = Post(s"/wallet/lock") ~> routes
+  def getBalance()          = Get(s"/wallet/balance") ~> routes
+  def getAddress()          = Get(s"/wallet/address") ~> routes
+  def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
+  def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -87,7 +92,13 @@ class WalletAppSpec
       status is StatusCodes.BadRequest
     }
 
-    create() ~> check {
+    create(2) ~> check {
+      val error = responseAs[WalletApiError]
+      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: DownField(mnemonicSize): {"password":"$password","mnemonicSize":2})"""
+      status is StatusCodes.BadRequest
+    }
+
+    create(24) ~> check {
       mnemonic = responseAs[model.Mnemonic]
       status is StatusCodes.OK
     }
@@ -104,15 +115,15 @@ class WalletAppSpec
     }
 
     getBalance() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     getAddress() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
-    transfer() ~> check {
-      status is StatusCodes.BadRequest
+    transfer(10) ~> check {
+      status is StatusCodes.Unauthorized
     }
 
     unlock()
@@ -127,9 +138,16 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    transfer() ~> check {
+    transfer(10) ~> check {
       status is StatusCodes.OK
-      responseAs[model.Transfer.Result] is model.Transfer.Result("txId")
+      responseAs[model.Transfer.Result]
+    }
+
+    val negAmount = -10
+    transfer(negAmount) ~> check {
+      val error = responseAs[WalletApiError]
+      error.detail is s"""Invalid value for: body (Invalid U64: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
+      status is StatusCodes.BadRequest
     }
 
     restore() ~> check {
@@ -137,7 +155,7 @@ class WalletAppSpec
     }
 
     getAddress() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.Unauthorized
     }
 
     unlock()
@@ -160,31 +178,15 @@ class WalletAppSpec
   }
 }
 
-object WalletAppSpec {
+object WalletAppSpec extends {
   import org.alephium.wallet.web.BlockFlowClient._
 
-  implicit val jsonRpcDecoder: Decoder[JsonRpc] = new Decoder[JsonRpc] {
-    def decode(c: HCursor, method: String, params: Json): Decoder.Result[JsonRpc] = {
-      method match {
-        case "send_transaction"   => params.as[SendTransaction]
-        case "create_transaction" => params.as[CreateTransaction]
-        case "get_balance"        => params.as[GetBalance]
-        case "self_clique"        => Right(GetSelfClique)
-        case _                    => Left(DecodingFailure(s"$method not supported", c.history))
-      }
-    }
-    final def apply(c: HCursor): Decoder.Result[JsonRpc] =
-      for {
-        method  <- c.downField("method").as[String]
-        params  <- c.downField("params").as[Json]
-        jsonRpc <- decode(c, method, params)
-      } yield jsonRpc
-  }
-
-  class BlockFlowServerMock(address: InetAddress, port: Int)(implicit val groupConfig: GroupConfig,
-                                                             system: ActorSystem)
+  class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(
+      implicit val groupConfig: GroupConfig,
+      system: ActorSystem)
       extends FailFastCirceSupport
-      with TxGenerators {
+      with TxGenerators
+      with Codecs {
 
     private val peer = PeerAddress(address, Some(port), None)
 
@@ -205,10 +207,28 @@ object WalletAppSpec {
                                         unsignedTx.toGroup.value)
               ))
           case SendTransaction(_, _) =>
-            complete(Result(TxResult("txId", 0, 0)))
+            complete(Result(TxResult(Hash.generate, 0, 0)))
         }
       }
 
     val server = Http().bindAndHandle(routes, address.getHostAddress, port)
+
+    implicit val jsonRpcDecoder: Decoder[JsonRpc] = new Decoder[JsonRpc] {
+      def decode(c: HCursor, method: String, params: Json): Decoder.Result[JsonRpc] = {
+        method match {
+          case "send_transaction"   => params.as[SendTransaction]
+          case "create_transaction" => params.as[CreateTransaction]
+          case "get_balance"        => params.as[GetBalance]
+          case "self_clique"        => Right(GetSelfClique)
+          case _                    => Left(DecodingFailure(s"$method not supported", c.history))
+        }
+      }
+      final def apply(c: HCursor): Decoder.Result[JsonRpc] =
+        for {
+          method  <- c.downField("method").as[String]
+          params  <- c.downField("params").as[Json]
+          jsonRpc <- decode(c, method, params)
+        } yield jsonRpc
+    }
   }
 }

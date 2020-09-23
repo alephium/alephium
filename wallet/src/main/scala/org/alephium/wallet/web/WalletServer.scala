@@ -11,13 +11,18 @@ import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.wallet.api.WalletEndpoints
+import org.alephium.protocol.model.NetworkType
+import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
+import org.alephium.wallet.service.WalletService._
 
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-class WalletServer(walletService: WalletService)(implicit executionContext: ExecutionContext)
-    extends WalletEndpoints {
+class WalletServer(walletService: WalletService, val networkType: NetworkType)(
+    implicit executionContext: ExecutionContext)
+    extends WalletEndpoints
+    with AkkaDecodeFailureHandler {
+  import WalletServer.toApiError
 
   private val docs: OpenAPI = List(
     createWallet,
@@ -32,25 +37,55 @@ class WalletServer(walletService: WalletService)(implicit executionContext: Exec
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
   def route: Route =
-    createWallet.toRoute(
-      walletCreation =>
+    createWallet.toRoute { walletCreation =>
+      walletService
+        .createWallet(walletCreation.password,
+                      walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
+                      walletCreation.mnemonicPassphrase)
+        .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)).left.map(toApiError))
+    } ~
+      restoreWallet.toRoute { walletRestore =>
         walletService
-          .createWallet(walletCreation.password,
-                        walletCreation.mnemonicSize.getOrElse(Mnemonic.worldListSizes.last),
-                        walletCreation.mnemonicPassphrase)
-          .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)))) ~
-      restoreWallet.toRoute(
-        walletRestore =>
-          walletService
-            .restoreWallet(walletRestore.password,
-                           walletRestore.mnemonic,
-                           walletRestore.mnemonicPassphrase)
-      ) ~
-      lockWallet.toRoute(_              => walletService.lockWallet()) ~
-      unlockWallet.toRoute(walletUnlock => walletService.unlockWallet(walletUnlock.password)) ~
-      getBalance.toRoute(_              => walletService.getBalance()) ~
-      getAddress.toRoute(_              => walletService.getAddress()) ~
-      transfer.toRoute(tr =>
-        walletService.transfer(tr.address, tr.amount).map(_.map(model.Transfer.Result.apply))) ~
+          .restoreWallet(walletRestore.password,
+                         walletRestore.mnemonic,
+                         walletRestore.mnemonicPassphrase)
+          .map(_.left.map(toApiError))
+      } ~
+      lockWallet.toRoute { _ =>
+        walletService.lockWallet().map(_.left.map(toApiError))
+      } ~
+      unlockWallet.toRoute { walletUnlock =>
+        walletService.unlockWallet(walletUnlock.password).map(_.left.map(toApiError))
+      } ~
+      getBalance.toRoute { _ =>
+        walletService.getBalance().map(_.left.map(toApiError))
+      } ~
+      getAddress.toRoute { _ =>
+        walletService.getAddress().map(_.left.map(toApiError))
+      } ~
+      transfer.toRoute { tr =>
+        walletService
+          .transfer(tr.address, tr.amount)
+          .map(_.map(model.Transfer.Result.apply).left.map(toApiError))
+      } ~
       swaggerUIRoute
+}
+
+object WalletServer {
+  import WalletApiError._
+  def toApiError(walletError: WalletError): WalletApiError = {
+
+    val badRequest   = BadRequest(walletError.message)
+    val unauthorized = Unauthorized(walletError.message)
+
+    walletError match {
+      case _: InvalidMnemonic           => badRequest
+      case _: CannotCreateEncryptedFile => badRequest
+      case _: BlockFlowClientError      => badRequest
+      case NoWalletLoaded               => badRequest
+
+      case WalletLocked    => unauthorized
+      case InvalidPassword => unauthorized
+    }
+  }
 }

@@ -53,7 +53,9 @@ object CirceUtils {
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))
 
   implicit val byteStringDecoder: Decoder[ByteString] =
-    (c: HCursor) => c.as[String].map(Hex.unsafe)
+    Decoder.decodeString.emap { bs =>
+      Hex.from(bs).toRight(s"Invalid hex string: $bs")
+    }
 
   implicit val inetAddressCodec: Codec[InetAddress] = {
     codecXemap[String, InetAddress](createInetAddress, _.getHostAddress)

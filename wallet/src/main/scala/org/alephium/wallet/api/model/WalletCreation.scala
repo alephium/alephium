@@ -1,12 +1,7 @@
 package org.alephium.wallet.api.model
 
-import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
+import org.alephium.crypto.wallet.Mnemonic
 
 final case class WalletCreation(password: String,
                                 mnemonicPassphrase: Option[String],
-                                mnemonicSize: Option[Int])
-
-object WalletCreation {
-  implicit val codec: Codec[WalletCreation] = deriveCodec[WalletCreation]
-}
+                                mnemonicSize: Option[Mnemonic.Size])
