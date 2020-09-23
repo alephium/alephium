@@ -177,25 +177,15 @@ object SecretStorage extends UtilCodecs {
     if (number <= 0) {
       Right(AVector.empty)
     } else {
-      BIP32
-        .btcMasterKey(seed)
-        .derive(Constants.path.toSeq)
-        .toRight(CannotDeriveKey)
-        .flatMap { firstKey =>
-          if (number <= 1) {
-            Right(AVector(firstKey))
-          } else {
-            AVector
-              .from((2 to number))
-              .foldE((firstKey, AVector(firstKey))) {
-                case ((prevKey, keys), _) =>
-                  deriveNextPrivateKey(seed, prevKey).map { newKey =>
-                    (newKey, keys :+ newKey)
-                  }
-              }
-              .map { case (_, keys) => keys }
-          }
+      for {
+        rootPrivateKey <- BIP32
+          .btcMasterKey(seed)
+          .derive(Constants.path.init)
+          .toRight(CannotDeriveKey)
+        privateKeys <- AVector.from(0 until number).mapE { index =>
+          rootPrivateKey.derive(index).toRight(CannotDeriveKey)
         }
+      } yield privateKeys
     }
   }
 
@@ -204,7 +194,7 @@ object SecretStorage extends UtilCodecs {
       privateKey: ExtendedPrivateKey): Either[Error, ExtendedPrivateKey] =
     (for {
       index  <- privateKey.path.lastOption.map(_ + 1)
-      parent <- BIP32.btcMasterKey(seed).derive(Constants.path.dropRight(1).toSeq)
+      parent <- BIP32.btcMasterKey(seed).derive(Constants.path.init)
       child  <- parent.derive(index)
     } yield child).toRight(CannotDeriveKey)
 

@@ -101,7 +101,7 @@ object WalletService {
         mnemonic: String,
         mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]] = {
       Future.successful {
-        val words = mnemonic.split(' ').toSeq
+        val words = AVector.unsafe(mnemonic.split(' '))
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
             SecretStorage

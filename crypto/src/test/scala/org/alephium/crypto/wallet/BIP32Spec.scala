@@ -3,7 +3,7 @@ package org.alephium.crypto.wallet
 import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
-import org.alephium.util.{AlephiumSpec, Base58}
+import org.alephium.util.{AlephiumSpec, AVector, Base58}
 import org.alephium.util.Hex._
 
 class BIP32Spec extends AlephiumSpec {
@@ -23,10 +23,9 @@ class BIP32Spec extends AlephiumSpec {
     (publicKey, chainCode)
   }
 
-  def decodeChain(input: String): Seq[Int] = {
-    input
-      .split("/")
-      .toSeq
+  def decodeChain(input: String): AVector[Int] = {
+    AVector
+      .unsafe(input.split("/"))
       .tail
       .map(raw => if (raw.last equals '\'') BIP32.harden(raw.init.toInt) else raw.toInt)
   }

@@ -66,7 +66,7 @@ class WalletAppSpec
   val routes: Route = walletApp.routes
 
   val password                   = Hash.generate.toHexString
-  var mnemonic: model.Mnemonic   = model.Mnemonic(Seq.empty)
+  var mnemonic: model.Mnemonic   = model.Mnemonic(AVector.empty)
   var addresses: model.Addresses = _
   var address: Address           = _
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()

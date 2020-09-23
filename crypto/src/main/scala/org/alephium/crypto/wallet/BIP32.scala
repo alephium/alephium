@@ -11,14 +11,14 @@ import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
 
 import org.alephium.crypto.{SecP256K1, SecP256K1PrivateKey, SecP256K1PublicKey}
-import org.alephium.util.Bytes
+import org.alephium.util.{AVector, Bytes}
 
 //scalastyle:off magic.number
 object BIP32 {
   def masterKey(prefix: String, seed: ByteString): ExtendedPrivateKey = {
     val i        = hmacSha512(ByteString.fromArrayUnsafe(prefix.getBytes(StandardCharsets.UTF_8)), seed)
     val (il, ir) = i.splitAt(32)
-    ExtendedPrivateKey(SecP256K1PrivateKey.unsafe(il), ir, Seq.empty)
+    ExtendedPrivateKey(SecP256K1PrivateKey.unsafe(il), ir, AVector.ofSize(5))
   }
 
   def btcMasterKey(seed: ByteString): ExtendedPrivateKey = masterKey("Bitcoin seed", seed)
@@ -40,7 +40,7 @@ object BIP32 {
 
   final case class ExtendedPrivateKey protected[wallet] (privateKey: SecP256K1PrivateKey,
                                                          chainCode: ByteString,
-                                                         path: Seq[Int]) {
+                                                         path: AVector[Int]) {
     def publicKey: SecP256K1PublicKey = privateKey.publicKey
 
     def extendedPublicKey: ExtendedPublicKey =
@@ -63,7 +63,7 @@ object BIP32 {
       }
     }
 
-    def derive(path: Seq[Int]): Option[ExtendedPrivateKey] = {
+    def derive(path: AVector[Int]): Option[ExtendedPrivateKey] = {
       @tailrec
       def iter(acc: ExtendedPrivateKey, i: Int): Option[ExtendedPrivateKey] = {
         if (i == path.length) Some(acc)
@@ -80,7 +80,7 @@ object BIP32 {
 
   final case class ExtendedPublicKey protected[wallet] (publicKey: SecP256K1PublicKey,
                                                         chainCode: ByteString,
-                                                        path: Seq[Int]) {
+                                                        path: AVector[Int]) {
     def derive(index: Int): Option[ExtendedPublicKey] = {
       assume(!isHardened(index))
       val i        = publicKey.bytes ++ Bytes.from(index)
@@ -98,7 +98,7 @@ object BIP32 {
       }
     }
 
-    def derive(path: Seq[Int]): Option[ExtendedPublicKey] = {
+    def derive(path: AVector[Int]): Option[ExtendedPublicKey] = {
       assume(path.forall(!isHardened(_)))
       @tailrec
       def iter(acc: ExtendedPublicKey, i: Int): Option[ExtendedPublicKey] = {
