@@ -157,8 +157,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       val lastCanonicalHash = reversed(lastCanonicalIndex)
       val heightFrom        = getHeightUnsafe(lastCanonicalHash) + 1
       val heightTo          = math.min(heightFrom + 1000, maxHeightUnsafe)
-      if (heightFrom <= heightTo) getSyncDataUnsafe(heightFrom, heightTo)
-      else AVector.empty
+      if (Utils.unsafe(isRecent(heightFrom))) {
+        getRecentDataUnsafe(heightFrom, heightTo)
+      } else {
+        getSyncDataUnsafe(heightFrom, heightTo)
+      }
     }
   }
 
@@ -166,7 +169,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
     @tailrec
     def iter(currentHeader: BlockHeader, currentHeight: Int, acc: AVector[Hash]): AVector[Hash] = {
-      if (currentHeight == heightFrom) acc :+ currentHeader.hash
+      if (currentHeight <= heightFrom) acc :+ currentHeader.hash
       else {
         val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
         iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
@@ -175,6 +178,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
     val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
     iter(startHeader, heightTo, AVector.empty).reverse
+  }
+
+  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
+    AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
   }
 }
 
