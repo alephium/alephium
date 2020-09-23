@@ -255,10 +255,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def isRecent(hash: Hash): IOResult[Boolean] = {
-    for {
-      height     <- getHeight(hash)
-      _maxHeight <- maxHeight
-    } yield (height >= _maxHeight - consensusConfig.recentBlockHeightDiff)
+    getHeight(hash).flatMap(isRecent)
+  }
+
+  def isRecent(height: Int): IOResult[Boolean] = {
+    maxHeight.map(height >= _ - consensusConfig.recentBlockHeightDiff)
   }
 }
 // scalastyle:on number.of.methods
