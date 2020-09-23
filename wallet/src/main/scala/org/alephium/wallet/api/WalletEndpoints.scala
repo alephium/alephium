@@ -44,11 +44,11 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in("unlock")
       .in(jsonBody[WalletUnlock])
 
-  val getBalance: Endpoint[Unit, WalletApiError, Long, Nothing] =
+  val getBalances: Endpoint[Unit, WalletApiError, Balances, Nothing] =
     baseEndpoint.get
       .in("wallet")
-      .in("balance")
-      .out(jsonBody[Long])
+      .in("balances")
+      .out(jsonBody[Balances])
 
   val transfer: Endpoint[Transfer, WalletApiError, Transfer.Result, Nothing] =
     baseEndpoint.post
@@ -57,9 +57,22 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
 
-  val getAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
+  val getAddresses: Endpoint[Unit, WalletApiError, Addresses, Nothing] =
     baseEndpoint.get
       .in("wallet")
-      .in("address")
+      .in("addresses")
+      .out(jsonBody[Addresses])
+
+  val deriveNextAddress: Endpoint[Unit, WalletApiError, Address, Nothing] =
+    baseEndpoint.post
+      .in("wallet")
+      .in("deriveNextAddress")
       .out(jsonBody[Address])
+
+  val changeActiveAddress: Endpoint[ChangeActiveAddress, WalletApiError, Unit, Nothing] =
+    baseEndpoint.post
+      .in("wallet")
+      .in("changeActiveAddress")
+      .in(jsonBody[ChangeActiveAddress])
+
 }

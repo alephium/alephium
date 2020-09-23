@@ -8,7 +8,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.util.{Hex, U64}
+import org.alephium.util.{AVector, Hex, U64}
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -25,9 +25,11 @@ trait WalletService {
 
   def lockWallet(): Future[Either[WalletError, Unit]]
   def unlockWallet(password: String): Future[Either[WalletError, Unit]]
-  def getBalance(): Future[Either[WalletError, Long]]
-  def getAddress(): Future[Either[WalletError, Address]]
+  def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]]
+  def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]]
   def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]]
+  def deriveNextAddress(): Future[Either[WalletError, Address]]
+  def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]]
 }
 
 object WalletService {
@@ -40,9 +42,12 @@ object WalletService {
     val message: String = s"Invalid mnemonic: $words"
   }
 
-  final case class CannotCreateEncryptedFile(directory: Path, storageMessage: String)
-      extends WalletError {
-    val message: String = s"Cannot create encrypted file at $directory ($storageMessage)"
+  final case class CannotCreateEncryptedFile(directory: Path) extends WalletError {
+    val message: String = s"Cannot create encrypted file at $directory"
+  }
+
+  final case class UnknownAddress(address: Address) extends WalletError {
+    val message: String = s"Unknown address: ${address.toBase58}"
   }
 
   case object NoWalletLoaded extends WalletError {
@@ -57,6 +62,10 @@ object WalletService {
     val message: String = s"Invalid password"
   }
 
+  case object CannotDeriveNewAddress extends WalletError {
+    val message: String = s"Cannot derive new address"
+  }
+
   final case class BlockFlowClientError(message: String) extends WalletError
 
   def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
@@ -68,60 +77,71 @@ object WalletService {
   private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext)
       extends WalletService {
-    def createWallet(password: String,
-                     mnemonicSize: Mnemonic.Size,
-                     mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]] =
+
+    override def createWallet(
+        password: String,
+        mnemonicSize: Mnemonic.Size,
+        mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]] =
       Future.successful(
         for {
           mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-          storage <- SecretStorage(seed, password, secretDir).left
-            .map(CannotCreateEncryptedFile(secretDir, _))
+          storage <- SecretStorage
+            .create(seed, password, secretDir)
+            .left
+            .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
           maybeSecretStorage = Option(storage)
           mnemonic
         }
       )
 
-    def restoreWallet(password: String,
-                      mnemonic: String,
-                      mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]] = {
+    override def restoreWallet(
+        password: String,
+        mnemonic: String,
+        mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]] = {
       Future.successful {
-        val words = mnemonic.split(' ').toSeq
+        val words = AVector.unsafe(mnemonic.split(' '))
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
-            SecretStorage(seed, password, secretDir)
+            SecretStorage
+              .load(seed, password, secretDir)
               .map { storage =>
                 maybeSecretStorage = Option(storage)
               }
               .left
-              .map(CannotCreateEncryptedFile(secretDir, _))
+              .map(_ => CannotCreateEncryptedFile(secretDir))
           case None =>
             Left(InvalidMnemonic(mnemonic))
         }
       }
     }
 
-    def lockWallet(): Future[Either[WalletError, Unit]] =
+    override def lockWallet(): Future[Either[WalletError, Unit]] =
       Future.successful {
         Right(maybeSecretStorage.foreach(_.lock()))
       }
 
-    def unlockWallet(password: String): Future[Either[WalletError, Unit]] =
+    override def unlockWallet(password: String): Future[Either[WalletError, Unit]] =
       withWallet(secretStorage =>
         Future.successful(secretStorage.unlock(password).left.map(_ => InvalidPassword)))
 
-    def getBalance(): Future[Either[WalletError, Long]] =
-      withAddress { address =>
-        blockFlowClient.getBalance(address).map(_.left.map(BlockFlowClientError))
+    override def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]] =
+      withAddresses {
+        case (_, addresses) =>
+          Future
+            .sequence(
+              addresses.toSeq.map(getBalance)
+            )
+            .map(AVector.from(_).mapE(identity))
       }
 
-    def getAddress(): Future[Either[WalletError, Address]] =
-      withAddress { address =>
-        Future.successful(Right(address))
+    override def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]] =
+      withAddresses { addresses =>
+        Future.successful(Right(addresses))
       }
 
-    def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]] = {
+    override def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]] = {
       withPrivateKey { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
@@ -137,6 +157,47 @@ object WalletService {
       }
     }
 
+    override def deriveNextAddress(): Future[Either[WalletError, Address]] = {
+      withWallet { secretStorage =>
+        Future.successful {
+          secretStorage
+            .deriveNextKey()
+            .left
+            .map {
+              case SecretStorage.Locked          => WalletLocked: WalletError
+              case SecretStorage.CannotDeriveKey => CannotDeriveNewAddress: WalletError
+              case SecretStorage.SecretFileError => CannotDeriveNewAddress: WalletError
+              case _                             => CannotDeriveNewAddress: WalletError
+            }
+            .map { privateKey =>
+              Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
+            }
+        }
+      }
+    }
+
+    override def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]] = {
+      withWallet { secretStorage =>
+        withPrivateKeys {
+          case (_, privateKeys) =>
+            Future.successful {
+              (for {
+                privateKey <- privateKeys.find(privateKey =>
+                  Address.p2pkh(networkType, privateKey.publicKey) == address)
+                _ <- secretStorage.changeActiveKey(privateKey).toOption
+              } yield (())).toRight(UnknownAddress(address): WalletError)
+            }
+        }
+      }
+    }
+
+    private def getBalance(address: Address): Future[Either[WalletError, (Address, U64)]] = {
+      blockFlowClient
+        .getBalance(address)
+        .map(_.map(amount => (address, amount)).left.map(message =>
+          BlockFlowClientError(message): WalletError))
+    }
+
     private def withWallet[A](
         f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
       maybeSecretStorage match {
@@ -146,16 +207,27 @@ object WalletService {
 
     private def withPrivateKey[A](
         f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withWallet(_.getPrivateKey() match {
-        case None             => Future.successful(Left(WalletLocked))
-        case Some(privateKey) => f(privateKey)
+      withWallet(_.getCurrentPrivateKey() match {
+        case Left(_)           => Future.successful(Left(WalletLocked))
+        case Right(privateKey) => f(privateKey)
       })
 
-    private def withAddress[A](
-        f: Address => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withPrivateKey { privateKey =>
-        val address = Address.p2pkh(networkType, privateKey.publicKey)
-        f(address)
+    private def withPrivateKeys[A](
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]])
+      : Future[Either[WalletError, A]] =
+      withWallet(_.getAllPrivateKeys() match {
+        case Left(_)            => Future.successful(Left(WalletLocked))
+        case Right(privateKeys) => f(privateKeys)
+      })
+
+    private def withAddresses[A](f: ((Address, AVector[Address])) => Future[Either[WalletError, A]])
+      : Future[Either[WalletError, A]] =
+      withPrivateKeys {
+        case (active, privateKeys) =>
+          val activeAddress = Address.p2pkh(networkType, active.publicKey)
+          val addresses =
+            privateKeys.map(privateKey => Address.p2pkh(networkType, privateKey.publicKey))
+          f((activeAddress, addresses))
       }
   }
 }

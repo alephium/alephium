@@ -17,12 +17,11 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
@@ -66,24 +65,31 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
-  val password                 = Hash.generate.toHexString
-  var mnemonic: model.Mnemonic = model.Mnemonic(Seq.empty)
-  var address                  = ""
-  val transferAddress          = Address(networkType, LockupScript.p2pkh(Hash.generate)).toBase58
-  val amount                   = 10
+  val password                   = Hash.generate.toHexString
+  var mnemonic: model.Mnemonic   = model.Mnemonic(AVector.empty)
+  var addresses: model.Addresses = _
+  var address: Address           = _
+  val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
+  val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
+  val transferAmount             = 10
+  val balanceAmount              = U64.unsafe(42)
 
-  def creationJson(size: Int)   = s"""{"password":"$password","mnemonicSize":$size}"""
-  val unlockJson                = s"""{"password":"$password"}"""
-  def transferJson(amount: Int) = s"""{"address":"$transferAddress","amount":$amount}"""
-  lazy val restoreJson          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def creationJson(size: Int)                   = s"""{"password":"$password","mnemonicSize":$size}"""
+  val unlockJson                                = s"""{"password":"$password"}"""
+  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
+  def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
+  lazy val restoreJson                          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
   def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
   def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
   def lock()                = Post(s"/wallet/lock") ~> routes
-  def getBalance()          = Get(s"/wallet/balance") ~> routes
-  def getAddress()          = Get(s"/wallet/address") ~> routes
+  def getBalance()          = Get(s"/wallet/balances") ~> routes
+  def getAddresses()        = Get(s"/wallet/addresses") ~> routes
   def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
   def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
+  def deriveNextAddress()   = Post(s"/wallet/deriveNextAddress") ~> routes
+  def changeActiveAddress(address: Address) =
+    Post(s"/wallet/changeActiveAddress", entity(changeActiveAddressJson(address))) ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
@@ -118,27 +124,30 @@ class WalletAppSpec
       status is StatusCodes.Unauthorized
     }
 
-    getAddress() ~> check {
+    getAddresses() ~> check {
       status is StatusCodes.Unauthorized
     }
 
-    transfer(10) ~> check {
+    transfer(transferAmount) ~> check {
       status is StatusCodes.Unauthorized
     }
 
     unlock()
 
+    getAddresses() ~> check {
+      addresses = responseAs[model.Addresses]
+      address   = addresses.activeAddress
+      status is StatusCodes.OK
+    }
+
     getBalance() ~> check {
-      responseAs[Long] is 42
+      responseAs[model.Balances] is model.Balances(
+        balanceAmount,
+        AVector(model.Balances.AddressBalance(address, balanceAmount)))
       status is StatusCodes.OK
     }
 
-    getAddress() ~> check {
-      address = responseAs[String]
-      status is StatusCodes.OK
-    }
-
-    transfer(10) ~> check {
+    transfer(transferAmount) ~> check {
       status is StatusCodes.OK
       responseAs[model.Transfer.Result]
     }
@@ -154,14 +163,31 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    getAddress() ~> check {
+    getAddresses() ~> check {
       status is StatusCodes.Unauthorized
     }
 
     unlock()
 
-    getAddress() ~> check {
-      responseAs[String] is address
+    deriveNextAddress() ~> check {
+      address   = responseAs[Address]
+      addresses = model.Addresses(address, addresses.addresses :+ address)
+      status is StatusCodes.OK
+    }
+
+    getAddresses() ~> check {
+      responseAs[model.Addresses] is addresses
+      status is StatusCodes.OK
+    }
+
+    address   = addresses.addresses.head
+    addresses = addresses.copy(activeAddress = address)
+
+    changeActiveAddress(address) ~> check {
+      status is StatusCodes.OK
+    }
+    getAddresses() ~> check {
+      responseAs[model.Addresses] is addresses
       status is StatusCodes.OK
     }
 

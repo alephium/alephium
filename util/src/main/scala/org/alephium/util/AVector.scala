@@ -34,9 +34,17 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     elems(start)
   }
 
+  def headOption: Option[A] = {
+    get(start)
+  }
+
   def last: A = {
     assume(nonEmpty)
     elems(end - 1)
+  }
+
+  def lastOption: Option[A] = {
+    get(end - 1)
   }
 
   def init: AVector[A] = {
@@ -445,6 +453,14 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
       arr(i + 1) = acc
     }
     AVector.unsafe(arr)
+  }
+
+  def find(f: A => Boolean): Option[A] = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      if (f(elem)) return Some(elem)
+    }
+    None
   }
 
   def indexWhere(f: A => Boolean): Int = {

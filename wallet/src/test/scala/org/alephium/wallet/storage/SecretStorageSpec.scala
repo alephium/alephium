@@ -7,7 +7,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.Generators
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
 class SecretStorageSpec() extends AlephiumSpec with Generators {
@@ -21,17 +21,30 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
       case (seed, password, wrongPassword) =>
-        val secretStorage = SecretStorage(seed, password, secretDir).toOption.get
-        val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
+        val secretStorage = SecretStorage.create(seed, password, secretDir).toOption.get
+        val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path).get
 
-        secretStorage.getPrivateKey() is None
+        secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(password) is Right(())
 
-        secretStorage.getPrivateKey() is Option(privateKey)
+        secretStorage.getCurrentPrivateKey() isE privateKey
+        secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
+
+        val newKey = secretStorage.deriveNextKey().toOption.get
+
+        secretStorage.getCurrentPrivateKey() isE newKey
+        secretStorage.getAllPrivateKeys() isE ((newKey, AVector(privateKey, newKey)))
+
+        secretStorage.changeActiveKey(privateKey) isE (())
+
+        secretStorage.getCurrentPrivateKey() isE privateKey
+        secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey, newKey)))
+
+        secretStorage.changeActiveKey(privateKey.derive(0).get) is Left(SecretStorage.UnknownKey)
 
         secretStorage.lock()
-        secretStorage.getPrivateKey() is None
+        secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
         secretStorage.unlock(wrongPassword).isLeft is true
     }
@@ -47,15 +60,9 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     )
 
     val rawFile =
-      """
-      {
-        "encrypted":"27adda4459431e84d208b4f7ad9d347facc3f9483cef87a867976dd9952262af3bd6d1562e879b31fceb814212fd3fb1aa778c03ee487ced705fa8c6005a86cf57f887994db994ad2957b4955a1e092c",
-        "salt":"a65767906fed48ccb2c40f08f4c344d5bb7a912bf2eb5a726b7276b224cc50e88cdc9c0ef212d1fd5c079a57a7ff12c8a7edbdad8ccf80d1c5e32fcc32e251c9",
-        "iv":"bddac30c9be7af09a0ede16a5f4ca2c439491781275901fc2ad1e2d465c203bc635b83314b396a4b7d6385539aa10cbd6d8579c0d22a7307fa7867a41eb51adc"
-      }
-      """
+      """{"encrypted":"8df619edbc5737594f0de56700634888ac42aa0a3d688a0721b15cd633ce5a5c2f3c1e696cf1d88a09a44899b010f717ff195ec0cd7f0b8a2a29937c162dfdb4a527bb8774aef5aaf3f0eea4d7bd17b1476d880a9e461be225412a18","salt":"a252a0caecc6673e72ee94caf5a646029b99736ff1e3f3c0f632a03556b0aa77d118b971c58903c37a74ab3504a77cee71ab66bb1c434e3c2e0d8e52e503fe80","iv":"bb341ab6dbcd3b5a5b6cee15308083ff2d12407924a399ec422494ba6b0a139d4720ab088104fdfe88d086334cd3b49e01a07a29e5bc5fc182541d9ce084d12f"}"""
 
-    val privateKey = BIP32.btcMasterKey(seed).derive(Constants.path.toSeq).get
+    val privateKey = BIP32.btcMasterKey(seed).derive(Constants.path).get
 
     val file      = new File(s"$secretDir/secret.json")
     val outWriter = new PrintWriter(file)
@@ -66,7 +73,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
     secretStorage.unlock(password) is Right(())
 
-    secretStorage.getPrivateKey() is Option(privateKey)
+    secretStorage.getCurrentPrivateKey() isE privateKey
   }
 
   it should "fail to load an non existing file" in {
@@ -76,7 +83,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       .fromFile(nonExistingFile, "password")
       .swap
       .toOption
-      .get is s"$fileName (No such file or directory)"
+      .get is SecretStorage.SecretFileError
   }
   secretDir.toFile.listFiles.foreach(_.deleteOnExit())
 }

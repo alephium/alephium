@@ -118,7 +118,9 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       whenever(xs.nonEmpty) {
         val vc = AVector.from(xs)
         vc.head is xs.head
+        vc.headOption is xs.headOption
         vc.last is xs.last
+        vc.lastOption is xs.lastOption
         checkEq(vc.init, xs.init)
         checkEq(vc.tail, xs.tail)
       }
@@ -329,11 +331,22 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "find" in new Fixture {
+    forAll(vectorGen) { vc =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.find(_ equals elem) is arr.find(_ equals elem)
+        vc.find(_ => false) is arr.find(_ => false)
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
         vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
+        vc.indexWhere(_ => false) is arr.indexWhere(_ => false)
       }
     }
   }

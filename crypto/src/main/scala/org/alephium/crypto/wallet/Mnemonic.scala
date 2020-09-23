@@ -13,7 +13,7 @@ import org.alephium.util.{AVector, Bits, Random}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic private (words: Seq[String]) extends AnyVal {
+final case class Mnemonic private (words: AVector[String]) extends AnyVal {
   def toSeed(passphrase: String): ByteString = {
     val mnemonic     = words.mkString(" ").toCharArray
     val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
@@ -31,7 +31,8 @@ final case class Mnemonic private (words: Seq[String]) extends AnyVal {
 object Mnemonic {
   final case class Size private (value: Int) extends AnyVal
   object Size {
-    val list: Seq[Size] = Seq(new Size(12), new Size(15), new Size(18), new Size(21), new Size(24))
+    val list: AVector[Size] =
+      AVector(new Size(12), new Size(15), new Size(18), new Size(21), new Size(24))
 
     def apply(size: Int): Option[Size] =
       Option.when(validate(size))(new Size(size))
@@ -44,16 +45,16 @@ object Mnemonic {
   val pbkdf2Iterations: Int   = 2048
   val pbkdf2KeyLength: Int    = 512
 
-  lazy val englishWordlist: Seq[String] = {
+  lazy val englishWordlist: AVector[String] = {
     val stream = Mnemonic.getClass.getResourceAsStream("/bip39_english_wordlist.txt")
-    Source.fromInputStream(stream, "UTF-8").getLines().toSeq
+    AVector.from(Source.fromInputStream(stream, "UTF-8").getLines().to(Iterable))
   }
 
   def generate(size: Int): Option[Mnemonic] =
     Size(size).map(generate)
 
   def generate(size: Size): Mnemonic = {
-    val typeIndex   = Size.list.indexOf(size)
+    val typeIndex   = Size.list.indexWhere(_ == size)
     val entropySize = entropySizes(typeIndex)
     val rawEntropy  = Array.ofDim[Byte](entropySize)
     Random.source.nextBytes(rawEntropy)
@@ -61,11 +62,11 @@ object Mnemonic {
     fromEntropyUnsafe(entropy)
   }
 
-  protected[wallet] def validateWords(words: Seq[String]): Boolean = {
+  protected[wallet] def validateWords(words: AVector[String]): Boolean = {
     Size.validate(words.length) && words.forall(englishWordlist.contains)
   }
 
-  def fromWords(words: Seq[String]): Option[Mnemonic] = {
+  def fromWords(words: AVector[String]): Option[Mnemonic] = {
     Option.when(validateWords(words))(new Mnemonic(words))
   }
 
@@ -80,7 +81,7 @@ object Mnemonic {
       .flatMap(Bits.from)
       .take(entropy.length * 8 + entropy.length / 4)
     val worldIndexes = extendedEntropy.grouped(11).map(Bits.toInt)
-    new Mnemonic(worldIndexes.map(englishWordlist.apply).toSeq)
+    new Mnemonic(worldIndexes.map(englishWordlist.apply))
   }
 
   def fromEntropyUnsafe(entropy: ByteString): Mnemonic = {

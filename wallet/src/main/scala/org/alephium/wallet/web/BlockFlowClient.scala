@@ -18,7 +18,7 @@ import org.alephium.util.{Hex, U64}
 import org.alephium.wallet.circe.ProtocolCodecs
 
 trait BlockFlowClient {
-  def getBalance(address: Address): Future[Either[String, Long]]
+  def getBalance(address: Address): Future[Either[String, U64]]
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
@@ -82,7 +82,7 @@ object BlockFlowClient {
         }
       }
 
-    def getBalance(address: Address): Future[Either[String, Long]] =
+    def getBalance(address: Address): Future[Either[String, U64]] =
       requestFromGroup[GetBalance, Balance](
         address.groupIndex,
         GetBalance(address)
@@ -134,7 +134,7 @@ object BlockFlowClient {
     val method: String = "get_balance"
   }
 
-  final case class Balance(balance: Long, utxoNum: Int)
+  final case class Balance(balance: U64, utxoNum: Int)
 
   final case class CreateTransaction(
       fromKey: String,
