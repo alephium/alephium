@@ -1,3 +1,4 @@
+import sbtrelease.ReleaseStateTransformations._
 import Dependencies._
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
@@ -161,12 +162,25 @@ val publishSettings = Seq(
 
 val releaseSettings =
   releaseProcess := Seq[ReleaseStep](
-    releaseStepCommandAndRemaining("publishLocalSigned")
+    checkSnapshotDependencies,
+    inquireVersions,
+    releaseStepCommandAndRemaining("clean"),
+    releaseStepCommandAndRemaining("test"),
+    releaseStepCommandAndRemaining("it:test"),
+    setReleaseVersion,
+    commitReleaseVersion,
+    tagRelease,
+    // TODO Relpace with `publishSigned` when publishing to sonatype
+    releaseStepCommandAndRemaining("publishLocalSigned"),
+    setNextVersion,
+    commitNextVersion,
+    // TODO Enable when publishing to sonatype
+    // releaseStepCommand("sonatypeBundleRelease"),
+    pushChanges
   )
 
 val commonSettings = publishSettings ++ releaseSettings ++ Seq(
   organization := "org.alephium",
-  version := "0.3.1-SNAPSHOT",
   scalaVersion := "2.13.3",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
