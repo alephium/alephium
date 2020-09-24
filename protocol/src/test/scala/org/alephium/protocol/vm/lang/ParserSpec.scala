@@ -111,16 +111,18 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
+    parsed0.isPayable is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U64, Type.U64)
 
     val parsed1 = fastparse
-      .parse("pub fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+      .parse("pub payable fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
              StatelessParser.func(_))
       .get
       .value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
+    parsed1.isPayable is true
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U64, Type.U64)
   }

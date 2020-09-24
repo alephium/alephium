@@ -102,6 +102,14 @@ object Lexer {
   def opOr[_: P]: P[LogicalOperator]  = P("||").map(_ => Or)
   def opNot[_: P]: P[LogicalOperator] = P("!").map(_  => Not)
 
+  sealed trait FuncModifier
+  case object Pub     extends FuncModifier
+  case object Payable extends FuncModifier
+
+  def pub[_: P]: P[FuncModifier]          = keyword("pub").map(_ => Pub)
+  def payable[_: P]: P[FuncModifier]      = keyword("payable").map(_ => Payable)
+  def funcModifier[_: P]: P[FuncModifier] = P(pub | payable)
+
   // format: off
   def keywordSet: Set[String] =
     Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")

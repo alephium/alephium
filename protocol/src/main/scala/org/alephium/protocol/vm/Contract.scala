@@ -8,6 +8,7 @@ import org.alephium.util.AVector
 
 final case class Method[Ctx <: Context](
     isPublic: Boolean,
+    isPayable: Boolean,
     localsType: AVector[Val.Type],
     returnType: AVector[Val.Type],
     instrs: AVector[Instr[Ctx]]
@@ -23,14 +24,18 @@ final case class Method[Ctx <: Context](
 
 object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct4(Method[StatelessContext],
-                      t => (t.isPublic, t.localsType, t.returnType, t.instrs))
+    Serde.forProduct5(Method[StatelessContext],
+                      t => (t.isPublic, t.isPayable, t.localsType, t.returnType, t.instrs))
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct4(Method[StatefulContext],
-                      t => (t.isPublic, t.localsType, t.returnType, t.instrs))
+    Serde.forProduct5(Method[StatefulContext],
+                      t => (t.isPublic, t.isPayable, t.localsType, t.returnType, t.instrs))
 
   def forMPT: Method[StatefulContext] =
-    Method[StatefulContext](isPublic = false, AVector.empty, AVector.empty, AVector(Pop))
+    Method[StatefulContext](isPublic  = false,
+                            isPayable = false,
+                            AVector.empty,
+                            AVector.empty,
+                            AVector(Pop))
 }
 
 sealed trait Contract[Ctx <: Context] {
