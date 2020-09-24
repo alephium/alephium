@@ -44,6 +44,8 @@ object LockupScript {
     }
   }
 
+  val vmDefault: LockupScript = p2pkh(Hash.zero)
+
   def fromBase58(input: String): Option[LockupScript] = {
     Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
   }

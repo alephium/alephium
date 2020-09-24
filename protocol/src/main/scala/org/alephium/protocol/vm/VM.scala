@@ -119,7 +119,7 @@ object StatefulVM {
   def runTxScript(worldState: WorldState,
                   txHash: Hash,
                   script: StatefulScript): ExeResult[WorldState] = {
-    val context = StatefulContext(txHash, worldState)
+    val context = StatefulContext.nonPayable(txHash, worldState)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map(_ => context.worldState)
   }

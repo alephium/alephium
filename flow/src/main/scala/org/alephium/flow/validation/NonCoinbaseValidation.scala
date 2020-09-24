@@ -137,10 +137,7 @@ object NonCoinbaseValidation {
     protected[validation] def getPreOutputs(
         tx: Transaction,
         worldState: WorldState): TxValidationResult[AVector[TxOutput]] = {
-      val query = tx.unsigned.inputs.mapE { input =>
-        worldState.getOutput(input.outputRef)
-      }
-      query match {
+      worldState.getPreOutputs(tx) match {
         case Right(preOutputs)            => validTx(preOutputs)
         case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
         case Left(error)                  => Left(Left(error))

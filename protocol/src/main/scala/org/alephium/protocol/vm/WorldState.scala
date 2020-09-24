@@ -50,6 +50,12 @@ sealed abstract class WorldState {
   def remove(outputRef: TxOutputRef): IOResult[WorldState]
 
   def persist: IOResult[WorldState.Persisted]
+
+  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
+    tx.unsigned.inputs.mapE { input =>
+      getOutput(input.outputRef)
+    }
+  }
 }
 
 object WorldState {
