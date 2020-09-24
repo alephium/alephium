@@ -115,6 +115,14 @@ sealed trait ContractObj[Ctx <: Context] {
                  operandStack: Stack[Val],
                  returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx]
 
+  def buildFrame(ctx: Ctx,
+                 balanceState: Frame.BalanceState,
+                 obj: ContractObj[Ctx],
+                 method: Method[Ctx],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[Ctx]
+
   def startFrame(ctx: Ctx,
                  methodIndex: Int,
                  args: AVector[Val],
@@ -122,14 +130,42 @@ sealed trait ContractObj[Ctx <: Context] {
     for {
       method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-    } yield
-      buildFrame(
-        ctx,
-        this,
-        method,
-        args,
-        operandStack,
-        returns => if (returns.nonEmpty) Left(NonEmptyReturnForMainFunction) else Right(()))
+      frame <- {
+        val returnTo: AVector[Val] => ExeResult[Unit] = returns =>
+          if (returns.nonEmpty) Left(NonEmptyReturnForMainFunction) else Right(())
+        if (method.isPayable) {
+          startPayableFrame(ctx, method, args, operandStack, returnTo)
+        } else {
+          startNonPayableFrame(ctx, method, args, operandStack, returnTo)
+        }
+      }
+    } yield frame
+  }
+
+  protected def startPayableFrame(
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+    ctx.getInitialBalances.map(
+      balances =>
+        buildFrame(ctx,
+                   Frame.BalanceState.from(balances),
+                   this,
+                   method,
+                   args,
+                   operandStack,
+                   returnTo))
+  }
+
+  protected def startNonPayableFrame(
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]): ExeResult[Frame[Ctx]] = {
+    Right(buildFrame(ctx, this, method, args, operandStack, returnTo))
   }
 
   def startFrameWithOutputs(ctx: Ctx,
@@ -140,7 +176,12 @@ sealed trait ContractObj[Ctx <: Context] {
     for {
       method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-    } yield buildFrame(ctx, this, method, args, operandStack, returnTo)
+      frame <- if (method.isPayable) {
+        startPayableFrame(ctx, method, args, operandStack, returnTo)
+      } else {
+        startNonPayableFrame(ctx, method, args, operandStack, returnTo)
+      }
+    } yield frame
   }
 }
 
@@ -160,6 +201,15 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
                  operandStack: Stack[Val],
                  returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] =
     Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
+
+  def buildFrame(ctx: StatelessContext,
+                 balanceState: Frame.BalanceState,
+                 obj: ContractObj[StatelessContext],
+                 method: Method[StatelessContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] =
+    Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
 }
 
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext] {
@@ -172,7 +222,16 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
                  args: AVector[Val],
                  operandStack: Stack[Val],
                  returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
-    Frame.stateful(ctx, obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+
+  def buildFrame(ctx: StatefulContext,
+                 balanceState: Frame.BalanceState,
+                 obj: ContractObj[StatefulContext],
+                 method: Method[StatefulContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
+    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
 }
 
 final case class StatefulContractObject(code: StatefulContract,
@@ -203,5 +262,14 @@ final case class StatefulContractObject(code: StatefulContract,
                  args: AVector[Val],
                  operandStack: Stack[Val],
                  returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
-    Frame.stateful(ctx, obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+
+  def buildFrame(ctx: StatefulContext,
+                 balanceState: Frame.BalanceState,
+                 obj: ContractObj[StatefulContext],
+                 method: Method[StatefulContext],
+                 args: AVector[Val],
+                 operandStack: Stack[Val],
+                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] =
+    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
 }

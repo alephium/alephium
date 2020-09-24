@@ -15,7 +15,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val worldStateNew =
       cachedWorldState.addContract(contractOutputRef, contractOutput, fields).toOption.get
     val obj     = contract.toObject(contractOutputRef.key, fields)
-    val context = StatefulContext(Hash.zero, worldStateNew)
+    val context = StatefulContext.nonPayable(Hash.zero, worldStateNew)
     obj -> context
   }
 }

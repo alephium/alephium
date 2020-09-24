@@ -48,6 +48,7 @@ object BuiltIn {
         case Type.U64Vec      => Seq(CheckEqU64Vec)
         case Type.I256Vec     => Seq(CheckEqI256Vec)
         case Type.U256Vec     => Seq(CheckEqU256Vec)
+        case Type.Address     => Seq(CheckEqAddress)
         case _: Type.Contract => Seq(CheckEqByteVec)
       }
     }

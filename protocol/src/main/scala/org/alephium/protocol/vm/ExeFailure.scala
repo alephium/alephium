@@ -2,6 +2,7 @@ package org.alephium.protocol.vm
 
 import org.alephium.io.IOError
 
+// scalastyle:off number.of.types
 trait ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 case object VerificationFailed                                 extends ExeFailure
@@ -35,4 +36,14 @@ case object NonEmptyReturnForMainFunction                      extends ExeFailur
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class IOErrorUpdateState(error: IOError)            extends ExeFailure
 final case class IOErrorLoadContract(error: IOError)           extends ExeFailure
+final case class IOErrorLoadOutputs(error: IOError)            extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
+case object UninitializedAddress                               extends ExeFailure
+case object NonPayableFrame                                    extends ExeFailure
+case object EmptyBalanceForPayableMethod                       extends ExeFailure
+case object NotEnoughBalance                                   extends ExeFailure
+case object BalanceOverflow                                    extends ExeFailure
+case object NoAlfBalanceForTheAddress                          extends ExeFailure
+case object NoTokenBalanceForTheAddress                        extends ExeFailure
+case object InvalidBalances                                    extends ExeFailure
+case object InvalidTokenId                                     extends ExeFailure

@@ -1,9 +1,13 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
 
 import org.alephium.protocol.Hash
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.protocol.model.{AssetOutput, ContractOutput, TokenId, TxOutput}
+import org.alephium.util.{AVector, Bytes, U64}
 
 abstract class Frame[Ctx <: Context] {
   var pc: Int
@@ -13,6 +17,8 @@ abstract class Frame[Ctx <: Context] {
   def locals: Array[Val]
   def returnTo: AVector[Val] => ExeResult[Unit]
   def ctx: Ctx
+
+  def balanceStateOpt: Option[Frame.BalanceState]
 
   def pcMax: Int = method.instrs.length
 
@@ -103,6 +109,7 @@ final class StatelessFrame(
   }
 
   // Should not be used in stateless context
+  def balanceStateOpt: Option[Frame.BalanceState]                                           = ???
   def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]] = ???
 
   @tailrec
@@ -141,14 +148,22 @@ final class StatefulFrame(
     val method: Method[StatefulContext],
     val locals: Array[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
-    val ctx: StatefulContext
+    val ctx: StatefulContext,
+    val balanceStateOpt: Option[Frame.BalanceState]
 ) extends Frame[StatefulContext] {
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
       method <- getMethod(index)
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.stateful(ctx, obj, method, args, opStack, opStack.push)
+      newBalanceStateOpt <- if (method.isPayable) {
+        balanceStateOpt
+          .toRight(EmptyBalanceForPayableMethod)
+          .map(state => Some(state.useApproved()))
+      } else Right(None)
+    } yield {
+      Frame.stateful(ctx, newBalanceStateOpt, obj, method, args, opStack, opStack.push)
+    }
   }
 
   override def externalMethodFrame(contractKey: Hash,
@@ -162,7 +177,14 @@ final class StatefulFrame(
       _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
       args   <- opStack.pop(method.localsType.length)
       _      <- method.check(args)
-    } yield Frame.stateful(ctx, contractObj, method, args, opStack, opStack.push)
+      newBalanceStateOpt <- if (method.isPayable) {
+        balanceStateOpt
+          .toRight(EmptyBalanceForPayableMethod)
+          .map(state => Some(state.useApproved()))
+      } else Right(None)
+    } yield {
+      Frame.stateful(ctx, newBalanceStateOpt, contractObj, method, args, opStack, opStack.push)
+    }
   }
 
   @tailrec
@@ -205,6 +227,8 @@ final class StatefulFrame(
     } yield None
 }
 
+object StatefulFrame {}
+
 object Frame {
   def stateless(ctx: StatelessContext,
                 obj: ContractObj[StatelessContext],
@@ -218,6 +242,7 @@ object Frame {
   }
 
   def stateful(ctx: StatefulContext,
+               balanceStateOpt: Option[Frame.BalanceState],
                obj: ContractObj[StatefulContext],
                method: Method[StatefulContext],
                args: AVector[Val],
@@ -225,6 +250,214 @@ object Frame {
                returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] = {
     val locals = method.localsType.mapToArray(_.default)
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new StatefulFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
+    new StatefulFrame(0,
+                      obj,
+                      operandStack.subStack(),
+                      method,
+                      locals,
+                      returnTo,
+                      ctx,
+                      balanceStateOpt)
+  }
+
+  /*
+   * For each stateful frame, users could put a set of assets.
+   * Contracts could move funds, generate outputs by using vm's instructions.
+   * `remaining` is the current usable balances
+   * `approved` is the balances for payable function call
+   */
+  final case class BalanceState(remaining: Balances, approved: Balances) {
+    def approveALF(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+      for {
+        _ <- remaining.subAlf(lockupScript, amount)
+        _ <- approved.addAlf(lockupScript, amount)
+      } yield ()
+    }
+
+    def approveToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+      for {
+        _ <- remaining.subToken(lockupScript, tokenId, amount)
+        _ <- approved.addToken(lockupScript, tokenId, amount)
+      } yield ()
+    }
+
+    def alfRemaining(lockupScript: LockupScript): Option[U64] = {
+      remaining.getBalances(lockupScript).map(_.alfAmount)
+    }
+
+    def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U64] = {
+      remaining.getTokenAmount(lockupScript, tokenId)
+    }
+
+    def useApproved(): BalanceState = {
+      val toUse = approved.use()
+      BalanceState(toUse, Balances.empty)
+    }
+
+    def useAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+      remaining.subAlf(lockupScript, amount)
+    }
+
+    def useToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+      remaining.subToken(lockupScript, tokenId, amount)
+    }
+  }
+
+  object BalanceState {
+    def from(balances: Balances): BalanceState = BalanceState(balances, Balances.empty)
+  }
+
+  final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
+    def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+      all.find(_._1 == lockupScript).map(_._2)
+    }
+
+    def getAlfAmount(lockupScript: LockupScript): Option[U64] = {
+      getBalances(lockupScript).map(_.alfAmount)
+    }
+
+    def getTokenAmount(lockupScript: LockupScript, tokenId: TokenId): Option[U64] = {
+      getBalances(lockupScript).flatMap(_.getTokenAmount(tokenId))
+    }
+
+    def addAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+      getBalances(lockupScript) match {
+        case Some(balances) =>
+          balances.addAlf(amount)
+        case None =>
+          all.addOne(lockupScript -> BalancesPerLockup.alf(amount))
+          Some(())
+      }
+    }
+
+    def addToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+      getBalances(lockupScript) match {
+        case Some(balances) =>
+          balances.addToken(tokenId, amount)
+        case None =>
+          all.addOne(lockupScript -> BalancesPerLockup.token(tokenId, amount))
+          Some(())
+      }
+    }
+
+    def subAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+      getBalances(lockupScript).flatMap(_.subAlf(amount))
+    }
+
+    def subToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+      getBalances(lockupScript).flatMap(_.subToken(tokenId, amount))
+    }
+
+    def add(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+      getBalances(lockupScript) match {
+        case Some(balances) =>
+          balances.add(balancesPerLockup)
+        case None =>
+          all.addOne(lockupScript -> balancesPerLockup)
+          Some(())
+      }
+    }
+
+    def sub(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+      getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
+    }
+
+    def use(): Balances = {
+      val newAll = ArrayBuffer.from(all)
+      all.clear()
+      Balances(newAll)
+    }
+  }
+
+  object Balances {
+    def from(inputs: AVector[TxOutput], outputs: AVector[TxOutput]): Option[Balances] = {
+      val inputBalances = inputs.fold(Option(empty)) {
+        case (Some(balances), input) =>
+          balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)
+        case (None, _) => None
+      }
+      val finalBalances = outputs.fold(inputBalances) {
+        case (Some(balances), output) =>
+          balances.sub(output.lockupScript, BalancesPerLockup.from(output)).map(_ => balances)
+        case (None, _) => None
+      }
+      finalBalances
+    }
+
+    def empty: Balances = Balances(ArrayBuffer.empty)
+  }
+
+  final case class BalancesPerLockup(var alfAmount: U64, tokenAmounts: mutable.Map[TokenId, U64]) {
+    def getTokenAmount(tokenId: TokenId): Option[U64] = tokenAmounts.get(tokenId)
+
+    def addAlf(amount: U64): Option[Unit] = {
+      alfAmount.add(amount).map(alfAmount = _)
+    }
+
+    def addToken(tokenId: TokenId, amount: U64): Option[Unit] = {
+      tokenAmounts.get(tokenId) match {
+        case Some(currentAmount) =>
+          currentAmount.add(amount).map(tokenAmounts(tokenId) = _)
+        case None =>
+          tokenAmounts(tokenId) = amount
+          Some(())
+      }
+    }
+
+    def subAlf(amount: U64): Option[Unit] = {
+      alfAmount.sub(amount).map(alfAmount = _)
+    }
+
+    def subToken(tokenId: TokenId, amount: U64): Option[Unit] = {
+      tokenAmounts.get(tokenId).flatMap { currentAmount =>
+        currentAmount.sub(amount).map(tokenAmounts(tokenId) = _)
+      }
+    }
+
+    def add(another: BalancesPerLockup): Option[Unit] =
+      Try {
+        alfAmount = alfAmount.add(another.alfAmount).getOrElse(throw BalancesPerLockup.error)
+        another.tokenAmounts.foreach {
+          case (tokenId, amount) =>
+            tokenAmounts.get(tokenId) match {
+              case Some(currentAmount) =>
+                tokenAmounts(tokenId) =
+                  currentAmount.add(amount).getOrElse(throw BalancesPerLockup.error)
+              case None =>
+                tokenAmounts(tokenId) = amount
+            }
+        }
+      }.toOption
+
+    def sub(another: BalancesPerLockup): Option[Unit] =
+      Try {
+        alfAmount = alfAmount.sub(another.alfAmount).getOrElse(throw BalancesPerLockup.error)
+        another.tokenAmounts.foreach {
+          case (tokenId, amount) =>
+            tokenAmounts.get(tokenId) match {
+              case Some(currentAmount) =>
+                tokenAmounts(tokenId) =
+                  currentAmount.sub(amount).getOrElse(throw BalancesPerLockup.error)
+              case None => throw BalancesPerLockup.error
+            }
+        }
+      }.toOption
+  }
+
+  object BalancesPerLockup {
+    val error: ArithmeticException = new ArithmeticException("U64")
+
+    def alf(amount: U64): BalancesPerLockup = {
+      BalancesPerLockup(amount, mutable.Map.empty)
+    }
+
+    def token(id: TokenId, amount: U64): BalancesPerLockup = {
+      BalancesPerLockup(U64.Zero, mutable.Map(id -> amount))
+    }
+
+    def from(output: TxOutput): BalancesPerLockup = output match {
+      case o: AssetOutput    => BalancesPerLockup(o.amount, mutable.Map.from(o.tokens.toIterable))
+      case o: ContractOutput => BalancesPerLockup(o.amount, mutable.Map.empty)
+    }
   }
 }
