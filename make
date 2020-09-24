@@ -64,6 +64,7 @@ class AlephiumMake(object):
             itest        Run the integration test suite
             benchmark    Run the benchmark suite
             package      Produce the project deliverable
+            release      Release a new version of the project
 
             run          Run a local testnet
             kill         kill a local running testnet
@@ -95,6 +96,9 @@ class AlephiumMake(object):
 
     def publish(self):
         run_exit('sbt publishLocal')
+
+    def release(self):
+        run_exit('sbt release')
 
     def benchmark(self):
         run_exit('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
