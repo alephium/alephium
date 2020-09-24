@@ -54,7 +54,7 @@ class CliqueCoordinatorBootstrapper(
       cliqueCoordinator.forward(c)
     case Bootstrapper.ForwardConnection =>
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
-      context become (awaitInfo orElse forwardConnection)
+      context become awaitInfoWithForward
   }
 }
 
@@ -66,7 +66,7 @@ class BrokerBootstrapper(
   log.debug("Start as Broker")
   val broker: ActorRef = context.actorOf(Broker.props(self))
 
-  override def receive: Receive = awaitInfo
+  override def receive: Receive = awaitInfoWithForward
 }
 
 class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Command],
@@ -76,7 +76,7 @@ class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Co
   log.debug("Start as single node clique bootstrapper")
   self ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
 
-  override def receive: Receive = awaitInfo
+  override def receive: Receive = awaitInfoWithForward
 }
 
 trait BootstrapperHandler extends BaseActor {
@@ -87,7 +87,9 @@ trait BootstrapperHandler extends BaseActor {
     tcpController ! TcpController.Start(self)
   }
 
-  def awaitInfo: Receive = {
+  def awaitInfoWithForward: Receive = awaitInfo orElse forwardConnection
+
+  private def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
       cliqueManager ! CliqueManager.Start(intraCliqueInfo.cliqueInfo)

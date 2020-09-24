@@ -44,23 +44,23 @@ class DurationSpec extends AlephiumSpec {
   }
 
   it should "operate correctly" in {
-    forAll { (l0: Long, l1: Long) =>
-      whenever(l0 >= 0 && l1 >= 0) {
-        val dt0 = Duration.ofMillisUnsafe(l0 / 2)
-        val dt1 = Duration.ofMillisUnsafe(l1 / 2)
-        (dt0 + dt1).millis is dt0.millis + dt1.millis
-        if (dt0 > dt1) {
-          (dt0 - dt1).get.millis is dt0.millis - dt1.millis
-        }
-        (dt0 timesUnsafe 2).millis is dt0.millis * 2
-        (dt0 divUnsafe 2).millis is dt0.millis / 2
+    forAll { (_l0: Long, _l1: Long) =>
+      val l0  = if (_l0 equals Long.MinValue) Long.MaxValue else math.abs(_l0)
+      val l1  = if (_l1 equals Long.MinValue) Long.MaxValue else math.abs(_l1)
+      val dt0 = Duration.ofMillisUnsafe(l0 / 2)
+      val dt1 = Duration.ofMillisUnsafe(l1 / 2)
+      (dt0 + dt1).millis is dt0.millis + dt1.millis
+      if (dt0 > dt1) {
+        (dt0 - dt1).get.millis is dt0.millis - dt1.millis
+      }
+      (dt0 timesUnsafe 2).millis is dt0.millis * 2
+      (dt0 divUnsafe 2).millis is dt0.millis / 2
 
-        val maxMS = Long.MaxValue / 1000000
-        if (l0 <= maxMS) {
-          Duration.ofMillis(l0).get.asScala is SDuration.apply(l0, MILLISECONDS)
-        } else {
-          assertThrows[IllegalArgumentException](Duration.ofMillis(l0).get.asScala)
-        }
+      val maxMS = Long.MaxValue / 1000000
+      if (l0 <= maxMS) {
+        Duration.ofMillis(l0).get.asScala is SDuration.apply(l0, MILLISECONDS)
+      } else {
+        assertThrows[IllegalArgumentException](Duration.ofMillis(l0).get.asScala)
       }
     }
   }
