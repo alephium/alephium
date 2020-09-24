@@ -87,12 +87,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
-      Lexer.keyword("pub").?.! ~ Lexer
+      Lexer.funcModifier.rep(0) ~ Lexer
         .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
       .map {
-        case (accessFlag, funcId, params, returnType, statement) =>
-          val isPublic = accessFlag.nonEmpty
-          Ast.FuncDef(funcId, isPublic, params, returnType, statement)
+        case (modifiers, funcId, params, returnType, statement) =>
+          if (modifiers.toSet.size != modifiers.length) {
+            throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
+          } else {
+            val isPublic  = modifiers.contains(Lexer.Pub)
+            val isPayable = modifiers.contains(Lexer.Payable)
+            Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statement)
+          }
       }
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }

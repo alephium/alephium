@@ -7,6 +7,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "not call from private function" in {
     val method =
       Method[StatefulContext](isPublic   = false,
+                              isPayable  = false,
                               localsType = AVector.empty,
                               returnType = AVector.empty,
                               instrs     = AVector.empty)
@@ -20,9 +21,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val method =
       Method[StatefulContext](
         isPublic   = true,
+        isPayable  = false,
         localsType = AVector(Val.U64),
         returnType = AVector(Val.U64),
-        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return))
+        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return)
+      )
     val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val](Val.U64(U64.Zero), Val.U64(U64.One)))
@@ -32,11 +35,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "call method" in {
     val method0 = Method[StatelessContext](isPublic = true,
+                                           isPayable  = false,
                                            localsType = AVector(Val.U64),
                                            returnType = AVector(Val.U64),
                                            instrs     = AVector(LoadLocal(0), CallLocal(1), Return))
     val method1 =
       Method[StatelessContext](isPublic   = false,
+                               isPayable  = false,
                                localsType = AVector(Val.U64),
                                returnType = AVector(Val.U64),
                                instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
@@ -58,9 +63,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val method =
       Method[StatefulContext](
         isPublic   = true,
+        isPayable  = false,
         localsType = AVector(Val.U64),
         returnType = AVector.empty,
-        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const1, U64Add, StoreField(1)))
+        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const1, U64Add, StoreField(1))
+      )
     val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
   }
