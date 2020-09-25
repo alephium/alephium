@@ -1,10 +1,9 @@
 package org.alephium.wallet.storage
 
 import java.io.{File, PrintWriter}
-import java.nio.file.{Files, Path}
 
 import scala.io.Source
-import scala.util.{Try, Using}
+import scala.util.Using
 
 import akka.util.ByteString
 import io.circe.Codec
@@ -12,7 +11,7 @@ import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 
-import org.alephium.crypto.{AES, Sha256}
+import org.alephium.crypto.AES
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.serde.{deserialize, serialize, Serde}
@@ -59,44 +58,46 @@ object SecretStorage extends UtilCodecs {
 
   implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
 
-  def load(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
-    withFileOrCreate(seed, password, secretDir)(file => fromFile(file, password))
+  def load(file: File): Either[Error, SecretStorage] = {
+    Using(Source.fromFile(file)) { source =>
+      val rawFile = source.getLines().mkString
+      for {
+        _ <- decode[AES.Encrypted](rawFile).left.map(_ => CannotParseFile)
+      } yield {
+        new Impl(file, None)
+      }
+    }.toEither.left
+      .map(_ => SecretFileError)
+      .flatten
   }
 
-  def create(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
-    withFileOrCreate(seed, password, secretDir)(_ => Left(SecretFileAlreadyExists))
-  }
-
-  private def withFileOrCreate(seed: ByteString, password: String, secretDir: Path)(
-      onFileExist: File => Either[Error, SecretStorage]): Either[Error, SecretStorage] = {
-    val name = Sha256.hash(Sha256.hash(seed)).shortHex
-    val file = new File(s"$secretDir/$name.json")
+  def create(seed: ByteString, password: String, file: File): Either[Error, SecretStorage] = {
     if (file.exists) {
-      onFileExist(file)
+      Left(SecretFileAlreadyExists)
     } else {
       for {
-        _ <- Try(Files.createDirectories(secretDir)).toEither.left.map(_ => SecretDirError)
         _ <- storeStateToFile(file,
                               StoredState(seed, numberOfAddresses = 1, activeAddressIndex = 0),
                               password)
+        state <- stateFromFile(file, password)
       } yield {
-        new Impl(file)
+        new Impl(file, Some(state))
       }
     }
   }
 
   private[storage] def fromFile(file: File, password: String): Either[Error, SecretStorage] = {
     for {
-      _ <- stateFromFile(file, password)
+      state <- stateFromFile(file, password)
     } yield {
-      new Impl(file)
+      new Impl(file, Some(state))
     }
   }
 
   //TODO add some `synchronized` for the state
-  private class Impl(file: File) extends SecretStorage {
+  private class Impl(file: File, initialState: Option[State]) extends SecretStorage {
 
-    private var maybeState: Option[State] = None
+    private var maybeState: Option[State] = initialState
 
     override def lock(): Unit = {
       maybeState = None

@@ -17,6 +17,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.scalatest.concurrent.ScalaFutures
 
+import org.alephium.crypto
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
@@ -69,6 +70,7 @@ class WalletAppSpec
   var mnemonic: model.Mnemonic   = model.Mnemonic(AVector.empty)
   var addresses: model.Addresses = _
   var address: Address           = _
+  var wallet: String             = _
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
   val transferAmount             = 10
@@ -78,22 +80,26 @@ class WalletAppSpec
   val unlockJson                                = s"""{"password":"$password"}"""
   def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
-  lazy val restoreJson                          = s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def restoreJson(mnemonic: model.Mnemonic) =
+    s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
 
-  def create(size: Int)     = Post(s"/wallet/create", entity(creationJson(size))) ~> routes
-  def unlock()              = Post(s"/wallet/unlock", entity(unlockJson)) ~> routes
-  def lock()                = Post(s"/wallet/lock") ~> routes
-  def getBalance()          = Get(s"/wallet/balances") ~> routes
-  def getAddresses()        = Get(s"/wallet/addresses") ~> routes
-  def transfer(amount: Int) = Post(s"/wallet/transfer", entity(transferJson(amount))) ~> routes
-  def restore()             = Post(s"/wallet/restore", entity(restoreJson)) ~> routes
-  def deriveNextAddress()   = Post(s"/wallet/deriveNextAddress") ~> routes
+  def create(size: Int)                 = Post(s"/wallets", entity(creationJson(size))) ~> routes
+  def restore(mnemonic: model.Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
+  def unlock()                          = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
+  def lock()                            = Post(s"/wallets/${wallet}/lock") ~> routes
+  def getBalance()                      = Get(s"/wallets/${wallet}/balances") ~> routes
+  def getAddresses()                    = Get(s"/wallets/${wallet}/addresses") ~> routes
+  def transfer(amount: Int) =
+    Post(s"/wallets/${wallet}/transfer", entity(transferJson(amount))) ~> routes
+  def deriveNextAddress() = Post(s"/wallets/${wallet}/deriveNextAddress") ~> routes
   def changeActiveAddress(address: Address) =
-    Post(s"/wallet/changeActiveAddress", entity(changeActiveAddressJson(address))) ~> routes
+    Post(s"/wallets/${wallet}/changeActiveAddress", entity(changeActiveAddressJson(address))) ~> routes
+  def listWallets() = Get(s"/wallets") ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
 
   it should "work" in {
+
     unlock() ~> check {
       status is StatusCodes.BadRequest
     }
@@ -109,7 +115,8 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    unlock() ~> check {
+    listWallets() ~> check {
+      wallet = responseAs[AVector[String]].head
       status is StatusCodes.OK
     }
 
@@ -159,16 +166,6 @@ class WalletAppSpec
       status is StatusCodes.BadRequest
     }
 
-    restore() ~> check {
-      status is StatusCodes.OK
-    }
-
-    getAddresses() ~> check {
-      status is StatusCodes.Unauthorized
-    }
-
-    unlock()
-
     deriveNextAddress() ~> check {
       address   = responseAs[Address]
       addresses = model.Addresses(address, addresses.addresses :+ address)
@@ -186,8 +183,20 @@ class WalletAppSpec
     changeActiveAddress(address) ~> check {
       status is StatusCodes.OK
     }
+
     getAddresses() ~> check {
       responseAs[model.Addresses] is addresses
+      status is StatusCodes.OK
+    }
+
+    val newMnemonic = model.Mnemonic(crypto.wallet.Mnemonic.generate(24).get.words)
+    restore(newMnemonic) ~> check {
+      status is StatusCodes.OK
+    }
+
+    listWallets() ~> check {
+      val wallets = responseAs[AVector[String]]
+      wallets.length is 2
       status is StatusCodes.OK
     }
 

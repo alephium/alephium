@@ -1,9 +1,15 @@
 package org.alephium.wallet.service
 
+import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
+import akka.util.ByteString
+
+import org.alephium.crypto.Sha256
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
@@ -23,13 +29,14 @@ trait WalletService {
                     mnemonic: String,
                     mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]]
 
-  def lockWallet(): Future[Either[WalletError, Unit]]
-  def unlockWallet(password: String): Future[Either[WalletError, Unit]]
-  def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]]
-  def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]]
-  def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]]
-  def deriveNextAddress(): Future[Either[WalletError, Address]]
-  def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]]
+  def lockWallet(wallet: String): Future[Either[WalletError, Unit]]
+  def unlockWallet(wallet: String, password: String): Future[Either[WalletError, Unit]]
+  def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U64)]]]
+  def getAddresses(wallet: String): Future[Either[WalletError, (Address, AVector[Address])]]
+  def transfer(wallet: String, address: Address, amount: U64): Future[Either[WalletError, Hash]]
+  def deriveNextAddress(wallet: String): Future[Either[WalletError, Address]]
+  def changeActiveAddress(wallet: String, address: Address): Future[Either[WalletError, Unit]]
+  def listWallets(): Future[Either[WalletError, AVector[String]]]
 }
 
 object WalletService {
@@ -66,13 +73,21 @@ object WalletService {
     val message: String = s"Cannot derive new address"
   }
 
+  case object UnexpectedError extends WalletError {
+    val message: String = s"Unexpected error"
+  }
+
   final case class BlockFlowClientError(message: String) extends WalletError
 
   def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
-      implicit executionContext: ExecutionContext): WalletService =
-    new Impl(blockFlowClient, secretDir, networkType)
+      implicit executionContext: ExecutionContext): WalletService = {
 
-  private var maybeSecretStorage: Option[SecretStorage] = None
+    Files.createDirectories(secretDir)
+
+    new Impl(blockFlowClient, secretDir, networkType)
+  }
+
+  private val secretStorages: mutable.Map[String, SecretStorage] = mutable.Map.empty
 
   private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext)
@@ -86,12 +101,13 @@ object WalletService {
         for {
           mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
+          file = fileFromSeed(seed)
           storage <- SecretStorage
-            .create(seed, password, secretDir)
+            .create(seed, password, file)
             .left
             .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
-          maybeSecretStorage = Option(storage)
+          secretStorages.addOne(file.getName -> storage)
           mnemonic
         }
       )
@@ -104,10 +120,12 @@ object WalletService {
         val words = AVector.unsafe(mnemonic.split(' '))
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
+            val file = fileFromSeed(seed)
             SecretStorage
-              .load(seed, password, secretDir)
+              .create(seed, password, file)
               .map { storage =>
-                maybeSecretStorage = Option(storage)
+                secretStorages.addOne(file.getName -> storage)
+                ()
               }
               .left
               .map(_ => CannotCreateEncryptedFile(secretDir))
@@ -117,17 +135,17 @@ object WalletService {
       }
     }
 
-    override def lockWallet(): Future[Either[WalletError, Unit]] =
+    override def lockWallet(wallet: String): Future[Either[WalletError, Unit]] =
       Future.successful {
-        Right(maybeSecretStorage.foreach(_.lock()))
+        Right(secretStorages.get(wallet).foreach(_.lock()))
       }
 
-    override def unlockWallet(password: String): Future[Either[WalletError, Unit]] =
-      withWallet(secretStorage =>
+    override def unlockWallet(wallet: String, password: String): Future[Either[WalletError, Unit]] =
+      withWallet(wallet)(secretStorage =>
         Future.successful(secretStorage.unlock(password).left.map(_ => InvalidPassword)))
 
-    override def getBalances(): Future[Either[WalletError, AVector[(Address, U64)]]] =
-      withAddresses {
+    override def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U64)]]] =
+      withAddresses(wallet) {
         case (_, addresses) =>
           Future
             .sequence(
@@ -136,13 +154,16 @@ object WalletService {
             .map(AVector.from(_).mapE(identity))
       }
 
-    override def getAddresses(): Future[Either[WalletError, (Address, AVector[Address])]] =
-      withAddresses { addresses =>
+    override def getAddresses(
+        wallet: String): Future[Either[WalletError, (Address, AVector[Address])]] =
+      withAddresses(wallet) { addresses =>
         Future.successful(Right(addresses))
       }
 
-    override def transfer(address: Address, amount: U64): Future[Either[WalletError, Hash]] = {
-      withPrivateKey { privateKey =>
+    override def transfer(wallet: String,
+                          address: Address,
+                          amount: U64): Future[Either[WalletError, Hash]] = {
+      withPrivateKey(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
@@ -157,8 +178,8 @@ object WalletService {
       }
     }
 
-    override def deriveNextAddress(): Future[Either[WalletError, Address]] = {
-      withWallet { secretStorage =>
+    override def deriveNextAddress(wallet: String): Future[Either[WalletError, Address]] = {
+      withWallet(wallet) { secretStorage =>
         Future.successful {
           secretStorage
             .deriveNextKey()
@@ -176,9 +197,10 @@ object WalletService {
       }
     }
 
-    override def changeActiveAddress(address: Address): Future[Either[WalletError, Unit]] = {
-      withWallet { secretStorage =>
-        withPrivateKeys {
+    override def changeActiveAddress(wallet: String,
+                                     address: Address): Future[Either[WalletError, Unit]] = {
+      withWallet(wallet) { secretStorage =>
+        withPrivateKeys(wallet) {
           case (_, privateKeys) =>
             Future.successful {
               (for {
@@ -191,6 +213,15 @@ object WalletService {
       }
     }
 
+    override def listWallets(): Future[Either[WalletError, AVector[String]]] = {
+      val dir = secretDir.toFile
+      Future.successful {
+        Either.cond(dir.exists && dir.isDirectory,
+                    AVector.from(dir.listFiles.filter(_.isFile).map(_.getName)),
+                    UnexpectedError)
+      }
+    }
+
     private def getBalance(address: Address): Future[Either[WalletError, (Address, U64)]] = {
       blockFlowClient
         .getBalance(address)
@@ -198,36 +229,52 @@ object WalletService {
           BlockFlowClientError(message): WalletError))
     }
 
-    private def withWallet[A](
-        f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      maybeSecretStorage match {
-        case None                => Future.successful(Left(NoWalletLoaded))
+    private def withWallet[A](wallet: String)(
+        f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] = {
+      secretStorages.get(wallet) match {
+        case None =>
+          val file = new File(s"$secretDir/$wallet")
+          SecretStorage.load(file) match {
+            case Right(secretStorage) =>
+              secretStorages.addOne(wallet -> secretStorage)
+              f(secretStorage)
+            case Left(_) =>
+              Future.successful(Left(NoWalletLoaded))
+          }
+
         case Some(secretStorage) => f(secretStorage)
       }
+    }
 
-    private def withPrivateKey[A](
+    private def withPrivateKey[A](wallet: String)(
         f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withWallet(_.getCurrentPrivateKey() match {
+      withWallet(wallet)(_.getCurrentPrivateKey() match {
         case Left(_)           => Future.successful(Left(WalletLocked))
         case Right(privateKey) => f(privateKey)
       })
 
-    private def withPrivateKeys[A](
+    private def withPrivateKeys[A](wallet: String)(
         f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]])
       : Future[Either[WalletError, A]] =
-      withWallet(_.getAllPrivateKeys() match {
+      withWallet(wallet)(_.getAllPrivateKeys() match {
         case Left(_)            => Future.successful(Left(WalletLocked))
         case Right(privateKeys) => f(privateKeys)
       })
 
-    private def withAddresses[A](f: ((Address, AVector[Address])) => Future[Either[WalletError, A]])
+    private def withAddresses[A](wallet: String)(
+        f: ((Address, AVector[Address])) => Future[Either[WalletError, A]])
       : Future[Either[WalletError, A]] =
-      withPrivateKeys {
+      withPrivateKeys(wallet) {
         case (active, privateKeys) =>
           val activeAddress = Address.p2pkh(networkType, active.publicKey)
           val addresses =
             privateKeys.map(privateKey => Address.p2pkh(networkType, privateKey.publicKey))
           f((activeAddress, addresses))
       }
+
+    private def fileFromSeed(seed: ByteString): File = {
+      val name = Sha256.hash(Sha256.hash(seed)).shortHex
+      new File(s"$secretDir/$name")
+    }
   }
 }
