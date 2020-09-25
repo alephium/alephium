@@ -111,12 +111,14 @@ class WalletAppSpec
     }
 
     create(24) ~> check {
-      mnemonic = responseAs[model.Mnemonic]
+      val result = responseAs[model.WalletCreation.Result]
+      mnemonic = result.mnemonic
+      wallet   = result.walletName
       status is StatusCodes.OK
     }
 
     listWallets() ~> check {
-      wallet = responseAs[AVector[String]].head
+      wallet is responseAs[AVector[String]].head
       status is StatusCodes.OK
     }
 
@@ -191,12 +193,14 @@ class WalletAppSpec
 
     val newMnemonic = model.Mnemonic(crypto.wallet.Mnemonic.generate(24).get.words)
     restore(newMnemonic) ~> check {
+      wallet = responseAs[model.WalletRestore.Result].walletName
       status is StatusCodes.OK
     }
 
     listWallets() ~> check {
       val wallets = responseAs[AVector[String]]
       wallets.length is 2
+      wallets.contains(wallet)
       status is StatusCodes.OK
     }
 

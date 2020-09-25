@@ -7,9 +7,6 @@ import java.nio.file.Path
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.util.ByteString
-
-import org.alephium.crypto.Sha256
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
@@ -21,13 +18,16 @@ import org.alephium.wallet.web.BlockFlowClient
 trait WalletService {
   import WalletService._
 
-  def createWallet(password: String,
-                   mnemonicSize: Mnemonic.Size,
-                   mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]]
+  def createWallet(
+      password: String,
+      mnemonicSize: Mnemonic.Size,
+      walletName: Option[String],
+      mnemonicPassphrase: Option[String]): Future[Either[WalletError, (String, Mnemonic)]]
 
   def restoreWallet(password: String,
                     mnemonic: String,
-                    mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]]
+                    walletName: Option[String],
+                    mnemonicPassphrase: Option[String]): Future[Either[WalletError, String]]
 
   def lockWallet(wallet: String): Future[Either[WalletError, Unit]]
   def unlockWallet(wallet: String, password: String): Future[Either[WalletError, Unit]]
@@ -96,39 +96,44 @@ object WalletService {
     override def createWallet(
         password: String,
         mnemonicSize: Mnemonic.Size,
-        mnemonicPassphrase: Option[String]): Future[Either[WalletError, Mnemonic]] =
+        walletName: Option[String],
+        mnemonicPassphrase: Option[String]): Future[Either[WalletError, (String, Mnemonic)]] =
       Future.successful(
         for {
           mnemonic <- Right(Mnemonic.generate(mnemonicSize))
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-          file = fileFromSeed(seed)
+          file <- buildWalletFile(walletName)
           storage <- SecretStorage
             .create(seed, password, file)
             .left
             .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
-          secretStorages.addOne(file.getName -> storage)
-          mnemonic
+          val fileName = file.getName
+          secretStorages.addOne(fileName -> storage)
+          (fileName, mnemonic)
         }
       )
 
     override def restoreWallet(
         password: String,
         mnemonic: String,
-        mnemonicPassphrase: Option[String]): Future[Either[WalletError, Unit]] = {
+        walletName: Option[String],
+        mnemonicPassphrase: Option[String]): Future[Either[WalletError, String]] = {
       Future.successful {
         val words = AVector.unsafe(mnemonic.split(' '))
         Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
           case Some(seed) =>
-            val file = fileFromSeed(seed)
-            SecretStorage
-              .create(seed, password, file)
-              .map { storage =>
-                secretStorages.addOne(file.getName -> storage)
-                ()
-              }
-              .left
-              .map(_ => CannotCreateEncryptedFile(secretDir))
+            for {
+              file <- buildWalletFile(walletName)
+              storage <- SecretStorage
+                .create(seed, password, file)
+                .left
+                .map(_ => CannotCreateEncryptedFile(secretDir))
+            } yield {
+              val fileName = file.getName
+              secretStorages.addOne(file.getName -> storage)
+              fileName
+            }
           case None =>
             Left(InvalidMnemonic(mnemonic))
         }
@@ -214,12 +219,14 @@ object WalletService {
     }
 
     override def listWallets(): Future[Either[WalletError, AVector[String]]] = {
+      Future.successful(listWalletsInSecretDir())
+    }
+
+    private def listWalletsInSecretDir(): Either[WalletError, AVector[String]] = {
       val dir = secretDir.toFile
-      Future.successful {
-        Either.cond(dir.exists && dir.isDirectory,
-                    AVector.from(dir.listFiles.filter(_.isFile).map(_.getName)),
-                    UnexpectedError)
-      }
+      Either.cond(dir.exists && dir.isDirectory,
+                  AVector.from(dir.listFiles.filter(_.isFile).map(_.getName)),
+                  UnexpectedError)
     }
 
     private def getBalance(address: Address): Future[Either[WalletError, (Address, U64)]] = {
@@ -272,9 +279,13 @@ object WalletService {
           f((activeAddress, addresses))
       }
 
-    private def fileFromSeed(seed: ByteString): File = {
-      val name = Sha256.hash(Sha256.hash(seed)).shortHex
-      new File(s"$secretDir/$name")
+    private def buildWalletFile(walletName: Option[String]): Either[WalletError, File] = {
+      for {
+        currentWallets <- listWalletsInSecretDir()
+      } yield {
+        val name = walletName.getOrElse(s"wallet-${currentWallets.length}")
+        new File(s"$secretDir/$name")
+      }
     }
   }
 }

@@ -21,17 +21,18 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
     )
   )
 
-  val createWallet: Endpoint[WalletCreation, WalletApiError, Mnemonic, Nothing] =
+  val createWallet: Endpoint[WalletCreation, WalletApiError, WalletCreation.Result, Nothing] =
     baseEndpoint.post
       .in("wallets")
       .in(jsonBody[WalletCreation])
-      .out(jsonBody[Mnemonic])
+      .out(jsonBody[WalletCreation.Result])
       .summary("Create a new wallet")
 
-  val restoreWallet: Endpoint[WalletRestore, WalletApiError, Unit, Nothing] =
+  val restoreWallet: Endpoint[WalletRestore, WalletApiError, WalletRestore.Result, Nothing] =
     baseEndpoint.put
       .in("wallets")
       .in(jsonBody[WalletRestore])
+      .out(jsonBody[WalletRestore.Result])
       .summary("Restore a wallet from your mnemonic")
 
   val listWallets: Endpoint[Unit, WalletApiError, AVector[String], Nothing] =

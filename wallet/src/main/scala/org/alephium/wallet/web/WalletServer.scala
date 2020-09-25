@@ -46,15 +46,20 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
       walletService
         .createWallet(walletCreation.password,
                       walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
+                      walletCreation.walletName,
                       walletCreation.mnemonicPassphrase)
-        .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)).left.map(toApiError))
+        .map(_.map {
+          case (walletName, mnemonic) =>
+            model.WalletCreation.Result(walletName, model.Mnemonic(mnemonic.words))
+        }.left.map(toApiError))
     } ~
       restoreWallet.toRoute { walletRestore =>
         walletService
           .restoreWallet(walletRestore.password,
                          walletRestore.mnemonic,
+                         walletRestore.walletName,
                          walletRestore.mnemonicPassphrase)
-          .map(_.left.map(toApiError))
+          .map(_.map(model.WalletRestore.Result).left.map(toApiError))
       } ~
       lockWallet.toRoute { wallet =>
         walletService.lockWallet(wallet).map(_.left.map(toApiError))

@@ -27,5 +27,11 @@ trait ModelCodecs extends ProtocolCodecs {
 
   implicit val walletRestoreCodec: Codec[WalletRestore] = deriveCodec[WalletRestore]
 
+  implicit val walletResultResultCodec: Codec[WalletRestore.Result] =
+    deriveCodec[WalletRestore.Result]
+
   implicit val walletCreationCodec: Codec[WalletCreation] = deriveCodec[WalletCreation]
+
+  implicit val walletCreationResultCodec: Codec[WalletCreation.Result] =
+    deriveCodec[WalletCreation.Result]
 }
