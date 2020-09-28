@@ -15,9 +15,10 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.SocketUtil
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
+import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.crypto
+import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
@@ -67,7 +68,7 @@ class WalletAppSpec
   val routes: Route = walletApp.routes
 
   val password                   = Hash.generate.toHexString
-  var mnemonic: model.Mnemonic   = model.Mnemonic(AVector.empty)
+  var mnemonic: Mnemonic         = _
   var addresses: model.Addresses = _
   var address: Address           = _
   var wallet: String             = _
@@ -80,15 +81,15 @@ class WalletAppSpec
   val unlockJson                                = s"""{"password":"$password"}"""
   def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
-  def restoreJson(mnemonic: model.Mnemonic) =
-    s"""{"password":"$password","mnemonic":"${mnemonic}"}"""
+  def restoreJson(mnemonic: Mnemonic) =
+    s"""{"password":"$password","mnemonic":${mnemonic.asJson}}"""
 
-  def create(size: Int)                 = Post(s"/wallets", entity(creationJson(size))) ~> routes
-  def restore(mnemonic: model.Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
-  def unlock()                          = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
-  def lock()                            = Post(s"/wallets/${wallet}/lock") ~> routes
-  def getBalance()                      = Get(s"/wallets/${wallet}/balances") ~> routes
-  def getAddresses()                    = Get(s"/wallets/${wallet}/addresses") ~> routes
+  def create(size: Int)           = Post(s"/wallets", entity(creationJson(size))) ~> routes
+  def restore(mnemonic: Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
+  def unlock()                    = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
+  def lock()                      = Post(s"/wallets/${wallet}/lock") ~> routes
+  def getBalance()                = Get(s"/wallets/${wallet}/balances") ~> routes
+  def getAddresses()              = Get(s"/wallets/${wallet}/addresses") ~> routes
   def transfer(amount: Int) =
     Post(s"/wallets/${wallet}/transfer", entity(transferJson(amount))) ~> routes
   def deriveNextAddress() = Post(s"/wallets/${wallet}/deriveNextAddress") ~> routes
@@ -191,7 +192,7 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    val newMnemonic = model.Mnemonic(crypto.wallet.Mnemonic.generate(24).get.words)
+    val newMnemonic = Mnemonic.generate(24).get
     restore(newMnemonic) ~> check {
       wallet = responseAs[model.WalletRestore.Result].walletName
       status is StatusCodes.OK

@@ -25,7 +25,7 @@ trait WalletService {
       mnemonicPassphrase: Option[String]): Future[Either[WalletError, (String, Mnemonic)]]
 
   def restoreWallet(password: String,
-                    mnemonic: String,
+                    mnemonic: Mnemonic,
                     walletName: Option[String],
                     mnemonicPassphrase: Option[String]): Future[Either[WalletError, String]]
 
@@ -116,26 +116,21 @@ object WalletService {
 
     override def restoreWallet(
         password: String,
-        mnemonic: String,
+        mnemonic: Mnemonic,
         walletName: Option[String],
         mnemonicPassphrase: Option[String]): Future[Either[WalletError, String]] = {
       Future.successful {
-        val words = AVector.unsafe(mnemonic.split(' '))
-        Mnemonic.fromWords(words).map(_.toSeed(mnemonicPassphrase.getOrElse(""))) match {
-          case Some(seed) =>
-            for {
-              file <- buildWalletFile(walletName)
-              storage <- SecretStorage
-                .create(seed, password, file)
-                .left
-                .map(_ => CannotCreateEncryptedFile(secretDir))
-            } yield {
-              val fileName = file.getName
-              secretStorages.addOne(file.getName -> storage)
-              fileName
-            }
-          case None =>
-            Left(InvalidMnemonic(mnemonic))
+        val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
+        for {
+          file <- buildWalletFile(walletName)
+          storage <- SecretStorage
+            .create(seed, password, file)
+            .left
+            .map(_ => CannotCreateEncryptedFile(secretDir))
+        } yield {
+          val fileName = file.getName
+          secretStorages.addOne(file.getName -> storage)
+          fileName
         }
       }
     }

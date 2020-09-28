@@ -50,7 +50,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
                       walletCreation.mnemonicPassphrase)
         .map(_.map {
           case (walletName, mnemonic) =>
-            model.WalletCreation.Result(walletName, model.Mnemonic(mnemonic.words))
+            model.WalletCreation.Result(walletName, mnemonic)
         }.left.map(toApiError))
     } ~
       restoreWallet.toRoute { walletRestore =>
