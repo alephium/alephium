@@ -36,7 +36,7 @@ trait WalletService {
   def transfer(wallet: String, address: Address, amount: U64): Future[Either[WalletError, Hash]]
   def deriveNextAddress(wallet: String): Future[Either[WalletError, Address]]
   def changeActiveAddress(wallet: String, address: Address): Future[Either[WalletError, Unit]]
-  def listWallets(): Future[Either[WalletError, AVector[String]]]
+  def listWallets(): Future[Either[WalletError, AVector[(String, Boolean)]]]
 }
 
 object WalletService {
@@ -213,8 +213,21 @@ object WalletService {
       }
     }
 
-    override def listWallets(): Future[Either[WalletError, AVector[String]]] = {
-      Future.successful(listWalletsInSecretDir())
+    override def listWallets(): Future[Either[WalletError, AVector[(String, Boolean)]]] = {
+      listWalletsInSecretDir().map { wallets =>
+        Future
+          .sequence(wallets.toSeq.map { wallet =>
+            withWallet(wallet)(secret => Future.successful(Right(secret.isLocked()))).map {
+              _.toOption.map { locked =>
+                (wallet, locked)
+              }
+            }
+          })
+          .map(_.flatten)
+      } match {
+        case Right(future) => future.map(seq => Right(AVector.from(seq)))
+        case Left(error)   => Future.successful(Left(error))
+      }
     }
 
     private def listWalletsInSecretDir(): Either[WalletError, AVector[String]] = {

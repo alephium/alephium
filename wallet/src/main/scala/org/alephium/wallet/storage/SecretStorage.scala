@@ -22,6 +22,7 @@ import org.alephium.wallet.circe.UtilCodecs
 trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.Error, Unit]
+  def isLocked(): Boolean
   def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
     : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
@@ -110,6 +111,8 @@ object SecretStorage extends UtilCodecs {
         maybeState = Some(state)
       }
     }
+
+    override def isLocked(): Boolean = maybeState.isEmpty
 
     override def getCurrentPrivateKey(): Either[Error, ExtendedPrivateKey] = {
       for {

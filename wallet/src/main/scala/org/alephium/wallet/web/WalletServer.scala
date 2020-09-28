@@ -109,7 +109,8 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
       listWallets.toRoute { _ =>
         walletService
           .listWallets()
-          .map(_.left.map(toApiError))
+          .map(_.map(_.map { case (name, locked) => model.WalletStatus(name, locked) }).left
+            .map(toApiError))
       } ~
       swaggerUIRoute
 }

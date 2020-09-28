@@ -119,7 +119,10 @@ class WalletAppSpec
     }
 
     listWallets() ~> check {
-      wallet is responseAs[AVector[String]].head
+      val walletStatus = responseAs[AVector[model.WalletStatus]].head
+      walletStatus.walletName is wallet
+      walletStatus.locked is false
+      wallet is walletStatus.walletName
       status is StatusCodes.OK
     }
 
@@ -199,9 +202,9 @@ class WalletAppSpec
     }
 
     listWallets() ~> check {
-      val wallets = responseAs[AVector[String]]
-      wallets.length is 2
-      wallets.contains(wallet)
+      val walletStatuses = responseAs[AVector[model.WalletStatus]]
+      walletStatuses.length is 2
+      walletStatuses.map(_.walletName).contains(wallet)
       status is StatusCodes.OK
     }
 

@@ -35,10 +35,10 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
       .out(jsonBody[WalletRestore.Result])
       .summary("Restore a wallet from your mnemonic")
 
-  val listWallets: Endpoint[Unit, WalletApiError, AVector[String], Nothing] =
+  val listWallets: Endpoint[Unit, WalletApiError, AVector[WalletStatus], Nothing] =
     baseEndpoint.get
       .in("wallets")
-      .out(jsonBody[AVector[String]])
+      .out(jsonBody[AVector[WalletStatus]])
       .summary("List available wallets")
 
   val lockWallet: Endpoint[String, WalletApiError, Unit, Nothing] =
