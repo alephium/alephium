@@ -57,13 +57,20 @@ object SecretStorage extends UtilCodecs {
                                  activeKey: ExtendedPrivateKey,
                                  privateKeys: AVector[ExtendedPrivateKey])
 
-  implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
+  private final case class SecretFile(encrypted: ByteString,
+                                      salt: ByteString,
+                                      iv: ByteString,
+                                      version: Int) {
+    def toAESEncrytped: AES.Encrypted = AES.Encrypted(encrypted, salt, iv)
+  }
+
+  private implicit val codec: Codec[SecretFile] = deriveCodec[SecretFile]
 
   def load(file: File): Either[Error, SecretStorage] = {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
-        _ <- decode[AES.Encrypted](rawFile).left.map(_ => CannotParseFile)
+        _ <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
       } yield {
         new Impl(file, None)
       }
@@ -165,8 +172,12 @@ object SecretStorage extends UtilCodecs {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
-        encrypted   <- decode[AES.Encrypted](rawFile).left.map(_ => CannotParseFile)
-        stateBytes  <- AES.decrypt(encrypted, password).toEither.left.map(_ => CannotDecryptSecret)
+        secretFile <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
+        stateBytes <- AES
+          .decrypt(secretFile.toAESEncrytped, password)
+          .toEither
+          .left
+          .map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
@@ -209,16 +220,18 @@ object SecretStorage extends UtilCodecs {
       .Manager { use =>
         val outWriter = use(new PrintWriter(file))
         val encrypted = AES.encrypt(serialize(storedState), password)
-        outWriter.write(encryptedAsJson(encrypted))
+        val secretFile =
+          SecretFile(encrypted.encrypted, encrypted.salt, encrypted.iv, Constants.walletFileVersion)
+        outWriter.write(secretFileAsJson(secretFile))
       }
       .toEither
       .left
       .map(_ => SecretFileError)
   }
 
-  private def encryptedAsJson(encrypted: AES.Encrypted) = {
+  private def secretFileAsJson(secretFile: SecretFile) = {
     // scalastyle:off regex
-    encrypted.asJson.noSpaces
+    secretFile.asJson.noSpaces
     // scalastyle:on
   }
 }
