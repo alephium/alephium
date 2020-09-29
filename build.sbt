@@ -93,6 +93,14 @@ lazy val rpc = project("rpc")
 lazy val `app-server` = mainProject("app-server")
   .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
   .settings(
+    mainClass in assembly := Some("org.alephium.appserver.Boot"),
+    assemblyJarName in assembly := s"alephium-${version.value}.jar",
+    test in assembly := {},
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", "maven", "org.webjars", "swagger-ui", xs @ _*) => MergeStrategy.first
+      case other => (assemblyMergeStrategy in assembly).value(other)
+    },
+
     libraryDependencies ++= Seq(
       `akka-http-cors`,
       `akka-http-test`,
