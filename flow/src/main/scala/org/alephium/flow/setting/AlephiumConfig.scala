@@ -132,13 +132,15 @@ object AlephiumConfig {
   implicit val chainsSettingReader: ConfigReader[ChainsSetting] =
     ConfigReader[TempChainsSetting].map(_.chainsSetting)
 
-  def load(config: Config): Result[AlephiumConfig] = {
+  def source(config: Config): ConfigSource = {
     val path          = "alephium"
     val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
-    ConfigSource.fromConfig(configLocated).load[AlephiumConfig]
+    ConfigSource.fromConfig(configLocated)
   }
 
   def load(rootPath: Path): Result[AlephiumConfig] = {
     load(Configs.parseConfig(rootPath))
   }
+  def load(config: Config): Result[AlephiumConfig] = source(config).load[AlephiumConfig]
+  def loadOrThrow(config: Config): AlephiumConfig = source(config).loadOrThrow[AlephiumConfig]
 }

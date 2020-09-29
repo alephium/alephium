@@ -19,9 +19,12 @@ final case class ApiConfig(
 )
 
 object ApiConfig {
-  def load(config: Config): Result[ApiConfig] = {
+  def source(config: Config): ConfigSource = {
     val path          = "alephium.api"
     val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
-    ConfigSource.fromConfig(configLocated).load[ApiConfig]
+    ConfigSource.fromConfig(configLocated)
   }
+
+  def load(config: Config): Result[ApiConfig] = source(config).load[ApiConfig]
+  def loadOrThrow(config: Config): ApiConfig = source(config).loadOrThrow[ApiConfig]
 }

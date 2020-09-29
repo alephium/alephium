@@ -17,8 +17,8 @@ import org.alephium.util.ActorRefT
 object Boot extends App with StrictLogging {
   val rootPath: Path                              = Platform.getRootPath()
   val typesafeConfig: Config                      = Configs.parseConfig(rootPath)
-  implicit val config: AlephiumConfig             = AlephiumConfig.load(typesafeConfig).toOption.get
-  implicit val apiConfig: ApiConfig               = ApiConfig.load(typesafeConfig).toOption.get
+  implicit val config: AlephiumConfig             = AlephiumConfig.loadOrThrow(typesafeConfig)
+  implicit val apiConfig: ApiConfig               = ApiConfig.loadOrThrow(typesafeConfig)
   implicit val system: ActorSystem                = ActorSystem("Root", typesafeConfig)
   implicit val executionContext: ExecutionContext = system.dispatcher
 
