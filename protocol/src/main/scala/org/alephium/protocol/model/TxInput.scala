@@ -94,7 +94,7 @@ object TxOutputRef {
 
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
     val refKey = key(transaction.hash, outputIndex)
-    TxOutputRef.from(transaction.getOutput(outputIndex).hint, refKey)
+    from(transaction.getOutput(outputIndex), refKey)
   }
 
   def from(output: TxOutput, key: Hash): TxOutputRef = {

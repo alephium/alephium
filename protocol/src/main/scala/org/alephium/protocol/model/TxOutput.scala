@@ -15,10 +15,8 @@ sealed trait TxOutput {
   def tokens: AVector[(TokenId, U64)]
 
   def hint: Hint
-  def isAsset: Boolean = hint.isAssetType
 
-  def scriptHint: ScriptHint                            = lockupScript.scriptHint
-  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  def isAsset: Boolean
 }
 
 object TxOutput {
@@ -63,7 +61,11 @@ final case class AssetOutput(amount: U64,
                              tokens: AVector[(TokenId, U64)],
                              additionalData: ByteString)
     extends TxOutput {
-  override def hint: Hint = Hint.ofAsset(scriptHint)
+  def isAsset: Boolean = true
+
+  def hint: Hint = Hint.from(this)
+
+  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
 object AssetOutput {
@@ -78,7 +80,9 @@ final case class ContractOutput(amount: U64,
                                 lockupScript: LockupScript,
                                 tokens: AVector[(TokenId, U64)])
     extends TxOutput {
-  override def hint: Hint = Hint.ofContract(scriptHint)
+  def isAsset: Boolean = false
+
+  def hint: Hint = Hint.from(this)
 }
 
 object ContractOutput {

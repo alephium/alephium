@@ -106,13 +106,21 @@ object NonCoinbaseValidation {
       else {
         val fromIndex = inputIndexes.head
         val outputIndexes =
-          (0 until tx.outputsLength).view.map(tx.getOutput(_).toGroup).filter(_ != fromIndex).toSet
+          (0 until tx.outputsLength).view
+            .map(index => getToGroup(tx.getOutput(index), fromIndex))
+            .filter(_ != fromIndex)
+            .toSet
         outputIndexes.size match {
           case 0 => validTx(ChainIndex(fromIndex, fromIndex))
           case 1 => validTx(ChainIndex(fromIndex, outputIndexes.head))
           case _ => invalidTx(InvalidOutputGroupIndex)
         }
       }
+    }
+
+    private def getToGroup(output: TxOutput, fromIndex: GroupIndex): GroupIndex = output match {
+      case o: AssetOutput    => o.toGroup
+      case _: ContractOutput => fromIndex
     }
 
     protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
