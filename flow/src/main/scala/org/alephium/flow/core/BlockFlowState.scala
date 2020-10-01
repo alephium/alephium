@@ -469,10 +469,7 @@ object BlockFlowState {
                                            tx.hash,
                                            tx.unsigned.fixedOutputs,
                                            targetGroup)
-      worldState2 <- updateStateForOutputs(worldState1,
-                                           tx.hash,
-                                           tx.unsigned.fixedOutputs,
-                                           targetGroup)
+      worldState2 <- updateStateForOutputs(worldState1, tx.hash, tx.generatedOutputs, targetGroup)
     } yield worldState2
   }
 
@@ -482,7 +479,10 @@ object BlockFlowState {
       outputs: AVector[O],
       targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     outputs.foldWithIndexE(worldState) {
-      case (state, output, index) if output.toGroup == targetGroup =>
+      case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
+        val outputRef = TxOutputRef.from(output, TxOutputRef.key(txHash, index))
+        state.addAsset(outputRef, output)
+      case (state, output: ContractOutput, index) =>
         val outputRef = TxOutputRef.from(output, TxOutputRef.key(txHash, index))
         state.addAsset(outputRef, output)
       case (state, _, _) => Right(state)

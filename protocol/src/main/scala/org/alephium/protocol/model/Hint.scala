@@ -23,6 +23,11 @@ object Hint {
     .bytesSerde(4)
     .xmap(bs => new Hint(Bytes.toIntUnsafe(bs)), hint => Bytes.from(hint.value))
 
+  def from(assetOutput: AssetOutput): Hint = ofAsset(assetOutput.lockupScript.scriptHint)
+
+  def from(contractOutput: ContractOutput): Hint =
+    ofContract(contractOutput.lockupScript.scriptHint)
+
   def ofAsset(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value)
 
   def ofContract(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value ^ 1)
