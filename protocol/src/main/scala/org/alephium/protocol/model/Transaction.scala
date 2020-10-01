@@ -35,7 +35,7 @@ final case class Transaction(unsigned: UnsignedTransaction,
   override val hash: Hash = unsigned.hash
 
   def allOutputs: AVector[TxOutput] =
-    unsigned.fixedOutputs.asInstanceOf[AVector[TxOutput]] ++ generatedOutputs
+    unsigned.fixedOutputs.map(_.asInstanceOf[TxOutput]) ++ generatedOutputs
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
 

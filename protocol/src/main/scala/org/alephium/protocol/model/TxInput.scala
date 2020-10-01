@@ -67,9 +67,6 @@ object ContractOutputRef {
 
   def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 
-  def from(scriptHint: ScriptHint, key: Hash): ContractOutputRef =
-    unsafe(Hint.ofContract(scriptHint), key)
-
   def from(contractOutput: ContractOutput, key: Hash): ContractOutputRef =
     unsafe(contractOutput.hint, key)
 

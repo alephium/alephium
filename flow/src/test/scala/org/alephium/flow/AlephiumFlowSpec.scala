@@ -2,6 +2,7 @@ package org.alephium.flow
 
 import scala.annotation.tailrec
 
+import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
@@ -155,17 +156,17 @@ trait FlowFixture
                  chainIndex: ChainIndex,
                  key: Hash,
                  fields: AVector[Val],
-                 outputRef: ContractOutputRef): Assertion = {
-    val contractState = blockFlow
-      .getBestPersistedTrie(chainIndex.from)
-      .toOption
-      .get
-      .getContractState(key)
-      .toOption
-      .get
+                 outputRef: ContractOutputRef,
+                 numAssets: Int    = 2,
+                 numContracts: Int = 2): Assertion = {
+    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).toOption.get
+    val contractState = worldState.getContractState(key).toOption.get
 
     contractState.fields is fields
     contractState.contractOutputRef is outputRef
+
+    worldState.getAssetOutputs(ByteString.empty).toOption.get.length is numAssets
+    worldState.getContractOutputs(ByteString.empty).toOption.get.length is numContracts
   }
 }
 
