@@ -1,6 +1,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.io.IOError
+import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
 trait ExeFailure
@@ -36,6 +37,7 @@ case object NonEmptyReturnForMainFunction                      extends ExeFailur
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class IOErrorUpdateState(error: IOError)            extends ExeFailure
 final case class IOErrorLoadContract(error: IOError)           extends ExeFailure
+final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
 final case class IOErrorLoadOutputs(error: IOError)            extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure

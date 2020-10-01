@@ -160,7 +160,7 @@ object NonCoinbaseValidation {
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
       for {
         inputBalances  <- computeTokenBalances(preOutputs)
-        outputBalances <- computeTokenBalances(tx.unsigned.fixedOutputs ++ tx.generatedOutputs)
+        outputBalances <- computeTokenBalances(tx.allOutputs)
         _ <- {
           val ok = outputBalances.forall {
             case (tokenId, balance) =>
@@ -176,14 +176,12 @@ object NonCoinbaseValidation {
         outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U64]] =
       try {
         val balances = mutable.Map.empty[TokenId, U64]
-        outputs.foreach {
-          case output: AssetOutput =>
-            output.tokens.foreach {
-              case (tokenId, amount) =>
-                val total = balances.getOrElse(tokenId, U64.Zero)
-                balances.put(tokenId, total.add(amount).get)
-            }
-          case _ => ()
+        outputs.foreach { output =>
+          output.tokens.foreach {
+            case (tokenId, amount) =>
+              val total = balances.getOrElse(tokenId, U64.Zero)
+              balances.put(tokenId, total.add(amount).get)
+          }
         }
         Right(balances)
       } catch {

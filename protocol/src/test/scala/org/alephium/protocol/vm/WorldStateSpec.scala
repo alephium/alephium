@@ -8,7 +8,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
-  def generateAsset: Gen[(AssetOutputRef, AssetOutput)] = {
+  def generateAsset: Gen[(TxOutputRef, TxOutput)] = {
     for {
       groupIndex     <- groupIndexGen
       assetOutputRef <- assetOutputRefGen(groupIndex)
@@ -16,41 +16,42 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     } yield (assetOutputRef, assetOutput)
   }
 
-  def generateContract: Gen[(ContractOutputRef, ContractOutput, AVector[Val])] = {
+  def generateContract: Gen[(StatefulContract, AVector[Val], ContractOutputRef, ContractOutput)] = {
     for {
-      groupIndex        <- groupIndexGen
-      contractOutputRef <- contractOutputRefGen(groupIndex)
-      contractOutput    <- contractOutputGen(groupIndex)()
-      contractState     <- counterStateGen
-    } yield (contractOutputRef, contractOutput, contractState)
+      groupIndex    <- groupIndexGen
+      outputRef     <- contractOutputRefGen(groupIndex)
+      output        <- contractOutputGen(groupIndex)()
+      contractState <- counterStateGen
+    } yield (counterContract, contractState, outputRef, output)
   }
 
   it should "work" in {
     def test(worldState: WorldState, persist: Boolean): Assertion = {
-      val (assetOutputRef, assetOutput)              = generateAsset.sample.get
-      val (contractOutputRef, contractOutput, state) = generateContract.sample.get
+      val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
+      val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
+      val contractKey                                      = contractOutputRef.key
       val contractObj =
-        StatefulContractObject(contractOutput.code, state.toArray, contractOutputRef.key)
+        StatefulContractObject(code, state.toArray, contractOutputRef.key)
 
       worldState.getOutput(assetOutputRef).isLeft is true
       worldState.getOutput(contractOutputRef).isLeft is true
       worldState.getContractObj(contractOutputRef.key).isLeft is true
       if (worldState.isInstanceOf[WorldState.Persisted]) {
-        worldState.remove(assetOutputRef).isLeft is true
-        worldState.remove(contractOutputRef).isLeft is true
+        worldState.removeAsset(assetOutputRef).isLeft is true
+        worldState.removeAsset(contractOutputRef).isLeft is true
       }
 
       val worldState0 = worldState.addAsset(assetOutputRef, assetOutput).toOption.get
       val worldState1 =
-        worldState0.addContract(contractOutputRef, contractOutput, state).toOption.get
+        worldState0.createContract(code, state, contractOutputRef, contractOutput).toOption.get
       val worldState2 = if (persist) worldState1.persist.toOption.get else worldState1
 
       worldState2.getOutput(assetOutputRef) isE assetOutput
       worldState2.getOutput(contractOutputRef) isE contractOutput
       worldState2.getContractObj(contractOutputRef.key) isE contractObj
 
-      val worldState3 = worldState2.remove(assetOutputRef).toOption.get
-      val worldState4 = worldState3.remove(contractOutputRef).toOption.get
+      val worldState3 = worldState2.removeAsset(assetOutputRef).toOption.get
+      val worldState4 = worldState3.removeContract(contractKey).toOption.get
       val worldState5 = if (persist) worldState4.persist.toOption.get else worldState4
 
       worldState5.getOutput(assetOutputRef).isLeft is true

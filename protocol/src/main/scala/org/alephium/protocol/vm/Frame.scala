@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutput, ContractOutput, TokenId, TxOutput}
+import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, Bytes, U64}
 
 abstract class Frame[Ctx <: Context] {
@@ -367,10 +367,20 @@ object Frame {
       all.clear()
       Balances(newAll)
     }
+
+    def pool(): Option[BalancesPerLockup] = {
+      Option.when(all.nonEmpty) {
+        val accumulator = BalancesPerLockup.empty
+        all.foreach { balances =>
+          accumulator.add(balances._2)
+        }
+        accumulator
+      }
+    }
   }
 
   object Balances {
-    def from(inputs: AVector[TxOutput], outputs: AVector[TxOutput]): Option[Balances] = {
+    def from(inputs: AVector[TxOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
       val inputBalances = inputs.fold(Option(empty)) {
         case (Some(balances), input) =>
           balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)
@@ -388,6 +398,11 @@ object Frame {
   }
 
   final case class BalancesPerLockup(var alfAmount: U64, tokenAmounts: mutable.Map[TokenId, U64]) {
+    def tokenVector: AVector[(TokenId, U64)] = {
+      import org.alephium.protocol.model.tokenIdOrder
+      AVector.from(tokenAmounts).sortBy(_._1)
+    }
+
     def getTokenAmount(tokenId: TokenId): Option[U64] = tokenAmounts.get(tokenId)
 
     def addAlf(amount: U64): Option[Unit] = {
@@ -447,6 +462,8 @@ object Frame {
   object BalancesPerLockup {
     val error: ArithmeticException = new ArithmeticException("U64")
 
+    val empty: BalancesPerLockup = BalancesPerLockup(U64.Zero, mutable.Map.empty)
+
     def alf(amount: U64): BalancesPerLockup = {
       BalancesPerLockup(amount, mutable.Map.empty)
     }
@@ -455,9 +472,7 @@ object Frame {
       BalancesPerLockup(U64.Zero, mutable.Map(id -> amount))
     }
 
-    def from(output: TxOutput): BalancesPerLockup = output match {
-      case o: AssetOutput    => BalancesPerLockup(o.amount, mutable.Map.from(o.tokens.toIterable))
-      case o: ContractOutput => BalancesPerLockup(o.amount, mutable.Map.empty)
-    }
+    def from(output: TxOutput): BalancesPerLockup =
+      BalancesPerLockup(output.amount, mutable.Map.from(output.tokens.toIterable))
   }
 }

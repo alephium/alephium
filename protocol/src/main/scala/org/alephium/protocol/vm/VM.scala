@@ -1,10 +1,12 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.Block
-import org.alephium.util.AVector
+import org.alephium.protocol.model.{TransactionAbstract, TxOutput}
+import org.alephium.serde._
+import org.alephium.util.{AVector, U64}
 
 sealed abstract class VM[Ctx <: Context](ctx: Ctx,
                                          frameStack: Stack[Frame[Ctx]],
@@ -106,22 +108,40 @@ object StatelessVM {
 }
 
 object StatefulVM {
-  def runTxScripts(worldState: WorldState, block: Block): ExeResult[WorldState] = {
-    block.transactions.foldE(worldState) {
-      case (worldState, tx) =>
-        tx.unsigned.scriptOpt match {
-          case Some(script) => runTxScript(worldState, tx.hash, script)
-          case None         => Right(worldState)
-        }
-    }
+  def contractCreation(code: StatefulContract,
+                       initialState: AVector[Val],
+                       lockupScript: LockupScript,
+                       alfAmount: U64): StatefulScript = {
+    val codeRaw  = serialize(code)
+    val stateRaw = serialize(initialState)
+    val method = Method[StatefulContext](
+      isPublic   = true,
+      isPayable  = true,
+      localsType = AVector.empty,
+      returnType = AVector.empty,
+      instrs = AVector(
+        U64Const(Val.U64(alfAmount)),
+        AddressConst(Val.Address(lockupScript)),
+        ApproveAlf,
+        BytesConst(Val.ByteVec(mutable.ArraySeq.from(stateRaw))),
+        BytesConst(Val.ByteVec(mutable.ArraySeq.from(codeRaw))),
+        CreateContract
+      )
+    )
+    StatefulScript(AVector(method))
   }
 
   def runTxScript(worldState: WorldState,
-                  txHash: Hash,
-                  script: StatefulScript): ExeResult[WorldState] = {
-    val context = StatefulContext.nonPayable(txHash, worldState)
-    val obj     = script.toObject
-    execute(context, obj, AVector.empty).map(_ => context.worldState)
+                  tx: TransactionAbstract,
+                  script: StatefulScript): ExeResult[(AVector[TxOutput], WorldState)] = {
+    val context = if (script.methods.head.isPayable) {
+      StatefulContext.payable(tx, worldState)
+    } else {
+      StatefulContext.nonPayable(tx.hash, worldState)
+    }
+    val obj = script.toObject
+    execute(context, obj, AVector.empty).map(_ =>
+      AVector.from(context.generatedOutputs) -> context.worldState)
   }
 
   def execute(context: StatefulContext,

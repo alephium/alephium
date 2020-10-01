@@ -273,8 +273,7 @@ class BlockFlowSpec extends AlephiumSpec {
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
-    val pubScript =
-      block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
+    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow, pubScript, 1)
     checkBalance(blockFlow, testGroup, genesisBalance - 1)
   }
@@ -305,8 +304,7 @@ class BlockFlowSpec extends AlephiumSpec {
     checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
 
     addAndCheck(blockFlow1, block, 1)
-    val pubScript =
-      block.nonCoinbase.head.unsigned.fixedOutputs.head.asInstanceOf[AssetOutput].lockupScript
+    val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow1, pubScript, 1)
   }
 

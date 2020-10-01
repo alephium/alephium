@@ -50,9 +50,9 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0                  = Block.from(AVector.empty, AVector.empty, consensusConfig.maxMiningTarget, 0)
 
     val input0          = txInputGen.sample.get
-    val output0         = txOutputGen.sample.get
+    val output0         = assetOutputGen.sample.get
     val emptyInputs     = AVector.empty[TxInput]
-    val emptyOutputs    = AVector.empty[TxOutput]
+    val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
 
     val coinbase1     = Transaction.coinbase(publicKey, 0, ByteString.empty)

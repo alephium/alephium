@@ -7,9 +7,9 @@ import akka.util.ByteString
 
 import org.alephium.crypto._
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.serde._
+import org.alephium.serde.{deserialize => decode, _}
 import org.alephium.util
-import org.alephium.util.{Bytes, Collection}
+import org.alephium.util.{AVector, Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
 
@@ -65,7 +65,7 @@ object Instr {
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I64Const, U64Const, I256Const, U256Const,
-    BytesConst,
+    BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop, Pop2, Dup, Dup2, Swap,
     I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
@@ -90,7 +90,10 @@ object Instr {
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
-    ArraySeq[InstrCompanion[StatefulContext]](LoadField, StoreField, CallExternal)
+    ArraySeq[InstrCompanion[StatefulContext]](
+      LoadField, StoreField, CallExternal,
+      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, TransferAlf, TransferToken, CreateContract
+    )
   // format: on
 
   val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
@@ -1232,6 +1235,21 @@ object TransferToken extends AssetInstr with StatefulInstrCompanion0 {
       _ <- frame.ctx.outputBalances
         .addToken(to.lockupScript, tokenId, amount.v)
         .toRight[ExeFailure](BalanceOverflow)
+    } yield ()
+  }
+}
+
+object CreateContract extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractCodeRaw <- frame.popT[Val.ByteVec]()
+      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left
+        .map(SerdeErrorCreateContract)
+      fieldsRaw    <- frame.popT[Val.ByteVec]()
+      fields       <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(SerdeErrorCreateContract)
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      balances = balanceState.approved.use()
+      _ <- frame.ctx.createContract(contractCode, balances, fields)
     } yield ()
   }
 }

@@ -1,9 +1,12 @@
 package org.alephium.protocol.vm
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
+import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.Transaction
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 trait ChainEnv
@@ -38,6 +41,32 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext {
   var worldState: WorldState
 
+  lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
+
+  def nextOutputNum: Int
+
+  def createContract(code: StatefulContract,
+                     initialBalances: Frame.Balances,
+                     initialFields: AVector[Val]): ExeResult[Unit] = {
+    for {
+      totalBalances <- initialBalances.pool().toRight(InvalidBalances)
+      contractId = TxOutputRef.key(txHash, nextOutputNum)
+      contractOutput = ContractOutput(totalBalances.alfAmount,
+                                      0, // TODO: use proper height here
+                                      LockupScript.p2c(contractId),
+                                      totalBalances.tokenVector,
+                                      ByteString.empty)
+      outputRef = ContractOutputRef.from(contractOutput, contractId)
+      newWorldState <- worldState
+        .createContract(code, initialFields, outputRef, contractOutput)
+        .left
+        .map(IOErrorUpdateState)
+    } yield {
+      worldState = newWorldState
+      generatedOutputs.addOne(contractOutput)
+    }
+  }
+
   def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
 
   def updateState(key: Hash, state: AVector[Val]): ExeResult[Unit] = {
@@ -52,7 +81,7 @@ trait StatefulContext extends StatelessContext {
 }
 
 object StatefulContext {
-  def payable(tx: Transaction, worldState: WorldState): StatefulContext =
+  def payable(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
     new Payable(tx, worldState)
 
   def nonPayable(txHash: Hash, worldState: WorldState): StatefulContext =
@@ -64,14 +93,18 @@ object StatefulContext {
       extends StatefulContext {
     override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
     override def outputBalances: Frame.Balances                = ??? // should not be used
+    override def nextOutputNum: Int                            = ??? // should not be used
   }
 
-  final class Payable(val tx: Transaction, val initWorldState: WorldState) extends StatefulContext {
+  final class Payable(val tx: TransactionAbstract, val initWorldState: WorldState)
+      extends StatefulContext {
     override var worldState: WorldState = initWorldState
 
     override def txHash: Hash = tx.hash
 
     override val signatures: Stack[Signature] = Stack.popOnly(tx.signatures)
+
+    override def nextOutputNum: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     override def getInitialBalances: ExeResult[Frame.Balances] = {
       for {
