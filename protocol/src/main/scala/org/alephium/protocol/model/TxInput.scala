@@ -14,13 +14,7 @@ final case class TxInput(outputRef: AssetOutputRef, unlockScript: UnlockScript)
 }
 
 object TxInput {
-//  def unsafe(transaction: Transaction, outputIndex: Int, unlockScript: UnlockScript): TxInput = {
-//    assume(outputIndex >= 0 && outputIndex < transaction.outputsLength)
-//    val outputRef = TxOutputRef.unsafe(transaction, outputIndex)
-//    TxInput(outputRef, unlockScript)
-//  }
-
-  // Note that the serialization has to put mainKey in the first 32 bytes for the sake of trie indexing
+  // Note that the serialization has to put outputRef in the first 32 bytes for the sake of trie indexing
   implicit val serde: Serde[TxInput] =
     Serde.forProduct2(TxInput.apply, ti => (ti.outputRef, ti.unlockScript))
 }
@@ -31,13 +25,13 @@ trait TxOutputRef {
 
   def isAssetType: Boolean
   def isContractType: Boolean
-
-  def fromGroup(implicit config: GroupConfig): GroupIndex = hint.scriptHint.groupIndex
 }
 
 final case class AssetOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
   override def isAssetType: Boolean    = true
   override def isContractType: Boolean = false
+
+  def fromGroup(implicit config: GroupConfig): GroupIndex = hint.scriptHint.groupIndex
 }
 object AssetOutputRef {
   implicit val serde: Serde[AssetOutputRef] =
@@ -80,8 +74,10 @@ object ContractOutputRef {
     unsafe(contractOutput.hint, key)
 
   // Only use this to initialize Merkle tree of ouptuts
-  def forMPT: ContractOutputRef =
-    ContractOutputRef.from(ScriptHint.fromHash(0), Hash.zero)
+  def forMPT: ContractOutputRef = {
+    val hint = Hint.ofContract(ScriptHint.fromHash(0))
+    unsafe(hint, Hash.zero)
+  }
 }
 
 object TxOutputRef {
