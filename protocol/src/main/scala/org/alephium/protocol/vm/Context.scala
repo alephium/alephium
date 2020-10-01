@@ -3,8 +3,6 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
-
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
@@ -54,8 +52,7 @@ trait StatefulContext extends StatelessContext {
       contractOutput = ContractOutput(totalBalances.alfAmount,
                                       0, // TODO: use proper height here
                                       LockupScript.p2c(contractId),
-                                      totalBalances.tokenVector,
-                                      ByteString.empty)
+                                      totalBalances.tokenVector)
       outputRef = ContractOutputRef.from(contractOutput, contractId)
       newWorldState <- worldState
         .createContract(code, initialFields, outputRef, contractOutput)

@@ -378,8 +378,8 @@ object BlockFlowState {
   private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
       implicit brokerConfig: GroupConfig): Map[TxOutputRef, TxOutput] = {
     convertOutputs(block).filter {
-      case (outputRef, _) if outputRef.fromGroup == groupIndex => true
-      case _                                                   => false
+      case (outputRef: AssetOutputRef, _) if outputRef.fromGroup == groupIndex => true
+      case _                                                                   => false
     }
   }
 

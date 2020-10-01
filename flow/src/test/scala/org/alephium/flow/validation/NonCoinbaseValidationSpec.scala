@@ -184,7 +184,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       dataNew.length is ALF.MaxOutputDataSize + 1
       val outputNew = outputs(index) match {
         case o: AssetOutput    => o.copy(additionalData = dataNew)
-        case o: ContractOutput => o.copy(additionalData = dataNew)
+        case o: ContractOutput => o
       }
       outputs.replace(index, outputNew)
     }
@@ -192,17 +192,19 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     forAll(transactionGenWithPreOutputs(1, 3)) {
       case (tx, preOutputs) =>
         val outputIndex = Random.source.nextInt(tx.outputsLength)
-        val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
-          val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)
-          tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
-        } else {
-          val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
-          val outputsNew     = modifyData1(tx.generatedOutputs, correctedIndex)
-          tx.copy(generatedOutputs = outputsNew)
+        if (tx.getOutput(outputIndex).isInstanceOf[AssetOutput]) {
+          val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
+            val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)
+            tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
+          } else {
+            val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
+            val outputsNew     = modifyData1(tx.generatedOutputs, correctedIndex)
+            tx.copy(generatedOutputs = outputsNew)
+          }
+          failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
+          failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
+          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
         }
-        failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-        failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
     }
   }
 

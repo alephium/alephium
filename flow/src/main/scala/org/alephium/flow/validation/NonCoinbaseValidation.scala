@@ -128,9 +128,13 @@ object NonCoinbaseValidation {
 
     protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
       EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
-        val output = tx.getOutput(outputIndex)
-        if (output.additionalData.length > ALF.MaxOutputDataSize) invalidTx(OutputDataSizeExceeded)
-        else Right(())
+        tx.getOutput(outputIndex) match {
+          case output: AssetOutput =>
+            if (output.additionalData.length > ALF.MaxOutputDataSize)
+              invalidTx(OutputDataSizeExceeded)
+            else Right(())
+          case _ => Right(())
+        }
       }
     }
 

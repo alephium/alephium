@@ -161,13 +161,11 @@ trait TxGenerators
       dataGen: Gen[ByteString]           = dataGen
   ): Gen[ContractOutput] = {
     for {
-      amount         <- _amountGen
-      tokens         <- _tokensGen
-      createdHeight  <- heightGen
-      lockupScript   <- scriptGen
-      additionalData <- dataGen
-    } yield
-      ContractOutput(amount, createdHeight, lockupScript, AVector.from(tokens), additionalData)
+      amount        <- _amountGen
+      tokens        <- _tokensGen
+      createdHeight <- heightGen
+      lockupScript  <- scriptGen
+    } yield ContractOutput(amount, createdHeight, lockupScript, AVector.from(tokens))
   }
 
   lazy val counterContract: StatefulContract = {

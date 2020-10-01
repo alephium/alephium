@@ -13,7 +13,6 @@ sealed trait TxOutput {
   def createdHeight: Int
   def lockupScript: LockupScript
   def tokens: AVector[(TokenId, U64)]
-  def additionalData: ByteString
 
   def hint: Hint
   def isAsset: Boolean = hint.isAssetType
@@ -38,24 +37,16 @@ object TxOutput {
   }
 
   def contract(amount: U64, createdHeight: Int, lockupScript: LockupScript): ContractOutput = {
-    ContractOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
+    ContractOutput(amount, createdHeight, lockupScript, AVector.empty)
   }
 
   def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
     asset(amount, ALF.GenesisHeight, lockupScript)
   }
 
-  def burn(amount: U64): TxOutput = {
-    asset(amount, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero))
-  }
-
   // TODO: improve this when vm is mature
   def forMPT: TxOutput =
-    ContractOutput(U64.One,
-                   ALF.GenesisHeight,
-                   LockupScript.p2pkh(Hash.zero),
-                   AVector.empty,
-                   ByteString.empty)
+    ContractOutput(U64.One, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero), AVector.empty)
 }
 
 /**
@@ -85,8 +76,7 @@ object AssetOutput {
 final case class ContractOutput(amount: U64,
                                 createdHeight: Int,
                                 lockupScript: LockupScript,
-                                tokens: AVector[(TokenId, U64)],
-                                additionalData: ByteString)
+                                tokens: AVector[(TokenId, U64)])
     extends TxOutput {
   override def hint: Hint = Hint.ofContract(scriptHint)
 }
@@ -94,6 +84,6 @@ final case class ContractOutput(amount: U64,
 object ContractOutput {
   import AssetOutput.tokenSerde
   implicit val serde: Serde[ContractOutput] =
-    Serde.forProduct5(ContractOutput.apply,
-                      t => (t.amount, t.createdHeight, t.lockupScript, t.tokens, t.additionalData))
+    Serde.forProduct4(ContractOutput.apply,
+                      t => (t.amount, t.createdHeight, t.lockupScript, t.tokens))
 }
