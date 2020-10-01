@@ -2,7 +2,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -79,7 +79,10 @@ object StatefulScript {
 final case class StatefulContract(
     fields: AVector[Val.Type],
     methods: AVector[Method[StatefulContext]]
-) extends Contract[StatefulContext] {
+) extends HashSerde[StatefulContract]
+    with Contract[StatefulContext] {
+  override lazy val hash: Hash = _getHash
+
   def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
     StatefulContractObject(this, contractState.fields.toArray, address)
   }

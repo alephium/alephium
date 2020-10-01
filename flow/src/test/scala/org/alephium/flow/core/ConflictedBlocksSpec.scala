@@ -14,7 +14,9 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
   trait Fixture {
     def blockGen0(txInputs: TxInput*): Block = {
       val transaction =
-        Transaction.from(AVector.from(txInputs), AVector.empty[TxOutput], AVector.empty[Signature])
+        Transaction.from(AVector.from(txInputs),
+                         AVector.empty[AssetOutput],
+                         AVector.empty[Signature])
       Block.from(AVector.empty,
                  AVector(transaction),
                  Random.nextNonZeroInt(),
@@ -23,7 +25,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
 
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
       val transactions = txInputs.map(inputs =>
-        Transaction.from(inputs, AVector.empty[TxOutput], AVector.empty[Signature]))
+        Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature]))
       Block.from(AVector.empty,
                  AVector.from(transactions),
                  Random.nextNonZeroInt(),

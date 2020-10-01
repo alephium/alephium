@@ -631,6 +631,9 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   override def toString: String = {
     toIterable.toString()
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def asUnsafe[T]: AVector[T] = this.asInstanceOf[AVector[T]]
 }
 // scalastyle:on
 

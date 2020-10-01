@@ -4,7 +4,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, StatefulContract}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -12,9 +12,11 @@ sealed trait TxOutput {
   def amount: U64
   def createdHeight: Int
   def lockupScript: LockupScript
+  def tokens: AVector[(TokenId, U64)]
   def additionalData: ByteString
 
   def hint: Hint
+  def isAsset: Boolean = hint.isAssetType
 
   def scriptHint: ScriptHint                            = lockupScript.scriptHint
   def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
@@ -35,11 +37,8 @@ object TxOutput {
     AssetOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
   }
 
-  def contract(amount: U64,
-               createdHeight: Int,
-               lockupScript: LockupScript,
-               code: StatefulContract): ContractOutput = {
-    ContractOutput(amount, createdHeight, lockupScript, code, ByteString.empty)
+  def contract(amount: U64, createdHeight: Int, lockupScript: LockupScript): ContractOutput = {
+    ContractOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
   }
 
   def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
@@ -55,7 +54,7 @@ object TxOutput {
     ContractOutput(U64.One,
                    ALF.GenesisHeight,
                    LockupScript.p2pkh(Hash.zero),
-                   StatefulContract.forMPT,
+                   AVector.empty,
                    ByteString.empty)
 }
 
@@ -77,7 +76,7 @@ final case class AssetOutput(amount: U64,
 }
 
 object AssetOutput {
-  private implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
+  private[model] implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
   implicit val serde: Serde[AssetOutput] =
     Serde.forProduct5(AssetOutput.apply,
                       t => (t.amount, t.createdHeight, t.lockupScript, t.tokens, t.additionalData))
@@ -86,14 +85,15 @@ object AssetOutput {
 final case class ContractOutput(amount: U64,
                                 createdHeight: Int,
                                 lockupScript: LockupScript,
-                                code: StatefulContract,
+                                tokens: AVector[(TokenId, U64)],
                                 additionalData: ByteString)
     extends TxOutput {
   override def hint: Hint = Hint.ofContract(scriptHint)
 }
 
 object ContractOutput {
+  import AssetOutput.tokenSerde
   implicit val serde: Serde[ContractOutput] =
     Serde.forProduct5(ContractOutput.apply,
-                      t => (t.amount, t.createdHeight, t.lockupScript, t.code, t.additionalData))
+                      t => (t.amount, t.createdHeight, t.lockupScript, t.tokens, t.additionalData))
 }

@@ -2,7 +2,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -13,12 +13,10 @@ import org.alephium.util.{AVector, U64}
   * @param scriptOpt optional script for invoking stateful contracts
   * @param inputs a vector of TxInput
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
-  * @param states a vector of contract states, each one of which is a vector of vm Val
   */
 final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
                                      inputs: AVector[TxInput],
-                                     fixedOutputs: AVector[TxOutput],
-                                     states: AVector[AVector[Val]])
+                                     fixedOutputs: AVector[AssetOutput])
     extends HashSerde[UnsignedTransaction] {
   override lazy val hash: Hash = _getHash
 
@@ -45,14 +43,13 @@ final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
 
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
-    Serde.forProduct4(UnsignedTransaction.apply,
-                      t => (t.scriptOpt, t.inputs, t.fixedOutputs, t.states))
+    Serde.forProduct3(UnsignedTransaction.apply, t => (t.scriptOpt, t.inputs, t.fixedOutputs))
 
-  def apply(inputs: AVector[TxInput], fixedOutputs: AVector[TxOutput]): UnsignedTransaction = {
-    UnsignedTransaction(None, inputs, fixedOutputs, AVector.empty)
+  def apply(inputs: AVector[TxInput], fixedOutputs: AVector[AssetOutput]): UnsignedTransaction = {
+    UnsignedTransaction(None, inputs, fixedOutputs)
   }
 
-  def transferAlf(inputs: AVector[TxOutputRef],
+  def transferAlf(inputs: AVector[AssetOutputRef],
                   inputSum: U64,
                   fromLockupScript: LockupScript,
                   fromUnlockScript: UnlockScript,
@@ -66,8 +63,8 @@ object UnsignedTransaction {
     val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
 
     val outputs =
-      if (remainder > U64.Zero) AVector[TxOutput](toOutput, fromOutput)
-      else AVector[TxOutput](toOutput)
+      if (remainder > U64.Zero) AVector[AssetOutput](toOutput, fromOutput)
+      else AVector[AssetOutput](toOutput)
     UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
   }
 }

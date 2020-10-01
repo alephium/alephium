@@ -69,6 +69,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       var worldState: WorldState                = cachedWorldState
       def txHash: Hash                          = Hash.zero
       def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
+      def nextOutputNum: Int                    = 0
 
       def getInitialBalances: ExeResult[Frame.Balances] = {
         Right(

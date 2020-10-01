@@ -8,11 +8,11 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U64}
 
-final case class Transaction(unsigned: UnsignedTransaction,
-                             generatedOutputs: AVector[TxOutput],
-                             signatures: AVector[Signature])
-    extends HashSerde[Transaction] {
-  override val hash: Hash = unsigned.hash
+trait TransactionAbstract {
+  def unsigned: UnsignedTransaction
+  def signatures: AVector[Signature]
+
+  def hash: Hash = unsigned.hash
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
@@ -22,6 +22,20 @@ final case class Transaction(unsigned: UnsignedTransaction,
 
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
+
+  def newTokenId: TokenId = unsigned.inputs.head.hash
+}
+
+final case class Transaction(unsigned: UnsignedTransaction,
+                             contractInputs: AVector[ContractOutputRef],
+                             generatedOutputs: AVector[TxOutput],
+                             signatures: AVector[Signature])
+    extends HashSerde[Transaction]
+    with TransactionAbstract {
+  override val hash: Hash = unsigned.hash
+
+  def allOutputs: AVector[TxOutput] =
+    unsigned.fixedOutputs.asInstanceOf[AVector[TxOutput]] ++ generatedOutputs
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
 
@@ -49,42 +63,44 @@ final case class Transaction(unsigned: UnsignedTransaction,
       sum  <- sum1.add(sum2)
     } yield sum
   }
-
-  def newTokenId: TokenId = unsigned.inputs.head.hash
 }
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct3(Transaction.apply, t => (t.unsigned, t.generatedOutputs, t.signatures))
+    Serde.forProduct4(Transaction.apply,
+                      t => (t.unsigned, t.contractInputs, t.generatedOutputs, t.signatures))
 
   def from(inputs: AVector[TxInput],
-           outputs: AVector[TxOutput],
+           outputs: AVector[AssetOutput],
            generatedOutputs: AVector[TxOutput],
            privateKey: PrivateKey): Transaction = {
     from(UnsignedTransaction(inputs, outputs), generatedOutputs, privateKey)
   }
 
   def from(inputs: AVector[TxInput],
-           outputs: AVector[TxOutput],
+           outputs: AVector[AssetOutput],
            privateKey: PrivateKey): Transaction = {
     from(inputs, outputs, AVector.empty, privateKey)
   }
 
   def from(inputs: AVector[TxInput],
-           outputs: AVector[TxOutput],
+           outputs: AVector[AssetOutput],
            signatures: AVector[Signature]): Transaction = {
-    Transaction(UnsignedTransaction(inputs, outputs), generatedOutputs = AVector.empty, signatures)
+    Transaction(UnsignedTransaction(inputs, outputs),
+                contractInputs   = AVector.empty,
+                generatedOutputs = AVector.empty,
+                signatures)
   }
 
   def from(inputs: AVector[TxInput],
-           outputs: AVector[TxOutput],
+           outputs: AVector[AssetOutput],
            generatedOutputs: AVector[TxOutput],
            signatures: AVector[Signature]): Transaction = {
-    Transaction(UnsignedTransaction(inputs, outputs), generatedOutputs, signatures)
+    Transaction(UnsignedTransaction(inputs, outputs), AVector.empty, generatedOutputs, signatures)
   }
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): Transaction = {
-    from(unsigned, AVector.empty, privateKey)
+    from(unsigned, AVector.empty[TxOutput], privateKey)
   }
 
   def from(unsigned: UnsignedTransaction,
@@ -92,25 +108,42 @@ object Transaction {
            privateKey: PrivateKey): Transaction = {
     val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
-    Transaction(unsigned, generatedOutputs, AVector.fill(inputCnt)(signature))
+    Transaction(unsigned, AVector.empty, generatedOutputs, AVector.fill(inputCnt)(signature))
   }
 
   def from(unsigned: UnsignedTransaction, signatures: AVector[Signature]): Transaction = {
-    Transaction(unsigned, AVector.empty, signatures)
+    Transaction(unsigned, AVector.empty, AVector.empty, signatures)
   }
 
   def coinbase(publicKey: PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
     val txOutput = AssetOutput(ALF.CoinBaseValue, height, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
-    Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
+    Transaction(unsigned,
+                contractInputs   = AVector.empty,
+                generatedOutputs = AVector.empty,
+                signatures       = AVector.empty)
   }
 
   def genesis(balances: AVector[(LockupScript, U64)]): Transaction = {
-    val outputs = balances.map[TxOutput] {
+    val outputs = balances.map[AssetOutput] {
       case (lockupScript, value) => TxOutput.genesis(value, lockupScript)
     }
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
-    Transaction(unsigned, generatedOutputs = AVector.empty, signatures = AVector.empty)
+    Transaction(unsigned,
+                contractInputs   = AVector.empty,
+                generatedOutputs = AVector.empty,
+                signatures       = AVector.empty)
+  }
+}
+
+final case class TransactionTemplate(unsigned: UnsignedTransaction, signatures: AVector[Signature])
+    extends TransactionAbstract
+
+object TransactionTemplate {
+  def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
+    val inputCnt  = unsigned.inputs.length
+    val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
+    TransactionTemplate(unsigned, AVector.fill(inputCnt)(signature))
   }
 }
