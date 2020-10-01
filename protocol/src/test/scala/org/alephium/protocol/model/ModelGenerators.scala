@@ -157,8 +157,7 @@ trait TxGenerators
       _amountGen: Gen[U64]               = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U64]] = tokensGen(1, 1, 5),
       heightGen: Gen[Int]                = createdHeightGen,
-      scriptGen: Gen[LockupScript]       = p2pkhLockupGen(groupIndex),
-      dataGen: Gen[ByteString]           = dataGen
+      scriptGen: Gen[LockupScript]       = p2pkhLockupGen(groupIndex)
   ): Gen[ContractOutput] = {
     for {
       amount        <- _amountGen

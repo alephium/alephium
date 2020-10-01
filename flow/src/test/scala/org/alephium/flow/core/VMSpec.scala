@@ -93,18 +93,18 @@ class VMSpec extends AlephiumSpec {
     val newState1 = AVector[Val](Val.U64(U64.unsafe(10)))
     val block1    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block1, 2)
-    checkState(blockFlow, chainIndex, contractKey0, newState1, contractOutputRef0)
+    checkState(blockFlow, chainIndex, contractKey0, newState1, contractOutputRef0, numAssets = 4)
 
     val newState2 = AVector[Val](Val.U64(U64.unsafe(20)))
     val block2    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block2, 3)
-    checkState(blockFlow, chainIndex, contractKey0, newState2, contractOutputRef0)
+    checkState(blockFlow, chainIndex, contractKey0, newState2, contractOutputRef0, numAssets = 6)
   }
 
   it should "use latest worldstate when call external functions" in new FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
 
-    def createContract(input: String): ContractOutputRef = {
+    def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
       val contract     = Compiler.compileContract(input).toOption.get
       val initialState = AVector[Val](Val.U64(U64.Zero))
       val fromLockup   = getGenesisLockupScript(chainIndex)
@@ -117,7 +117,13 @@ class VMSpec extends AlephiumSpec {
       val contractKey = contractOutputRef.key
 
       blockFlow.add(block).isRight is true
-      checkState(blockFlow, chainIndex, contractKey, initialState, contractOutputRef)
+      checkState(blockFlow,
+                 chainIndex,
+                 contractKey,
+                 initialState,
+                 contractOutputRef,
+                 numAssets,
+                 numContracts)
       contractOutputRef
     }
 
@@ -141,7 +147,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val contractOutputRef0 = createContract(input0)
+    val contractOutputRef0 = createContract(input0, 2, 2)
     val contractKey0       = contractOutputRef0.key
 
     val input1 =
@@ -165,7 +171,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |""".stripMargin
-    val contractOutputRef1 = createContract(input1)
+    val contractOutputRef1 = createContract(input1, 3, 3)
     val contractKey1       = contractOutputRef1.key
 
     val main =
@@ -193,6 +199,12 @@ class VMSpec extends AlephiumSpec {
     val newState = AVector[Val](Val.U64(U64.unsafe(110)))
     val block    = mine(blockFlow, chainIndex, txScriptOption = Some(script))
     blockFlow.add(block).isRight is true
-    checkState(blockFlow, chainIndex, contractKey0, newState, contractOutputRef0)
+    checkState(blockFlow,
+               chainIndex,
+               contractKey0,
+               newState,
+               contractOutputRef0,
+               numAssets    = 5,
+               numContracts = 3)
   }
 }

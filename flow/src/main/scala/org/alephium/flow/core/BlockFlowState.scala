@@ -261,7 +261,7 @@ trait BlockFlowState extends FlowTipsUtil {
     for {
       bestTrie <- getBestPersistedTrie(groupIndex)
       persistedUtxos <- bestTrie
-        .getOutputs(lockupScript.assetHintBytes) // TODO: consider contract hint too
+        .getAssetOutputs(lockupScript.assetHintBytes)
         .map(_.filter(p => lockedBy(p._2, lockupScript)))
       pair <- getUtxosInCache(lockupScript, groupIndex, persistedUtxos)
     } yield {
@@ -464,28 +464,11 @@ object BlockFlowState {
       worldState: WorldState,
       tx: Transaction,
       targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
-    for {
-      worldState1 <- updateStateForOutputs(worldState,
-                                           tx.hash,
-                                           tx.unsigned.fixedOutputs,
-                                           targetGroup)
-      worldState2 <- updateStateForOutputs(worldState1, tx.hash, tx.generatedOutputs, targetGroup)
-    } yield worldState2
-  }
-
-  private def updateStateForOutputs[O <: TxOutput](
-      worldState: WorldState,
-      txHash: Hash,
-      outputs: AVector[O],
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
-    outputs.foldWithIndexE(worldState) {
+    tx.allOutputs.foldWithIndexE(worldState) {
       case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
-        val outputRef = TxOutputRef.from(output, TxOutputRef.key(txHash, index))
+        val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.hash, index))
         state.addAsset(outputRef, output)
-      case (state, output: ContractOutput, index) =>
-        val outputRef = TxOutputRef.from(output, TxOutputRef.key(txHash, index))
-        state.addAsset(outputRef, output)
-      case (state, _, _) => Right(state)
+      case (state, _, _) => Right(state) // contract outputs are updated in VM
     }
   }
 }

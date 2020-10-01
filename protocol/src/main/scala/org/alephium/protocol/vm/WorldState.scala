@@ -31,7 +31,7 @@ sealed abstract class WorldState {
   def createContract(code: StatefulContract,
                      fields: AVector[Val],
                      outputRef: ContractOutputRef,
-                     output: TxOutput): IOResult[WorldState]
+                     output: ContractOutput): IOResult[WorldState]
 
   def updateContract(key: Hash, fields: AVector[Val]): IOResult[WorldState] = {
     for {
@@ -64,12 +64,23 @@ object WorldState {
       outputState.get(outputRef)
     }
 
-    def getOutputs(
+    def getAllOutputs(outputRefPrefix: ByteString): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
+      outputState.getAll(outputRefPrefix)
+    }
+
+    def getAssetOutputs(
         outputRefPrefix: ByteString): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
       outputState
         .getAll(outputRefPrefix)
         .map(
           _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)])
+    }
+
+    def getContractOutputs(
+        outputRefPrefix: ByteString): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
+      getAllOutputs(outputRefPrefix).map(
+        _.filter(p => p._1.isContractType && !p._2.isAsset)
+          .asUnsafe[(ContractOutputRef, ContractOutput)])
     }
 
     override def getContractState(key: Hash): IOResult[ContractState] = {
@@ -88,7 +99,7 @@ object WorldState {
     override def createContract(code: StatefulContract,
                                 fields: AVector[Val],
                                 outputRef: ContractOutputRef,
-                                output: TxOutput): IOResult[WorldState] = {
+                                output: ContractOutput): IOResult[WorldState] = {
       val state = ContractState(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
@@ -143,7 +154,7 @@ object WorldState {
     override def createContract(code: StatefulContract,
                                 fields: AVector[Val],
                                 outputRef: ContractOutputRef,
-                                output: TxOutput): IOResult[WorldState] = {
+                                output: ContractOutput): IOResult[WorldState] = {
       val state = ContractState(code, fields, outputRef)
       for {
         _ <- outputState.put(outputRef, output)
