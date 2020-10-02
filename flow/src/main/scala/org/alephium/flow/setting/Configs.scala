@@ -34,10 +34,12 @@ object Configs extends StrictLogging {
 
   def getConfigTemplate(rootPath: Path, confName: String, templateName: String): File = {
     val file     = getConfigFile(rootPath, confName)
-    if (!file.exists) {
-      Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
-      file.setWritable(false)
-    }
+
+    if (file.exists) file.delete()
+
+    Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
+    file.setWritable(false)
+
     file
   }
 
