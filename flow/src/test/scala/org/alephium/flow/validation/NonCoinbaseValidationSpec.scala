@@ -9,7 +9,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, TxInputStateInfo}
+import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
 import org.alephium.util.{AVector, Random, U64}
 
@@ -32,20 +32,13 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   class Fixture extends NonCoinbaseValidation.Impl with VMFactory {
     // TODO: prepare blockflow to test checkMempool
-    def prepareWorldState(inputInfos: AVector[TxInputStateInfo]): WorldState = {
+    def prepareWorldState(inputInfos: AVector[AssetInputInfo]): WorldState = {
       inputInfos.fold(cachedWorldState) {
         case (worldState, inputInfo: AssetInputInfo) =>
           worldState
             .addAsset(inputInfo.txInput.outputRef, inputInfo.referredOutput)
             .toOption
             .get
-//        case (worldState, inputInfo: ContractInfo) =>
-//          worldState
-//            .createContract(inputInfo.txInput.outputRef.asInstanceOf[ContractOutputRef],
-//                            inputInfo.referredOutput,
-//                            inputInfo.state)
-//            .toOption
-//            .get
       }
     }
   }

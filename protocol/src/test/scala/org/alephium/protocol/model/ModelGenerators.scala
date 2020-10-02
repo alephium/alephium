@@ -12,7 +12,7 @@ import org.scalatest.Assertion
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U64}
 
@@ -180,23 +180,6 @@ trait TxGenerators
     Compiler.compileContract(input).toOption.get
   }
 
-  lazy val counterStateGen: Gen[AVector[Val]] =
-    Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U64(U64.unsafe(n))))
-
-//  def contractOutputGen(groupIndex: GroupIndex)(
-//      _amountGen: Gen[U64]           = amountGen(1),
-//      heightGen: Gen[Int]            = createdHeightGen,
-//      scriptGen: Gen[LockupScript]   = p2pkhLockupGen(groupIndex),
-//      codeGen: Gen[StatefulContract] = Gen.const(counterContract)
-//  ): Gen[ContractOutput] = {
-//    for {
-//      amount        <- _amountGen
-//      createdHeight <- heightGen
-//      lockupScript  <- scriptGen
-//      code          <- codeGen
-//    } yield ContractOutput(amount, createdHeight, lockupScript, code, ByteString.empty)
-//  }
-
   lazy val assetOutputGen: Gen[AssetOutput] = for {
     value <- Gen.choose[Long](1, 5)
   } yield TxOutput.asset(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
@@ -213,9 +196,6 @@ trait TxGenerators
       val txInput = TxInput(AssetOutputRef.from(assetOutput, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
-
-//  private lazy val noContracts: Gen[AVector[ContractInfo]] =
-//    Gen.const(()).map(_ => AVector.empty)
 
   type IndexScriptPairGen   = GroupIndex => Gen[ScriptPair]
   type IndexLockupScriptGen = GroupIndex => Gen[LockupScript]
@@ -295,7 +275,7 @@ trait TxGenerators
       chainIndexGen: Gen[ChainIndex]  = chainIndexGen,
       scriptGen: IndexScriptPairGen   = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = p2pkhLockupGen
-  ): Gen[(Transaction, AVector[TxInputStateInfo])] =
+  ): Gen[(Transaction, AVector[AssetInputInfo])] =
     for {
       chainIndex <- chainIndexGen
       assetInfos <- assetsToSpendGen(minInputs,
@@ -307,9 +287,8 @@ trait TxGenerators
       signatures = assetInfos.map(info =>
         SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
     } yield {
-      val tx        = Transaction(unsignedTx, AVector.empty, AVector.empty, signatures)
-      val preOutput = assetInfos.map[TxInputStateInfo](identity)
-      tx -> preOutput
+      val tx = Transaction(unsignedTx, AVector.empty, AVector.empty, signatures)
+      tx -> assetInfos
     }
 
   def transactionGen(
@@ -418,18 +397,7 @@ object ModelGenerators {
     }
   }
 
-  sealed trait TxInputStateInfo {
-    def referredOutput: TxOutput
-  }
-
   case class AssetInputInfo(txInput: TxInput, referredOutput: TxOutput, privateKey: PrivateKey)
-      extends TxInputStateInfo
-
-//  case class ContractInfo(txInput: TxInput,
-//                          referredOutput: ContractOutput,
-//                          state: AVector[Val],
-//                          privateKey: PrivateKey)
-//      extends TxInputStateInfo
 }
 
 class ModelGeneratorsSpec extends AlephiumSpec with TokenGenerators with DefaultGenerators {
