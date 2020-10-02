@@ -1,0 +1,30 @@
+alephium {
+  broker {
+    broker-id = 0
+    broker-num = 2
+    groups = 4
+  }
+
+  consensus {
+    block-target-time = 1.5 minutes
+  }
+
+  network {
+    external-address  = null
+    internal-address  = "127.0.0.1:9973"
+    master-address    = "3.17.183.61:9973"
+
+    rpc-port = 10973
+    ws-port  = 11973
+  }
+
+  api {
+    network-interface = "0.0.0.0"
+    blockflow-fetch-max-age = 12 hours
+    api-key-hash = "72134f46493ff2442aa91de86cc93443e0c4bb7828991d0597b48ab426bb6951"
+  }
+
+  discovery {
+    bootstrap = ["127.0.0.1:9973"]
+  }
+}

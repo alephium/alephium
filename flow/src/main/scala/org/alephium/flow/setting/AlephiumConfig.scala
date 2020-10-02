@@ -139,7 +139,7 @@ object AlephiumConfig {
   }
 
   def load(rootPath: Path): Result[AlephiumConfig] = {
-    load(Configs.parseConfig(rootPath))
+    load(Configs.parseConfig(rootPath, None))
   }
   def load(config: Config): Result[AlephiumConfig] = source(config).load[AlephiumConfig]
   def loadOrThrow(config: Config): AlephiumConfig = source(config).loadOrThrow[AlephiumConfig]
