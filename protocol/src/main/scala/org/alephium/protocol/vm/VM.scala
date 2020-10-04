@@ -48,31 +48,75 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
       newFrameOpt <- currentFrame.execute()
       _ <- newFrameOpt match {
         case Some(frame) => frameStack.push(frame)
-        case None        => postFrame()
+        case None        => postFrame(currentFrame)
       }
     } yield ()
   }
 
-  private def postFrame(): ExeResult[Unit] = {
+  private def postFrame(currentFrame: Frame[Ctx]): ExeResult[Unit] = {
     for {
       _ <- frameStack.pop()
       _ <- frameStack.top match {
-        case Some(frame) => frame.reloadFields()
-        case None        => Right(())
+        case Some(nextFrame) =>
+          for {
+            _ <- nextFrame.reloadFields()
+            _ <- checkBalances(currentFrame, nextFrame)
+          } yield ()
+        case None =>
+          checkFinalBalances(currentFrame)
       }
     } yield ()
   }
+
+  protected def checkBalances(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
+
+  protected def checkFinalBalances(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
 final class StatelessVM(ctx: StatelessContext,
                         frameStack: Stack[Frame[StatelessContext]],
                         operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack)
+    extends VM(ctx, frameStack, operandStack) {
+  protected def checkBalances(currentFrame: Frame[StatelessContext],
+                              nextFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+
+  protected def checkFinalBalances(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+}
 
 final class StatefulVM(ctx: StatefulContext,
                        frameStack: Stack[Frame[StatefulContext]],
                        operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack)
+    extends VM(ctx, frameStack, operandStack) {
+  protected def checkBalances(currentFrame: Frame[StatefulContext],
+                              nextFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    if (currentFrame.method.isPayable) {
+      val resultOpt = for {
+        currentBalances <- currentFrame.balanceStateOpt
+        nextBalances    <- nextFrame.balanceStateOpt
+        _               <- nextBalances.remaining.merge(currentBalances.remaining)
+        _               <- nextBalances.remaining.merge(currentBalances.approved)
+      } yield ()
+      resultOpt.toRight(InvalidBalances)
+    } else Right(())
+  }
+
+  protected def checkFinalBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    if (lastFrame.method.isPayable) {
+      val resultOpt = for {
+        balances <- lastFrame.balanceStateOpt
+        _        <- balances.remaining.merge(balances.approved)
+      } yield outputRemaining(balances.remaining)
+      resultOpt.toRight(InvalidBalances)
+    } else Right(())
+  }
+
+  private def outputRemaining(remaining: Frame.Balances): Unit = {
+    remaining.all.foreach {
+      case (lockupScript, balances) =>
+        balances.toAssetOutput(lockupScript).foreach(ctx.generatedOutputs.addOne)
+    }
+  }
+}
 
 object StatelessVM {
   def runAssetScript(txHash: Hash,
