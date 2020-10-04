@@ -5,6 +5,8 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, Bytes, U64}
@@ -377,6 +379,22 @@ object Frame {
         accumulator
       }
     }
+
+    def merge(balances: Balances): Option[Unit] = {
+      @tailrec
+      def iter(index: Int): Option[Unit] = {
+        if (index >= balances.all.length) Some(())
+        else {
+          val (lockupScript, balancesPerLockup) = balances.all(index)
+          add(lockupScript, balancesPerLockup) match {
+            case Some(_) => iter(index + 1)
+            case None    => None
+          }
+        }
+      }
+
+      iter(0)
+    }
   }
 
   object Balances {
@@ -457,6 +475,12 @@ object Frame {
             }
         }
       }.toOption
+
+    def toAssetOutput(lockupScript: LockupScript): Option[AssetOutput] = {
+      Option.when(alfAmount != U64.Zero)(
+        AssetOutput(alfAmount, 0, lockupScript, tokenVector, ByteString.empty)
+      )
+    }
   }
 
   object BalancesPerLockup {
