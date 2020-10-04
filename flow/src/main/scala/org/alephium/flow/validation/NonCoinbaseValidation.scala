@@ -49,6 +49,7 @@ trait NonCoinbaseValidation {
       _          <- checkAlfBalance(tx, preOutputs)
       _          <- checkTokenBalance(tx, preOutputs)
       _          <- checkWitnesses(tx, preOutputs)
+      _          <- checkTxScript(tx, worldState)
     } yield ()
   }
 
@@ -68,6 +69,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
+  protected[validation] def checkTxScript(tx: Transaction, worldState: WorldState): TxValidationResult[Unit] // TODO: optimize it with preOutputs
   // format: on
 }
 
@@ -272,6 +274,25 @@ object NonCoinbaseValidation {
       StatelessVM.runAssetScript(tx.hash, script, params, signatures) match {
         case Right(_) => validTx(()) // TODO: handle returns
         case Left(e)  => invalidTx(InvalidUnlockScript(e))
+      }
+    }
+
+    protected[validation] def checkTxScript(tx: Transaction,
+                                            worldState: WorldState): TxValidationResult[Unit] = {
+      val chainIndex = tx.chainIndex
+      if (chainIndex.isIntraGroup) {
+        tx.unsigned.scriptOpt match {
+          case Some(script) =>
+            StatefulVM.runTxScript(worldState, tx, script) match {
+              case Right((generatedOutputs, _)) =>
+                if (generatedOutputs == tx.generatedOutputs) validTx(())
+                else invalidTx(InvalidGeneratedOutputs)
+              case Left(error) => invalidTx(TxScriptExeFailed(error))
+            }
+          case None => validTx(())
+        }
+      } else {
+        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(())
       }
     }
   }

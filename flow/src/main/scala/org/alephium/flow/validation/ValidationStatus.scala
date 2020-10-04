@@ -98,3 +98,6 @@ final case object InvalidUnlockScriptType               extends InvalidTxStatus
 final case class InvalidUnlockScript(error: ExeFailure) extends InvalidTxStatus
 final case object CreateContractWithOldId               extends InvalidTxStatus
 final case class WorldStateIOError(error: IOError)      extends InvalidTxStatus
+final case object UnexpectedTxScript                    extends InvalidTxStatus
+final case class TxScriptExeFailed(error: ExeFailure)   extends InvalidTxStatus
+final case object InvalidGeneratedOutputs               extends InvalidTxStatus
