@@ -1205,36 +1205,78 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
   }
 }
 
-object TransferAlf extends AssetInstr with StatefulInstrCompanion0 {
-  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+sealed trait Transfer extends AssetInstr {
+  def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
+    frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract).map(LockupScript.p2c)
+  }
+
+  def transferAlf[C <: StatefulContext](frame: Frame[C],
+                                        from: LockupScript,
+                                        to: LockupScript): ExeResult[Unit] = {
     for {
-      from         <- frame.popT[Val.Address]()
-      to           <- frame.popT[Val.Address]()
       amount       <- frame.popT[Val.U64]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
-      _            <- balanceState.useAlf(from.lockupScript, amount.v).toRight[ExeFailure](NotEnoughBalance)
+      _            <- balanceState.useAlf(from, amount.v).toRight[ExeFailure](NotEnoughBalance)
       _ <- frame.ctx.outputBalances
-        .addAlf(to.lockupScript, amount.v)
+        .addAlf(to, amount.v)
         .toRight[ExeFailure](BalanceOverflow)
     } yield ()
   }
-}
 
-object TransferToken extends AssetInstr with StatefulInstrCompanion0 {
-  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def transferToken[C <: StatefulContext](frame: Frame[C],
+                                          from: LockupScript,
+                                          to: LockupScript): ExeResult[Unit] = {
     for {
-      from         <- frame.popT[Val.Address]()
-      to           <- frame.popT[Val.Address]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
       amount       <- frame.popT[Val.U64]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _ <- balanceState
-        .useToken(from.lockupScript, tokenId, amount.v)
+        .useToken(from, tokenId, amount.v)
         .toRight[ExeFailure](NotEnoughBalance)
       _ <- frame.ctx.outputBalances
-        .addToken(to.lockupScript, tokenId, amount.v)
+        .addToken(to, tokenId, amount.v)
         .toRight[ExeFailure](BalanceOverflow)
+    } yield ()
+  }
+}
+
+object TransferAlf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popT[Val.Address]()
+      to   <- frame.popT[Val.Address]()
+      _    <- transferAlf(frame, from.lockupScript, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- getContractLockupScript(frame)
+      to   <- frame.popT[Val.Address]()
+      _    <- transferAlf(frame, from, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferToken extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popT[Val.Address]()
+      to   <- frame.popT[Val.Address]()
+      _    <- transferToken(frame, from.lockupScript, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- getContractLockupScript(frame)
+      to   <- frame.popT[Val.Address]()
+      _    <- transferToken(frame, from, to.lockupScript)
     } yield ()
   }
 }
@@ -1250,6 +1292,15 @@ object CreateContract extends StatefulInstrCompanion0 {
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       balances = balanceState.approved.use()
       _ <- frame.ctx.createContract(contractCode, balances, fields)
+    } yield ()
+  }
+}
+
+object SelfAddress extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      _           <- frame.push(Val.Address(LockupScript.p2c(addressHash)))
     } yield ()
   }
 }

@@ -49,3 +49,4 @@ case object NoAlfBalanceForTheAddress                          extends ExeFailur
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
+case object ExpectAContract                                    extends ExeFailure
