@@ -34,28 +34,33 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
   @tailrec
   private def executeFrames(): ExeResult[Unit] = {
     if (frameStack.nonEmpty) {
-      val currentFrame = frameStack.topUnsafe
-      val frameResult = for {
-        newFrameOpt <- currentFrame.execute()
-        _ <- newFrameOpt match {
-          case Some(frame) => frameStack.push(frame)
-          case None =>
-            for {
-              _ <- frameStack.pop()
-              _ <- frameStack.top match {
-                case Some(frame) => frame.reloadFields()
-                case None        => Right(())
-              }
-            } yield ()
-        }
-      } yield ()
-      frameResult match {
+      executeCurrentFrame(frameStack.topUnsafe) match {
         case Right(_)    => executeFrames()
         case Left(error) => Left(error)
       }
     } else {
       Right(())
     }
+  }
+
+  private def executeCurrentFrame(currentFrame: Frame[Ctx]): ExeResult[Unit] = {
+    for {
+      newFrameOpt <- currentFrame.execute()
+      _ <- newFrameOpt match {
+        case Some(frame) => frameStack.push(frame)
+        case None        => postFrame()
+      }
+    } yield ()
+  }
+
+  private def postFrame(): ExeResult[Unit] = {
+    for {
+      _ <- frameStack.pop()
+      _ <- frameStack.top match {
+        case Some(frame) => frame.reloadFields()
+        case None        => Right(())
+      }
+    } yield ()
   }
 }
 
