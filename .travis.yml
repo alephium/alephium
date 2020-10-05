@@ -24,11 +24,6 @@ install:
   - sudo apt-get install python3.6 rng-tools haveged
   - sudo haveged
 
-script:
-  - ps aux | grep haveged
-  - ./make test
-  - ./make itest
-
 jobs:
   include:
     - stage: test
