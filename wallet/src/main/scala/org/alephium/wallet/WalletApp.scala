@@ -38,7 +38,7 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
 
   private val bindingPromise: Promise[Http.ServerBinding] = Promise()
 
-  override val subServices: ArraySeq[Service] = ArraySeq()
+  override val subServices: ArraySeq[Service] = ArraySeq(walletService)
 
   protected def startSelfOnce(): Future[Unit] = {
     for {

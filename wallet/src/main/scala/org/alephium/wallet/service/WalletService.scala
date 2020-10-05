@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -11,11 +12,11 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.util.{AVector, Hex, U64}
+import org.alephium.util.{AVector, Hex, Service, U64}
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
-trait WalletService {
+trait WalletService extends Service {
   import WalletService._
 
   def createWallet(
@@ -82,16 +83,28 @@ object WalletService {
   def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): WalletService = {
 
-    Files.createDirectories(secretDir)
-
     new Impl(blockFlowClient, secretDir, networkType)
   }
 
   private val secretStorages: mutable.Map[String, SecretStorage] = mutable.Map.empty
 
   private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
-      implicit executionContext: ExecutionContext)
+      implicit val executionContext: ExecutionContext)
       extends WalletService {
+
+    protected def startSelfOnce(): Future[Unit] = {
+      Future.successful {
+        Files.createDirectories(secretDir)
+        ()
+      }
+    }
+
+    protected def stopSelfOnce(): Future[Unit] = {
+      Future.successful(())
+
+    }
+
+    override val subServices: ArraySeq[Service] = ArraySeq()
 
     override def createWallet(
         password: String,
