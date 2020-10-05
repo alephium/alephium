@@ -50,7 +50,7 @@ class DiscoveryServerSpec
                                     AVector(master),
                                     groupConfig.groups)
     CliqueInfo.validate(newInfo)(groupConfig).isRight is true
-    newInfo.masterAddress is master
+    newInfo.coordinatorAddress is master
     newInfo
   }
 

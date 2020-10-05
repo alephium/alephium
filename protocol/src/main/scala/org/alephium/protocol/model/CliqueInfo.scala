@@ -28,7 +28,7 @@ final case class CliqueInfo private (
     }
   }
 
-  def masterAddress: InetSocketAddress = internalAddresses.head
+  def coordinatorAddress: InetSocketAddress = internalAddresses.head
 
   def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): InterBrokerInfo =
     InterBrokerInfo.unsafe(id, brokerConfig.brokerId, groupNumPerBroker)

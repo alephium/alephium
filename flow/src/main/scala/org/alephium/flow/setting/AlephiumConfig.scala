@@ -59,14 +59,14 @@ final case class NetworkSetting(
     upnp: UpnpSettings,
     bindAddress: InetSocketAddress,
     internalAddress: InetSocketAddress,
-    masterAddress: InetSocketAddress,
+    coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     rpcPort: Int,
     wsPort: Int,
     restPort: Int
 ) {
-  val isCoordinator: Boolean = internalAddress == masterAddress
+  val isCoordinator: Boolean = internalAddress == coordinatorAddress
 
   def handshakeTimeout: Duration = retryTimeout
 
