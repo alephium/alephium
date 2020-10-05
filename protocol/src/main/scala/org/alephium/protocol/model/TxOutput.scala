@@ -30,6 +30,13 @@ object TxOutput {
     }
   )
 
+  def from(amount: U64, tokens: AVector[(TokenId, U64)], lockupScript: LockupScript): TxOutput = {
+    lockupScript match {
+      case _: LockupScript.P2C => ContractOutput(amount, 0, lockupScript, tokens)
+      case _                   => AssetOutput(amount, 0, lockupScript, tokens, ByteString.empty)
+    }
+  }
+
   def asset(amount: U64, createdHeight: Int, lockupScript: LockupScript): AssetOutput = {
     AssetOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
   }

@@ -5,8 +5,6 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
-import akka.util.ByteString
-
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, Bytes, U64}
@@ -153,16 +151,36 @@ final class StatefulFrame(
     val ctx: StatefulContext,
     val balanceStateOpt: Option[Frame.BalanceState]
 ) extends Frame[StatefulContext] {
+  private def getNewFrameBalancesState(
+      contractObj: ContractObj[StatefulContext],
+      method: Method[StatefulContext]): ExeResult[Option[Frame.BalanceState]] = {
+    if (method.isPayable) {
+      for {
+        state <- balanceStateOpt.toRight[ExeFailure](EmptyBalanceForPayableMethod)
+        balanceStateOpt <- {
+          val newFrameBalances = state.useApproved()
+          contractObj.addressOpt match {
+            case Some(contractId) =>
+              ctx
+                .useContractAsset(contractId)
+                .map { balancesPerLockup =>
+                  newFrameBalances.remaining.add(LockupScript.p2c(contractId), balancesPerLockup)
+                  Some(newFrameBalances)
+                }
+            case None =>
+              Right(Some(newFrameBalances))
+          }
+        }
+      } yield balanceStateOpt
+    } else Right(None)
+  }
+
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
-      method <- getMethod(index)
-      args   <- opStack.pop(method.localsType.length)
-      _      <- method.check(args)
-      newBalanceStateOpt <- if (method.isPayable) {
-        balanceStateOpt
-          .toRight(EmptyBalanceForPayableMethod)
-          .map(state => Some(state.useApproved()))
-      } else Right(None)
+      method             <- getMethod(index)
+      args               <- opStack.pop(method.localsType.length)
+      _                  <- method.check(args)
+      newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
     } yield {
       Frame.stateful(ctx, newBalanceStateOpt, obj, method, args, opStack, opStack.push)
     }
@@ -175,15 +193,11 @@ final class StatefulFrame(
         .getContractObj(contractKey)
         .left
         .map[ExeFailure](IOErrorLoadContract)
-      method <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
-      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-      args   <- opStack.pop(method.localsType.length)
-      _      <- method.check(args)
-      newBalanceStateOpt <- if (method.isPayable) {
-        balanceStateOpt
-          .toRight(EmptyBalanceForPayableMethod)
-          .map(state => Some(state.useApproved()))
-      } else Right(None)
+      method             <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
+      _                  <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+      args               <- opStack.pop(method.localsType.length)
+      _                  <- method.check(args)
+      newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
     } yield {
       Frame.stateful(ctx, newBalanceStateOpt, contractObj, method, args, opStack, opStack.push)
     }
@@ -476,9 +490,9 @@ object Frame {
         }
       }.toOption
 
-    def toAssetOutput(lockupScript: LockupScript): Option[AssetOutput] = {
+    def toTxOutput(lockupScript: LockupScript): Option[TxOutput] = {
       Option.when(alfAmount != U64.Zero)(
-        AssetOutput(alfAmount, 0, lockupScript, tokenVector, ByteString.empty)
+        TxOutput.from(alfAmount, tokenVector, lockupScript)
       )
     }
   }

@@ -13,11 +13,33 @@ sealed abstract class WorldState {
 
   def getContractState(key: Hash): IOResult[ContractState]
 
-  def getContractAsset(key: Hash): IOResult[TxOutput] = {
+  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
     for {
-      state  <- getContractState(key)
-      output <- getOutput(state.contractOutputRef)
+      state     <- getContractState(key)
+      outputRaw <- getOutput(state.contractOutputRef)
+      output <- outputRaw match {
+        case _: AssetOutput =>
+          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
+          Left(IOError.Other(new RuntimeException(error)))
+        case o: ContractOutput =>
+          Right(o)
+      }
     } yield output
+  }
+
+  def useContractAsset(contractId: ContractId): IOResult[(ContractOutput, WorldState)] = {
+    for {
+      state     <- getContractState(contractId)
+      outputRaw <- getOutput(state.contractOutputRef)
+      output <- outputRaw match {
+        case _: AssetOutput =>
+          val error = s"ContractOutput expected, but got AssetOutput for contract $contractId"
+          Left(IOError.Other(new RuntimeException(error)))
+        case o: ContractOutput =>
+          Right(o)
+      }
+      newWorldState <- removeAsset(state.contractOutputRef)
+    } yield output -> newWorldState
   }
 
   def getContractObj(key: Hash): IOResult[StatefulContractObject] = {

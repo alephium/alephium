@@ -64,6 +64,18 @@ trait StatefulContext extends StatelessContext {
     }
   }
 
+  def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {
+    worldState
+      .useContractAsset(contractId)
+      .map {
+        case (contractAsset, newWorldState) =>
+          updateWorldState(newWorldState)
+          Frame.BalancesPerLockup.from(contractAsset)
+      }
+      .left
+      .map(IOErrorLoadContract)
+  }
+
   def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
 
   def updateState(key: Hash, state: AVector[Val]): ExeResult[Unit] = {

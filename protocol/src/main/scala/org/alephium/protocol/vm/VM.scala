@@ -113,7 +113,7 @@ final class StatefulVM(ctx: StatefulContext,
   private def outputRemaining(remaining: Frame.Balances): Unit = {
     remaining.all.foreach {
       case (lockupScript, balances) =>
-        balances.toAssetOutput(lockupScript).foreach(ctx.generatedOutputs.addOne)
+        balances.toTxOutput(lockupScript).foreach(ctx.generatedOutputs.addOne)
     }
   }
 }
