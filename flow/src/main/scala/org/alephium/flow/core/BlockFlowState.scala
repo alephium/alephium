@@ -445,7 +445,7 @@ object BlockFlowState {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
         StatefulVM.runTxScript(worldState, tx, script) match {
-          case Right((_, worldState))          => Right(worldState)
+          case Right(exeResult)                => Right(exeResult.worldState)
           case Left(IOErrorUpdateState(error)) => Left(error)
           case Left(error) =>
             throw new RuntimeException(s"Updating world state for invalid tx: $error")
@@ -454,6 +454,7 @@ object BlockFlowState {
     }
   }
 
+  // Note: contract inputs are updated during the execution of tx script
   def updateStateForInputs(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
     tx.unsigned.inputs.foldE(worldState) {
       case (state, txInput) => state.removeAsset(txInput.outputRef)
