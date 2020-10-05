@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.{TransactionAbstract, TxOutput}
+import org.alephium.protocol.model.{ContractOutputRef, TransactionAbstract, TxOutput}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -180,17 +180,24 @@ object StatefulVM {
     StatefulScript(AVector(method))
   }
 
+  final case class TxScriptExecution(contractInputs: AVector[ContractOutputRef],
+                                     generatedOutputs: AVector[TxOutput],
+                                     worldState: WorldState)
+
   def runTxScript(worldState: WorldState,
                   tx: TransactionAbstract,
-                  script: StatefulScript): ExeResult[(AVector[TxOutput], WorldState)] = {
+                  script: StatefulScript): ExeResult[TxScriptExecution] = {
     val context = if (script.methods.head.isPayable) {
       StatefulContext.payable(tx, worldState)
     } else {
       StatefulContext.nonPayable(tx.hash, worldState)
     }
     val obj = script.toObject
-    execute(context, obj, AVector.empty).map(_ =>
-      AVector.from(context.generatedOutputs) -> context.worldState)
+    execute(context, obj, AVector.empty).map(
+      worldState =>
+        TxScriptExecution(AVector.from(context.contractInputs),
+                          AVector.from(context.generatedOutputs),
+                          worldState))
   }
 
   def execute(context: StatefulContext,

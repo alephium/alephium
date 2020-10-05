@@ -27,7 +27,8 @@ sealed abstract class WorldState {
     } yield output
   }
 
-  def useContractAsset(contractId: ContractId): IOResult[(ContractOutput, WorldState)] = {
+  def useContractAsset(
+      contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput, WorldState)] = {
     for {
       state     <- getContractState(contractId)
       outputRaw <- getOutput(state.contractOutputRef)
@@ -39,7 +40,7 @@ sealed abstract class WorldState {
           Right(o)
       }
       newWorldState <- removeAsset(state.contractOutputRef)
-    } yield output -> newWorldState
+    } yield (state.contractOutputRef, output, newWorldState)
   }
 
   def getContractObj(key: Hash): IOResult[StatefulContractObject] = {

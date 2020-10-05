@@ -284,9 +284,10 @@ object NonCoinbaseValidation {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
             StatefulVM.runTxScript(worldState, tx, script) match {
-              case Right((generatedOutputs, _)) =>
-                if (generatedOutputs == tx.generatedOutputs) validTx(())
-                else invalidTx(InvalidGeneratedOutputs)
+              case Right(StatefulVM.TxScriptExecution(contractInputs, generatedOutputs, _)) =>
+                if (contractInputs != tx.contractInputs) invalidTx(InvalidContractInputs)
+                else if (generatedOutputs != tx.generatedOutputs) invalidTx(InvalidGeneratedOutputs)
+                else validTx(())
               case Left(error) => invalidTx(TxScriptExeFailed(error))
             }
           case None => validTx(())

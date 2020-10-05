@@ -39,7 +39,8 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext {
   var worldState: WorldState
 
-  lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
+  lazy val generatedOutputs: ArrayBuffer[TxOutput]        = ArrayBuffer.empty
+  lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
 
   def nextOutputNum: Int
 
@@ -68,8 +69,9 @@ trait StatefulContext extends StatelessContext {
     worldState
       .useContractAsset(contractId)
       .map {
-        case (contractAsset, newWorldState) =>
+        case (contractOutputRef, contractAsset, newWorldState) =>
           updateWorldState(newWorldState)
+          contractInputs.addOne(contractOutputRef)
           Frame.BalancesPerLockup.from(contractAsset)
       }
       .left

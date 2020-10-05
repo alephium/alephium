@@ -87,7 +87,7 @@ trait FlowFixture
                          tx: TransactionTemplate,
                          txScript: StatefulScript): AVector[TxOutput] = {
     val worldState = blockFlow.getBestCachedTrie(mainGroup).toOption.get
-    StatefulVM.runTxScript(worldState, tx, txScript).toOption.get._1
+    StatefulVM.runTxScript(worldState, tx, txScript).toOption.get.generatedOutputs
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
