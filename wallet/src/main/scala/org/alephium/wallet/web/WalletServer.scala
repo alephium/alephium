@@ -28,6 +28,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
   private val docs: OpenAPI = List(
     createWallet,
     restoreWallet,
+    listWallets,
     lockWallet,
     unlockWallet,
     getBalances,
@@ -45,25 +46,31 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
       walletService
         .createWallet(walletCreation.password,
                       walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
+                      walletCreation.walletName,
                       walletCreation.mnemonicPassphrase)
-        .map(_.map(mnemonic => model.Mnemonic(mnemonic.words)).left.map(toApiError))
+        .map(_.map {
+          case (walletName, mnemonic) =>
+            model.WalletCreation.Result(walletName, mnemonic)
+        }.left.map(toApiError))
     } ~
       restoreWallet.toRoute { walletRestore =>
         walletService
           .restoreWallet(walletRestore.password,
                          walletRestore.mnemonic,
+                         walletRestore.walletName,
                          walletRestore.mnemonicPassphrase)
-          .map(_.left.map(toApiError))
+          .map(_.map(model.WalletRestore.Result).left.map(toApiError))
       } ~
-      lockWallet.toRoute { _ =>
-        walletService.lockWallet().map(_.left.map(toApiError))
+      lockWallet.toRoute { wallet =>
+        walletService.lockWallet(wallet).map(_.left.map(toApiError))
       } ~
-      unlockWallet.toRoute { walletUnlock =>
-        walletService.unlockWallet(walletUnlock.password).map(_.left.map(toApiError))
+      unlockWallet.toRoute {
+        case (wallet, walletUnlock) =>
+          walletService.unlockWallet(wallet, walletUnlock.password).map(_.left.map(toApiError))
       } ~
-      getBalances.toRoute { _ =>
+      getBalances.toRoute { wallet =>
         walletService
-          .getBalances()
+          .getBalances(wallet)
           .map(_.map { balances =>
             val totalBalance = balances.map { case (_, amount) => amount }.fold(U64.Zero) {
               case (acc, u64) => acc.addUnsafe(u64)
@@ -74,28 +81,36 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
             model.Balances(totalBalance, balancesPerAddress)
           }.left.map(toApiError))
       } ~
-      getAddresses.toRoute { _ =>
+      getAddresses.toRoute { wallet =>
         walletService
-          .getAddresses()
+          .getAddresses(wallet)
           .map(_.map {
             case (active, addresses) =>
               model.Addresses(active, addresses)
           }.left.map(toApiError))
       } ~
-      transfer.toRoute { tr =>
-        walletService
-          .transfer(tr.address, tr.amount)
-          .map(_.map(model.Transfer.Result.apply).left.map(toApiError))
+      transfer.toRoute {
+        case (wallet, tr) =>
+          walletService
+            .transfer(wallet, tr.address, tr.amount)
+            .map(_.map(model.Transfer.Result.apply).left.map(toApiError))
       } ~
-      deriveNextAddress.toRoute { _ =>
+      deriveNextAddress.toRoute { wallet =>
         walletService
-          .deriveNextAddress()
+          .deriveNextAddress(wallet)
           .map(_.left.map(toApiError))
       } ~
-      changeActiveAddress.toRoute { change =>
+      changeActiveAddress.toRoute {
+        case (wallet, change) =>
+          walletService
+            .changeActiveAddress(wallet, change.address)
+            .map(_.left.map(toApiError))
+      } ~
+      listWallets.toRoute { _ =>
         walletService
-          .changeActiveAddress(change.address)
-          .map(_.left.map(toApiError))
+          .listWallets()
+          .map(_.map(_.map { case (name, locked) => model.WalletStatus(name, locked) }).left
+            .map(toApiError))
       } ~
       swaggerUIRoute
 }
@@ -114,6 +129,7 @@ object WalletServer {
       case _: UnknownAddress            => badRequest
       case NoWalletLoaded               => badRequest
       case CannotDeriveNewAddress       => badRequest
+      case UnexpectedError              => badRequest
 
       case WalletLocked    => unauthorized
       case InvalidPassword => unauthorized

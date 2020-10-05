@@ -1,10 +1,9 @@
 package org.alephium.wallet.storage
 
 import java.io.{File, PrintWriter}
-import java.nio.file.{Files, Path}
 
 import scala.io.Source
-import scala.util.{Try, Using}
+import scala.util.Using
 
 import akka.util.ByteString
 import io.circe.Codec
@@ -12,7 +11,7 @@ import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 
-import org.alephium.crypto.{AES, Sha256}
+import org.alephium.crypto.AES
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.serde.{deserialize, serialize, Serde}
@@ -23,6 +22,7 @@ import org.alephium.wallet.circe.UtilCodecs
 trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.Error, Unit]
+  def isLocked(): Boolean
   def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
     : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
@@ -57,46 +57,55 @@ object SecretStorage extends UtilCodecs {
                                  activeKey: ExtendedPrivateKey,
                                  privateKeys: AVector[ExtendedPrivateKey])
 
-  implicit val codec: Codec[AES.Encrypted] = deriveCodec[AES.Encrypted]
-
-  def load(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
-    withFileOrCreate(seed, password, secretDir)(file => fromFile(file, password))
+  private final case class SecretFile(encrypted: ByteString,
+                                      salt: ByteString,
+                                      iv: ByteString,
+                                      version: Int) {
+    def toAESEncrytped: AES.Encrypted = AES.Encrypted(encrypted, salt, iv)
   }
 
-  def create(seed: ByteString, password: String, secretDir: Path): Either[Error, SecretStorage] = {
-    withFileOrCreate(seed, password, secretDir)(_ => Left(SecretFileAlreadyExists))
+  private implicit val codec: Codec[SecretFile] = deriveCodec[SecretFile]
+
+  def load(file: File): Either[Error, SecretStorage] = {
+    Using(Source.fromFile(file)) { source =>
+      val rawFile = source.getLines().mkString
+      for {
+        _ <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
+      } yield {
+        new Impl(file, None)
+      }
+    }.toEither.left
+      .map(_ => SecretFileError)
+      .flatten
   }
 
-  private def withFileOrCreate(seed: ByteString, password: String, secretDir: Path)(
-      onFileExist: File => Either[Error, SecretStorage]): Either[Error, SecretStorage] = {
-    val name = Sha256.hash(Sha256.hash(seed)).shortHex
-    val file = new File(s"$secretDir/$name.json")
+  def create(seed: ByteString, password: String, file: File): Either[Error, SecretStorage] = {
     if (file.exists) {
-      onFileExist(file)
+      Left(SecretFileAlreadyExists)
     } else {
       for {
-        _ <- Try(Files.createDirectories(secretDir)).toEither.left.map(_ => SecretDirError)
         _ <- storeStateToFile(file,
                               StoredState(seed, numberOfAddresses = 1, activeAddressIndex = 0),
                               password)
+        state <- stateFromFile(file, password)
       } yield {
-        new Impl(file)
+        new Impl(file, Some(state))
       }
     }
   }
 
   private[storage] def fromFile(file: File, password: String): Either[Error, SecretStorage] = {
     for {
-      _ <- stateFromFile(file, password)
+      state <- stateFromFile(file, password)
     } yield {
-      new Impl(file)
+      new Impl(file, Some(state))
     }
   }
 
   //TODO add some `synchronized` for the state
-  private class Impl(file: File) extends SecretStorage {
+  private class Impl(file: File, initialState: Option[State]) extends SecretStorage {
 
-    private var maybeState: Option[State] = None
+    private var maybeState: Option[State] = initialState
 
     override def lock(): Unit = {
       maybeState = None
@@ -109,6 +118,8 @@ object SecretStorage extends UtilCodecs {
         maybeState = Some(state)
       }
     }
+
+    override def isLocked(): Boolean = maybeState.isEmpty
 
     override def getCurrentPrivateKey(): Either[Error, ExtendedPrivateKey] = {
       for {
@@ -161,8 +172,12 @@ object SecretStorage extends UtilCodecs {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
-        encrypted   <- decode[AES.Encrypted](rawFile).left.map(_ => CannotParseFile)
-        stateBytes  <- AES.decrypt(encrypted, password).toEither.left.map(_ => CannotDecryptSecret)
+        secretFile <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
+        stateBytes <- AES
+          .decrypt(secretFile.toAESEncrytped, password)
+          .toEither
+          .left
+          .map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
@@ -205,16 +220,18 @@ object SecretStorage extends UtilCodecs {
       .Manager { use =>
         val outWriter = use(new PrintWriter(file))
         val encrypted = AES.encrypt(serialize(storedState), password)
-        outWriter.write(encryptedAsJson(encrypted))
+        val secretFile =
+          SecretFile(encrypted.encrypted, encrypted.salt, encrypted.iv, Constants.walletFileVersion)
+        outWriter.write(secretFileAsJson(secretFile))
       }
       .toEither
       .left
       .map(_ => SecretFileError)
   }
 
-  private def encryptedAsJson(encrypted: AES.Encrypted) = {
+  private def secretFileAsJson(secretFile: SecretFile) = {
     // scalastyle:off regex
-    encrypted.asJson.noSpaces
+    secretFile.asJson.noSpaces
     // scalastyle:on
   }
 }

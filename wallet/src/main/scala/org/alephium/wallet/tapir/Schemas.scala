@@ -14,6 +14,8 @@ trait Schemas {
 
   implicit val hashSchema: Schema[Hash] = Schema(Schema.schemaForString.schemaType)
 
+  implicit val mnemonicSchema: Schema[Mnemonic] = Schema(Schema.schemaForString.schemaType)
+
   implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(Schema.schemaForInt.schemaType)
 
   implicit val u64Schema: Schema[U64] = Schema(Schema.schemaForLong.schemaType)
