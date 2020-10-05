@@ -104,4 +104,9 @@ alephium {
   chains = {
     network-type = "testnet"
   }
+
+  wallet {
+    port = 15973
+    secret-dir = "${java.io.tmpdir}/alf-wallets/test/node-secrets"
+  }
 }

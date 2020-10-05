@@ -148,13 +148,7 @@ object RestServer {
       implicit system: ActorSystem,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext): RestServer = {
-    (for {
-      restPort <- node.config.network.restPort
-    } yield {
-      new RestServer(node, restPort, miner)
-    }) match {
-      case Some(server) => server
-      case None         => throw new RuntimeException("rpc and ws ports are required")
-    }
+    val restPort = node.config.network.restPort
+    new RestServer(node, restPort, miner)
   }
 }

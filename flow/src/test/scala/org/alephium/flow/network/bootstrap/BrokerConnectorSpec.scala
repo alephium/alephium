@@ -26,8 +26,8 @@ class BrokerConnectorSpec
                       brokerConfig.groupNumPerBroker,
                       Some(randomAddress),
                       randomAddress,
-                      None,
-                      None)
+                      Random.source.nextInt,
+                      Random.source.nextInt)
 
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)

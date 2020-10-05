@@ -102,7 +102,7 @@ object ApiModel {
     }
   }
 
-  final case class PeerAddress(address: InetAddress, rpcPort: Option[Int], wsPort: Option[Int])
+  final case class PeerAddress(address: InetAddress, rpcPort: Int, wsPort: Int)
 
   final case class SelfClique(cliqueId: CliqueId,
                               peers: AVector[PeerAddress],

@@ -28,9 +28,12 @@ import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
+import org.alephium.wallet.WalletApp
+import org.alephium.wallet.config.WalletConfig
 
 class TestFixture(val name: String) extends TestFixtureLike
 
+// scalastyle:off method.length
 trait TestFixtureLike
     extends AlephiumActorSpecLike
     with AlephiumFlowSpec
@@ -66,6 +69,7 @@ trait TestFixtureLike
   val defaultMasterPort    = generatePort
   val defaultRpcMasterPort = rpcPort(defaultMasterPort)
   val defaultWsMasterPort  = wsPort(defaultMasterPort)
+  val defaultWalletPort    = generatePort
 
   val blockNotifyProbe = TestProbe()
 
@@ -110,6 +114,7 @@ trait TestFixtureLike
 
   def buildEnv(publicPort: Int,
                masterPort: Int,
+               walletPort: Int,
                brokerId: Int,
                brokerNum: Int                       = 2,
                bootstrap: Option[InetSocketAddress] = None) = {
@@ -124,7 +129,8 @@ trait TestFixtureLike
         ("alephium.network.rest-port", publicPort - 300),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
-        ("alephium.api.api-key-hash", apiKeyHash.toHexString)
+        ("alephium.api.api-key-hash", apiKeyHash.toHexString),
+        ("alephium.wallet.port", walletPort)
       )
       override implicit lazy val config = {
         val tmp = AlephiumConfig.load(newConfig).toOption.get
@@ -145,6 +151,7 @@ trait TestFixtureLike
       bootNode(publicPort = publicPort,
                masterPort = masterPort,
                brokerId   = brokerId,
+               walletPort = generatePort,
                bootstrap  = bootstrap)
     }
 
@@ -155,8 +162,9 @@ trait TestFixtureLike
                brokerId: Int,
                brokerNum: Int                       = 2,
                masterPort: Int                      = defaultMasterPort,
+               walletPort: Int                      = defaultWalletPort,
                bootstrap: Option[InetSocketAddress] = None): Server = {
-    val platformEnv        = buildEnv(publicPort, masterPort, brokerId, brokerNum, bootstrap)
+    val platformEnv        = buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
     implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
 
     val server: Server = new Server {
@@ -188,6 +196,19 @@ trait TestFixtureLike
 
       lazy val rpcServer: RPCServer   = RPCServer(node, miner)
       lazy val restServer: RestServer = RestServer(node, miner)
+
+      val walletConfig: WalletConfig = WalletConfig(
+        config.wallet.port,
+        config.wallet.secretDir,
+        config.chains.networkType,
+        WalletConfig.BlockFlow(
+          apiConfig.networkInterface.getHostAddress,
+          config.network.rpcPort,
+          config.broker.groups
+        )
+      )
+
+      lazy val wallet: WalletApp = new WalletApp(walletConfig)
     }
 
     server
@@ -246,3 +267,4 @@ trait TestFixtureLike
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
     jsonRpc("blockflow_fetch", s"""{"fromTs":${fromTs.millis},"toTs":${toTs.millis}}""")
 }
+// scalastyle:on method.length

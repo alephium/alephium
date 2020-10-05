@@ -12,7 +12,7 @@ class MiningTest extends AlephiumSpec {
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker
-    val rpcPort    = selfClique.peers(index).rpcPort.get
+    val rpcPort    = selfClique.peers(index).rpcPort
 
     request[Balance](getBalance(address), rpcPort) is initialBalance
 
@@ -21,7 +21,7 @@ class MiningTest extends AlephiumSpec {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](startMining, peer.rpcPort.get) is true
+      request[Boolean](startMining, peer.rpcPort) is true
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
@@ -36,7 +36,7 @@ class MiningTest extends AlephiumSpec {
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](stopMining, peer.rpcPort.get) is true
+      request[Boolean](stopMining, peer.rpcPort) is true
     }
 
     eventually {

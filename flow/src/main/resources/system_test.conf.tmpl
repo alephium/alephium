@@ -61,6 +61,11 @@ alephium {
   chains = {
     network-type = "devnet"
   }
+
+  wallet {
+    port = 15973
+    secret-dir = "${java.io.tmpdir}/alf-wallets/test/node-secrets"
+  }
 }
 
 akka {

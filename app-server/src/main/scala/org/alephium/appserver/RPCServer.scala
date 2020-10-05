@@ -147,15 +147,9 @@ object RPCServer {
       implicit system: ActorSystem,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext): RPCServer = {
-    (for {
-      rpcPort <- node.config.network.rpcPort
-      wsPort  <- node.config.network.wsPort
-    } yield {
-      new RPCServer(node, rpcPort, wsPort, miner)
-    }) match {
-      case Some(server) => server
-      case None         => throw new RuntimeException("rpc and ws ports are required")
-    }
+    val rpcPort = node.config.network.rpcPort
+    val wsPort  = node.config.network.wsPort
+    new RPCServer(node, rpcPort, wsPort, miner)
   }
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {

@@ -10,6 +10,9 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, NumericHelpers}
 
 trait Generators extends NumericHelpers {
+
+  lazy val portGen: Gen[Int] = Gen.choose(0x401, 65535)
+
   lazy val hashGen: Gen[Hash] =
     Gen.const(()).map(_ => Hash.generate)
 
@@ -81,8 +84,9 @@ trait Generators extends NumericHelpers {
       ip1  <- Gen.choose(0, 255)
       ip2  <- Gen.choose(0, 255)
       ip3  <- Gen.choose(0, 255)
-      port <- Gen.choose(0x401, 65535)
+      port <- portGen
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
+
 }
 
 trait DefaultGenerators extends Generators {
