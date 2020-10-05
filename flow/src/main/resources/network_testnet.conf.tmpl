@@ -1,7 +1,7 @@
 alephium {
   broker {
     broker-id = 0
-    broker-num = 2
+    broker-num = 1
     groups = 4
   }
 
@@ -12,7 +12,7 @@ alephium {
   network {
     external-address  = null
     internal-address  = "127.0.0.1:9973"
-    master-address    = "3.137.220.47:9973"
+    master-address    = "127.0.0.1:9973"
 
     rpc-port = 10973
     ws-port  = 11973
@@ -25,6 +25,7 @@ alephium {
   }
 
   discovery {
-    bootstrap = ["3.137.220.47:9973"]
+    # TODO Add bootstrap nodes fixed IP addreses once available 
+    bootstrap = []
   }
 }

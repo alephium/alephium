@@ -83,8 +83,7 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def assembly(self):
-        run('sbt app-server/assembly')
-        run_exit('cp app-server/target/scala-2.13/alephium-*.jar ./')
+        run_exit('sbt app-server/assembly')
 
     def build(self):
         run_exit('sbt app-server/stage')
