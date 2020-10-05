@@ -1,5 +1,6 @@
 package org.alephium.appserver
 
+import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.Future
 
 import sttp.tapir._
@@ -15,13 +16,22 @@ import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{TimeStamp, U64}
 
-trait Endpoints extends ApiModelCodec with TapirCodecs {
+trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
   implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig
 
   type BaseEndpoint[A, B] = Endpoint[A, Response.Failure, B, Nothing]
   type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, Response.Failure, B, Nothing, Future]
+
+  private val apiKeyHash  = apiConfig.apiKeyHash match {
+    case Some(apiKeyHash) => apiKeyHash
+    case None             => {
+      val apiKey = Hash.generate.toHexString
+      logger.info(s"Api Key is '$apiKey'")
+      Hash.hash(apiKey)
+    }
+  }
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -32,7 +42,7 @@ trait Endpoints extends ApiModelCodec with TapirCodecs {
         (timeInterval.from, timeInterval.to))
 
   private def checkApiKey(apiKey: ApiKey): Either[Response.Failure, ApiKey] =
-    if (apiKey.hash == apiConfig.apiKeyHash) {
+    if (apiKey.hash == apiKeyHash) {
       Right(apiKey)
     } else {
       Left(Response.failed(Error.UnauthorizedError))

@@ -15,7 +15,7 @@ final case class ApiConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
     askTimeout: Duration,
-    apiKeyHash: Sha256
+    apiKeyHash: Option[Sha256]
 )
 
 object ApiConfig {
