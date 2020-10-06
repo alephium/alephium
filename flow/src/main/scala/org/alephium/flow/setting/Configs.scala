@@ -83,6 +83,11 @@ object Configs extends StrictLogging {
     }
   }
 
+  def parseNetworkType(rootPath: Path): Option[NetworkType] = {
+    val config = ConfigFactory.parseFile(getConfigUser(rootPath)).resolve()
+    Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
+  }
+
   def splitBalance(raw: String): Option[(LockupScript, U64)] = {
     val splitIndex = raw.indexOf(":")
     if (splitIndex == -1) None

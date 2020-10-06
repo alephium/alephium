@@ -10,14 +10,14 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.setting.{AlephiumConfig, Args, Configs, Platform}
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.{ActorRefT}
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Boot extends App with StrictLogging {
   val rootPath: Path                              = Platform.getRootPath()
-  val networkType: Option[NetworkType]            = Args.parse(args.toList).getOrElse(sys.error("_"))
+  val networkType: Option[NetworkType]            = Configs.parseNetworkType(rootPath)
   val typesafeConfig: Config                      = Configs.parseConfig(rootPath, networkType)
   implicit val config: AlephiumConfig             = AlephiumConfig.loadOrThrow(typesafeConfig)
   implicit val apiConfig: ApiConfig               = ApiConfig.loadOrThrow(typesafeConfig)
