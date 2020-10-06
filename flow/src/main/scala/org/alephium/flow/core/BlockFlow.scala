@@ -172,7 +172,7 @@ object BlockFlow extends StrictLogging {
       else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
         val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
-        weight1 + weight2 + header.target
+        weight1 + weight2 + header.target.value
       }
     }
 
@@ -186,7 +186,7 @@ object BlockFlow extends StrictLogging {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) ALF.GenesisWeight
       else {
-        header.outDeps.sumBy(getChainWeightUnsafe) + header.target
+        header.outDeps.sumBy(getChainWeightUnsafe) + header.target.value
       }
     }
 

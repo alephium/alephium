@@ -63,7 +63,7 @@ object FlowHandler {
   final case class BlockFlowTemplate(index: ChainIndex,
                                      height: Int,
                                      deps: AVector[Hash],
-                                     target: BigInt,
+                                     target: Target,
                                      transactions: AVector[Transaction])
       extends Event
   final case class BlocksLocated(blocks: AVector[Block])           extends Event
@@ -234,7 +234,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     } yield s"$i-$j:$height"
     val heightsInfo = heights.mkString(", ")
     val targetRatio =
-      (BigDecimal(header.target) / BigDecimal(consensusConfig.maxMiningTarget)).toFloat
+      (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
     val timeSpan = {
       chain.getBlockHeader(header.parentHash) match {
         case Left(_) => "?ms"
