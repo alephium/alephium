@@ -89,10 +89,10 @@ class AlephiumMake(object):
         run_exit('sbt app-server/stage')
 
     def test(self):
-        run_exit('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle coverage test coverageReport doc')
+        run_exit('sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck scalastyle test:scalastyle coverage test coverageReport doc')
 
     def itest(self):
-        run_exit('sbt it:scalafmt it:scalastyle it:test')
+        run_exit('sbt it:scalafmtCheck it:scalastyle it:test')
 
     def package(self):
         run_exit('sbt app-server/universal:packageBin')
