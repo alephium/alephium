@@ -6,7 +6,7 @@ import java.nio.file.Files
 import org.scalacheck.Gen
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
-import org.alephium.protocol.Generators
+import org.alephium.protocol.{Generators, Hash}
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
@@ -21,7 +21,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
       case (seed, password, wrongPassword) =>
-        val name = scala.util.Random.nextString(10)
+        val name = Hash.generate.shortHex
         val file = new File(s"$secretDir/$name")
 
         val secretStorage = SecretStorage.create(seed, password, file).toOption.get
