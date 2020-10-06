@@ -1,5 +1,7 @@
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.collection.mutable
 
 import org.scalatest.Assertion
@@ -8,7 +10,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Target}
 import org.alephium.util.{AVector, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
@@ -50,10 +52,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   it should "calculate target correctly" in new Fixture {
     val genesis       = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
     val gHeader       = genesis.header
-    val currentTarget = genesis.header.target
-    reTarget(currentTarget, consensusConfig.expectedTimeSpan.millis) is gHeader.target
-    reTarget(currentTarget, (consensusConfig.expectedTimeSpan timesUnsafe 2).millis) is (gHeader.target * 2)
-    reTarget(currentTarget, (consensusConfig.expectedTimeSpan divUnsafe 2).millis) is (gHeader.target / 2)
+    val currentTarget = Target.unsafe((gHeader.target / 4).underlying())
+    reTarget(currentTarget, consensusConfig.expectedTimeSpan.millis) is currentTarget
+    reTarget(currentTarget, (consensusConfig.expectedTimeSpan timesUnsafe 2).millis).value is
+      (currentTarget * 2).underlying()
+    reTarget(currentTarget, (consensusConfig.expectedTimeSpan divUnsafe 2).millis) is
+      Target.unsafe((currentTarget.value / 2).underlying())
   }
 
   it should "compute the correct median value" in {
@@ -89,13 +93,16 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     for (i <- 1 until consensusConfig.medianTimeInterval) {
       addNewHash(i)
     }
-    calHashTarget(currentHash, 9999) isE 9999
+    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
+      Target.unsafe(BigInteger.valueOf(9999))
 
     addNewHash(consensusConfig.medianTimeInterval)
-    calHashTarget(currentHash, 9999) isE 9999
+    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
+      Target.unsafe(BigInteger.valueOf(9999))
 
     addNewHash(consensusConfig.medianTimeInterval + 1)
     val expected = BigInt(9999) * consensusConfig.timeSpanMin.millis / consensusConfig.expectedTimeSpan.millis
-    calHashTarget(currentHash, 9999) isE expected
+    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
+      Target.unsafe(expected.underlying())
   }
 }

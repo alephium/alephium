@@ -16,7 +16,7 @@ final case class BlockHeader(
     blockDeps: AVector[Hash],
     txsHash: Hash,
     timestamp: TimeStamp,
-    target: BigInt,
+    target: Target,
     nonce: BigInt
 ) extends HashSerde[BlockHeader]
     with FlowData {
@@ -62,7 +62,7 @@ object BlockHeader {
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: Hash, target: BigInt, nonce: BigInt): BlockHeader = {
+  def genesis(txsHash: Hash, target: Target, nonce: BigInt): BlockHeader = {
     BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 }

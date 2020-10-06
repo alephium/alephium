@@ -1,5 +1,6 @@
 package org.alephium.flow.setting
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.nio.file.Path
 
@@ -13,7 +14,7 @@ import pureconfig.generic.auto._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
-import org.alephium.protocol.model.{Block, NetworkType}
+import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U64}
 
@@ -31,7 +32,8 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
                                   tipsPruneInterval: Int,
                                   blockCacheCapacityPerChain: Int)
     extends ConsensusConfig {
-  val maxMiningTarget: BigInt = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
+  val maxMiningTarget: Target =
+    Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
   val expectedTimeSpan: Duration = blockTargetTime
 

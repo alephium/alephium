@@ -8,7 +8,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
@@ -43,7 +43,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
     for {
       parentState <- getState(parentHash)
-      chainWeight = parentState.chainWeight + header.target
+      chainWeight = parentState.chainWeight + header.target.value
       height      = parentState.height + 1
       _           <- addHeader(header)
       isCanonical <- reorgFor(header, chainWeight, height)
@@ -111,7 +111,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getHashTarget(hash: Hash): IOResult[BigInt] = {
+  def getHashTarget(hash: Hash): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
       newTarget <- calHashTarget(hash, header.target)

@@ -1,6 +1,7 @@
 package org.alephium.flow
 
 import scala.annotation.tailrec
+import scala.language.implicitConversions
 
 import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
@@ -20,6 +21,8 @@ trait FlowFixture
     with StoragesFixture
     with NumericHelpers {
   lazy val blockFlow: BlockFlow = genesisBlockFlow()
+
+  implicit def target2BigInt(target: Target): BigInt = BigInt(target.value)
 
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)

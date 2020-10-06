@@ -16,7 +16,7 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
 
   override def timestamp: TimeStamp = header.timestamp
 
-  override def target: BigInt = header.target
+  override def target: Target = header.target
 
   def chainIndex(implicit config: GroupConfig): ChainIndex = {
     header.chainIndex
@@ -38,7 +38,7 @@ object Block {
 
   def from(blockDeps: AVector[Hash],
            transactions: AVector[Transaction],
-           target: BigInt,
+           target: Target,
            nonce: BigInt): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
     val txsHash     = Hash.hash(transactions)
@@ -47,7 +47,7 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: AVector[Transaction], target: BigInt, nonce: BigInt): Block = {
+  def genesis(transactions: AVector[Transaction], target: Target, nonce: BigInt): Block = {
     val txsHash     = Hash.hash(transactions)
     val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
     Block(blockHeader, transactions)

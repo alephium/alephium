@@ -1,11 +1,12 @@
 package org.alephium.protocol.config
 
+import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
 trait ConsensusConfig {
 
   def numZerosAtLeastInHash: Int
-  def maxMiningTarget: BigInt
+  def maxMiningTarget: Target
 
   def blockTargetTime: Duration
   // scalastyle:off magic.number

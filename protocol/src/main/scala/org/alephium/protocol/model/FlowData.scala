@@ -7,7 +7,7 @@ import org.alephium.util.TimeStamp
 trait FlowData {
   def timestamp: TimeStamp
 
-  def target: BigInt
+  def target: Target
 
   def hash: Hash
 
