@@ -3,7 +3,7 @@ package org.alephium.wallet.api
 import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.model.StatusCode
-import sttp.tapir.Schema
+import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.SchemaType.{SObjectInfo, SProduct}
 
 sealed trait WalletApiError {
@@ -35,7 +35,8 @@ object WalletApiError {
     implicit val schema: Schema[Unauthorized] =
       Schema(
         SProduct(SObjectInfo("Unauthorized"),
-                 List("status" -> Schema.schemaForInt, "detail" -> Schema.schemaForString)))
+                 List(FieldName("status") -> Schema.schemaForInt,
+                      FieldName("detail") -> Schema.schemaForString)))
   }
 
   final case class BadRequest(val detail: String) extends WalletApiError {
@@ -51,7 +52,8 @@ object WalletApiError {
     implicit val schema: Schema[BadRequest] =
       Schema(
         SProduct(SObjectInfo("BadRequest"),
-                 List("status" -> Schema.schemaForInt, "detail" -> Schema.schemaForString)))
+                 List(FieldName("status") -> Schema.schemaForInt,
+                      FieldName("detail") -> Schema.schemaForString)))
   }
 
   implicit val decoder: Decoder[WalletApiError] = new Decoder[WalletApiError] {

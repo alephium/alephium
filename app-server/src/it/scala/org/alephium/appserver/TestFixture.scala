@@ -30,6 +30,7 @@ import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
+import org.alephium.wallet.service.WalletService
 
 class TestFixture(val name: String) extends TestFixtureLike
 
@@ -194,21 +195,26 @@ trait TestFixtureLike
         ActorRefT.build(system, props, s"FairMiner")
       }
 
-      lazy val rpcServer: RPCServer   = RPCServer(node, miner)
-      lazy val restServer: RestServer = RestServer(node, miner)
+      private val walletApp: Option[WalletApp] =
+        Option.when(config.network.isCoordinator) {
+          val walletConfig: WalletConfig = WalletConfig(
+            config.wallet.port,
+            config.wallet.secretDir,
+            config.chains.networkType,
+            WalletConfig.BlockFlow(
+              apiConfig.networkInterface.getHostAddress,
+              config.network.rpcPort,
+              config.broker.groups
+            )
+          )
 
-      val walletConfig: WalletConfig = WalletConfig(
-        config.wallet.port,
-        config.wallet.secretDir,
-        config.chains.networkType,
-        WalletConfig.BlockFlow(
-          apiConfig.networkInterface.getHostAddress,
-          config.network.rpcPort,
-          config.broker.groups
-        )
-      )
+          new WalletApp(walletConfig)
+        }
 
-      lazy val wallet: WalletApp = new WalletApp(walletConfig)
+      lazy val rpcServer: RPCServer                 = RPCServer(node, miner)
+      lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+      lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
+
     }
 
     server
