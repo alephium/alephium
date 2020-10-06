@@ -33,11 +33,16 @@ trait AlephiumSpec extends AnyFlatSpecLike with ScalaCheckDrivenPropertyChecks w
   }
 
   implicit class IsEOps[A: Equality, L](left: Either[L, A])(implicit pos: Position) {
+    def get(left: Either[L, A]): A = left match {
+      case Left(error) => throw new AssertionError(error)
+      case Right(a)    => a
+    }
+
     // scalastyle:off scalatest-matcher
-    def isE(right: A): Assertion                             = left.toOption.get shouldEqual right
-    def isE(right: ResultOfATypeInvocation[_]): Assertion    = left.toOption.get shouldBe right
-    def isnotE(right: A): Assertion                          = left.toOption.get should not equal right
-    def isnotE(right: ResultOfATypeInvocation[_]): Assertion = left.toOption.get should not be right
+    def isE(right: A): Assertion                             = get(left) shouldEqual right
+    def isE(right: ResultOfATypeInvocation[_]): Assertion    = get(left) shouldBe right
+    def isnotE(right: A): Assertion                          = get(left) should not equal right
+    def isnotE(right: ResultOfATypeInvocation[_]): Assertion = get(left) should not be right
     // scalastyle:on scalatest-matcher
   }
   // scalastyle:on
