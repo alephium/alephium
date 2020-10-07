@@ -97,6 +97,7 @@ lazy val `app-server` = mainProject("app-server")
     assemblyJarName in assembly := s"alephium-${version.value}.jar",
     test in assembly := {},
     assemblyMergeStrategy in assembly := {
+      case "logback.xml" => MergeStrategy.first
       case PathList("META-INF", "maven", "org.webjars", "swagger-ui", xs @ _*) => MergeStrategy.first
       case other => (assemblyMergeStrategy in assembly).value(other)
     },
