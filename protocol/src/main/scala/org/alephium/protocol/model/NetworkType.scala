@@ -12,15 +12,15 @@ sealed trait NetworkType {
 
 object NetworkType {
   case object Mainnet extends NetworkType {
-    val name: String = "mainnet"
+    val name: String   = "mainnet"
     val prefix: String = "M"
   }
   case object Testnet extends NetworkType {
-    val name: String = "testnet"
+    val name: String   = "testnet"
     val prefix: String = "T"
   }
   case object Devnet extends NetworkType {
-    val name: String = "devnet"
+    val name: String   = "devnet"
     val prefix: String = "D"
   }
 

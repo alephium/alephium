@@ -14,6 +14,7 @@ import org.alephium.io.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
+import org.alephium.wallet.service.WalletService
 
 trait Server extends Service {
   def config: AlephiumConfig
@@ -24,14 +25,10 @@ trait Server extends Service {
   def rpcServer: RPCServer
   def restServer: RestServer
   def miner: ActorRefT[Miner.Command]
-  def wallet: WalletApp
+  def walletService: Option[WalletService]
 
   override lazy val subServices: ArraySeq[Service] = {
-    if (config.network.isCoordinator) {
-      ArraySeq(rpcServer, restServer, wallet, node)
-    } else {
-      ArraySeq(rpcServer, restServer, node)
-    }
+    ArraySeq(rpcServer, restServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
   override protected def startSelfOnce(): Future[Unit] =
     Future.successful(())
@@ -63,19 +60,23 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
     ActorRefT.build(system, props, s"FairMiner")
   }
 
-  implicit def brokerConfig: BrokerSetting = config.broker
-  lazy val rpcServer: RPCServer            = RPCServer(node, miner)
-  lazy val restServer: RestServer          = RestServer(node, miner)
-
-  val walletConfig: WalletConfig = WalletConfig(
-    config.wallet.port,
-    config.wallet.secretDir,
-    config.chains.networkType,
-    WalletConfig.BlockFlow(
-      apiConfig.networkInterface.getHostAddress,
-      config.network.rpcPort,
-      config.broker.groups
+  private lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
+    val walletConfig: WalletConfig = WalletConfig(
+      config.wallet.port,
+      config.wallet.secretDir,
+      config.chains.networkType,
+      WalletConfig.BlockFlow(
+        apiConfig.networkInterface.getHostAddress,
+        config.network.rpcPort,
+        config.broker.groups
+      )
     )
-  )
-  lazy val wallet: WalletApp = new WalletApp(walletConfig)
+
+    new WalletApp(walletConfig)
+  }
+
+  implicit def brokerConfig: BrokerSetting      = config.broker
+  lazy val rpcServer: RPCServer                 = RPCServer(node, miner)
+  lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+  lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 }

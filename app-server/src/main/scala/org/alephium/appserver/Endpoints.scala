@@ -47,6 +47,7 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
       .errorOut(jsonBody[Response.Failure])
+      .tag("Blockflow")
 
   private val authEndpoint: AuthEndpoint[Unit, Unit] =
     baseEndpoint

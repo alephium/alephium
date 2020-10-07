@@ -33,7 +33,7 @@ object Configs extends StrictLogging {
   }
 
   def getConfigTemplate(rootPath: Path, confName: String, templateName: String): File = {
-    val file     = getConfigFile(rootPath, confName)
+    val file = getConfigFile(rootPath, confName)
 
     if (file.exists) file.delete()
 
@@ -53,9 +53,8 @@ object Configs extends StrictLogging {
   def getConfigNetwork(rootPath: Path, networkType: NetworkType): File =
     getConfigTemplate(rootPath, "network", s"network_${networkType.name}")
 
-
   def getConfigSystem(rootPath: Path): File = {
-    val env      = Env.resolve().name
+    val env = Env.resolve().name
     getConfigTemplate(rootPath, "system", s"system_$env")
   }
 
@@ -71,9 +70,11 @@ object Configs extends StrictLogging {
         ConfigFactory
           .parseFile(getConfigUser(rootPath))
           .withFallback(
-            ConfigFactory.parseFile(getConfigNetwork(rootPath, networkType))
+            ConfigFactory
+              .parseFile(getConfigNetwork(rootPath, networkType))
               .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
-          ).resolve()
+          )
+          .resolve()
 
       case None =>
         ConfigFactory

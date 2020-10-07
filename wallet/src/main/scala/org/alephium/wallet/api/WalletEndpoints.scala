@@ -12,14 +12,16 @@ import org.alephium.wallet.tapir
 
 trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Codecs {
 
-  private val baseEndpoint = endpoint.errorOut(
-    oneOf[WalletApiError](
-      statusMapping(StatusCode.BadRequest,
-                    jsonBody[WalletApiError.BadRequest].description("Bad request")),
-      statusMapping(StatusCode.Unauthorized,
-                    jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+  private val baseEndpoint = endpoint
+    .errorOut(
+      oneOf[WalletApiError](
+        statusMapping(StatusCode.BadRequest,
+                      jsonBody[WalletApiError.BadRequest].description("Bad request")),
+        statusMapping(StatusCode.Unauthorized,
+                      jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+      )
     )
-  )
+    .tag("Wallet")
 
   val createWallet: Endpoint[WalletCreation, WalletApiError, WalletCreation.Result, Nothing] =
     baseEndpoint.post

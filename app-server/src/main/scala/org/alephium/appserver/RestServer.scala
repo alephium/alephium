@@ -10,7 +10,7 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
-import sttp.tapir.docs.openapi.RichOpenAPIServerEndpoints
+import sttp.tapir.docs.openapi.RichOpenAPIEndpoints
 import sttp.tapir.openapi.OpenAPI
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
@@ -23,12 +23,17 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, Duration, Service}
+import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
-class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
-    implicit val apiConfig: ApiConfig,
-    val actorSystem: ActorSystem,
-    val executionContext: ExecutionContext)
+class RestServer(
+    node: Node,
+    port: Int,
+    miner: ActorRefT[Miner.Command],
+    walletServer: Option[WalletServer]
+)(implicit val apiConfig: ApiConfig,
+  val actorSystem: ActorSystem,
+  val executionContext: ExecutionContext)
     extends Endpoints
     with Service
     with StrictLogging {
@@ -42,24 +47,24 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
   implicit val networkType: NetworkType   = node.config.chains.networkType
   implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
 
-  private val getBlockflowLogic = getBlockflow.serverLogic { timeInterval =>
+  private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
     Future.successful(
       ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
   }
 
-  private val getBlockLogic = getBlock.serverLogic { hash =>
+  private val getBlockRoute = getBlock.toRoute { hash =>
     Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))
   }
 
-  private val getBalanceLogic = getBalance.serverLogic { address =>
+  private val getBalanceRoute = getBalance.toRoute { address =>
     Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
-  private val getGroupLogic = getGroup.serverLogic { address =>
+  private val getGroupRoute = getGroup.toRoute { address =>
     Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))
   }
 
-  private val getHashesAtHeightLogic = getHashesAtHeight.serverLogic {
+  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
     case (from, to, height) =>
       Future.successful(
         ServerUtils.getHashesAtHeight(blockFlow,
@@ -67,12 +72,12 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
                                       GetHashesAtHeight(from.value, to.value, height)))
   }
 
-  private val getChainInfoLogic = getChainInfo.serverLogic {
+  private val getChainInfoRoute = getChainInfo.toRoute {
     case (from, to) =>
       Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
-  private val createTransactionLogic = createTransaction.serverLogic {
+  private val createTransactionRoute = createTransaction.toRoute {
     case (fromKey, toAddress, value) =>
       Future.successful(
         ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))
@@ -91,32 +96,39 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
       }
   }
 
-  private val docs: OpenAPI = List(
-    getBlockflowLogic,
-    getBlockLogic,
-    getBalanceLogic,
-    getGroupLogic,
-    getHashesAtHeightLogic,
-    getChainInfoLogic,
-    createTransactionLogic,
-    sendTransactionLogic,
-    minerActionLogic
-  ).toOpenAPI("Alephium BlockFlow API", "1.0")
+  private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
+  private val blockflowDocs = List(
+    getBlockflow,
+    getBlock,
+    getBalance,
+    getGroup,
+    getHashesAtHeight,
+    getChainInfo,
+    createTransaction,
+    sendTransactionLogic.endpoint,
+    minerActionLogic.endpoint
+  )
+
+  private val docs: OpenAPI =
+    (walletDocs ++ blockflowDocs).toOpenAPI("Alephium API", "1.0")
 
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
+  private val blockFlowRoute: Route =
+    getBlockflowRoute ~
+      getBlockRoute ~
+      getBalanceRoute ~
+      getGroupRoute ~
+      getHashesAtHeightRoute ~
+      getChainInfoRoute ~
+      createTransactionRoute ~
+      sendTransactionLogic.toRoute ~
+      minerActionLogic.toRoute ~
+      swaggerUIRoute
+
   val route: Route =
     cors()(
-      getBlockflowLogic.toRoute ~
-        getBlockLogic.toRoute ~
-        getBalanceLogic.toRoute ~
-        getGroupLogic.toRoute ~
-        getHashesAtHeightLogic.toRoute ~
-        getChainInfoLogic.toRoute ~
-        createTransactionLogic.toRoute ~
-        sendTransactionLogic.toRoute ~
-        minerActionLogic.toRoute ~
-        swaggerUIRoute
+      walletServer.map(wallet => blockFlowRoute ~ wallet.route).getOrElse(blockFlowRoute)
     )
 
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
@@ -144,11 +156,11 @@ class RestServer(node: Node, port: Int, miner: ActorRefT[Miner.Command])(
 }
 
 object RestServer {
-  def apply(node: Node, miner: ActorRefT[Miner.Command])(
+  def apply(node: Node, miner: ActorRefT[Miner.Command], walletServer: Option[WalletServer])(
       implicit system: ActorSystem,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext): RestServer = {
     val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner)
+    new RestServer(node, restPort, miner, walletServer)
   }
 }

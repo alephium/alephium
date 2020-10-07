@@ -5,6 +5,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.OverflowStrategy
 import com.typesafe.scalalogging.StrictLogging
@@ -34,7 +35,7 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
 
   val walletServer: WalletServer = new WalletServer(walletService, config.networkType)
 
-  val routes: Route = walletServer.route
+  val routes: Route = walletServer.route ~ walletServer.docsRoute
 
   private val bindingPromise: Promise[Http.ServerBinding] = Promise()
 

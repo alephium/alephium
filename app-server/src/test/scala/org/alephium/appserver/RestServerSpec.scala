@@ -161,6 +161,6 @@ class RestServerSpec
                                   blockFlowProbe.ref,
                                   dummyTx,
                                   storages)
-    lazy val server: RestServer = RestServer(node, miner)
+    lazy val server: RestServer = RestServer(node, miner, None)
   }
 }

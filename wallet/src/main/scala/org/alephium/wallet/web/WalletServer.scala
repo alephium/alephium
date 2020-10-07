@@ -4,8 +4,8 @@ import scala.concurrent.ExecutionContext
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import sttp.tapir.Endpoint
 import sttp.tapir.docs.openapi._
-import sttp.tapir.openapi.OpenAPI
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
@@ -25,7 +25,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     with AkkaDecodeFailureHandler {
   import WalletServer.toApiError
 
-  private val docs: OpenAPI = List(
+  val docs: List[Endpoint[_, _, _, _]] = List(
     createWallet,
     restoreWallet,
     listWallets,
@@ -36,9 +36,10 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
     getAddresses,
     deriveNextAddress,
     changeActiveAddress
-  ).toOpenAPI("Alephium Wallet", "1.0")
+  )
 
-  private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
+  val docsRoute: Route = new SwaggerAkka(docs.toOpenAPI("Alephium Wallet", "1.0").toYaml,
+                                         yamlName = "openapi.yaml").routes
 
   // scalastyle:off method.length
   def route: Route =
@@ -112,7 +113,7 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
           .map(_.map(_.map { case (name, locked) => model.WalletStatus(name, locked) }).left
             .map(toApiError))
       } ~
-      swaggerUIRoute
+      docsRoute
 }
 
 object WalletServer {

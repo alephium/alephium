@@ -108,6 +108,8 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
   }
 
   it should "cache nothing when keep duration is 0" in new Fixture1 {
+    Thread.sleep(10) // make sure blocks are old now
+
     val cache0 = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(0))
     blocks.foreach(cache0.add)
     blocks.foreach(block => cache0.isBlockCached(block) is false)
