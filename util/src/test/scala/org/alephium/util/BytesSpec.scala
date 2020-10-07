@@ -43,4 +43,12 @@ class BytesSpec extends AlephiumSpec {
       output is expected
     }
   }
+
+  it should "compare byte string" in {
+    import Bytes.byteStringOrdering
+    Seq(ByteString.empty, ByteString(0)).max is ByteString(0)
+    Seq(ByteString(0), ByteString(1)).max is ByteString(1)
+    Seq(ByteString(0), ByteString(0, 1)).max is ByteString(0, 1)
+    Seq(ByteString(0, 0), ByteString(0, 1)).max is ByteString(0, 1)
+  }
 }

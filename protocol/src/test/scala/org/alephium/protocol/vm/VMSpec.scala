@@ -141,7 +141,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AlfRemaining,
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
-      TokenRemaining,
+      TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(89)))
   }
@@ -173,7 +173,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AlfRemaining,
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
-      TokenRemaining,
+      TokenRemaining
     )
 
     val context = pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(98)))
