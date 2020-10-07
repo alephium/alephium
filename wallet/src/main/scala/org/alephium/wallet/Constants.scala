@@ -23,7 +23,6 @@ object Constants {
 
   val coinType: Int      = 1234
   val path: AVector[Int] = AVector(BIP32.harden(44), BIP32.harden(coinType), BIP32.harden(0), 0, 0)
-  val pathStr: String    = s"m/44'/$coinType'/0'/0/0"
 
   val walletFileVersion: Int = 1
 }
