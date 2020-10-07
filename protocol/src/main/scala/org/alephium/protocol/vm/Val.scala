@@ -29,6 +29,7 @@ object Val {
         case U64Vec(a)  => encode(a)
         case I256Vec(a) => encode(a)
         case U256Vec(a) => encode(a)
+        case Address(a) => encode(a)
       }
       ByteString(input.tpe.id) ++ content
     }
@@ -55,6 +56,7 @@ object Val {
         case U64Vec  => decode[ArraySeq[util.U64]](content).map(t   => U64Vec(t._1)  -> t._2)
         case I256Vec => decode[ArraySeq[util.I256]](content).map(t  => I256Vec(t._1) -> t._2)
         case U256Vec => decode[ArraySeq[util.U256]](content).map(t  => U256Vec(t._1) -> t._2)
+        case Address => decode[LockupScript](content).map(t         => Address(t._1) -> t._2)
       }
   }
 
@@ -70,7 +72,7 @@ object Val {
       }, _.id)
 
     val types: AVector[Type] = AVector[Type](Bool, Byte, I64, U64, I256, U256) ++
-      AVector[Type](BoolVec, ByteVec, I64Vec, U64Vec, I256Vec, U256Vec)
+      AVector[Type](BoolVec, ByteVec, I64Vec, U64Vec, I256Vec, U256Vec, Address)
   }
 
   // TODO: optimize using value class
@@ -104,6 +106,10 @@ object Val {
   }
   final case class U256Vec(a: ArraySeq[util.U256]) extends AnyVal with Val {
     def tpe: Val.Type = U256Vec
+  }
+
+  final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
+    def tpe: Val.Type = Address
   }
 
   object Bool extends Type {
@@ -204,6 +210,15 @@ object Val {
     override def isNumeric: Boolean    = false
 
     override def toString: String = "U256Vec"
+  }
+
+  object Address extends Type {
+    implicit val serde: Serde[Address] = serdeImpl[LockupScript].xmap(Address(_), _.lockupScript)
+    override val id: scala.Byte        = 12.toByte
+    override def default: Address      = Address(LockupScript.vmDefault)
+    override def isNumeric: Boolean    = false
+
+    override def toString: String = "Address"
   }
 
   val True: Bool  = Bool(true)

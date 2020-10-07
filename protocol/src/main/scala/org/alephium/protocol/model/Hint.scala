@@ -4,6 +4,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.Bytes
 
+// No substypes for the sake of performance
 class Hint(val value: Int) extends AnyVal {
   def isAssetType: Boolean = (value & 1) == 1
 
@@ -21,6 +22,11 @@ object Hint {
   implicit val serde: Serde[Hint] = Serde
     .bytesSerde(4)
     .xmap(bs => new Hint(Bytes.toIntUnsafe(bs)), hint => Bytes.from(hint.value))
+
+  def from(assetOutput: AssetOutput): Hint = ofAsset(assetOutput.lockupScript.scriptHint)
+
+  def from(contractOutput: ContractOutput): Hint =
+    ofContract(contractOutput.lockupScript.scriptHint)
 
   def ofAsset(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value)
 

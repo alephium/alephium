@@ -35,7 +35,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     ApiConfig(dummyAddress.getAddress,
               blockflowFetchMaxAge,
               askTimeout = Duration.zero,
-              apiKeyHash = Sha256.hash(apiKey))
+              apiKeyHash = Some(Sha256.hash(apiKey)))
 
   val networkType = NetworkType.Mainnet
 

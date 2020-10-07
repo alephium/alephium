@@ -25,6 +25,7 @@ object Type {
       case Val.U64Vec  => U64Vec
       case Val.I256Vec => I256Vec
       case Val.U256Vec => U256Vec
+      case Val.Address => Address
     }
   }
 
@@ -40,6 +41,7 @@ object Type {
   case object U64Vec  extends Type { def toVal: Val.Type = Val.U64Vec }
   case object I256Vec extends Type { def toVal: Val.Type = Val.I256Vec }
   case object U256Vec extends Type { def toVal: Val.Type = Val.U256Vec }
+  case object Address extends Type { def toVal: Val.Type = Val.Address }
 
   sealed trait Contract extends Type {
     def id: Ast.TypeId

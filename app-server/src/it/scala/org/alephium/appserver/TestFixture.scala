@@ -122,7 +122,7 @@ trait TestFixtureLike
       override val configValues = Map(
         ("alephium.network.bind-address", s"localhost:$publicPort"),
         ("alephium.network.internal-address", s"localhost:$publicPort"),
-        ("alephium.network.master-address", s"localhost:$masterPort"),
+        ("alephium.network.coordinator-address", s"localhost:$masterPort"),
         ("alephium.network.external-address", s"localhost:$publicPort"),
         ("alephium.network.rpc-port", publicPort - 100),
         ("alephium.network.ws-port", publicPort - 200),

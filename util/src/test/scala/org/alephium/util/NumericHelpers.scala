@@ -20,6 +20,8 @@ trait NumericHelpers {
   implicit def intToU64(n: Int): U64   = U64.unsafe(n.toLong)
   implicit def longToU64(n: Long): U64 = U64.unsafe(n)
 
+  implicit def bigInt(n: BigInteger): BigInt = BigInt(n)
+
   private val random = SecureRandom.getInstanceStrong
 
   // Generate a random Int in the range of [from, to]

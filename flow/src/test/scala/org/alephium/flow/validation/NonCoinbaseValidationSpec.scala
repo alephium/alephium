@@ -9,7 +9,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.protocol.model.ModelGenerators.{AssetInputInfo, ContractInfo, TxInputStateInfo}
+import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
 import org.alephium.util.{AVector, Random, U64}
 
@@ -32,19 +32,11 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   class Fixture extends NonCoinbaseValidation.Impl with VMFactory {
     // TODO: prepare blockflow to test checkMempool
-    def prepareWorldState(inputInfos: AVector[TxInputStateInfo]): WorldState = {
+    def prepareWorldState(inputInfos: AVector[AssetInputInfo]): WorldState = {
       inputInfos.fold(cachedWorldState) {
         case (worldState, inputInfo: AssetInputInfo) =>
           worldState
-            .addAsset(inputInfo.txInput.outputRef.asInstanceOf[AssetOutputRef],
-                      inputInfo.referredOutput)
-            .toOption
-            .get
-        case (worldState, inputInfo: ContractInfo) =>
-          worldState
-            .addContract(inputInfo.txInput.outputRef.asInstanceOf[ContractOutputRef],
-                         inputInfo.referredOutput,
-                         inputInfo.state)
+            .addAsset(inputInfo.txInput.outputRef, inputInfo.referredOutput)
             .toOption
             .get
       }
@@ -65,10 +57,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
     def modifyAlfAmount(tx: Transaction, delta: U64): Transaction = {
       val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()
-      val outputNew = output match {
-        case o: AssetOutput    => o.copy(amount = o.amount + delta)
-        case o: ContractOutput => o.copy(amount = o.amount + delta)
-      }
+      val outputNew       = output.copy(amount = output.amount + delta)
       tx.copy(
         unsigned =
           tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
@@ -122,12 +111,9 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
             scriptHint   <- scriptHintGen(fromGroupNew)
             selected     <- Gen.choose(0, inputs.length - 1)
           } yield {
-            val input = inputs(selected)
-            val outputRefNew = input.outputRef match {
-              case ref: AssetOutputRef    => AssetOutputRef.from(scriptHint, ref.key)
-              case ref: ContractOutputRef => ContractOutputRef.from(scriptHint, ref.key)
-            }
-            val inputsNew = inputs.replace(selected, input.copy(outputRef = outputRefNew))
+            val input        = inputs(selected)
+            val outputRefNew = AssetOutputRef.from(scriptHint, input.outputRef.key)
+            val inputsNew    = inputs.replace(selected, input.copy(outputRef = outputRefNew))
             tx.unsigned.copy(inputs = inputsNew)
           }
         forAll(localUnsignedGen) { unsignedNew =>
@@ -152,10 +138,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
               lockupScriptNew <- p2pkhLockupGen(toGroupNew)
               selected        <- Gen.choose(0, outputs.length - 1)
             } yield {
-              val outputNew = outputs(selected) match {
-                case output: AssetOutput    => output.copy(lockupScript = lockupScriptNew)
-                case output: ContractOutput => output.copy(lockupScript = lockupScriptNew)
-              }
+              val outputNew  = outputs(selected).copy(lockupScript = lockupScriptNew)
               val outputsNew = outputs.replace(selected, outputNew)
               tx.unsigned.copy(fixedOutputs = outputsNew)
             }
@@ -182,12 +165,19 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "check output data size" in new StatelessFixture {
-    private def modifyData(outputs: AVector[TxOutput], index: Int): AVector[TxOutput] = {
+    private def modifyData0(outputs: AVector[AssetOutput], index: Int): AVector[AssetOutput] = {
+      val dataNew = ByteString.fromArrayUnsafe(Array.fill(ALF.MaxOutputDataSize + 1)(0))
+      dataNew.length is ALF.MaxOutputDataSize + 1
+      val outputNew = outputs(index).copy(additionalData = dataNew)
+      outputs.replace(index, outputNew)
+    }
+
+    private def modifyData1(outputs: AVector[TxOutput], index: Int): AVector[TxOutput] = {
       val dataNew = ByteString.fromArrayUnsafe(Array.fill(ALF.MaxOutputDataSize + 1)(0))
       dataNew.length is ALF.MaxOutputDataSize + 1
       val outputNew = outputs(index) match {
         case o: AssetOutput    => o.copy(additionalData = dataNew)
-        case o: ContractOutput => o.copy(additionalData = dataNew)
+        case o: ContractOutput => o
       }
       outputs.replace(index, outputNew)
     }
@@ -195,17 +185,19 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     forAll(transactionGenWithPreOutputs(1, 3)) {
       case (tx, preOutputs) =>
         val outputIndex = Random.source.nextInt(tx.outputsLength)
-        val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
-          val outputsNew = modifyData(tx.unsigned.fixedOutputs, outputIndex)
-          tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
-        } else {
-          val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
-          val outputsNew     = modifyData(tx.generatedOutputs, correctedIndex)
-          tx.copy(generatedOutputs = outputsNew)
+        if (tx.getOutput(outputIndex).isInstanceOf[AssetOutput]) {
+          val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
+            val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)
+            tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
+          } else {
+            val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
+            val outputsNew     = modifyData1(tx.generatedOutputs, correctedIndex)
+            tx.copy(generatedOutputs = outputsNew)
+          }
+          failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
+          failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
+          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
         }
-        failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-        failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
     }
   }
 
@@ -224,12 +216,11 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       val fixedOutputs = tx.unsigned.fixedOutputs
       val relatedOutputIndexes = fixedOutputs
         .mapWithIndex {
-          case (output: AssetOutput, index) => (index, output.tokens.exists(_._1 equals tokenId))
-          case (_, index)                   => (index, false)
+          case (output, index) => (index, output.tokens.exists(_._1 equals tokenId))
         }
         .map(_._1)
       val selected    = relatedOutputIndexes.sample()
-      val output      = fixedOutputs(selected).asInstanceOf[AssetOutput]
+      val output      = fixedOutputs(selected)
       val tokenIndex  = output.tokens.indexWhere(_._1 equals tokenId)
       val tokenAmount = output.tokens(tokenIndex)._2
       val outputNew =
@@ -238,30 +229,24 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
 
     def sampleToken(tx: Transaction): TokenId = {
-      val tokens = tx.unsigned.fixedOutputs.flatMap {
-        case output: AssetOutput => output.tokens.map(_._1)
-        case _: ContractOutput   => AVector.ofSize[TokenId](0)
-      }
+      val tokens = tx.unsigned.fixedOutputs.flatMap(_.tokens.map(_._1))
       tokens.sample()
     }
 
     def getTokenAmount(tx: Transaction, tokenId: TokenId): U64 = {
       tx.unsigned.fixedOutputs.fold(U64.Zero) {
-        case (acc, output: AssetOutput) =>
+        case (acc, output) =>
           acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
-        case (acc, _) => acc
       }
     }
 
     def replaceTokenId(tx: Transaction, from: TokenId, to: TokenId): Transaction = {
-      val outputsNew = tx.unsigned.fixedOutputs.map[TxOutput] {
-        case output: AssetOutput =>
-          val tokensNew = output.tokens.map {
-            case (id, amount) if id equals from => (to, amount)
-            case pair                           => pair
-          }
-          output.copy(tokens = tokensNew)
-        case output: ContractOutput => output
+      val outputsNew = tx.unsigned.fixedOutputs.map { output =>
+        val tokensNew = output.tokens.map {
+          case (id, amount) if id equals from => (to, amount)
+          case pair                           => pair
+        }
+        output.copy(tokens = tokensNew)
       }
       tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
     }
@@ -320,9 +305,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     forAll(transactionGenWithPreOutputs()) {
       case (tx, preOutputs) =>
         val newTokenId = tx.newTokenId
-        val newTokenIssued = tx.unsigned.fixedOutputs.exists {
-          case output: AssetOutput => output.tokens.exists(_._1 equals newTokenId)
-          case _                   => false
+        val newTokenIssued = tx.unsigned.fixedOutputs.exists { output =>
+          output.tokens.exists(_._1 equals newTokenId)
         }
         newTokenIssued is true
 

@@ -1,8 +1,11 @@
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ChainDifficultyAdjustment {
@@ -30,7 +33,7 @@ trait ChainDifficultyAdjustment {
   }
 
   // Digi Shield DAA
-  final protected def calHashTarget(hash: Hash, currentTarget: BigInt): IOResult[BigInt] = {
+  final protected def calHashTarget(hash: Hash, currentTarget: Target): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height > ALF.GenesisHeight + consensusConfig.medianTimeInterval =>
         calMedianBlockTime(hash, height).map {
@@ -50,8 +53,12 @@ trait ChainDifficultyAdjustment {
     }
   }
 
-  final protected def reTarget(currentTarget: BigInt, timeSpanMs: Long): BigInt = {
-    currentTarget * timeSpanMs / consensusConfig.expectedTimeSpan.millis
+  final protected def reTarget(currentTarget: Target, timeSpanMs: Long): Target = {
+    val nextTarget = currentTarget.value
+      .multiply(BigInteger.valueOf(timeSpanMs))
+      .divide(BigInteger.valueOf(consensusConfig.expectedTimeSpan.millis))
+    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) Target.unsafe(nextTarget)
+    else consensusConfig.maxMiningTarget
   }
 }
 

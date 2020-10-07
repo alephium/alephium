@@ -82,6 +82,9 @@ class AlephiumMake(object):
         else:
             getattr(self, args.command[0])(args.command[1:])
 
+    def assembly(self):
+        run_exit('sbt app-server/assembly')
+
     def build(self):
         run_exit('sbt app-server/stage')
 
@@ -125,10 +128,10 @@ class AlephiumMake(object):
             wsPort = port + 2000
             restPort = port + 3000
             bindAddress = "localhost:" + str(port)
-            masterAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
+            coordinatorAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
             print("Starting a new node")
-            print("node-{}: {} (master: {})".format(str(brokerId), bindAddress, masterAddress))
+            print("node-{}: {} (coordinator: {})".format(str(brokerId), bindAddress, coordinatorAddress))
 
             bootstrap = ""
             if node // brokerNum > 0:
@@ -139,14 +142,44 @@ class AlephiumMake(object):
             if not os.path.exists(nodedir):
                 os.makedirs(nodedir)
 
-            shutil.copy2(os.path.join(homedir, ".alephium", "user.conf"), nodedir)
+            userConf = """
+                alephium {{
+                  broker {{
+                    broker-id = {}
+                    broker-num = {}
+                    groups = {}
+                  }}
+                  network {{
+                    bind-address = "{}"
+                    external-address = "{}"
+                    internal-address  = "{}"
+                    coordinator-address    = "{}"
+                    rpc-port = {}
+                    ws-port = {}
+                    rest-port = {}
+                  }}
+                  discovery {{
+                    bootstrap = "{}"
+                  }}
+                  api {{
+                    api-key-hash = {}
+                  }}
+                }}
+            """.format(brokerId, brokerNum, groups, bindAddress, bindAddress, bindAddress, coordinatorAddress,
+                    rpcPort, wsPort, restPort, bootstrap, apiKeyHash)
 
-            run('BROKER_NUM={} BROKER_ID={} '\
-              'BIND_ADDRESS={} EXTERNAL_ADDRESS={} INTERNAL_ADDRESS={} MASTER_ADDRESS={} '\
-              'RPC_PORT={} WS_PORT={} REST_PORT={} BOOTSTRAP={} API_KEY_HASH={} ALEPHIUM_HOME={} '\
+            userConfPath = '{}/user.conf'.format(nodedir)
+
+            if os.path.isfile(userConfPath):
+                os.remove(userConfPath)
+
+            userConfFile = open(userConfPath, 'w')
+            userConfFile.write(userConf)
+            userConfFile.close()
+
+            run('ALEPHIUM_HOME={} '\
               'nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'\
-              .format(brokerNum, brokerId, bindAddress, bindAddress, bindAddress, masterAddress,
-                rpcPort, wsPort, restPort, bootstrap, apiKeyHash, nodedir, nodedir))
+              .format(nodedir, nodedir))
 
     def rpc(self, params):
         method = params[0]

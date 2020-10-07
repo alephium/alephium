@@ -1,5 +1,7 @@
 package org.alephium.util
 
+import scala.math.Ordering.{Boolean => BooleanOrdering, Byte => ByteOrdering}
+
 import akka.util.ByteString
 
 object Bytes {
@@ -46,4 +48,20 @@ object Bytes {
     val byte3 = value.toByte
     (byte0 ^ byte1 ^ byte2 ^ byte3).toByte
   }
+
+  // scalastyle:off return
+  implicit val byteStringOrdering: Ordering[ByteString] = new Ordering[ByteString] {
+    override def compare(x: ByteString, y: ByteString): Int = {
+      val xe = x.iterator
+      val ye = y.iterator
+
+      while (xe.hasNext && ye.hasNext) {
+        val res = ByteOrdering.compare(xe.next(), ye.next())
+        if (res != 0) return res
+      }
+
+      BooleanOrdering.compare(xe.hasNext, ye.hasNext)
+    }
+  }
+  // scalastyle:on return
 }

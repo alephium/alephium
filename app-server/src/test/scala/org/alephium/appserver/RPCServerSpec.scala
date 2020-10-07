@@ -37,7 +37,7 @@ class RPCServerSpec
 
   it should "encode BlockNotify" in new ServerFixture {
     val dep         = Hash.hash("foo")
-    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, 1, 2)
+    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
     val blockNotify = BlockNotify(header, 1)
     val headerHash  = header.hash.toHexString
     val chainIndex  = header.chainIndex

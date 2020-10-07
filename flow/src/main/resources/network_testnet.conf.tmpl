@@ -1,0 +1,26 @@
+alephium {
+  broker {
+    broker-id = 0
+    broker-num = 1
+    groups = 4
+  }
+
+  consensus {
+    block-target-time = 1.5 minutes
+  }
+
+  network {
+    rpc-port = 10973
+    ws-port  = 11973
+  }
+
+  api {
+    network-interface = "0.0.0.0"
+    blockflow-fetch-max-age = 12 hours
+  }
+
+  discovery {
+    # TODO Add bootstrap nodes fixed IP addreses once available
+    # bootstrap = []
+  }
+}

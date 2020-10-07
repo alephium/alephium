@@ -49,6 +49,7 @@ trait NonCoinbaseValidation {
       _          <- checkAlfBalance(tx, preOutputs)
       _          <- checkTokenBalance(tx, preOutputs)
       _          <- checkWitnesses(tx, preOutputs)
+      _          <- checkTxScript(tx, worldState)
     } yield ()
   }
 
@@ -68,6 +69,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
+  protected[validation] def checkTxScript(tx: Transaction, worldState: WorldState): TxValidationResult[Unit] // TODO: optimize it with preOutputs
   // format: on
 }
 
@@ -106,13 +108,21 @@ object NonCoinbaseValidation {
       else {
         val fromIndex = inputIndexes.head
         val outputIndexes =
-          (0 until tx.outputsLength).view.map(tx.getOutput(_).toGroup).filter(_ != fromIndex).toSet
+          (0 until tx.outputsLength).view
+            .map(index => getToGroup(tx.getOutput(index), fromIndex))
+            .filter(_ != fromIndex)
+            .toSet
         outputIndexes.size match {
           case 0 => validTx(ChainIndex(fromIndex, fromIndex))
           case 1 => validTx(ChainIndex(fromIndex, outputIndexes.head))
           case _ => invalidTx(InvalidOutputGroupIndex)
         }
       }
+    }
+
+    private def getToGroup(output: TxOutput, fromIndex: GroupIndex): GroupIndex = output match {
+      case o: AssetOutput    => o.toGroup
+      case _: ContractOutput => fromIndex
     }
 
     protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
@@ -128,19 +138,20 @@ object NonCoinbaseValidation {
 
     protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
       EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
-        val output = tx.getOutput(outputIndex)
-        if (output.additionalData.length > ALF.MaxOutputDataSize) invalidTx(OutputDataSizeExceeded)
-        else Right(())
+        tx.getOutput(outputIndex) match {
+          case output: AssetOutput =>
+            if (output.additionalData.length > ALF.MaxOutputDataSize)
+              invalidTx(OutputDataSizeExceeded)
+            else Right(())
+          case _ => Right(())
+        }
       }
     }
 
     protected[validation] def getPreOutputs(
         tx: Transaction,
         worldState: WorldState): TxValidationResult[AVector[TxOutput]] = {
-      val query = tx.unsigned.inputs.mapE { input =>
-        worldState.getOutput(input.outputRef)
-      }
-      query match {
+      worldState.getPreOutputs(tx) match {
         case Right(preOutputs)            => validTx(preOutputs)
         case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
         case Left(error)                  => Left(Left(error))
@@ -163,7 +174,7 @@ object NonCoinbaseValidation {
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
       for {
         inputBalances  <- computeTokenBalances(preOutputs)
-        outputBalances <- computeTokenBalances(tx.unsigned.fixedOutputs ++ tx.generatedOutputs)
+        outputBalances <- computeTokenBalances(tx.allOutputs)
         _ <- {
           val ok = outputBalances.forall {
             case (tokenId, balance) =>
@@ -179,14 +190,12 @@ object NonCoinbaseValidation {
         outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U64]] =
       try {
         val balances = mutable.Map.empty[TokenId, U64]
-        outputs.foreach {
-          case output: AssetOutput =>
-            output.tokens.foreach {
-              case (tokenId, amount) =>
-                val total = balances.getOrElse(tokenId, U64.Zero)
-                balances.put(tokenId, total.add(amount).get)
-            }
-          case _ => ()
+        outputs.foreach { output =>
+          output.tokens.foreach {
+            case (tokenId, amount) =>
+              val total = balances.getOrElse(tokenId, U64.Zero)
+              balances.put(tokenId, total.add(amount).get)
+          }
         }
         Right(balances)
       } catch {
@@ -265,6 +274,26 @@ object NonCoinbaseValidation {
       StatelessVM.runAssetScript(tx.hash, script, params, signatures) match {
         case Right(_) => validTx(()) // TODO: handle returns
         case Left(e)  => invalidTx(InvalidUnlockScript(e))
+      }
+    }
+
+    protected[validation] def checkTxScript(tx: Transaction,
+                                            worldState: WorldState): TxValidationResult[Unit] = {
+      val chainIndex = tx.chainIndex
+      if (chainIndex.isIntraGroup) {
+        tx.unsigned.scriptOpt match {
+          case Some(script) =>
+            StatefulVM.runTxScript(worldState, tx, script) match {
+              case Right(StatefulVM.TxScriptExecution(contractInputs, generatedOutputs, _)) =>
+                if (contractInputs != tx.contractInputs) invalidTx(InvalidContractInputs)
+                else if (generatedOutputs != tx.generatedOutputs) invalidTx(InvalidGeneratedOutputs)
+                else validTx(())
+              case Left(error) => invalidTx(TxScriptExeFailed(error))
+            }
+          case None => validTx(())
+        }
+      } else {
+        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(())
       }
     }
   }

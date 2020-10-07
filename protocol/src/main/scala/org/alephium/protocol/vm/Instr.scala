@@ -6,10 +6,10 @@ import scala.collection.immutable.ArraySeq
 import akka.util.ByteString
 
 import org.alephium.crypto._
-import org.alephium.protocol.{PublicKey, SignatureSchema}
-import org.alephium.serde._
+import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.serde.{deserialize => decode, _}
 import org.alephium.util
-import org.alephium.util.{Bytes, Collection}
+import org.alephium.util.{AVector, Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
 
@@ -65,7 +65,7 @@ object Instr {
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I64Const, U64Const, I256Const, U256Const,
-    BytesConst,
+    BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop, Pop2, Dup, Dup2, Swap,
     I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
@@ -90,7 +90,10 @@ object Instr {
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
-    ArraySeq[InstrCompanion[StatefulContext]](LoadField, StoreField, CallExternal)
+    ArraySeq[InstrCompanion[StatefulContext]](
+      LoadField, StoreField, CallExternal,
+      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, TransferAlf, TransferToken, CreateContract
+    )
   // format: on
 
   val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
@@ -122,13 +125,25 @@ sealed abstract class StatelessInstrCompanion1[T: Serde]
 
 sealed abstract class StatefulInstrCompanion1[T: Serde] extends InstrCompanion1[StatefulContext, T]
 
-sealed trait InstrCompanion0 extends InstrCompanion[StatelessContext] with Instr[StatelessContext] {
+sealed trait StatelessInstrCompanion0
+    extends InstrCompanion[StatelessContext]
+    with Instr[StatelessContext] {
   lazy val code: Byte = Instr.toCode(this).toByte
 
-  override def serialize(): ByteString = ByteString(code)
+  def serialize(): ByteString = ByteString(code)
 
-  override def deserialize[C <: StatelessContext](
-      input: ByteString): SerdeResult[(Instr[C], ByteString)] =
+  def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[(Instr[C], ByteString)] =
+    Right((this, input))
+}
+
+sealed trait StatefulInstrCompanion0
+    extends InstrCompanion[StatefulContext]
+    with Instr[StatefulContext] {
+  lazy val code: Byte = Instr.toCode(this).toByte
+
+  def serialize(): ByteString = ByteString(code)
+
+  def deserialize[C <: StatefulContext](input: ByteString): SerdeResult[(Instr[C], ByteString)] =
     Right((this, input))
 }
 
@@ -199,7 +214,7 @@ object ConstInstr {
   }
 }
 
-sealed trait ConstInstr0 extends ConstInstr with InstrCompanion0 {
+sealed trait ConstInstr0 extends ConstInstr with StatelessInstrCompanion0 {
   def const: Val
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -275,6 +290,12 @@ final case class BytesConst(const: Val.ByteVec) extends ConstInstr1[Val.ByteVec]
 }
 object BytesConst extends StatelessInstrCompanion1[Val.ByteVec]
 
+final case class AddressConst(const: Val.Address) extends ConstInstr1[Val.Address] {
+  override def serialize(): ByteString =
+    ByteString(AddressConst.code) ++ serdeImpl[Val.Address].serialize(const)
+}
+object AddressConst extends StatelessInstrCompanion1[Val.Address]
+
 // Note: 0 <= index <= 0xFF
 final case class LoadLocal(index: Byte) extends OperandStackInstr {
   override def serialize(): ByteString = ByteString(LoadLocal.code, index)
@@ -319,7 +340,7 @@ final case class StoreField(index: Byte) extends FieldInstr {
 }
 object StoreField extends StatefulInstrCompanion1[Byte]
 
-sealed trait PureStackInstr extends OperandStackInstr with InstrCompanion0
+sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0
 
 case object Pop extends PureStackInstr {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -347,7 +368,7 @@ object Swap extends PureStackInstr {
   }
 }
 
-sealed trait ArithmeticInstr extends InstrCompanion0
+sealed trait ArithmeticInstr extends StatelessInstrCompanion0
 
 sealed trait BinaryArithmeticInstr extends ArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val]
@@ -619,7 +640,7 @@ object GeU256 extends BinaryArithmeticInstr {
     BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
 }
 
-case object NotBool extends InstrCompanion0 {
+case object NotBool extends StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool <- frame.popT[Val.Bool]()
@@ -627,7 +648,7 @@ case object NotBool extends InstrCompanion0 {
     } yield ()
   }
 }
-case object AndBool extends InstrCompanion0 {
+case object AndBool extends StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popT[Val.Bool]()
@@ -636,7 +657,7 @@ case object AndBool extends InstrCompanion0 {
     } yield ()
   }
 }
-case object OrBool extends InstrCompanion0 {
+case object OrBool extends StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popT[Val.Bool]()
@@ -646,7 +667,7 @@ case object OrBool extends InstrCompanion0 {
   }
 }
 
-sealed trait ConversionInstr[R <: Val, U <: Val] extends InstrCompanion0 {
+sealed trait ConversionInstr[R <: Val, U <: Val] extends StatelessInstrCompanion0 {
   def converse(from: R): ExeResult[U]
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1028,7 +1049,7 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
 sealed trait ReturnInstr extends StatelessInstr
-case object Return extends ReturnInstr with InstrCompanion0 {
+case object Return extends ReturnInstr with StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val returnType = frame.method.returnType
     for {
@@ -1043,7 +1064,7 @@ sealed trait CryptoInstr   extends StatelessInstr
 sealed trait Signature     extends CryptoInstr
 sealed trait EllipticCurve extends CryptoInstr
 
-sealed trait CheckEqT[T <: Val] extends CryptoInstr with InstrCompanion0 {
+sealed trait CheckEqT[T <: Val] extends CryptoInstr with StatelessInstrCompanion0 {
   def check(x: T, y: T): ExeResult[Unit] = {
     if (x == y) Right(()) else Left(EqualityFailed)
   }
@@ -1069,8 +1090,11 @@ case object CheckEqI64Vec  extends CheckEqT[Val.I64Vec]
 case object CheckEqU64Vec  extends CheckEqT[Val.U64Vec]
 case object CheckEqI256Vec extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec extends CheckEqT[Val.U256Vec]
+case object CheckEqAddress extends CheckEqT[Val.Address]
 
-sealed abstract class HashAlg[T <: Val, H <: RandomBytes] extends CryptoInstr with InstrCompanion0 {
+sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
+    extends CryptoInstr
+    with StatelessInstrCompanion0 {
   def convert(t: T): ByteString
 
   def hash(bs: ByteString): H
@@ -1109,7 +1133,7 @@ case object Keccak256ByteVec
     with HashAlg.ByteVecConvertor
     with HashAlg.Keccak256Hash
 
-case object CheckSignature extends Signature with InstrCompanion0 {
+case object CheckSignature extends Signature with StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txHash.bytes
     val signatures = frame.ctx.signatures
@@ -1121,6 +1145,162 @@ case object CheckSignature extends Signature with InstrCompanion0 {
         if (SignatureSchema.verify(rawData, signature, publicKey)) Right(())
         else Left(VerificationFailed)
       }
+    } yield ()
+  }
+}
+
+sealed trait AssetInstr extends StatefulInstr
+
+object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popT[Val.Address]()
+      amount       <- frame.popT[Val.U64]()
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      _ <- balanceState
+        .approveALF(address.lockupScript, amount.v)
+        .toRight(NotEnoughBalance)
+    } yield ()
+  }
+}
+
+object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popT[Val.Address]()
+      tokenIdRaw   <- frame.popT[Val.ByteVec]()
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
+      amount       <- frame.popT[Val.U64]()
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      _ <- balanceState
+        .approveToken(address.lockupScript, tokenId, amount.v)
+        .toRight(NotEnoughBalance)
+    } yield ()
+  }
+}
+
+object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popT[Val.Address]()
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      amount       <- balanceState.alfRemaining(address.lockupScript).toRight(NoAlfBalanceForTheAddress)
+      _            <- frame.push(Val.U64(amount))
+    } yield ()
+  }
+}
+
+object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popT[Val.Address]()
+      tokenIdRaw   <- frame.popT[Val.ByteVec]()
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      amount <- balanceState
+        .tokenRemaining(address.lockupScript, tokenId)
+        .toRight(NoTokenBalanceForTheAddress)
+      _ <- frame.push(Val.U64(amount))
+    } yield ()
+  }
+}
+
+sealed trait Transfer extends AssetInstr {
+  def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
+    frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract).map(LockupScript.p2c)
+  }
+
+  def transferAlf[C <: StatefulContext](frame: Frame[C],
+                                        from: LockupScript,
+                                        to: LockupScript): ExeResult[Unit] = {
+    for {
+      amount       <- frame.popT[Val.U64]()
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      _            <- balanceState.useAlf(from, amount.v).toRight[ExeFailure](NotEnoughBalance)
+      _ <- frame.ctx.outputBalances
+        .addAlf(to, amount.v)
+        .toRight[ExeFailure](BalanceOverflow)
+    } yield ()
+  }
+
+  def transferToken[C <: StatefulContext](frame: Frame[C],
+                                          from: LockupScript,
+                                          to: LockupScript): ExeResult[Unit] = {
+    for {
+      tokenIdRaw   <- frame.popT[Val.ByteVec]()
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
+      amount       <- frame.popT[Val.U64]()
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      _ <- balanceState
+        .useToken(from, tokenId, amount.v)
+        .toRight[ExeFailure](NotEnoughBalance)
+      _ <- frame.ctx.outputBalances
+        .addToken(to, tokenId, amount.v)
+        .toRight[ExeFailure](BalanceOverflow)
+    } yield ()
+  }
+}
+
+object TransferAlf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popT[Val.Address]()
+      to   <- frame.popT[Val.Address]()
+      _    <- transferAlf(frame, from.lockupScript, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- getContractLockupScript(frame)
+      to   <- frame.popT[Val.Address]()
+      _    <- transferAlf(frame, from, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferToken extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popT[Val.Address]()
+      to   <- frame.popT[Val.Address]()
+      _    <- transferToken(frame, from.lockupScript, to.lockupScript)
+    } yield ()
+  }
+}
+
+object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- getContractLockupScript(frame)
+      to   <- frame.popT[Val.Address]()
+      _    <- transferToken(frame, from, to.lockupScript)
+    } yield ()
+  }
+}
+
+object CreateContract extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractCodeRaw <- frame.popT[Val.ByteVec]()
+      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left
+        .map(SerdeErrorCreateContract)
+      fieldsRaw    <- frame.popT[Val.ByteVec]()
+      fields       <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(SerdeErrorCreateContract)
+      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      balances = balanceState.approved.use()
+      _ <- frame.ctx.createContract(contractCode, balances, fields)
+    } yield ()
+  }
+}
+
+object SelfAddress extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      _           <- frame.push(Val.Address(LockupScript.p2c(addressHash)))
     } yield ()
   }
 }

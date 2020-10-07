@@ -64,23 +64,19 @@ alephium {
       enabled = false
     }
 
-    bind-address = "localhost:9972"
-    external-address = "localhost:9972"
-    internal-address = "localhost:9972"
-    master-address = "localhost:9973"
+    bind-address = "127.0.0.1:9972"
+    external-address = "127.0.0.1:9972"
+    internal-address = "127.0.0.1:9972"
+    coordinator-address = "127.0.0.1:9973"
     num-of-sync-blocks-limit = 128
 
     rpc-port = 0
-    rpc-port = ${?RPC_PORT}
     ws-port = 0
-    ws-port = ${?WS_PORT}
     rest-port = 0
-    rest-port = ${?REST_PORT}
   }
 
   discovery {
     bootstrap = []
-    bootstrap = ${?BOOTSTRAP}
 
     peers-per-group = 16
     scan-max-per-group = 8
@@ -93,7 +89,7 @@ alephium {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
-    api-key-hash = ${?API_KEY_HASH}
+    api-key-hash = null
   }
 
   mempool {

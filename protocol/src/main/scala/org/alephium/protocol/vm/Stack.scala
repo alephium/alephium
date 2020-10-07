@@ -12,6 +12,10 @@ object Stack {
     new Stack(underlying, 0, capacity, 0)
   }
 
+  def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
+    unsafe(elems, elems.length)
+  }
+
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
     val underlying = mutable.ArraySeq.make(elems.toArray)

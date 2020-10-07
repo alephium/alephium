@@ -53,7 +53,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
     with SerdeUtils {
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
-  def remoteAddress: InetSocketAddress = networkSetting.masterAddress
+  def remoteAddress: InetSocketAddress = networkSetting.coordinatorAddress
 
   IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
 
@@ -104,7 +104,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
 
   def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = {
     case Terminated(_) =>
-      log.debug(s"Connection to master ${networkSetting.masterAddress} is closed")
+      log.debug(s"Connection to master ${networkSetting.coordinatorAddress} is closed")
       bootstrapper ! Bootstrapper.SendIntraCliqueInfo(cliqueInfo)
       context.stop(self)
   }

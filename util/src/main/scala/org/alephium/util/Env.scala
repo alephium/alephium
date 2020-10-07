@@ -11,7 +11,7 @@ object Env {
   case object Integration extends Env { override def name: String = "it" }
 
   def resolve(): Env =
-    resolve(System.getenv("ALEPHIUM_ENV"))
+    resolve(sys.env.getOrElse("ALEPHIUM_ENV", "prod"))
 
   def resolve(env: String): Env = {
     env match {

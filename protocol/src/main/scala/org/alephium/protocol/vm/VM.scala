@@ -1,10 +1,12 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.Block
-import org.alephium.util.AVector
+import org.alephium.protocol.model.{ContractOutputRef, TransactionAbstract, TxOutput}
+import org.alephium.serde._
+import org.alephium.util.{AVector, U64}
 
 sealed abstract class VM[Ctx <: Context](ctx: Ctx,
                                          frameStack: Stack[Frame[Ctx]],
@@ -32,22 +34,7 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
   @tailrec
   private def executeFrames(): ExeResult[Unit] = {
     if (frameStack.nonEmpty) {
-      val currentFrame = frameStack.topUnsafe
-      val frameResult = for {
-        newFrameOpt <- currentFrame.execute()
-        _ <- newFrameOpt match {
-          case Some(frame) => frameStack.push(frame)
-          case None =>
-            for {
-              _ <- frameStack.pop()
-              _ <- frameStack.top match {
-                case Some(frame) => frame.reloadFields()
-                case None        => Right(())
-              }
-            } yield ()
-        }
-      } yield ()
-      frameResult match {
+      executeCurrentFrame(frameStack.topUnsafe) match {
         case Right(_)    => executeFrames()
         case Left(error) => Left(error)
       }
@@ -55,17 +42,81 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
       Right(())
     }
   }
+
+  private def executeCurrentFrame(currentFrame: Frame[Ctx]): ExeResult[Unit] = {
+    for {
+      newFrameOpt <- currentFrame.execute()
+      _ <- newFrameOpt match {
+        case Some(frame) => frameStack.push(frame)
+        case None        => postFrame(currentFrame)
+      }
+    } yield ()
+  }
+
+  private def postFrame(currentFrame: Frame[Ctx]): ExeResult[Unit] = {
+    for {
+      _ <- frameStack.pop()
+      _ <- frameStack.top match {
+        case Some(nextFrame) =>
+          for {
+            _ <- nextFrame.reloadFields()
+            _ <- checkBalances(currentFrame, nextFrame)
+          } yield ()
+        case None =>
+          checkFinalBalances(currentFrame)
+      }
+    } yield ()
+  }
+
+  protected def checkBalances(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
+
+  protected def checkFinalBalances(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
 final class StatelessVM(ctx: StatelessContext,
                         frameStack: Stack[Frame[StatelessContext]],
                         operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack)
+    extends VM(ctx, frameStack, operandStack) {
+  protected def checkBalances(currentFrame: Frame[StatelessContext],
+                              nextFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+
+  protected def checkFinalBalances(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+}
 
 final class StatefulVM(ctx: StatefulContext,
                        frameStack: Stack[Frame[StatefulContext]],
                        operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack)
+    extends VM(ctx, frameStack, operandStack) {
+  protected def checkBalances(currentFrame: Frame[StatefulContext],
+                              nextFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    if (currentFrame.method.isPayable) {
+      val resultOpt = for {
+        currentBalances <- currentFrame.balanceStateOpt
+        nextBalances    <- nextFrame.balanceStateOpt
+        _               <- nextBalances.remaining.merge(currentBalances.remaining)
+        _               <- nextBalances.remaining.merge(currentBalances.approved)
+      } yield ()
+      resultOpt.toRight(InvalidBalances)
+    } else Right(())
+  }
+
+  protected def checkFinalBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    if (lastFrame.method.isPayable) {
+      val resultOpt = for {
+        balances <- lastFrame.balanceStateOpt
+        _        <- balances.remaining.merge(balances.approved)
+      } yield outputRemaining(balances.remaining)
+      resultOpt.toRight(InvalidBalances)
+    } else Right(())
+  }
+
+  private def outputRemaining(remaining: Frame.Balances): Unit = {
+    remaining.all.foreach {
+      case (lockupScript, balances) =>
+        balances.toTxOutput(lockupScript).foreach(ctx.generatedOutputs.addOne)
+    }
+  }
+}
 
 object StatelessVM {
   def runAssetScript(txHash: Hash,
@@ -106,22 +157,47 @@ object StatelessVM {
 }
 
 object StatefulVM {
-  def runTxScripts(worldState: WorldState, block: Block): ExeResult[WorldState] = {
-    block.transactions.foldE(worldState) {
-      case (worldState, tx) =>
-        tx.unsigned.scriptOpt match {
-          case Some(script) => runTxScript(worldState, tx.hash, script)
-          case None         => Right(worldState)
-        }
-    }
+  def contractCreation(code: StatefulContract,
+                       initialState: AVector[Val],
+                       lockupScript: LockupScript,
+                       alfAmount: U64): StatefulScript = {
+    val codeRaw  = serialize(code)
+    val stateRaw = serialize(initialState)
+    val method = Method[StatefulContext](
+      isPublic   = true,
+      isPayable  = true,
+      localsType = AVector.empty,
+      returnType = AVector.empty,
+      instrs = AVector(
+        U64Const(Val.U64(alfAmount)),
+        AddressConst(Val.Address(lockupScript)),
+        ApproveAlf,
+        BytesConst(Val.ByteVec(mutable.ArraySeq.from(stateRaw))),
+        BytesConst(Val.ByteVec(mutable.ArraySeq.from(codeRaw))),
+        CreateContract
+      )
+    )
+    StatefulScript(AVector(method))
   }
 
+  final case class TxScriptExecution(contractInputs: AVector[ContractOutputRef],
+                                     generatedOutputs: AVector[TxOutput],
+                                     worldState: WorldState)
+
   def runTxScript(worldState: WorldState,
-                  txHash: Hash,
-                  script: StatefulScript): ExeResult[WorldState] = {
-    val context = StatefulContext(txHash, worldState)
-    val obj     = script.toObject
-    execute(context, obj, AVector.empty).map(_ => context.worldState)
+                  tx: TransactionAbstract,
+                  script: StatefulScript): ExeResult[TxScriptExecution] = {
+    val context = if (script.methods.head.isPayable) {
+      StatefulContext.payable(tx, worldState)
+    } else {
+      StatefulContext.nonPayable(tx.hash, worldState)
+    }
+    val obj = script.toObject
+    execute(context, obj, AVector.empty).map(
+      worldState =>
+        TxScriptExecution(AVector.from(context.contractInputs),
+                          AVector.from(context.generatedOutputs),
+                          worldState))
   }
 
   def execute(context: StatefulContext,

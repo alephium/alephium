@@ -13,7 +13,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val fromTs = TimeStamp.now()
 
     val clique1           = bootClique(nbOfNodes = 2)
-    val masterPortClique1 = clique1.head.config.network.masterAddress.getPort
+    val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
     Future.sequence(clique1.map(_.start())).futureValue
 
@@ -34,7 +34,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val clique2 =
       bootClique(nbOfNodes = 2,
                  bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
-    val masterPortClique2 = clique2.head.config.network.masterAddress.getPort
+    val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
     Future.sequence(clique2.map(_.start())).futureValue
 

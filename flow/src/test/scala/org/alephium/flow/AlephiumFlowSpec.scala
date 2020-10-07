@@ -1,7 +1,9 @@
 package org.alephium.flow
 
 import scala.annotation.tailrec
+import scala.language.implicitConversions
 
+import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
@@ -20,6 +22,8 @@ trait FlowFixture
     with NumericHelpers {
   lazy val blockFlow: BlockFlow = genesisBlockFlow()
 
+  implicit def target2BigInt(target: Target): BigInt = BigInt(target.value)
+
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)
 
@@ -29,11 +33,17 @@ trait FlowFixture
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
+  def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript = {
+    val mainGroup         = chainIndex.from
+    val (_, publicKey, _) = genesisKeys(mainGroup.value)
+    LockupScript.p2pkh(publicKey)
+  }
+
   def mine(blockFlow: BlockFlow,
            chainIndex: ChainIndex,
-           onlyTxForIntra: Boolean                                      = false,
-           outputScriptOption: Option[(StatefulContract, AVector[Val])] = None,
-           txScriptOption: Option[StatefulScript]                       = None): Block = {
+           onlyTxForIntra: Boolean                = false,
+           txScriptOption: Option[StatefulScript] = None,
+           createContract: Boolean                = false): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -50,20 +60,19 @@ trait FlowFixture
         val toLockupScript             = LockupScript.p2pkh(toPublicKey)
         val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
 
-        val output0 = outputScriptOption match {
-          case Some((script, _)) => TxOutput.contract(1, height, toLockupScript, script)
-          case None              => TxOutput.asset(1, height, toLockupScript)
-        }
+        val output0 = TxOutput.asset(1, height, toLockupScript)
         val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
-        val outputs = AVector[TxOutput](output0, output1)
-        val unsignedTx = outputScriptOption match {
-          case Some((_, state)) =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector(state))
-          case None =>
-            UnsignedTransaction(txScriptOption, inputs, outputs, AVector.empty)
+        if (createContract) {
+          val unsignedTx      = UnsignedTransaction(txScriptOption, inputs, AVector(output1))
+          val contractTx      = TransactionTemplate.from(unsignedTx, privateKey)
+          val generateOutputs = genOutputs(blockFlow, mainGroup, contractTx, txScriptOption.get)
+          val fullTx          = Transaction.from(unsignedTx, generateOutputs, privateKey)
+          AVector(fullTx, coinbaseTx)
+        } else {
+          val unsignedTx = UnsignedTransaction(txScriptOption, inputs, AVector(output0, output1))
+          val transferTx = Transaction.from(unsignedTx, privateKey)
+          AVector(transferTx, coinbaseTx)
         }
-        val transferTx = Transaction.from(unsignedTx, privateKey)
-        AVector(transferTx, coinbaseTx)
       } else AVector(coinbaseTx)
     }
 
@@ -74,6 +83,14 @@ trait FlowFixture
     }
 
     iter(0)
+  }
+
+  private def genOutputs(blockFlow: BlockFlow,
+                         mainGroup: GroupIndex,
+                         tx: TransactionTemplate,
+                         txScript: StatefulScript): AVector[TxOutput] = {
+    val worldState = blockFlow.getBestCachedTrie(mainGroup).toOption.get
+    StatefulVM.runTxScript(worldState, tx, txScript).toOption.get.generatedOutputs
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
@@ -129,7 +146,7 @@ trait FlowFixture
 
   def showBalances(blockFlow: BlockFlow): Unit = {
     def show(txOutput: TxOutput): String = {
-      s"${txOutput.scriptHint}:${txOutput.amount}"
+      s"${txOutput.hint}:${txOutput.amount}"
     }
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
@@ -141,13 +158,18 @@ trait FlowFixture
   def checkState(blockFlow: BlockFlow,
                  chainIndex: ChainIndex,
                  key: Hash,
-                 expected: AVector[Val]): Assertion = {
-    blockFlow
-      .getBestPersistedTrie(chainIndex.from)
-      .toOption
-      .get
-      .getContractState(key)
-      .map(_.fields) isE expected
+                 fields: AVector[Val],
+                 outputRef: ContractOutputRef,
+                 numAssets: Int    = 2,
+                 numContracts: Int = 2): Assertion = {
+    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).toOption.get
+    val contractState = worldState.getContractState(key).toOption.get
+
+    contractState.fields is fields
+    contractState.contractOutputRef is outputRef
+
+    worldState.getAssetOutputs(ByteString.empty).toOption.get.length is numAssets
+    worldState.getContractOutputs(ByteString.empty).toOption.get.length is numContracts
   }
 }
 

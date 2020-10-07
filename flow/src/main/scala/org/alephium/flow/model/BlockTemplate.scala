@@ -1,11 +1,11 @@
 package org.alephium.flow.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, BlockHeader, Transaction}
+import org.alephium.protocol.model.{Block, BlockHeader, Target, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockTemplate(deps: AVector[Hash],
-                               target: BigInt,
+                               target: Target,
                                txHash: Hash,
                                transactions: AVector[Transaction]) {
 
@@ -21,7 +21,7 @@ final case class BlockTemplate(deps: AVector[Hash],
 object BlockTemplate {
 
   def apply(deps: AVector[Hash],
-            target: BigInt,
+            target: Target,
             transactions: AVector[Transaction]): BlockTemplate = {
     val txHash = Hash.hash(transactions)
     BlockTemplate(deps, target, txHash, transactions)

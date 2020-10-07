@@ -4,7 +4,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, StatefulContract}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -12,12 +12,11 @@ sealed trait TxOutput {
   def amount: U64
   def createdHeight: Int
   def lockupScript: LockupScript
-  def additionalData: ByteString
+  def tokens: AVector[(TokenId, U64)]
 
   def hint: Hint
 
-  def scriptHint: ScriptHint                            = lockupScript.scriptHint
-  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  def isAsset: Boolean
 }
 
 object TxOutput {
@@ -31,32 +30,28 @@ object TxOutput {
     }
   )
 
+  def from(amount: U64, tokens: AVector[(TokenId, U64)], lockupScript: LockupScript): TxOutput = {
+    lockupScript match {
+      case _: LockupScript.P2C => ContractOutput(amount, 0, lockupScript, tokens)
+      case _                   => AssetOutput(amount, 0, lockupScript, tokens, ByteString.empty)
+    }
+  }
+
   def asset(amount: U64, createdHeight: Int, lockupScript: LockupScript): AssetOutput = {
     AssetOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
   }
 
-  def contract(amount: U64,
-               createdHeight: Int,
-               lockupScript: LockupScript,
-               code: StatefulContract): ContractOutput = {
-    ContractOutput(amount, createdHeight, lockupScript, code, ByteString.empty)
+  def contract(amount: U64, createdHeight: Int, lockupScript: LockupScript): ContractOutput = {
+    ContractOutput(amount, createdHeight, lockupScript, AVector.empty)
   }
 
   def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
     asset(amount, ALF.GenesisHeight, lockupScript)
   }
 
-  def burn(amount: U64): TxOutput = {
-    asset(amount, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero))
-  }
-
   // TODO: improve this when vm is mature
   def forMPT: TxOutput =
-    ContractOutput(U64.One,
-                   ALF.GenesisHeight,
-                   LockupScript.p2pkh(Hash.zero),
-                   StatefulContract.forMPT,
-                   ByteString.empty)
+    ContractOutput(U64.One, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero), AVector.empty)
 }
 
 /**
@@ -73,11 +68,15 @@ final case class AssetOutput(amount: U64,
                              tokens: AVector[(TokenId, U64)],
                              additionalData: ByteString)
     extends TxOutput {
-  override def hint: Hint = Hint.ofAsset(scriptHint)
+  def isAsset: Boolean = true
+
+  def hint: Hint = Hint.from(this)
+
+  def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 }
 
 object AssetOutput {
-  private implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
+  private[model] implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
   implicit val serde: Serde[AssetOutput] =
     Serde.forProduct5(AssetOutput.apply,
                       t => (t.amount, t.createdHeight, t.lockupScript, t.tokens, t.additionalData))
@@ -86,14 +85,16 @@ object AssetOutput {
 final case class ContractOutput(amount: U64,
                                 createdHeight: Int,
                                 lockupScript: LockupScript,
-                                code: StatefulContract,
-                                additionalData: ByteString)
+                                tokens: AVector[(TokenId, U64)])
     extends TxOutput {
-  override def hint: Hint = Hint.ofContract(scriptHint)
+  def isAsset: Boolean = false
+
+  def hint: Hint = Hint.from(this)
 }
 
 object ContractOutput {
+  import AssetOutput.tokenSerde
   implicit val serde: Serde[ContractOutput] =
-    Serde.forProduct5(ContractOutput.apply,
-                      t => (t.amount, t.createdHeight, t.lockupScript, t.code, t.additionalData))
+    Serde.forProduct4(ContractOutput.apply,
+                      t => (t.amount, t.createdHeight, t.lockupScript, t.tokens))
 }

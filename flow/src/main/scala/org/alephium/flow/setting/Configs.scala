@@ -10,7 +10,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Block, ChainIndex, NetworkType, Transaction}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.deserialize
 import org.alephium.util._
@@ -32,6 +32,17 @@ object Configs extends StrictLogging {
     }
   }
 
+  def getConfigTemplate(rootPath: Path, confName: String, templateName: String): File = {
+    val file     = getConfigFile(rootPath, confName)
+
+    if (file.exists) file.delete()
+
+    Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
+    file.setWritable(false)
+
+    file
+  }
+
   def getConfigFile(rootPath: Path, name: String): File = {
     val path = rootPath.resolve(s"$name.conf")
     logger.info(s"Using $name configuration file at $path \n")
@@ -39,15 +50,13 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
+  def getConfigNetwork(rootPath: Path, networkType: NetworkType): File =
+    getConfigTemplate(rootPath, "network", s"network_${networkType.name}")
+
+
   def getConfigSystem(rootPath: Path): File = {
-    val file     = getConfigFile(rootPath, "system")
-    val env      = Env.resolve()
-    val filename = s"system_${env.name}.conf"
-    if (!file.exists) {
-      Files.copyFromResource(s"/$filename.tmpl", file.toPath)
-      file.setWritable(false)
-    }
-    file
+    val env      = Env.resolve().name
+    getConfigTemplate(rootPath, "system", s"system_$env")
   }
 
   def getConfigUser(rootPath: Path): File = {
@@ -56,11 +65,54 @@ object Configs extends StrictLogging {
     file
   }
 
-  def parseConfig(rootPath: Path): Config = {
-    ConfigFactory
-      .parseFile(getConfigUser(rootPath))
-      .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
-      .resolve()
+  def parseConfig(rootPath: Path, networkType: Option[NetworkType]): Config = {
+    networkType match {
+      case Some(networkType) =>
+        ConfigFactory
+          .parseFile(getConfigUser(rootPath))
+          .withFallback(
+            ConfigFactory.parseFile(getConfigNetwork(rootPath, networkType))
+              .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
+          ).resolve()
+
+      case None =>
+        ConfigFactory
+          .parseFile(getConfigUser(rootPath))
+          .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
+          .resolve()
+    }
+  }
+
+  def parseConfigAndValidate(rootPath: Path, networkType: Option[NetworkType]): Config = {
+    val config = parseConfig(rootPath, networkType)
+    if (!config.hasPath("alephium.discovery.bootstrap")) {
+      logger.error(s"""|The bootstrap nodes are not defined!
+                       |
+                       |Please set the bootstrap nodes in $rootPath/user.conf and try again.
+                       |
+                       |Example:
+                       |alephium.discovery.bootstrap = ["1.2.3.4:1234"]
+                  """.stripMargin)
+      sys.exit(1)
+    } else {
+      config
+    }
+  }
+
+  def parseNetworkType(rootPath: Path): Option[NetworkType] = {
+    val config = parseConfig(rootPath, None)
+    if (!config.hasPath("alephium.chains.network-type")) {
+      logger.error(s"""|The network type isn't defined!
+                       |
+                       |Please set the network type in your $rootPath/user.conf and try again.
+                       |
+                       |Example:
+                       |alephium.chains.network-type = "testnet"
+                  """.stripMargin)
+      sys.exit(1)
+    } else {
+      Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
+    }
   }
 
   def splitBalance(raw: String): Option[(LockupScript, U64)] = {

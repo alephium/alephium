@@ -1,7 +1,5 @@
 package org.alephium.protocol.vm
 
-import java.util.InputMismatchException
-
 import akka.util.ByteString
 
 import org.alephium.io._
@@ -13,43 +11,71 @@ import org.alephium.util.AVector
 sealed abstract class WorldState {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
-  protected[vm] def getContractState(key: Hash): IOResult[ContractState]
+  def getContractState(key: Hash): IOResult[ContractState]
+
+  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
+    for {
+      state     <- getContractState(key)
+      outputRaw <- getOutput(state.contractOutputRef)
+      output <- outputRaw match {
+        case _: AssetOutput =>
+          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
+          Left(IOError.Other(new RuntimeException(error)))
+        case o: ContractOutput =>
+          Right(o)
+      }
+    } yield output
+  }
+
+  def useContractAsset(
+      contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput, WorldState)] = {
+    for {
+      state     <- getContractState(contractId)
+      outputRaw <- getOutput(state.contractOutputRef)
+      output <- outputRaw match {
+        case _: AssetOutput =>
+          val error = s"ContractOutput expected, but got AssetOutput for contract $contractId"
+          Left(IOError.Other(new RuntimeException(error)))
+        case o: ContractOutput =>
+          Right(o)
+      }
+      newWorldState <- removeAsset(state.contractOutputRef)
+    } yield (state.contractOutputRef, output, newWorldState)
+  }
 
   def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
     for {
       state <- getContractState(key)
-      output <- {
-        assume(state.hint.isContractType)
-        val ref = ContractOutputRef.unsafe(state.hint, key)
-        getOutput(ref)
-      }
-      contractOutput <- output match {
-        case _: AssetOutput =>
-          val error = new InputMismatchException("Expect ContractOutput, but got AssetOutput")
-          Left(IOError.Other(error))
-        case output: ContractOutput => Right(output)
-      }
-    } yield contractOutput.code.toObject(key, state)
+    } yield state.code.toObject(key, state)
   }
 
-  def addAsset(outputRef: AssetOutputRef, output: AssetOutput): IOResult[WorldState]
+  def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState]
 
-  def addContract(outputRef: ContractOutputRef,
-                  output: ContractOutput,
-                  fields: AVector[Val]): IOResult[WorldState]
+  def createContract(code: StatefulContract,
+                     fields: AVector[Val],
+                     outputRef: ContractOutputRef,
+                     output: ContractOutput): IOResult[WorldState]
 
   def updateContract(key: Hash, fields: AVector[Val]): IOResult[WorldState] = {
     for {
       oldState <- getContractState(key)
-      newState <- updateContract(key, ContractState(oldState.hint, fields))
+      newState <- updateContract(key, oldState.copy(fields = fields))
     } yield newState
   }
 
-  def updateContract(key: Hash, state: ContractState): IOResult[WorldState]
+  protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[WorldState]
 
-  def remove(outputRef: TxOutputRef): IOResult[WorldState]
+  def removeAsset(outputRef: TxOutputRef): IOResult[WorldState]
+
+  def removeContract(contractKey: Hash): IOResult[WorldState]
 
   def persist: IOResult[WorldState.Persisted]
+
+  def getPreOutputs(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
+    tx.unsigned.inputs.mapE { input =>
+      getOutput(input.outputRef)
+    }
+  }
 }
 
 object WorldState {
@@ -61,15 +87,30 @@ object WorldState {
       outputState.get(outputRef)
     }
 
-    def getOutputs(outputRefPrefix: ByteString): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
+    def getAllOutputs(outputRefPrefix: ByteString): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
       outputState.getAll(outputRefPrefix)
+    }
+
+    def getAssetOutputs(
+        outputRefPrefix: ByteString): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+      outputState
+        .getAll(outputRefPrefix)
+        .map(
+          _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)])
+    }
+
+    def getContractOutputs(
+        outputRefPrefix: ByteString): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
+      getAllOutputs(outputRefPrefix).map(
+        _.filter(p => p._1.isContractType && !p._2.isAsset)
+          .asUnsafe[(ContractOutputRef, ContractOutput)])
     }
 
     override def getContractState(key: Hash): IOResult[ContractState] = {
       contractState.get(key)
     }
 
-    override def addAsset(outputRef: AssetOutputRef, output: AssetOutput): IOResult[WorldState] = {
+    override def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
@@ -78,10 +119,11 @@ object WorldState {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
-    override def addContract(outputRef: ContractOutputRef,
-                             output: ContractOutput,
-                             fields: AVector[Val]): IOResult[WorldState] = {
-      val state = ContractState(outputRef.hint, fields)
+    override def createContract(code: StatefulContract,
+                                fields: AVector[Val],
+                                outputRef: ContractOutputRef,
+                                output: ContractOutput): IOResult[WorldState] = {
+      val state = ContractState(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
         newContractState <- contractState.put(outputRef.key, state)
@@ -92,15 +134,16 @@ object WorldState {
       contractState.put(key, state).map(Persisted(outputState, _))
     }
 
-    override def remove(outputRef: TxOutputRef): IOResult[Persisted] = {
-      if (outputRef.isAssetType) {
-        outputState.remove(outputRef).map(Persisted(_, contractState))
-      } else {
-        for {
-          newOutputState   <- outputState.remove(outputRef)
-          newContractState <- contractState.remove(outputRef.key)
-        } yield Persisted(newOutputState, newContractState)
-      }
+    override def removeAsset(outputRef: TxOutputRef): IOResult[Persisted] = {
+      outputState.remove(outputRef).map(Persisted(_, contractState))
+    }
+
+    override def removeContract(contractKey: Hash): IOResult[WorldState] = {
+      for {
+        state            <- getContractState(contractKey)
+        newOutputState   <- outputState.remove(state.contractOutputRef)
+        newContractState <- contractState.remove(contractKey)
+      } yield Persisted(newOutputState, newContractState)
     }
 
     override def persist: IOResult[WorldState.Persisted] = Right(this)
@@ -123,18 +166,19 @@ object WorldState {
       outputState.get(outputRef)
     }
 
-    override protected[vm] def getContractState(key: Hash): IOResult[ContractState] = {
+    override def getContractState(key: Hash): IOResult[ContractState] = {
       contractState.get(key)
     }
 
-    override def addAsset(outputRef: AssetOutputRef, output: AssetOutput): IOResult[Cached] = {
+    override def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Cached] = {
       outputState.put(outputRef, output).map(_ => this)
     }
 
-    override def addContract(outputRef: ContractOutputRef,
-                             output: ContractOutput,
-                             fields: AVector[Val]): IOResult[WorldState] = {
-      val state = ContractState(outputRef.hint, fields)
+    override def createContract(code: StatefulContract,
+                                fields: AVector[Val],
+                                outputRef: ContractOutputRef,
+                                output: ContractOutput): IOResult[WorldState] = {
+      val state = ContractState(code, fields, outputRef)
       for {
         _ <- outputState.put(outputRef, output)
         _ <- contractState.put(outputRef.key, state)
@@ -145,15 +189,16 @@ object WorldState {
       contractState.put(key, state).map(_ => this)
     }
 
-    override def remove(outputRef: TxOutputRef): IOResult[Cached] = {
-      if (outputRef.isAssetType) {
-        outputState.remove(outputRef).map(_ => this)
-      } else {
-        for {
-          _ <- outputState.remove(outputRef)
-          _ <- contractState.remove(outputRef.key)
-        } yield this
-      }
+    override def removeAsset(outputRef: TxOutputRef): IOResult[Cached] = {
+      outputState.remove(outputRef).map(_ => this)
+    }
+
+    override def removeContract(contractKey: Hash): IOResult[WorldState] = {
+      for {
+        state <- getContractState(contractKey)
+        _     <- outputState.remove(state.contractOutputRef)
+        _     <- contractState.remove(contractKey)
+      } yield this
     }
 
     override def persist: IOResult[Persisted] = {
@@ -165,10 +210,11 @@ object WorldState {
   }
 
   def emptyPersisted(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Persisted = {
-    val genesisRef        = TxOutputRef.emptyTreeNode
-    val emptyOutput       = TxOutput.forMPT
-    val emptyOutputTrie   = MerklePatriciaTrie.build(storage, genesisRef, emptyOutput)
-    val emptyState        = ContractState(genesisRef.hint, AVector.empty)
+    val genesisRef  = ContractOutputRef.forMPT
+    val emptyOutput = TxOutput.forMPT
+    val emptyOutputTrie =
+      MerklePatriciaTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
+    val emptyState        = ContractState(StatefulContract.forMPT, AVector.empty, genesisRef)
     val emptyContractTrie = MerklePatriciaTrie.build(storage, Hash.zero, emptyState)
     Persisted(emptyOutputTrie, emptyContractTrie)
   }

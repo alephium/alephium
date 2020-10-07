@@ -1,5 +1,6 @@
 package org.alephium.flow.setting
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.nio.file.Path
 
@@ -13,7 +14,7 @@ import pureconfig.generic.auto._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
-import org.alephium.protocol.model.{Block, NetworkType}
+import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U64}
 
@@ -31,7 +32,8 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
                                   tipsPruneInterval: Int,
                                   blockCacheCapacityPerChain: Int)
     extends ConsensusConfig {
-  val maxMiningTarget: BigInt = (BigInt(1) << (256 - numZerosAtLeastInHash)) - 1
+  val maxMiningTarget: Target =
+    Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
   val expectedTimeSpan: Duration = blockTargetTime
 
@@ -57,14 +59,14 @@ final case class NetworkSetting(
     upnp: UpnpSettings,
     bindAddress: InetSocketAddress,
     internalAddress: InetSocketAddress,
-    masterAddress: InetSocketAddress,
+    coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     rpcPort: Int,
     wsPort: Int,
     restPort: Int
 ) {
-  val isCoordinator: Boolean = internalAddress == masterAddress
+  val isCoordinator: Boolean = internalAddress == coordinatorAddress
 
   def handshakeTimeout: Duration = retryTimeout
 
@@ -130,13 +132,15 @@ object AlephiumConfig {
   implicit val chainsSettingReader: ConfigReader[ChainsSetting] =
     ConfigReader[TempChainsSetting].map(_.chainsSetting)
 
-  def load(config: Config): Result[AlephiumConfig] = {
+  def source(config: Config): ConfigSource = {
     val path          = "alephium"
     val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
-    ConfigSource.fromConfig(configLocated).load[AlephiumConfig]
+    ConfigSource.fromConfig(configLocated)
   }
 
   def load(rootPath: Path): Result[AlephiumConfig] = {
-    load(Configs.parseConfig(rootPath))
+    load(Configs.parseConfig(rootPath, None))
   }
+  def load(config: Config): Result[AlephiumConfig] = source(config).load[AlephiumConfig]
+  def loadOrThrow(config: Config): AlephiumConfig = source(config).loadOrThrow[AlephiumConfig]
 }
