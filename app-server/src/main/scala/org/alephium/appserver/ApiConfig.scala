@@ -26,5 +26,5 @@ object ApiConfig {
   }
 
   def load(config: Config): Result[ApiConfig] = source(config).load[ApiConfig]
-  def loadOrThrow(config: Config): ApiConfig = source(config).loadOrThrow[ApiConfig]
+  def loadOrThrow(config: Config): ApiConfig  = source(config).loadOrThrow[ApiConfig]
 }

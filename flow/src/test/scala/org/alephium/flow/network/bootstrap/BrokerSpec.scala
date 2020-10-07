@@ -10,8 +10,8 @@ import org.alephium.util.ActorRefT
 
 class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
   it should "follow this workflow" in {
-    val connection    = TestProbe()
-    val bootstrapper  = TestProbe()
+    val connection         = TestProbe()
+    val bootstrapper       = TestProbe()
     val coordinatorAddress = SocketUtil.temporaryServerAddress()
 
     IO(Tcp) ! Tcp.Bind(connection.ref, coordinatorAddress)
