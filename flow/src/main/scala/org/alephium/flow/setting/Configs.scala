@@ -84,7 +84,7 @@ object Configs extends StrictLogging {
   }
 
   def parseNetworkType(rootPath: Path): Option[NetworkType] = {
-    val config = ConfigFactory.parseFile(getConfigUser(rootPath)).resolve()
+    val config = parseConfig(rootPath, None)
     Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
   }
 

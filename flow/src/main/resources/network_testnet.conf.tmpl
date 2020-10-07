@@ -10,10 +10,6 @@ alephium {
   }
 
   network {
-    external-address  = null
-    internal-address  = "127.0.0.1:9973"
-    coordinator-address    = "127.0.0.1:9973"
-
     rpc-port = 10973
     ws-port  = 11973
   }
@@ -21,11 +17,10 @@ alephium {
   api {
     network-interface = "0.0.0.0"
     blockflow-fetch-max-age = 12 hours
-    api-key-hash = null
   }
 
   discovery {
-    # TODO Add bootstrap nodes fixed IP addreses once available 
+    # TODO Add bootstrap nodes fixed IP addreses once available
     bootstrap = []
   }
 }

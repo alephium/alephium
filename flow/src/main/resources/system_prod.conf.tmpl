@@ -40,15 +40,13 @@ akka {
 
 alephium {
   broker {
-    groups = ${GROUPS}
-    broker-num = ${GROUPS}
-    broker-num = ${?BROKER_NUM}
-    broker-id = ${BROKER_ID}
+    broker-id = 0
+    broker-num = 1
+    groups = 4
   }
 
   consensus {
     num-zeros-at-least-in-hash = 18
-    num-zeros-at-least-in-hash = ${?ZEROS}
     block-target-time = 2 minutes
     tips-prune-interval = 100
     block-cache-capacity-per-chain = 25
@@ -67,24 +65,18 @@ alephium {
     }
 
     bind-address = "localhost:9973"
-    bind-address = ${?BIND_ADDRESS}
-    external-address = ${?EXTERNAL_ADDRESS}
-    internal-address = ${?EXTERNAL_ADDRESS}
-    internal-address = ${?INTERNAL_ADDRESS}
-    coordinator-address = ${?COORDINATOR_ADDRESS}
+    external-address = null
+    internal-address  = "127.0.0.1:9973"
+    coordinator-address    = "127.0.0.1:9973"
     num-of-sync-blocks-limit = 128
 
     rpc-port = 0
-    rpc-port = ${?RPC_PORT}
     ws-port = 0
-    ws-port = ${?WS_PORT}
     rest-port = 0
-    rest-port = ${?REST_PORT}
   }
 
   discovery {
     bootstrap = []
-    bootstrap = ${?BOOTSTRAP}
 
     peers-per-group = 16
     scan-max-per-group = 8
@@ -102,7 +94,7 @@ alephium {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
-    api-key-hash = ${?API_KEY_HASH}
+    api-key-hash = null
   }
 
   chains = {
