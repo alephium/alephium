@@ -325,7 +325,7 @@ object Frame {
 
   final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
-      all.find(_._1 == lockupScript).map(_._2)
+      all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
     }
 
     def getAlfAmount(lockupScript: LockupScript): Option[U64] = {

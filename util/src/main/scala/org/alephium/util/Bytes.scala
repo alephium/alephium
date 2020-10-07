@@ -49,6 +49,7 @@ object Bytes {
     (byte0 ^ byte1 ^ byte2 ^ byte3).toByte
   }
 
+  // scalastyle:off return
   implicit val byteStringOrdering: Ordering[ByteString] = new Ordering[ByteString] {
     override def compare(x: ByteString, y: ByteString): Int = {
       val xe = x.iterator
@@ -62,4 +63,5 @@ object Bytes {
       BooleanOrdering.compare(xe.hasNext, ye.hasNext)
     }
   }
+  // scalastyle:on return
 }
