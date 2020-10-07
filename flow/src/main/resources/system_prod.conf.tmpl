@@ -39,12 +39,6 @@ akka {
 }
 
 alephium {
-  broker {
-    broker-id = 0
-    broker-num = 1
-    groups = 4
-  }
-
   consensus {
     num-zeros-at-least-in-hash = 18
     block-target-time = 2 minutes
@@ -64,7 +58,7 @@ alephium {
       enabled = true
     }
 
-    bind-address = "localhost:9973"
+    bind-address = "127.0.0.1:9973"
     external-address = null
     internal-address  = "127.0.0.1:9973"
     coordinator-address    = "127.0.0.1:9973"
@@ -76,8 +70,6 @@ alephium {
   }
 
   discovery {
-    bootstrap = []
-
     peers-per-group = 16
     scan-max-per-group = 8
     scan-frequency = 120.seconds
@@ -95,10 +87,6 @@ alephium {
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
     api-key-hash = null
-  }
-
-  chains = {
-    network-type = "mainnet"
   }
 
   wallet {

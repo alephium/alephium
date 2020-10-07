@@ -83,9 +83,36 @@ object Configs extends StrictLogging {
     }
   }
 
+  def parseConfigAndValidate(rootPath: Path, networkType: Option[NetworkType]): Config = {
+    val config = parseConfig(rootPath, networkType)
+    if (!config.hasPath("alephium.discovery.bootstrap")) {
+      logger.error(s"""|The bootstrap nodes are not defined!
+                       |
+                       |Please set the bootstrap nodes in $rootPath/user.conf and try again.
+                       |
+                       |Example:
+                       |alephium.discovery.bootstrap = ["1.2.3.4:1234"]
+                  """.stripMargin)
+      sys.exit(1)
+    } else {
+      config
+    }
+  }
+
   def parseNetworkType(rootPath: Path): Option[NetworkType] = {
     val config = parseConfig(rootPath, None)
-    Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
+    if (!config.hasPath("alephium.chains.network-type")) {
+      logger.error(s"""|The network type isn't defined!
+                       |
+                       |Please set the network type in your $rootPath/user.conf and try again.
+                       |
+                       |Example:
+                       |alephium.chains.network-type = "testnet"
+                  """.stripMargin)
+      sys.exit(1)
+    } else {
+      Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
+    }
   }
 
   def splitBalance(raw: String): Option[(LockupScript, U64)] = {

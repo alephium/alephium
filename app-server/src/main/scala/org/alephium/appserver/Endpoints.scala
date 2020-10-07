@@ -2,7 +2,6 @@ package org.alephium.appserver
 
 import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.Future
-
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
@@ -24,13 +23,10 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
   type BaseEndpoint[A, B] = Endpoint[A, Response.Failure, B, Nothing]
   type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, Response.Failure, B, Nothing, Future]
 
-  private val apiKeyHash  = apiConfig.apiKeyHash match {
-    case Some(apiKeyHash) => apiKeyHash
-    case None             => {
-      val apiKey = Hash.generate.toHexString
-      logger.info(s"Api Key is '$apiKey'")
-      Hash.hash(apiKey)
-    }
+  private val apiKeyHash = apiConfig.apiKeyHash.getOrElse {
+    val apiKey = Hash.generate.toHexString
+    logger.info(s"Api Key is '$apiKey'")
+    Hash.hash(apiKey)
   }
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
