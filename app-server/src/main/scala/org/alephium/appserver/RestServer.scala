@@ -96,7 +96,8 @@ class RestServer(
       }
   }
 
-  private val docs: OpenAPI = (List(
+  private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
+  private val blockflowDocs = List(
     getBlockflow,
     getBlock,
     getBalance,
@@ -106,7 +107,10 @@ class RestServer(
     createTransaction,
     sendTransactionLogic.endpoint,
     minerActionLogic.endpoint
-  ) ++ walletServer.map(_.docs).getOrElse(List.empty)).toOpenAPI("Alephium BlockFlow API", "1.0")
+  )
+
+  private val docs: OpenAPI =
+    (walletDocs ++ blockflowDocs).toOpenAPI("Alephium API", "1.0")
 
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
