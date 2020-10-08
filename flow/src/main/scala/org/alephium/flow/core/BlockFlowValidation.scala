@@ -62,7 +62,7 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
       }
     }
 
-    iter(initialTips, blockDeps.tail).exists(_.toBlockDeps.deps == blockDeps)
+    iter(initialTips, blockDeps.tail).nonEmpty
   }
 
   def checkFlowTxsUnsafe(block: Block): Boolean = {

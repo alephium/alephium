@@ -102,7 +102,10 @@ trait TestFixtureLike
       json    <- parse(Unmarshal(response.entity).to[String].futureValue)
       request <- json.as[JsonRPC.Response.Success]
       t       <- request.result.as[T]
-    } yield t).toOption.get
+    } yield t) match {
+      case Right(t)    => t
+      case Left(error) => throw new AssertionError(error.toString)
+    }
   }
 
   def transfer(fromPubKey: String,
