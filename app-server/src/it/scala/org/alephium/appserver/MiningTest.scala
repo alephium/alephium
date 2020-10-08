@@ -41,14 +41,18 @@ class MiningTest extends AlephiumSpec {
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
+    Thread.sleep(1000)
     awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
-    request[Balance](getBalance(address), rpcPort) is
-      Balance(initialBalance.balance - transferAmount, 1)
+    eventually {
+      request[Balance](getBalance(address), rpcPort) is
+        Balance(initialBalance.balance - transferAmount, 1)
+    }
 
     val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
+    Thread.sleep(1000)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     selfClique.peers.foreach { peer =>

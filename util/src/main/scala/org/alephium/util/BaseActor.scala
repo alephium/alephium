@@ -79,8 +79,8 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
 
   override def create(): SupervisorStrategy = {
     Env.resolve() match {
-      case Env.Prod => resumeStrategy
-      case _        => stopStrategy
+      case Env.Test => stopStrategy
+      case _        => resumeStrategy
     }
   }
 

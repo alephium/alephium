@@ -53,12 +53,18 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
-      val block4      = mine(blockFlow, chainIndex4)
+      val block4      = mine(blockFlow, chainIndex4, transfer = false)
       addAndCheck(blockFlow, block4, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
+
+      val chainIndex5 = ChainIndex.unsafe(0, 0)
+      val block5      = mine(blockFlow, chainIndex5)
+      addAndCheck(blockFlow, block5, 5)
+      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block5)
       checkBalance(blockFlow, 0, genesisBalance - 3)
     }
   }
@@ -155,7 +161,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = mine(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 3)
+      checkBalance(blockFlow, 0, genesisBalance - 2)
     }
   }
 
@@ -317,10 +323,18 @@ class BlockFlowSpec extends AlephiumSpec {
     block.nonCoinbase.nonEmpty is true
 
     addAndCheck(blockFlow0, block, 1)
-    checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
+    checkBalance(blockFlow0, fromGroup, genesisBalance)
 
     addAndCheck(blockFlow1, block, 1)
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
+    checkBalance(blockFlow1, pubScript, 0)
+
+    val fromGroupBlock = mine(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup), transfer = false)
+    addAndCheck(blockFlow0, fromGroupBlock, 2)
+    checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
+
+    val toGroupBlock = mine(blockFlow1, ChainIndex.unsafe(toGroup, toGroup), transfer = false)
+    addAndCheck(blockFlow1, toGroupBlock, 2) // TODO: fix weight calculation
     checkBalance(blockFlow1, pubScript, 1)
   }
 
