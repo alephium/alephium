@@ -141,6 +141,11 @@ object U64 {
   val MaxValue: U64 = unsafe(-1)
   val MinValue: U64 = Zero
 
+  // scalastyle:off magic.number
+  val Million: U64 = unsafe(1000000)
+  val Billion: U64 = unsafe(1000000000)
+  // scalastyle:on magic.number
+
   @inline private def checkAdd(a: U64, c: Long): Boolean = {
     JLong.compareUnsigned(c, a.v) >= 0
   }
