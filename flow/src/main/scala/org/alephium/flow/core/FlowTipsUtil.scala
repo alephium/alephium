@@ -35,7 +35,7 @@ trait FlowTipsUtil {
   def getBlockUnsafe(hash: Hash): Block
   def getBlockHeader(hash: Hash): IOResult[BlockHeader]
   def getBlockHeaderUnsafe(hash: Hash): BlockHeader
-  def getHeaderChain(hash: Hash): BlockHeaderChain
+  def getHashChain(hash: Hash): BlockHashChain
   def getHashChain(chainIndex: ChainIndex): BlockHashChain
 
   def isConflicted(hash: Hash, newDeps: AVector[Hash], getBlock: Hash => Block): Boolean
@@ -87,7 +87,7 @@ trait FlowTipsUtil {
   }
 
   def getTipsDiff(newTip: Hash, oldTip: Hash): IOResult[AVector[Hash]] = {
-    getHeaderChain(oldTip).getBlockHashesBetween(newTip, oldTip)
+    getHashChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
   protected def getTipsDiffUnsafe(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {

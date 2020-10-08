@@ -215,10 +215,10 @@ object BlockFlow extends StrictLogging {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
-    def tryExtend(tipsCur: FlowTips,
-                  weightCur: BigInt,
-                  group: GroupIndex,
-                  toTry: AVector[Hash]): (FlowTips, BigInt) = {
+    def tryExtendUnsafe(tipsCur: FlowTips,
+                        weightCur: BigInt,
+                        group: GroupIndex,
+                        toTry: AVector[Hash]): (FlowTips, BigInt) = {
       toTry
         .fold[(FlowTips, BigInt)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
@@ -240,7 +240,7 @@ object BlockFlow extends StrictLogging {
         case ((tipsCur, weightCur), _r) =>
           val r     = GroupIndex.unsafe(_r)
           val chain = getHashChain(group, r)
-          tryExtend(tipsCur, weightCur, group, chain.getAllTips)
+          tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips)
       }
       val (flowTips2, _) = (0 until groups)
         .filter(_ != group.value)
@@ -252,7 +252,7 @@ object BlockFlow extends StrictLogging {
                 val r = GroupIndex.unsafe(_r)
                 acc ++ getHashChain(l, r).getAllTips
               }
-              tryExtend(tipsCur, weightCur, group, toTry)
+              tryExtendUnsafe(tipsCur, weightCur, group, toTry)
             } else (tipsCur, weightCur)
         }
       flowTips2.toBlockDeps
