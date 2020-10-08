@@ -134,6 +134,9 @@ trait BrokerHandler extends BaseActor {
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
         send(SendHeaders(headers))
       }
+    case Received(SendTxs(txs)) =>
+      log.debug(s"SendTxs received: ${Utils.show(txs.map(_.hash))}")
+      txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddTx(tx, dataOrigin))
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
