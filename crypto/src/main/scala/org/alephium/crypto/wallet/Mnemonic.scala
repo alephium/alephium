@@ -31,7 +31,7 @@ import org.alephium.util.{AVector, Bits, Random}
 
 final case class Mnemonic private (words: AVector[String]) extends AnyVal {
   def toSeed(passphrase: String): ByteString = {
-    val mnemonic     = words.mkString(" ").toCharArray
+    val mnemonic     = toLongString.toCharArray
     val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
     val spec = new PBEKeySpec(
       mnemonic,
@@ -42,6 +42,8 @@ final case class Mnemonic private (words: AVector[String]) extends AnyVal {
     val factory = SecretKeyFactory.getInstance(Mnemonic.pbkdf2Algorithm)
     ByteString.fromArrayUnsafe(factory.generateSecret(spec).getEncoded)
   }
+
+  def toLongString: String = words.mkString(" ")
 }
 
 object Mnemonic {

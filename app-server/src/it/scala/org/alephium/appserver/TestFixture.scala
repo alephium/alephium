@@ -67,9 +67,9 @@ trait TestFixtureLike
     (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "T1J9XcQ5FsFfihNYMzdYKXoiZBTzsHQifzu7CKQfZPbwt1"
-  val publicKey               = "02f363a2a97f4f62e387c2ef2d8e2d9e9259f2724383c2ad7a7d156ea813b7faf3"
-  val privateKey              = "39e8746b56393787e9dce167f242f37509c960c3930436fb290f0af34532ca51"
+  val address                 = "T1E6WcDQHkXutd6vCiMpeBZtwD1UWGwS8U5MfGevQwS16v"
+  val publicKey               = "0287d1135007a4030505f295e774d9ceae85afa9c0a5754e70037631908c5066e7"
+  val privateKey              = "2c5309e042c78253ff4edda366cf8e13fb2ef7cef60c1a2297447546852c0e66"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
@@ -104,7 +104,7 @@ trait TestFixtureLike
       t       <- request.result.as[T]
     } yield t) match {
       case Right(t)    => t
-      case Left(error) => throw new AssertionError(error.toString)
+      case Left(error) => throw new AssertionError(s"circe: $error")
     }
   }
 
@@ -112,7 +112,7 @@ trait TestFixtureLike
                toAddress: String,
                amount: Int,
                privateKey: String,
-               rpcPort: Int): TxResult = {
+               rpcPort: Int): TxResult = eventually {
     val createTx   = createTransaction(fromPubKey, toAddress, amount)
     val unsignedTx = request[CreateTransactionResult](createTx, rpcPort)
     val sendTx     = sendTransaction(unsignedTx, privateKey)

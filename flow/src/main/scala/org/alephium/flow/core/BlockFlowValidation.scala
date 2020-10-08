@@ -26,27 +26,17 @@ import org.alephium.util.AVector
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
   def getBlockUnsafe(hash: Hash): Block
 
-  def checkFlowBlock(block: Block): IOResult[Boolean] =
-    IOUtils.tryExecute(checkFlowUnsafe(block))
+  def checkFlowDeps(block: Block): IOResult[Boolean] =
+    IOUtils.tryExecute(checkFlowDepsUnsafe(block.header))
 
-  def checkFlowHeader(header: BlockHeader): IOResult[Boolean] =
-    IOUtils.tryExecute(checkFlowUnsafe(header))
+  def checkFlowTxs(block: Block): IOResult[Boolean] =
+    IOUtils.tryExecute(checkFlowTxsUnsafe(block))
 
-  def checkFlowUnsafe(block: Block): Boolean = {
-    assume(!block.isGenesis)
+  def checkFlowDeps(header: BlockHeader): IOResult[Boolean] =
+    IOUtils.tryExecute(checkFlowDepsUnsafe(header))
 
-    checkFlowDepsUnsafe(block.header, checkTxConflicts = true) && checkFlowTxsUnsafe(block)
-  }
-
-  def checkFlowUnsafe(header: BlockHeader): Boolean = {
-    assume(!header.isGenesis)
-
-    checkFlowDepsUnsafe(header, checkTxConflicts = false)
-  }
-
-  def checkFlowDepsUnsafe(header: BlockHeader, checkTxConflicts: Boolean): Boolean = {
+  def checkFlowDepsUnsafe(header: BlockHeader): Boolean = {
     val targetGroup = header.chainIndex.from
-    assume(!(checkTxConflicts ^ brokerConfig.contains(targetGroup)))
 
     val blockDeps   = header.blockDeps
     val initialTips = getFlowTipsUnsafe(blockDeps.head, targetGroup)
@@ -55,7 +45,7 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     def iter(currentTips: FlowTips, tips: AVector[Hash]): Option[FlowTips] = {
       if (tips.isEmpty) Some(currentTips)
       else {
-        tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts) match {
+        tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts = false) match {
           case Some(merged) => iter(merged, tips.tail)
           case None         => None
         }

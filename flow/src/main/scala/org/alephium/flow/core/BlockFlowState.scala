@@ -279,11 +279,7 @@ trait BlockFlowState extends FlowTipsUtil {
       persistedUtxos <- bestTrie
         .getAssetOutputs(lockupScript.assetHintBytes)
         .map(_.filter(p => lockedBy(p._2, lockupScript)))
-      pair <- getUtxosInCache(lockupScript, groupIndex, persistedUtxos)
-    } yield {
-      val (usedUtxos, newUtxos) = pair
-      persistedUtxos.filter(p => !usedUtxos.contains(p._1)) ++ newUtxos
-    }
+    } yield persistedUtxos
   }
 
   def getBalance(lockupScript: LockupScript): IOResult[(U64, Int)] = {

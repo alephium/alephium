@@ -44,7 +44,7 @@ trait ModelCodecs extends ProtocolCodecs {
     Mnemonic.fromWords(words).toRight(s"Cannot validate mnemonic: $input")
   }
 
-  implicit val mnemonicEncoder: Encoder[Mnemonic] = Encoder[String].contramap(_.words.mkString(" "))
+  implicit val mnemonicEncoder: Encoder[Mnemonic] = Encoder[String].contramap(_.toLongString)
 
   implicit val mnemonicCodec: Codec[Mnemonic] = Codec.from(mnemonicDecoder, mnemonicEncoder)
 

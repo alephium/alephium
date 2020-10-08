@@ -33,24 +33,23 @@ object Genesis {
 
   // scalastyle:off magic.number
   private val mainnet: AVector[(LockupScript, U64)] = AVector(
-    build0("M1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3", ALF.alf(U64.Million).get, Mainnet),
-    build0("M1H7CmpbvGJwgyLzR91wzSJJSkiBC92WDPTWny4gmhQJQc", ALF.alf(U64.Million).get, Mainnet),
-    build0("M1DkrQMni2h8KYpvY8t7dECshL66gwnxiR5uD2Udxps6og", ALF.alf(U64.Million).get, Mainnet),
-    build0("M131R8ufDhcsu6SRztR9D3m8GUzkWFUPfT78aQ6jgtgzob", ALF.alf(U64.Million).get, Mainnet)
-  )
-
-  private val devnet: AVector[(LockupScript, U64)] = AVector(
-    build1("D15eh7Qe3CC9YgQcY3bpfZ9z6mSsU1mDuKKY4ox5ZNx51E", 100, Devnet),
-    build1("D14GrSzgcEcJVRCjA8WE6VPaagr4csBvbuQUfpaCfDJnnF", 100, Devnet),
-    build1("D13zsJa9zidziyzjxkwgsVePxBbgb1hBUCdYyoRRHR8epm", 100, Devnet),
-    build1("D1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n", 100, Devnet)
+    build0("M1HG1adtFdyw6Cw5LdJFtcxj5Sc79Rg1iV5WwyhAaQcxPo", ALF.alf(U64.Million).get, Mainnet),
+    build0("M15hxs6Rj3Spho32a6Nhvr8FqmtqdoyXvxWxfEwcxEQKCL", ALF.alf(U64.Million).get, Mainnet),
+    build0("M1Cxio4bhgrFXQsVLGGTK9iR4Uzk1qihtTy6B5zACdVhf8", ALF.alf(U64.Million).get, Mainnet),
+    build0("M18qok6gsyGm4NcQL25JTFsUyN65SxNB9a6PqCjVHSuZsX", ALF.alf(U64.Million).get, Mainnet)
   )
 
   private val testnet: AVector[(LockupScript, U64)] = AVector(
-    build1("T1J9XcQ5FsFfihNYMzdYKXoiZBTzsHQifzu7CKQfZPbwt1", 100, Testnet),
-    build1("T16Q9sJkSYW66HKeai8sJeEo2buKLdwnmvY7VXtZFVDCoT", 100, Testnet),
-    build1("T15phYy54YWvsLbnUcn9xQAp82PgKXWRKfFUmDUYC13Ecm", 100, Testnet),
-    build1("T17ad4SSso1f3trkUfmi1YHkNnEo7qnF6SA83tdNJD2Saa", 100, Testnet)
+    build1("T1AHLBD9WjNS83aX4pTxQDYiMXgcnSxXx3TCDZ1JrRK8tK", 100, Testnet),
+    build1("T1E6WcDQHkXutd6vCiMpeBZtwD1UWGwS8U5MfGevQwS16v", 100, Testnet),
+    build1("T1H1YgkDMm9pQiwJ489fmixDwji1GNCgXUp2MyHyULmmq1", 100, Testnet),
+    build1("T15NDEYK6c5iARwVtQDx5K1Mi8xDZZH6HRiCphLMAxUgNQ", 100, Testnet)
+  )
+
+  private val devnet: AVector[(LockupScript, U64)] = AVector(
+    build1("D1FVtCAYNzaByeBD6o3hzGNrcUzVMFbjRTioZQo93SHwVs", 100, Devnet),
+    build1("D14XRkG89wntfY1ucHraiz6wCQCdmK36DwY6iRqmwq19pr", 100, Devnet),
+    build1("D19xZMmeAnEPkwYLR2b4PS6ML3n6mvYAYzrZT9upegA6G8", 100, Devnet)
   )
   // scalastyle:on magic.number
 

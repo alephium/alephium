@@ -57,6 +57,7 @@ trait FlowFixture
 
   def mine(blockFlow: BlockFlow,
            chainIndex: ChainIndex,
+           transfer: Boolean                      = true,
            onlyTxForIntra: Boolean                = false,
            txScriptOption: Option[StatefulScript] = None,
            createContract: Boolean                = false): Block = {
@@ -65,7 +66,7 @@ trait FlowFixture
     val (_, toPublicKey) = chainIndex.to.generateKey
     val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
     val transactions = {
-      if (brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
+      if (transfer && brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
         val mainGroup                  = chainIndex.from
         val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
         val fromLockupScript           = LockupScript.p2pkh(publicKey)

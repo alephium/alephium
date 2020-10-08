@@ -57,8 +57,10 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       context.watch(sender())
       brokerInfos += ActorRefT[BrokerHandler.Command](sender()) -> remoteBrokerInfo
     case Sync =>
-      log.debug(s"Send sync requests to the network")
-      allHandlers.flowHandler ! FlowHandler.GetSyncLocators
+      if (brokerInfos.nonEmpty) {
+        log.debug(s"Send sync requests to the network")
+        allHandlers.flowHandler ! FlowHandler.GetSyncLocators
+      }
     case FlowHandler.SyncLocators(locators) =>
       samplePeers.foreach(_ ! BrokerHandler.SyncLocators(locators))
     case SyncInventories(hashes) => download(hashes)
