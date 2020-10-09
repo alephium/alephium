@@ -35,6 +35,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.crypto.Sha256
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
@@ -73,7 +74,7 @@ trait TestFixtureLike
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
-  val apiKeyHash = Hash.hash(apiKey)
+  val apiKeyHash = Sha256.hash(apiKey)
 
   val initialBalance = Balance(100, 1)
   val transferAmount = 10

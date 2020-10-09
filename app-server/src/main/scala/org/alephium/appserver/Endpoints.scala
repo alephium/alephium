@@ -16,8 +16,9 @@
 
 package org.alephium.appserver
 
-import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.Future
+
+import com.typesafe.scalalogging.StrictLogging
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
@@ -25,6 +26,7 @@ import sttp.tapir.server.PartialServerEndpoint
 import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.TapirCodecs
 import org.alephium.appserver.TapirSchemas._
+import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -42,7 +44,7 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
   private val apiKeyHash = apiConfig.apiKeyHash.getOrElse {
     val apiKey = Hash.generate.toHexString
     logger.info(s"Api Key is '$apiKey'")
-    Hash.hash(apiKey)
+    Sha256.hash(apiKey)
   }
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
