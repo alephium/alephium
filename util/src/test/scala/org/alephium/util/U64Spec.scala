@@ -24,8 +24,8 @@ class U64Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     U64.Zero.toBigInt is BigInteger.ZERO
     U64.One.toBigInt is BigInteger.ONE
-    U64.Two.toBigInt is BigInteger.TWO
-    U64.MaxValue.toBigInt is BigInteger.TWO.pow(64).subtract(BigInteger.ONE)
+    U64.Two.toBigInt is BigInteger.valueOf(2)
+    U64.MaxValue.toBigInt is BigInteger.valueOf(2).pow(64).subtract(BigInteger.ONE)
   }
 
   it should "convert from BigInt" in {

@@ -24,10 +24,10 @@ class I64Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     I64.Zero.toBigInt is BigInteger.ZERO
     I64.One.toBigInt is BigInteger.ONE
-    I64.Two.toBigInt is BigInteger.TWO
+    I64.Two.toBigInt is BigInteger.valueOf(2)
     I64.NegOne.toBigInt is BigInteger.ONE.negate()
-    I64.MinValue.toBigInt is BigInteger.TWO.pow(63).negate()
-    I64.MaxValue.toBigInt is BigInteger.TWO.pow(63).subtract(BigInteger.ONE)
+    I64.MinValue.toBigInt is BigInteger.valueOf(2).pow(63).negate()
+    I64.MaxValue.toBigInt is BigInteger.valueOf(2).pow(63).subtract(BigInteger.ONE)
   }
 
   it should "convert from BigInt" in {
