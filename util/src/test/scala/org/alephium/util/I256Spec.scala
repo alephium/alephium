@@ -27,7 +27,7 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "be bounded properly" in {
-    I256.upperBound.subtract(I256.lowerBound) is BigInteger.TWO.pow(256)
+    I256.upperBound.subtract(I256.lowerBound) is BigInteger.valueOf(2).pow(256)
     I256.validate(I256.lowerBound) is true
     I256.validate(I256.lowerBound.add(BigInteger.ONE)) is true
     I256.validate(I256.lowerBound.subtract(BigInteger.ONE)) is false
@@ -38,8 +38,8 @@ class I256Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     I256.Zero.toBigInt is BigInteger.ZERO
     I256.One.toBigInt is BigInteger.ONE
-    I256.MaxValue.toBigInt is BigInteger.TWO.pow(255).subtract(BigInteger.ONE)
-    I256.MinValue.toBigInt is BigInteger.TWO.pow(255).negate()
+    I256.MaxValue.toBigInt is BigInteger.valueOf(2).pow(255).subtract(BigInteger.ONE)
+    I256.MinValue.toBigInt is BigInteger.valueOf(2).pow(255).negate()
   }
 
   it should "convert from BigInt" in {

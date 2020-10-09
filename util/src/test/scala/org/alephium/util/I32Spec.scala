@@ -24,10 +24,10 @@ class I32Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     I32.Zero.toBigInt is BigInteger.ZERO
     I32.One.toBigInt is BigInteger.ONE
-    I32.Two.toBigInt is BigInteger.TWO
+    I32.Two.toBigInt is BigInteger.valueOf(2)
     I32.NegOne.toBigInt is BigInteger.ONE.negate()
-    I32.MinValue.toBigInt is BigInteger.TWO.pow(31).negate()
-    I32.MaxValue.toBigInt is BigInteger.TWO.pow(31).subtract(BigInteger.ONE)
+    I32.MinValue.toBigInt is BigInteger.valueOf(2).pow(31).negate()
+    I32.MaxValue.toBigInt is BigInteger.valueOf(2).pow(31).subtract(BigInteger.ONE)
   }
 
   it should "convert from BigInt" in {

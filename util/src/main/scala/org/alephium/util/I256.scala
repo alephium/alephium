@@ -145,7 +145,7 @@ object I256 {
 
   val Zero: I256     = unsafe(BigInteger.ZERO)
   val One: I256      = unsafe(BigInteger.ONE)
-  val Two: I256      = unsafe(BigInteger.TWO)
+  val Two: I256      = unsafe(BigInteger.valueOf(2))
   val NegOne: I256   = unsafe(BigInteger.ONE.negate())
   val MaxValue: I256 = unsafe(upperBound.subtract(BigInteger.ONE))
   val MinValue: I256 = unsafe(lowerBound)

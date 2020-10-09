@@ -24,8 +24,8 @@ class U32Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     U32.Zero.toBigInt is BigInteger.ZERO
     U32.One.toBigInt is BigInteger.ONE
-    U32.Two.toBigInt is BigInteger.TWO
-    U32.MaxValue.toBigInt is BigInteger.TWO.pow(32).subtract(BigInteger.ONE)
+    U32.Two.toBigInt is BigInteger.valueOf(2)
+    U32.MaxValue.toBigInt is BigInteger.valueOf(2).pow(32).subtract(BigInteger.ONE)
   }
 
   it should "convert from BigInt" in {

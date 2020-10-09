@@ -25,7 +25,7 @@ class U256Spec extends AlephiumSpec {
   }
 
   it should "be bounded properly" in {
-    U256.upperBound.subtract(BigInteger.ZERO) is BigInteger.TWO.pow(256)
+    U256.upperBound.subtract(BigInteger.ZERO) is BigInteger.valueOf(2).pow(256)
     U256.validate(BigInteger.ZERO) is true
     U256.validate(BigInteger.ONE) is true
     U256.validate(BigInteger.ONE.negate()) is false
@@ -36,7 +36,7 @@ class U256Spec extends AlephiumSpec {
   it should "convert to BigInt" in {
     U256.Zero.toBigInt is BigInteger.ZERO
     U256.One.toBigInt is BigInteger.ONE
-    U256.MaxValue.toBigInt is BigInteger.TWO.pow(256).subtract(BigInteger.ONE)
+    U256.MaxValue.toBigInt is BigInteger.valueOf(2).pow(256).subtract(BigInteger.ONE)
   }
 
   it should "convert from BigInt" in {
