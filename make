@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-import argparse, multiprocessing, os, pathlib, shutil, subprocess, sys, tempfile, secrets, hashlib
+#!/usr/bin/env python
+import argparse, multiprocessing, os, shutil, subprocess, sys, tempfile, uuid, hashlib
 
 port_start = 9973
 
@@ -108,7 +108,6 @@ class AlephiumMake(object):
 
     def run(self):
         tempdir = tempfile.gettempdir()
-        homedir = str(pathlib.Path.home())
         groups = get_env_int('GROUPS')
         brokerNum = get_env_default_int('BROKER_NUM', groups)
         nodes = get_env_int('NODES')
@@ -118,7 +117,7 @@ class AlephiumMake(object):
 
         deployedNodes = get_env_default_int('DEPLOYED_NODES', 0)
 
-        apiKey = secrets.token_urlsafe(32)
+        apiKey = uuid.uuid4().hex
         apiKeyHash = hashlib.sha256(str.encode(apiKey)).hexdigest()
         print("Api key: " + apiKey)
 
