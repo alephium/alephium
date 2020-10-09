@@ -163,6 +163,7 @@ class AlephiumMake(object):
                   api {{
                     api-key-hash = {}
                   }}
+                  chains.network-type = "testnet"
                 }}
             """.format(brokerId, brokerNum, groups, bindAddress, bindAddress, bindAddress, coordinatorAddress,
                     rpcPort, wsPort, restPort, bootstrap, apiKeyHash)
