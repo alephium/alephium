@@ -108,7 +108,7 @@ object Configs extends StrictLogging {
                        |Please set the bootstrap nodes in $rootPath/user.conf and try again.
                        |
                        |Example:
-                       |alephium.discovery.bootstrap = ["1.2.3.4:1234"]
+                       |alephium.discovery.bootstrap = ["1.2.3.4:1234"] (or [] for test purpose)
                   """.stripMargin)
       sys.exit(1)
     } else {
