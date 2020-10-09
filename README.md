@@ -6,7 +6,7 @@
 
 You must have the following dependencies installed on your system in order to run our JAR delivrable:
 
-- JDK (>= 11)
+- java (>= 8, 11 is recommended)
 
 ### Running
 
@@ -19,7 +19,7 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 ### Requierments
 
 In order to build the project from source the following dependencies must be installed on your system:
-- JDK (>= 11)
+- java (>= 8, 11 is recommended)
 - Python 3
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
