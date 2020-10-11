@@ -536,3 +536,17 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc.foreach(_ is AVector.defaultSize)
   }
 }
+
+class RefAVectorSpec extends AlephiumSpec {
+  it should "convert covariantly" in {
+    sealed trait Foo
+    final case class Bar(n: Int) extends Foo
+
+    val vector    = AVector(1, 2, 3).map(Bar)
+    val converted = vector.as[Foo]
+    converted.length is 3
+    converted(0).asInstanceOf[Bar] is Bar(1)
+    converted(1).asInstanceOf[Bar] is Bar(2)
+    converted(2).asInstanceOf[Bar] is Bar(3)
+  }
+}

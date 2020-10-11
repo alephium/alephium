@@ -50,8 +50,7 @@ final case class Transaction(unsigned: UnsignedTransaction,
     with TransactionAbstract {
   override val hash: Hash = unsigned.hash
 
-  def allOutputs: AVector[TxOutput] =
-    unsigned.fixedOutputs.map(_.asInstanceOf[TxOutput]) ++ generatedOutputs
+  def allOutputs: AVector[TxOutput] = unsigned.fixedOutputs.as[TxOutput] ++ generatedOutputs
 
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
 

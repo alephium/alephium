@@ -277,7 +277,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(res)
   }
 
-  def mapToArray[B: ClassTag](f: A => B): Array[B] = {
+  def mapToArray[@sp B: ClassTag](f: A => B): Array[B] = {
     Array.tabulate(length) { i =>
       f(apply(i))
     }
@@ -407,7 +407,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     reduceBy(identity)(op)
   }
 
-  def reduceBy[B: ClassTag](f: A => B)(op: (B, B) => B): B = {
+  def reduceBy[@sp B: ClassTag](f: A => B)(op: (B, B) => B): B = {
     assume(nonEmpty)
 
     var acc = f(elems(start))
@@ -433,7 +433,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(acc)
   }
 
-  def flatMap[B: ClassTag](f: A => AVector[B]): AVector[B] = {
+  def flatMap[@sp B: ClassTag](f: A => AVector[B]): AVector[B] = {
     fold(AVector.empty[B]) { (acc, elem) =>
       acc ++ f(elem)
     }
@@ -445,7 +445,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def flatMapWithIndex[B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
+  def flatMapWithIndex[@sp B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
     val (_, xs) = fold((0, AVector.empty[B])) {
       case ((i, acc), elem) =>
         (i + 1, acc ++ f(elem, i))
@@ -460,7 +460,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
-  def scanLeft[B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
+  def scanLeft[@sp B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
     val arr = new Array[B](length + 1)
     var acc = zero
     arr(0) = acc
@@ -649,7 +649,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def asUnsafe[T]: AVector[T] = this.asInstanceOf[AVector[T]]
+  def as[@sp T >: A: ClassTag]: AVector[T] =
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def asUnsafe[T: ClassTag]: AVector[T] =
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
 }
 // scalastyle:on
 
