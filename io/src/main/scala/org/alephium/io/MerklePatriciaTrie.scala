@@ -143,9 +143,10 @@ object MerklePatriciaTrie {
     }
   }
 
-  final case class TrieUpdateActions(newNodeOpt: Option[Node],
+  final case class TrieUpdateActions(nodeOpt: Option[Node],
                                      toDelete: AVector[Hash],
                                      toAdd: AVector[Node])
+
   final case class MPTException(message: String) extends Exception(message)
   object MPTException {
     def keyNotFound(action: String): MPTException = MPTException("Key not found in " ++ action)
@@ -214,7 +215,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
         storage.put(node.hash, node)
       }
       .map { _ =>
-        result.newNodeOpt match {
+        result.nodeOpt match {
           case None       => this
           case Some(node) => new MerklePatriciaTrie(node.hash, storage)
         }
@@ -322,7 +323,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
                               nibble: Int,
                               result: TrieUpdateActions): IOResult[TrieUpdateActions] = {
     val children     = branchNode.children
-    val childOptHash = result.newNodeOpt.map(_.hash)
+    val childOptHash = result.nodeOpt.map(_.hash)
     val newChildren  = children.replace(nibble, childOptHash)
     if (childOptHash.isEmpty && newChildren.map(_.fold(0)(_ => 1)).sum == 1) {
       val onlyChildIndex = newChildren.indexWhere(_.nonEmpty)
@@ -341,7 +342,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
           else result.toDelete ++ AVector(oldChildOptHash.get, branchHash)
         Right(TrieUpdateActions(Some(newBranchNode), toDelete, result.toAdd :+ newBranchNode))
       } else {
-        Right(TrieUpdateActions(None, result.toDelete, result.toAdd))
+        Right(TrieUpdateActions(Some(branchNode), AVector.empty, AVector.empty))
       }
     }
   }
@@ -389,8 +390,11 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
           }
         case leaf: LeafNode =>
           assume(path.length == nibbles.length)
-          val newLeaf = LeafNode(path, value)
-          Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
+          if (leaf.data == value) Right(TrieUpdateActions(Some(leaf), AVector.empty, AVector.empty))
+          else {
+            val newLeaf = LeafNode(path, value)
+            Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
+          }
       }
     } else {
       branch(hash, node, branchIndex, nibbles, value)

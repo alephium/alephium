@@ -174,10 +174,23 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     val keys = AVector.tabulate(100) { _ =>
       val (key, value) = fixture.generateKV()
       trie = trie.putRaw(key, value).toOption.get
+      trie = trie.putRaw(key, value).toOption.get //idempotent tests
       key
     }
 
-    keys.map { key =>
+    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    keys.foreach { key =>
+      trie.getOptRaw(key).map(_.nonEmpty) isE true
+      trie.existRaw(key) isE true
+    }
+
+    keys.foreach { key =>
+      val (_, value) = fixture.generateKV()
+      trie = trie.putRaw(key, value).toOption.get
+    }
+
+    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    keys.foreach { key =>
       trie.getOptRaw(key).map(_.nonEmpty) isE true
       trie.existRaw(key) isE true
     }

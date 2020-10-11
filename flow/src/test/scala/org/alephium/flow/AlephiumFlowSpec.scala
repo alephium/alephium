@@ -179,8 +179,8 @@ trait FlowFixture
                  outputRef: ContractOutputRef,
                  numAssets: Int    = 2,
                  numContracts: Int = 2): Assertion = {
-    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).toOption.get
-    val contractState = worldState.getContractState(key).toOption.get
+    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val contractState = worldState.getContractState(key).fold(throw _, identity)
 
     contractState.fields is fields
     contractState.contractOutputRef is outputRef

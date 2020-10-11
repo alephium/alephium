@@ -126,6 +126,10 @@ object WorldState {
       contractState.get(key)
     }
 
+    def getContractStates(): IOResult[AVector[(ContractId, ContractState)]] = {
+      contractState.getAll(ByteString.empty)
+    }
+
     override def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }

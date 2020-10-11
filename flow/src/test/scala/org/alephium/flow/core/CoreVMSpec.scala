@@ -215,6 +215,10 @@ class VMSpec extends AlephiumSpec {
     val newState = AVector[Val](Val.U64(U64.unsafe(110)))
     val block    = mine(blockFlow, chainIndex, txScriptOption = Some(script))
     blockFlow.add(block).isRight is true
+
+    val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    worldState.getContractStates().toOption.get.length is 3
+
     checkState(blockFlow,
                chainIndex,
                contractKey0,
