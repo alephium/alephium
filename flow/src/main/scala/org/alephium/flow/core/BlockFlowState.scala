@@ -365,7 +365,7 @@ object BlockFlowState {
   private def convertInputs(block: Block): Set[TxOutputRef] = {
     block.transactions.flatMap { tx =>
       tx.unsigned.inputs.map[TxOutputRef](_.outputRef) ++
-        tx.contractInputs.map(_.asInstanceOf[TxOutputRef])
+        tx.contractInputs.as[TxOutputRef]
     }.toSet
   }
 
