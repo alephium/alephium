@@ -15,6 +15,11 @@ The protocol's innovations extend mature ideas from [Bitcoin](https://bitcoin.or
 * Tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
 * PoLW algorithm reduces the energy consumption of PoW in the long term
 
+## Development Status
+
+This project is currently under heavy development toward MainNet launch.
+Any contribution is welcome, so don't hesitate to send an issue or pull request. 
+
 ## Installation
 
 ### Requierments
