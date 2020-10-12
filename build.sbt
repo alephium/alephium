@@ -37,7 +37,9 @@ def project(path: String): Project = {
       inConfig(IntegrationTest)(ScalastylePlugin.rawScalastyleSettings()),
       IntegrationTest / scalastyleConfig := root.base / scalastyleTestCfgFile,
       IntegrationTest / scalastyleTarget := target.value / "scalastyle-it-results.xml",
-      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value
+      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value,
+      publishArtifact := false,
+      publishArtifact in Test := false
     )
 }
 
@@ -52,6 +54,7 @@ lazy val util = project("util")
   .dependsOn(macros)
   .settings(
     scalacOptions -= "-Xlint:nonlocal-return",
+    publishArtifact := true,
     publishArtifact in Test := true,
     libraryDependencies ++= Seq(
       akka,
@@ -70,6 +73,9 @@ lazy val serde = project("serde")
 
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
+  .settings(
+    publishArtifact := true
+  )
 
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
@@ -86,7 +92,8 @@ lazy val rpc = project("rpc")
       `scala-logging`,
       `akka-test`,
       `akka-http-test`
-    )
+    ),
+    publishArtifact := true
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -139,7 +146,8 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       fastparse,
       pureconfig
-    )
+    ),
+    publishArtifact := true
   )
 
 lazy val wallet = project("wallet")
