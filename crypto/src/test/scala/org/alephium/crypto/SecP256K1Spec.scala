@@ -48,8 +48,11 @@ class SecP256K1Spec extends AlephiumSpec {
   }
 
   it should "be verified with proper public key" in {
-    forAll { (message1: AVector[Byte], message2: AVector[Byte]) =>
-      whenever(message1 != message2) {
+    forAll { (_message1: AVector[Byte], _message2: AVector[Byte]) =>
+      whenever(_message1 != _message2) {
+        val message1 = Blake2b.hash(_message1).bytes
+        val message2 = Blake2b.hash(_message2).bytes
+
         val (sk1, pk1) = SecP256K1.generatePriPub()
         val (_, pk2)   = SecP256K1.generatePriPub()
         val signature  = SecP256K1.sign(message1, sk1)
