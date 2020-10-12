@@ -29,6 +29,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.util.{AVector, Hex, Service, U64}
+import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -108,6 +109,8 @@ object WalletService {
       implicit val executionContext: ExecutionContext)
       extends WalletService {
 
+    private val path: AVector[Int] = Constants.path(networkType)
+
     protected def startSelfOnce(): Future[Unit] = {
       Future.successful {
         Files.createDirectories(secretDir)
@@ -133,7 +136,7 @@ object WalletService {
           seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
           file <- buildWalletFile(walletName)
           storage <- SecretStorage
-            .create(seed, password, file)
+            .create(seed, password, file, path)
             .left
             .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
@@ -153,7 +156,7 @@ object WalletService {
         for {
           file <- buildWalletFile(walletName)
           storage <- SecretStorage
-            .create(seed, password, file)
+            .create(seed, password, file, path)
             .left
             .map(_ => CannotCreateEncryptedFile(secretDir))
         } yield {
@@ -278,7 +281,7 @@ object WalletService {
       secretStorages.get(wallet) match {
         case None =>
           val file = new File(s"$secretDir/$wallet")
-          SecretStorage.load(file) match {
+          SecretStorage.load(file, path) match {
             case Right(secretStorage) =>
               secretStorages.addOne(wallet -> secretStorage)
               f(secretStorage)

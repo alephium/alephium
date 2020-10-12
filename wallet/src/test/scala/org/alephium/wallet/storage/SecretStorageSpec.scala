@@ -23,6 +23,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.{Generators, Hash}
+import org.alephium.protocol.model.NetworkType
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
@@ -33,6 +34,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   val seedGen     = Gen.const(()).map(_ => Mnemonic.generate(24).get.toSeed(""))
   val passwordGen = hashGen.map(_.toHexString)
+  val path        = Constants.path(NetworkType.Devnet)
 
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
@@ -40,8 +42,8 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
         val name = Hash.generate.shortHex
         val file = new File(s"$secretDir/$name")
 
-        val secretStorage = SecretStorage.create(seed, password, file).toOption.get
-        val privateKey    = BIP32.btcMasterKey(seed).derive(Constants.path).get
+        val secretStorage = SecretStorage.create(seed, password, file, path).toOption.get
+        val privateKey    = BIP32.btcMasterKey(seed).derive(path).get
 
         secretStorage.getCurrentPrivateKey() isE privateKey
         secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
@@ -80,14 +82,14 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     val rawFile =
       """{"encrypted":"8df619edbc5737594f0de56700634888ac42aa0a3d688a0721b15cd633ce5a5c2f3c1e696cf1d88a09a44899b010f717ff195ec0cd7f0b8a2a29937c162dfdb4a527bb8774aef5aaf3f0eea4d7bd17b1476d880a9e461be225412a18","salt":"a252a0caecc6673e72ee94caf5a646029b99736ff1e3f3c0f632a03556b0aa77d118b971c58903c37a74ab3504a77cee71ab66bb1c434e3c2e0d8e52e503fe80","iv":"bb341ab6dbcd3b5a5b6cee15308083ff2d12407924a399ec422494ba6b0a139d4720ab088104fdfe88d086334cd3b49e01a07a29e5bc5fc182541d9ce084d12f","version":1}"""
 
-    val privateKey = BIP32.btcMasterKey(seed).derive(Constants.path).get
+    val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
     val file      = new File(s"$secretDir/secret.json")
     val outWriter = new PrintWriter(file)
     outWriter.write(rawFile)
     outWriter.close()
 
-    val secretStorage = SecretStorage.fromFile(file, password).toOption.get
+    val secretStorage = SecretStorage.fromFile(file, password, path).toOption.get
 
     secretStorage.unlock(password) is Right(())
 
@@ -98,7 +100,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     val fileName        = scala.util.Random.nextString(10)
     val nonExistingFile = new File(fileName)
     SecretStorage
-      .fromFile(nonExistingFile, "password")
+      .fromFile(nonExistingFile, "password", path)
       .swap
       .toOption
       .get is SecretStorage.SecretFileError
