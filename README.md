@@ -1,5 +1,20 @@
 # Alephium
 
+This repository is the reference implementation of Alephium platform,
+which is a sharded blockchain to make programmable money scalable and secure.
+
+Please visit our website: [https://alephium.org/](https://alephium.org/), telegram: [@alephiumgroup](https://t.me/alephiumgroup) for more information.
+
+## Main Innovations
+
+The protocol's innovations extend mature ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
+
+* BlockFlow algorithm based on UTXO model enables sharding for today
+* sUTXO model combines the advantages of both eUTXO model and account model
+* New VM design eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc
+* Tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
+* PoLW algorithm reduces the energy consumption of PoW in the long term
+
 ## Installation
 
 ### Requierments
@@ -20,7 +35,7 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 
 In order to build the project from source the following dependencies must be installed on your system:
 - java (>= 8, 11 is recommended)
-- Python 3
+- Python
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
 ### Single JAR
