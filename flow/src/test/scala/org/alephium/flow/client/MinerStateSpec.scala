@@ -64,6 +64,11 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     running.foreach(_.foreach(_ is true))
   }
 
+  it should "be idle after stopping" in new Fixture {
+    postMinerStop()
+    running.foreach(_.foreach(_ is false))
+  }
+
   it should "handle mining counts correctly" in new Fixture {
     forAll(Gen.choose(0, brokerConfig.groupNumPerBroker - 1),
            Gen.choose(0, brokerConfig.groups - 1)) { (fromShift, to) =>
