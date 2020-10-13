@@ -92,7 +92,7 @@ trait TxInputGenerators extends Generators {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
     } yield {
-      val outputRef = AssetOutputRef.from(scriptHint, hash)
+      val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.zero))
     }
 }
@@ -209,7 +209,7 @@ trait TxGenerators
     } yield {
       val assetOutput =
         AssetOutput(balances.alfAmount, height, lockup, AVector.from(balances.tokens), data)
-      val txInput = TxInput(AssetOutputRef.from(assetOutput, outputHash), unlock)
+      val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
 

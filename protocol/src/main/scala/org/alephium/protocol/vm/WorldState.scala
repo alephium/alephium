@@ -79,6 +79,10 @@ sealed abstract class WorldState {
     } yield newState
   }
 
+  def updateContract(key: Hash,
+                     outputRef: ContractOutputRef,
+                     output: ContractOutput): IOResult[WorldState]
+
   protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[WorldState]
 
   def removeAsset(outputRef: TxOutputRef): IOResult[WorldState]
@@ -154,6 +158,16 @@ object WorldState {
       contractState.put(key, state).map(Persisted(outputState, _))
     }
 
+    def updateContract(key: Hash,
+                       outputRef: ContractOutputRef,
+                       output: ContractOutput): IOResult[WorldState] = {
+      for {
+        state            <- getContractState(key)
+        newOutputState   <- outputState.put(outputRef, output)
+        newContractState <- contractState.put(key, state.copy(contractOutputRef = outputRef))
+      } yield Persisted(newOutputState, newContractState)
+    }
+
     override def removeAsset(outputRef: TxOutputRef): IOResult[Persisted] = {
       outputState.remove(outputRef).map(Persisted(_, contractState))
     }
@@ -207,6 +221,16 @@ object WorldState {
 
     override def updateContract(key: Hash, state: ContractState): IOResult[Cached] = {
       contractState.put(key, state).map(_ => this)
+    }
+
+    def updateContract(key: Hash,
+                       outputRef: ContractOutputRef,
+                       output: ContractOutput): IOResult[WorldState] = {
+      for {
+        state <- getContractState(key)
+        _     <- outputState.put(outputRef, output)
+        _     <- contractState.put(key, state.copy(contractOutputRef = outputRef))
+      } yield this
     }
 
     override def removeAsset(outputRef: TxOutputRef): IOResult[Cached] = {

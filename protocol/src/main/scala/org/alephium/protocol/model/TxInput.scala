@@ -59,14 +59,14 @@ object AssetOutputRef {
 
   def unsafe(hint: Hint, key: Hash): AssetOutputRef = new AssetOutputRef(hint, key)
 
-  def from(scriptHint: ScriptHint, key: Hash): AssetOutputRef =
+  def unsafeWithScriptHint(scriptHint: ScriptHint, key: Hash): AssetOutputRef =
     unsafe(Hint.ofAsset(scriptHint), key)
 
-  def from(assetOutput: AssetOutput, key: Hash): AssetOutputRef = unsafe(assetOutput.hint, key)
-
   // Only use this to initialize Merkle tree of ouptuts
-  def forMPT: AssetOutputRef =
-    AssetOutputRef.from(ScriptHint.fromHash(0), Hash.zero)
+  def forMPT: AssetOutputRef = {
+    val hint = Hint.ofAsset(ScriptHint.fromHash(0))
+    unsafe(hint, Hash.zero)
+  }
 }
 
 final case class ContractOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
@@ -83,8 +83,10 @@ object ContractOutputRef {
 
   def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 
-  def from(contractOutput: ContractOutput, key: Hash): ContractOutputRef =
-    unsafe(contractOutput.hint, key)
+  def unsafe(txHash: Hash, contractOutput: ContractOutput, outputIndex: Int): ContractOutputRef = {
+    val refKey = TxOutputRef.key(txHash, outputIndex)
+    unsafe(contractOutput.hint, refKey)
+  }
 
   // Only use this to initialize Merkle tree of ouptuts
   def forMPT: ContractOutputRef = {

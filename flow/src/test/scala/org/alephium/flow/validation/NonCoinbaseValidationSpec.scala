@@ -128,7 +128,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
             selected     <- Gen.choose(0, inputs.length - 1)
           } yield {
             val input        = inputs(selected)
-            val outputRefNew = AssetOutputRef.from(scriptHint, input.outputRef.key)
+            val outputRefNew = AssetOutputRef.unsafeWithScriptHint(scriptHint, input.outputRef.key)
             val inputsNew    = inputs.replace(selected, input.copy(outputRef = outputRefNew))
             tx.unsigned.copy(inputs = inputsNew)
           }

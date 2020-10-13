@@ -108,7 +108,7 @@ object Instr {
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
     ArraySeq[InstrCompanion[StatefulContext]](
       LoadField, StoreField, CallExternal,
-      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, TransferAlf, TransferToken, CreateContract
+      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, TransferAlf, TransferToken, CreateContract, IssueToken
     )
   // format: on
 
@@ -1317,6 +1317,20 @@ object SelfAddress extends StatefulInstrCompanion0 {
     for {
       addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
       _           <- frame.push(Val.Address(LockupScript.p2c(addressHash)))
+    } yield ()
+  }
+}
+
+object IssueToken extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _           <- Either.cond(frame.method.isPayable, (), NonPayableFrame)
+      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      amount      <- frame.popT[Val.U64]()
+      tokenId = addressHash // tokenId is addressHash
+      _ <- frame.ctx.outputBalances
+        .addToken(LockupScript.p2c(addressHash), tokenId, amount.v)
+        .toRight[ExeFailure](BalanceOverflow)
     } yield ()
   }
 }
