@@ -295,7 +295,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "test token balance overflow" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs(issueNewToken = false)) {
+    forAll(transactionGenWithPreOutputs()) {
       case (tx, preOutputs) =>
         whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
           val tokenId     = sampleToken(tx)
@@ -308,32 +308,12 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "validate token balances" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs(issueNewToken = false)) {
+    forAll(transactionGenWithPreOutputs()) {
       case (tx, preOutputs) =>
         val tokenId = sampleToken(tx)
         val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
         failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
         failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidTokenBalance)
-    }
-  }
-
-  it should "create new token" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        val newTokenId = tx.newTokenId
-        val newTokenIssued = tx.unsigned.fixedOutputs.exists { output =>
-          output.tokens.exists(_._1 equals newTokenId)
-        }
-        newTokenIssued is true
-
-        val txNew0 = replaceTokenId(tx, tx.newTokenId, Hash.generate)
-        failCheck(checkTokenBalance(txNew0, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
-        failCheck(checkBlockTx(txNew0, prepareWorldState(preOutputs)), InvalidTokenBalance)
-
-        val tokenAmount = getTokenAmount(tx, newTokenId)
-        val txNew1      = modifyTokenAmount(tx, newTokenId, U64.MaxValue - tokenAmount + 1 + _)
-        failCheck(checkTokenBalance(txNew1, preOutputs.map(_.referredOutput)), BalanceOverFlow)
-        failCheck(checkBlockTx(txNew1, prepareWorldState(preOutputs)), BalanceOverFlow)
     }
   }
 
