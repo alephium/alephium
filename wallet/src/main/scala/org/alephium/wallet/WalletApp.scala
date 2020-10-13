@@ -16,6 +16,8 @@
 
 package org.alephium.wallet
 
+import java.nio.file.Paths
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -46,8 +48,10 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
                           config.blockflow.groups,
                           config.networkType)
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private val secretDir = Paths.get(config.secretDir.toString, config.networkType.name)
   val walletService: WalletService =
-    WalletService.apply(blockFlowClient, config.secretDir, config.networkType)
+    WalletService.apply(blockFlowClient, secretDir, config.networkType)
 
   val walletServer: WalletServer = new WalletServer(walletService, config.networkType)
 

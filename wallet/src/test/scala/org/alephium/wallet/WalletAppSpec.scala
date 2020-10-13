@@ -83,6 +83,8 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
+  walletApp.start()
+
   val password                   = Hash.generate.toHexString
   var mnemonic: Mnemonic         = _
   var addresses: model.Addresses = _

@@ -82,20 +82,23 @@ object SecretStorage extends UtilCodecs {
 
   private implicit val codec: Codec[SecretFile] = deriveCodec[SecretFile]
 
-  def load(file: File): Either[Error, SecretStorage] = {
+  def load(file: File, path: AVector[Int]): Either[Error, SecretStorage] = {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
         _ <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
       } yield {
-        new Impl(file, None)
+        new Impl(file, None, path)
       }
     }.toEither.left
       .map(_ => SecretFileError)
       .flatten
   }
 
-  def create(seed: ByteString, password: String, file: File): Either[Error, SecretStorage] = {
+  def create(seed: ByteString,
+             password: String,
+             file: File,
+             path: AVector[Int]): Either[Error, SecretStorage] = {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
     } else {
@@ -103,23 +106,26 @@ object SecretStorage extends UtilCodecs {
         _ <- storeStateToFile(file,
                               StoredState(seed, numberOfAddresses = 1, activeAddressIndex = 0),
                               password)
-        state <- stateFromFile(file, password)
+        state <- stateFromFile(file, password, path)
       } yield {
-        new Impl(file, Some(state))
+        new Impl(file, Some(state), path)
       }
     }
   }
 
-  private[storage] def fromFile(file: File, password: String): Either[Error, SecretStorage] = {
+  private[storage] def fromFile(file: File,
+                                password: String,
+                                path: AVector[Int]): Either[Error, SecretStorage] = {
     for {
-      state <- stateFromFile(file, password)
+      state <- stateFromFile(file, password, path)
     } yield {
-      new Impl(file, Some(state))
+      new Impl(file, Some(state), path)
     }
   }
 
   //TODO add some `synchronized` for the state
-  private class Impl(file: File, initialState: Option[State]) extends SecretStorage {
+  private class Impl(file: File, initialState: Option[State], path: AVector[Int])
+      extends SecretStorage {
 
     private var maybeState: Option[State] = initialState
 
@@ -129,7 +135,7 @@ object SecretStorage extends UtilCodecs {
 
     override def unlock(password: String): Either[Error, Unit] = {
       for {
-        state <- stateFromFile(file, password)
+        state <- stateFromFile(file, password, path)
       } yield {
         maybeState = Some(state)
       }
@@ -181,10 +187,21 @@ object SecretStorage extends UtilCodecs {
       }
     }
 
+    private def deriveNextPrivateKey(
+        seed: ByteString,
+        privateKey: ExtendedPrivateKey): Either[Error, ExtendedPrivateKey] =
+      (for {
+        index  <- privateKey.path.lastOption.map(_ + 1)
+        parent <- BIP32.btcMasterKey(seed).derive(path.init)
+        child  <- parent.derive(index)
+      } yield child).toRight(CannotDeriveKey)
+
     private def getState: Either[Error, State] = maybeState.toRight(Locked)
   }
 
-  private def stateFromFile(file: File, password: String): Either[Error, State] = {
+  private def stateFromFile(file: File,
+                            password: String,
+                            path: AVector[Int]): Either[Error, State] = {
     Using(Source.fromFile(file)) { source =>
       val rawFile = source.getLines().mkString
       for {
@@ -195,7 +212,7 @@ object SecretStorage extends UtilCodecs {
           .left
           .map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
-        privateKeys <- deriveKeys(state.seed, state.numberOfAddresses)
+        privateKeys <- deriveKeys(state.seed, state.numberOfAddresses, path)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
         State(state.seed, password, active, privateKeys)
@@ -204,14 +221,15 @@ object SecretStorage extends UtilCodecs {
   }
 
   private def deriveKeys(seed: ByteString,
-                         number: Int): Either[Error, AVector[ExtendedPrivateKey]] = {
+                         number: Int,
+                         path: AVector[Int]): Either[Error, AVector[ExtendedPrivateKey]] = {
     if (number <= 0) {
       Right(AVector.empty)
     } else {
       for {
         rootPrivateKey <- BIP32
           .btcMasterKey(seed)
-          .derive(Constants.path.init)
+          .derive(path.init)
           .toRight(CannotDeriveKey)
         privateKeys <- AVector.from(0 until number).mapE { index =>
           rootPrivateKey.derive(index).toRight(CannotDeriveKey)
@@ -219,15 +237,6 @@ object SecretStorage extends UtilCodecs {
       } yield privateKeys
     }
   }
-
-  private def deriveNextPrivateKey(
-      seed: ByteString,
-      privateKey: ExtendedPrivateKey): Either[Error, ExtendedPrivateKey] =
-    (for {
-      index  <- privateKey.path.lastOption.map(_ + 1)
-      parent <- BIP32.btcMasterKey(seed).derive(Constants.path.init)
-      child  <- parent.derive(index)
-    } yield child).toRight(CannotDeriveKey)
 
   private def storeStateToFile(file: File,
                                storedState: StoredState,
