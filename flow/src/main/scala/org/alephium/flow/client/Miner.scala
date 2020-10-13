@@ -103,15 +103,18 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       updateTasks()
       startNewTasks()
       context become (handleMining orElse awaitStop)
-    case cmd: Miner.Command =>
-      log.debug(s"ignore miner commands $cmd")
+    case event =>
+      log.debug(s"ignore miner event: $event")
   }
 
   def awaitStop: Receive = {
     case Miner.Stop =>
       log.info("Stop mining")
       handlers.flowHandler ! FlowHandler.UnRegister
-      context become (awaitStart orElse handleMining)
+      postMinerStop()
+      context become awaitStart
+    case cmd: Miner.Command =>
+      log.debug(s"ignore miner commands: $cmd")
   }
 
   def handleMining: Receive = {

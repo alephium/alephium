@@ -67,10 +67,8 @@ trait MinerState {
     for {
       fromShift <- 0 until brokerConfig.groupNumPerBroker
       to        <- 0 until brokerConfig.groups
-      if {
-        (miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep) && !isRunning(fromShift,
-                                                                                         to)
-      }
+      if (miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep) &&
+        !isRunning(fromShift, to)
     } yield {
       (fromShift, to, pendingTasks(fromShift)(to))
     }
@@ -84,6 +82,13 @@ trait MinerState {
         startTask(fromShift, to, template, blockHandler)
         setRunning(fromShift, to)
     }
+  }
+
+  protected def postMinerStop(): Unit = {
+    for {
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
+    } setIdle(fromShift, to)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
