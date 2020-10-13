@@ -173,6 +173,7 @@ lazy val wallet = project("wallet")
 
 val publishSettings = Seq(
   publishMavenStyle := true,
+  publishMavenStyle in publishLocal := false,
   publishArtifact in Test := false,
   publishTo in ThisBuild := sonatypePublishToBundle.value
 )
