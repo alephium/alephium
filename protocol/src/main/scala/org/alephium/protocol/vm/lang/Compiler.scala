@@ -64,7 +64,7 @@ object Compiler {
     def name: String
     def isPublic: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]]
+    def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
@@ -242,7 +242,7 @@ object Compiler {
                                        immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]]])
       extends State[StatelessContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
-      BuiltIn.funcs
+      BuiltIn.statelessFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
@@ -268,7 +268,7 @@ object Compiler {
                                        immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]]])
       extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
-      BuiltIn.funcs
+      BuiltIn.statefulFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 

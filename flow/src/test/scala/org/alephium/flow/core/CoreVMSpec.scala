@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import akka.util.ByteString
+
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, ContractOutputRef, TxOutputRef}
 import org.alephium.protocol.vm.{StatefulVM, Val}
@@ -117,7 +119,7 @@ class VMSpec extends AlephiumSpec {
     checkState(blockFlow, chainIndex, contractKey0, newState2, contractOutputRef0, numAssets = 6)
   }
 
-  it should "use latest worldstate when call external functions" in new FlowFixture {
+  trait ContractFixture extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
 
     def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
@@ -142,7 +144,9 @@ class VMSpec extends AlephiumSpec {
                  numContracts)
       contractOutputRef
     }
+  }
 
+  it should "use latest worldstate when call external functions" in new ContractFixture {
     val input0 =
       s"""
          |TxContract Foo(mut x: U64) {
@@ -226,5 +230,59 @@ class VMSpec extends AlephiumSpec {
                contractOutputRef0,
                numAssets    = 5,
                numContracts = 3)
+  }
+
+  it should "issue new token" in new ContractFixture {
+    val input =
+      s"""
+         |TxContract Foo(mut x: U64) {
+         |  pub payable fn foo() -> () {
+         |    issueToken!(10000000)
+         |  }
+         |}
+         |""".stripMargin
+    val contractOutputRef = createContract(input, 2, 2)
+    val contractKey       = contractOutputRef.key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    let foo = Foo(@${contractKey.toHexString})
+         |    foo.foo()
+         |  }
+         |}
+         |
+         |TxContract Foo(mut x: U64) {
+         |  pub payable fn foo() -> () {
+         |    issueToken!(10000000)
+         |  }
+         |}
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).toOption.get
+
+    val block0 = mine(blockFlow, chainIndex, txScriptOption = Some(script), createContract = true)
+    blockFlow.add(block0).isRight is true
+
+    val worldState0 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    worldState0.getContractStates().toOption.get.length is 2
+    worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach {
+      case (ref, output) =>
+        if (ref != ContractOutputRef.forMPT) {
+          output.tokens.head is (contractKey -> U64.unsafe(10000000))
+        }
+    }
+
+    val block1 = mine(blockFlow, chainIndex, txScriptOption = Some(script), createContract = true)
+    blockFlow.add(block1).isRight is true
+
+    val worldState1 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    worldState1.getContractStates().toOption.get.length is 2
+    worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach {
+      case (ref, output) =>
+        if (ref != ContractOutputRef.forMPT) {
+          output.tokens.head is (contractKey -> U64.unsafe(20000000))
+        }
+    }
   }
 }

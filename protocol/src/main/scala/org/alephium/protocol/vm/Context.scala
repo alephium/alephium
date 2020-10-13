@@ -58,19 +58,22 @@ trait StatefulContext extends StatelessContext {
   lazy val generatedOutputs: ArrayBuffer[TxOutput]        = ArrayBuffer.empty
   lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
 
-  def nextOutputNum: Int
+  def nextOutputIndex: Int
+
+  def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
+    ContractOutputRef.unsafe(txHash, output, nextOutputIndex)
 
   def createContract(code: StatefulContract,
                      initialBalances: Frame.Balances,
                      initialFields: AVector[Val]): ExeResult[Unit] = {
     for {
       totalBalances <- initialBalances.pool().toRight(InvalidBalances)
-      contractId = TxOutputRef.key(txHash, nextOutputNum)
+      contractId = TxOutputRef.key(txHash, nextOutputIndex)
       contractOutput = ContractOutput(totalBalances.alfAmount,
                                       0, // TODO: use proper height here
                                       LockupScript.p2c(contractId),
                                       totalBalances.tokenVector)
-      outputRef = ContractOutputRef.from(contractOutput, contractId)
+      outputRef = nextContractOutputRef(contractOutput)
       newWorldState <- worldState
         .createContract(code, initialFields, outputRef, contractOutput)
         .left
@@ -92,6 +95,16 @@ trait StatefulContext extends StatelessContext {
       }
       .left
       .map(IOErrorLoadContract)
+  }
+
+  def updateContractAsset(contractId: ContractId,
+                          outputRef: ContractOutputRef,
+                          output: ContractOutput): ExeResult[Unit] = {
+    worldState
+      .updateContract(contractId, outputRef, output)
+      .map(updateWorldState)
+      .left
+      .map(IOErrorUpdateState)
   }
 
   def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
@@ -120,7 +133,7 @@ object StatefulContext {
       extends StatefulContext {
     override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
     override def outputBalances: Frame.Balances                = ??? // should not be used
-    override def nextOutputNum: Int                            = ??? // should not be used
+    override def nextOutputIndex: Int                          = ??? // should not be used
   }
 
   final class Payable(val tx: TransactionAbstract, val initWorldState: WorldState)
@@ -131,7 +144,7 @@ object StatefulContext {
 
     override val signatures: Stack[Signature] = Stack.popOnly(tx.signatures)
 
-    override def nextOutputNum: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
+    override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     override def getInitialBalances: ExeResult[Frame.Balances] = {
       for {

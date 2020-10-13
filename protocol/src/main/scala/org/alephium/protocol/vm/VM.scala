@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.{ContractOutputRef, TransactionAbstract, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, U64}
 
@@ -121,15 +121,26 @@ final class StatefulVM(ctx: StatefulContext,
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
         _        <- balances.remaining.merge(balances.approved)
+        _        <- balances.remaining.merge(ctx.outputBalances)
       } yield outputRemaining(balances.remaining)
       resultOpt.toRight(InvalidBalances)
     } else Right(())
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def outputRemaining(remaining: Frame.Balances): Unit = {
     remaining.all.foreach {
       case (lockupScript, balances) =>
-        balances.toTxOutput(lockupScript).foreach(ctx.generatedOutputs.addOne)
+        balances.toTxOutput(lockupScript).foreach { output =>
+          lockupScript match {
+            case LockupScript.P2C(contractId) =>
+              val contractOutput = output.asInstanceOf[ContractOutput]
+              val outputRef      = ctx.nextContractOutputRef(contractOutput)
+              ctx.updateContractAsset(contractId, outputRef, contractOutput)
+            case _ => ()
+          }
+          ctx.generatedOutputs.addOne(output)
+        }
     }
   }
 }

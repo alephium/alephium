@@ -428,6 +428,7 @@ object Frame {
   }
 
   object Balances {
+    // TODO: optimize this
     def from(inputs: AVector[TxOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
       val inputBalances = inputs.fold(Option(empty)) {
         case (Some(balances), input) =>

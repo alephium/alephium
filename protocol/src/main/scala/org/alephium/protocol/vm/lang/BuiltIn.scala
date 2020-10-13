@@ -30,21 +30,35 @@ object BuiltIn {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")
     }
   }
-  final case class SimpleBuiltIn(name: String,
-                                 argsType: Seq[Type],
-                                 returnType: Seq[Type],
-                                 instr: Instr[StatelessContext])
-      extends BuiltIn[StatelessContext] {
+
+  sealed trait SimpleBuiltIn[-Ctx <: StatelessContext] extends BuiltIn[Ctx] {
+    def argsType: Seq[Type]
+    def returnType: Seq[Type]
+    def instr: Instr[Ctx]
+
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) returnType
       else throw Error(s"Invalid args type $inputType for builtin func $name")
     }
 
-    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
+    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
   }
-  sealed abstract class GenericBuiltIn(val name: String) extends BuiltIn[StatelessContext]
 
-  val checkEq: GenericBuiltIn = new GenericBuiltIn("checkEq") {
+  final case class SimpleStatelessBuiltIn(name: String,
+                                          argsType: Seq[Type],
+                                          returnType: Seq[Type],
+                                          instr: Instr[StatelessContext])
+      extends SimpleBuiltIn[StatelessContext]
+
+  final case class SimpleStatefulBuiltIn(name: String,
+                                         argsType: Seq[Type],
+                                         returnType: Seq[Type],
+                                         instr: Instr[StatefulContext])
+      extends SimpleBuiltIn[StatefulContext]
+
+  sealed abstract class GenericStatelessBuiltIn(val name: String) extends BuiltIn[StatelessContext]
+
+  val checkEq: GenericStatelessBuiltIn = new GenericStatelessBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (!(inputType.length == 2) || inputType(0) != inputType(1))
         throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -70,14 +84,14 @@ object BuiltIn {
     }
   }
 
-  val blake2b: SimpleBuiltIn =
-    SimpleBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
-  val keccak256: SimpleBuiltIn =
-    SimpleBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
-  val checkSignature: SimpleBuiltIn =
-    SimpleBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
+  val blake2b: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
+  val keccak256: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
+  val checkSignature: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
 
-  sealed abstract class ConversionBuiltIn(name: String) extends GenericBuiltIn(name) {
+  sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
     import ConversionBuiltIn.validTypes
 
     def toType: Type
@@ -160,7 +174,7 @@ object BuiltIn {
     }
   }
 
-  val funcs: Map[String, FuncInfo[StatelessContext]] = Seq(
+  val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
     checkEq,
@@ -171,4 +185,10 @@ object BuiltIn {
     toI256,
     toU256
   ).map(f => f.name -> f).toMap
+
+  val issueToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("issueToken", Seq(Type.U64), Seq.empty, IssueToken)
+
+  val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
+    statelessFuncs ++ Seq(issueToken).map(f => f.name -> f)
 }
