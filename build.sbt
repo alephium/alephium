@@ -67,7 +67,8 @@ lazy val util = project("util")
 lazy val serde = project("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
+    publishArtifact := true
   )
   .dependsOn(util % "test->test;compile->compile")
 
