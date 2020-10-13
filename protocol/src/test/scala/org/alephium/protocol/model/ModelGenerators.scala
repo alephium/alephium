@@ -218,7 +218,6 @@ trait TxGenerators
 
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
-      issueNewToken: Boolean                = true,
       lockupScriptGen: IndexLockupScriptGen = p2pkhLockupGen,
       heightGen: Gen[Int]                   = createdHeightGen,
       dataGen: Gen[ByteString]              = dataGen
@@ -240,9 +239,6 @@ trait TxGenerators
             tokens.put(tokenId, total + amount)
         })
         tokens
-      }
-      if (issueNewToken) {
-        tokenTable(inputs.head.hash) = nextU64(1, U64.MaxValue)
       }
 
       val initialBalances = Balances(alfAmount, tokenTable.toMap)
@@ -287,7 +283,6 @@ trait TxGenerators
       maxInputs: Int                  = 10,
       minTokens: Int                  = 1,
       maxTokens: Int                  = 3,
-      issueNewToken: Boolean          = true,
       chainIndexGen: Gen[ChainIndex]  = chainIndexGen,
       scriptGen: IndexScriptPairGen   = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = p2pkhLockupGen
@@ -299,7 +294,7 @@ trait TxGenerators
                                      minTokens,
                                      maxTokens,
                                      scriptGen(chainIndex.from))
-      unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), issueNewToken, lockupGen)
+      unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
       signatures = assetInfos.map(info =>
         SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
     } yield {
@@ -312,7 +307,6 @@ trait TxGenerators
       maxInputs: Int                  = 10,
       minTokens: Int                  = 1,
       maxTokens: Int                  = 3,
-      issueNewToken: Boolean          = true,
       chainIndexGen: Gen[ChainIndex]  = chainIndexGen,
       scriptGen: IndexScriptPairGen   = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = p2pkhLockupGen
@@ -321,7 +315,6 @@ trait TxGenerators
                                  maxInputs,
                                  minTokens,
                                  maxTokens,
-                                 issueNewToken,
                                  chainIndexGen,
                                  scriptGen,
                                  lockupGen).map(_._1)

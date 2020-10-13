@@ -38,8 +38,6 @@ trait TransactionAbstract {
 
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
-
-  def newTokenId: TokenId = unsigned.inputs.head.hash
 }
 
 final case class Transaction(unsigned: UnsignedTransaction,
