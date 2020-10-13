@@ -67,7 +67,8 @@ lazy val util = project("util")
 lazy val serde = project("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
+    publishArtifact := true
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -173,6 +174,7 @@ lazy val wallet = project("wallet")
 
 val publishSettings = Seq(
   publishMavenStyle := true,
+  publishMavenStyle in publishLocal := false,
   publishArtifact in Test := false,
   publishTo in ThisBuild := sonatypePublishToBundle.value
 )
