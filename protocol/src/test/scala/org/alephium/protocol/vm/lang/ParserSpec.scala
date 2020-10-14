@@ -16,33 +16,11 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.crypto.Byte32
-import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
-import org.alephium.util.{AlephiumSpec, Hex, I256, I64, U256, U64}
+import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
+import org.alephium.util.AlephiumSpec
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
-
-  it should "parse lexer" in {
-    val byte32 = Byte32.generate.toHexString
-
-    fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
-    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
-    fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
-    fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
-    fastparse.parse(s"@$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
-      Hex.asArraySeq(byte32).get)
-    fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
-    fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
-    fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
-    fastparse.parse("x: U64", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
-    fastparse.parse("mut x: U64", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
-    fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
-    fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
-    fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
-  }
 
   it should "parse exprs" in {
     fastparse.parse("x + y", StatelessParser.expr(_)).get.value is
