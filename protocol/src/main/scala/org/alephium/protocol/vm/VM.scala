@@ -17,12 +17,10 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.serde._
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.AVector
 
 sealed abstract class VM[Ctx <: Context](ctx: Ctx,
                                          frameStack: Stack[Frame[Ctx]],
@@ -184,29 +182,6 @@ object StatelessVM {
 }
 
 object StatefulVM {
-  def contractCreation(code: StatefulContract,
-                       initialState: AVector[Val],
-                       lockupScript: LockupScript,
-                       alfAmount: U64): StatefulScript = {
-    val codeRaw  = serialize(code)
-    val stateRaw = serialize(initialState)
-    val method = Method[StatefulContext](
-      isPublic   = true,
-      isPayable  = true,
-      localsType = AVector.empty,
-      returnType = AVector.empty,
-      instrs = AVector(
-        U64Const(Val.U64(alfAmount)),
-        AddressConst(Val.Address(lockupScript)),
-        ApproveAlf,
-        BytesConst(Val.ByteVec(mutable.ArraySeq.from(stateRaw))),
-        BytesConst(Val.ByteVec(mutable.ArraySeq.from(codeRaw))),
-        CreateContract
-      )
-    )
-    StatefulScript(AVector(method))
-  }
-
   final case class TxScriptExecution(contractInputs: AVector[ContractOutputRef],
                                      generatedOutputs: AVector[TxOutput],
                                      worldState: WorldState)

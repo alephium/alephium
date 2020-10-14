@@ -1170,8 +1170,8 @@ sealed trait AssetInstr extends StatefulInstr
 object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address      <- frame.popT[Val.Address]()
       amount       <- frame.popT[Val.U64]()
+      address      <- frame.popT[Val.Address]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _ <- balanceState
         .approveALF(address.lockupScript, amount.v)
@@ -1183,10 +1183,10 @@ object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
 object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address      <- frame.popT[Val.Address]()
+      amount       <- frame.popT[Val.U64]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
-      amount       <- frame.popT[Val.U64]()
+      address      <- frame.popT[Val.Address]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _ <- balanceState
         .approveToken(address.lockupScript, tokenId, amount.v)
@@ -1209,8 +1209,8 @@ object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
 object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address      <- frame.popT[Val.Address]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
+      address      <- frame.popT[Val.Address]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       amount <- balanceState
@@ -1227,10 +1227,12 @@ sealed trait Transfer extends AssetInstr {
   }
 
   def transferAlf[C <: StatefulContext](frame: Frame[C],
-                                        from: LockupScript,
-                                        to: LockupScript): ExeResult[Unit] = {
+                                        fromThunk: => ExeResult[LockupScript],
+                                        toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
     for {
       amount       <- frame.popT[Val.U64]()
+      to           <- toThunk
+      from         <- fromThunk
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _            <- balanceState.useAlf(from, amount.v).toRight[ExeFailure](NotEnoughBalance)
       _ <- frame.ctx.outputBalances
@@ -1240,12 +1242,14 @@ sealed trait Transfer extends AssetInstr {
   }
 
   def transferToken[C <: StatefulContext](frame: Frame[C],
-                                          from: LockupScript,
-                                          to: LockupScript): ExeResult[Unit] = {
+                                          fromThunk: => ExeResult[LockupScript],
+                                          toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
     for {
+      amount       <- frame.popT[Val.U64]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
-      amount       <- frame.popT[Val.U64]()
+      to           <- toThunk
+      from         <- fromThunk
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _ <- balanceState
         .useToken(from, tokenId, amount.v)
@@ -1259,52 +1263,44 @@ sealed trait Transfer extends AssetInstr {
 
 object TransferAlf extends Transfer with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      from <- frame.popT[Val.Address]()
-      to   <- frame.popT[Val.Address]()
-      _    <- transferAlf(frame, from.lockupScript, to.lockupScript)
-    } yield ()
+    transferAlf(frame,
+                frame.popT[Val.Address]().map(_.lockupScript),
+                frame.popT[Val.Address]().map(_.lockupScript))
   }
 }
 
 object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      from <- getContractLockupScript(frame)
-      to   <- frame.popT[Val.Address]()
-      _    <- transferAlf(frame, from, to.lockupScript)
-    } yield ()
+    transferAlf(frame,
+                getContractLockupScript(frame),
+                frame.popT[Val.Address]().map(_.lockupScript))
   }
 }
 
 object TransferToken extends Transfer with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      from <- frame.popT[Val.Address]()
-      to   <- frame.popT[Val.Address]()
-      _    <- transferToken(frame, from.lockupScript, to.lockupScript)
-    } yield ()
+    transferToken(frame,
+                  frame.popT[Val.Address]().map(_.lockupScript),
+                  frame.popT[Val.Address]().map(_.lockupScript))
   }
 }
 
 object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      from <- getContractLockupScript(frame)
-      to   <- frame.popT[Val.Address]()
-      _    <- transferToken(frame, from, to.lockupScript)
-    } yield ()
+    transferToken(frame,
+                  getContractLockupScript(frame),
+                  frame.popT[Val.Address]().map(_.lockupScript))
   }
 }
 
 object CreateContract extends StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
+      fieldsRaw       <- frame.popT[Val.ByteVec]()
+      fields          <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(SerdeErrorCreateContract)
       contractCodeRaw <- frame.popT[Val.ByteVec]()
       contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left
         .map(SerdeErrorCreateContract)
-      fieldsRaw    <- frame.popT[Val.ByteVec]()
-      fields       <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(SerdeErrorCreateContract)
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       balances = balanceState.approved.use()
       _ <- frame.ctx.createContract(contractCode, balances, fields)

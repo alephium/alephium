@@ -31,7 +31,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def const[_: P]: P[Ast.Const[Ctx]] =
-    P(Lexer.typedNum | Lexer.bool | Lexer.bytes).map(Ast.Const.apply[Ctx])
+    P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
   def variable[_: P]: P[Ast.Variable[Ctx]] = P(Lexer.ident).map(Ast.Variable.apply[Ctx])
   def callAbs[_: P]: P[(Ast.FuncId, Seq[Ast.Expr[Ctx]])] =
     P(Lexer.funcId ~ "(" ~ expr.rep(0, ",") ~ ")")
