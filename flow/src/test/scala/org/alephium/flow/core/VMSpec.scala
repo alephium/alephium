@@ -82,7 +82,7 @@ class VMSpec extends AlephiumSpec {
          |
          |TxScript Bar {
          |  pub fn call() -> () {
-         |    let foo = Foo(@${contractKey0.toHexString})
+         |    let foo = Foo(#${contractKey0.toHexString})
          |    foo.add(4)
          |    return
          |  }
@@ -198,8 +198,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  pub fn main() -> () {
-         |    let foo = Foo(@${contractKey0.toHexString})
-         |    foo.foo(@${contractKey0.toHexString}, @${contractKey1.toHexString})
+         |    let foo = Foo(#${contractKey0.toHexString})
+         |    foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
          |  }
          |}
          |
@@ -248,7 +248,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  pub payable fn main() -> () {
-         |    let foo = Foo(@${contractKey.toHexString})
+         |    let foo = Foo(#${contractKey.toHexString})
          |    foo.foo()
          |  }
          |}

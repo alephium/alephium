@@ -179,7 +179,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |AssetScript P2PKH {
          |  pub fn verify(pk: ByteVec) -> () {
-         |    let hash = @${hash.toHexString}
+         |    let hash = #${hash.toHexString}
          |    checkEq!(hash, blake2b!(pk))
          |    checkSignature!(pk)
          |    return
