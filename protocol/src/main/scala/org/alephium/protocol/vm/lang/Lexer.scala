@@ -96,7 +96,7 @@ object Lexer {
       case None          => throw Compiler.Error(s"Invalid Byte32 value: $hexString")
     }
   }
-  def bytes[_: P]: P[Val] = P("@" ~ bytesInternal)
+  def bytes[_: P]: P[Val] = P("#" ~ bytesInternal)
 
   def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
     case "true" => Val.Bool(true)
