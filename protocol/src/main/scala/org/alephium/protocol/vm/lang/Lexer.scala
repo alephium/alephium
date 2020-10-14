@@ -21,6 +21,7 @@ import java.math.BigInteger
 import fastparse._
 import fastparse.NoWhitespace._
 
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.util._
@@ -89,16 +90,25 @@ object Lexer {
           }
       }
 
-  def bytesInternal[_: P]: P[Val] = P(hex).!.map { hexString =>
+  def bytesInternal[_: P]: P[Val.ByteVec] = P(hex).!.map { hexString =>
     val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
     byteVecOpt match {
       case Some(byteVec) => byteVec
       case None          => throw Compiler.Error(s"Invalid Byte32 value: $hexString")
     }
   }
-  def bytes[_: P]: P[Val] = P("#" ~ bytesInternal)
+  def bytes[_: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
 
-  def bool[_: P]: P[Val] = P(keyword("true") | keyword("false")).!.map {
+  def addressInternal[_: P]: P[Val.Address] = P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
+    val lockupScriptOpt = Address.extractLockupScript(input)
+    lockupScriptOpt match {
+      case Some(lockupScript) => Val.Address(lockupScript)
+      case None               => throw Compiler.Error(s"Invalid address: $input")
+    }
+  }
+  def address[_: P]: P[Val.Address] = P("@" ~ addressInternal)
+
+  def bool[_: P]: P[Val.Bool] = P(keyword("true") | keyword("false")).!.map {
     case "true" => Val.Bool(true)
     case _      => Val.Bool(false)
   }

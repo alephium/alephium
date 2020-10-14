@@ -186,9 +186,72 @@ object BuiltIn {
     toU256
   ).map(f => f.name -> f).toMap
 
+  val approveAlf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("approveAlf", Seq[Type](Type.Address, Type.U64), Seq.empty, ApproveAlf)
+
+  val approveToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("approveToken",
+                          Seq[Type](Type.Address, Type.ByteVec, Type.U64),
+                          Seq.empty,
+                          ApproveToken)
+
+  val alfRemaining: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("alfRemaining", Seq(Type.Address), Seq(Type.U64), AlfRemaining)
+
+  val tokenRemaining: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("tokenRemaining",
+                          Seq[Type](Type.Address, Type.ByteVec),
+                          Seq(Type.U64),
+                          TokenRemaining)
+
+  val transferAlf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferAlf",
+                          Seq[Type](Type.Address, Type.Address, Type.U64),
+                          Seq.empty,
+                          TransferAlf)
+
+  val transferAlfFromSelf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferAlfFromSelf",
+                          Seq[Type](Type.Address, Type.U64),
+                          Seq.empty,
+                          TransferAlfFromSelf)
+
+  val transferToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferToken",
+                          Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U64),
+                          Seq.empty,
+                          TransferToken)
+
+  val transferTokenFromSelf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferTokenFromSelf",
+                          Seq[Type](Type.Address, Type.ByteVec, Type.U64),
+                          Seq.empty,
+                          TransferTokenFromSelf)
+
+  val createContract: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("createContract",
+                          Seq[Type](Type.ByteVec, Type.ByteVec),
+                          Seq.empty,
+                          CreateContract)
+
+  val selfAddress: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
+
   val issueToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("issueToken", Seq(Type.U64), Seq.empty, IssueToken)
 
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
-    statelessFuncs ++ Seq(issueToken).map(f => f.name -> f)
+    statelessFuncs ++ Seq(
+      approveAlf,
+      approveToken,
+      alfRemaining,
+      tokenRemaining,
+      transferAlf,
+      transferAlfFromSelf,
+      transferToken,
+      transferTokenFromSelf,
+      createContract,
+      selfAddress,
+      issueToken
+    ).map(f => f.name -> f)
 }

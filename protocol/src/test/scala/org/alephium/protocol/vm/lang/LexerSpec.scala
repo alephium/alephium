@@ -17,12 +17,15 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.crypto.Byte32
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, Hex, I256, I64, U256, U64}
 
 class LexerSpec extends AlephiumSpec {
   it should "parse lexer" in {
-    val byte32 = Byte32.generate.toHexString
+    val byte32  = Byte32.generate.toHexString
+    val address = Address.p2pkh(NetworkType.Testnet, PublicKey.generate)
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
@@ -30,6 +33,8 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.asArraySeq(byte32).get)
+    fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
+      address.lockupScript)
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")

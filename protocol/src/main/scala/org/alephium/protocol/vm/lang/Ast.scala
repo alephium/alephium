@@ -60,7 +60,7 @@ object Ast {
         case _: Val.U64Vec  => ???
         case _: Val.I256Vec => ???
         case _: Val.U256Vec => ???
-        case _: Val.Address => ???
+        case v: Val.Address => Seq(AddressConst(v))
       }
     }
   }

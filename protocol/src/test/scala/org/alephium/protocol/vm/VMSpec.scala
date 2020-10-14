@@ -126,8 +126,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AlfRemaining,
       AddressConst(address1),
       AlfRemaining,
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U64(100), Val.U64(0), Val.U64(99)))
@@ -135,8 +135,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "fail when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address0),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
     fail(instrs, NoTokenBalanceForTheAddress)
@@ -144,19 +144,19 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "approve balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
-      U64Const(Val.U64(10)),
       AddressConst(address0),
+      U64Const(Val.U64(10)),
       ApproveAlf,
       AddressConst(address0),
       AlfRemaining,
-      U64Const(Val.U64(10)),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      U64Const(Val.U64(10)),
       ApproveToken,
       AddressConst(address1),
       AlfRemaining,
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(89)))
@@ -164,9 +164,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
-      U64Const(Val.U64(10)),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address0),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      U64Const(Val.U64(10)),
       ApproveToken
     )
     fail(instrs, NotEnoughBalance)
@@ -174,21 +174,21 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "transfer asset to output" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      AddressConst(address1),
       U64Const(Val.U64(10)),
-      AddressConst(address1),
-      AddressConst(address0),
       TransferAlf,
-      U64Const(Val.U64(1)),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
-      AddressConst(address0),
       AddressConst(address1),
+      AddressConst(address0),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      U64Const(Val.U64(1)),
       TransferToken,
       AddressConst(address0),
       AlfRemaining,
       AddressConst(address1),
       AlfRemaining,
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       AddressConst(address1),
+      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
 

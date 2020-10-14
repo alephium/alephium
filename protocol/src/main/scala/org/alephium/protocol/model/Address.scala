@@ -38,6 +38,14 @@ object Address {
     } yield Address(networkType, lockupScript)
   }
 
+  def extractLockupScript(address: String): Option[LockupScript] = {
+    for {
+      (_, lockupScriptBase58) <- NetworkType.decode(address)
+      lockupScriptRaw         <- Base58.decode(lockupScriptBase58)
+      lockupScript            <- deserialize[LockupScript](lockupScriptRaw).toOption
+    } yield lockupScript
+  }
+
   def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address =
     Address(networkType, LockupScript.p2pkh(publicKey))
 }

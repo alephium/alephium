@@ -19,12 +19,32 @@ package org.alephium.flow.core
 import akka.util.ByteString
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{ChainIndex, ContractOutputRef, TxOutputRef}
-import org.alephium.protocol.vm.{StatefulVM, Val}
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, StatefulScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, U64}
+import org.alephium.serde.serialize
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
 
 class VMSpec extends AlephiumSpec {
+  def contractCreation(code: StatefulContract,
+                       initialState: AVector[Val],
+                       lockupScript: LockupScript,
+                       alfAmount: U64): StatefulScript = {
+    val address  = Address(NetworkType.Testnet, lockupScript)
+    val codeRaw  = Hex.toHexString(serialize(code))
+    val stateRaw = Hex.toHexString(serialize(initialState))
+    val scriptRaw =
+      s"""
+         |TxScript Foo {
+         |  pub payable fn main() -> () {
+         |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+         |    createContract!(#$codeRaw, #$stateRaw)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(scriptRaw).toOption.get
+  }
+
   it should "not start with private function" in new FlowFixture {
     val input =
       s"""
@@ -61,7 +81,7 @@ class VMSpec extends AlephiumSpec {
 
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
-    lazy val txScript0  = StatefulVM.contractCreation(script0, initialState, fromLockup, U64.One)
+    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U64.One)
     lazy val block0 =
       mine(blockFlow, chainIndex, txScriptOption = Some(txScript0), createContract = true)
     lazy val contractOutputRef0 =
@@ -126,7 +146,7 @@ class VMSpec extends AlephiumSpec {
       val contract     = Compiler.compileContract(input).toOption.get
       val initialState = AVector[Val](Val.U64(U64.Zero))
       val fromLockup   = getGenesisLockupScript(chainIndex)
-      val txScript     = StatefulVM.contractCreation(contract, initialState, fromLockup, U64.One)
+      val txScript     = contractCreation(contract, initialState, fromLockup, U64.One)
 
       val block =
         mine(blockFlow, chainIndex, txScriptOption = Some(txScript), createContract = true)
