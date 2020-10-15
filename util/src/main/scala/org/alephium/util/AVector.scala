@@ -653,7 +653,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def asUnsafe[T: ClassTag]: AVector[T] =
+  def asUnsafe[T <: A: ClassTag]: AVector[T] =
     AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
 }
 // scalastyle:on
