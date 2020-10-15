@@ -75,11 +75,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = Frame.BalancesPerLockup(100, mutable.Map.empty)
+    val balances0    = Frame.BalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = Frame.BalancesPerLockup(0, mutable.Map(tokenId -> 99))
+    val balances1    = Frame.BalancesPerLockup(0, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext = new StatefulContext {
       var worldState: WorldState                = cachedWorldState
@@ -193,10 +193,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     )
 
     val context = pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(98)))
-    context.outputBalances.getAlfAmount(address0.lockupScript).get is 0
+    context.outputBalances.getAlfAmount(address0.lockupScript).get is 90
     context.outputBalances.getAlfAmount(address1.lockupScript).get is 10
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
-    context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).isEmpty is true
+    context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
 
   it should "serde instructions" in {

@@ -1302,8 +1302,8 @@ object CreateContract extends StatefulInstrCompanion0 {
       contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left
         .map(SerdeErrorCreateContract)
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
-      balances = balanceState.approved.use()
-      _ <- frame.ctx.createContract(contractCode, balances, fields)
+      balances     <- balanceState.approved.useForNewContract().toRight(InvalidBalances)
+      _            <- frame.ctx.createContract(contractCode, balances, fields)
     } yield ()
   }
 }

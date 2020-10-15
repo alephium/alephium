@@ -395,17 +395,21 @@ object Frame {
     }
 
     def use(): Balances = {
-      val newAll = ArrayBuffer.from(all)
+      val newAll = all.map {
+        case (lockupScript, balancesPerLockup) =>
+          lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
+      }
       all.clear()
       Balances(newAll)
     }
 
-    def pool(): Option[BalancesPerLockup] = {
+    def useForNewContract(): Option[BalancesPerLockup] = {
       Option.when(all.nonEmpty) {
         val accumulator = BalancesPerLockup.empty
         all.foreach { balances =>
           accumulator.add(balances._2)
         }
+        all.clear()
         accumulator
       }
     }
@@ -446,7 +450,9 @@ object Frame {
     def empty: Balances = Balances(ArrayBuffer.empty)
   }
 
-  final case class BalancesPerLockup(var alfAmount: U64, tokenAmounts: mutable.Map[TokenId, U64]) {
+  final case class BalancesPerLockup(var alfAmount: U64,
+                                     tokenAmounts: mutable.Map[TokenId, U64],
+                                     scopeDepth: Int) {
     def tokenVector: AVector[(TokenId, U64)] = {
       import org.alephium.protocol.model.tokenIdOrder
       AVector.from(tokenAmounts).sortBy(_._1)
@@ -515,19 +521,19 @@ object Frame {
   }
 
   object BalancesPerLockup {
-    val error: ArithmeticException = new ArithmeticException("U64")
+    val error: ArithmeticException = new ArithmeticException("Balance amount")
 
-    val empty: BalancesPerLockup = BalancesPerLockup(U64.Zero, mutable.Map.empty)
+    val empty: BalancesPerLockup = BalancesPerLockup(U64.Zero, mutable.Map.empty, 0)
 
     def alf(amount: U64): BalancesPerLockup = {
-      BalancesPerLockup(amount, mutable.Map.empty)
+      BalancesPerLockup(amount, mutable.Map.empty, 0)
     }
 
     def token(id: TokenId, amount: U64): BalancesPerLockup = {
-      BalancesPerLockup(U64.Zero, mutable.Map(id -> amount))
+      BalancesPerLockup(U64.Zero, mutable.Map(id -> amount), 0)
     }
 
     def from(output: TxOutput): BalancesPerLockup =
-      BalancesPerLockup(output.amount, mutable.Map.from(output.tokens.toIterable))
+      BalancesPerLockup(output.amount, mutable.Map.from(output.tokens.toIterable), 0)
   }
 }
