@@ -64,24 +64,23 @@ trait StatefulContext extends StatelessContext {
     ContractOutputRef.unsafe(txHash, output, nextOutputIndex)
 
   def createContract(code: StatefulContract,
-                     initialBalances: Frame.Balances,
+                     initialBalances: Frame.BalancesPerLockup,
                      initialFields: AVector[Val]): ExeResult[Unit] = {
-    for {
-      totalBalances <- initialBalances.pool().toRight(InvalidBalances)
-      contractId = TxOutputRef.key(txHash, nextOutputIndex)
-      contractOutput = ContractOutput(totalBalances.alfAmount,
-                                      0, // TODO: use proper height here
-                                      LockupScript.p2c(contractId),
-                                      totalBalances.tokenVector)
-      outputRef = nextContractOutputRef(contractOutput)
-      newWorldState <- worldState
-        .createContract(code, initialFields, outputRef, contractOutput)
-        .left
-        .map(IOErrorUpdateState)
-    } yield {
-      worldState = newWorldState
-      generatedOutputs.addOne(contractOutput)
-    }
+    val contractId = TxOutputRef.key(txHash, nextOutputIndex)
+    val contractOutput = ContractOutput(initialBalances.alfAmount,
+                                        0, // TODO: use proper height here
+                                        LockupScript.p2c(contractId),
+                                        initialBalances.tokenVector)
+    val outputRef = nextContractOutputRef(contractOutput)
+    worldState
+      .createContract(code, initialFields, outputRef, contractOutput)
+      .map { newWorldState =>
+        worldState = newWorldState
+        generatedOutputs.addOne(contractOutput)
+        ()
+      }
+      .left
+      .map(IOErrorUpdateState)
   }
 
   def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {

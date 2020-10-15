@@ -107,27 +107,47 @@ final class StatefulVM(ctx: StatefulContext,
       val resultOpt = for {
         currentBalances <- currentFrame.balanceStateOpt
         nextBalances    <- nextFrame.balanceStateOpt
-        _               <- nextBalances.remaining.merge(currentBalances.remaining)
-        _               <- nextBalances.remaining.merge(currentBalances.approved)
+        _               <- merge(nextBalances.remaining, currentBalances.remaining)
+        _               <- merge(nextBalances.remaining, currentBalances.approved)
       } yield ()
       resultOpt.toRight(InvalidBalances)
     } else Right(())
+  }
+
+  protected def merge(next: Frame.Balances, current: Frame.Balances): Option[Unit] = {
+    @tailrec
+    def iter(index: Int): Option[Unit] = {
+      if (index >= current.all.length) Some(())
+      else {
+        val (lockupScript, balancesPerLockup) = current.all(index)
+        if (balancesPerLockup.scopeDepth <= 0) {
+          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+        } else {
+          next.add(lockupScript, balancesPerLockup) match {
+            case Some(_) => iter(index + 1)
+            case None    => None
+          }
+        }
+      }
+    }
+
+    iter(0)
   }
 
   protected def checkFinalBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     if (lastFrame.method.isPayable) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
-        _        <- balances.remaining.merge(balances.approved)
-        _        <- balances.remaining.merge(ctx.outputBalances)
-      } yield outputRemaining(balances.remaining)
+        _        <- ctx.outputBalances.merge(balances.approved)
+        _        <- ctx.outputBalances.merge(balances.remaining)
+      } yield outputGeneratedBalances(ctx.outputBalances)
       resultOpt.toRight(InvalidBalances)
     } else Right(())
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def outputRemaining(remaining: Frame.Balances): Unit = {
-    remaining.all.foreach {
+  private def outputGeneratedBalances(outputBalances: Frame.Balances): Unit = {
+    outputBalances.all.foreach {
       case (lockupScript, balances) =>
         balances.toTxOutput(lockupScript).foreach { output =>
           lockupScript match {
