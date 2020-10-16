@@ -44,6 +44,10 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
     AVector.from(pool.values.take(maxNum))
   }
 
+  def getAll: AVector[Transaction] = readOnly {
+    AVector.from(pool.values)
+  }
+
   def add(transactions: AVector[(Transaction, Double)]): Int = writeOnly {
     val sizeBefore = size
     transactions.foreachE {
