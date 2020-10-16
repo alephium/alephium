@@ -28,8 +28,10 @@ jobs:
   include:
     - stage: test
       script:
-        - ps aux | grep haveged
-        - ./make test && ./make itest
+        - ./make test
+    - stage: ittest
+      script:
+        - ./make itest
 
 branches:
   only:
@@ -37,3 +39,4 @@ branches:
 
 stages:
   - test
+  - ittest
