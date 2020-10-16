@@ -37,15 +37,14 @@ def project(path: String): Project = {
       inConfig(IntegrationTest)(ScalastylePlugin.rawScalastyleSettings()),
       IntegrationTest / scalastyleConfig := root.base / scalastyleTestCfgFile,
       IntegrationTest / scalastyleTarget := target.value / "scalastyle-it-results.xml",
-      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value,
-      publishArtifact := false,
-      publishArtifact in Test := false
+      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value
     )
 }
 
 lazy val macros = project("macros")
   .settings(
     libraryDependencies += `scala-reflect`(scalaVersion.value),
+    publish := {},
     wartremoverErrors in (Compile, compile) := Warts.allBut(
       wartsCompileExcludes :+ Wart.AsInstanceOf: _*)
   )
@@ -54,8 +53,6 @@ lazy val util = project("util")
   .dependsOn(macros)
   .settings(
     scalacOptions -= "-Xlint:nonlocal-return",
-    publishArtifact := true,
-    publishArtifact in Test := true,
     libraryDependencies ++= Seq(
       akka,
       `akka-slf4j`,
@@ -68,19 +65,18 @@ lazy val serde = project("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
     Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
-    publishArtifact := true
   )
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
-  .settings(
-    publishArtifact := true
-  )
 
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
-  .settings(libraryDependencies += rocksdb)
+  .settings(
+    libraryDependencies += rocksdb,
+    publish := {}
+  )
 
 lazy val rpc = project("rpc")
   .settings(
@@ -93,8 +89,7 @@ lazy val rpc = project("rpc")
       `scala-logging`,
       `akka-test`,
       `akka-http-test`
-    ),
-    publishArtifact := true
+    )
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -120,13 +115,17 @@ lazy val `app-server` = mainProject("app-server")
       `tapir-openapi`,
       `tapir-openapi-circe`,
       `tapir-swagger-ui`,
-    )
+    ),
+    publish := {},
   )
 
 lazy val benchmark = project("benchmark")
   .enablePlugins(JmhPlugin)
   .dependsOn(flow)
-  .settings(scalacOptions += "-Xdisable-assertions")
+  .settings(
+    publish := {},
+    scalacOptions += "-Xdisable-assertions"
+  )
 
 lazy val flow = project("flow")
   .dependsOn(crypto, io, serde, util % "test->test")
@@ -137,7 +136,8 @@ lazy val flow = project("flow")
       logback,
       `scala-logging`,
       weupnp
-    )
+    ),
+    publish := {},
   )
   .dependsOn(protocol % "test->test;compile->compile")
 
@@ -147,8 +147,7 @@ lazy val protocol = project("protocol")
     libraryDependencies ++= Seq(
       fastparse,
       pureconfig
-    ),
-    publishArtifact := true
+    )
   )
 
 lazy val wallet = project("wallet")
@@ -169,7 +168,8 @@ lazy val wallet = project("wallet")
       `tapir-swagger-ui`,
       `scala-logging`,
       logback,
-    )
+    ),
+    publish := {}
   )
 
 val publishSettings = Seq(
