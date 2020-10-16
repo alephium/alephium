@@ -26,17 +26,13 @@ install:
 
 jobs:
   include:
-    - stage: test
+    - name: test
       script:
         - ./make test
-    - stage: ittest
+    - name: ittest
       script:
         - ./make itest
 
 branches:
   only:
   - master
-
-stages:
-  - test
-  - ittest
