@@ -93,6 +93,11 @@ class RestServer(
       Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
+  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
+    case (from, to) =>
+      Future.successful(ServerUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
+  }
+
   private val createTransactionRoute = createTransaction.toRoute {
     case (fromKey, toAddress, value) =>
       Future.successful(
@@ -120,6 +125,7 @@ class RestServer(
     getGroup,
     getHashesAtHeight,
     getChainInfo,
+    listUnconfirmedTransactions,
     createTransaction,
     sendTransactionLogic.endpoint,
     minerActionLogic.endpoint
@@ -137,6 +143,7 @@ class RestServer(
       getGroupRoute ~
       getHashesAtHeightRoute ~
       getChainInfoRoute ~
+      listUnconfirmedTransactionsRoute ~
       createTransactionRoute ~
       sendTransactionLogic.toRoute ~
       minerActionLogic.toRoute ~

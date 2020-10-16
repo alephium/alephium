@@ -28,6 +28,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.appserver.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.rpc.CirceUtils.avectorCodec
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -115,6 +116,13 @@ class RestServerSpec
     }
     Get(s"/chains?fromGroup=1&toGroup=10") ~> server.route ~> check {
       status is StatusCodes.BadRequest
+    }
+  }
+
+  it should "call GET /unconfirmed-transactions" in new RestServerFixture {
+    Get(s"/unconfirmed-transactions?fromGroup=0&toGroup=0") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[AVector[Tx]] is AVector.empty[Tx]
     }
   }
 

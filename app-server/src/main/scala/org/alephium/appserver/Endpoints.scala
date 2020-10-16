@@ -30,6 +30,7 @@ import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
+import org.alephium.rpc.CirceUtils.avectorCodec
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{TimeStamp, U256}
 
@@ -117,6 +118,15 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
+
+  //have to be lazy to let `groupConfig` being initialized
+  lazy val listUnconfirmedTransactions: BaseEndpoint[(GroupIndex, GroupIndex), AVector[Tx]] =
+    baseEndpoint.get
+      .in("unconfirmed-transactions")
+      .in(query[GroupIndex]("fromGroup"))
+      .in(query[GroupIndex]("toGroup"))
+      .out(jsonBody[AVector[Tx]])
+      .description("List unconfirmed transactions")
 
   val createTransaction: BaseEndpoint[(PublicKey, Address, U256), CreateTransactionResult] =
     baseEndpoint.get
