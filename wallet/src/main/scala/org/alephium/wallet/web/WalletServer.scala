@@ -28,7 +28,7 @@ import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.NetworkType
-import org.alephium.util.U64
+import org.alephium.util.U256
 import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
@@ -89,8 +89,8 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
         walletService
           .getBalances(wallet)
           .map(_.map { balances =>
-            val totalBalance = balances.map { case (_, amount) => amount }.fold(U64.Zero) {
-              case (acc, u64) => acc.addUnsafe(u64)
+            val totalBalance = balances.map { case (_, amount) => amount }.fold(U256.Zero) {
+              case (acc, u256) => acc.addUnsafe(u256)
             }
             val balancesPerAddress = balances.map {
               case (address, amount) => model.Balances.AddressBalance(address, amount)

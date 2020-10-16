@@ -39,7 +39,7 @@ import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
@@ -93,7 +93,7 @@ class WalletAppSpec
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
   val transferAmount             = 10
-  val balanceAmount              = U64.unsafe(42)
+  val balanceAmount              = U256.unsafe(42)
 
   def creationJson(size: Int)                   = s"""{"password":"$password","mnemonicSize":$size}"""
   val unlockJson                                = s"""{"password":"$password"}"""
@@ -186,7 +186,7 @@ class WalletAppSpec
     val negAmount = -10
     transfer(negAmount) ~> check {
       val error = responseAs[WalletApiError]
-      error.detail is s"""Invalid value for: body (Invalid U64: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
+      error.detail is s"""Invalid value for: body (Invalid U256: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
       status is StatusCodes.BadRequest
     }
 

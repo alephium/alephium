@@ -55,17 +55,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val contract =
       s"""
          |// comment
-         |TxContract Foo(mut x: U64, mut y: U64, c: U64) {
+         |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
          |  // comment
-         |  pub fn add0(a: U64, b: U64) -> (U64) {
+         |  pub fn add0(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
          |
-         |  fn add1() -> (U64) {
+         |  fn add1() -> (U256) {
          |    return (x + y)
          |  }
          |
-         |  fn add2(d: U64) -> () {
+         |  fn add2(d: U256) -> () {
          |    let mut z = 0u
          |    z = d
          |    x = x + z // comment
@@ -88,7 +88,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
               validity: Boolean = false) = {
       val contract =
         s"""
-         |TxContract Foo($xMut x: U64) {
+         |TxContract Foo($xMut x: U256) {
          |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
          |    x = a + b
          |    return (a - b)
@@ -102,15 +102,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContract(contract).isRight is validity
     }
 
-    check("mut", "a", "U64", "b", "U64", "U64", "foo", true)
-    check("", "a", "U64", "b", "U64", "U64", "foo")
-    check("mut", "x", "U64", "b", "U64", "U64", "foo")
-    check("mut", "a", "U64", "x", "U64", "U64", "foo")
-    check("mut", "a", "I64", "b", "U64", "U64", "foo")
-    check("mut", "a", "U64", "b", "I64", "U64", "foo")
-    check("mut", "a", "U64", "b", "U64", "I64", "foo")
-    check("mut", "a", "U64", "b", "U64", "U64, U64", "foo")
-    check("mut", "a", "U64", "b", "U64", "U64", "add")
+    check("mut", "a", "U256", "b", "U256", "U256", "foo", true)
+    check("", "a", "U256", "b", "U256", "U256", "foo")
+    check("mut", "x", "U256", "b", "U256", "U256", "foo")
+    check("mut", "a", "U256", "x", "U256", "U256", "foo")
+    check("mut", "a", "I64", "b", "U256", "U256", "foo")
+    check("mut", "a", "U256", "b", "I64", "U256", "foo")
+    check("mut", "a", "U256", "b", "U256", "I64", "foo")
+    check("mut", "a", "U256", "b", "U256", "U256, U256", "foo")
+    check("mut", "a", "U256", "b", "U256", "U256", "add")
   }
 
   it should "parse multiple contracts" in {
@@ -156,22 +156,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "generate IR code" in new Fixture {
     val input =
       s"""
-         |TxContract Foo(x: U64) {
+         |TxContract Foo(x: U256) {
          |
-         |  pub fn add(a: U64) -> (U64) {
+         |  pub fn add(a: U256) -> (U256) {
          |    return square(x) + square(a)
          |  }
          |
-         |  fn square(n: U64) -> (U64) {
+         |  fn square(n: U256) -> (U256) {
          |    return n * n
          |  }
          |}
          |""".stripMargin
 
     test(input,
-         AVector(Val.U64(U64.Two)),
-         AVector(Val.U64(U64.unsafe(5))),
-         AVector(Val.U64(U64.One)))
+         AVector(Val.U256(U256.Two)),
+         AVector(Val.U256(U256.unsafe(5))),
+         AVector(Val.U256(U256.One)))
   }
 
   it should "verify signature" in {
@@ -206,10 +206,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract Conversion() {
          |  pub fn main() -> () {
          |    let mut x = 5u
-         |    x = u64!(5i)
-         |    x = u64!(5I)
-         |    x = u64!(5U)
-         |    return
+         |    let mut y = 5i
+         |    x = u256!(y)
+         |    y = i256!(x)
          |  }
          |}
          |""".stripMargin,
@@ -221,7 +220,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract While() {
-         |  pub fn main() -> (U64) {
+         |  pub fn main() -> (U256) {
          |    let mut x = 5
          |    let mut done = false
          |    while !done {
@@ -233,7 +232,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       AVector.empty,
-      AVector(Val.U64(U64.unsafe(35)))
+      AVector(Val.U256(U256.unsafe(35)))
     )
   }
 
@@ -243,28 +242,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract Main() {
          |
          |  pub fn main() -> () {
-         |    let an_i64 = 5i // Suffix annotation
-         |    let an_u64 = 5u
-         |    let an_i256 = 5I
-         |    let an_u256 = 5U
+         |    let an_i256 = 5i
+         |    let an_u256 = 5u
          |
          |    // Or a default will be used.
-         |    let default_integer = 7   // `U64`
+         |    let default_integer = 7   // `U256`
          |
          |    // A mutable variable's value can be changed.
-         |    let mut another_i64 = 5i
-         |    let mut another_u64 = 5u
-         |    let mut another_i256 = 5I
-         |    let mut another_u256 = 5U
-         |    another_i64 = 6i
-         |    another_u64 = 6u
-         |    another_i256 = 6I
-         |    another_u256 = 6U
+         |    let mut another_i256 = 5i
+         |    let mut another_u256 = 5u
+         |    another_i256 = 6i
+         |    another_u256 = 6u
          |
          |    let mut bool = true
          |    bool = false
-         |
-         |    return
          |  }
          |}
          |""".stripMargin,
@@ -274,43 +265,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Fibonacci() {
-         |  pub fn f(n: I64) -> (I64) {
+         |  pub fn f(n: I256) -> (I256) {
          |    if n < 2i {
          |      return n
          |    } else {
          |      return f(n-1i) + f(n-2i)
-         |    }
-         |  }
-         |}
-         |""".stripMargin,
-      AVector(Val.I64(I64.from(10))),
-      AVector[Val](Val.I64(I64.from(55)))
-    )
-
-    test(
-      s"""
-         |TxContract Fibonacci() {
-         |  pub fn f(n: U64) -> (U64) {
-         |    if n < 2 {
-         |      return n
-         |    } else {
-         |      return f(n-1) + f(n-2)
-         |    }
-         |  }
-         |}
-         |""".stripMargin,
-      AVector(Val.U64(U64.unsafe(10))),
-      AVector[Val](Val.U64(U64.unsafe(55)))
-    )
-
-    test(
-      s"""
-         |TxContract Fibonacci() {
-         |  pub fn f(n: I256) -> (I256) {
-         |    if n < 2I {
-         |      return n
-         |    } else {
-         |      return f(n-1I) + f(n-2I)
          |    }
          |  }
          |}
@@ -323,10 +282,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Fibonacci() {
          |  pub fn f(n: U256) -> (U256) {
-         |    if n < 2U {
+         |    if n < 2u {
          |      return n
          |    } else {
-         |      return f(n-1U) + f(n-2U)
+         |      return f(n-1u) + f(n-2u)
          |    }
          |  }
          |}
@@ -373,7 +332,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       s"""
          |TxContract Foo() {
-         |  pub fn f(mut n: U64) -> (U64) {
+         |  pub fn f(mut n: U256) -> (U256) {
          |    if n < 2 {
          |      n = n + 1
          |    }
@@ -381,8 +340,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      AVector(Val.U64(U64.unsafe(2))),
-      AVector[Val](Val.U64(U64.unsafe(2)))
+      AVector(Val.U256(U256.unsafe(2))),
+      AVector[Val](Val.U256(U256.unsafe(2)))
     )
   }
 
@@ -390,11 +349,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val contract =
       s"""
          |TxContract Uniswap(
-         |  mut alfReserve: U64,
-         |  mut btcReserve: U64
+         |  mut alfReserve: U256,
+         |  mut btcReserve: U256
          |) {
-         |  pub fn exchange(alfAmount: U64) -> (U64) {
-         |    let tokenAmount = u64!(u256!(btcReserve) * u256!(alfAmount) / u256!(alfReserve + alfAmount))
+         |  pub fn exchange(alfAmount: U256) -> (U256) {
+         |    let tokenAmount = btcReserve * alfAmount / (alfReserve + alfAmount)
          |    alfReserve = alfReserve + alfAmount
          |    btcReserve = btcReserve - tokenAmount
          |    return tokenAmount
@@ -404,17 +363,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     test(
       contract,
-      AVector(Val.U64(U64.unsafe(1000))),
-      AVector(Val.U64(U64.unsafe(99))),
-      AVector(Val.U64(U64.unsafe(1000000)), Val.U64(U64.unsafe(100000)))
+      AVector(Val.U256(U256.unsafe(1000))),
+      AVector(Val.U256(U256.unsafe(99))),
+      AVector(Val.U256(U256.unsafe(1000000)), Val.U256(U256.unsafe(100000)))
     )
 
     test(
       contract,
-      AVector(Val.U64(U64.unsafe(1000))),
-      AVector(Val.U64(U64.unsafe(99))),
-      AVector(Val.U64(U64.MaxValue divUnsafe U64.unsafe(10)),
-              Val.U64(U64.MaxValue divUnsafe U64.unsafe(100)))
+      AVector(Val.U256(U256.unsafe(1000))),
+      AVector(Val.U256(U256.unsafe(99))),
+      AVector(Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(10)),
+              Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(100)))
     )
   }
 
@@ -422,7 +381,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val contract =
       s"""
          |TxContract Operator() {
-         |  pub fn main() -> (U64, Bool, Bool) {
+         |  pub fn main() -> (U256, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
          |    let y = 1 < 2 <= 2 < 3
          |    let z = !false && false || false
@@ -431,6 +390,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    test(contract, AVector.empty, AVector(Val.U64(U64.unsafe(6)), Val.True, Val.False))
+    test(contract, AVector.empty, AVector(Val.U256(U256.unsafe(6)), Val.True, Val.False))
   }
 }

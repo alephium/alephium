@@ -20,7 +20,7 @@ import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.{AVector, U256}
 
 /**
   * Upto one new token might be issued in each transaction exception for the coinbase transaction
@@ -66,11 +66,11 @@ object UnsignedTransaction {
   }
 
   def transferAlf(inputs: AVector[AssetOutputRef],
-                  inputSum: U64,
+                  inputSum: U256,
                   fromLockupScript: LockupScript,
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
-                  amount: U64,
+                  amount: U256,
                   height: Int): UnsignedTransaction = {
     assume(inputSum >= amount)
     val remainder = inputSum.subUnsafe(amount)
@@ -79,7 +79,7 @@ object UnsignedTransaction {
     val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
 
     val outputs =
-      if (remainder > U64.Zero) AVector[AssetOutput](toOutput, fromOutput)
+      if (remainder > U256.Zero) AVector[AssetOutput](toOutput, fromOutput)
       else AVector[AssetOutput](toOutput)
     UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
   }

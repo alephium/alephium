@@ -30,15 +30,15 @@ import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{Hex, U64}
+import org.alephium.util.{Hex, U256}
 import org.alephium.wallet.circe.ProtocolCodecs
 
 trait BlockFlowClient {
-  def getBalance(address: Address): Future[Either[String, U64]]
+  def getBalance(address: Address): Future[Either[String, U256]]
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
-      value: U64): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
+      value: U256): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
   def sendTransaction(tx: String,
                       signature: Signature,
                       fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]]
@@ -98,7 +98,7 @@ object BlockFlowClient {
         }
       }
 
-    def getBalance(address: Address): Future[Either[String, U64]] =
+    def getBalance(address: Address): Future[Either[String, U256]] =
       requestFromGroup[GetBalance, Balance](
         address.groupIndex,
         GetBalance(address)
@@ -106,7 +106,7 @@ object BlockFlowClient {
 
     def prepareTransaction(fromKey: String,
                            toAddress: Address,
-                           value: U64): Future[Either[String, CreateTransactionResult]] = {
+                           value: U256): Future[Either[String, CreateTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
         case None => Future.successful(Left(s"Cannot decode key $fromKey"))
         case Some(lockupScript) =>
@@ -150,12 +150,12 @@ object BlockFlowClient {
     val method: String = "get_balance"
   }
 
-  final case class Balance(balance: U64, utxoNum: Int)
+  final case class Balance(balance: U256, utxoNum: Int)
 
   final case class CreateTransaction(
       fromKey: String,
       toAddress: Address,
-      value: U64
+      value: U256
   ) extends JsonRpc {
     val method: String = "create_transaction"
   }

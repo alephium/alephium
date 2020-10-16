@@ -61,22 +61,12 @@ object Lexer {
     case (_, i)   => i
   }
   def typedNum[_: P]: P[Val] =
-    P(num ~ ("i" | "u" | "I" | "U" | "b").?.!)
+    P(num ~ ("i" | "u" | "b").?.!)
       .map {
         case (n, "i") =>
-          I64.from(n) match {
-            case Some(value) => Val.I64(value)
-            case None        => throw Compiler.Error(s"Invalid I64 value: $n")
-          }
-        case (n, "I") =>
           I256.from(n) match {
             case Some(value) => Val.I256(value)
             case None        => throw Compiler.Error(s"Invalid I256 value: $n")
-          }
-        case (n, "U") =>
-          U256.from(n) match {
-            case Some(value) => Val.U256(value)
-            case None        => throw Compiler.Error(s"Invalid U256 value: $n")
           }
         case (n, "b") =>
           U64.from(n).filter(u => u.v < 0x100) match {
@@ -84,9 +74,9 @@ object Lexer {
             case None        => throw Compiler.Error(s"Invalid Byte value: $n")
           }
         case (n, _) =>
-          U64.from(n) match {
-            case Some(value) => Val.U64(value)
-            case None        => throw Compiler.Error(s"Invalid U64 value: $n")
+          U256.from(n) match {
+            case Some(value) => Val.U256(value)
+            case None        => throw Compiler.Error(s"Invalid U256 value: $n")
           }
       }
 

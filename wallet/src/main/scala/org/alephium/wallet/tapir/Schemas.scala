@@ -17,11 +17,12 @@
 package org.alephium.wallet.tapir
 
 import sttp.tapir.Schema
+import sttp.tapir.SchemaType.SInteger
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.{AVector, U256}
 
 trait Schemas {
   implicit val addressSchema: Schema[Address] = Schema(Schema.schemaForString.schemaType)
@@ -34,5 +35,5 @@ trait Schemas {
 
   implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(Schema.schemaForInt.schemaType)
 
-  implicit val u64Schema: Schema[U64] = Schema(Schema.schemaForLong.schemaType)
+  implicit val u256Schema: Schema[U256] = Schema(SInteger).format("uint256")
 }

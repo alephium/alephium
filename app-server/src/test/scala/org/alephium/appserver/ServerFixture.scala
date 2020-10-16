@@ -64,7 +64,7 @@ trait ServerFixture
   lazy val dummySelfClique      = SelfClique.from(dummyIntraCliqueInfo)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
-  lazy val dummyBalance         = Balance(U64.Zero, 0)
+  lazy val dummyBalance         = Balance(U256.Zero, 0)
   lazy val dummyGroup           = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
@@ -169,18 +169,19 @@ object ServerFixture {
       Right(AVector((block.header, 1)))
     }
 
-    override def getBalance(lockupScript: LockupScript): IOResult[(U64, Int)] = Right((U64.Zero, 0))
+    override def getBalance(lockupScript: LockupScript): IOResult[(U256, Int)] =
+      Right((U256.Zero, 0))
 
     override def prepareUnsignedTx(fromLockupScript: LockupScript,
                                    fromUnlockScript: UnlockScript,
                                    toLockupScript: LockupScript,
-                                   value: U64): IOResult[Option[UnsignedTransaction]] =
+                                   value: U256): IOResult[Option[UnsignedTransaction]] =
       Right(Some(dummyTx.unsigned))
 
     override def prepareTx(fromLockupScript: LockupScript,
                            fromUnlockScript: UnlockScript,
                            toLockupScript: LockupScript,
-                           value: U64,
+                           value: U256,
                            fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] = {
       Right(Some(dummyTx))
     }

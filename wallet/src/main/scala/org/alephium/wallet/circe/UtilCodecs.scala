@@ -25,7 +25,7 @@ import _root_.io.circe._
 import akka.util.ByteString
 
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.util.{AVector, Hex, U64}
+import org.alephium.util.{AVector, Hex, U256}
 
 trait UtilCodecs {
 
@@ -53,13 +53,11 @@ trait UtilCodecs {
     codecXemap[String, InetAddress](parseInetAddress, _.getHostAddress)
   }
 
-  implicit val u64Encoder: Encoder[U64] = Encoder.encodeJavaBigInteger.contramap[U64](_.toBigInt)
-
-  implicit val u64Decoder: Decoder[U64] = Decoder.decodeJavaBigInteger.emap { u64 =>
-    U64.from(u64).toRight(s"Invalid U64: $u64")
+  implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
+  implicit val u256Decoder: Decoder[U256] = Decoder.decodeJavaBigInteger.emap { u64 =>
+    U256.from(u64).toRight(s"Invalid U256: $u64")
   }
-
-  implicit val u64Codec: Codec[U64] = Codec.from(u64Decoder, u64Encoder)
+  implicit val u64Codec: Codec[U256] = Codec.from(u256Decoder, u256Encoder)
 
   implicit val mnemonicSizeEncoder: Encoder[Mnemonic.Size] =
     Encoder.encodeInt.contramap[Mnemonic.Size](_.value)

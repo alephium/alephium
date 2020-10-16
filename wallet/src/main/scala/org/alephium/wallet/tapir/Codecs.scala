@@ -24,7 +24,7 @@ import sttp.tapir.CodecFormat.TextPlain
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
-import org.alephium.util.U64
+import org.alephium.util.U256
 import org.alephium.wallet.circe.ProtocolCodecs
 
 trait Codecs extends ProtocolCodecs {
@@ -38,8 +38,8 @@ trait Codecs extends ProtocolCodecs {
   implicit val mnemonicSizeTapirCodec: Codec[String, Mnemonic.Size, TextPlain] =
     fromCirce[Mnemonic.Size]
 
-  implicit val u64TapirCodec: Codec[String, U64, TextPlain] =
-    fromCirce[U64]
+  implicit val u256TapirCodec: Codec[String, U256, TextPlain] =
+    fromCirce[U256]
 
   private def fromCirce[A: circe.Codec]: Codec[String, A, TextPlain] =
     Codec.string.mapDecode[A] { raw =>

@@ -28,7 +28,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.util.{AVector, Hex, Service, U64}
+import org.alephium.util.{AVector, Hex, Service, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -49,9 +49,9 @@ trait WalletService extends Service {
 
   def lockWallet(wallet: String): Future[Either[WalletError, Unit]]
   def unlockWallet(wallet: String, password: String): Future[Either[WalletError, Unit]]
-  def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U64)]]]
+  def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U256)]]]
   def getAddresses(wallet: String): Future[Either[WalletError, (Address, AVector[Address])]]
-  def transfer(wallet: String, address: Address, amount: U64): Future[Either[WalletError, Hash]]
+  def transfer(wallet: String, address: Address, amount: U256): Future[Either[WalletError, Hash]]
   def deriveNextAddress(wallet: String): Future[Either[WalletError, Address]]
   def changeActiveAddress(wallet: String, address: Address): Future[Either[WalletError, Unit]]
   def listWallets(): Future[Either[WalletError, AVector[(String, Boolean)]]]
@@ -176,7 +176,8 @@ object WalletService {
       withWallet(wallet)(secretStorage =>
         Future.successful(secretStorage.unlock(password).left.map(_ => InvalidPassword)))
 
-    override def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U64)]]] =
+    override def getBalances(
+        wallet: String): Future[Either[WalletError, AVector[(Address, U256)]]] =
       withAddresses(wallet) {
         case (_, addresses) =>
           Future
@@ -194,7 +195,7 @@ object WalletService {
 
     override def transfer(wallet: String,
                           address: Address,
-                          amount: U64): Future[Either[WalletError, Hash]] = {
+                          amount: U256): Future[Either[WalletError, Hash]] = {
       withPrivateKey(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
@@ -269,7 +270,7 @@ object WalletService {
                   UnexpectedError)
     }
 
-    private def getBalance(address: Address): Future[Either[WalletError, (Address, U64)]] = {
+    private def getBalance(address: Address): Future[Either[WalletError, (Address, U256)]] = {
       blockFlowClient
         .getBalance(address)
         .map(_.map(amount => (address, amount)).left.map(message =>

@@ -27,7 +27,7 @@ import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
-import org.alephium.util.{AVector, Random, U64}
+import org.alephium.util.{AVector, Random, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
@@ -71,7 +71,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   trait StatelessFixture extends Fixture {
     val blockFlow = genesisBlockFlow()
 
-    def modifyAlfAmount(tx: Transaction, delta: U64): Transaction = {
+    def modifyAlfAmount(tx: Transaction, delta: U256): Transaction = {
       val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()
       val outputNew       = output.copy(amount = output.amount + delta)
       tx.copy(
@@ -107,7 +107,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       case (tx, preOutputs) =>
         whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
           val alfAmount = tx.alfAmountInOutputs.get
-          val delta     = U64.MaxValue - alfAmount + 1
+          val delta     = U256.MaxValue - alfAmount + 1
           val txNew     = modifyAlfAmount(tx, delta)
           failCheck(checkAlfOutputAmount(txNew), BalanceOverFlow)
           failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
@@ -220,15 +220,15 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   behavior of "stateful validation"
 
   trait StatefulFixture extends StatelessFixture {
-    def genTokenOutput(tokenId: Hash, amount: U64): AssetOutput = {
-      AssetOutput(U64.Zero,
+    def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
+      AssetOutput(U256.Zero,
                   0,
                   LockupScript.p2pkh(Hash.zero),
                   AVector(tokenId -> amount),
                   ByteString.empty)
     }
 
-    def modifyTokenAmount(tx: Transaction, tokenId: TokenId, f: U64 => U64): Transaction = {
+    def modifyTokenAmount(tx: Transaction, tokenId: TokenId, f: U256 => U256): Transaction = {
       val fixedOutputs = tx.unsigned.fixedOutputs
       val relatedOutputIndexes = fixedOutputs
         .mapWithIndex {
@@ -249,8 +249,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       tokens.sample()
     }
 
-    def getTokenAmount(tx: Transaction, tokenId: TokenId): U64 = {
-      tx.unsigned.fixedOutputs.fold(U64.Zero) {
+    def getTokenAmount(tx: Transaction, tokenId: TokenId): U256 = {
+      tx.unsigned.fixedOutputs.fold(U256.Zero) {
         case (acc, output) =>
           acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
       }
@@ -300,7 +300,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
           val tokenId     = sampleToken(tx)
           val tokenAmount = getTokenAmount(tx, tokenId)
-          val txNew       = modifyTokenAmount(tx, tokenId, U64.MaxValue - tokenAmount + 1 + _)
+          val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
           failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), BalanceOverFlow)
         }
