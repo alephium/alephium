@@ -282,9 +282,9 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield persistedUtxos
   }
 
-  def getBalance(lockupScript: LockupScript): IOResult[(U64, Int)] = {
+  def getBalance(lockupScript: LockupScript): IOResult[(U256, Int)] = {
     getUtxos(lockupScript).map { utxos =>
-      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
+      val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
       (balance, utxos.length)
     }
   }
@@ -310,12 +310,12 @@ trait BlockFlowState extends FlowTipsUtil {
   def prepareUnsignedTx(fromLockupScript: LockupScript,
                         fromUnlockScript: UnlockScript,
                         toLockupScript: LockupScript,
-                        value: U64): IOResult[Option[UnsignedTransaction]] = {
+                        value: U256): IOResult[Option[UnsignedTransaction]] = {
     for {
       utxos  <- getUtxos(fromLockupScript)
       height <- getBestHeight(ChainIndex(fromLockupScript.groupIndex, toLockupScript.groupIndex))
     } yield {
-      val balance = utxos.fold(U64.Zero)(_ addUnsafe _._2.amount)
+      val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
       if (balance >= value) {
         Some(
           UnsignedTransaction
@@ -335,7 +335,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def prepareTx(fromLockupScript: LockupScript,
                 fromUnlockScript: UnlockScript,
                 toLockupScript: LockupScript,
-                value: U64,
+                value: U256,
                 fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] =
     prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value).map(_.map {
       unsigned =>

@@ -68,14 +68,10 @@ object BuiltIn {
       inputType(0) match {
         case Type.Bool        => Seq(CheckEqBool)
         case Type.Byte        => Seq(CheckEqByte)
-        case Type.I64         => Seq(CheckEqI64)
-        case Type.U64         => Seq(CheckEqU64)
         case Type.I256        => Seq(CheckEqI256)
         case Type.U256        => Seq(CheckEqU256)
         case Type.BoolVec     => Seq(CheckEqBoolVec)
         case Type.ByteVec     => Seq(CheckEqByteVec)
-        case Type.I64Vec      => Seq(CheckEqI64Vec)
-        case Type.U64Vec      => Seq(CheckEqU64Vec)
         case Type.I256Vec     => Seq(CheckEqI256Vec)
         case Type.U256Vec     => Seq(CheckEqU256Vec)
         case Type.Address     => Seq(CheckEqAddress)
@@ -105,7 +101,7 @@ object BuiltIn {
     }
   }
   object ConversionBuiltIn {
-    val validTypes: AVector[Type] = AVector(Type.Byte, Type.I64, Type.U64, Type.I256, Type.U256)
+    val validTypes: AVector[Type] = AVector(Type.Byte, Type.I256, Type.U256)
   }
 
   val toByte: ConversionBuiltIn = new ConversionBuiltIn("byte") {
@@ -113,36 +109,8 @@ object BuiltIn {
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
-        case Type.I64  => Seq(I64ToByte)
-        case Type.U64  => Seq(U64ToByte)
         case Type.I256 => Seq(I256ToByte)
         case Type.U256 => Seq(U256ToByte)
-        case _         => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  val toI64: ConversionBuiltIn = new ConversionBuiltIn("i64") {
-    override def toType: Type = Type.I64
-
-    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-      inputType(0) match {
-        case Type.Byte => Seq(ByteToI64)
-        case Type.U64  => Seq(U64ToI64)
-        case Type.I256 => Seq(I256ToI64)
-        case Type.U256 => Seq(U256ToI64)
-        case _         => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
-  val toU64: ConversionBuiltIn = new ConversionBuiltIn("u64") {
-    override def toType: Type = Type.U64
-
-    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-      inputType(0) match {
-        case Type.Byte => Seq(ByteToU64)
-        case Type.I64  => Seq(I64ToU64)
-        case Type.I256 => Seq(I256ToU64)
-        case Type.U256 => Seq(U256ToU64)
         case _         => throw new RuntimeException("Dead branch")
       }
     }
@@ -153,8 +121,6 @@ object BuiltIn {
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Type.Byte => Seq(ByteToI256)
-        case Type.I64  => Seq(I64ToI256)
-        case Type.U64  => Seq(U64ToI256)
         case Type.U256 => Seq(U256ToI256)
         case _         => throw new RuntimeException("Dead branch")
       }
@@ -166,8 +132,6 @@ object BuiltIn {
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Type.Byte => Seq(ByteToU256)
-        case Type.I64  => Seq(I64ToU256)
-        case Type.U64  => Seq(U64ToU256)
         case Type.I256 => Seq(I256ToU256)
         case _         => throw new RuntimeException("Dead branch")
       }
@@ -180,51 +144,49 @@ object BuiltIn {
     checkEq,
     checkSignature,
     toByte,
-    toI64,
-    toU64,
     toI256,
     toU256
   ).map(f => f.name -> f).toMap
 
   val approveAlf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("approveAlf", Seq[Type](Type.Address, Type.U64), Seq.empty, ApproveAlf)
+    SimpleStatefulBuiltIn("approveAlf", Seq[Type](Type.Address, Type.U256), Seq.empty, ApproveAlf)
 
   val approveToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("approveToken",
-                          Seq[Type](Type.Address, Type.ByteVec, Type.U64),
+                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
                           Seq.empty,
                           ApproveToken)
 
   val alfRemaining: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("alfRemaining", Seq(Type.Address), Seq(Type.U64), AlfRemaining)
+    SimpleStatefulBuiltIn("alfRemaining", Seq(Type.Address), Seq(Type.U256), AlfRemaining)
 
   val tokenRemaining: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("tokenRemaining",
                           Seq[Type](Type.Address, Type.ByteVec),
-                          Seq(Type.U64),
+                          Seq(Type.U256),
                           TokenRemaining)
 
   val transferAlf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("transferAlf",
-                          Seq[Type](Type.Address, Type.Address, Type.U64),
+                          Seq[Type](Type.Address, Type.Address, Type.U256),
                           Seq.empty,
                           TransferAlf)
 
   val transferAlfFromSelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("transferAlfFromSelf",
-                          Seq[Type](Type.Address, Type.U64),
+                          Seq[Type](Type.Address, Type.U256),
                           Seq.empty,
                           TransferAlfFromSelf)
 
   val transferToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("transferToken",
-                          Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U64),
+                          Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
                           Seq.empty,
                           TransferToken)
 
   val transferTokenFromSelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("transferTokenFromSelf",
-                          Seq[Type](Type.Address, Type.ByteVec, Type.U64),
+                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
                           Seq.empty,
                           TransferTokenFromSelf)
 
@@ -238,7 +200,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
 
   val issueToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("issueToken", Seq(Type.U64), Seq.empty, IssueToken)
+    SimpleStatefulBuiltIn("issueToken", Seq(Type.U256), Seq.empty, IssueToken)
 
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(

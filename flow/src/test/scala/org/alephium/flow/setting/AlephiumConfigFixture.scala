@@ -24,12 +24,12 @@ import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Env, U64}
+import org.alephium.util.{AVector, Env, U256}
 
 trait AlephiumConfigFixture {
   val configValues: Map[String, Any] = Map.empty
 
-  val genesisBalance: U64 = U64.unsafe(100)
+  val genesisBalance: U256 = U256.unsafe(100)
 
   val env      = Env.resolve()
   val rootPath = Platform.getRootPath(env)
@@ -43,7 +43,7 @@ trait AlephiumConfigFixture {
   lazy val groupConfig: GroupConfig = new GroupConfig { override def groups: Int = groups0 }
 
   lazy val genesisKeys =
-    AVector.tabulate[(PrivateKey, PublicKey, U64)](groups0) { i =>
+    AVector.tabulate[(PrivateKey, PublicKey, U256)](groups0) { i =>
       val groupIndex              = GroupIndex.unsafe(i)(groupConfig)
       val (privateKey, publicKey) = groupIndex.generateKey(groupConfig)
       (privateKey, publicKey, genesisBalance)

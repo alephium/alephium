@@ -20,28 +20,27 @@ import org.alephium.crypto.Byte32
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.Val
-import org.alephium.util.{AlephiumSpec, Hex, I256, I64, U256, U64}
+import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {
   it should "parse lexer" in {
     val byte32  = Byte32.generate.toHexString
     val address = Address.p2pkh(NetworkType.Testnet, PublicKey.generate)
 
-    fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U64(U64.unsafe(5))
-    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I64(I64.from(-5))
-    fastparse.parse("5U", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
-    fastparse.parse("-5I", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
+    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.asArraySeq(byte32).get)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
       address.lockupScript)
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
-    fastparse.parse("U64", Lexer.typeId(_)).get.value is Ast.TypeId("U64")
+    fastparse.parse("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
-    fastparse.parse("x: U64", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = false)
-    fastparse.parse("mut x: U64", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U64, isMutable = true)
+    fastparse.parse("x: U256", StatelessParser.funcArgument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = false)
+    fastparse.parse("mut x: U256", StatelessParser.funcArgument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)

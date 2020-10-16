@@ -23,13 +23,13 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
 class VMSpec extends AlephiumSpec {
   def contractCreation(code: StatefulContract,
                        initialState: AVector[Val],
                        lockupScript: LockupScript,
-                       alfAmount: U64): StatefulScript = {
+                       alfAmount: U256): StatefulScript = {
     val address  = Address(NetworkType.Testnet, lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
@@ -69,7 +69,7 @@ class VMSpec extends AlephiumSpec {
          |    foo(${frameStackMaxSize - 1})
          |  }
          |
-         |  fn foo(n: U64) -> () {
+         |  fn foo(n: U256) -> () {
          |    if (n > 0) {
          |      foo(n - 1)
          |    }
@@ -90,8 +90,8 @@ class VMSpec extends AlephiumSpec {
 
     lazy val input0 =
       s"""
-         |TxContract Foo(mut x: U64) {
-         |  $access fn add(a: U64) -> () {
+         |TxContract Foo(mut x: U256) {
+         |  $access fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
          |      add(a - 1)
@@ -101,11 +101,11 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     lazy val script0      = Compiler.compileContract(input0).toOption.get
-    lazy val initialState = AVector[Val](Val.U64(U64.Zero))
+    lazy val initialState = AVector[Val](Val.U256(U256.Zero))
 
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
-    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U64.One)
+    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U256.One)
     lazy val block0 =
       mine(blockFlow, chainIndex, txScriptOption = Some(txScript0), createContract = true)
     lazy val contractOutputRef0 =
@@ -114,8 +114,8 @@ class VMSpec extends AlephiumSpec {
 
     lazy val input1 =
       s"""
-         |TxContract Foo(mut x: U64) {
-         |  pub fn add(a: U64) -> () {
+         |TxContract Foo(mut x: U256) {
+         |  pub fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
          |      add(a - 1)
@@ -152,12 +152,12 @@ class VMSpec extends AlephiumSpec {
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
     val script1   = Compiler.compileTxScript(input1, 1).toOption.get
-    val newState1 = AVector[Val](Val.U64(U64.unsafe(10)))
+    val newState1 = AVector[Val](Val.U256(U256.unsafe(10)))
     val block1    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block1, 2)
     checkState(blockFlow, chainIndex, contractKey0, newState1, contractOutputRef0, numAssets = 4)
 
-    val newState2 = AVector[Val](Val.U64(U64.unsafe(20)))
+    val newState2 = AVector[Val](Val.U256(U256.unsafe(20)))
     val block2    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
     addAndCheck(blockFlow, block2, 3)
     checkState(blockFlow, chainIndex, contractKey0, newState2, contractOutputRef0, numAssets = 6)
@@ -168,9 +168,9 @@ class VMSpec extends AlephiumSpec {
 
     def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
       val contract     = Compiler.compileContract(input).toOption.get
-      val initialState = AVector[Val](Val.U64(U64.Zero))
+      val initialState = AVector[Val](Val.U256(U256.Zero))
       val fromLockup   = getGenesisLockupScript(chainIndex)
-      val txScript     = contractCreation(contract, initialState, fromLockup, U64.One)
+      val txScript     = contractCreation(contract, initialState, fromLockup, U256.One)
 
       val block =
         mine(blockFlow, chainIndex, txScriptOption = Some(txScript), createContract = true)
@@ -193,8 +193,8 @@ class VMSpec extends AlephiumSpec {
   it should "use latest worldstate when call external functions" in new ContractFixture {
     val input0 =
       s"""
-         |TxContract Foo(mut x: U64) {
-         |  pub fn get() -> (U64) {
+         |TxContract Foo(mut x: U256) {
+         |  pub fn get() -> (U256) {
          |    return x
          |  }
          |
@@ -205,8 +205,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Bar(mut x: U64) {
-         |  pub fn bar(foo: ByteVec) -> (U64) {
+         |TxContract Bar(mut x: U256) {
+         |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
          |}
@@ -216,14 +216,14 @@ class VMSpec extends AlephiumSpec {
 
     val input1 =
       s"""
-         |TxContract Bar(mut x: U64) {
-         |  pub fn bar(foo: ByteVec) -> (U64) {
+         |TxContract Bar(mut x: U256) {
+         |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
          |}
          |
-         |TxContract Foo(mut x: U64) {
-         |  pub fn get() -> (U64) {
+         |TxContract Foo(mut x: U256) {
+         |  pub fn get() -> (U256) {
          |    return x
          |  }
          |
@@ -247,8 +247,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Foo(mut x: U64) {
-         |  pub fn get() -> (U64) {
+         |TxContract Foo(mut x: U256) {
+         |  pub fn get() -> (U256) {
          |    return x
          |  }
          |
@@ -260,7 +260,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val script   = Compiler.compileTxScript(main).toOption.get
-    val newState = AVector[Val](Val.U64(U64.unsafe(110)))
+    val newState = AVector[Val](Val.U256(U256.unsafe(110)))
     val block    = mine(blockFlow, chainIndex, txScriptOption = Some(script))
     blockFlow.add(block).isRight is true
 
@@ -279,7 +279,7 @@ class VMSpec extends AlephiumSpec {
   it should "issue new token" in new ContractFixture {
     val input =
       s"""
-         |TxContract Foo(mut x: U64) {
+         |TxContract Foo(mut x: U256) {
          |  pub payable fn foo() -> () {
          |    issueToken!(10000000)
          |  }
@@ -297,7 +297,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Foo(mut x: U64) {
+         |TxContract Foo(mut x: U256) {
          |  pub payable fn foo() -> () {
          |    issueToken!(10000000)
          |  }
@@ -313,7 +313,7 @@ class VMSpec extends AlephiumSpec {
     worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
         if (ref != ContractOutputRef.forMPT) {
-          output.tokens.head is (contractKey -> U64.unsafe(10000000))
+          output.tokens.head is (contractKey -> U256.unsafe(10000000))
         }
     }
 
@@ -325,7 +325,7 @@ class VMSpec extends AlephiumSpec {
     worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
         if (ref != ContractOutputRef.forMPT) {
-          output.tokens.head is (contractKey -> U64.unsafe(20000000))
+          output.tokens.head is (contractKey -> U256.unsafe(20000000))
         }
     }
   }

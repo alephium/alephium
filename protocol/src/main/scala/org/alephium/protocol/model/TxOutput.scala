@@ -22,13 +22,13 @@ import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.{AVector, U256}
 
 sealed trait TxOutput {
-  def amount: U64
+  def amount: U256
   def createdHeight: Int
   def lockupScript: LockupScript
-  def tokens: AVector[(TokenId, U64)]
+  def tokens: AVector[(TokenId, U256)]
 
   def hint: Hint
 
@@ -46,28 +46,28 @@ object TxOutput {
     }
   )
 
-  def from(amount: U64, tokens: AVector[(TokenId, U64)], lockupScript: LockupScript): TxOutput = {
+  def from(amount: U256, tokens: AVector[(TokenId, U256)], lockupScript: LockupScript): TxOutput = {
     lockupScript match {
       case _: LockupScript.P2C => ContractOutput(amount, 0, lockupScript, tokens)
       case _                   => AssetOutput(amount, 0, lockupScript, tokens, ByteString.empty)
     }
   }
 
-  def asset(amount: U64, createdHeight: Int, lockupScript: LockupScript): AssetOutput = {
+  def asset(amount: U256, createdHeight: Int, lockupScript: LockupScript): AssetOutput = {
     AssetOutput(amount, createdHeight, lockupScript, AVector.empty, ByteString.empty)
   }
 
-  def contract(amount: U64, createdHeight: Int, lockupScript: LockupScript): ContractOutput = {
+  def contract(amount: U256, createdHeight: Int, lockupScript: LockupScript): ContractOutput = {
     ContractOutput(amount, createdHeight, lockupScript, AVector.empty)
   }
 
-  def genesis(amount: U64, lockupScript: LockupScript): AssetOutput = {
+  def genesis(amount: U256, lockupScript: LockupScript): AssetOutput = {
     asset(amount, ALF.GenesisHeight, lockupScript)
   }
 
   // TODO: improve this when vm is mature
   def forMPT: TxOutput =
-    ContractOutput(U64.One, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero), AVector.empty)
+    ContractOutput(U256.One, ALF.GenesisHeight, LockupScript.p2pkh(Hash.zero), AVector.empty)
 }
 
 /**
@@ -78,10 +78,10 @@ object TxOutput {
   * @param tokens secondary tokens in the output
   * @param additionalData data payload for additional information
   */
-final case class AssetOutput(amount: U64,
+final case class AssetOutput(amount: U256,
                              createdHeight: Int,
                              lockupScript: LockupScript,
-                             tokens: AVector[(TokenId, U64)],
+                             tokens: AVector[(TokenId, U256)],
                              additionalData: ByteString)
     extends TxOutput {
   def isAsset: Boolean = true
@@ -92,16 +92,16 @@ final case class AssetOutput(amount: U64,
 }
 
 object AssetOutput {
-  private[model] implicit val tokenSerde: Serde[(TokenId, U64)] = Serde.tuple2[TokenId, U64]
+  private[model] implicit val tokenSerde: Serde[(TokenId, U256)] = Serde.tuple2[TokenId, U256]
   implicit val serde: Serde[AssetOutput] =
     Serde.forProduct5(AssetOutput.apply,
                       t => (t.amount, t.createdHeight, t.lockupScript, t.tokens, t.additionalData))
 }
 
-final case class ContractOutput(amount: U64,
+final case class ContractOutput(amount: U256,
                                 createdHeight: Int,
                                 lockupScript: LockupScript,
-                                tokens: AVector[(TokenId, U64)])
+                                tokens: AVector[(TokenId, U256)])
     extends TxOutput {
   def isAsset: Boolean = false
 

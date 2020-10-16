@@ -72,7 +72,7 @@ trait FlowFixture
         val fromLockupScript           = LockupScript.p2pkh(publicKey)
         val unlockScript               = UnlockScript.p2pkh(publicKey)
         val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-        val total                      = balances.fold(U64.Zero)(_ addUnsafe _._2.amount)
+        val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
         val (_, toPublicKey)           = chainIndex.to.generateKey
         val toLockupScript             = LockupScript.p2pkh(toPublicKey)
         val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
@@ -120,18 +120,18 @@ trait FlowFixture
     blockFlow.getWeight(header) isE consensusConfig.maxMiningTarget * weightFactor
   }
 
-  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U64): Assertion = {
+  def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U256): Assertion = {
     val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
       .getUtxos(pubScript)
       .toOption
       .get
-      .sumBy(_._2.amount.v) is expected.v
+      .sumBy(_._2.amount.v: BigInt) is expected.toBigInt
   }
 
-  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U64): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v) is expected.v
+  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U256): Assertion = {
+    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -154,11 +154,11 @@ trait FlowFixture
     tips ++ bestDeps
   }
 
-  def getBalance(blockFlow: BlockFlow, address: PublicKey): U64 = {
+  def getBalance(blockFlow: BlockFlow, address: PublicKey): U256 = {
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUtxos(lockupScript)
-    query.toOption.get.sumBy(_._2.amount.v)
+    U256.unsafe(query.toOption.get.sumBy(_._2.amount.v: BigInt).underlying())
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {

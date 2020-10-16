@@ -20,21 +20,22 @@ import java.math.BigInteger
 import java.security.SecureRandom
 
 import scala.language.implicitConversions
+import scala.math.BigInt
 
 import org.scalacheck.Gen
 
 trait NumericHelpers {
   lazy val smallPositiveInt: Gen[Int] = Gen.choose(1, 5)
 
-  implicit class U64Helpers(n: U64) { Self =>
-    def +(m: U64): U64 = n.add(m).get
-    def -(m: U64): U64 = n.sub(m).get
-    def *(m: U64): U64 = n.mul(m).get
-    def /(m: U64): U64 = n.div(m).get
+  implicit class U256Helpers(n: U256) { Self =>
+    def +(m: U256): U256 = n.add(m).get
+    def -(m: U256): U256 = n.sub(m).get
+    def *(m: U256): U256 = n.mul(m).get
+    def /(m: U256): U256 = n.div(m).get
   }
 
-  implicit def intToU64(n: Int): U64   = U64.unsafe(n.toLong)
-  implicit def longToU64(n: Long): U64 = U64.unsafe(n)
+  implicit def intToU256(n: Int): U256   = U256.unsafe(n.toLong)
+  implicit def longToU256(n: Long): U256 = U256.unsafe(n)
 
   implicit def bigInt(n: BigInteger): BigInt = BigInt(n)
 
@@ -47,18 +48,18 @@ trait NumericHelpers {
     if (from equals to) from else (random.nextLong() % (to - from) + from)
   }
   def nextLong(to: Long): Long = nextLong(0, to)
-  def nextU64(from: U64, to: U64): U64 = {
+  def nextU256(from: U256, to: U256): U256 = {
     val range = (to - from).toBigInt
     var shift = new BigInteger(range.bitLength(), random)
     while (shift.compareTo(range) > 0) {
       shift = new BigInteger(range.bitLength(), random)
     }
-    from + U64.from(shift).get
+    from + U256.from(shift).get
   }
-  def nextU64(to: U64): U64 = nextU64(U64.Zero, to)
+  def nextU256(to: U256): U256 = nextU256(U256.Zero, to)
 
-  def min(xs: U64*): U64 = xs.min
-  def max(xs: U64*): U64 = xs.max
+  def min(xs: U256*): U256 = xs.min
+  def max(xs: U256*): U256 = xs.max
 }
 
 class NumericHelpersSpec extends AlephiumSpec with NumericHelpers {
@@ -69,15 +70,15 @@ class NumericHelpersSpec extends AlephiumSpec with NumericHelpers {
     nextLong(0, 0) is 0
     nextLong(Int.MaxValue, Int.MaxValue) is Int.MaxValue
     nextLong(Int.MinValue, Int.MinValue) is Int.MinValue
-    nextU64(U64.Zero, U64.Zero) is U64.Zero
-    nextU64(U64.MaxValue, U64.MaxValue) is U64.MaxValue
-    nextU64(U64.One, U64.MaxValue).isZero is false
+    nextU256(U256.Zero, U256.Zero) is U256.Zero
+    nextU256(U256.MaxValue, U256.MaxValue) is U256.MaxValue
+    nextU256(U256.One, U256.MaxValue).isZero is false
   }
 
   it should "find min/max value in the list" in {
     forAll(Gen.nonEmptyListOf(Gen.posNum[Int])) { ns: Seq[Int] =>
-      min(ns.map(n => U64.unsafe(n.toLong)): _*) is ns.min
-      max(ns.map(n => U64.unsafe(n.toLong)): _*) is ns.max
+      min(ns.map(n => U256.unsafe(n.toLong)): _*) is ns.min
+      max(ns.map(n => U256.unsafe(n.toLong)): _*) is ns.max
     }
   }
 }

@@ -32,7 +32,7 @@ import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Duration, U64}
+import org.alephium.util.{AVector, Duration, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
   override val chainNum: Int = groups * groups
@@ -116,7 +116,7 @@ final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
 final case class ChainsSetting(
     networkType: NetworkType,
-    genesisBalances: AVector[(LockupScript, U64)]
+    genesisBalances: AVector[(LockupScript, U256)]
 ) extends ChainsConfig
 
 final case class WalletSetting(port: Int, secretDir: Path)

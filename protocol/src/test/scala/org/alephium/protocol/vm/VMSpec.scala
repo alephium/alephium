@@ -35,7 +35,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val contract = StatefulContract(AVector.empty, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, AVector(Val.U64(U64.Two))) is Left(PrivateExternalMethodCall)
+    StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is Left(PrivateExternalMethodCall)
   }
 
   it should "overflow oprand stack" in {
@@ -43,24 +43,24 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic   = true,
         isPayable  = false,
-        localsType = AVector(Val.U64),
+        localsType = AVector(Val.U256),
         returnType = AVector.empty,
-        instrs = AVector(U64Const0,
-                         U64Const0,
+        instrs = AVector(U256Const0,
+                         U256Const0,
                          LoadLocal(0),
-                         U64Const0,
-                         GtU64,
+                         U256Const0,
+                         GtU256,
                          IfFalse(4),
                          LoadLocal(0),
-                         U64Const1,
-                         U64Sub,
+                         U256Const1,
+                         U256Sub,
                          CallLocal(0))
       )
 
     val contract = StatefulContract(AVector.empty, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, AVector(Val.U64(U64.unsafe(opStackMaxSize.toLong / 2 - 1)))) is Left(
+    StatefulVM.execute(context, obj, AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1)))) is Left(
       StackOverflow)
   }
 
@@ -69,33 +69,33 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic   = true,
         isPayable  = false,
-        localsType = AVector(Val.U64),
-        returnType = AVector(Val.U64),
-        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const5, U64Add, Return)
+        localsType = AVector(Val.U256),
+        returnType = AVector(Val.U256),
+        instrs     = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const5, U256Add, Return)
       )
-    val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
+    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
     val (obj, context) =
-      prepareContract(contract, AVector[Val](Val.U64(U64.Zero), Val.U64(U64.One)))
-    StatefulVM.executeWithOutputs(context, obj, AVector(Val.U64(U64.Two))) isE
-      AVector[Val](Val.U64(U64.unsafe(8)))
+      prepareContract(contract, AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One)))
+    StatefulVM.executeWithOutputs(context, obj, AVector(Val.U256(U256.Two))) isE
+      AVector[Val](Val.U256(U256.unsafe(8)))
   }
 
   it should "call method" in {
     val method0 = Method[StatelessContext](isPublic = true,
                                            isPayable  = false,
-                                           localsType = AVector(Val.U64),
-                                           returnType = AVector(Val.U64),
+                                           localsType = AVector(Val.U256),
+                                           returnType = AVector(Val.U256),
                                            instrs     = AVector(LoadLocal(0), CallLocal(1), Return))
     val method1 =
       Method[StatelessContext](isPublic   = false,
                                isPayable  = false,
-                               localsType = AVector(Val.U64),
-                               returnType = AVector(Val.U64),
-                               instrs     = AVector(LoadLocal(0), U64Const1, U64Add, Return))
+                               localsType = AVector(Val.U256),
+                               returnType = AVector(Val.U256),
+                               instrs     = AVector(LoadLocal(0), U256Const1, U256Add, Return))
     val script = StatelessScript(methods = AVector(method0, method1))
     val obj    = script.toObject
-    StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U64(U64.Two))) isE
-      AVector[Val](Val.U64(U64.unsafe(3)))
+    StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U256(U256.Two))) isE
+      AVector[Val](Val.U256(U256.unsafe(3)))
   }
 
   trait BalancesFixture {
@@ -156,7 +156,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
-    pass(instrs, AVector[Val](Val.U64(100), Val.U64(0), Val.U64(99)))
+    pass(instrs, AVector[Val](Val.U256(100), Val.U256(0), Val.U256(99)))
   }
 
   it should "fail when there is no token balances" in new BalancesFixture {
@@ -171,13 +171,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "approve balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      U64Const(Val.U64(10)),
+      U256Const(Val.U256(10)),
       ApproveAlf,
       AddressConst(address0),
       AlfRemaining,
       AddressConst(address1),
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
-      U64Const(Val.U64(10)),
+      U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
       AlfRemaining,
@@ -185,14 +185,14 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
-    pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(89)))
+    pass(instrs, AVector[Val](Val.U256(90), Val.U256(0), Val.U256(89)))
   }
 
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
-      U64Const(Val.U64(10)),
+      U256Const(Val.U256(10)),
       ApproveToken
     )
     fail(instrs, NotEnoughBalance)
@@ -202,12 +202,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       AddressConst(address1),
-      U64Const(Val.U64(10)),
+      U256Const(Val.U256(10)),
       TransferAlf,
       AddressConst(address1),
       AddressConst(address0),
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
-      U64Const(Val.U64(1)),
+      U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
       AlfRemaining,
@@ -218,7 +218,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TokenRemaining
     )
 
-    val context = pass(instrs, AVector[Val](Val.U64(90), Val.U64(0), Val.U64(98)))
+    val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(0), Val.U256(98)))
     context.outputBalances.getAlfAmount(address0.lockupScript).get is 90
     context.outputBalances.getAlfAmount(address1.lockupScript).get is 10
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
@@ -238,11 +238,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic   = true,
         isPayable  = false,
-        localsType = AVector(Val.U64),
+        localsType = AVector(Val.U256),
         returnType = AVector.empty,
-        instrs     = AVector(LoadLocal(0), LoadField(1), U64Add, U64Const1, U64Add, StoreField(1))
+        instrs     = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const1, U256Add, StoreField(1))
       )
-    val contract = StatefulContract(AVector(Val.U64, Val.U64), methods = AVector(method))
+    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
   }
 }

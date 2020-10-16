@@ -25,7 +25,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, EitherF, U64}
+import org.alephium.util.{AVector, EitherF, U256}
 
 trait NonCoinbaseValidation {
   import ValidationStatus._
@@ -77,7 +77,7 @@ trait NonCoinbaseValidation {
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U64]
+  protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256]
   protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex]
   protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
@@ -110,7 +110,7 @@ object NonCoinbaseValidation {
       else validTx(())
     }
 
-    protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U64] = {
+    protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {
       tx.alfAmountInOutputs match {
         case Some(total) => validTx(total)
         case None        => invalidTx(BalanceOverFlow)
@@ -177,7 +177,7 @@ object NonCoinbaseValidation {
     protected[validation] def checkAlfBalance(
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-      val inputSum = preOutputs.fold(U64.Zero)(_ addUnsafe _.amount)
+      val inputSum = preOutputs.fold(U256.Zero)(_ addUnsafe _.amount)
       tx.alfAmountInOutputs match {
         case Some(outputSum) if outputSum <= inputSum => validTx(())
         case Some(_)                                  => invalidTx(InvalidAlfBalance)
@@ -203,13 +203,13 @@ object NonCoinbaseValidation {
 
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     protected[validation] def computeTokenBalances(
-        outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U64]] =
+        outputs: AVector[TxOutput]): TxValidationResult[mutable.Map[TokenId, U256]] =
       try {
-        val balances = mutable.Map.empty[TokenId, U64]
+        val balances = mutable.Map.empty[TokenId, U256]
         outputs.foreach { output =>
           output.tokens.foreach {
             case (tokenId, amount) =>
-              val total = balances.getOrElse(tokenId, U64.Zero)
+              val total = balances.getOrElse(tokenId, U256.Zero)
               balances.put(tokenId, total.add(amount).get)
           }
         }

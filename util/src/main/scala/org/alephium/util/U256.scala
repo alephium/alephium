@@ -81,6 +81,8 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
 
   def compare(that: U256): Int = this.v.compareTo(that.v)
 
+  def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
+
   def toBigInt: BigInteger = v
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -138,4 +140,9 @@ object U256 {
   val Ten: U256      = unsafe(BigInteger.TEN)
   val MaxValue: U256 = unsafe(upperBound.subtract(BigInteger.ONE))
   val MinValue: U256 = Zero
+
+  // scalastyle:off magic.number
+  val Million: U256 = unsafe(1000000)
+  val Billion: U256 = unsafe(1000000000)
+  // scalastyle:on magic.number
 }

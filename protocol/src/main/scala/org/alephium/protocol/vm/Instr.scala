@@ -76,33 +76,25 @@ object Instr {
   // format: off
   val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
     BoolConstTrue, BoolConstFalse,
-    I64Const0, I64Const1, I64Const2, I64Const3, I64Const4, I64Const5, I64ConstN1,
-    U64Const0, U64Const1, U64Const2, U64Const3, U64Const4, U64Const5,
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
-    I64Const, U64Const, I256Const, U256Const,
+    I256Const, U256Const,
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop, Pop2, Dup, Dup2, Swap,
-    I64Add,  I64Sub,  I64Mul,  I64Div,  I64Mod,  EqI64,  NeI64,  LtI64,  LeI64,  GtI64,  GeI64,
-    U64Add,  U64Sub,  U64Mul,  U64Div,  U64Mod,  EqU64,  NeU64,  LtU64,  LeU64,  GtU64,  GeU64,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
     NotBool, AndBool, OrBool,
-                ByteToI64, ByteToU64, ByteToI256, ByteToU256,
-    I64ToByte,             I64ToU64,  I64ToI256,  I64ToU256,
-    U64ToByte,  U64ToI64,             U64ToI256,  U64ToU256,
-    I256ToByte, I256ToI64, I256ToU64,             I256ToU256,
-    U256ToByte, U256ToI64, U256ToU64, U256ToI256,
+                ByteToI256, ByteToU256,
+    I256ToByte,             I256ToU256,
+    U256ToByte, U256ToI256,
     Forward, Backward,
     IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
-    IfEqI64, IfNeI64, IfLtI64, IfLeI64, IfGtI64, IfGeI64,
-    IfEqU64, IfNeU64, IfLtU64, IfLeU64, IfGtU64, IfGeU64,
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
     IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
     CallLocal, Return,
-    CheckEqBool, CheckEqByte, CheckEqI64, CheckEqU64, CheckEqI256, CheckEqU256, CheckEqByteVec,
-    CheckEqBoolVec, CheckEqByteVec, CheckEqI64Vec, CheckEqU64Vec, CheckEqI256Vec, CheckEqU256Vec,
+    CheckEqBool, CheckEqByte, CheckEqI256, CheckEqU256, CheckEqByteVec,
+    CheckEqBoolVec, CheckEqByteVec, CheckEqI256Vec, CheckEqU256Vec,
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
@@ -167,33 +159,6 @@ sealed trait OperandStackInstr extends StatelessInstr
 
 sealed trait ConstInstr extends OperandStackInstr
 object ConstInstr {
-  def i64(v: Val.I64): ConstInstr = {
-    // TODO: use @switch annotation
-    (v.v.v) match {
-      case -1 => I64ConstN1
-      case 0  => I64Const0
-      case 1  => I64Const1
-      case 2  => I64Const2
-      case 3  => I64Const3
-      case 4  => I64Const4
-      case 5  => I64Const5
-      case _  => I64Const(v)
-    }
-  }
-
-  def u64(v: Val.U64): ConstInstr = {
-    // TODO: use @switch annotation
-    (v.v.v) match {
-      case 0 => U64Const0
-      case 1 => U64Const1
-      case 2 => U64Const2
-      case 3 => U64Const3
-      case 4 => U64Const4
-      case 5 => U64Const5
-      case _ => U64Const(v)
-    }
-  }
-
   def i256(v: Val.I256): ConstInstr = {
     val bi = v.v.v
     if (bi.bitLength() <= 8) {
@@ -249,21 +214,6 @@ sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
 object BoolConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true) }
 object BoolConstFalse extends ConstInstr0 { val const: Val = Val.Bool(false) }
 
-object I64ConstN1 extends ConstInstr0 { val const: Val = Val.I64(util.I64.NegOne) }
-object I64Const0  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Zero) }
-object I64Const1  extends ConstInstr0 { val const: Val = Val.I64(util.I64.One) }
-object I64Const2  extends ConstInstr0 { val const: Val = Val.I64(util.I64.Two) }
-object I64Const3  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(3)) }
-object I64Const4  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(4)) }
-object I64Const5  extends ConstInstr0 { val const: Val = Val.I64(util.I64.from(5)) }
-
-object U64Const0 extends ConstInstr0 { val const: Val = Val.U64(util.U64.Zero) }
-object U64Const1 extends ConstInstr0 { val const: Val = Val.U64(util.U64.One) }
-object U64Const2 extends ConstInstr0 { val const: Val = Val.U64(util.U64.Two) }
-object U64Const3 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(3)) }
-object U64Const4 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(4)) }
-object U64Const5 extends ConstInstr0 { val const: Val = Val.U64(util.U64.unsafe(5)) }
-
 object I256ConstN1 extends ConstInstr0 { val const: Val = Val.I256(util.I256.NegOne) }
 object I256Const0  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Zero) }
 object I256Const1  extends ConstInstr0 { val const: Val = Val.I256(util.I256.One) }
@@ -279,16 +229,6 @@ object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsa
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
-final case class I64Const(const: Val.I64) extends ConstInstr1[Val.I64] {
-  override def serialize(): ByteString =
-    ByteString(I64Const.code) ++ serdeImpl[util.I64].serialize(const.v)
-}
-object I64Const extends StatelessInstrCompanion1[Val.I64]
-final case class U64Const(const: Val.U64) extends ConstInstr1[Val.U64] {
-  override def serialize(): ByteString =
-    ByteString(U64Const.code) ++ serdeImpl[util.U64].serialize(const.v)
-}
-object U64Const extends StatelessInstrCompanion1[Val.U64]
 final case class I256Const(const: Val.I256) extends ConstInstr1[Val.I256] {
   override def serialize(): ByteString =
     ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(const.v)
@@ -403,26 +343,6 @@ object BinaryArithmeticInstr {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
   }
 
-  @inline def i64SafeOp(
-      instr: ArithmeticInstr,
-      op: (util.I64, util.I64) => Option[util.I64]
-  )(x: Val, y: Val): ExeResult[Val.I64] =
-    (x, y) match {
-      case (a: Val.I64, b: Val.I64) =>
-        op(a.v, b.v).map(Val.I64.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
-      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
-    }
-
-  @inline def u64SafeOp(
-      instr: ArithmeticInstr,
-      op: (util.U64, util.U64) => Option[util.U64]
-  )(x: Val, y: Val): ExeResult[Val.U64] =
-    (x, y) match {
-      case (a: Val.U64, b: Val.U64) =>
-        op(a.v, b.v).map(Val.U64.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
-      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
-    }
-
   @inline def i256SafeOp(
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Option[util.I256]
@@ -443,24 +363,6 @@ object BinaryArithmeticInstr {
       case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
     }
 
-  @inline def i64Comp(
-      instr: ArithmeticInstr,
-      op: (util.I64, util.I64) => Boolean
-  )(x: Val, y: Val): ExeResult[Val.Bool] =
-    (x, y) match {
-      case (a: Val.I64, b: Val.I64) => Right(Val.Bool(op(a.v, b.v)))
-      case _                        => Left(BinaryArithmeticInstr.error(x, y, instr))
-    }
-
-  @inline def u64Comp(
-      instr: ArithmeticInstr,
-      op: (util.U64, util.U64) => Boolean
-  )(x: Val, y: Val): ExeResult[Val.Bool] =
-    (x, y) match {
-      case (a: Val.U64, b: Val.U64) => Right(Val.Bool(op(a.v, b.v)))
-      case _                        => Left(BinaryArithmeticInstr.error(x, y, instr))
-    }
-
   @inline def i256Comp(
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Boolean
@@ -478,94 +380,6 @@ object BinaryArithmeticInstr {
       case (a: Val.U256, b: Val.U256) => Right(Val.Bool(op(a.v, b.v)))
       case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
     }
-}
-object I64Add extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64SafeOp(this, _.add(_))(x, y)
-}
-object I64Sub extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64SafeOp(this, _.sub(_))(x, y)
-}
-object I64Mul extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64SafeOp(this, _.mul(_))(x, y)
-}
-object I64Div extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64SafeOp(this, _.div(_))(x, y)
-}
-object I64Mod extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64SafeOp(this, _.mod(_))(x, y)
-}
-object EqI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.==(_))(x, y)
-}
-object NeI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.!=(_))(x, y)
-}
-object LtI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.<(_))(x, y)
-}
-object LeI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.<=(_))(x, y)
-}
-object GtI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.>(_))(x, y)
-}
-object GeI64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i64Comp(this, _.>=(_))(x, y)
-}
-object U64Add extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64SafeOp(this, _.add(_))(x, y)
-}
-object U64Sub extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64SafeOp(this, _.sub(_))(x, y)
-}
-object U64Mul extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64SafeOp(this, _.mul(_))(x, y)
-}
-object U64Div extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64SafeOp(this, _.div(_))(x, y)
-}
-object U64Mod extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64SafeOp(this, _.mod(_))(x, y)
-}
-object EqU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.==(_))(x, y)
-}
-object NeU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.!=(_))(x, y)
-}
-object LtU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.<(_))(x, y)
-}
-object LeU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.<=(_))(x, y)
-}
-object GtU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.>(_))(x, y)
-}
-object GeU64 extends BinaryArithmeticInstr {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u64Comp(this, _.>=(_))(x, y)
 }
 object I256Add extends BinaryArithmeticInstr {
   protected def op(x: Val, y: Val): ExeResult[Val] =
@@ -695,16 +509,6 @@ sealed trait ConversionInstr[R <: Val, U <: Val] extends StatelessInstrCompanion
   }
 }
 
-case object ByteToI64 extends ConversionInstr[Val.Byte, Val.I64] {
-  override def converse(from: Val.Byte): ExeResult[Val.I64] = {
-    Right(Val.I64(util.I64.from(from.v & 0xFFL)))
-  }
-}
-case object ByteToU64 extends ConversionInstr[Val.Byte, Val.U64] {
-  override def converse(from: Val.Byte): ExeResult[Val.U64] = {
-    Right(Val.U64(util.U64.unsafe(from.v & 0xFFL)))
-  }
-}
 case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] {
   override def converse(from: Val.Byte): ExeResult[Val.I256] = {
     Right(Val.I256(util.I256.from(from.v & 0xFFL)))
@@ -716,65 +520,9 @@ case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] {
   }
 }
 
-case object I64ToByte extends ConversionInstr[Val.I64, Val.Byte] {
-  override def converse(from: Val.I64): ExeResult[Val.Byte] = {
-    val underlying = from.v.v
-    if (underlying >= 0 && underlying < 0x100) Right(Val.Byte(underlying.toByte)) // unsigned Byte
-    else Left(InvalidConversion(from, Val.Byte))
-  }
-}
-case object I64ToU64 extends ConversionInstr[Val.I64, Val.U64] {
-  override def converse(from: Val.I64): ExeResult[Val.U64] = {
-    util.U64.fromI64(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
-  }
-}
-case object I64ToI256 extends ConversionInstr[Val.I64, Val.I256] {
-  override def converse(from: Val.I64): ExeResult[Val.I256] = {
-    Right(Val.I256(util.I256.fromI64(from.v)))
-  }
-}
-case object I64ToU256 extends ConversionInstr[Val.I64, Val.U256] {
-  override def converse(from: Val.I64): ExeResult[Val.U256] = {
-    util.U256.fromI64(from.v).map(Val.U256.apply).toRight(InvalidConversion(from, Val.U256))
-  }
-}
-
-case object U64ToByte extends ConversionInstr[Val.U64, Val.Byte] {
-  override def converse(from: Val.U64): ExeResult[Val.Byte] = {
-    val underlying = from.v.v
-    if (underlying < 0x100) Right(Val.Byte(underlying.toByte)) // unsigned Byte
-    else Left(InvalidConversion(from, Val.Byte))
-  }
-}
-case object U64ToI64 extends ConversionInstr[Val.U64, Val.I64] {
-  override def converse(from: Val.U64): ExeResult[Val.I64] = {
-    util.I64.fromU64(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
-  }
-}
-case object U64ToI256 extends ConversionInstr[Val.U64, Val.I256] {
-  override def converse(from: Val.U64): ExeResult[Val.I256] = {
-    Right(Val.I256(util.I256.fromU64(from.v)))
-  }
-}
-case object U64ToU256 extends ConversionInstr[Val.U64, Val.U256] {
-  override def converse(from: Val.U64): ExeResult[Val.U256] = {
-    Right(Val.U256(util.U256.fromU64(from.v)))
-  }
-}
-
 case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] {
   override def converse(from: Val.I256): ExeResult[Val.Byte] = {
-    I256ToI64.converse(from).flatMap(I64ToByte.converse) // TODO: optimize this
-  }
-}
-case object I256ToI64 extends ConversionInstr[Val.I256, Val.I64] {
-  override def converse(from: Val.I256): ExeResult[Val.I64] = {
-    util.I64.fromI256(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
-  }
-}
-case object I256ToU64 extends ConversionInstr[Val.I256, Val.U64] {
-  override def converse(from: Val.I256): ExeResult[Val.U64] = {
-    util.U64.fromI256(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
+    from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.Byte))
   }
 }
 case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] {
@@ -785,17 +533,7 @@ case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] {
 
 case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] {
   override def converse(from: Val.U256): ExeResult[Val.Byte] = {
-    U256ToU64.converse(from).flatMap(U64ToByte.converse)
-  }
-}
-case object U256ToI64 extends ConversionInstr[Val.U256, Val.I64] {
-  override def converse(from: Val.U256): ExeResult[Val.I64] = {
-    util.I64.fromU256(from.v).map(Val.I64.apply).toRight(InvalidConversion(from, Val.I64))
-  }
-}
-case object U256ToU64 extends ConversionInstr[Val.U256, Val.U64] {
-  override def converse(from: Val.U256): ExeResult[Val.U64] = {
-    util.U64.fromU256(from.v).map(Val.U64.apply).toRight(InvalidConversion(from, Val.U64))
+    from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.U256))
   }
 }
 case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] {
@@ -807,10 +545,6 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] {
 sealed trait ObjectInstr   extends StatelessInstr
 sealed trait NewBooleanVec extends ObjectInstr
 sealed trait NewByteVec    extends ObjectInstr
-sealed trait NewI32Vec     extends ObjectInstr
-sealed trait NewU32Vec     extends ObjectInstr
-sealed trait NewI64Vec     extends ObjectInstr
-sealed trait NewU64Vec     extends ObjectInstr
 sealed trait NewI256Vec    extends ObjectInstr
 sealed trait NewU256Vec    extends ObjectInstr
 sealed trait NewByte256Vec extends ObjectInstr
@@ -903,78 +637,6 @@ final case class IfNotOr(offset: Byte) extends BranchInstr[Val.Bool] {
   override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v || value2.v)
 }
 case object IfNotOr extends StatelessInstrCompanion1[Byte]
-final case class IfEqI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfEqI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v == value2.v
-}
-object IfEqI64 extends StatelessInstrCompanion1[Byte]
-final case class IfNeI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfNeI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v != value2.v
-}
-object IfNeI64 extends StatelessInstrCompanion1[Byte]
-final case class IfLtI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfLtI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v < value2.v
-}
-object IfLtI64 extends StatelessInstrCompanion1[Byte]
-final case class IfLeI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfLeI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v <= value2.v
-}
-object IfLeI64 extends StatelessInstrCompanion1[Byte]
-final case class IfGtI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfGtI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v > value2.v
-}
-object IfGtI64 extends StatelessInstrCompanion1[Byte]
-final case class IfGeI64(offset: Byte) extends BranchInstr[Val.I64] {
-  override def code: Byte = IfGeI64.code
-
-  override def condition(value1: Val.I64, value2: Val.I64): Boolean = value1.v >= value2.v
-}
-object IfGeI64 extends StatelessInstrCompanion1[Byte]
-final case class IfEqU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfEqU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v == value2.v
-}
-object IfEqU64 extends StatelessInstrCompanion1[Byte]
-final case class IfNeU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfNeU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v != value2.v
-}
-object IfNeU64 extends StatelessInstrCompanion1[Byte]
-final case class IfLtU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfLtU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v < value2.v
-}
-object IfLtU64 extends StatelessInstrCompanion1[Byte]
-final case class IfLeU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfLeU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v <= value2.v
-}
-object IfLeU64 extends StatelessInstrCompanion1[Byte]
-final case class IfGtU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfGtU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v > value2.v
-}
-object IfGtU64 extends StatelessInstrCompanion1[Byte]
-final case class IfGeU64(offset: Byte) extends BranchInstr[Val.U64] {
-  override def code: Byte = IfGeU64.code
-
-  override def condition(value1: Val.U64, value2: Val.U64): Boolean = value1.v >= value2.v
-}
-object IfGeU64 extends StatelessInstrCompanion1[Byte]
 final case class IfEqI256(offset: Byte) extends BranchInstr[Val.I256] {
   override def code: Byte = IfEqI256.code
 
@@ -1096,14 +758,10 @@ sealed trait CheckEqT[T <: Val] extends CryptoInstr with StatelessInstrCompanion
 
 case object CheckEqBool    extends CheckEqT[Val.Bool]
 case object CheckEqByte    extends CheckEqT[Val.Byte]
-case object CheckEqI64     extends CheckEqT[Val.I64]
-case object CheckEqU64     extends CheckEqT[Val.U64]
 case object CheckEqI256    extends CheckEqT[Val.I256]
 case object CheckEqU256    extends CheckEqT[Val.U256]
 case object CheckEqBoolVec extends CheckEqT[Val.BoolVec]
 case object CheckEqByteVec extends CheckEqT[Val.ByteVec]
-case object CheckEqI64Vec  extends CheckEqT[Val.I64Vec]
-case object CheckEqU64Vec  extends CheckEqT[Val.U64Vec]
 case object CheckEqI256Vec extends CheckEqT[Val.I256Vec]
 case object CheckEqU256Vec extends CheckEqT[Val.U256Vec]
 case object CheckEqAddress extends CheckEqT[Val.Address]
@@ -1170,7 +828,7 @@ sealed trait AssetInstr extends StatefulInstr
 object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      amount       <- frame.popT[Val.U64]()
+      amount       <- frame.popT[Val.U256]()
       address      <- frame.popT[Val.Address]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       _ <- balanceState
@@ -1183,7 +841,7 @@ object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
 object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      amount       <- frame.popT[Val.U64]()
+      amount       <- frame.popT[Val.U256]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
       address      <- frame.popT[Val.Address]()
@@ -1201,7 +859,7 @@ object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
       address      <- frame.popT[Val.Address]()
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
       amount       <- balanceState.alfRemaining(address.lockupScript).toRight(NoAlfBalanceForTheAddress)
-      _            <- frame.push(Val.U64(amount))
+      _            <- frame.push(Val.U256(amount))
     } yield ()
   }
 }
@@ -1216,7 +874,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
         .toRight(NoTokenBalanceForTheAddress)
-      _ <- frame.push(Val.U64(amount))
+      _ <- frame.push(Val.U256(amount))
     } yield ()
   }
 }
@@ -1230,7 +888,7 @@ sealed trait Transfer extends AssetInstr {
                                         fromThunk: => ExeResult[LockupScript],
                                         toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
     for {
-      amount       <- frame.popT[Val.U64]()
+      amount       <- frame.popT[Val.U256]()
       to           <- toThunk
       from         <- fromThunk
       balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
@@ -1245,7 +903,7 @@ sealed trait Transfer extends AssetInstr {
                                           fromThunk: => ExeResult[LockupScript],
                                           toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
     for {
-      amount       <- frame.popT[Val.U64]()
+      amount       <- frame.popT[Val.U256]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
       to           <- toThunk
@@ -1322,7 +980,7 @@ object IssueToken extends StatefulInstrCompanion0 {
     for {
       _           <- Either.cond(frame.method.isPayable, (), NonPayableFrame)
       addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
-      amount      <- frame.popT[Val.U64]()
+      amount      <- frame.popT[Val.U256]()
       tokenId = addressHash // tokenId is addressHash
       _ <- frame.ctx.outputBalances
         .addToken(LockupScript.p2c(addressHash), tokenId, amount.v)

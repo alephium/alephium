@@ -31,7 +31,7 @@ import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction
 import org.alephium.protocol.vm._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.deserialize
-import org.alephium.util.{ActorRefT, AVector, Hex, U64}
+import org.alephium.util.{ActorRefT, AVector, Hex, U256}
 
 object ServerUtils {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest)(
@@ -142,7 +142,7 @@ object ServerUtils {
   def prepareTransaction(blockFlow: BlockFlow,
                          fromKey: PublicKey,
                          toKey: PublicKey,
-                         value: U64,
+                         value: U256,
                          fromPrivateKey: PrivateKey): Try[Transaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(toKey)
@@ -157,7 +157,7 @@ object ServerUtils {
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
                                  fromKey: PublicKey,
                                  toLockupScript: LockupScript,
-                                 value: U64): Try[UnsignedTransaction] = {
+                                 value: U256): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     blockFlow.prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value) match {

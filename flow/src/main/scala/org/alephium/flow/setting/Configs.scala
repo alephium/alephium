@@ -132,7 +132,7 @@ object Configs extends StrictLogging {
     }
   }
 
-  def splitBalance(raw: String): Option[(LockupScript, U64)] = {
+  def splitBalance(raw: String): Option[(LockupScript, U256)] = {
     val splitIndex = raw.indexOf(":")
     if (splitIndex == -1) None
     else {
@@ -142,12 +142,12 @@ object Configs extends StrictLogging {
         bytestring   <- Hex.from(left)
         lockupScript <- deserialize[LockupScript](bytestring).toOption
         rawBalance   <- allCatch.opt(BigInt(right).underlying())
-        balance      <- U64.from(rawBalance)
+        balance      <- U256.from(rawBalance)
       } yield (lockupScript, balance)
     }
   }
 
-  def loadBlockFlow(balances: AVector[(LockupScript, U64)])(
+  def loadBlockFlow(balances: AVector[(LockupScript, U256)])(
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) {

@@ -30,7 +30,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U64}
+import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U256}
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
@@ -99,27 +99,27 @@ trait TxInputGenerators extends Generators {
 
 trait TokenGenerators extends Generators with NumericHelpers {
   val minAmount = 1000L
-  def amountGen(inputNum: Int): Gen[U64] = {
-    Gen.choose(minAmount * inputNum, ALF.MaxALFValue.v / 1000L).map(U64.unsafe)
+  def amountGen(inputNum: Int): Gen[U256] = {
+    Gen.choose(minAmount * inputNum, ALF.MaxALFValue.v.longValueExact() / 1000L).map(U256.unsafe)
   }
 
-  def tokenGen(inputNum: Int): Gen[(TokenId, U64)] =
+  def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
     for {
       tokenId <- hashGen
       amount  <- amountGen(inputNum)
     } yield (tokenId, amount)
 
-  def tokensGen(inputNum: Int, minTokens: Int, maxTokens: Int): Gen[Map[TokenId, U64]] =
+  def tokensGen(inputNum: Int, minTokens: Int, maxTokens: Int): Gen[Map[TokenId, U256]] =
     for {
       tokenNum <- Gen.choose(minTokens, maxTokens)
       tokens   <- Gen.listOfN(tokenNum, tokenGen(inputNum))
     } yield tokens.toMap
 
-  def split(amount: U64, minAmount: U64, num: Int): AVector[U64] = {
+  def split(amount: U256, minAmount: U256, num: Int): AVector[U256] = {
     assume(num > 0)
     val remainder = amount - (minAmount * num)
-    val pivots    = Array.fill(num + 1)(nextU64(remainder))
-    pivots(0) = U64.Zero
+    val pivots    = Array.fill(num + 1)(nextU256(remainder))
+    pivots(0) = U256.Zero
     pivots(1) = remainder
     Sorting.quickSort(pivots)
     AVector.tabulate(num)(i => pivots(i + 1) - pivots(i) + minAmount)
@@ -154,11 +154,11 @@ trait TxGenerators
   } yield ByteString(bytes)
 
   def assetOutputGen(groupIndex: GroupIndex)(
-      _amountGen: Gen[U64]               = amountGen(1),
-      _tokensGen: Gen[Map[TokenId, U64]] = tokensGen(1, 1, 5),
-      heightGen: Gen[Int]                = createdHeightGen,
-      scriptGen: Gen[LockupScript]       = p2pkhLockupGen(groupIndex),
-      dataGen: Gen[ByteString]           = dataGen
+      _amountGen: Gen[U256]               = amountGen(1),
+      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
+      heightGen: Gen[Int]                 = createdHeightGen,
+      scriptGen: Gen[LockupScript]        = p2pkhLockupGen(groupIndex),
+      dataGen: Gen[ByteString]            = dataGen
   ): Gen[AssetOutput] = {
     for {
       amount         <- _amountGen
@@ -170,10 +170,10 @@ trait TxGenerators
   }
 
   def contractOutputGen(groupIndex: GroupIndex)(
-      _amountGen: Gen[U64]               = amountGen(1),
-      _tokensGen: Gen[Map[TokenId, U64]] = tokensGen(1, 1, 5),
-      heightGen: Gen[Int]                = createdHeightGen,
-      scriptGen: Gen[LockupScript]       = p2pkhLockupGen(groupIndex)
+      _amountGen: Gen[U256]               = amountGen(1),
+      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
+      heightGen: Gen[Int]                 = createdHeightGen,
+      scriptGen: Gen[LockupScript]        = p2pkhLockupGen(groupIndex)
   ): Gen[ContractOutput] = {
     for {
       amount        <- _amountGen
@@ -186,7 +186,7 @@ trait TxGenerators
   lazy val counterContract: StatefulContract = {
     val input =
       s"""
-         |TxContract Foo(mut x: U64) {
+         |TxContract Foo(mut x: U256) {
          |  fn add() -> () {
          |    x = x + 1
          |    return
@@ -198,7 +198,7 @@ trait TxGenerators
 
   lazy val assetOutputGen: Gen[AssetOutput] = for {
     value <- Gen.choose[Long](1, 5)
-  } yield TxOutput.asset(U64.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
+  } yield TxOutput.asset(U256.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
 
   def assetInputInfoGen(balances: Balances, scriptGen: Gen[ScriptPair]): Gen[AssetInputInfo] =
     for {
@@ -232,10 +232,10 @@ trait TxGenerators
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
       val alfAmount      = outputsToSpend.map(_.amount).reduce(_ + _)
       val tokenTable = {
-        val tokens = mutable.Map.empty[TokenId, U64]
+        val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach {
           case (tokenId, amount) =>
-            val total = tokens.getOrElse(tokenId, U64.Zero)
+            val total = tokens.getOrElse(tokenId, U256.Zero)
             tokens.put(tokenId, total + amount)
         })
         tokens
@@ -399,7 +399,7 @@ trait NoIndexModelGenerators
 object ModelGenerators {
   final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)
 
-  final case class Balances(alfAmount: U64, tokens: Map[TokenId, U64]) {
+  final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
     def toOutput(createdHeight: Int, lockupScript: LockupScript, data: ByteString): AssetOutput = {
       val tokensVec = AVector.from(tokens)
       AssetOutput(alfAmount, createdHeight, lockupScript, tokensVec, data)

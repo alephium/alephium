@@ -23,7 +23,7 @@ import scala.util.Try
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
-import org.alephium.util.{AVector, Bytes, U64}
+import org.alephium.util.{AVector, Bytes, U256}
 
 abstract class Frame[Ctx <: Context] {
   var pc: Int
@@ -299,25 +299,25 @@ object Frame {
    * `approved` is the balances for payable function call
    */
   final case class BalanceState(remaining: Balances, approved: Balances) {
-    def approveALF(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+    def approveALF(lockupScript: LockupScript, amount: U256): Option[Unit] = {
       for {
         _ <- remaining.subAlf(lockupScript, amount)
         _ <- approved.addAlf(lockupScript, amount)
       } yield ()
     }
 
-    def approveToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+    def approveToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
       for {
         _ <- remaining.subToken(lockupScript, tokenId, amount)
         _ <- approved.addToken(lockupScript, tokenId, amount)
       } yield ()
     }
 
-    def alfRemaining(lockupScript: LockupScript): Option[U64] = {
+    def alfRemaining(lockupScript: LockupScript): Option[U256] = {
       remaining.getBalances(lockupScript).map(_.alfAmount)
     }
 
-    def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U64] = {
+    def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
       remaining.getTokenAmount(lockupScript, tokenId)
     }
 
@@ -326,11 +326,11 @@ object Frame {
       BalanceState(toUse, Balances.empty)
     }
 
-    def useAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+    def useAlf(lockupScript: LockupScript, amount: U256): Option[Unit] = {
       remaining.subAlf(lockupScript, amount)
     }
 
-    def useToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+    def useToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
       remaining.subToken(lockupScript, tokenId, amount)
     }
   }
@@ -344,15 +344,15 @@ object Frame {
       all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
     }
 
-    def getAlfAmount(lockupScript: LockupScript): Option[U64] = {
+    def getAlfAmount(lockupScript: LockupScript): Option[U256] = {
       getBalances(lockupScript).map(_.alfAmount)
     }
 
-    def getTokenAmount(lockupScript: LockupScript, tokenId: TokenId): Option[U64] = {
+    def getTokenAmount(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
       getBalances(lockupScript).flatMap(_.getTokenAmount(tokenId))
     }
 
-    def addAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+    def addAlf(lockupScript: LockupScript, amount: U256): Option[Unit] = {
       getBalances(lockupScript) match {
         case Some(balances) =>
           balances.addAlf(amount)
@@ -362,7 +362,7 @@ object Frame {
       }
     }
 
-    def addToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+    def addToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
       getBalances(lockupScript) match {
         case Some(balances) =>
           balances.addToken(tokenId, amount)
@@ -372,11 +372,11 @@ object Frame {
       }
     }
 
-    def subAlf(lockupScript: LockupScript, amount: U64): Option[Unit] = {
+    def subAlf(lockupScript: LockupScript, amount: U256): Option[Unit] = {
       getBalances(lockupScript).flatMap(_.subAlf(amount))
     }
 
-    def subToken(lockupScript: LockupScript, tokenId: TokenId, amount: U64): Option[Unit] = {
+    def subToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
       getBalances(lockupScript).flatMap(_.subToken(tokenId, amount))
     }
 
@@ -450,21 +450,21 @@ object Frame {
     def empty: Balances = Balances(ArrayBuffer.empty)
   }
 
-  final case class BalancesPerLockup(var alfAmount: U64,
-                                     tokenAmounts: mutable.Map[TokenId, U64],
+  final case class BalancesPerLockup(var alfAmount: U256,
+                                     tokenAmounts: mutable.Map[TokenId, U256],
                                      scopeDepth: Int) {
-    def tokenVector: AVector[(TokenId, U64)] = {
+    def tokenVector: AVector[(TokenId, U256)] = {
       import org.alephium.protocol.model.tokenIdOrder
       AVector.from(tokenAmounts).sortBy(_._1)
     }
 
-    def getTokenAmount(tokenId: TokenId): Option[U64] = tokenAmounts.get(tokenId)
+    def getTokenAmount(tokenId: TokenId): Option[U256] = tokenAmounts.get(tokenId)
 
-    def addAlf(amount: U64): Option[Unit] = {
+    def addAlf(amount: U256): Option[Unit] = {
       alfAmount.add(amount).map(alfAmount = _)
     }
 
-    def addToken(tokenId: TokenId, amount: U64): Option[Unit] = {
+    def addToken(tokenId: TokenId, amount: U256): Option[Unit] = {
       tokenAmounts.get(tokenId) match {
         case Some(currentAmount) =>
           currentAmount.add(amount).map(tokenAmounts(tokenId) = _)
@@ -474,11 +474,11 @@ object Frame {
       }
     }
 
-    def subAlf(amount: U64): Option[Unit] = {
+    def subAlf(amount: U256): Option[Unit] = {
       alfAmount.sub(amount).map(alfAmount = _)
     }
 
-    def subToken(tokenId: TokenId, amount: U64): Option[Unit] = {
+    def subToken(tokenId: TokenId, amount: U256): Option[Unit] = {
       tokenAmounts.get(tokenId).flatMap { currentAmount =>
         currentAmount.sub(amount).map(tokenAmounts(tokenId) = _)
       }
@@ -514,7 +514,7 @@ object Frame {
       }.toOption
 
     def toTxOutput(lockupScript: LockupScript): Option[TxOutput] = {
-      Option.when(alfAmount != U64.Zero)(
+      Option.when(alfAmount != U256.Zero)(
         TxOutput.from(alfAmount, tokenVector, lockupScript)
       )
     }
@@ -523,14 +523,14 @@ object Frame {
   object BalancesPerLockup {
     val error: ArithmeticException = new ArithmeticException("Balance amount")
 
-    val empty: BalancesPerLockup = BalancesPerLockup(U64.Zero, mutable.Map.empty, 0)
+    val empty: BalancesPerLockup = BalancesPerLockup(U256.Zero, mutable.Map.empty, 0)
 
-    def alf(amount: U64): BalancesPerLockup = {
+    def alf(amount: U256): BalancesPerLockup = {
       BalancesPerLockup(amount, mutable.Map.empty, 0)
     }
 
-    def token(id: TokenId, amount: U64): BalancesPerLockup = {
-      BalancesPerLockup(U64.Zero, mutable.Map(id -> amount), 0)
+    def token(id: TokenId, amount: U256): BalancesPerLockup = {
+      BalancesPerLockup(U256.Zero, mutable.Map(id -> amount), 0)
     }
 
     def from(output: TxOutput): BalancesPerLockup =

@@ -99,7 +99,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse functions" in {
     val parsed0 = fastparse
-      .parse("fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+      .parse("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
              StatelessParser.func(_))
       .get
       .value
@@ -107,10 +107,10 @@ class ParserSpec extends AlephiumSpec {
     parsed0.isPublic is false
     parsed0.isPayable is false
     parsed0.args.size is 2
-    parsed0.rtypes is Seq(Type.U64, Type.U64)
+    parsed0.rtypes is Seq(Type.U256, Type.U256)
 
     val parsed1 = fastparse
-      .parse("pub payable fn add(x: U64, y: U64) -> (U64, U64) { return x + y, x - y }",
+      .parse("pub payable fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
              StatelessParser.func(_))
       .get
       .value
@@ -118,7 +118,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.isPayable is true
     parsed1.args.size is 2
-    parsed1.rtypes is Seq(Type.U64, Type.U64)
+    parsed1.rtypes is Seq(Type.U256, Type.U256)
   }
 
 }

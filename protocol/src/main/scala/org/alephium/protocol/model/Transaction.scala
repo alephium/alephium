@@ -22,7 +22,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
-import org.alephium.util.{AVector, U64}
+import org.alephium.util.{AVector, U256}
 
 trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -61,14 +61,14 @@ final case class Transaction(unsigned: UnsignedTransaction,
     }
   }
 
-  lazy val alfAmountInOutputs: Option[U64] = {
+  lazy val alfAmountInOutputs: Option[U256] = {
     val sum1Opt =
       unsigned.fixedOutputs
-        .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))
+        .foldE(U256.Zero)((sum, output) => sum.add(output.amount).toRight(()))
         .toOption
     val sum2Opt =
       generatedOutputs
-        .foldE(U64.Zero)((sum, output) => sum.add(output.amount).toRight(()))
+        .foldE(U256.Zero)((sum, output) => sum.add(output.amount).toRight(()))
         .toOption
     for {
       sum1 <- sum1Opt
@@ -138,7 +138,7 @@ object Transaction {
                 signatures       = AVector.empty)
   }
 
-  def genesis(balances: AVector[(LockupScript, U64)]): Transaction = {
+  def genesis(balances: AVector[(LockupScript, U256)]): Transaction = {
     val outputs = balances.map[AssetOutput] {
       case (lockupScript, value) => TxOutput.genesis(value, lockupScript)
     }

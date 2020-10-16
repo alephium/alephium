@@ -25,7 +25,7 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
-import org.alephium.util.{TimeStamp, U64}
+import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
@@ -43,8 +43,8 @@ trait TapirCodecs extends ApiModelCodec {
   implicit val publicKeyTapirCodec: Codec[String, PublicKey, TextPlain] =
     fromCirce[PublicKey]
 
-  implicit val u64TapirCodec: Codec[String, U64, TextPlain] =
-    fromCirce[U64]
+  implicit val u256TapirCodec: Codec[String, U256, TextPlain] =
+    fromCirce[U256]
 
   implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
     fromCirce[MinerAction]

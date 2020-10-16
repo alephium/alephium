@@ -90,7 +90,7 @@ object Compiler {
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) returnType
-      else throw Error(s"Invalid args type $inputType for builtin func $name")
+      else throw Error(s"Invalid args type $inputType for func $name")
     }
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {

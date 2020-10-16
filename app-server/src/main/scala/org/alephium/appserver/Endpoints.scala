@@ -31,7 +31,7 @@ import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{TimeStamp, U64}
+import org.alephium.util.{TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
@@ -118,12 +118,12 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
 
-  val createTransaction: BaseEndpoint[(PublicKey, Address, U64), CreateTransactionResult] =
+  val createTransaction: BaseEndpoint[(PublicKey, Address, U256), CreateTransactionResult] =
     baseEndpoint.get
       .in("unsigned-transactions")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
-      .in(query[U64]("value"))
+      .in(query[U256]("value"))
       .out(jsonBody[CreateTransactionResult])
       .description("Create an unsigned transaction")
 

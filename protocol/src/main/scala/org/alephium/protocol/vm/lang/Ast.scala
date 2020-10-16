@@ -50,14 +50,10 @@ object Ast {
       v match {
         case Val.Bool(b)    => Seq(if (b) BoolConstTrue else BoolConstFalse)
         case _: Val.Byte    => ???
-        case v: Val.I64     => Seq(ConstInstr.i64(v))
-        case v: Val.U64     => Seq(ConstInstr.u64(v))
         case v: Val.I256    => Seq(ConstInstr.i256(v))
         case v: Val.U256    => Seq(ConstInstr.u256(v))
         case _: Val.BoolVec => ???
         case v: Val.ByteVec => Seq(BytesConst(v))
-        case _: Val.I64Vec  => ???
-        case _: Val.U64Vec  => ???
         case _: Val.I256Vec => ???
         case _: Val.U256Vec => ???
         case v: Val.Address => Seq(AddressConst(v))
