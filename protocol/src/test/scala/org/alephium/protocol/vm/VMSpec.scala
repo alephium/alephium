@@ -38,6 +38,32 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     StatefulVM.execute(context, obj, AVector(Val.U64(U64.Two))) is Left(PrivateExternalMethodCall)
   }
 
+  it should "overflow oprand stack" in {
+    val method =
+      Method[StatefulContext](
+        isPublic   = true,
+        isPayable  = false,
+        localsType = AVector(Val.U64),
+        returnType = AVector.empty,
+        instrs = AVector(U64Const0,
+                         U64Const0,
+                         LoadLocal(0),
+                         U64Const0,
+                         GtU64,
+                         IfFalse(4),
+                         LoadLocal(0),
+                         U64Const1,
+                         U64Sub,
+                         CallLocal(0))
+      )
+
+    val contract = StatefulContract(AVector.empty, methods = AVector(method))
+    val (obj, context) =
+      prepareContract(contract, AVector[Val]())
+    StatefulVM.execute(context, obj, AVector(Val.U64(U64.unsafe(opStackMaxSize.toLong / 2 - 1)))) is Left(
+      StackOverflow)
+  }
+
   it should "execute the following script" in {
     val method =
       Method[StatefulContext](

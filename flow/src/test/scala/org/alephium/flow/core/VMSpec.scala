@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, StatefulScript, Val}
+import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U64}
@@ -59,6 +59,30 @@ class VMSpec extends AlephiumSpec {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = mine(blockFlow, chainIndex, txScriptOption = Some(script))
     assertThrows[RuntimeException](addAndCheck(blockFlow, block, 1))
+  }
+
+  it should "overflow frame stack" in new FlowFixture {
+    val input =
+      s"""
+         |TxScript Foo {
+         |  pub fn main() -> () {
+         |    foo(${frameStackMaxSize - 1})
+         |  }
+         |
+         |  fn foo(n: U64) -> () {
+         |    if (n > 0) {
+         |      foo(n - 1)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    val script = Compiler.compileTxScript(input).toOption.get
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = mine(blockFlow, chainIndex, txScriptOption = Some(script))
+    val tx         = block.transactions.head
+    val worldState = blockFlow.getBestCachedTrie(chainIndex.from).toOption.get
+    StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get) is Left(StackOverflow)
   }
 
   trait CallFixture extends FlowFixture {
