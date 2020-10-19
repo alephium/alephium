@@ -71,8 +71,6 @@ abstract class Frame[Ctx <: Context] {
   def setLocal(index: Int, v: Val): ExeResult[Unit] = {
     if (!locals.isDefinedAt(index)) {
       Left(InvalidLocalIndex)
-    } else if (locals(index).tpe != v.tpe) {
-      Left(InvalidLocalType)
     } else {
       Right(locals.update(index, v))
     }
@@ -119,7 +117,7 @@ final class StatelessFrame(
   def methodFrame(index: Int): ExeResult[Frame[StatelessContext]] = {
     for {
       method <- getMethod(index)
-      args   <- opStack.pop(method.localsType.length)
+      args   <- opStack.pop(method.argsType.length)
       _      <- method.check(args)
     } yield Frame.stateless(ctx, obj, method, args, opStack, opStack.push)
   }
@@ -194,7 +192,7 @@ final class StatefulFrame(
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
       method             <- getMethod(index)
-      args               <- opStack.pop(method.localsType.length)
+      args               <- opStack.pop(method.argsType.length)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
     } yield {
@@ -211,7 +209,7 @@ final class StatefulFrame(
         .map[ExeFailure](IOErrorLoadContract)
       method             <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
       _                  <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
-      args               <- opStack.pop(method.localsType.length)
+      args               <- opStack.pop(method.argsType.length)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
     } yield {
@@ -268,7 +266,10 @@ object Frame {
                 args: AVector[Val],
                 operandStack: Stack[Val],
                 returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] = {
-    val locals = method.localsType.mapToArray(_.default)
+    val locals = Array.fill[Val](method.localsLength)(Val.False)
+    method.argsType.foreachWithIndex {
+      case (tpe, index) => locals(index) = tpe.default
+    }
     args.foreachWithIndex((v, index) => locals(index) = v)
     new StatelessFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
   }
@@ -280,7 +281,7 @@ object Frame {
                args: AVector[Val],
                operandStack: Stack[Val],
                returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] = {
-    val locals = method.localsType.mapToArray(_.default)
+    val locals = Array.fill[Val](method.localsLength)(Val.False)
     args.foreachWithIndex((v, index) => locals(index) = v)
     new StatefulFrame(0,
                       obj,

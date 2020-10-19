@@ -25,7 +25,7 @@ sealed trait Type {
 
 object Type {
   val primitives: AVector[Type] = AVector[Type](Bool, Byte, I256, U256) ++
-    AVector[Type](BoolVec, ByteVec, I256Vec, U256Vec)
+    AVector[Type](BoolVec, ByteVec, I256Vec, U256Vec, Address)
 
   def fromVal(tpe: Val.Type): Type = {
     tpe match {

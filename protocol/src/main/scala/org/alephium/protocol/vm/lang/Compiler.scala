@@ -79,7 +79,7 @@ object Compiler {
   }
 
   final case class VarInfo(tpe: Type, isMutable: Boolean, index: Byte)
-  class SimpleFunc[Ctx <: StatelessContext](
+  final case class SimpleFunc[Ctx <: StatelessContext](
       val id: Ast.FuncId,
       val isPublic: Boolean,
       argsType: Seq[Type],

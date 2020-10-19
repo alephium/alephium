@@ -178,6 +178,12 @@ object BuiltIn {
                           Seq.empty,
                           TransferAlfFromSelf)
 
+  val transferAlfToSelf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferAlfToSelf",
+                          Seq[Type](Type.Address, Type.U256),
+                          Seq.empty,
+                          TransferAlfToSelf)
+
   val transferToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("transferToken",
                           Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
@@ -190,6 +196,12 @@ object BuiltIn {
                           Seq.empty,
                           TransferTokenFromSelf)
 
+  val transferTokenToSelf: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("transferTokenToSelf",
+                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+                          Seq.empty,
+                          TransferTokenToSelf)
+
   val createContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("createContract",
                           Seq[Type](Type.ByteVec, Type.ByteVec),
@@ -198,6 +210,9 @@ object BuiltIn {
 
   val selfAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
+
+  val selfTokenId: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("selfTokenId", Seq.empty, Seq(Type.ByteVec), SelfTokenId)
 
   val issueToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("issueToken", Seq(Type.U256), Seq.empty, IssueToken)
@@ -210,10 +225,13 @@ object BuiltIn {
       tokenRemaining,
       transferAlf,
       transferAlfFromSelf,
+      transferAlfToSelf,
       transferToken,
       transferTokenFromSelf,
+      transferTokenToSelf,
       createContract,
       selfAddress,
+      selfTokenId,
       issueToken
     ).map(f => f.name -> f)
 }

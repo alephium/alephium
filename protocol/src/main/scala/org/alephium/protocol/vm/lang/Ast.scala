@@ -199,10 +199,15 @@ object Ast {
       check(state)
 
       val localVars  = state.getLocalVars(id)
-      val localsType = localVars.map(_.tpe.toVal)
+      val argsType   = localVars.take(args.length).map(_.tpe.toVal)
       val returnType = AVector.from(rtypes.view.map(_.toVal))
       val instrs     = body.flatMap(_.genCode(state))
-      Method[Ctx](isPublic, isPayable, AVector.from(localsType), returnType, AVector.from(instrs))
+      Method[Ctx](isPublic,
+                  isPayable,
+                  AVector.from(argsType),
+                  localVars.length,
+                  returnType,
+                  AVector.from(instrs))
     }
   }
   // TODO: handle multiple returns

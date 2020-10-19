@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.switch
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 
 import akka.util.ByteString
 
@@ -100,7 +101,9 @@ object Instr {
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
     ArraySeq[InstrCompanion[StatefulContext]](
       LoadField, StoreField, CallExternal,
-      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, TransferAlf, TransferToken, CreateContract, IssueToken
+      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
+      TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
+      CreateContract, SelfAddress, SelfTokenId, IssueToken
     )
   // format: on
 
@@ -935,6 +938,14 @@ object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
   }
 }
 
+object TransferAlfToSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    transferAlf(frame,
+                frame.popT[Val.Address]().map(_.lockupScript),
+                getContractLockupScript(frame))
+  }
+}
+
 object TransferToken extends Transfer with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     transferToken(frame,
@@ -948,6 +959,14 @@ object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(frame,
                   getContractLockupScript(frame),
                   frame.popT[Val.Address]().map(_.lockupScript))
+  }
+}
+
+object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    transferToken(frame,
+                  frame.popT[Val.Address]().map(_.lockupScript),
+                  getContractLockupScript(frame))
   }
 }
 
@@ -971,6 +990,16 @@ object SelfAddress extends StatefulInstrCompanion0 {
     for {
       addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
       _           <- frame.push(Val.Address(LockupScript.p2c(addressHash)))
+    } yield ()
+  }
+}
+
+object SelfTokenId extends StatefulInstrCompanion0 {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      tokenId = addressHash // tokenId is addressHash
+      _ <- frame.push(Val.ByteVec(mutable.ArraySeq.from(tokenId.bytes)))
     } yield ()
   }
 }

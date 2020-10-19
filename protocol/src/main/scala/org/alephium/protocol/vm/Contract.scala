@@ -25,14 +25,15 @@ import org.alephium.util.AVector
 final case class Method[Ctx <: Context](
     isPublic: Boolean,
     isPayable: Boolean,
-    localsType: AVector[Val.Type],
+    argsType: AVector[Val.Type],
+    localsLength: Int,
     returnType: AVector[Val.Type],
     instrs: AVector[Instr[Ctx]]
 ) {
   def check(args: AVector[Val]): ExeResult[Unit] = {
-    if (args.length != localsType.length)
-      Left(InvalidMethodArgLength(args.length, localsType.length))
-    else if (!args.forallWithIndex((v, index) => v.tpe == localsType(index))) {
+    if (args.length != argsType.length)
+      Left(InvalidMethodArgLength(args.length, argsType.length))
+    else if (!args.forallWithIndex((v, index) => v.tpe == argsType(index))) {
       Left(InvalidMethodParamsType)
     } else Right(())
   }
@@ -40,16 +41,19 @@ final case class Method[Ctx <: Context](
 
 object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct5(Method[StatelessContext],
-                      t => (t.isPublic, t.isPayable, t.localsType, t.returnType, t.instrs))
+    Serde.forProduct6(
+      Method[StatelessContext],
+      t => (t.isPublic, t.isPayable, t.argsType, t.localsLength, t.returnType, t.instrs))
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct5(Method[StatefulContext],
-                      t => (t.isPublic, t.isPayable, t.localsType, t.returnType, t.instrs))
+    Serde.forProduct6(
+      Method[StatefulContext],
+      t => (t.isPublic, t.isPayable, t.argsType, t.localsLength, t.returnType, t.instrs))
 
   def forMPT: Method[StatefulContext] =
     Method[StatefulContext](isPublic  = false,
                             isPayable = false,
                             AVector.empty,
+                            0,
                             AVector.empty,
                             AVector(Pop))
 }

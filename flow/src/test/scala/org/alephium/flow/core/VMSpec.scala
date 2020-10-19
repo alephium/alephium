@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model._
@@ -107,7 +108,7 @@ class VMSpec extends AlephiumSpec {
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
     lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U256.One)
     lazy val block0 =
-      mine(blockFlow, chainIndex, txScriptOption = Some(txScript0), createContract = true)
+      mine(blockFlow, chainIndex, txScriptOption = Some(txScript0), callContract = true)
     lazy val contractOutputRef0 =
       TxOutputRef.unsafe(block0.transactions.head, 1).asInstanceOf[ContractOutputRef]
     lazy val contractKey0 = contractOutputRef0.key
@@ -164,21 +165,27 @@ class VMSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
+    val chainIndex     = ChainIndex.unsafe(0, 0)
+    val genesisLockup  = getGenesisLockupScript(chainIndex)
+    val genesisAddress = Address(NetworkType.Testnet, genesisLockup)
 
-    def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
-      val contract     = Compiler.compileContract(input).toOption.get
-      val initialState = AVector[Val](Val.U256(U256.Zero))
-      val fromLockup   = getGenesisLockupScript(chainIndex)
-      val txScript     = contractCreation(contract, initialState, fromLockup, U256.One)
+    def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
+      val contract = Compiler.compileContract(input).toOption.get
+      val txScript = contractCreation(contract, initialState, genesisLockup, U256.One)
+      val block    = minePayable(blockFlow, chainIndex.from, txScript)
 
-      val block =
-        mine(blockFlow, chainIndex, txScriptOption = Some(txScript), createContract = true)
       val contractOutputRef =
-        TxOutputRef.unsafe(block.transactions.head, 1).asInstanceOf[ContractOutputRef]
-      val contractKey = contractOutputRef.key
+        TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
 
       blockFlow.add(block).isRight is true
+      contractOutputRef
+    }
+
+    def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
+      val initialState      = AVector[Val](Val.U256(U256.Zero))
+      val contractOutputRef = createContract(input, initialState)
+
+      val contractKey = contractOutputRef.key
       checkState(blockFlow,
                  chainIndex,
                  contractKey,
@@ -186,7 +193,14 @@ class VMSpec extends AlephiumSpec {
                  contractOutputRef,
                  numAssets,
                  numContracts)
+
       contractOutputRef
+    }
+
+    def callTxScript(input: String): Assertion = {
+      val script = Compiler.compileTxScript(input).toOption.get
+      val block  = minePayable(blockFlow, chainIndex.from, script)
+      blockFlow.add(block).isRight is true
     }
   }
 
@@ -305,7 +319,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).toOption.get
 
-    val block0 = mine(blockFlow, chainIndex, txScriptOption = Some(script), createContract = true)
+    val block0 = mine(blockFlow, chainIndex, txScriptOption = Some(script), callContract = true)
     blockFlow.add(block0).isRight is true
 
     val worldState0 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
@@ -317,7 +331,7 @@ class VMSpec extends AlephiumSpec {
         }
     }
 
-    val block1 = mine(blockFlow, chainIndex, txScriptOption = Some(script), createContract = true)
+    val block1 = mine(blockFlow, chainIndex, txScriptOption = Some(script), callContract = true)
     blockFlow.add(block1).isRight is true
 
     val worldState1 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
@@ -328,5 +342,129 @@ class VMSpec extends AlephiumSpec {
           output.tokens.head is (contractKey -> U256.unsafe(20000000))
         }
     }
+  }
+
+  behavior of "constant product market"
+
+  it should "swap" in new ContractFixture {
+    val tokenContract =
+      s"""
+         |TxContract Token(mut x: U256) {
+         |  pub payable fn issue(amount: U256) -> () {
+         |    issueToken!(amount)
+         |  }
+         |
+         |  pub payable fn withdraw(address: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
+    val tokenContractKey = createContract(tokenContract, 2, 2).key
+    val tokenId          = tokenContractKey
+
+    callTxScript(s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    let token = Token(#${tokenContractKey.toHexString})
+         |    token.issue(1024)
+         |  }
+         |}
+         |
+         |$tokenContract
+         |""".stripMargin)
+
+    callTxScript(s"""
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    let token = Token(#${tokenContractKey.toHexString})
+                    |    token.withdraw(@${genesisAddress.toBase58}, 1024)
+                    |  }
+                    |}
+                    |
+                    |$tokenContract
+                    |""".stripMargin)
+
+    val swapContract =
+      s"""
+         |// Simple swap contract purely for testing
+         |
+         |TxContract Swap(tokenId: ByteVec, mut alfReserve: U256, mut tokenReserve: U256) {
+         |  pub payable fn setup() -> () {
+         |    issueToken!(10000)
+         |  }
+         |
+         |  pub payable fn addLiquidity(lp: Address, alfAmount: U256, tokenAmount: U256) -> () {
+         |    transferAlfToSelf!(lp, alfAmount)
+         |    transferTokenToSelf!(lp, tokenId, tokenAmount)
+         |    alfReserve = alfAmount
+         |    tokenReserve = tokenAmount
+         |  }
+         |  
+         |  pub payable fn swapToken(buyer: Address, alfAmount: U256) -> () {
+         |    let tokenAmount = tokenReserve - alfReserve * tokenReserve / (alfReserve + alfAmount)
+         |    transferAlfToSelf!(buyer, alfAmount)
+         |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
+         |    alfReserve = alfReserve + alfAmount
+         |    tokenReserve = tokenReserve - tokenAmount
+         |  }
+         |  
+         |  pub payable fn swapAlf(buyer: Address, tokenAmount: U256) -> () {
+         |    let alfAmount = alfReserve - alfReserve * tokenReserve / (tokenReserve + tokenAmount)
+         |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
+         |    transferAlfFromSelf!(buyer, alfAmount)
+         |    alfReserve = alfReserve - alfAmount
+         |    tokenReserve = tokenReserve + tokenAmount
+         |  }
+         |}
+         |""".stripMargin
+    val swapContractKey = createContract(
+      swapContract,
+      AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero))).key
+
+    def checkSwapBalance(alfReserve: Long, tokenReserve: Long) = {
+      val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+      val output     = worldState.getContractAsset(swapContractKey).toOption.get
+      output.amount is alfReserve
+      output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
+    }
+
+    callTxScript(s"""
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    let swap = Swap(#${swapContractKey.toHexString})
+                    |    swap.setup()
+                    |  }
+                    |}
+                    |
+                    |$swapContract
+                    |""".stripMargin)
+    checkSwapBalance(4, 0)
+
+    callTxScript(s"""
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    approveAlf!(@${genesisAddress.toBase58}, 10)
+                    |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 100)
+                    |    let swap = Swap(#${swapContractKey.toHexString})
+                    |    swap.addLiquidity(@${genesisAddress.toBase58}, 10, 100)
+                    |  }
+                    |}
+                    |
+                    |$swapContract
+                    |""".stripMargin)
+    checkSwapBalance(14, 100)
+
+    callTxScript(s"""
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    approveAlf!(@${genesisAddress.toBase58}, 10)
+                    |    let swap = Swap(#${swapContractKey.toHexString})
+                    |    swap.swapToken(@${genesisAddress.toBase58}, 10)
+                    |  }
+                    |}
+                    |
+                    |$swapContract
+                    |""".stripMargin)
+    checkSwapBalance(24, 50)
   }
 }
