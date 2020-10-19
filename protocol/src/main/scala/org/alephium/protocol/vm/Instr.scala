@@ -75,7 +75,7 @@ object Instr {
 
   // format: off
   val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
-    BoolConstTrue, BoolConstFalse,
+    ConstTrue, ConstFalse,
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I256Const, U256Const,
@@ -211,8 +211,8 @@ sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
   }
 }
 
-object BoolConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true) }
-object BoolConstFalse extends ConstInstr0 { val const: Val = Val.Bool(false) }
+object ConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true) }
+object ConstFalse extends ConstInstr0 { val const: Val = Val.Bool(false) }
 
 object I256ConstN1 extends ConstInstr0 { val const: Val = Val.I256(util.I256.NegOne) }
 object I256Const0  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Zero) }
