@@ -649,8 +649,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def as[@sp T >: A: ClassTag]: AVector[T] =
-    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
+  def as[@sp T >: A: ClassTag]: AVector[T] = map(identity)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def asUnsafe[T <: A: ClassTag]: AVector[T] =
