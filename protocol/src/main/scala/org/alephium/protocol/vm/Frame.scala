@@ -456,7 +456,7 @@ object Frame {
                                      scopeDepth: Int) {
     def tokenVector: AVector[(TokenId, U256)] = {
       import org.alephium.protocol.model.tokenIdOrder
-      AVector.from(tokenAmounts).sortBy(_._1)
+      AVector.from(tokenAmounts.filter(_._2.nonZero)).sortBy(_._1)
     }
 
     def getTokenAmount(tokenId: TokenId): Option[U256] = tokenAmounts.get(tokenId)
@@ -514,10 +514,13 @@ object Frame {
         }
       }.toOption
 
-    def toTxOutput(lockupScript: LockupScript): Option[TxOutput] = {
-      Option.when(alfAmount != U256.Zero)(
-        TxOutput.from(alfAmount, tokenVector, lockupScript)
-      )
+    def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
+      val tokens = tokenVector
+      if (alfAmount.isZero) {
+        if (tokens.isEmpty) Right(None) else Left(InvalidOutputBalances)
+      } else {
+        Right(Some(TxOutput.from(alfAmount, tokens, lockupScript)))
+      }
     }
   }
 

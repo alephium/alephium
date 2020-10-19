@@ -140,26 +140,40 @@ final class StatefulVM(ctx: StatefulContext,
         balances <- lastFrame.balanceStateOpt
         _        <- ctx.outputBalances.merge(balances.approved)
         _        <- ctx.outputBalances.merge(balances.remaining)
-      } yield outputGeneratedBalances(ctx.outputBalances)
-      resultOpt.toRight(InvalidBalances)
+      } yield ()
+      for {
+        _ <- resultOpt.toRight(InvalidBalances)
+        _ <- outputGeneratedBalances(ctx.outputBalances)
+      } yield ()
     } else Right(())
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def outputGeneratedBalances(outputBalances: Frame.Balances): Unit = {
-    outputBalances.all.foreach {
-      case (lockupScript, balances) =>
-        balances.toTxOutput(lockupScript).foreach { output =>
-          lockupScript match {
-            case LockupScript.P2C(contractId) =>
-              val contractOutput = output.asInstanceOf[ContractOutput]
-              val outputRef      = ctx.nextContractOutputRef(contractOutput)
-              ctx.updateContractAsset(contractId, outputRef, contractOutput)
-            case _ => ()
-          }
-          ctx.generatedOutputs.addOne(output)
+  private def outputGeneratedBalances(outputBalances: Frame.Balances): ExeResult[Unit] = {
+    @tailrec
+    def iter(index: Int): ExeResult[Unit] = {
+      if (index >= outputBalances.all.length) Right(())
+      else {
+        val (lockupScript, balances) = outputBalances.all(index)
+        balances.toTxOutput(lockupScript) match {
+          case Right(outputOpt) =>
+            outputOpt.foreach { output =>
+              lockupScript match {
+                case LockupScript.P2C(contractId) =>
+                  val contractOutput = output.asInstanceOf[ContractOutput]
+                  val outputRef      = ctx.nextContractOutputRef(contractOutput)
+                  ctx.updateContractAsset(contractId, outputRef, contractOutput)
+                case _ => ()
+              }
+              ctx.generatedOutputs.addOne(output)
+            }
+            iter(index + 1)
+          case Left(error) => Left(error)
         }
+      }
     }
+
+    iter(0)
   }
 }
 
