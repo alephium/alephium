@@ -48,7 +48,7 @@ object Ast {
     // TODO: support constants for all values
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       v match {
-        case Val.Bool(b)    => Seq(if (b) BoolConstTrue else BoolConstFalse)
+        case Val.Bool(b)    => Seq(if (b) ConstTrue else ConstFalse)
         case _: Val.Byte    => ???
         case v: Val.I256    => Seq(ConstInstr.i256(v))
         case v: Val.U256    => Seq(ConstInstr.u256(v))
