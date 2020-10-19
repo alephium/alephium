@@ -43,6 +43,7 @@ class BrokerConnectorSpec
                       Some(randomAddress),
                       randomAddress,
                       Random.source.nextInt,
+                      Random.source.nextInt,
                       Random.source.nextInt)
 
     connection.expectMsgType[Tcp.Register]

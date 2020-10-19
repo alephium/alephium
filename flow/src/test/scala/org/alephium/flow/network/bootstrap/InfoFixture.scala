@@ -23,12 +23,19 @@ import org.alephium.protocol.model.ModelGenerators
 trait InfoFixture extends ModelGenerators {
   lazy val intraCliqueInfoGen: Gen[IntraCliqueInfo] = {
     for {
-      info    <- cliqueInfoGen
-      rpcPort <- portGen
-      wsPort  <- portGen
+      info     <- cliqueInfoGen
+      rpcPort  <- portGen
+      restPort <- portGen
+      wsPort   <- portGen
     } yield {
       val peers = info.internalAddresses.mapWithIndex { (address, id) =>
-        PeerInfo.unsafe(id, info.groupNumPerBroker, Some(address), address, rpcPort, wsPort)
+        PeerInfo.unsafe(id,
+                        info.groupNumPerBroker,
+                        Some(address),
+                        address,
+                        rpcPort,
+                        restPort,
+                        wsPort)
       }
       IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker)
     }

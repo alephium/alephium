@@ -28,16 +28,16 @@ class MiningTest extends AlephiumSpec {
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker
-    val rpcPort    = selfClique.peers(index).rpcPort
+    val restPort   = selfClique.peers(index).restPort
 
-    request[Balance](getBalance(address), rpcPort) is initialBalance
+    request[Balance](getBalance(address), restPort) is initialBalance
 
     startWS(defaultWsMasterPort)
 
-    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
+    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](startMining, peer.rpcPort) is true
+      request[Boolean](startMining, peer.restPort) is true
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
@@ -45,22 +45,22 @@ class MiningTest extends AlephiumSpec {
     awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
     eventually {
-      request[Balance](getBalance(address), rpcPort) is
+      request[Balance](getBalance(address), restPort) is
         Balance(initialBalance.balance - transferAmount, 1)
     }
 
-    val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, rpcPort)
+    val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     Thread.sleep(1000)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     selfClique.peers.foreach { peer =>
-      request[Boolean](stopMining, peer.rpcPort) is true
+      request[Boolean](stopMining, peer.restPort) is true
     }
 
     eventually {
-      request[Balance](getBalance(address), rpcPort) is
+      request[Balance](getBalance(address), restPort) is
         Balance(initialBalance.balance - (2 * transferAmount), 1)
     }
 

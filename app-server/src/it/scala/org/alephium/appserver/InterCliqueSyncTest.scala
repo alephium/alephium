@@ -52,16 +52,16 @@ class InterCliqueSyncTest extends AlephiumSpec {
       startWS(wsPort(masterPortClique1))
 
       clique1.foreach { server =>
-        request[Boolean](startMining, rpcPort(server.config.network.bindAddress.getPort)) is true
+        request[Boolean](startMining, restPort(server.config.network.bindAddress.getPort)) is true
       }
 
       blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
 
       clique1.foreach { server =>
-        request[Boolean](stopMining, rpcPort(server.config.network.bindAddress.getPort)) is true
+        request[Boolean](stopMining, restPort(server.config.network.bindAddress.getPort)) is true
       }
 
-      val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
+      val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
       val clique2 =
         bootClique(nbOfNodes = nbOfNodesClique2,
@@ -75,7 +75,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
           val response =
             request[Seq[InterCliquePeerInfo]](
               getInterCliquePeerInfo,
-              rpcPort(server.config.network.bindAddress.getPort)).head
+              restPort(server.config.network.bindAddress.getPort)).head
 
           response.cliqueId is selfClique1.cliqueId
           response.isSynced is true
@@ -85,8 +85,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val toTs = TimeStamp.now()
 
       eventually {
-        request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique1)).blocks.toSet is
-          request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique2)).blocks.toSet
+        request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique1)).blocks.toSet is
+          request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique2)).blocks.toSet
       }
     }
   }

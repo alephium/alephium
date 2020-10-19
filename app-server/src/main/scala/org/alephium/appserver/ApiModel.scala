@@ -118,7 +118,7 @@ object ApiModel {
     }
   }
 
-  final case class PeerAddress(address: InetAddress, rpcPort: Int, wsPort: Int)
+  final case class PeerAddress(address: InetAddress, rpcPort: Int, restPort: Int, wsPort: Int)
 
   final case class SelfClique(cliqueId: CliqueId,
                               peers: AVector[PeerAddress],
@@ -126,10 +126,12 @@ object ApiModel {
       extends ApiModel
   object SelfClique {
     def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
-      SelfClique(cliqueInfo.id,
-                 cliqueInfo.peers.map(peer =>
-                   PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.wsPort)),
-                 cliqueInfo.groupNumPerBroker)
+      SelfClique(
+        cliqueInfo.id,
+        cliqueInfo.peers.map(peer =>
+          PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.restPort, peer.wsPort)),
+        cliqueInfo.groupNumPerBroker
+      )
     }
   }
 

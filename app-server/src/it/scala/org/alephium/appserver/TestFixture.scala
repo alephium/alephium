@@ -24,7 +24,8 @@ import scala.concurrent.{Await, Promise}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -42,7 +43,6 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
@@ -81,28 +81,46 @@ trait TestFixtureLike
 
   def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
 
-  def rpcPort(port: Int) = port - 100
-  def wsPort(port: Int)  = port - 200
+  def wsPort(port: Int)   = port - 200
+  def restPort(port: Int) = port - 300
 
-  val defaultMasterPort    = generatePort
-  val defaultRpcMasterPort = rpcPort(defaultMasterPort)
-  val defaultWsMasterPort  = wsPort(defaultMasterPort)
-  val defaultWalletPort    = generatePort
+  val defaultMasterPort     = generatePort
+  val defaultRestMasterPort = restPort(defaultMasterPort)
+  val defaultWsMasterPort   = wsPort(defaultMasterPort)
+  val defaultWalletPort     = generatePort
 
   val blockNotifyProbe = TestProbe()
 
-  def request[T: Decoder](content: String, port: Int = defaultRpcMasterPort): T = {
-    val httpRequest =
-      HttpRequest(HttpMethods.POST,
-                  uri    = s"http://localhost:${port}",
-                  entity = HttpEntity(ContentTypes.`application/json`, content))
+  def httpRequest(method: HttpMethod,
+                  endpoint: String,
+                  maybeEntity: Option[String]     = None,
+                  maybeHeader: Option[HttpHeader] = None): Int => HttpRequest = { port =>
+    val request = HttpRequest(method, uri = s"http://localhost:${port}$endpoint")
 
-    val response = Http().singleRequest(httpRequest).futureValue
+    val requestWithEntity = maybeEntity match {
+      case Some(entity) => request.withEntity(HttpEntity(ContentTypes.`application/json`, entity))
+      case None         => request
+    }
+
+    val res = maybeHeader match {
+      case Some(header) => requestWithEntity.addHeader(header)
+      case None         => requestWithEntity
+    }
+    res
+
+  }
+
+  def httpGet(endpoint: String, maybeEntity: Option[String] = None) =
+    httpRequest(HttpMethods.GET, endpoint, maybeEntity)
+  def httpPost(endpoint: String, maybeEntity: Option[String] = None) =
+    httpRequest(HttpMethods.POST, endpoint, maybeEntity, Some(RawHeader("X-API-KEY", apiKey)))
+
+  def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
+    val response = Http().singleRequest(request(port)).futureValue
 
     (for {
-      json    <- parse(Unmarshal(response.entity).to[String].futureValue)
-      request <- json.as[JsonRPC.Response.Success]
-      t       <- request.result.as[T]
+      json <- parse(Unmarshal(response.entity).to[String].futureValue)
+      t    <- json.as[T]
     } yield t) match {
       case Right(t)    => t
       case Left(error) => throw new AssertionError(s"circe: $error")
@@ -113,11 +131,12 @@ trait TestFixtureLike
                toAddress: String,
                amount: Int,
                privateKey: String,
-               rpcPort: Int): TxResult = eventually {
+               restPort: Int): TxResult = eventually {
     val createTx   = createTransaction(fromPubKey, toAddress, amount)
-    val unsignedTx = request[CreateTransactionResult](createTx, rpcPort)
+    val unsignedTx = request[CreateTransactionResult](createTx, restPort)
     val sendTx     = sendTransaction(unsignedTx, privateKey)
-    request[TxResult](sendTx, rpcPort)
+    val res        = request[TxResult](sendTx, restPort)
+    res
   }
 
   @tailrec
@@ -261,37 +280,40 @@ trait TestFixtureLike
   def jsonRpc(method: String, params: String): String =
     s"""{"jsonrpc":"2.0","id": 0,"method":"$method","params": $params}"""
 
-  val getSelfClique = jsonRpc("self_clique", "{}")
+  val getSelfClique =
+    httpGet(s"/infos/self-clique") // jsonRpc("self_clique_synced", "{}") = jsonRpc("self_clique", "{}")
 
-  val getSelfCliqueSynced = jsonRpc("self_clique_synced", "{}")
+  val getSelfCliqueSynced =
+    httpGet(s"/infos/self-clique-synced") // jsonRpc("self_clique_synced", "{}")
 
-  val getInterCliquePeerInfo = jsonRpc("get_inter_clique_peer_info", "{}")
+  val getInterCliquePeerInfo =
+    httpGet(s"/infos/inter-clique-peer-info") //jsonRpc("get_inter_clique_peer_info", "{}")
 
-  val getNeighborCliques = jsonRpc("neighbor_cliques", "{}")
-
-  def getGroup(address: String) = jsonRpc("get_group", s"""{"address":"$address"}""")
+  def getGroup(address: String) =
+    httpGet(s"/addresses/$address/group")
 
   def getBalance(address: String) =
-    jsonRpc("get_balance", s"""{"address":"$address"}""")
+    httpGet(s"/addresses/$address/balance")
 
-  def createTransaction(fromPubKey: String, toAddress: String, amount: Int) = jsonRpc(
-    "create_transaction",
-    s"""{"fromKey":"$fromPubKey","toAddress":"$toAddress","value":$amount}"""
-  )
+  def createTransaction(fromPubKey: String, toAddress: String, amount: Int) =
+    httpGet(
+      s"/unsigned-transactions?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
+    )
 
   def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
     val signature: Signature = SignatureSchema.sign(Hex.unsafe(createTransactionResult.hash),
                                                     PrivateKey.unsafe(Hex.unsafe(privateKey)))
-    jsonRpc(
-      "send_transaction",
-      s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""
+    httpPost(
+      "/transactions",
+      Some(
+        s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
     )
   }
 
-  val startMining = jsonRpc("mining_start", "{}")
-  val stopMining  = jsonRpc("mining_stop", "{}")
+  val startMining = httpPost("/miners?action=start-mining")
+  val stopMining  = httpPost("/miners?action=stop-mining")
 
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
-    jsonRpc("blockflow_fetch", s"""{"fromTs":${fromTs.millis},"toTs":${toTs.millis}}""")
+    httpGet(s"/blockflow?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
 }
 // scalastyle:on method.length

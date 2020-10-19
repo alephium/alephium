@@ -32,7 +32,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils.avectorCodec
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
@@ -72,6 +72,24 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
     baseEndpoint
       .in(auth.apiKey(header[ApiKey]("X-API-KEY")))
       .serverLogicForCurrent(apiKey => Future.successful(checkApiKey(apiKey)))
+
+  val getSelfClique: BaseEndpoint[Unit, SelfClique] =
+    baseEndpoint.get
+      .in("infos")
+      .in("self-clique")
+      .out(jsonBody[SelfClique])
+
+  val getSelfCliqueSynced: BaseEndpoint[Unit, Boolean] =
+    baseEndpoint.get
+      .in("infos")
+      .in("self-clique-synced")
+      .out(jsonBody[Boolean])
+
+  val getInterCliquePeerInfo: BaseEndpoint[Unit, AVector[InterCliquePeerInfo]] =
+    baseEndpoint.get
+      .in("infos")
+      .in("inter-clique-peer-info")
+      .out(jsonBody[AVector[InterCliquePeerInfo]])
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     baseEndpoint.get
