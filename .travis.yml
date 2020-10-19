@@ -21,7 +21,7 @@ cache:
     - $HOME/.coursier
 
 install:
-  - sudo apt-get install python3.6 rng-tools haveged
+  - sudo apt-get install rng-tools haveged
   - sudo haveged
 
 jobs:
