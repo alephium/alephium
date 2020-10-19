@@ -97,6 +97,7 @@ final case object NoInputs                              extends InvalidTxStatus
 final case object TooManyInputs                         extends InvalidTxStatus
 final case object NoOutputs                             extends InvalidTxStatus
 final case object TooManyOutputs                        extends InvalidTxStatus
+final case object AmountIsZero                          extends InvalidTxStatus
 final case object DuplicatedInputs                      extends InvalidTxStatus
 final case object InvalidInputGroupIndex                extends InvalidTxStatus
 final case object InvalidOutputGroupIndex               extends InvalidTxStatus

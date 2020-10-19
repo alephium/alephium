@@ -78,6 +78,22 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         unsigned =
           tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
     }
+
+    def zeroAlfAmount(tx: Transaction): Transaction = {
+      val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()
+      val outputNew       = output.copy(amount = 0)
+      tx.copy(
+        unsigned =
+          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+    }
+
+    def zeroTokenAmount(tx: Transaction): Transaction = {
+      val (index, output) = tx.unsigned.fixedOutputs.sampleWithIndex()
+      val outputNew       = output.copy(tokens = AVector(Hash.generate -> U256.Zero))
+      tx.copy(
+        unsigned =
+          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+    }
   }
 
   it should "check empty inputs" in new StatelessFixture {
@@ -109,9 +125,33 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val alfAmount = tx.alfAmountInOutputs.get
           val delta     = U256.MaxValue - alfAmount + 1
           val txNew     = modifyAlfAmount(tx, delta)
-          failCheck(checkAlfOutputAmount(txNew), BalanceOverFlow)
+          failCheck(checkOutputAmount(txNew), BalanceOverFlow)
           failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), BalanceOverFlow)
+        }
+    }
+  }
+
+  it should "check non-zero alf amount for outputs" in new StatelessFixture {
+    forAll(transactionGenWithPreOutputs()) {
+      case (tx, preOutputs) =>
+        whenever(tx.unsigned.fixedOutputs.nonEmpty) {
+          val txNew = zeroAlfAmount(tx)
+          failCheck(checkOutputAmount(txNew), AmountIsZero)
+          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
+        }
+    }
+  }
+
+  it should "check non-zero token amount for outputs" in new StatelessFixture {
+    forAll(transactionGenWithPreOutputs()) {
+      case (tx, preOutputs) =>
+        whenever(tx.unsigned.fixedOutputs.nonEmpty) {
+          val txNew = zeroTokenAmount(tx)
+          failCheck(checkOutputAmount(txNew), AmountIsZero)
+          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
         }
     }
   }
