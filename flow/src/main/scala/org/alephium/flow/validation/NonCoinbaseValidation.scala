@@ -16,6 +16,7 @@
 
 package org.alephium.flow.validation
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
@@ -52,7 +53,7 @@ trait NonCoinbaseValidation {
     for {
       _          <- checkInputNum(tx)
       _          <- checkOutputNum(tx)
-      _          <- checkAlfOutputAmount(tx)
+      _          <- checkOutputAmount(tx)
       chainIndex <- checkChainIndex(tx)
       _          <- checkUniqueInputs(tx)
       _          <- checkOutputDataSize(tx)
@@ -77,7 +78,7 @@ trait NonCoinbaseValidation {
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256]
+  protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
   protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex]
   protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
@@ -108,6 +109,28 @@ object NonCoinbaseValidation {
       if (outputNum == 0) invalidTx(NoOutputs)
       else if (outputNum > ALF.MaxTxOutputNum) invalidTx(TooManyOutputs)
       else validTx(())
+    }
+
+    protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
+      for {
+        _      <- checkPositiveOutputAmount(tx)
+        amount <- checkAlfOutputAmount(tx)
+      } yield amount
+    }
+
+    protected[validation] def checkPositiveOutputAmount(
+        tx: Transaction): TxValidationResult[Unit] = {
+      @tailrec
+      def iter(outputIndex: Int): TxValidationResult[Unit] = {
+        if (outputIndex >= tx.outputsLength) validTx(())
+        else {
+          val output = tx.getOutput(outputIndex)
+          val ok     = output.amount.nonZero && output.tokens.forall(_._2.nonZero)
+          if (ok) iter(outputIndex + 1) else invalidTx(AmountIsZero)
+        }
+      }
+
+      iter(0)
     }
 
     protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {

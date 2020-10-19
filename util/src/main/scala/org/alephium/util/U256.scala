@@ -23,7 +23,9 @@ import akka.util.ByteString
 class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   import U256.validate
 
-  @inline def isZero: Boolean = v.signum() == 0
+  def isZero: Boolean = v.signum() == 0
+
+  def nonZero: Boolean = v.signum() != 0
 
   def addUnsafe(that: U256): U256 = {
     val underlying = this.v.add(that.v)
