@@ -399,7 +399,7 @@ class VMSpec extends AlephiumSpec {
          |    alfReserve = alfAmount
          |    tokenReserve = tokenAmount
          |  }
-         |  
+         |
          |  pub payable fn swapToken(buyer: Address, alfAmount: U256) -> () {
          |    let tokenAmount = tokenReserve - alfReserve * tokenReserve / (alfReserve + alfAmount)
          |    transferAlfToSelf!(buyer, alfAmount)
@@ -407,7 +407,7 @@ class VMSpec extends AlephiumSpec {
          |    alfReserve = alfReserve + alfAmount
          |    tokenReserve = tokenReserve - tokenAmount
          |  }
-         |  
+         |
          |  pub payable fn swapAlf(buyer: Address, tokenAmount: U256) -> () {
          |    let alfAmount = alfReserve - alfReserve * tokenReserve / (tokenReserve + tokenAmount)
          |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
@@ -438,7 +438,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(4, 0)
+    checkSwapBalance(15, 0)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -452,7 +452,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(14, 100)
+    checkSwapBalance(25, 100)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -465,6 +465,6 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(24, 50)
+    checkSwapBalance(35, 50)
   }
 }
