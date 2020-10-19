@@ -67,7 +67,7 @@ trait MinerState {
     for {
       fromShift <- 0 until brokerConfig.groupNumPerBroker
       to        <- 0 until brokerConfig.groups
-      if (miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep) &&
+      if miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep &&
         !isRunning(fromShift, to)
     } yield {
       (fromShift, to, pendingTasks(fromShift)(to))
