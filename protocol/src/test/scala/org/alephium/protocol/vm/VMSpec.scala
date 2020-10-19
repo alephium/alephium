@@ -112,7 +112,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = Frame.BalancesPerLockup(0, mutable.Map(tokenId -> 99), 0)
+    val balances1    = Frame.BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext = new StatefulContext {
       var worldState: WorldState                = cachedWorldState
@@ -164,7 +164,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
-    pass(instrs, AVector[Val](Val.U256(100), Val.U256(0), Val.U256(99)))
+    pass(instrs, AVector[Val](Val.U256(100), Val.U256(1), Val.U256(99)))
   }
 
   it should "fail when there is no token balances" in new BalancesFixture {
@@ -193,7 +193,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
       TokenRemaining
     )
-    pass(instrs, AVector[Val](Val.U256(90), Val.U256(0), Val.U256(89)))
+    pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
   }
 
   it should "fail when no enough balance for approval" in new BalancesFixture {
@@ -226,9 +226,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TokenRemaining
     )
 
-    val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(0), Val.U256(98)))
+    val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(98)))
     context.outputBalances.getAlfAmount(address0.lockupScript).get is 90
-    context.outputBalances.getAlfAmount(address1.lockupScript).get is 10
+    context.outputBalances.getAlfAmount(address1.lockupScript).get is 11
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }

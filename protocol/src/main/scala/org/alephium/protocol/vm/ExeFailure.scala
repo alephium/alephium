@@ -64,5 +64,6 @@ case object BalanceOverflow                                    extends ExeFailur
 case object NoAlfBalanceForTheAddress                          extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
+case object InvalidOutputBalances                              extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
 case object ExpectAContract                                    extends ExeFailure
