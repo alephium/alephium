@@ -7,13 +7,13 @@ Please visit our website: [https://alephium.org/](https://alephium.org/), telegr
 
 ## Main Innovations
 
-The protocol's innovations extend mature ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
+The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
 
-* BlockFlow algorithm based on UTXO model enables sharding for today
-* sUTXO model combines the advantages of both eUTXO model and account model
-* New VM design eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc
+* BlockFlow algorithm based on UTXO model enables sharding and scalability for today ([algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
+* Stateful UTXO model combines the advantages of both eUTXO model and account model (see code, wiki to come)
+* New VM design eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc (see code, wiki to come)
 * Tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
-* PoLW algorithm reduces the energy consumption of PoW in the long term
+* PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
 
 ## Development Status
 
