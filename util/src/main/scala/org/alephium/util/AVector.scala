@@ -648,7 +648,6 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     toIterable.toString()
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def as[@sp T >: A: ClassTag]: AVector[T] = map(identity)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
