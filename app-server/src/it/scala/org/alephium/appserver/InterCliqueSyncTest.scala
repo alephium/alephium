@@ -25,37 +25,52 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.util._
 
 class InterCliqueSyncTest extends AlephiumSpec {
-  it should "boot and sync two cliques" in new TestFixture("2-cliques-of-2-nodses") {
-    val fromTs = TimeStamp.now()
+  it should "boot and sync two cliques of 2 nodes" in new Fixture("2-cliques-of-2-nodes") {
+    test(2, 2)
+  }
 
-    val clique1           = bootClique(nbOfNodes = 2)
-    val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
+  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
+    "clique-1-node-clique-2-node") {
+    test(1, 2)
+  }
 
-    Future.sequence(clique1.map(_.start())).futureValue
+  it should "boot and sync two cliques of 2 and 1 nodes" in new Fixture(
+    "clique-2-node-clique-1-node") {
+    test(2, 1)
+  }
 
-    startWS(wsPort(masterPortClique1))
+  class Fixture(name: String) extends TestFixture(name) {
 
-    clique1.foreach { server =>
-      request[Boolean](startMining, rpcPort(server.config.network.bindAddress.getPort)) is true
-    }
+    def test(nbOfNodesClique1: Int, nbOfNodesClique2: Int) = {
+      val fromTs = TimeStamp.now()
 
-    blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
+      val clique1           = bootClique(nbOfNodes = nbOfNodesClique1)
+      val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
-    clique1.foreach { server =>
-      request[Boolean](stopMining, rpcPort(server.config.network.bindAddress.getPort)) is true
-    }
+      Future.sequence(clique1.map(_.start())).futureValue
 
-    val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
+      startWS(wsPort(masterPortClique1))
 
-    val clique2 =
-      bootClique(nbOfNodes = 2,
-                 bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
-    val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
+      clique1.foreach { server =>
+        request[Boolean](startMining, rpcPort(server.config.network.bindAddress.getPort)) is true
+      }
 
-    Future.sequence(clique2.map(_.start())).futureValue
+      blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
 
-    clique2.zipWithIndex.foreach {
-      case (server, index) =>
+      clique1.foreach { server =>
+        request[Boolean](stopMining, rpcPort(server.config.network.bindAddress.getPort)) is true
+      }
+
+      val selfClique1 = request[SelfClique](getSelfClique, rpcPort(masterPortClique1))
+
+      val clique2 =
+        bootClique(nbOfNodes = nbOfNodesClique2,
+                   bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
+      val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
+
+      Future.sequence(clique2.map(_.start())).futureValue
+
+      clique2.foreach { server =>
         eventually {
           val response =
             request[Seq[InterCliquePeerInfo]](
@@ -63,16 +78,16 @@ class InterCliqueSyncTest extends AlephiumSpec {
               rpcPort(server.config.network.bindAddress.getPort)).head
 
           response.cliqueId is selfClique1.cliqueId
-          response.brokerId is index
           response.isSynced is true
         }
-    }
+      }
 
-    val toTs = TimeStamp.now()
+      val toTs = TimeStamp.now()
 
-    eventually {
-      request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique1)).blocks.toSet is
-        request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique2)).blocks.toSet
+      eventually {
+        request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique1)).blocks.toSet is
+          request[FetchResponse](blockflowFetch(fromTs, toTs), rpcPort(masterPortClique2)).blocks.toSet
+      }
     }
   }
 }
