@@ -84,7 +84,17 @@ object FlowHandler {
       extends Event
   final case class BlocksLocated(blocks: AVector[Block])           extends Event
   final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Event
-  final case class SyncLocators(hashes: AVector[AVector[Hash]])    extends Event
+  final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[Hash]])
+      extends Command {
+    def filerFor(another: BrokerGroupInfo): AVector[AVector[Hash]] = {
+      val (groupFrom, groupUntil) = selfBrokerInfo.calIntersection(another)
+      if (groupUntil <= groupFrom) AVector.empty
+      else {
+        hashes.slice((groupFrom - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups,
+                     (groupUntil - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups)
+      }
+    }
+  }
   final case class BlockAdded(block: Block,
                               broker: ActorRefT[ChainHandler.Event],
                               origin: DataOrigin)
@@ -141,7 +151,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
   def handleSync: Receive = {
     case GetSyncLocators =>
       escapeIOError(blockFlow.getSyncLocators()) { locators =>
-        sender() ! SyncLocators(locators)
+        sender() ! SyncLocators(brokerConfig, locators)
       }
     case GetSyncInventories(locators) =>
       escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>

@@ -22,9 +22,10 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.protocol.Hash
 import org.alephium.protocol.message.{SyncRequest, SyncResponse}
-import org.alephium.protocol.model.BrokerInfo
-import org.alephium.util.ActorRefT
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
+import org.alephium.util.{ActorRefT, AVector}
 
 trait BrokerHandler extends BaseBrokerHandler {
   def cliqueManager: ActorRefT[CliqueManager.Command]
@@ -43,22 +44,40 @@ trait BrokerHandler extends BaseBrokerHandler {
 
     val receive: Receive = {
       case BaseBrokerHandler.SyncLocators(locators) =>
+        log.debug(s"Send sync locators to $remoteAddress: ${show(locators)}")
         send(SyncRequest(locators))
       case BaseBrokerHandler.Received(SyncRequest(locators)) =>
-        allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
+        if (validate(locators)) {
+          log.debug(s"Received sync request from $remoteAddress: ${show(locators)}")
+          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
+        } else {
+          log.warning(s"Invalid locators from $remoteAddress: ${show(locators)}")
+        }
       case FlowHandler.SyncInventories(inventories) =>
+        log.debug(s"Send sync response to $remoteAddress: ${show(inventories)}")
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
-        log.debug(
-          s"Received sync response ${Utils.show(hashes.flatMap(identity))} from $remoteAddress")
         if (hashes.forall(_.isEmpty)) {
           cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
         } else {
-          blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
+          if (validate(hashes)) {
+            log.debug(s"Received sync response ${show(hashes)} from $remoteAddress")
+            blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
+          } else {
+            log.warning(s"Invalid sync response from $remoteAddress: ${show(hashes)}")
+          }
         }
     }
     receive
   }
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
+
+  def validate(locators: AVector[AVector[Hash]]): Boolean = {
+    locators.forall(_.forall(hash => brokerConfig.contains(ChainIndex.from(hash).from)))
+  }
+
+  def show(hashes: AVector[AVector[Hash]]): String = {
+    Utils.show(hashes.flatMap(identity))
+  }
 }
