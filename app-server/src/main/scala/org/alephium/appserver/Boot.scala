@@ -22,13 +22,13 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
 import akka.actor.ActorSystem
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.protocol.model.NetworkType
-import org.alephium.util.{ActorRefT}
+import org.alephium.protocol.model.{Block, NetworkType}
+import org.alephium.util.{ActorRefT, AVector}
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Boot extends App with StrictLogging {
@@ -40,16 +40,12 @@ object Boot extends App with StrictLogging {
   implicit val system: ActorSystem                = ActorSystem("Root", typesafeConfig)
   implicit val executionContext: ExecutionContext = system.dispatcher
 
+  logConfig()
+
   val flowMonitor: ActorRefT[FlowMonitor.Command] =
     ActorRefT.build(system, FlowMonitor.props(stop()), "FlowMonitor")
 
   val server: Server = new ServerImpl(rootPath)
-
-  def stop(): Unit =
-    Await.result(for {
-      _ <- server.stop()
-      _ <- system.terminate()
-    } yield (), FlowMonitor.shutdownTimeout.asScala)
 
   server
     .start()
@@ -63,4 +59,21 @@ object Boot extends App with StrictLogging {
   Runtime.getRuntime.addShutdownHook(new Thread(() => {
     stop()
   }))
+
+  def stop(): Unit =
+    Await.result(for {
+      _ <- server.stop()
+      _ <- system.terminate()
+    } yield (), FlowMonitor.shutdownTimeout.asScala)
+
+  def logConfig(): Unit = {
+    val renderOptions =
+      ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
+    logger.debug(typesafeConfig.root().render(renderOptions))
+
+    val digests = config.genesisBlocks.map(showBlocks).mkString("-")
+    logger.info(s"Genesis digests: $digests")
+  }
+
+  def showBlocks(blocks: AVector[Block]): String = blocks.map(_.shortHex).mkString("-")
 }

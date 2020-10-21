@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.util.Timeout
-import com.typesafe.scalalogging.{Logger, StrictLogging}
+import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.{FlowMonitor, Utils}
 import org.alephium.flow.core._
@@ -31,8 +31,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.protocol.model.Block
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventBus, Service}
+import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
 trait Node extends Service {
   implicit def config: AlephiumConfig
@@ -72,8 +71,6 @@ object Node {
     implicit val networkSetting  = config.network
     implicit val discoveryConfig = config.discovery
 
-    logConfig(logger, config)
-
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
     val brokerManager: ActorRefT[BrokerManager.Command] =
@@ -112,21 +109,6 @@ object Node {
     val monitor: ActorRefT[Node.Command] =
       ActorRefT.build(system, Monitor.props(this), "NodeMonitor")
   }
-
-  def logConfig(logger: Logger, config: AlephiumConfig): Unit = {
-    logger.info(s"Zeros: ${config.consensus.numZerosAtLeastInHash}")
-
-    config.network.externalAddressInferred.foreach { address =>
-      logger.info(s"The node is using this external address: $address")
-    }
-  }
-
-  def logGenesis(logger: Logger, genesis: AVector[AVector[Block]]): Unit = {
-    val digests = genesis.map(showBlocks).mkString("-")
-    logger.info(s"Genesis digests: $digests")
-  }
-
-  def showBlocks(blocks: AVector[Block]): String = blocks.map(_.shortHex).mkString("-")
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {
     val nodeStateStorage = storages.nodeStateStorage
