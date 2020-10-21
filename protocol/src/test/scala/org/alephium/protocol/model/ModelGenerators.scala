@@ -326,7 +326,7 @@ trait BlockGenerators extends TxGenerators {
   implicit def consensusConfig: ConsensusConfig
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
-    blockGenOf(chainIndex, AVector(Hash.zero))
+    blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(Hash.zero))
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)

@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.model
 
+import scala.annotation.tailrec
+
 import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
@@ -46,6 +48,39 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash = {
     header.uncleHash(toIndex)
+  }
+
+  // we shuffle non-coinbase txs randomly for execution to mitigate front-running
+  def getExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+    if (isGenesis) {
+      AVector.tabulate(transactions.length)(identity)
+    } else {
+      val nonCoinbaseLength = transactions.length - 1
+      val orders            = Array.tabulate(transactions.length)(identity)
+
+      @tailrec
+      def iter(index: Int, seed: Hash): Unit = {
+        if (index < nonCoinbaseLength - 1) {
+          val txRemaining = nonCoinbaseLength - index - 1
+          val randomIndex = index + Math.floorMod(seed.toRandomInt, txRemaining)
+          val tmp         = orders(index)
+          orders(index)       = orders(randomIndex)
+          orders(randomIndex) = tmp
+          iter(index + 1, transactions(randomIndex).hash)
+        }
+      }
+
+      val initialSeed = {
+        val seed0 = transactions.fold(parentHash) {
+          case (acc, tx) => Hash.xor(acc, tx.hash)
+        }
+        transactions.fold(seed0) {
+          case (acc, tx) => Hash.xor(Hash.addPerByte(acc, tx.hash), tx.hash)
+        }
+      }
+      iter(0, initialSeed)
+      AVector.unsafe(orders)
+    }
   }
 }
 

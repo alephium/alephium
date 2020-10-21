@@ -42,11 +42,11 @@ trait NonCoinbaseValidation {
     convert(validationResult, ValidTx)
   }
   protected[validation] def checkBlockTx(tx: Transaction,
-                                         worldState: WorldState): TxValidationResult[Unit] = {
+                                         worldState: WorldState): TxValidationResult[WorldState] = {
     for {
-      _ <- checkStateless(tx)
-      _ <- checkStateful(tx, worldState)
-    } yield ()
+      _        <- checkStateless(tx)
+      newState <- checkStateful(tx, worldState)
+    } yield newState
   }
 
   protected[validation] def checkStateless(tx: Transaction): TxValidationResult[ChainIndex] = {
@@ -59,15 +59,16 @@ trait NonCoinbaseValidation {
       _          <- checkOutputDataSize(tx)
     } yield chainIndex
   }
-  protected[validation] def checkStateful(tx: Transaction,
-                                          worldState: WorldState): TxValidationResult[Unit] = {
+  protected[validation] def checkStateful(
+      tx: Transaction,
+      worldState: WorldState): TxValidationResult[WorldState] = {
     for {
       preOutputs <- getPreOutputs(tx, worldState)
       _          <- checkAlfBalance(tx, preOutputs)
       _          <- checkTokenBalance(tx, preOutputs)
       _          <- checkWitnesses(tx, preOutputs)
-      _          <- checkTxScript(tx, worldState)
-    } yield ()
+      newState   <- checkTxScript(tx, worldState)
+    } yield newState
   }
 
   protected[validation] def getPreOutputs(
@@ -86,7 +87,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  protected[validation] def checkTxScript(tx: Transaction, worldState: WorldState): TxValidationResult[Unit] // TODO: optimize it with preOutputs
+  protected[validation] def checkTxScript(tx: Transaction, worldState: WorldState): TxValidationResult[WorldState] // TODO: optimize it with preOutputs
   // format: on
 }
 
@@ -316,23 +317,25 @@ object NonCoinbaseValidation {
       }
     }
 
-    protected[validation] def checkTxScript(tx: Transaction,
-                                            worldState: WorldState): TxValidationResult[Unit] = {
+    protected[validation] def checkTxScript(
+        tx: Transaction,
+        worldState: WorldState): TxValidationResult[WorldState] = {
       val chainIndex = tx.chainIndex
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
             StatefulVM.runTxScript(worldState, tx, script) match {
-              case Right(StatefulVM.TxScriptExecution(contractInputs, generatedOutputs, _)) =>
+              case Right(
+                  StatefulVM.TxScriptExecution(contractInputs, generatedOutputs, newState)) =>
                 if (contractInputs != tx.contractInputs) invalidTx(InvalidContractInputs)
                 else if (generatedOutputs != tx.generatedOutputs) invalidTx(InvalidGeneratedOutputs)
-                else validTx(())
+                else validTx(newState)
               case Left(error) => invalidTx(TxScriptExeFailed(error))
             }
-          case None => validTx(())
+          case None => validTx(worldState)
         }
       } else {
-        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(())
+        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(worldState)
       }
     }
   }
