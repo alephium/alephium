@@ -173,7 +173,8 @@ trait TestFixtureLike
                masterPort = masterPort,
                brokerId   = brokerId,
                walletPort = generatePort,
-               bootstrap  = bootstrap)
+               bootstrap  = bootstrap,
+               brokerNum  = nbOfNodes)
     }
 
     servers
