@@ -17,7 +17,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.serde._
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
@@ -38,6 +38,14 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     forAll(chainIndexGen) { chainIndex =>
       val block = blockGen(chainIndex).sample.get
       block.chainIndex is chainIndex
+    }
+  }
+
+  it should "calculate proper execution order" in {
+    forAll(blockGen) { block =>
+      val order = block.getExecutionOrder
+      order.last is order.length - 1
+      order.sorted is AVector.tabulate(block.transactions.length)(identity)
     }
   }
 }

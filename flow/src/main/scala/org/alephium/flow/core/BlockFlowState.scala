@@ -414,8 +414,9 @@ object BlockFlowState {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
-      block.transactions.foldE(worldState) {
-        case (state, tx) => updateStateForInOutBlock(state, tx, targetGroup)
+      block.getExecutionOrder.foldE(worldState) {
+        case (state, index) =>
+          updateStateForInOutBlock(state, block.transactions(index), targetGroup)
       }
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foldE(worldState) {

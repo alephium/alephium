@@ -110,7 +110,10 @@ trait BlockValidation extends Validation[Block, BlockStatus] {
       val result = for {
         _    <- checkBlockDoubleSpending(block)
         trie <- ValidationStatus.from(flow.getPersistedTrie(block))
-        _    <- block.nonCoinbase.foreachE(nonCoinbaseValidation.checkBlockTx(_, trie))
+        _ <- block.getExecutionOrder.init.foldE(trie) {
+          case (currentTrie, index) =>
+            nonCoinbaseValidation.checkBlockTx(block.transactions(index), currentTrie)
+        }
       } yield ()
       convert(result)
     } else {

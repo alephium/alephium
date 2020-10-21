@@ -71,5 +71,19 @@ abstract class HashSchema[T: TypeTag](unsafe: ByteString => T, toBytes: T => Byt
     hash(serializer.serialize(input))
   }
 
+  def xor(hash0: T, hash1: T): T = {
+    val bytes0 = toBytes(hash0)
+    val bytes1 = toBytes(hash1)
+    val result = Array.tabulate[Byte](length)(index => (bytes0(index) ^ bytes1(index)).toByte)
+    unsafe(ByteString.fromArrayUnsafe(result))
+  }
+
+  def addPerByte(hash0: T, hash1: T): T = {
+    val bytes0 = toBytes(hash0)
+    val bytes1 = toBytes(hash1)
+    val result = Array.tabulate[Byte](length)(index => (bytes0(index) + bytes1(index)).toByte)
+    unsafe(ByteString.fromArrayUnsafe(result))
+  }
+
   def random: T = generate
 }
