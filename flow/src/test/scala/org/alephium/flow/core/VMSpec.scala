@@ -210,6 +210,18 @@ class VMSpec extends AlephiumSpec {
         else simpleScript(blockFlow, chainIndex, script)
       addAndValidate(blockFlow, block)
     }
+
+    def callTxScriptMulti(input: Int => String): Block = {
+      val block0 = transfer(blockFlow, chainIndex, amount = 2, numReceivers = 10)
+      addAndValidate(blockFlow, block0)
+      val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
+      val scripts = AVector.tabulate(newAddresses.length) { index =>
+        Compiler.compileTxScript(input(index)).fold(throw _, identity)
+      }
+      val block1 = simpleScriptMulti(blockFlow, chainIndex, newAddresses, scripts)
+      addAndValidate(blockFlow, block1)
+      block1
+    }
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -487,5 +499,35 @@ class VMSpec extends AlephiumSpec {
                     |$swapContract
                     |""".stripMargin)
     checkSwapBalance(11, 100)
+  }
+
+  behavior of "random execution"
+
+  it should "execute tx in random order" in new ContractFixture {
+    val testContract =
+      s"""
+         |TxContract Foo(mut x: U256) {
+         |  pub fn foo(y: U256) -> () {
+         |    x = x * 10 + y
+         |  }
+         |}
+         |""".stripMargin
+    val contractKey = createContract(testContract, 2, 2).key
+
+    val block = callTxScriptMulti(index => s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${contractKey.toHexString})
+         |    foo.foo($index)
+         |  }
+         |}
+         |
+         |$testContract
+         |""".stripMargin)
+
+    val expected      = block.getExecutionOrder.init.fold(0L)(_ * 10 + _)
+    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val contractState = worldState.getContractState(contractKey).fold(throw _, identity)
+    contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }
 }

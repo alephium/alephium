@@ -119,6 +119,17 @@ trait FlowFixture
     mine(blockFlow, chainIndex)(transferTxs(_, _, 1, 1, Some(txScript)))
   }
 
+  def simpleScriptMulti(blockFlow: BlockFlow,
+                        chainIndex: ChainIndex,
+                        invokers: AVector[LockupScript],
+                        txScripts: AVector[StatefulScript]): Block = {
+    assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
+    val zipped = invokers.mapWithIndex {
+      case (invoker, index) => invoker -> txScripts(index)
+    }
+    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, 1))
+  }
+
   def transfer(blockFlow: BlockFlow,
                chainIndex: ChainIndex,
                amount: Int       = 1,
@@ -151,6 +162,16 @@ trait FlowFixture
     val remaining  = TxOutput.asset(total - amount * numReceivers, height, fromLockupScript)
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, outputs :+ remaining)
     AVector(Transaction.from(unsignedTx, privateKey))
+  }
+
+  def transferTxsMulti(blockFlow: BlockFlow,
+                       chainIndex: ChainIndex,
+                       scripts: AVector[(LockupScript, StatefulScript)],
+                       amount: Int): AVector[Transaction] = {
+    scripts.map {
+      case (lockupScript, txScript) =>
+        transferTx(blockFlow, chainIndex, lockupScript, amount, Some(txScript))
+    }
   }
 
   def transferTx(blockFlow: BlockFlow,
