@@ -54,6 +54,11 @@ trait WalletEndpoints
       .in(jsonBody[WalletCreation])
       .out(jsonBody[WalletCreation.Result])
       .summary("Create a new wallet")
+      .description(s"""
+        |A new wallet will be created and respond with a mnemonic.
+        |Make sure to keep that mnemonic safely as it will allows you to recover your wallet.
+        |Default mnemonic size is 24, (options: $mnemonicSizes).
+      """.stripMargin)
 
   val restoreWallet: Endpoint[WalletRestore, WalletApiError, WalletRestore.Result, Nothing] =
     wallets.put
