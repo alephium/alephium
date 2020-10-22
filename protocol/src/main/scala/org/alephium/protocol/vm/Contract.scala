@@ -85,7 +85,7 @@ object StatelessScript {
     Serde.forProduct1(StatelessScript.apply, _.methods)
 }
 
-final case class StatefulScript(methods: AVector[Method[StatefulContext]])
+final case class StatefulScript private (methods: AVector[Method[StatefulContext]])
     extends Script[StatefulContext] {
   def entryMethod: Method[StatefulContext] = methods.head
 
@@ -95,7 +95,22 @@ final case class StatefulScript(methods: AVector[Method[StatefulContext]])
 }
 
 object StatefulScript {
-  implicit val serde: Serde[StatefulScript] = Serde.forProduct1(StatefulScript.apply, _.methods)
+  implicit val serde: Serde[StatefulScript] = Serde
+    .forProduct1[AVector[Method[StatefulContext]], StatefulScript](StatefulScript.unsafe, _.methods)
+    .validate(script => if (validate(script.methods)) Right(()) else Left("Invalid TxScript"))
+
+  def unsafe(methods: AVector[Method[StatefulContext]]): StatefulScript = {
+    new StatefulScript(methods)
+  }
+
+  def from(methods: AVector[Method[StatefulContext]]): Option[StatefulScript] = {
+    val ok = methods.nonEmpty && methods.head.isPublic && methods.tail.forall(m => !m.isPublic)
+    Option.when(ok)(new StatefulScript(methods))
+  }
+
+  def validate(methods: AVector[Method[StatefulContext]]): Boolean = {
+    methods.nonEmpty && methods.head.isPublic && methods.tail.forall(m => !m.isPublic)
+  }
 }
 
 final case class StatefulContract(

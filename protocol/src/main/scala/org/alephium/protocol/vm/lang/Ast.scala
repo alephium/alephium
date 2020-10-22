@@ -353,7 +353,10 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
-      StatefulScript(methods)
+      StatefulScript
+        .from(methods)
+        .getOrElse(throw Compiler.Error(
+          "Expect the 1st function to be public and the other functions to be private for tx script"))
     }
   }
 
