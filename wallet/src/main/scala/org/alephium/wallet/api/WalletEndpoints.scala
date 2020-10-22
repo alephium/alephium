@@ -16,9 +16,11 @@
 
 package org.alephium.wallet.api
 
+import io.circe.{Decoder, Encoder}
 import sttp.model.StatusCode
 import sttp.tapir._
-import sttp.tapir.json.circe.jsonBody
+import sttp.tapir.EndpointIO.Example
+import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
 
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
@@ -26,7 +28,14 @@ import org.alephium.wallet.api.model._
 import org.alephium.wallet.circe
 import org.alephium.wallet.tapir
 
-trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Codecs {
+trait WalletEndpoints
+    extends circe.ModelCodecs
+    with tapir.Schemas
+    with tapir.Codecs
+    with WalletExamples {
+
+  private def jsonBody[T: Encoder: Decoder: Schema: Validator](
+      implicit examples: List[Example[T]]) = tapirJsonBody[T].examples(examples)
 
   private val wallets = endpoint
     .in("wallets")
