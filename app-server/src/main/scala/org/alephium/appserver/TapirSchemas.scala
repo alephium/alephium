@@ -16,12 +16,14 @@
 
 package org.alephium.appserver
 
+import java.net.{InetAddress, InetSocketAddress}
+
 import akka.util.ByteString
 import sttp.tapir.Schema
 import sttp.tapir.SchemaType.SInteger
 
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -35,4 +37,8 @@ object TapirSchemas {
   implicit val signatureSchema: Schema[Signature]           = Schema(Schema.schemaForString.schemaType)
   implicit val timestampSchema: Schema[TimeStamp]           = Schema(Schema.schemaForLong.schemaType)
   implicit val u256Schema: Schema[U256]                     = Schema(SInteger).format("uint256")
+  implicit val inetAddressSchema: Schema[InetAddress]       = Schema(Schema.schemaForString.schemaType)
+  implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
+    Schema.schemaForString.schemaType)
+  implicit val cliqueIdSchema: Schema[CliqueId] = Schema(Schema.schemaForString.schemaType)
 }

@@ -36,9 +36,11 @@ import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, Duration, Service}
+import org.alephium.util.{ActorRefT, AVector, Duration, Service}
 import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
@@ -62,6 +64,26 @@ class RestServer(
   implicit val chainsConfig: ChainsConfig = node.config.chains
   implicit val networkType: NetworkType   = node.config.chains.networkType
   implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
+
+  private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
+    node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
+      cliqueInfo =>
+        Right(SelfClique.from(cliqueInfo))
+    }
+  }
+
+  private val getSelfCliqueSyncedRoute = getSelfCliqueSynced.toRoute { _ =>
+    node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean].map(Right(_))
+  }
+
+  private val getInterCliquePeerInfoRoute = getInterCliquePeerInfo.toRoute { _ =>
+    node.cliqueManager
+      .ask(InterCliqueManager.GetSyncStatuses)
+      .mapTo[Seq[InterCliqueManager.SyncStatus]]
+      .map { syncedStatuses =>
+        Right(AVector.from(syncedStatuses.map(InterCliquePeerInfo.from)))
+      }
+  }
 
   private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
     Future.successful(
@@ -93,6 +115,11 @@ class RestServer(
       Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
+  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
+    case (from, to) =>
+      Future.successful(ServerUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
+  }
+
   private val createTransactionRoute = createTransaction.toRoute {
     case (fromKey, toAddress, value) =>
       Future.successful(
@@ -114,12 +141,16 @@ class RestServer(
 
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
+    getSelfClique,
+    getSelfCliqueSynced,
+    getInterCliquePeerInfo,
     getBlockflow,
     getBlock,
     getBalance,
     getGroup,
     getHashesAtHeight,
     getChainInfo,
+    listUnconfirmedTransactions,
     createTransaction,
     sendTransactionLogic.endpoint,
     minerActionLogic.endpoint
@@ -131,12 +162,16 @@ class RestServer(
   private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
 
   private val blockFlowRoute: Route =
-    getBlockflowRoute ~
+    getSelfCliqueRoute ~
+      getSelfCliqueSyncedRoute ~
+      getInterCliquePeerInfoRoute ~
+      getBlockflowRoute ~
       getBlockRoute ~
       getBalanceRoute ~
       getGroupRoute ~
       getHashesAtHeightRoute ~
       getChainInfoRoute ~
+      listUnconfirmedTransactionsRoute ~
       createTransactionRoute ~
       sendTransactionLogic.toRoute ~
       minerActionLogic.toRoute ~

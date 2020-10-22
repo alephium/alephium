@@ -60,6 +60,12 @@ object ServerUtils {
     Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
+  def listUnconfirmedTransactions(blockFlow: BlockFlow, chainIndex: ChainIndex)(
+      implicit chainsConfig: ChainsConfig): Try[AVector[Tx]] = {
+    Right(
+      blockFlow.getPool(chainIndex).getAll(chainIndex).map(Tx.from(_, chainsConfig.networkType)))
+  }
+
   def createTransaction(blockFlow: BlockFlow, query: CreateTransaction)(
       implicit groupConfig: GroupConfig): Try[CreateTransactionResult] = {
     val resultEither = for {

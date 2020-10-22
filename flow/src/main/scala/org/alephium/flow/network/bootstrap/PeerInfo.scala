@@ -30,6 +30,7 @@ final case class PeerInfo private (
     externalAddress: Option[InetSocketAddress],
     internalAddress: InetSocketAddress,
     rpcPort: Int,
+    restPort: Int,
     wsPort: Int
 )
 
@@ -39,13 +40,20 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
              publicAddress: Option[InetSocketAddress],
              privateAddress: InetSocketAddress,
              rpcPort: Int,
+             restPort: Int,
              wsPort: Int): PeerInfo =
-    new PeerInfo(id, groupNumPerBroker, publicAddress, privateAddress, rpcPort, wsPort)
+    new PeerInfo(id, groupNumPerBroker, publicAddress, privateAddress, rpcPort, restPort, wsPort)
 
   val _serde: Serde[PeerInfo] =
-    Serde.forProduct6(
-      unsafe,
-      t => (t.id, t.groupNumPerBroker, t.externalAddress, t.internalAddress, t.rpcPort, t.wsPort))
+    Serde.forProduct7(unsafe,
+                      t =>
+                        (t.id,
+                         t.groupNumPerBroker,
+                         t.externalAddress,
+                         t.internalAddress,
+                         t.rpcPort,
+                         t.restPort,
+                         t.wsPort))
 
   override def validate(info: PeerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     for {
@@ -53,6 +61,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       _ <- info.externalAddress.fold[Either[String, Unit]](Right(()))(address =>
         Configs.validatePort(address.getPort))
       _ <- Configs.validatePort(info.rpcPort)
+      _ <- Configs.validatePort(info.restPort)
       _ <- Configs.validatePort(info.wsPort)
     } yield ()
   }
@@ -64,6 +73,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       networkSetting.externalAddressInferred,
       networkSetting.internalAddress,
       networkSetting.rpcPort,
+      networkSetting.restPort,
       networkSetting.wsPort
     )
   }

@@ -16,6 +16,8 @@
 
 package org.alephium.appserver
 
+import java.net.InetAddress
+
 import io.circe
 import io.circe.syntax._
 import sttp.tapir.{Codec, DecodeResult, Validator}
@@ -24,7 +26,8 @@ import sttp.tapir.CodecFormat.TextPlain
 import org.alephium.appserver.ApiModel._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
+import org.alephium.rpc.CirceUtils.inetAddressCodec
 import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
@@ -48,6 +51,24 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
     fromCirce[MinerAction]
+
+  implicit val peerAddressTapirCodec: Codec[String, PeerAddress, TextPlain] =
+    fromCirce[PeerAddress]
+
+  implicit val cliqueIdTapirCodec: Codec[String, CliqueId, TextPlain] =
+    fromCirce[CliqueId]
+
+  implicit val selfCliqueTapirCodec: Codec[String, SelfClique, TextPlain] =
+    fromCirce[SelfClique]
+
+  implicit val interCliquePeerInfoTapirCodec: Codec[String, InterCliquePeerInfo, TextPlain] =
+    fromCirce[InterCliquePeerInfo]
+
+  implicit val inetAddressTapirCodec: Codec[String, InetAddress, TextPlain] =
+    fromCirce[InetAddress]
+
+  implicit val inetSocketAddressTapirCodec: Codec[String, InetAddress, TextPlain] =
+    fromCirce[InetAddress]
 
   implicit def groupIndexCodec(
       implicit groupConfig: GroupConfig): Codec[String, GroupIndex, TextPlain] =

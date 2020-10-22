@@ -43,6 +43,10 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
     getPool(index).collectForBlock(maxNum)
   }
 
+  def getAll(index: ChainIndex): AVector[Transaction] = readOnly {
+    getPool(index).getAll
+  }
+
   def add(index: ChainIndex, transactions: AVector[(Transaction, Double)]): Int = readOnly {
     getPool(index).add(transactions)
   }
