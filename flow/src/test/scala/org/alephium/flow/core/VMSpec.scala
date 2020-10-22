@@ -51,16 +51,18 @@ class VMSpec extends AlephiumSpec {
     val input =
       s"""
          |TxScript Foo {
-         |  fn add() -> () {
+         |  pub fn add() -> () {
          |    return
          |  }
          |}
          |""".stripMargin
-    val script = Compiler.compileTxScript(input).toOption.get
+    val script      = Compiler.compileTxScript(input).toOption.get
+    val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
 
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = simpleScript(blockFlow, chainIndex, script)
-    assertThrows[RuntimeException](addAndCheck(blockFlow, block, 1))
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val block           = simpleScript(blockFlow, chainIndex, errorScript)
+    val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+    blockValidation.validate(block, blockFlow).isRight is false
   }
 
   it should "overflow frame stack" in new FlowFixture {

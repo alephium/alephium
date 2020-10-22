@@ -118,7 +118,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Foo() {
          |  fn foo(bar: Bar) -> () {
-         |    return bar.foo()
+         |    return bar.bar()
          |  }
          |
          |  pub fn bar() -> () {
@@ -127,11 +127,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |
          |TxScript Bar {
-         |  fn bar(foo: Foo) -> () {
-         |    return foo.bar()
+         |  pub fn bar() -> () {
+         |    return foo()
          |  }
          |
-         |  pub fn foo() -> () {
+         |  fn foo() -> () {
          |    return
          |  }
          |}

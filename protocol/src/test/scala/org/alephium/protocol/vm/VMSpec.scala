@@ -138,7 +138,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         returnType   = expected.fold(_ => AVector.empty[Val.Type], _.map(_.tpe)),
         instrs)
       val context = mockContext()
-      val obj     = StatefulScript(AVector(method)).toObject
+      val obj     = StatefulScript.from(AVector(method)).get.toObject
 
       StatefulVM.executeWithOutputs(context, obj, AVector.empty) is expected
 

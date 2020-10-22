@@ -223,7 +223,7 @@ object StatefulVM {
   def runTxScript(worldState: WorldState,
                   tx: TransactionAbstract,
                   script: StatefulScript): ExeResult[TxScriptExecution] = {
-    val context = if (script.methods.head.isPayable) {
+    val context = if (script.entryMethod.isPayable) {
       StatefulContext.payable(tx, worldState)
     } else {
       StatefulContext.nonPayable(tx.hash, worldState)
