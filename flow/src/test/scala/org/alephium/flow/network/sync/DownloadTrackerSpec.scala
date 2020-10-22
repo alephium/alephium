@@ -30,7 +30,7 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
   trait Fixture { F =>
     val blockflow = genesisBlockFlow()
     val hashes = AVector.from((1 to 5).map { k =>
-      val block = mine(blockflow, ChainIndex.unsafe(0, 0))
+      val block = transfer(blockflow, ChainIndex.unsafe(0, 0))
       addAndCheck(blockflow, block, k)
       block.hash
     })

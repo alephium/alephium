@@ -448,6 +448,7 @@ object Frame {
       finalBalances
     }
 
+    // Need to be `def` as it's mutable
     def empty: Balances = Balances(ArrayBuffer.empty)
   }
 
@@ -527,7 +528,8 @@ object Frame {
   object BalancesPerLockup {
     val error: ArithmeticException = new ArithmeticException("Balance amount")
 
-    val empty: BalancesPerLockup = BalancesPerLockup(U256.Zero, mutable.Map.empty, 0)
+    // Need to be `def` as it's mutable
+    def empty: BalancesPerLockup = BalancesPerLockup(U256.Zero, mutable.Map.empty, 0)
 
     def alf(amount: U256): BalancesPerLockup = {
       BalancesPerLockup(amount, mutable.Map.empty, 0)

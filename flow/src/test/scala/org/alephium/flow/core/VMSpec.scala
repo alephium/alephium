@@ -20,6 +20,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.validation.{BlockValidation, ValidBlock}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -58,7 +59,7 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(input).toOption.get
 
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = mine(blockFlow, chainIndex, txScriptOption = Some(script))
+    val block      = simpleScript(blockFlow, chainIndex, script)
     assertThrows[RuntimeException](addAndCheck(blockFlow, block, 1))
   }
 
@@ -80,7 +81,7 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(input).toOption.get
 
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = mine(blockFlow, chainIndex, txScriptOption = Some(script))
+    val block      = simpleScript(blockFlow, chainIndex, script)
     val tx         = block.transactions.head
     val worldState = blockFlow.getBestCachedTrie(chainIndex.from).toOption.get
     StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get) is Left(StackOverflow)
@@ -107,10 +108,9 @@ class VMSpec extends AlephiumSpec {
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
     lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U256.One)
-    lazy val block0 =
-      mine(blockFlow, chainIndex, txScriptOption = Some(txScript0), callContract = true)
+    lazy val block0     = payableCall(blockFlow, chainIndex, txScript0)
     lazy val contractOutputRef0 =
-      TxOutputRef.unsafe(block0.transactions.head, 1).asInstanceOf[ContractOutputRef]
+      TxOutputRef.unsafe(block0.transactions.head, 0).asInstanceOf[ContractOutputRef]
     lazy val contractKey0 = contractOutputRef0.key
 
     lazy val input1 =
@@ -142,7 +142,7 @@ class VMSpec extends AlephiumSpec {
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
     val script1 = Compiler.compileTxScript(input1, 1).toOption.get
-    val block1  = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    val block1  = simpleScript(blockFlow, chainIndex, script1)
     assertThrows[RuntimeException](addAndCheck(blockFlow, block1, 2))
   }
 
@@ -154,12 +154,12 @@ class VMSpec extends AlephiumSpec {
 
     val script1   = Compiler.compileTxScript(input1, 1).toOption.get
     val newState1 = AVector[Val](Val.U256(U256.unsafe(10)))
-    val block1    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    val block1    = simpleScript(blockFlow, chainIndex, script1)
     addAndCheck(blockFlow, block1, 2)
     checkState(blockFlow, chainIndex, contractKey0, newState1, contractOutputRef0, numAssets = 4)
 
     val newState2 = AVector[Val](Val.U256(U256.unsafe(20)))
-    val block2    = mine(blockFlow, chainIndex, txScriptOption = Some(script1))
+    val block2    = simpleScript(blockFlow, chainIndex, script1)
     addAndCheck(blockFlow, block2, 3)
     checkState(blockFlow, chainIndex, contractKey0, newState2, contractOutputRef0, numAssets = 6)
   }
@@ -169,15 +169,21 @@ class VMSpec extends AlephiumSpec {
     val genesisLockup  = getGenesisLockupScript(chainIndex)
     val genesisAddress = Address(NetworkType.Testnet, genesisLockup)
 
+    def addAndValidate(blockFlow: BlockFlow, block: Block): Assertion = {
+      val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+      blockValidation.validate(block, blockFlow) is Right(ValidBlock)
+      blockFlow.add(block).isRight is true
+    }
+
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
       val contract = Compiler.compileContract(input).toOption.get
       val txScript = contractCreation(contract, initialState, genesisLockup, U256.One)
-      val block    = minePayable(blockFlow, chainIndex.from, txScript)
+      val block    = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
 
-      blockFlow.add(block).isRight is true
+      addAndValidate(blockFlow, block)
       contractOutputRef
     }
 
@@ -199,8 +205,10 @@ class VMSpec extends AlephiumSpec {
 
     def callTxScript(input: String): Assertion = {
       val script = Compiler.compileTxScript(input).toOption.get
-      val block  = minePayable(blockFlow, chainIndex.from, script)
-      blockFlow.add(block).isRight is true
+      val block =
+        if (script.entryMethod.isPayable) payableCall(blockFlow, chainIndex, script)
+        else simpleScript(blockFlow, chainIndex, script)
+      addAndValidate(blockFlow, block)
     }
   }
 
@@ -275,7 +283,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script   = Compiler.compileTxScript(main).toOption.get
     val newState = AVector[Val](Val.U256(U256.unsafe(110)))
-    val block    = mine(blockFlow, chainIndex, txScriptOption = Some(script))
+    val block    = simpleScript(blockFlow, chainIndex, script)
     blockFlow.add(block).isRight is true
 
     val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
@@ -319,7 +327,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).toOption.get
 
-    val block0 = mine(blockFlow, chainIndex, txScriptOption = Some(script), callContract = true)
+    val block0 = payableCall(blockFlow, chainIndex, script)
     blockFlow.add(block0).isRight is true
 
     val worldState0 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
@@ -331,7 +339,7 @@ class VMSpec extends AlephiumSpec {
         }
     }
 
-    val block1 = mine(blockFlow, chainIndex, txScriptOption = Some(script), callContract = true)
+    val block1 = payableCall(blockFlow, chainIndex, script)
     blockFlow.add(block1).isRight is true
 
     val worldState1 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
@@ -363,15 +371,15 @@ class VMSpec extends AlephiumSpec {
     val tokenId          = tokenContractKey
 
     callTxScript(s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    let token = Token(#${tokenContractKey.toHexString})
-         |    token.issue(1024)
-         |  }
-         |}
-         |
-         |$tokenContract
-         |""".stripMargin)
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    let token = Token(#${tokenContractKey.toHexString})
+                    |    token.issue(1024)
+                    |  }
+                    |}
+                    |
+                    |$tokenContract
+                    |""".stripMargin)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -438,7 +446,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(15, 0)
+    checkSwapBalance(1, 0)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -452,7 +460,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(25, 100)
+    checkSwapBalance(11, 100)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -465,6 +473,19 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(35, 50)
+    checkSwapBalance(21, 50)
+
+    callTxScript(s"""
+                    |TxScript Main {
+                    |  pub payable fn main() -> () {
+                    |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 50)
+                    |    let swap = Swap(#${swapContractKey.toHexString})
+                    |    swap.swapAlf(@${genesisAddress.toBase58}, 50)
+                    |  }
+                    |}
+                    |
+                    |$swapContract
+                    |""".stripMargin)
+    checkSwapBalance(11, 100)
   }
 }

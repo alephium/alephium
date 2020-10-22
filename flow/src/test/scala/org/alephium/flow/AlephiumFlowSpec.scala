@@ -17,6 +17,7 @@
 package org.alephium.flow
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.language.implicitConversions
 
 import akka.util.ByteString
@@ -25,8 +26,8 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{BlockValidation, HeaderValidation, Validation}
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.flow.validation.{BlockValidation, HeaderValidation, Validation, ValidBlock}
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -37,6 +38,8 @@ trait FlowFixture
     with StoragesFixture
     with NumericHelpers {
   lazy val blockFlow: BlockFlow = genesisBlockFlow()
+
+  lazy val keyManager: mutable.Map[LockupScript, PrivateKey] = mutable.Map.empty
 
   implicit def target2BigInt(target: Target): BigInt = BigInt(target.value)
 
@@ -69,10 +72,12 @@ trait FlowFixture
       val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
       val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
 
-      val unsignedTx      = UnsignedTransaction(Some(script), inputs, AVector.empty)
-      val contractTx      = TransactionTemplate.from(unsignedTx, privateKey)
-      val generateOutputs = genOutputs(blockFlow, mainGroup, contractTx, script)
-      val fullTx          = Transaction.from(unsignedTx, generateOutputs, privateKey)
+      val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
+      val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
+
+      val (contractInputs, generateOutputs) =
+        genInputsOutputs(blockFlow, mainGroup, contractTx, script)
+      val fullTx = Transaction.from(unsignedTx, contractInputs, generateOutputs, privateKey)
       AVector(fullTx, coinbaseTx)
     }
 
@@ -85,65 +90,194 @@ trait FlowFixture
     iter(0)
   }
 
-  def mine(blockFlow: BlockFlow,
-           chainIndex: ChainIndex,
-           transfer: Boolean                      = true,
-           onlyTxForIntra: Boolean                = false,
-           txScriptOption: Option[StatefulScript] = None,
-           callContract: Boolean                  = false): Block = {
+  def tryToTranfer(blockFlow: BlockFlow, chainIndex: ChainIndex, amount: Int = 1): Block = {
+    if (blockFlow.brokerConfig.contains(chainIndex.from)) {
+      transfer(blockFlow, chainIndex, amount)
+    } else {
+      emptyBlock(blockFlow, chainIndex)
+    }
+  }
+
+  def transferOnlyForIntraGroup(blockFlow: BlockFlow,
+                                chainIndex: ChainIndex,
+                                amount: Int = 1): Block = {
+    if (chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from)) {
+      transfer(blockFlow, chainIndex, amount)
+    } else {
+      emptyBlock(blockFlow, chainIndex)
+    }
+  }
+
+  def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
+    mine(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
+  }
+
+  def simpleScript(blockFlow: BlockFlow,
+                   chainIndex: ChainIndex,
+                   txScript: StatefulScript): Block = {
+    assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
+    mine(blockFlow, chainIndex)(transferTxs(_, _, 1, 1, Some(txScript)))
+  }
+
+  def transfer(blockFlow: BlockFlow,
+               chainIndex: ChainIndex,
+               amount: Int       = 1,
+               numReceivers: Int = 1): Block = {
+    assume(blockFlow.brokerConfig.contains(chainIndex.from))
+    mine(blockFlow, chainIndex)(transferTxs(_, _, amount, numReceivers, None))
+  }
+
+  def transferTxs(blockFlow: BlockFlow,
+                  chainIndex: ChainIndex,
+                  amount: Int,
+                  numReceivers: Int,
+                  txScriptOpt: Option[StatefulScript]): AVector[Transaction] = {
+    val height                     = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
+    val mainGroup                  = chainIndex.from
+    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val unlockScript               = UnlockScript.p2pkh(publicKey)
+    val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val toLockupScripts = AVector.fill(numReceivers) {
+      val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
+      val lockupScript                = LockupScript.p2pkh(toPublicKey)
+      keyManager += lockupScript -> toPrivateKey
+      lockupScript
+    }
+    val inputs = balances.map(_._1).map(TxInput(_, unlockScript))
+
+    val outputs    = toLockupScripts.map(TxOutput.asset(amount, height, _))
+    val remaining  = TxOutput.asset(total - amount * numReceivers, height, fromLockupScript)
+    val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, outputs :+ remaining)
+    AVector(Transaction.from(unsignedTx, privateKey))
+  }
+
+  def transferTx(blockFlow: BlockFlow,
+                 chainIndex: ChainIndex,
+                 fromLockupScript: LockupScript,
+                 amount: Int,
+                 txScriptOpt: Option[StatefulScript]): Transaction = {
+    val height       = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
+    val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
+    val publicKey    = privateKey.publicKey
+    val unlockScript = UnlockScript.p2pkh(publicKey)
+    val balances     = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val total        = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+
+    val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
+    val lockupScript                = LockupScript.p2pkh(toPublicKey)
+
+    keyManager += lockupScript -> toPrivateKey
+    val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
+    val output     = TxOutput.asset(amount, height, lockupScript)
+    val remaining  = TxOutput.asset(total - amount, height, fromLockupScript)
+    val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, AVector(output, remaining))
+    Transaction.from(unsignedTx, privateKey)
+  }
+
+  def payableCall(blockFlow: BlockFlow, chainIndex: ChainIndex, script: StatefulScript): Block = {
+    mine(blockFlow, chainIndex)(payableCallTxs(_, _, script))
+  }
+
+  def payableCallTxs(blockFlow: BlockFlow,
+                     chainIndex: ChainIndex,
+                     script: StatefulScript): AVector[Transaction] = {
+    assume(chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from))
+    val mainGroup                  = chainIndex.from
+    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val unlockScript               = UnlockScript.p2pkh(publicKey)
+    val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
+
+    val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
+    val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
+
+    val (contractInputs, generateOutputs) =
+      genInputsOutputs(blockFlow, mainGroup, contractTx, script)
+    val fullTx = Transaction.from(unsignedTx, contractInputs, generateOutputs, privateKey)
+    AVector(fullTx)
+  }
+
+  def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
+      prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
     val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
-    val transactions = {
-      if (transfer && brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
-        val mainGroup                  = chainIndex.from
-        val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-        val fromLockupScript           = LockupScript.p2pkh(publicKey)
-        val unlockScript               = UnlockScript.p2pkh(publicKey)
-        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-        val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
-        val (_, toPublicKey)           = chainIndex.to.generateKey
-        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
-        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-
-        val output0 = TxOutput.asset(1, height, toLockupScript)
-        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
-        if (callContract) {
-          val unsignedTx      = UnsignedTransaction(txScriptOption, inputs, AVector(output1))
-          val contractTx      = TransactionTemplate.from(unsignedTx, privateKey)
-          val generateOutputs = genOutputs(blockFlow, mainGroup, contractTx, txScriptOption.get)
-          val fullTx          = Transaction.from(unsignedTx, generateOutputs, privateKey)
-          AVector(fullTx, coinbaseTx)
-        } else {
-          val unsignedTx = UnsignedTransaction(txScriptOption, inputs, AVector(output0, output1))
-          val transferTx = Transaction.from(unsignedTx, privateKey)
-          AVector(transferTx, coinbaseTx)
-        }
-      } else AVector(coinbaseTx)
-    }
+    val txs              = prepareTxs(blockFlow, chainIndex) :+ coinbaseTx
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
+      val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, nonce)
       if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)
   }
 
-  private def genOutputs(blockFlow: BlockFlow,
-                         mainGroup: GroupIndex,
-                         tx: TransactionTemplate,
-                         txScript: StatefulScript): AVector[TxOutput] = {
+//  def mine(blockFlow: BlockFlow,
+//           chainIndex: ChainIndex,
+//           transfer: Boolean                      = true,
+//           onlyTxForIntra: Boolean                = false,
+//           txScriptOption: Option[StatefulScript] = None,
+//           callContract: Boolean                  = false): Block = {
+//    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+//    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
+//    val (_, toPublicKey) = chainIndex.to.generateKey
+//    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
+//    val transactions = {
+//      if (transfer && brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
+//        val mainGroup                  = chainIndex.from
+//        val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+//        val fromLockupScript           = LockupScript.p2pkh(publicKey)
+//        val unlockScript               = UnlockScript.p2pkh(publicKey)
+//        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+//        val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+//        val (_, toPublicKey)           = chainIndex.to.generateKey
+//        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
+//        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
+//
+//        val output0 = TxOutput.asset(1, height, toLockupScript)
+//        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
+//        if (callContract) {
+//          val unsignedTx      = UnsignedTransaction(txScriptOption, inputs, AVector(output1))
+//          val contractTx      = TransactionTemplate.from(unsignedTx, privateKey)
+//          val generateOutputs = genOutputs(blockFlow, mainGroup, contractTx, txScriptOption.get)
+//          val fullTx          = Transaction.from(unsignedTx, generateOutputs, privateKey)
+//          AVector(fullTx, coinbaseTx)
+//        } else {
+//          val unsignedTx = UnsignedTransaction(txScriptOption, inputs, AVector(output0, output1))
+//          val transferTx = Transaction.from(unsignedTx, privateKey)
+//          AVector(transferTx, coinbaseTx)
+//        }
+//      } else AVector(coinbaseTx)
+//    }
+//
+//    @tailrec
+//    def iter(nonce: BigInt): Block = {
+//      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
+//      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
+//    }
+//
+//    iter(0)
+//  }
+
+  private def genInputsOutputs(
+      blockFlow: BlockFlow,
+      mainGroup: GroupIndex,
+      tx: TransactionTemplate,
+      txScript: StatefulScript): (AVector[ContractOutputRef], AVector[TxOutput]) = {
     val worldState = blockFlow.getBestCachedTrie(mainGroup).toOption.get
-    StatefulVM.runTxScript(worldState, tx, txScript).toOption.get.generatedOutputs
+    val result     = StatefulVM.runTxScript(worldState, tx, txScript).toOption.get
+    result.contractInputs -> result.generatedOutputs
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
     val blockValidation =
       BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block, blockFlow).isRight is true
+    blockValidation.validate(block, blockFlow) is Right(ValidBlock)
     blockFlow.add(block).isRight is true
     blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * weightRatio
   }

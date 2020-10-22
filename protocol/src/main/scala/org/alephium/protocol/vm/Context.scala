@@ -147,7 +147,7 @@ object StatefulContext {
 
     override def getInitialBalances: ExeResult[Frame.Balances] = {
       for {
-        preOutputs <- initWorldState.getPreOutputs(tx).left.map[ExeFailure](IOErrorLoadOutputs)
+        preOutputs <- initWorldState.getPreOutputsForVM(tx).left.map[ExeFailure](IOErrorLoadOutputs)
         balances <- Frame.Balances
           .from(preOutputs, tx.unsigned.fixedOutputs)
           .toRight(InvalidBalances)

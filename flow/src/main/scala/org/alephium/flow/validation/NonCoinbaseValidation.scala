@@ -212,17 +212,20 @@ object NonCoinbaseValidation {
     protected[validation] def checkTokenBalance(
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-      for {
-        inputBalances  <- computeTokenBalances(preOutputs)
-        outputBalances <- computeTokenBalances(tx.allOutputs)
-        _ <- {
-          val ok = outputBalances.forall {
-            case (tokenId, balance) =>
-              (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance)
+      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) validTx(())
+      else {
+        for {
+          inputBalances  <- computeTokenBalances(preOutputs)
+          outputBalances <- computeTokenBalances(tx.allOutputs)
+          _ <- {
+            val ok = outputBalances.forall {
+              case (tokenId, balance) =>
+                (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance)
+            }
+            if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
           }
-          if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
-        }
-      } yield ()
+        } yield ()
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -246,9 +249,9 @@ object NonCoinbaseValidation {
     protected[validation] def checkWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-      assume(tx.unsigned.inputs.length == preOutputs.length)
+      assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.unsafe(tx.signatures.reverse, tx.signatures.length)
-      EitherF.foreachTry(preOutputs.indices) { idx =>
+      EitherF.foreachTry(tx.unsigned.inputs.indices) { idx =>
         val unlockScript = tx.unsigned.inputs(idx).unlockScript
         checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signatures)
       }
