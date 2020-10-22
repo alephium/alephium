@@ -38,7 +38,7 @@ trait WalletEndpoints extends circe.ModelCodecs with tapir.Schemas with tapir.Co
                       jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
       )
     )
-    .tag("Wallet")
+    .tag("Wallets")
 
   val createWallet: Endpoint[WalletCreation, WalletApiError, WalletCreation.Result, Nothing] =
     wallets.post
