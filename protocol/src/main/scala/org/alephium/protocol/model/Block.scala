@@ -82,6 +82,10 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
       AVector.unsafe(orders)
     }
   }
+
+  def getNonCoinbaseExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+    getExecutionOrder.init
+  }
 }
 
 object Block {
