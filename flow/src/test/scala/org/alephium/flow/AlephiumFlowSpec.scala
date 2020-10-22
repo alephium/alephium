@@ -58,39 +58,7 @@ trait FlowFixture
     LockupScript.p2pkh(publicKey)
   }
 
-  def minePayable(blockFlow: BlockFlow, group: GroupIndex, script: StatefulScript): Block = {
-    val chainIndex       = ChainIndex(group, group)
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
-    val (_, toPublicKey) = group.generateKey
-    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
-    val transactions = {
-      val mainGroup                  = chainIndex.from
-      val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-      val fromLockupScript           = LockupScript.p2pkh(publicKey)
-      val unlockScript               = UnlockScript.p2pkh(publicKey)
-      val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-      val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-
-      val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
-      val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
-
-      val (contractInputs, generateOutputs) =
-        genInputsOutputs(blockFlow, mainGroup, contractTx, script)
-      val fullTx = Transaction.from(unsignedTx, contractInputs, generateOutputs, privateKey)
-      AVector(fullTx, coinbaseTx)
-    }
-
-    @tailrec
-    def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
-      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
-    }
-
-    iter(0)
-  }
-
-  def tryToTranfer(blockFlow: BlockFlow, chainIndex: ChainIndex, amount: Int = 1): Block = {
+  def tryToTransfer(blockFlow: BlockFlow, chainIndex: ChainIndex, amount: Int = 1): Block = {
     if (blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
     } else {
@@ -237,53 +205,6 @@ trait FlowFixture
 
     iter(0)
   }
-
-//  def mine(blockFlow: BlockFlow,
-//           chainIndex: ChainIndex,
-//           transfer: Boolean                      = true,
-//           onlyTxForIntra: Boolean                = false,
-//           txScriptOption: Option[StatefulScript] = None,
-//           callContract: Boolean                  = false): Block = {
-//    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-//    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
-//    val (_, toPublicKey) = chainIndex.to.generateKey
-//    val coinbaseTx       = Transaction.coinbase(toPublicKey, height, Hash.generate.bytes)
-//    val transactions = {
-//      if (transfer && brokerConfig.contains(chainIndex.from) && (chainIndex.isIntraGroup || !onlyTxForIntra)) {
-//        val mainGroup                  = chainIndex.from
-//        val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-//        val fromLockupScript           = LockupScript.p2pkh(publicKey)
-//        val unlockScript               = UnlockScript.p2pkh(publicKey)
-//        val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
-//        val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
-//        val (_, toPublicKey)           = chainIndex.to.generateKey
-//        val toLockupScript             = LockupScript.p2pkh(toPublicKey)
-//        val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
-//
-//        val output0 = TxOutput.asset(1, height, toLockupScript)
-//        val output1 = TxOutput.asset(total - 1, height, fromLockupScript)
-//        if (callContract) {
-//          val unsignedTx      = UnsignedTransaction(txScriptOption, inputs, AVector(output1))
-//          val contractTx      = TransactionTemplate.from(unsignedTx, privateKey)
-//          val generateOutputs = genOutputs(blockFlow, mainGroup, contractTx, txScriptOption.get)
-//          val fullTx          = Transaction.from(unsignedTx, generateOutputs, privateKey)
-//          AVector(fullTx, coinbaseTx)
-//        } else {
-//          val unsignedTx = UnsignedTransaction(txScriptOption, inputs, AVector(output0, output1))
-//          val transferTx = Transaction.from(unsignedTx, privateKey)
-//          AVector(transferTx, coinbaseTx)
-//        }
-//      } else AVector(coinbaseTx)
-//    }
-//
-//    @tailrec
-//    def iter(nonce: BigInt): Block = {
-//      val block = Block.from(deps, transactions, consensusConfig.maxMiningTarget, nonce)
-//      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
-//    }
-//
-//    iter(0)
-//  }
 
   private def genInputsOutputs(
       blockFlow: BlockFlow,

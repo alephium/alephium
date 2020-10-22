@@ -171,8 +171,8 @@ class BlockFlowSpec extends AlephiumSpec {
         val blockFlow = genesisBlockFlow()
 
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
-        val block11    = tryToTranfer(blockFlow, chainIndex)
-        val block12    = tryToTranfer(blockFlow, chainIndex)
+        val block11    = tryToTransfer(blockFlow, chainIndex)
+        val block12    = tryToTransfer(blockFlow, chainIndex)
         blockFlow.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block11, 1)
         blockFlow.mempools.foreach(_.size is 0)
