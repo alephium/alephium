@@ -58,7 +58,7 @@ class HeaderChainHandler(blockFlow: BlockFlow,
                          flowHandler: ActorRefT[FlowHandler.Command])(
     implicit brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig)
-    extends ChainHandler[BlockHeader, HeaderStatus, HeaderChainHandler.Command](
+    extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
       blockFlow,
       chainIndex,
       HeaderValidation.build) {

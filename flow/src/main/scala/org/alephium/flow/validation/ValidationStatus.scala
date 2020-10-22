@@ -23,17 +23,11 @@ import org.alephium.util.AVector
 
 // scalastyle:off number.of.types
 
-sealed trait ValidationStatus
-sealed trait InvalidStatus extends ValidationStatus
-sealed trait ValidStatus   extends ValidationStatus
+sealed trait InvalidStatus
 
-sealed trait BlockStatus        extends ValidationStatus
-sealed trait InvalidBlockStatus extends BlockStatus with InvalidStatus
-final case object ValidBlock    extends BlockStatus with ValidStatus
+sealed trait InvalidBlockStatus extends InvalidStatus
 
-sealed trait HeaderStatus        extends ValidationStatus
-sealed trait InvalidHeaderStatus extends HeaderStatus with InvalidBlockStatus
-final case object ValidHeader    extends HeaderStatus with ValidStatus
+sealed trait InvalidHeaderStatus extends InvalidBlockStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
 final case object InvalidGroup                      extends InvalidBlockStatus
@@ -89,9 +83,7 @@ object ValidationStatus {
     }
 }
 
-sealed trait TxStatus        extends ValidationStatus
-sealed trait InvalidTxStatus extends TxStatus with InvalidStatus
-final case object ValidTx    extends TxStatus with ValidStatus
+sealed trait InvalidTxStatus extends InvalidStatus
 
 final case object NoInputs                              extends InvalidTxStatus
 final case object TooManyInputs                         extends InvalidTxStatus

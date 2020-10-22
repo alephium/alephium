@@ -33,7 +33,7 @@ object ChainHandler {
   trait Event
 }
 
-abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Command](
+abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
     validator: Validation[T, S])(implicit brokerConfig: BrokerConfig)
@@ -75,11 +75,10 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
         handleReadies(broker, origin, pending => Right(pending.parentHash == data.hash))
       case Right(false) =>
         validator.validate(data, blockFlow) match {
-          case Left(e)                    => handleIOError(broker, e)
-          case Right(MissingDeps(hashes)) => handleMissingDeps(data, hashes, broker, origin)
-          case Right(x: InvalidStatus)    => handleInvalidData(data, broker, x)
-          case Right(_: ValidStatus)      => handleValidData(data, broker, origin)
-          case Right(unexpected)          => log.warning(s"Unexpected pattern matching: $unexpected")
+          case Left(Left(e))                    => handleIOError(broker, e)
+          case Left(Right(MissingDeps(hashes))) => handleMissingDeps(data, hashes, broker, origin)
+          case Left(Right(x: InvalidStatus))    => handleInvalidData(data, broker, x)
+          case Right(_)                         => handleValidData(data, broker, origin)
         }
       case Left(error) => handleIOError(broker, error)
     }
@@ -89,10 +88,9 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: ValidationStatus, Comm
     assume(!blockFlow.containsUnsafe(data.hash))
     val validationResult = validator.validateAfterDependencies(data, blockFlow)
     validationResult match {
-      case Left(e)                      => handleIOError(broker, e)
-      case Right(x: InvalidBlockStatus) => handleInvalidData(data, broker, x)
-      case Right(_: ValidStatus)        => handleValidData(data, broker, origin)
-      case Right(unexpected)            => log.debug(s"Unexpected pattern matching $unexpected")
+      case Left(Left(e))  => handleIOError(broker, e)
+      case Left(Right(x)) => handleInvalidData(data, broker, x)
+      case Right(_)       => handleValidData(data, broker, origin)
     }
   }
 

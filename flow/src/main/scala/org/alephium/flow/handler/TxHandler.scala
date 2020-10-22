@@ -22,7 +22,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, ValidTx}
+import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
@@ -55,15 +55,12 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
     val mempool    = blockFlow.getPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
       nonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
-        case Right(s: InvalidTxStatus) =>
+        case Left(Right(s: InvalidTxStatus)) =>
           log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
           addFailed(tx)
-        case Right(_: ValidTx.type) =>
+        case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin)
-        case Right(unexpected) =>
-          log.warning(s"Unexpected pattern matching $unexpected")
-          addFailed(tx)
-        case Left(e) =>
+        case Left(Left(e)) =>
           log.warning(s"IO failed in validating tx ${tx.shortHex} due to $e")
           addFailed(tx)
       }

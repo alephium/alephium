@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -33,14 +33,14 @@ trait NonCoinbaseValidation {
 
   implicit def groupConfig: GroupConfig
 
-  def validateMempoolTx(tx: Transaction, flow: BlockFlow): IOResult[TxStatus] = {
-    val validationResult = for {
+  def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
+    for {
       _          <- checkStateless(tx)
       worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
       _          <- checkStateful(tx, worldState)
     } yield ()
-    convert(validationResult, ValidTx)
   }
+
   protected[validation] def checkBlockTx(tx: Transaction,
                                          worldState: WorldState): TxValidationResult[WorldState] = {
     for {

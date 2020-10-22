@@ -20,7 +20,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.{BlockValidation, ValidBlock}
+import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -171,7 +171,7 @@ class VMSpec extends AlephiumSpec {
 
     def addAndValidate(blockFlow: BlockFlow, block: Block): Assertion = {
       val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-      blockValidation.validate(block, blockFlow) is Right(ValidBlock)
+      blockValidation.validate(block, blockFlow).isRight is true
       blockFlow.add(block).isRight is true
     }
 
