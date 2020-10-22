@@ -87,8 +87,10 @@ object StatelessScript {
 
 final case class StatefulScript(methods: AVector[Method[StatefulContext]])
     extends Script[StatefulContext] {
+  def entryMethod: Method[StatefulContext] = methods.head
+
   override def toObject: ScriptObj[StatefulContext] = {
-    new StatefulScriptObject(this)
+    StatefulScriptObject(this)
   }
 }
 

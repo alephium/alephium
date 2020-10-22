@@ -24,7 +24,7 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, U256}
 
-trait TransactionAbstract {
+sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
   def signatures: AVector[Signature]
 
@@ -122,6 +122,15 @@ object Transaction {
     val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(unsigned, AVector.empty, generatedOutputs, AVector.fill(inputCnt)(signature))
+  }
+
+  def from(unsigned: UnsignedTransaction,
+           contractInputs: AVector[ContractOutputRef],
+           generatedOutputs: AVector[TxOutput],
+           privateKey: PrivateKey): Transaction = {
+    val inputCnt  = unsigned.inputs.length
+    val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
+    Transaction(unsigned, contractInputs, generatedOutputs, AVector.fill(inputCnt)(signature))
   }
 
   def from(unsigned: UnsignedTransaction, signatures: AVector[Signature]): Transaction = {

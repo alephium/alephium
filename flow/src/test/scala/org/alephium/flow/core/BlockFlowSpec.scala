@@ -38,31 +38,31 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
-      val block1      = mine(blockFlow, chainIndex1)
+      val block1      = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block1, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block1)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
-      val block2      = mine(blockFlow, chainIndex2)
+      val block2      = emptyBlock(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block2.header, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
-      val block3      = mine(blockFlow, chainIndex3)
+      val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
-      val block4      = mine(blockFlow, chainIndex4, transfer = false)
+      val block4      = emptyBlock(blockFlow, chainIndex4)
       addAndCheck(blockFlow, block4, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex5 = ChainIndex.unsafe(0, 0)
-      val block5      = mine(blockFlow, chainIndex5)
+      val block5      = transfer(blockFlow, chainIndex5)
       addAndCheck(blockFlow, block5, 5)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block5)
       checkBalance(blockFlow, 0, genesisBalance - 3)
@@ -73,7 +73,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val newBlocks = for {
       i <- 0 to 1
       j <- 0 to 1
-    } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
     newBlocks.foreach { block =>
       val index = block.chainIndex
       if (index.relateTo(GroupIndex.unsafe(0))) {
@@ -99,7 +99,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val newBlocks1 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+      } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks1.foreach { block =>
         addAndCheck(blockFlow, block, 1)
         blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
@@ -111,7 +111,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val newBlocks2 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+      } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks2.foreach { block =>
         addAndCheck(blockFlow, block, 4)
         blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
@@ -123,7 +123,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val newBlocks3 = for {
         i <- 0 to 1
         j <- 0 to 1
-      } yield mine(blockFlow, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+      } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks3.foreach { block =>
         addAndCheck(blockFlow, block, 8)
         blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
@@ -137,28 +137,28 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "work for 2 user group when there is a fork" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
-      val block11     = mine(blockFlow, chainIndex1)
-      val block12     = mine(blockFlow, chainIndex1)
+      val block11     = transfer(blockFlow, chainIndex1)
+      val block12     = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
       checkBalance(blockFlow, 0, genesisBalance - 1)
 
-      val block13 = mine(blockFlow, chainIndex1)
+      val block13 = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block13, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block13)
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
-      val block21     = mine(blockFlow, chainIndex2)
-      val block22     = mine(blockFlow, chainIndex2)
+      val block21     = emptyBlock(blockFlow, chainIndex2)
+      val block22     = emptyBlock(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block21.header, 3)
       addAndCheck(blockFlow, block22.header, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
       checkBalance(blockFlow, 0, genesisBalance - 2)
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
-      val block3      = mine(blockFlow, chainIndex3)
+      val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - 2)
@@ -171,8 +171,8 @@ class BlockFlowSpec extends AlephiumSpec {
         val blockFlow = genesisBlockFlow()
 
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
-        val block11    = mine(blockFlow, chainIndex)
-        val block12    = mine(blockFlow, chainIndex)
+        val block11    = tryToTranfer(blockFlow, chainIndex)
+        val block12    = tryToTranfer(blockFlow, chainIndex)
         blockFlow.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block11, 1)
         blockFlow.mempools.foreach(_.size is 0)
@@ -196,7 +196,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val newBlocks1 = for {
       i <- 0 to 1
       j <- 0 to 1
-    } yield mine(blockFlow0, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    } yield transferOnlyForIntraGroup(blockFlow0, ChainIndex.unsafe(i, j))
     newBlocks1.foreach { block =>
       addAndCheck(blockFlow0, block, 1)
     }
@@ -208,7 +208,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val newBlocks2 = for {
       i <- 0 to 1
       j <- 0 to 1
-    } yield mine(blockFlow1, ChainIndex.unsafe(i, j), onlyTxForIntra = true)
+    } yield transferOnlyForIntraGroup(blockFlow1, ChainIndex.unsafe(i, j))
     newBlocks2.foreach { block =>
       addAndCheck(blockFlow1, block, 4)
       blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
@@ -228,7 +228,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val testFromGroup = brokerConfig.groupFrom
       val blocks = (1 to 6).map { k =>
         val block =
-          mine(blockFlow0, ChainIndex.unsafe(testFromGroup, testToGroup), onlyTxForIntra = true)
+          transferOnlyForIntraGroup(blockFlow0, ChainIndex.unsafe(testFromGroup, testToGroup))
         addAndCheck(blockFlow0, block, k)
         block
       }
@@ -289,9 +289,9 @@ class BlockFlowSpec extends AlephiumSpec {
 
   behavior of "Balance"
 
-  it should "transfer token for inside a same group" in new FlowFixture {
+  it should "transfer token inside a same group" in new FlowFixture {
     val testGroup = Random.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
-    val block     = mine(blockFlow, ChainIndex.unsafe(testGroup, testGroup), onlyTxForIntra = true)
+    val block     = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(testGroup, testGroup))
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
@@ -319,7 +319,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val fromGroup = Random.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
     val toGroup   = Random.source.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
-    val block     = mine(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+    val block     = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true
 
     addAndCheck(blockFlow0, block, 1)
@@ -329,11 +329,11 @@ class BlockFlowSpec extends AlephiumSpec {
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow1, pubScript, 0)
 
-    val fromGroupBlock = mine(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup), transfer = false)
+    val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)
     checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
 
-    val toGroupBlock = mine(blockFlow1, ChainIndex.unsafe(toGroup, toGroup), transfer = false)
+    val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
     addAndCheck(blockFlow1, toGroupBlock, 2) // TODO: fix weight calculation
     checkBalance(blockFlow1, pubScript, 1)
   }

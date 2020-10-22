@@ -91,10 +91,21 @@ sealed abstract class WorldState {
 
   def persist: IOResult[WorldState.Persisted]
 
-  def getPreOutputs(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
+  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
     tx.unsigned.inputs.mapE { input =>
       getOutput(input.outputRef)
     }
+  }
+
+  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
+    for {
+      fixedInputs <- tx.unsigned.inputs.mapE { input =>
+        getOutput(input.outputRef)
+      }
+      contractInputs <- tx.contractInputs.mapE { outputRef =>
+        getOutput(outputRef)
+      }
+    } yield (fixedInputs ++ contractInputs)
   }
 }
 
