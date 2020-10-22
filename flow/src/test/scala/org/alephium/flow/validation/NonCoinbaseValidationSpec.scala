@@ -22,7 +22,6 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
@@ -38,12 +37,12 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     result.left.value isE error
   }
 
-  def passValidation(result: IOResult[TxStatus]): Assertion = {
-    result.toOption.get is ValidTx
+  def passValidation(result: TxValidationResult[Unit]): Assertion = {
+    result.isRight is true
   }
 
-  def failValidation(result: IOResult[TxStatus], error: InvalidTxStatus): Assertion = {
-    result.toOption.get is error
+  def failValidation(result: TxValidationResult[Unit], error: InvalidTxStatus): Assertion = {
+    result.left.value isE error
   }
 
   class Fixture extends NonCoinbaseValidation.Impl with VMFactory {

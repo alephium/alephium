@@ -60,9 +60,10 @@ class BlockChainHandler(blockFlow: BlockFlow,
                         flowHandler: ActorRefT[FlowHandler.Command])(
     implicit brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig)
-    extends ChainHandler[Block, BlockStatus, BlockChainHandler.Command](blockFlow,
-                                                                        chainIndex,
-                                                                        BlockValidation.build) {
+    extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
+      blockFlow,
+      chainIndex,
+      BlockValidation.build) {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)

@@ -17,31 +17,31 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
-trait BlockValidation extends Validation[Block, BlockStatus] {
+trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
 
   def headerValidation: HeaderValidation
   def nonCoinbaseValidation: NonCoinbaseValidation
 
-  override def validate(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
-    convert(checkBlock(block, flow), ValidBlock)
+  override def validate(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+    checkBlock(block, flow)
   }
 
-  override def validateUntilDependencies(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
-    convert(checkBlockUntilDependencies(block, flow), ValidBlock)
+  override def validateUntilDependencies(block: Block,
+                                         flow: BlockFlow): BlockValidationResult[Unit] = {
+    checkBlockUntilDependencies(block, flow)
   }
 
-  def validateAfterDependencies(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
-    convert(checkBlockAfterDependencies(block, flow), ValidBlock)
+  def validateAfterDependencies(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+    checkBlockAfterDependencies(block, flow)
   }
 
-  def validateAfterHeader(block: Block, flow: BlockFlow): IOResult[BlockStatus] = {
-    convert(checkBlockAfterHeader(block, flow), ValidBlock)
+  def validateAfterHeader(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+    checkBlockAfterHeader(block, flow)
   }
 
   private[validation] def checkBlockUntilDependencies(

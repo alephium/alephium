@@ -21,7 +21,6 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.io.IOResult
 import org.alephium.protocol.{Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
@@ -35,12 +34,12 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.left.value isE error
   }
 
-  def passValidation(result: IOResult[BlockStatus]): Assertion = {
-    result.toOption.get is ValidBlock
+  def passValidation(result: BlockValidationResult[Unit]): Assertion = {
+    result.isRight is true
   }
 
-  def failValidation(result: IOResult[BlockStatus], error: InvalidBlockStatus): Assertion = {
-    result.toOption.get is error
+  def failValidation(result: BlockValidationResult[Unit], error: InvalidBlockStatus): Assertion = {
+    result.left.value isE error
   }
 
   class Fixture extends BlockValidation.Impl()

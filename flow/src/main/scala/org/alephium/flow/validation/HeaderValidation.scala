@@ -17,16 +17,13 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
-import org.alephium.io.IOResult
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.TimeStamp
 
-trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
-  import ValidationStatus._
-
-  def validate(header: BlockHeader, flow: BlockFlow): IOResult[HeaderStatus] = {
-    convert(checkHeader(header, flow), ValidHeader)
+trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
+  def validate(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit] = {
+    checkHeader(header, flow)
   }
 
   protected[validation] def checkHeader(header: BlockHeader,
@@ -37,12 +34,14 @@ trait HeaderValidation extends Validation[BlockHeader, HeaderStatus] {
     } yield ()
   }
 
-  def validateUntilDependencies(header: BlockHeader, flow: BlockFlow): IOResult[HeaderStatus] = {
-    convert(checkHeaderUntilDependencies(header, flow), ValidHeader)
+  def validateUntilDependencies(header: BlockHeader,
+                                flow: BlockFlow): HeaderValidationResult[Unit] = {
+    checkHeaderUntilDependencies(header, flow)
   }
 
-  def validateAfterDependencies(header: BlockHeader, flow: BlockFlow): IOResult[HeaderStatus] = {
-    convert(checkHeaderAfterDependencies(header, flow), ValidHeader)
+  def validateAfterDependencies(header: BlockHeader,
+                                flow: BlockFlow): HeaderValidationResult[Unit] = {
+    checkHeaderAfterDependencies(header, flow)
   }
 
   protected[validation] def checkHeaderUntilDependencies(
