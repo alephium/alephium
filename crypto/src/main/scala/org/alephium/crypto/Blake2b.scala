@@ -21,14 +21,9 @@ import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
 import org.alephium.serde.RandomBytes
-import org.alephium.util.Bytes
 
 class Blake2b(val bytes: ByteString) extends RandomBytes {
   def toByte32: Byte32 = Byte32.unsafe(bytes)
-
-  def toRandomInt: Int = bytes.sliding(4).foldLeft(0) {
-    case (acc, subBytes) => acc + Bytes.toIntUnsafe(subBytes)
-  }
 }
 
 object Blake2b extends HashSchema[Blake2b](HashSchema.unsafeBlake2b, _.bytes) {

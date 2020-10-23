@@ -47,6 +47,15 @@ class HashSpec extends AlephiumSpec {
         output is expcted
       }
     }
+
+    it should "do arithmic correctly" in {
+      provider.xor(provider.zero, provider.zero) is provider.zero
+      provider.xor(provider.zero, provider.allOne) is provider.allOne
+      provider.xor(provider.allOne, provider.zero) is provider.allOne
+      provider.xor(provider.allOne, provider.allOne) is provider.zero
+      provider.zero.toRandomIntUnsafe is 0
+      provider.allOne.toRandomIntUnsafe is (0xFFFFFFFFL * 8).toInt
+    }
   }
 
   check(
