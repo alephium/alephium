@@ -62,7 +62,7 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
       def iter(index: Int, seed: Hash): Unit = {
         if (index < nonCoinbaseLength - 1) {
           val txRemaining = nonCoinbaseLength - index - 1
-          val randomIndex = index + Math.floorMod(seed.toRandomInt, txRemaining)
+          val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
           val tmp         = orders(index)
           orders(index)       = orders(randomIndex)
           orders(randomIndex) = tmp

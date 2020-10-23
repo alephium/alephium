@@ -21,7 +21,7 @@ import scala.reflect.runtime.universe.TypeTag
 
 import akka.util.ByteString
 
-import org.alephium.util.{Hex, Random}
+import org.alephium.util.{Bytes, Hex, Random}
 
 trait RandomBytes {
   def bytes: ByteString
@@ -59,11 +59,18 @@ trait RandomBytes {
   def toHexString: String = Hex.toHexString(bytes)
 
   def shortHex: String = toHexString.takeRight(8)
+
+  // Only use this when length % 4 == 0
+  def toRandomIntUnsafe: Int = bytes.sliding(4, 4).foldLeft(0) {
+    case (acc, subBytes) => acc + Bytes.toIntUnsafe(subBytes)
+  }
 }
 
 object RandomBytes {
   abstract class Companion[T: TypeTag](val unsafe: ByteString => T, val toBytes: T => ByteString) {
     lazy val zero: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0)))
+
+    lazy val allOne: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0xFF.toByte)))
 
     def length: Int
 
