@@ -13,6 +13,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 * Stateful UTXO model combines the advantages of both eUTXO model and account model (see code, wiki to come)
 * New VM design eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc (see code, wiki to come)
 * Tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
+* Front-running mitigation through random execution of transactions (see code, wiki to come)  
 * PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
 
 ## Development Status
