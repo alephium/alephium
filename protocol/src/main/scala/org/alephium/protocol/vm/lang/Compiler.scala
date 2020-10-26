@@ -22,6 +22,7 @@ import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.MultiTxContract
+import org.alephium.util.AVector
 
 object Compiler {
   def compileAssetScript(input: String): Either[Error, StatelessScript] =
@@ -54,6 +55,17 @@ object Compiler {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) => Right(genCode(multiContract))
         case failure: Parsed.Failure          => Left(Error.parse(failure))
+      }
+    } catch {
+      case e: Error => Left(e)
+    }
+  }
+
+  def compileState(stateRaw: String): Either[Error, AVector[Val]] = {
+    try {
+      fastparse.parse(stateRaw, StatefulParser.state(_)) match {
+        case Parsed.Success(state, _) => Right(AVector.from(state.map(_.v)))
+        case failure: Parsed.Failure  => Left(Error.parse(failure))
       }
     } catch {
       case e: Error => Left(e)

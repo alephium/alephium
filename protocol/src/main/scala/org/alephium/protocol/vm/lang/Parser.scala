@@ -187,4 +187,6 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def multiContract[_: P]: P[Ast.MultiTxContract] =
     P(Start ~ (rawTxScript | rawTxContract).rep(1) ~ End).map(Ast.MultiTxContract.apply)
+
+  def state[_: P]: P[Seq[Ast.Const[StatefulContext]]] = P("[" ~ const.rep(0, ",") ~ "]")
 }

@@ -16,8 +16,10 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
@@ -121,4 +123,17 @@ class ParserSpec extends AlephiumSpec {
     parsed1.rtypes is Seq(Type.U256, Type.U256)
   }
 
+  it should "parser contract initial states" in {
+    val bytes    = Hash.generate
+    val address  = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}]"
+    val expected =
+      Seq[Val](Val.U256(U256.One),
+               Val.I256(I256.Two),
+               Val.True,
+               Val.Address(address.lockupScript),
+               Val.ByteVec.from(bytes))
+    fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
+    Compiler.compileState(stateRaw).extractedValue() is AVector.from(expected)
+  }
 }
