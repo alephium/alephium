@@ -30,7 +30,7 @@ import org.alephium.util.{AVector, Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
 
-sealed trait Instr[-Ctx <: Context] {
+sealed trait Instr[-Ctx <: Context] { self: GasSchedule =>
   def serialize(): ByteString
 
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
@@ -110,8 +110,11 @@ object Instr {
   val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-sealed trait StatefulInstr  extends Instr[StatefulContext]
-sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext]
+sealed trait StatefulInstr extends Instr[StatefulContext] { self: GasSchedule =>
+}
+sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] {
+  self: GasSchedule =>
+}
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
@@ -138,7 +141,7 @@ sealed abstract class StatefulInstrCompanion1[T: Serde] extends InstrCompanion1[
 
 sealed trait StatelessInstrCompanion0
     extends InstrCompanion[StatelessContext]
-    with Instr[StatelessContext] {
+    with Instr[StatelessContext] { self: GasSchedule =>
   lazy val code: Byte = Instr.toCode(this).toByte
 
   def serialize(): ByteString = ByteString(code)
@@ -149,7 +152,7 @@ sealed trait StatelessInstrCompanion0
 
 sealed trait StatefulInstrCompanion0
     extends InstrCompanion[StatefulContext]
-    with Instr[StatefulContext] {
+    with Instr[StatefulContext] { self: GasSchedule =>
   lazy val code: Byte = Instr.toCode(this).toByte
 
   def serialize(): ByteString = ByteString(code)
@@ -158,9 +161,10 @@ sealed trait StatefulInstrCompanion0
     Right((this, input))
 }
 
-sealed trait OperandStackInstr extends StatelessInstr
+sealed trait OperandStackInstr extends StatelessInstr { self: GasSchedule =>
+}
 
-sealed trait ConstInstr extends OperandStackInstr
+sealed trait ConstInstr extends OperandStackInstr with GasVeryLow
 object ConstInstr {
   def i256(v: Val.I256): ConstInstr = {
     val bi = v.v.v
@@ -256,7 +260,7 @@ final case class AddressConst(const: Val.Address) extends ConstInstr1[Val.Addres
 object AddressConst extends StatelessInstrCompanion1[Val.Address]
 
 // Note: 0 <= index <= 0xFF
-final case class LoadLocal(index: Byte) extends OperandStackInstr {
+final case class LoadLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
   override def serialize(): ByteString = ByteString(LoadLocal.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -266,7 +270,7 @@ final case class LoadLocal(index: Byte) extends OperandStackInstr {
   }
 }
 object LoadLocal extends StatelessInstrCompanion1[Byte]
-final case class StoreLocal(index: Byte) extends OperandStackInstr {
+final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
   override def serialize(): ByteString = ByteString(StoreLocal.code, index)
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -277,8 +281,9 @@ final case class StoreLocal(index: Byte) extends OperandStackInstr {
 }
 object StoreLocal extends StatelessInstrCompanion1[Byte]
 
-sealed trait FieldInstr extends StatefulInstr
-final case class LoadField(index: Byte) extends FieldInstr {
+sealed trait FieldInstr extends StatefulInstr { self: GasSchedule =>
+}
+final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
   override def serialize(): ByteString = ByteString(LoadField.code, index)
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -288,7 +293,7 @@ final case class LoadField(index: Byte) extends FieldInstr {
   }
 }
 object LoadField extends StatefulInstrCompanion1[Byte]
-final case class StoreField(index: Byte) extends FieldInstr {
+final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
   override def serialize(): ByteString = ByteString(StoreField.code, index)
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -299,7 +304,7 @@ final case class StoreField(index: Byte) extends FieldInstr {
 }
 object StoreField extends StatefulInstrCompanion1[Byte]
 
-sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0
+sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0 with GasVeryLow
 
 case object Pop extends PureStackInstr {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -327,9 +332,10 @@ object Swap extends PureStackInstr {
   }
 }
 
-sealed trait ArithmeticInstr extends StatelessInstrCompanion0
+sealed trait ArithmeticInstr extends StatelessInstrCompanion0 { self: GasSchedule =>
+}
 
-sealed trait BinaryArithmeticInstr extends ArithmeticInstr {
+sealed trait BinaryArithmeticInstr extends ArithmeticInstr { self: GasSchedule =>
   protected def op(x: Val, y: Val): ExeResult[Val]
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -384,96 +390,96 @@ object BinaryArithmeticInstr {
       case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
     }
 }
-object I256Add extends BinaryArithmeticInstr {
+object I256Add extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.add(_))(x, y)
 }
-object I256Sub extends BinaryArithmeticInstr {
+object I256Sub extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.sub(_))(x, y)
 }
-object I256Mul extends BinaryArithmeticInstr {
+object I256Mul extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mul(_))(x, y)
 }
-object I256Div extends BinaryArithmeticInstr {
+object I256Div extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.div(_))(x, y)
 }
-object I256Mod extends BinaryArithmeticInstr {
+object I256Mod extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mod(_))(x, y)
 }
-object EqI256 extends BinaryArithmeticInstr {
+object EqI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.==(_))(x, y)
 }
-object NeI256 extends BinaryArithmeticInstr {
+object NeI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.!=(_))(x, y)
 }
-object LtI256 extends BinaryArithmeticInstr {
+object LtI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.<(_))(x, y)
 }
-object LeI256 extends BinaryArithmeticInstr {
+object LeI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.<=(_))(x, y)
 }
-object GtI256 extends BinaryArithmeticInstr {
+object GtI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.>(_))(x, y)
 }
-object GeI256 extends BinaryArithmeticInstr {
+object GeI256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(this, _.>=(_))(x, y)
 }
-object U256Add extends BinaryArithmeticInstr {
+object U256Add extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
 }
-object U256Sub extends BinaryArithmeticInstr {
+object U256Sub extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.sub(_))(x, y)
 }
-object U256Mul extends BinaryArithmeticInstr {
+object U256Mul extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mul(_))(x, y)
 }
-object U256Div extends BinaryArithmeticInstr {
+object U256Div extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.div(_))(x, y)
 }
-object U256Mod extends BinaryArithmeticInstr {
+object U256Mod extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
 }
-object EqU256 extends BinaryArithmeticInstr {
+object EqU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.==(_))(x, y)
 }
-object NeU256 extends BinaryArithmeticInstr {
+object NeU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.!=(_))(x, y)
 }
-object LtU256 extends BinaryArithmeticInstr {
+object LtU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.<(_))(x, y)
 }
-object LeU256 extends BinaryArithmeticInstr {
+object LeU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.<=(_))(x, y)
 }
-object GtU256 extends BinaryArithmeticInstr {
+object GtU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.>(_))(x, y)
 }
-object GeU256 extends BinaryArithmeticInstr {
+object GeU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
 }
 
-case object NotBool extends StatelessInstrCompanion0 {
+case object NotBool extends StatelessInstrCompanion0 with GasVeryLow {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool <- frame.popT[Val.Bool]()
@@ -481,7 +487,7 @@ case object NotBool extends StatelessInstrCompanion0 {
     } yield ()
   }
 }
-case object AndBool extends StatelessInstrCompanion0 {
+case object AndBool extends StatelessInstrCompanion0 with GasVeryLow {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popT[Val.Bool]()
@@ -490,7 +496,7 @@ case object AndBool extends StatelessInstrCompanion0 {
     } yield ()
   }
 }
-case object OrBool extends StatelessInstrCompanion0 {
+case object OrBool extends StatelessInstrCompanion0 with GasVeryLow {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popT[Val.Bool]()
@@ -501,6 +507,8 @@ case object OrBool extends StatelessInstrCompanion0 {
 }
 
 sealed trait ConversionInstr[R <: Val, U <: Val] extends StatelessInstrCompanion0 {
+  self: GasSchedule =>
+
   def converse(from: R): ExeResult[U]
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -512,50 +520,53 @@ sealed trait ConversionInstr[R <: Val, U <: Val] extends StatelessInstrCompanion
   }
 }
 
-case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] {
+case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] with GasVeryLow {
   override def converse(from: Val.Byte): ExeResult[Val.I256] = {
     Right(Val.I256(util.I256.from(from.v & 0xFFL)))
   }
 }
-case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] {
+case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] with GasVeryLow {
   override def converse(from: Val.Byte): ExeResult[Val.U256] = {
     Right(Val.U256(util.U256.unsafe(from.v & 0xFFL)))
   }
 }
 
-case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] {
+case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] with GasVeryLow {
   override def converse(from: Val.I256): ExeResult[Val.Byte] = {
     from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.Byte))
   }
 }
-case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] {
+case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] with GasVeryLow {
   override def converse(from: Val.I256): ExeResult[Val.U256] = {
     util.U256.fromI256(from.v).map(Val.U256.apply).toRight(InvalidConversion(from, Val.U256))
   }
 }
 
-case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] {
+case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] with GasVeryLow {
   override def converse(from: Val.U256): ExeResult[Val.Byte] = {
     from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.U256))
   }
 }
-case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] {
+case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryLow {
   override def converse(from: Val.U256): ExeResult[Val.I256] = {
     util.I256.fromU256(from.v).map(Val.I256.apply).toRight(InvalidConversion(from, Val.I256))
   }
 }
 
-sealed trait ObjectInstr   extends StatelessInstr
-sealed trait NewBooleanVec extends ObjectInstr
-sealed trait NewByteVec    extends ObjectInstr
-sealed trait NewI256Vec    extends ObjectInstr
-sealed trait NewU256Vec    extends ObjectInstr
-sealed trait NewByte256Vec extends ObjectInstr
+sealed trait ObjectInstr extends StatelessInstr { self: GasSchedule =>
+}
+sealed trait NewBooleanVec extends ObjectInstr { self: GasSchedule =>
+}
+sealed trait NewByteVec extends ObjectInstr { self: GasSchedule =>
+}
+sealed trait NewI256Vec extends ObjectInstr { self: GasSchedule =>
+}
+sealed trait NewU256Vec extends ObjectInstr { self: GasSchedule =>
+}
+sealed trait NewByte256Vec extends ObjectInstr { self: GasSchedule =>
+}
 
-sealed trait ControlInstr extends StatelessInstr
-sealed trait If           extends ControlInstr
-sealed trait IfElse       extends ControlInstr
-sealed trait DoWhile      extends ControlInstr
+sealed trait ControlInstr extends StatelessInstr with GasHigh
 
 final case class Forward(offset: Byte) extends ControlInstr {
   override def serialize(): ByteString = ByteString(Forward.code, offset)
@@ -714,14 +725,14 @@ final case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
 object IfGeU256 extends StatelessInstrCompanion1[Byte]
 
 sealed trait CallInstr
-final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr {
+final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr with GasCall {
   override def serialize(): ByteString = ByteString(CallLocal.code, index)
 
   // Implemented in frame instead
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallLocal extends StatelessInstrCompanion1[Byte]
-final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr {
+final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr with GasCall {
   override def serialize(): ByteString = ByteString(CallExternal.code, index)
 
   // Implemented in frame instead
@@ -729,7 +740,7 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
-sealed trait ReturnInstr extends StatelessInstr
+sealed trait ReturnInstr extends StatelessInstr with GasZero
 case object Return extends ReturnInstr with StatelessInstrCompanion0 {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val returnType = frame.method.returnType
@@ -741,11 +752,14 @@ case object Return extends ReturnInstr with StatelessInstrCompanion0 {
   }
 }
 
-sealed trait CryptoInstr   extends StatelessInstr
-sealed trait Signature     extends CryptoInstr
-sealed trait EllipticCurve extends CryptoInstr
+sealed trait CryptoInstr extends StatelessInstr { self: GasSchedule =>
+}
+sealed trait Signature extends CryptoInstr { self: GasSchedule =>
+}
+sealed trait EllipticCurve extends CryptoInstr { self: GasSchedule =>
+}
 
-sealed trait CheckEqT[T <: Val] extends CryptoInstr with StatelessInstrCompanion0 {
+sealed trait CheckEqT[T <: Val] extends CryptoInstr with StatelessInstrCompanion0 with GasVeryLow {
   def check(x: T, y: T): ExeResult[Unit] = {
     if (x == y) Right(()) else Left(EqualityFailed)
   }
@@ -771,7 +785,8 @@ case object CheckEqAddress extends CheckEqT[Val.Address]
 
 sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
     extends CryptoInstr
-    with StatelessInstrCompanion0 {
+    with StatelessInstrCompanion0
+    with GasHash {
   def convert(t: T): ByteString
 
   def hash(bs: ByteString): H
@@ -810,7 +825,7 @@ case object Keccak256ByteVec
     with HashAlg.ByteVecConvertor
     with HashAlg.Keccak256Hash
 
-case object CheckSignature extends Signature with StatelessInstrCompanion0 {
+case object CheckSignature extends Signature with StatelessInstrCompanion0 with GasSignature {
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txHash.bytes
     val signatures = frame.ctx.signatures
@@ -826,7 +841,7 @@ case object CheckSignature extends Signature with StatelessInstrCompanion0 {
   }
 }
 
-sealed trait AssetInstr extends StatefulInstr
+sealed trait AssetInstr extends StatefulInstr with GasBalance
 
 object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -970,7 +985,7 @@ object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
   }
 }
 
-object CreateContract extends StatefulInstrCompanion0 {
+object CreateContract extends StatefulInstrCompanion0 with GasCreate {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       fieldsRaw       <- frame.popT[Val.ByteVec]()
@@ -985,7 +1000,7 @@ object CreateContract extends StatefulInstrCompanion0 {
   }
 }
 
-object SelfAddress extends StatefulInstrCompanion0 {
+object SelfAddress extends StatefulInstrCompanion0 with GasVeryLow {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
@@ -994,7 +1009,7 @@ object SelfAddress extends StatefulInstrCompanion0 {
   }
 }
 
-object SelfTokenId extends StatefulInstrCompanion0 {
+object SelfTokenId extends StatefulInstrCompanion0 with GasVeryLow {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
@@ -1004,7 +1019,7 @@ object SelfTokenId extends StatefulInstrCompanion0 {
   }
 }
 
-object IssueToken extends StatefulInstrCompanion0 {
+object IssueToken extends StatefulInstrCompanion0 with GasBalance {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _           <- Either.cond(frame.method.isPayable, (), NonPayableFrame)

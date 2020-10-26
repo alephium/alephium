@@ -110,6 +110,10 @@ object U256 {
     new U256(value)
   }
 
+  def unsafe(value: Int): U256 = {
+    unsafe(value.toLong)
+  }
+
   def unsafe(value: Long): U256 = {
     assume(value >= 0)
     new U256(BigInteger.valueOf(value))
