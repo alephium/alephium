@@ -19,13 +19,13 @@ package org.alephium.protocol.vm
 trait CostStrategy {
   var gasRemaining: Int
 
-  def chargeGas(instr: GasSimple): ExeResult[Unit] = charge(instr.gas)
+  def chargeGas(instr: GasSimple): ExeResult[Unit] = chargeGas(instr.gas)
 
   def chargeGasWithSize(instr: GasFormula, size: Int): ExeResult[Unit] = {
-    charge(instr.gas(size))
+    chargeGas(instr.gas(size))
   }
 
-  private def charge(gas: Int): ExeResult[Unit] = {
+  def chargeGas(gas: Int): ExeResult[Unit] = {
     if (gasRemaining >= gas) {
       gasRemaining -= gas
       Right(())

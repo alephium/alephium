@@ -84,7 +84,10 @@ class VMSpec extends AlephiumSpec {
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = simpleScript(blockFlow, chainIndex, script)
-    val tx         = block.transactions.head
+    val tx = {
+      val txTemplate = block.transactions.head
+      txTemplate.copy(unsigned = txTemplate.unsigned.copy(gas = 1000000))
+    }
     val worldState = blockFlow.getBestCachedTrie(chainIndex.from).toOption.get
     StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get) is Left(StackOverflow)
   }

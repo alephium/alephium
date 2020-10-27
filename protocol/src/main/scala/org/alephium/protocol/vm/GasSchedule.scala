@@ -72,10 +72,6 @@ trait GasCall extends GasFormula {
   def gas(size: Int): Int = ??? // should call the companion object instead
 }
 
-object GasCall {
-  def stateless(): Int = 200
-
-  def statefulLocal(): Int = 200
-
-  def statefulExternal(): Int = 5000
+object GasSchedule {
+  val callGas: Int = 200
 }
