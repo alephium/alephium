@@ -250,7 +250,7 @@ object NonCoinbaseValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
-      val signatures = Stack.unsafe(tx.signatures.reverse, tx.signatures.length)
+      val signatures = Stack.unsafe(tx.inputSignatures.reverse, tx.inputSignatures.length)
       EitherF.foreachTry(tx.unsigned.inputs.indices) { idx =>
         val unlockScript = tx.unsigned.inputs(idx).unlockScript
         checkLockupScript(tx, preOutputs(idx).lockupScript, unlockScript, signatures)
