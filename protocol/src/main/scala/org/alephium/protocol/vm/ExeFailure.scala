@@ -68,3 +68,4 @@ case object InvalidOutputBalances                              extends ExeFailur
 case object InvalidTokenId                                     extends ExeFailure
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
+case object ContractPoolOverflow                               extends ExeFailure

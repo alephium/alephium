@@ -25,6 +25,10 @@ trait CostStrategy {
     chargeGas(instr.gas(size))
   }
 
+  def chargeContractLoad(): ExeResult[Unit] = chargeGas(GasSchedule.contractLoadGas)
+
+  def chargeContractUpdate(): ExeResult[Unit] = chargeGas(GasSchedule.contractUpdateGas)
+
   def chargeGas(gas: Int): ExeResult[Unit] = {
     if (gasRemaining >= gas) {
       gasRemaining -= gas

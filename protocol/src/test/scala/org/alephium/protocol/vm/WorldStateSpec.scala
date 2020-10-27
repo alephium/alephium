@@ -48,8 +48,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
       val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
       val contractKey                                      = contractOutputRef.key
-      val contractObj =
-        StatefulContractObject(code, state.toArray, contractOutputRef.key)
+
+      val contractObj = StatefulContractObject(code, state, state.toArray, contractOutputRef.key)
 
       worldState.getOutput(assetOutputRef).isLeft is true
       worldState.getOutput(contractOutputRef).isLeft is true

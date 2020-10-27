@@ -71,38 +71,33 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
     for {
       _ <- frameStack.pop()
       _ <- frameStack.top match {
-        case Some(nextFrame) =>
-          for {
-            _ <- nextFrame.reloadFields()
-            _ <- checkBalances(currentFrame, nextFrame)
-          } yield ()
-        case None =>
-          checkFinalBalances(currentFrame)
+        case Some(nextFrame) => switchFrame(currentFrame, nextFrame)
+        case None            => completeLastFrame(currentFrame)
       }
     } yield ()
   }
 
-  protected def checkBalances(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
+  protected def switchFrame(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
 
-  protected def checkFinalBalances(lastFrame: Frame[Ctx]): ExeResult[Unit]
+  protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
 final class StatelessVM(ctx: StatelessContext,
                         frameStack: Stack[Frame[StatelessContext]],
                         operandStack: Stack[Val])
     extends VM(ctx, frameStack, operandStack) {
-  protected def checkBalances(currentFrame: Frame[StatelessContext],
-                              nextFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+  protected def switchFrame(currentFrame: Frame[StatelessContext],
+                            nextFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 
-  protected def checkFinalBalances(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+  protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
 
 final class StatefulVM(ctx: StatefulContext,
                        frameStack: Stack[Frame[StatefulContext]],
                        operandStack: Stack[Val])
     extends VM(ctx, frameStack, operandStack) {
-  protected def checkBalances(currentFrame: Frame[StatefulContext],
-                              nextFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+  protected def switchFrame(currentFrame: Frame[StatefulContext],
+                            nextFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     if (currentFrame.method.isPayable) {
       val resultOpt = for {
         currentBalances <- currentFrame.balanceStateOpt
@@ -134,7 +129,14 @@ final class StatefulVM(ctx: StatefulContext,
     iter(0)
   }
 
-  protected def checkFinalBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+  protected def completeLastFrame(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    for {
+      _ <- ctx.commitContractStates()
+      _ <- cleanBalances(lastFrame)
+    } yield ()
+  }
+
+  private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     if (lastFrame.method.isPayable) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
