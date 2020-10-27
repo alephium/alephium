@@ -232,12 +232,8 @@ object StatefulVM {
   def runTxScript(worldState: WorldState,
                   tx: TransactionAbstract,
                   script: StatefulScript): ExeResult[TxScriptExecution] = {
-    val context = if (script.entryMethod.isPayable) {
-      StatefulContext.payable(tx, worldState)
-    } else {
-      StatefulContext.nonPayable(tx, worldState)
-    }
-    val obj = script.toObject
+    val context = StatefulContext(tx, worldState)
+    val obj     = script.toObject
     execute(context, obj, AVector.empty).map(
       worldState =>
         TxScriptExecution(AVector.from(context.contractInputs),

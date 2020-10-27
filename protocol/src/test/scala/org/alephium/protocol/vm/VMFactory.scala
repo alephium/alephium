@@ -33,7 +33,4 @@ trait VMFactory extends StorageFixture {
 
   lazy val statelessContext: StatelessContext =
     StatelessContext(Hash.zero, minimalGas, Stack.ofCapacity[Signature](0))
-
-  lazy val statefulContext: StatefulContext =
-    StatefulContext.nonPayable(Hash.zero, minimalGas, cachedWorldState)
 }

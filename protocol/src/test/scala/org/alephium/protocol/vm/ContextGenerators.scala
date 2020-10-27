@@ -16,13 +16,15 @@
 
 package org.alephium.protocol.vm
 
+import org.alephium.protocol
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{minimalGas, GroupIndex, NoIndexModelGenerators}
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareContract(contract: StatefulContract,
-                      fields: AVector[Val]): (StatefulContractObject, StatefulContext) = {
+                      fields: AVector[Val],
+                      gasLimit: Int = minimalGas): (StatefulContractObject, StatefulContext) = {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
     val contractOutput    = contractOutputGen(groupIndex)().sample.get
@@ -31,8 +33,16 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
         .createContract(contract, fields, contractOutputRef, contractOutput)
         .toOption
         .get
-    val obj     = contract.toObject(contractOutputRef.key, fields)
-    val context = StatefulContext.nonPayable(Hash.zero, minimalGas, worldStateNew)
+    val obj = contract.toObject(contractOutputRef.key, fields)
+    val context = new StatefulContext {
+      override var worldState: WorldState                        = worldStateNew
+      override def outputBalances: Frame.Balances                = ???
+      override def nextOutputIndex: Int                          = ???
+      override def txHash: Hash                                  = Hash.zero
+      override def signatures: Stack[protocol.Signature]         = Stack.ofCapacity(0)
+      override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
+      override var gasRemaining: Int                             = gasLimit
+    }
     obj -> context
   }
 }

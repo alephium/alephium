@@ -62,7 +62,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
     val contract = StatefulContract(AVector.empty, methods = AVector(method))
     val (obj, context) =
-      prepareContract(contract, AVector[Val]())
+      prepareContract(contract, AVector[Val](), 1000000)
     StatefulVM.execute(context, obj, AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1)))) is Left(
       StackOverflow)
   }
