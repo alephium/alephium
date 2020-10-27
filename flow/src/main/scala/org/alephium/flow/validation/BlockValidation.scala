@@ -90,7 +90,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.isEmpty && unsigned.fixedOutputs.length == 1 && coinbase.generatedOutputs.isEmpty && coinbase.signatures.isEmpty)
+    if (unsigned.inputs.isEmpty &&
+        unsigned.fixedOutputs.length == 1 &&
+        coinbase.generatedOutputs.isEmpty &&
+        coinbase.inputSignatures.isEmpty &&
+        coinbase.contractSignatures.isEmpty)
       validBlock(())
     else invalidBlock(InvalidCoinbase)
   }

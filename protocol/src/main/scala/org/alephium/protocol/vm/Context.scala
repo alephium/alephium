@@ -120,7 +120,7 @@ object StatefulContext {
 
     override var gasRemaining: Int = tx.unsigned.gas
 
-    override val signatures: Stack[Signature] = Stack.popOnly(tx.signatures)
+    override val signatures: Stack[Signature] = Stack.popOnly(tx.contractSignatures)
 
     override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
