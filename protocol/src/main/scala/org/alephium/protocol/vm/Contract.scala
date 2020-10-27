@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.protocol.model.ContractId
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -76,7 +77,7 @@ sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
 final case class StatelessScript(methods: AVector[Method[StatelessContext]])
     extends Script[StatelessContext] {
   override def toObject: ScriptObj[StatelessContext] = {
-    new StatelessScriptObject(this)
+    StatelessScriptObject(this)
   }
 }
 
@@ -121,11 +122,11 @@ final case class StatefulContract(
   override lazy val hash: Hash = _getHash
 
   def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
-    StatefulContractObject(this, contractState.fields.toArray, address)
+    StatefulContractObject(this, contractState.fields, contractState.fields.toArray, address)
   }
 
   def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
-    StatefulContractObject(this, fields.toArray, address)
+    StatefulContractObject(this, fields, fields.toArray, address)
   }
 }
 
@@ -140,9 +141,6 @@ sealed trait ContractObj[Ctx <: Context] {
   def addressOpt: Option[Hash]
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
-
-  def reloadFields(ctx: Ctx): ExeResult[Unit]
-  def commitFields(ctx: Ctx): ExeResult[Unit]
 
   def getMethod(index: Int): Option[Method[Ctx]] = {
     code.methods.get(index)
@@ -231,9 +229,6 @@ sealed trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
 }
 
 final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext] {
-  def commitFields(ctx: StatelessContext): ExeResult[Unit] = Right(())
-  def reloadFields(ctx: StatelessContext): ExeResult[Unit] = Right(())
-
   def buildNonPayableFrame(ctx: StatelessContext,
                            obj: ContractObj[StatelessContext],
                            method: Method[StatelessContext],
@@ -253,9 +248,6 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 }
 
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext] {
-  def commitFields(ctx: StatefulContext): ExeResult[Unit] = Right(())
-  def reloadFields(ctx: StatefulContext): ExeResult[Unit] = Right(())
-
   def buildNonPayableFrame(ctx: StatefulContext,
                            obj: ContractObj[StatefulContext],
                            method: Method[StatefulContext],
@@ -275,26 +267,13 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
 }
 
 final case class StatefulContractObject(code: StatefulContract,
+                                        initialFields: AVector[Val],
                                         fields: mutable.ArraySeq[Val],
-                                        address: Hash)
+                                        address: ContractId)
     extends ContractObj[StatefulContext] {
-  override def addressOpt: Option[Hash] = Some(address)
+  override def addressOpt: Option[ContractId] = Some(address)
 
-  def commitFields(ctx: StatefulContext): ExeResult[Unit] = {
-    ctx.updateState(address, AVector.from(fields))
-  }
-
-  def reloadFields(ctx: StatefulContext): ExeResult[Unit] = {
-    ctx.worldState.getContractState(address) match {
-      case Right(state) =>
-        assume(state.fields.length == fields.length)
-        fields.indices.foreach { i =>
-          fields(i) = state.fields(i)
-        }
-        Right(())
-      case Left(error) => Left(IOErrorLoadContract(error))
-    }
-  }
+  def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
 
   def buildNonPayableFrame(ctx: StatefulContext,
                            obj: ContractObj[StatefulContext],

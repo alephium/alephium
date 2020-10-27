@@ -51,7 +51,7 @@ object StatelessContext {
   }
 }
 
-trait StatefulContext extends StatelessContext {
+trait StatefulContext extends StatelessContext with ContractPool {
   var worldState: WorldState
 
   def outputBalances: Frame.Balances
@@ -105,18 +105,6 @@ trait StatefulContext extends StatelessContext {
       .map(updateWorldState)
       .left
       .map(IOErrorUpdateState)
-  }
-
-  def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
-
-  def updateState(key: Hash, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContract(key, state) match {
-      case Left(error) =>
-        Left(IOErrorUpdateState(error))
-      case Right(state) =>
-        updateWorldState(state)
-        Right(())
-    }
   }
 }
 

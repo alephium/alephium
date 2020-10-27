@@ -73,5 +73,7 @@ trait GasCall extends GasFormula {
 }
 
 object GasSchedule {
-  val callGas: Int = 200
+  val callGas: Int           = 200
+  val contractLoadGas: Int   = 800
+  val contractUpdateGas: Int = 5000
 }

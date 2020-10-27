@@ -81,8 +81,6 @@ abstract class Frame[Ctx <: Context] {
     if (fields.isDefinedAt(index)) Right(fields(index)) else Left(InvalidFieldIndex)
   }
 
-  def reloadFields(): ExeResult[Unit] = obj.reloadFields(ctx)
-
   def setField(index: Int, v: Val): ExeResult[Unit] = {
     val fields = obj.fields
     if (!fields.isDefinedAt(index)) {
@@ -208,10 +206,7 @@ final class StatefulFrame(
   override def externalMethodFrame(contractKey: Hash,
                                    index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj <- ctx.worldState
-        .getContractObj(contractKey)
-        .left
-        .map[ExeFailure](IOErrorLoadContract)
+      contractObj        <- ctx.loadContract(contractKey)
       method             <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
       _                  <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
       args               <- opStack.pop(method.argsType.length)
@@ -226,7 +221,6 @@ final class StatefulFrame(
     advancePC()
     for {
       _           <- ctx.chargeGas(GasSchedule.callGas)
-      _           <- obj.commitFields(ctx)
       byteVec     <- popT[Val.ByteVec]()
       contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
       newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
@@ -259,7 +253,6 @@ final class StatefulFrame(
   private def runReturn(): ExeResult[Option[Frame[StatefulContext]]] =
     for {
       _ <- Return.runWith(this)
-      _ <- obj.commitFields(ctx)
     } yield None
 }
 
