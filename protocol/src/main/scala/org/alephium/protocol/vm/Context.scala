@@ -121,26 +121,10 @@ trait StatefulContext extends StatelessContext {
 }
 
 object StatefulContext {
-  def payable(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
-    new Payable(tx, worldState)
+  def apply(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
+    new Impl(tx, worldState)
 
-  def nonPayable(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
-    new NonPayable(tx.hash, tx.unsigned.gas, Stack.ofCapacity(0), worldState)
-
-  def nonPayable(txHash: Hash, txGas: Int, worldState: WorldState): StatefulContext =
-    new NonPayable(txHash, txGas, Stack.ofCapacity(0), worldState)
-
-  final class NonPayable(val txHash: Hash,
-                         var gasRemaining: Int,
-                         val signatures: Stack[Signature],
-                         var worldState: WorldState)
-      extends StatefulContext {
-    override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
-    override def outputBalances: Frame.Balances                = ??? // should not be used
-    override def nextOutputIndex: Int                          = ??? // should not be used
-  }
-
-  final class Payable(val tx: TransactionAbstract, val initWorldState: WorldState)
+  final class Impl(val tx: TransactionAbstract, val initWorldState: WorldState)
       extends StatefulContext {
     override var worldState: WorldState = initWorldState
 
@@ -152,14 +136,20 @@ object StatefulContext {
 
     override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
-    override def getInitialBalances: ExeResult[Frame.Balances] = {
-      for {
-        preOutputs <- initWorldState.getPreOutputsForVM(tx).left.map[ExeFailure](IOErrorLoadOutputs)
-        balances <- Frame.Balances
-          .from(preOutputs, tx.unsigned.fixedOutputs)
-          .toRight(InvalidBalances)
-      } yield balances
-    }
+    override def getInitialBalances: ExeResult[Frame.Balances] =
+      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
+        for {
+          preOutputs <- initWorldState
+            .getPreOutputsForVM(tx)
+            .left
+            .map[ExeFailure](IOErrorLoadOutputs)
+          balances <- Frame.Balances
+            .from(preOutputs, tx.unsigned.fixedOutputs)
+            .toRight(InvalidBalances)
+        } yield balances
+      } else {
+        Left(NonPayableFrame)
+      }
 
     override val outputBalances: Frame.Balances = Frame.Balances.empty
   }
