@@ -227,7 +227,8 @@ object StatelessVM {
 }
 
 object StatefulVM {
-  final case class TxScriptExecution(contractInputs: AVector[ContractOutputRef],
+  final case class TxScriptExecution(gasUsed: Int,
+                                     contractInputs: AVector[ContractOutputRef],
                                      generatedOutputs: AVector[TxOutput],
                                      worldState: WorldState)
 
@@ -238,7 +239,8 @@ object StatefulVM {
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map(
       worldState =>
-        TxScriptExecution(AVector.from(context.contractInputs),
+        TxScriptExecution(tx.unsigned.gas - context.gasRemaining,
+                          AVector.from(context.contractInputs),
                           AVector.from(context.generatedOutputs),
                           worldState))
   }

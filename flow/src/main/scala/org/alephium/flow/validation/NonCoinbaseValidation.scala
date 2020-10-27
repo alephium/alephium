@@ -329,7 +329,7 @@ object NonCoinbaseValidation {
           case Some(script) =>
             StatefulVM.runTxScript(worldState, tx, script) match {
               case Right(
-                  StatefulVM.TxScriptExecution(contractInputs, generatedOutputs, newState)) =>
+                  StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs, newState)) =>
                 if (contractInputs != tx.contractInputs) invalidTx(InvalidContractInputs)
                 else if (generatedOutputs != tx.generatedOutputs) invalidTx(InvalidGeneratedOutputs)
                 else validTx(newState)

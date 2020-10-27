@@ -22,13 +22,17 @@ import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import org.alephium.crypto.{Blake2b, Keccak256, Sha256}
+import org.alephium.crypto.{Blake2b, Keccak256, SecP256K1, Sha256}
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
-class HashBench {
-  val data: ByteString = ByteString.fromArrayUnsafe(Array.fill(1 << 10)(0))
+class CryptoBench {
+  val data: ByteString = Blake2b.generate.bytes
+
+  private val (privateKey, publicKey) = SecP256K1.generatePriPub()
+  private val signature               = SecP256K1.sign(data, privateKey)
+  require(SecP256K1.verify(data, signature, publicKey))
 
   @Benchmark
   def black2b(bh: Blackhole): Unit = {
@@ -43,5 +47,10 @@ class HashBench {
   @Benchmark
   def sha256(bh: Blackhole): Unit = {
     bh.consume(Sha256.hash(data))
+  }
+
+  @Benchmark
+  def secp256k1(bh: Blackhole): Unit = {
+    bh.consume(SecP256K1.verify(data, signature, publicKey))
   }
 }
