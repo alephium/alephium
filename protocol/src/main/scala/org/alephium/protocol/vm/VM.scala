@@ -179,19 +179,28 @@ final class StatefulVM(ctx: StatefulContext,
 
 object StatelessVM {
   def runAssetScript(txHash: Hash,
+                     initialGas: Int,
                      script: StatelessScript,
                      args: AVector[Val],
                      signature: Signature): ExeResult[Unit] = {
-    val context = StatelessContext(txHash, signature)
+    val context = StatelessContext(txHash, initialGas, signature)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def runAssetScript(txHash: Hash,
+  def runAssetScript(tx: TransactionAbstract,
                      script: StatelessScript,
                      args: AVector[Val],
                      signatures: Stack[Signature]): ExeResult[Unit] = {
-    val context = StatelessContext(txHash, signatures)
+    runAssetScript(tx.hash, tx.unsigned.gas, script, args, signatures)
+  }
+
+  def runAssetScript(txHash: Hash,
+                     initialGas: Int,
+                     script: StatelessScript,
+                     args: AVector[Val],
+                     signatures: Stack[Signature]): ExeResult[Unit] = {
+    val context = StatelessContext(txHash, initialGas, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }
@@ -226,7 +235,7 @@ object StatefulVM {
     val context = if (script.entryMethod.isPayable) {
       StatefulContext.payable(tx, worldState)
     } else {
-      StatefulContext.nonPayable(tx.hash, worldState)
+      StatefulContext.nonPayable(tx, worldState)
     }
     val obj = script.toObject
     execute(context, obj, AVector.empty).map(

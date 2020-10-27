@@ -314,7 +314,7 @@ object NonCoinbaseValidation {
         script: StatelessScript,
         params: AVector[Val],
         signatures: Stack[Signature]): TxValidationResult[Unit] = {
-      StatelessVM.runAssetScript(tx.hash, script, params, signatures) match {
+      StatelessVM.runAssetScript(tx, script, params, signatures) match {
         case Right(_) => validTx(()) // TODO: handle returns
         case Left(e)  => invalidTx(InvalidUnlockScript(e))
       }

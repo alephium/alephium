@@ -16,14 +16,20 @@
 
 package org.alephium.protocol.vm
 
-sealed trait GasSchedule
+trait GasSchedule {
+  protected def typeHint(): Unit // for type safety
+}
 
-sealed trait GasSimple extends GasSchedule {
+trait GasSimple extends GasSchedule {
+  protected def typeHint(): Unit = ()
+
   def gas: Int
 }
 
-sealed trait GasFormula extends GasSchedule {
-  def gas(count: Int): Int
+trait GasFormula extends GasSchedule {
+  protected def typeHint(): Unit = ()
+
+  def gas(size: Int): Int
 }
 
 trait GasZero extends GasSimple {
@@ -63,7 +69,7 @@ trait GasBalance extends GasSimple {
 }
 
 trait GasCall extends GasFormula {
-  def gas(count: Int): Int = ??? // should call the companion object instead
+  def gas(size: Int): Int = ??? // should call the companion object instead
 }
 
 object GasCall {

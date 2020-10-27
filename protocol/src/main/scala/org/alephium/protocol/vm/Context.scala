@@ -28,32 +28,33 @@ trait BlockEnv
 trait TxEnv
 trait ContractEnv
 
-trait Context {
+trait Context extends CostStrategy {
   def txHash: Hash
   def signatures: Stack[Signature]
   def getInitialBalances: ExeResult[Frame.Balances]
-  def outputBalances: Frame.Balances
 }
 
 trait StatelessContext extends Context
 
 object StatelessContext {
-  def apply(txHash: Hash, signature: Signature): StatelessContext = {
+  def apply(txHash: Hash, txGas: Int, signature: Signature): StatelessContext = {
     val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    apply(txHash, stack)
+    apply(txHash, txGas, stack)
   }
 
-  def apply(txHash: Hash, signatures: Stack[Signature]): StatelessContext =
-    new Impl(txHash, signatures)
+  def apply(txHash: Hash, txGas: Int, signatures: Stack[Signature]): StatelessContext =
+    new Impl(txHash, signatures, txGas)
 
-  final class Impl(val txHash: Hash, val signatures: Stack[Signature]) extends StatelessContext {
+  final class Impl(val txHash: Hash, val signatures: Stack[Signature], var gasRemaining: Int)
+      extends StatelessContext {
     override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
-    override def outputBalances: Frame.Balances                = ??? // should not be used
   }
 }
 
 trait StatefulContext extends StatelessContext {
   var worldState: WorldState
+
+  def outputBalances: Frame.Balances
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput]        = ArrayBuffer.empty
   lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
@@ -123,10 +124,14 @@ object StatefulContext {
   def payable(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
     new Payable(tx, worldState)
 
-  def nonPayable(txHash: Hash, worldState: WorldState): StatefulContext =
-    new NonPayable(txHash, Stack.ofCapacity(0), worldState)
+  def nonPayable(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
+    new NonPayable(tx.hash, tx.unsigned.gas, Stack.ofCapacity(0), worldState)
+
+  def nonPayable(txHash: Hash, txGas: Int, worldState: WorldState): StatefulContext =
+    new NonPayable(txHash, txGas, Stack.ofCapacity(0), worldState)
 
   final class NonPayable(val txHash: Hash,
+                         var gasRemaining: Int,
                          val signatures: Stack[Signature],
                          var worldState: WorldState)
       extends StatefulContext {
@@ -140,6 +145,8 @@ object StatefulContext {
     override var worldState: WorldState = initWorldState
 
     override def txHash: Hash = tx.hash
+
+    override var gasRemaining: Int = tx.unsigned.gas
 
     override val signatures: Stack[Signature] = Stack.popOnly(tx.signatures)
 

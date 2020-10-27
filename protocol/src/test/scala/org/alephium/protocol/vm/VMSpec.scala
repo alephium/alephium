@@ -21,6 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol
 import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.model.minimalGas
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -117,6 +118,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     def mockContext(): StatefulContext = new StatefulContext {
       var worldState: WorldState                = cachedWorldState
       def txHash: Hash                          = Hash.zero
+      var gasRemaining                          = minimalGas
       def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
       def nextOutputIndex: Int                  = 0
 
