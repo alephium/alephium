@@ -100,6 +100,14 @@ abstract class Frame[Ctx <: Context] {
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
 
+  def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
+    advancePC()
+    for {
+      _     <- ctx.chargeGas(GasSchedule.callGas)
+      frame <- methodFrame(Bytes.toPosInt(index))
+    } yield Some(frame)
+  }
+
   def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]]
 
   def execute(): ExeResult[Option[Frame[Ctx]]]
@@ -130,12 +138,9 @@ final class StatelessFrame(
   override def execute(): ExeResult[Option[Frame[StatelessContext]]] = {
     if (pc < pcMax) {
       method.instrs(pc) match {
-        case CallLocal(index) =>
-          advancePC()
-          methodFrame(Bytes.toPosInt(index)).map(Some.apply)
-        case Return =>
-          runReturn()
-        case instr =>
+        case CallLocal(index) => callLocal(index)
+        case Return           => runReturn()
+        case instr            =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
@@ -217,24 +222,25 @@ final class StatefulFrame(
     }
   }
 
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatefulContext]]] = {
+    advancePC()
+    for {
+      _           <- ctx.chargeGas(GasSchedule.callGas)
+      _           <- obj.commitFields(ctx)
+      byteVec     <- popT[Val.ByteVec]()
+      contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
+      newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
+    } yield Some(newFrame)
+  }
+
   @tailrec
   override def execute(): ExeResult[Option[Frame[StatefulContext]]] = {
     if (pc < pcMax) {
       method.instrs(pc) match {
-        case CallLocal(index) =>
-          advancePC()
-          methodFrame(Bytes.toPosInt(index)).map(Some.apply)
-        case CallExternal(index) =>
-          advancePC()
-          for {
-            _           <- obj.commitFields(ctx)
-            byteVec     <- popT[Val.ByteVec]()
-            contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
-            newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
-          } yield Some(newFrame)
-        case Return =>
-          runReturn()
-        case instr =>
+        case CallLocal(index)    => callLocal(index)
+        case CallExternal(index) => callExternal(index)
+        case Return              => runReturn()
+        case instr               =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
