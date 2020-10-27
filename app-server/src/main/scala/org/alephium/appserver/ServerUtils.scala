@@ -27,10 +27,11 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
-import org.alephium.protocol.model.{ChainIndex, Transaction, UnsignedTransaction}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.serde.deserialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, AVector, Hex, U256}
 
 object ServerUtils {
@@ -205,5 +206,133 @@ object ServerUtils {
       Right(true)
     }
 
+  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[Val]] = {
+    str match {
+      case None => Right(AVector[Val](Val.U256(U256.Zero)))
+      case Some(state) =>
+        val res = Compiler.compileState(state)
+        res
+    }
+  }
+
+  private def buildContract(contract: StatefulContract,
+                            address: Address,
+                            initialState: AVector[Val],
+                            alfAmount: U256): Either[Compiler.Error, StatefulScript] = {
+
+    val codeRaw  = Hex.toHexString(serialize(contract))
+    val stateRaw = Hex.toHexString(serialize(initialState))
+
+    val scriptRaw = s"""
+      |TxScript Main {
+      |  pub payable fn main() -> () {
+      |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+      |    createContract!(#$codeRaw, #$stateRaw)
+      |  }
+      |}
+      |""".stripMargin
+
+    Compiler.compileTxScript(scriptRaw)
+  }
+
+  private def unignedTxFromScript(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      lockupScript: LockupScript,
+      publicKey: PublicKey
+  ): ExeResult[UnsignedTransaction] = {
+    val unlockScript = UnlockScript.p2pkh(publicKey)
+    for {
+      balances <- blockFlow.getUtxos(lockupScript).left.map[ExeFailure](IOErrorLoadOutputs)
+      inputs = balances.map(_._1).map(TxInput(_, unlockScript))
+    } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
+  }
+
+  private def txFromScript(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      fromGroup: GroupIndex,
+      contractTx: TransactionAbstract
+  ): ExeResult[Transaction] = {
+    for {
+      worldState <- blockFlow
+        .getBestCachedTrie(fromGroup)
+        .left
+        .map[ExeFailure](error => NonCategorized(error.getMessage))
+      result <- StatefulVM.runTxScript(worldState, contractTx, script, contractTx.unsigned.startGas)
+    } yield {
+      val contractInputs  = result.contractInputs
+      val generateOutputs = result.generatedOutputs
+      Transaction(contractTx.unsigned,
+                  contractInputs,
+                  generateOutputs,
+                  contractTx.inputSignatures,
+                  contractTx.contractSignatures)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def createContract(blockFlow: BlockFlow, query: CreateContract)(
+      implicit groupConfig: GroupConfig): FutureTry[CreateContractResult] = {
+    Future.successful((for {
+      codeBytestring <- Hex
+        .from(query.code)
+        .toRight(Response.failed("Cannot decode code hex string"))
+      script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
+        Response.failed(serdeError.getMessage))
+      utx <- unignedTxFromScript(blockFlow,
+                                 script,
+                                 LockupScript.p2pkh(query.fromKey),
+                                 query.fromKey).left.map(error => Response.failed(error.toString))
+    } yield utx).map(CreateContractResult.from))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def sendContract(blockFlow: BlockFlow,
+                   txHandler: ActorRefT[TxHandler.Command],
+                   query: SendContract)(implicit groupConfig: GroupConfig,
+                                        askTimeout: Timeout,
+                                        executionContext: ExecutionContext): FutureTry[TxResult] = {
+
+    (for {
+      codeBytestring <- Hex
+        .from(query.code)
+        .toRight(Response.failed("Cannot decode code hex string"))
+      script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
+        Response.failed(serdeError.getMessage))
+      txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
+      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
+        Response.failed(serdeError.getMessage))
+      group <- GroupIndex.from(query.fromGroup).toRight(Response.failed("Invalid chain index"))
+      transaction <- txFromScript(
+        blockFlow,
+        script,
+        group,
+        TransactionTemplate(unsignedTx,
+                            AVector.fill(unsignedTx.inputs.length)(query.signature),
+                            AVector.empty)).left
+        .map(error => Response.failed(error.toString))
+    } yield transaction) match {
+      case Left(error)        => Future.successful(Left(error))
+      case Right(transaction) => ServerUtils.publishTx(txHandler, transaction)
+    }
+  }
+
+  def compile(query: Compile): FutureTry[CompileResult] = {
+    Future.successful(
+      (query.`type` match {
+        case "script" =>
+          Compiler.compileTxScript(query.code)
+        case "contract" =>
+          for {
+            code   <- Compiler.compileContract(query.code)
+            state  <- parseState(query.state)
+            script <- buildContract(code, query.address, state, U256.One)
+          } yield script
+      }).map(script => CompileResult(Hex.toHexString(serialize(script))))
+        .left
+        .map(error => Response.failed(error.toString))
+    )
+  }
   private def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 }

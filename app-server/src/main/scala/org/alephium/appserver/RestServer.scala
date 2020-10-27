@@ -139,6 +139,18 @@ class RestServer(
       }
   }
 
+  private val sendContractRoute = sendContract.toRoute { query =>
+    ServerUtils.sendContract(blockFlow, txHandler, query)
+  }
+
+  private val createContractRoute = createContract.toRoute { query =>
+    ServerUtils.createContract(blockFlow, query)
+  }
+
+  private val compileRoute = compile.toRoute { query =>
+    ServerUtils.compile(query)
+  }
+
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
     getSelfClique,
@@ -153,6 +165,9 @@ class RestServer(
     listUnconfirmedTransactions,
     createTransaction,
     sendTransactionLogic.endpoint,
+    sendContract,
+    compile,
+    createContract,
     minerActionLogic.endpoint
   )
 
@@ -175,6 +190,9 @@ class RestServer(
       createTransactionRoute ~
       sendTransactionLogic.toRoute ~
       minerActionLogic.toRoute ~
+      sendContractRoute ~
+      compileRoute ~
+      createContractRoute ~
       swaggerUIRoute
 
   val route: Route =

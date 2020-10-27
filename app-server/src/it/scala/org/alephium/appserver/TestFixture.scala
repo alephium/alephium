@@ -313,6 +313,18 @@ trait TestFixtureLike
     )
   }
 
+  def compileFilang(code: String) = {
+    httpPost(s"/compile", Some(code))
+  }
+
+  def createContract(query: String) = {
+    httpPost(s"/unsigned-contracts", Some(query))
+  }
+
+  def sendContract(contract: String) = {
+    httpPost(s"/contracts", Some(contract))
+  }
+
   val startMining = httpPost("/miners?action=start-mining")
   val stopMining  = httpPost("/miners?action=stop-mining")
 

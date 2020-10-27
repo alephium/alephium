@@ -168,4 +168,25 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
       .description("Execute an action on miners")
+
+  val compile: BaseEndpoint[Compile, CompileResult] =
+    baseEndpoint.post
+      .in("compile")
+      .in(jsonBody[Compile])
+      .out(jsonBody[CompileResult])
+      .description("Compile a smart contract")
+
+  val createContract: BaseEndpoint[CreateContract, CreateContractResult] =
+    baseEndpoint.post
+      .in("unsigned-contracts")
+      .in(jsonBody[CreateContract])
+      .out(jsonBody[CreateContractResult])
+      .description("Create an unsigned contracts")
+
+  val sendContract: BaseEndpoint[SendContract, TxResult] =
+    baseEndpoint.post
+      .in("contracts")
+      .in(jsonBody[SendContract])
+      .out(jsonBody[TxResult])
+      .description("Compile a smart contract")
 }
