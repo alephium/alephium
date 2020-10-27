@@ -33,38 +33,67 @@ trait GasFormula extends GasSchedule {
 }
 
 trait GasZero extends GasSimple {
+  def gas: Int = GasZero.gas
+}
+object GasZero {
   val gas: Int = 0
 }
 
 trait GasVeryLow extends GasSimple {
+  def gas: Int = GasVeryLow.gas
+}
+object GasVeryLow {
   val gas: Int = 3
 }
 
 trait GasLow extends GasSimple {
+  def gas: Int = GasLow.gas
+}
+object GasLow {
   val gas: Int = 5
 }
 
 trait GasMid extends GasSimple {
+  def gas: Int = GasMid.gas
+}
+object GasMid {
   val gas: Int = 8
 }
 
 trait GasHigh extends GasSimple {
+  def gas: Int = GasHigh.gas
+}
+object GasHigh {
   val gas: Int = 10
 }
 
 trait GasHash extends GasFormula {
-  def gas(inputLength: Int): Int = (30 + 6 * ((inputLength + 3) / 8))
+  def gas(inputLength: Int): Int =
+    GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8)
+}
+object GasHash {
+  val baseGas: Int         = 30
+  val extraGasPerWord: Int = 6
 }
 
 trait GasSignature extends GasSimple {
-  val gas: Int = 500 // TODO: bench this
+  def gas: Int = GasSignature.gas
+}
+object GasSignature {
+  val gas: Int = 10000 // TODO: bench this
 }
 
 trait GasCreate extends GasSimple {
+  def gas: Int = GasCreate.gas
+}
+object GasCreate {
   val gas: Int = 32000
 }
 
 trait GasBalance extends GasSimple {
+  def gas: Int = GasBalance.gas
+}
+object GasBalance {
   val gas: Int = 50
 }
 
