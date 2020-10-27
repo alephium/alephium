@@ -19,6 +19,7 @@ package org.alephium.protocol.vm.lang
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.model.minimalGas
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -196,7 +197,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val args = AVector[Val](Val.ByteVec.from(pubKey))
     StatelessVM
-      .runAssetScript(Hash.zero, script, args, signature)
+      .runAssetScript(Hash.zero, minimalGas, script, args, signature)
       .isRight is true
   }
 

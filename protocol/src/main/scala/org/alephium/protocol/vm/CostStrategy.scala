@@ -14,17 +14,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.protocol.vm
 
-import org.alephium.util.Bytes.byteStringOrdering
+trait CostStrategy {
+  var gasRemaining: Int
 
-package object model {
-  val cliqueIdLength: Int = PublicKey.length
+  def chargeGas(instr: GasSimple): ExeResult[Unit] = charge(instr.gas)
 
-  val minimalGas: Int = 100000
+  def chargeGasWithSize(instr: GasFormula, size: Int): ExeResult[Unit] = {
+    charge(instr.gas(size))
+  }
 
-  type TokenId    = Hash
-  type ContractId = Hash
-
-  implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
+  private def charge(gas: Int): ExeResult[Unit] = {
+    if (gasRemaining >= gas) {
+      gasRemaining -= gas
+      Right(())
+    } else Left(OutOfGas)
+  }
 }

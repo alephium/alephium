@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{GroupIndex, NoIndexModelGenerators}
+import org.alephium.protocol.model.{minimalGas, GroupIndex, NoIndexModelGenerators}
 import org.alephium.util.AVector
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
@@ -32,7 +32,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
         .toOption
         .get
     val obj     = contract.toObject(contractOutputRef.key, fields)
-    val context = StatefulContext.nonPayable(Hash.zero, worldStateNew)
+    val context = StatefulContext.nonPayable(Hash.zero, minimalGas, worldStateNew)
     obj -> context
   }
 }
