@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.language.implicitConversions
+
 import akka.util.ByteString
 import org.scalatest.Assertion
 
@@ -28,6 +30,8 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
 class VMSpec extends AlephiumSpec {
+  implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
+
   def contractCreation(code: StatefulContract,
                        initialState: AVector[Val],
                        lockupScript: LockupScript,

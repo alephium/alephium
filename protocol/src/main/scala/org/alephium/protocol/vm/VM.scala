@@ -180,10 +180,10 @@ final class StatefulVM(ctx: StatefulContext,
 }
 
 object StatelessVM {
-  final case class AssetScriptExecution(gasRemaining: Int) extends AnyVal
+  final case class AssetScriptExecution(gasRemaining: GasBox)
 
   def runAssetScript(txHash: Hash,
-                     initialGas: Int,
+                     initialGas: GasBox,
                      script: StatelessScript,
                      args: AVector[Val],
                      signature: Signature): ExeResult[AssetScriptExecution] = {
@@ -193,7 +193,7 @@ object StatelessVM {
   }
 
   def runAssetScript(txHash: Hash,
-                     initialGas: Int,
+                     initialGas: GasBox,
                      script: StatelessScript,
                      args: AVector[Val],
                      signatures: Stack[Signature]): ExeResult[AssetScriptExecution] = {
@@ -222,7 +222,7 @@ object StatelessVM {
 }
 
 object StatefulVM {
-  final case class TxScriptExecution(gasUsed: Int,
+  final case class TxScriptExecution(gasBox: GasBox,
                                      contractInputs: AVector[ContractOutputRef],
                                      generatedOutputs: AVector[TxOutput],
                                      worldState: WorldState)
@@ -230,12 +230,12 @@ object StatefulVM {
   def runTxScript(worldState: WorldState,
                   tx: TransactionAbstract,
                   script: StatefulScript,
-                  gasRemaining: Int): ExeResult[TxScriptExecution] = {
+                  gasRemaining: GasBox): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(tx, gasRemaining, worldState)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map(
       worldState =>
-        TxScriptExecution(tx.unsigned.startGas - context.gasRemaining,
+        TxScriptExecution(context.gasRemaining,
                           AVector.from(context.contractInputs),
                           AVector.from(context.generatedOutputs),
                           worldState))

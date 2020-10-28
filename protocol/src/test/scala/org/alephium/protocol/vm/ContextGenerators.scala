@@ -24,7 +24,7 @@ import org.alephium.util.AVector
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareContract(contract: StatefulContract,
                       fields: AVector[Val],
-                      gasLimit: Int = minimalGas): (StatefulContractObject, StatefulContext) = {
+                      gasLimit: GasBox = minimalGas): (StatefulContractObject, StatefulContext) = {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
     val contractOutput    = contractOutputGen(groupIndex)().sample.get
@@ -41,7 +41,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       override def txHash: Hash                                  = Hash.zero
       override def signatures: Stack[protocol.Signature]         = Stack.ofCapacity(0)
       override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
-      override var gasRemaining: Int                             = gasLimit
+      override var gasRemaining: GasBox                          = gasLimit
     }
     obj -> context
   }

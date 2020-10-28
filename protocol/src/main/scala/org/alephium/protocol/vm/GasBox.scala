@@ -14,18 +14,25 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.protocol.vm
 
-import org.alephium.protocol.vm.GasBox
-import org.alephium.util.Bytes.byteStringOrdering
+import org.alephium.serde.Serde
 
-package object model {
-  val cliqueIdLength: Int = PublicKey.length
+final case class GasBox private (value: Int) extends AnyVal {
+  def use(amount: Int): ExeResult[GasBox] = {
+    if (value >= amount) {
+      Right(GasBox(value - amount))
+    } else Left(OutOfGas)
+  }
+}
 
-  val minimalGas: GasBox = GasBox.unsafe(100000)
+object GasBox {
+  implicit val serde: Serde[GasBox] = Serde
+    .forProduct1[Int, GasBox](new GasBox(_), _.value)
+    .validate(box => if (box.value >= 0) Right(()) else Left(s"Negative gas ${box.value}"))
 
-  type TokenId    = Hash
-  type ContractId = Hash
-
-  implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
+  def unsafe(initialGas: Int): GasBox = {
+    assume(initialGas >= 0)
+    new GasBox(initialGas)
+  }
 }
