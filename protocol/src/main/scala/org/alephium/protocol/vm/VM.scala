@@ -235,7 +235,7 @@ object StatefulVM {
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map(
       worldState =>
-        TxScriptExecution(tx.unsigned.gas - context.gasRemaining,
+        TxScriptExecution(tx.unsigned.startGas - context.gasRemaining,
                           AVector.from(context.contractInputs),
                           AVector.from(context.generatedOutputs),
                           worldState))
