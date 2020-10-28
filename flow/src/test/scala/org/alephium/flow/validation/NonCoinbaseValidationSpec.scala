@@ -117,21 +117,26 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
-  it should "check start gas" in new StatelessFixture {
+  it should "check gas bounds" in new StatelessFixture {
     val tx = transactionGen(1, 1).sample.get
-    passCheck(checkGasBox(tx))
+    passCheck(checkGasBound(tx))
 
     val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
-    failCheck(checkGasBox(txNew0), InvalidStartGas)
+    failCheck(checkGasBound(txNew0), InvalidStartGas)
     failValidation(validateMempoolTx(txNew0, blockFlow), InvalidStartGas)
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
-    failCheck(checkGasBox(txNew1), InvalidStartGas)
+    failCheck(checkGasBound(txNew1), InvalidStartGas)
     failValidation(validateMempoolTx(txNew1, blockFlow), InvalidStartGas)
     val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).extractedValue()))
-    failCheck(checkGasBox(txNew2), InvalidStartGas)
+    failCheck(checkGasBound(txNew2), InvalidStartGas)
     failValidation(validateMempoolTx(txNew2, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
-    passCheck(checkGasBox(txNew3))
+    passCheck(checkGasBound(txNew3))
+
+    val txNew4 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = 0))
+    failCheck(checkGasBound(txNew4), InvalidGasPrice)
+    val txNew5 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = ALF.MaxALFValue))
+    failCheck(checkGasBound(txNew5), InvalidGasPrice)
   }
 
   it should "check ALF balance overflow" in new StatelessFixture {

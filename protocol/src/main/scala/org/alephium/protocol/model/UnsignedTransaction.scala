@@ -33,6 +33,7 @@ import org.alephium.util.{AVector, U256}
   */
 final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
                                      startGas: GasBox,
+                                     gasPrice: U256,
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[AssetOutput])
     extends HashSerde[UnsignedTransaction] {
@@ -62,22 +63,24 @@ final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
     Serde
-      .forProduct4[Option[StatefulScript],
+      .forProduct5[Option[StatefulScript],
                    GasBox,
+                   U256,
                    AVector[TxInput],
                    AVector[AssetOutput],
-                   UnsignedTransaction](UnsignedTransaction.apply,
-                                        t => (t.scriptOpt, t.startGas, t.inputs, t.fixedOutputs))
+                   UnsignedTransaction](
+        UnsignedTransaction.apply,
+        t => (t.scriptOpt, t.startGas, t.gasPrice, t.inputs, t.fixedOutputs))
       .validate(tx => if (GasBox.validate(tx.startGas)) Right(()) else Left("Invalid Gas"))
 
   def apply(txScriptOpt: Option[StatefulScript],
             inputs: AVector[TxInput],
             fixedOutputs: AVector[AssetOutput]): UnsignedTransaction = {
-    UnsignedTransaction(txScriptOpt, minimalGas, inputs, fixedOutputs)
+    UnsignedTransaction(txScriptOpt, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
   def apply(inputs: AVector[TxInput], fixedOutputs: AVector[AssetOutput]): UnsignedTransaction = {
-    UnsignedTransaction(None, minimalGas, inputs, fixedOutputs)
+    UnsignedTransaction(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
   def transferAlf(inputs: AVector[AssetOutputRef],
