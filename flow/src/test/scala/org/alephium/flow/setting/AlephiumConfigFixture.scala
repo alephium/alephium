@@ -20,16 +20,16 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.protocol.{PrivateKey, PublicKey}
+import org.alephium.protocol.{ALF, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Env, U256}
+import org.alephium.util.{AVector, Env, Number, U256}
 
 trait AlephiumConfigFixture {
   val configValues: Map[String, Any] = Map.empty
 
-  val genesisBalance: U256 = U256.unsafe(100)
+  val genesisBalance: U256 = ALF.alf(Number.million)
 
   val env      = Env.resolve()
   val rootPath = Platform.getRootPath(env)

@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.util
+package org.alephium.protocol
 
-import java.math.BigInteger
+import org.alephium.util.{AlephiumSpec, U256}
 
-object Numeric {
-  def isPositive(n: BigInteger): Boolean  = n.signum() > 0
-  def nonNegative(n: BigInteger): Boolean = n.signum() >= 0
-  def isNegative(n: BigInteger): Boolean  = n.signum() < 0
-  def nonPositive(n: BigInteger): Boolean = n.signum() <= 0
+class ALFSpec extends AlephiumSpec {
+  it should "use correct unit" in {
+    ALF.alf(1) is ALF.nanoAlf(1).mul(U256.Billion).get
+    ALF.alf(1).toBigInt.longValue() is math.pow(10, 18).longValue()
+  }
 }

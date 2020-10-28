@@ -93,7 +93,7 @@ object U32 {
   import java.lang.{Integer => JInt}
 
   def validate(value: BigInteger): Boolean = {
-    Numeric.nonNegative(value) && value.bitLength() <= 32
+    Number.nonNegative(value) && value.bitLength() <= 32
   }
 
   def unsafe(value: Int): U32 = new U32(value)
