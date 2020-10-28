@@ -16,6 +16,10 @@
 
 package org.alephium.protocol.vm
 
+import org.alephium.protocol.model.TxOutput
+import org.alephium.protocol.PublicKey
+import org.alephium.serde._
+
 trait GasSchedule {
   protected def typeHint(): Unit // for type safety
 }
@@ -68,12 +72,14 @@ object GasHigh {
 }
 
 trait GasHash extends GasFormula {
-  def gas(inputLength: Int): Int =
-    GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8)
+  def gas(inputLength: Int): Int = GasHash.gas(inputLength)
 }
 object GasHash {
   val baseGas: Int         = 30
   val extraGasPerWord: Int = 6
+
+  def gas(inputLength: Int): Int =
+    GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8)
 }
 
 trait GasSignature extends GasSimple {
@@ -105,4 +111,34 @@ object GasSchedule {
   val callGas: Int           = 200
   val contractLoadGas: Int   = 800
   val contractUpdateGas: Int = 5000
+
+  val trieRemovalGas: Int = 4000
+  val trieUpdateGas: Int  = 5000
+
+  /*
+   * The gas cost of a transaction consists of 4 parts
+   * 1. a fixed base gas for each transaction
+   * 2. gas for each input including the auto generated contract inputs:
+   *    2.1. gas for removing the input from the blockchain state trie
+   *    2.2. data gas based on the length of the serialized input
+   *    2.3. execution gas for the unlockup script of the input
+   * 3. gas for each output including the auto generated vm outputs:
+   *    3.1. gas for adding the output into the blockchain state trie
+   *    3.2. data gas based on the length of the serialized output
+   * 4. execution gas for the optional tx script
+   */
+  val txBaseGas: Int = 4000
+  val txDataGas: Int = 68
+
+  def inputGas(theOutputOfInput: TxOutput, unlockGas: Int): Int = {
+    trieRemovalGas + txDataGas * serialize(theOutputOfInput).length + unlockGas
+  }
+
+  def outputGas(txOutput: TxOutput): Int = {
+    trieUpdateGas + txDataGas * serialize(txOutput).length
+  }
+
+  val p2pkUnlockGas: Int = {
+    GasHash.gas(PublicKey.length) + GasSignature.gas
+  }
 }

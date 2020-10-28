@@ -89,7 +89,8 @@ class VMSpec extends AlephiumSpec {
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(gas = 1000000))
     }
     val worldState = blockFlow.getBestCachedTrie(chainIndex.from).toOption.get
-    StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get) is Left(StackOverflow)
+    StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get, tx.unsigned.gas) is
+      Left(StackOverflow)
   }
 
   trait CallFixture extends FlowFixture {

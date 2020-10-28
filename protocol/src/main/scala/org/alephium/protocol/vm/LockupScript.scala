@@ -41,9 +41,8 @@ object LockupScript {
     override def serialize(input: LockupScript): ByteString = {
       input match {
         case s: P2PKH => ByteString(0) ++ serdeImpl[Hash].serialize(s.pkHash)
-        case s: P2SH  => ByteString(1) ++ serdeImpl[Hash].serialize(s.scriptHash)
-        case s: P2S   => ByteString(2) ++ serdeImpl[StatelessScript].serialize(s.script)
-        case s: P2C   => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId)
+        case s: P2S   => ByteString(1) ++ serdeImpl[StatelessScript].serialize(s.script)
+        case s: P2C   => ByteString(2) ++ serdeImpl[Hash].serialize(s.contractId)
       }
     }
 
@@ -52,10 +51,8 @@ object LockupScript {
         case (0, content) =>
           serdeImpl[Hash]._deserialize(content).map { case (pkHash, rest) => P2PKH(pkHash) -> rest }
         case (1, content) =>
-          serdeImpl[Hash]._deserialize(content).map { case (sHash, rest) => P2SH(sHash) -> rest }
-        case (2, content) =>
           serdeImpl[StatelessScript]._deserialize(content).map { case (s, rest) => P2S(s) -> rest }
-        case (3, content) =>
+        case (2, content) =>
           serdeImpl[Hash]._deserialize(content).map { case (cHash, rest) => P2C(cHash) -> rest }
         case (n, _) =>
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
@@ -71,12 +68,10 @@ object LockupScript {
 
   def p2pkh(key: PublicKey): P2PKH      = p2pkh(Hash.hash(key.bytes))
   def p2pkh(pkHash: Hash): P2PKH        = P2PKH(pkHash)
-  def p2sh(scriptHash: Hash): P2SH      = P2SH(scriptHash)
   def p2s(script: StatelessScript): P2S = P2S(script)
   def p2c(contractId: Hash): P2C        = P2C(contractId)
 
   final case class P2PKH(pkHash: Hash)          extends LockupScript
-  final case class P2SH(scriptHash: Hash)       extends LockupScript
   final case class P2S(script: StatelessScript) extends LockupScript
   final case class P2C(contractId: Hash)        extends LockupScript
 

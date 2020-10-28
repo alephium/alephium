@@ -457,7 +457,8 @@ object BlockFlowState {
   def updateStateForTxScript(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
-        StatefulVM.runTxScript(worldState, tx, script) match {
+        // we set gasRemaining = initial gas as the tx is already validated
+        StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.gas) match {
           case Right(exeResult)                => Right(exeResult.worldState)
           case Left(IOErrorUpdateState(error)) => Left(error)
           case Left(error) =>
