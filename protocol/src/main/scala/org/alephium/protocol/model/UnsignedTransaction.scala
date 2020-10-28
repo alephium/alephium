@@ -68,7 +68,7 @@ object UnsignedTransaction {
                    AVector[AssetOutput],
                    UnsignedTransaction](UnsignedTransaction.apply,
                                         t => (t.scriptOpt, t.startGas, t.inputs, t.fixedOutputs))
-      .validate(tx => if (tx.startGas.value < minimalGas.value) Left("Invalid Gas") else Right(()))
+      .validate(tx => if (GasBox.validate(tx.startGas)) Right(()) else Left("Invalid Gas"))
 
   def apply(txScriptOpt: Option[StatefulScript],
             inputs: AVector[TxInput],
