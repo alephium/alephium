@@ -255,7 +255,7 @@ trait TxGenerators
             }
           balance.toOutput(createdHeight, lockupScript, dataGen.sample.get)
       }
-      val gas = math.max(minimalGas, (inputs.length + outputs.length) * 10000)
+      val gas = math.max(minimalGas.value, (inputs.length + outputs.length) * 10000)
       UnsignedTransaction(None, gas, inputs, outputs)
     }
 

@@ -85,10 +85,10 @@ trait NonCoinbaseValidation {
 
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Int]
+  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       tx: Transaction,
-      gasRemaining: Int,
+      gasRemaining: GasBox,
       worldState: WorldState): TxValidationResult[WorldState] // TODO: optimize it with preOutputs
   // format: on
 }
@@ -250,7 +250,7 @@ object NonCoinbaseValidation {
     // TODO: signatures might not be 1-to-1 mapped to inputs
     protected[validation] def checkWitnesses(
         tx: Transaction,
-        preOutputs: AVector[TxOutput]): TxValidationResult[Int] = {
+        preOutputs: AVector[TxOutput]): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.unsafe(tx.inputSignatures.reverse, tx.inputSignatures.length)
       EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.startGas) {
@@ -266,10 +266,10 @@ object NonCoinbaseValidation {
 
     protected[validation] def checkLockupScript(
         tx: Transaction,
-        gasRemaining: Int,
+        gasRemaining: GasBox,
         lockupScript: LockupScript,
         unlockScript: UnlockScript,
-        signatures: Stack[Signature]): TxValidationResult[Int] = {
+        signatures: Stack[Signature]): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
           checkP2pkh(tx, gasRemaining, lock, unlock, signatures)
@@ -280,11 +280,12 @@ object NonCoinbaseValidation {
       }
     }
 
-    protected[validation] def checkP2pkh(tx: Transaction,
-                                         gasRemaining: Int,
-                                         lock: LockupScript.P2PKH,
-                                         unlock: UnlockScript.P2PKH,
-                                         signatures: Stack[Signature]): TxValidationResult[Int] = {
+    protected[validation] def checkP2pkh(
+        tx: Transaction,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2PKH,
+        unlock: UnlockScript.P2PKH,
+        signatures: Stack[Signature]): TxValidationResult[GasBox] = {
       if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
@@ -292,27 +293,28 @@ object NonCoinbaseValidation {
           case Right(signature) =>
             if (!SignatureSchema.verify(tx.hash.bytes, signature, unlock.publicKey)) {
               invalidTx(InvalidSignature)
-            } else if (gasRemaining < GasSchedule.p2pkUnlockGas) {
-              invalidTx(OutOfGas)
-            } else validTx(gasRemaining - GasSchedule.p2pkUnlockGas)
+            } else {
+              gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
+            }
           case Left(_) => invalidTx(NotEnoughSignature)
         }
       }
     }
 
     protected[validation] def checkP2S(tx: Transaction,
-                                       gasRemaining: Int,
+                                       gasRemaining: GasBox,
                                        lock: LockupScript.P2S,
                                        unlock: UnlockScript.P2S,
-                                       signatures: Stack[Signature]): TxValidationResult[Int] = {
+                                       signatures: Stack[Signature]): TxValidationResult[GasBox] = {
       checkScript(tx, gasRemaining, lock.script, unlock.params, signatures)
     }
 
-    protected[validation] def checkScript(tx: Transaction,
-                                          gasRemaining: Int,
-                                          script: StatelessScript,
-                                          params: AVector[Val],
-                                          signatures: Stack[Signature]): TxValidationResult[Int] = {
+    protected[validation] def checkScript(
+        tx: Transaction,
+        gasRemaining: GasBox,
+        script: StatelessScript,
+        params: AVector[Val],
+        signatures: Stack[Signature]): TxValidationResult[GasBox] = {
       StatelessVM.runAssetScript(tx.hash, gasRemaining, script, params, signatures) match {
         case Right(result) => validTx(result.gasRemaining)
         case Left(e)       => invalidTx(InvalidUnlockScript(e))
@@ -321,7 +323,7 @@ object NonCoinbaseValidation {
 
     protected[validation] def checkTxScript(
         tx: Transaction,
-        gasRemaining: Int,
+        gasRemaining: GasBox,
         worldState: WorldState): TxValidationResult[WorldState] = {
       val chainIndex = tx.chainIndex
       if (chainIndex.isIntraGroup) {

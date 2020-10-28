@@ -37,15 +37,15 @@ trait Context extends CostStrategy {
 trait StatelessContext extends Context
 
 object StatelessContext {
-  def apply(txHash: Hash, txGas: Int, signature: Signature): StatelessContext = {
+  def apply(txHash: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
     val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
     apply(txHash, txGas, stack)
   }
 
-  def apply(txHash: Hash, txGas: Int, signatures: Stack[Signature]): StatelessContext =
+  def apply(txHash: Hash, txGas: GasBox, signatures: Stack[Signature]): StatelessContext =
     new Impl(txHash, signatures, txGas)
 
-  final class Impl(val txHash: Hash, val signatures: Stack[Signature], var gasRemaining: Int)
+  final class Impl(val txHash: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
     override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
   }
@@ -109,14 +109,15 @@ trait StatefulContext extends StatelessContext with ContractPool {
 }
 
 object StatefulContext {
-  def apply(tx: TransactionAbstract, gasRemaining: Int, worldState: WorldState): StatefulContext = {
-    require(gasRemaining >= 0)
+  def apply(tx: TransactionAbstract,
+            gasRemaining: GasBox,
+            worldState: WorldState): StatefulContext = {
     new Impl(tx, worldState, gasRemaining)
   }
 
   final class Impl(val tx: TransactionAbstract,
                    val initWorldState: WorldState,
-                   var gasRemaining: Int)
+                   var gasRemaining: GasBox)
       extends StatefulContext {
     override var worldState: WorldState = initWorldState
 

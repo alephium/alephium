@@ -18,14 +18,17 @@ package org.alephium.protocol
 
 import java.net.InetSocketAddress
 
+import scala.language.implicitConversions
+
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasBox
 import org.alephium.util.{AVector, NumericHelpers}
 
 trait Generators extends NumericHelpers {
+  implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
   lazy val portGen: Gen[Int] = Gen.choose(0x401, 65535)
 

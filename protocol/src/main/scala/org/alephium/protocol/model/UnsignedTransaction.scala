@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.{AVector, U256}
 
@@ -32,7 +32,7 @@ import org.alephium.util.{AVector, U256}
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
 final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
-                                     startGas: Int,
+                                     startGas: GasBox,
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[AssetOutput])
     extends HashSerde[UnsignedTransaction] {
@@ -63,12 +63,12 @@ object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
     Serde
       .forProduct4[Option[StatefulScript],
-                   Int,
+                   GasBox,
                    AVector[TxInput],
                    AVector[AssetOutput],
                    UnsignedTransaction](UnsignedTransaction.apply,
                                         t => (t.scriptOpt, t.startGas, t.inputs, t.fixedOutputs))
-      .validate(tx => if (tx.startGas < minimalGas) Left("Invalid Gas") else Right(()))
+      .validate(tx => if (tx.startGas.value < minimalGas.value) Left("Invalid Gas") else Right(()))
 
   def apply(txScriptOpt: Option[StatefulScript],
             inputs: AVector[TxInput],
