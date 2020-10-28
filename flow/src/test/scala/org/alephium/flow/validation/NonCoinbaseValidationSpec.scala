@@ -25,7 +25,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
-import org.alephium.protocol.vm.{LockupScript, VMFactory, WorldState}
+import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory, WorldState}
 import org.alephium.util.{AVector, Random, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -115,6 +115,23 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
         failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), NoOutputs)
     }
+  }
+
+  it should "check start gas" in new StatelessFixture {
+    val tx = transactionGen(1, 1).sample.get
+    passCheck(checkGasBox(tx))
+
+    val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
+    failCheck(checkGasBox(txNew0), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew0, blockFlow), InvalidStartGas)
+    val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
+    failCheck(checkGasBox(txNew1), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew1, blockFlow), InvalidStartGas)
+    val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).extractedValue()))
+    failCheck(checkGasBox(txNew2), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew2, blockFlow), InvalidStartGas)
+    val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
+    passCheck(checkGasBox(txNew3))
   }
 
   it should "check ALF balance overflow" in new StatelessFixture {
