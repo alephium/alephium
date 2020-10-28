@@ -76,7 +76,7 @@ trait TestFixtureLike
   val apiKey     = Hash.generate.toHexString
   val apiKeyHash = Sha256.hash(apiKey)
 
-  val initialBalance = Balance(100, 1)
+  val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = 10
 
   def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)

@@ -107,7 +107,7 @@ object U64 {
   private[U64] val modulus = BigInteger.valueOf(1).shiftLeft(java.lang.Long.SIZE)
 
   def validate(value: BigInteger): Boolean = {
-    Numeric.nonNegative(value) && value.bitLength() <= 64
+    Number.nonNegative(value) && value.bitLength() <= 64
   }
 
   def unsafe(value: Long): U64 = new U64(value)

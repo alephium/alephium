@@ -16,13 +16,15 @@
 
 package org.alephium.protocol
 
-import org.alephium.util.{TimeStamp, U256}
+import org.alephium.util.{Number, TimeStamp, U256}
 
 object ALF {
   //scalastyle:off magic.number
-  val CoinInOneALF: U256  = U256.unsafe(1000000000)
+  val CoinInOneALF: U256     = U256.unsafe(Number.quintillion)
+  val CoinInOneNanoAlf: U256 = U256.unsafe(Number.billion)
+
   val MaxALFValue: U256   = U256.unsafe(100) mulUnsafe U256.Million mulUnsafe CoinInOneALF
-  val CoinBaseValue: U256 = U256.unsafe(15) // Note: temporary value
+  val CoinBaseValue: U256 = U256.unsafe(15) mulUnsafe CoinInOneALF // Note: temporary value
 
   val GenesisHeight: Int          = 0
   val GenesisWeight: BigInt       = 0
@@ -35,5 +37,13 @@ object ALF {
 
   def alf(amount: U256): Option[U256] = amount.mul(CoinInOneALF)
 
-  def nanoAlf(amount: U256): U256 = amount
+  def alf(amount: Long): U256 = {
+    assume(amount >= 0)
+    U256.unsafe(amount).mulUnsafe(CoinInOneALF)
+  }
+
+  def nanoAlf(amount: Long): U256 = {
+    assume(amount >= 0)
+    U256.unsafe(amount).mulUnsafe(CoinInOneNanoAlf)
+  }
 }

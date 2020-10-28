@@ -102,7 +102,7 @@ object U256 {
   private[util] val upperBound = BigInteger.ONE.shiftLeft(256)
 
   def validate(value: BigInteger): Boolean = {
-    Numeric.nonNegative(value) && value.bitLength() <= 256
+    Number.nonNegative(value) && value.bitLength() <= 256
   }
 
   def unsafe(value: BigInteger): U256 = {
@@ -147,8 +147,6 @@ object U256 {
   val MaxValue: U256 = unsafe(upperBound.subtract(BigInteger.ONE))
   val MinValue: U256 = Zero
 
-  // scalastyle:off magic.number
-  val Million: U256 = unsafe(1000000)
-  val Billion: U256 = unsafe(1000000000)
-  // scalastyle:on magic.number
+  val Million: U256 = unsafe(Number.million)
+  val Billion: U256 = unsafe(Number.billion)
 }

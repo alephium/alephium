@@ -21,7 +21,7 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.serde._
-import org.alephium.util.{Bytes, Numeric}
+import org.alephium.util.{Bytes, Number}
 
 /*
  * value = mantissa * 256 ^ (exponent - 3)
@@ -44,7 +44,7 @@ object Target {
   }
 
   def unsafe(value: BigInteger): Target = {
-    require(Numeric.nonNegative(value) && value.compareTo(max) < 0)
+    require(Number.nonNegative(value) && value.compareTo(max) < 0)
     new Target(toCompactBitsUnsafe(value))
   }
 

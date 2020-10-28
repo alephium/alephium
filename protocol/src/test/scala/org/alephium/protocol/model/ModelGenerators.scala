@@ -30,7 +30,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Number, NumericHelpers, U256}
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
@@ -98,9 +98,10 @@ trait TxInputGenerators extends Generators {
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {
-  val minAmount = 1000L
+  val minAmountInNanoAlf = 1000L
+  val minAmount          = ALF.nanoAlf(minAmountInNanoAlf)
   def amountGen(inputNum: Int): Gen[U256] = {
-    Gen.choose(minAmount * inputNum, ALF.MaxALFValue.v.longValueExact() / 1000L).map(U256.unsafe)
+    Gen.choose(minAmountInNanoAlf * inputNum, Number.quadrillion).map(ALF.nanoAlf)
   }
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
