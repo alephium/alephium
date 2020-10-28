@@ -18,11 +18,14 @@ package org.alephium.protocol
 
 import org.alephium.protocol.vm.GasBox
 import org.alephium.util.Bytes.byteStringOrdering
+import org.alephium.util.U256
 
 package object model {
   val cliqueIdLength: Int = PublicKey.length
 
-  val minimalGas: GasBox = GasBox.unsafe(100000)
+  // TODO: improve gas mechanism
+  val minimalGas: GasBox    = GasBox.unsafe(100000)
+  val defaultGasPrice: U256 = ALF.nanoAlf(1)
 
   type TokenId    = Hash
   type ContractId = Hash

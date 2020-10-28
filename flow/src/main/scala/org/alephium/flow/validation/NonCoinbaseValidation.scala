@@ -52,7 +52,7 @@ trait NonCoinbaseValidation {
     for {
       _          <- checkInputNum(tx)
       _          <- checkOutputNum(tx)
-      _          <- checkGasBox(tx)
+      _          <- checkGasBound(tx)
       _          <- checkOutputAmount(tx)
       chainIndex <- checkChainIndex(tx)
       _          <- checkUniqueInputs(tx)
@@ -79,7 +79,7 @@ trait NonCoinbaseValidation {
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkGasBox(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkGasBound(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
   protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex]
   protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
@@ -116,8 +116,14 @@ object NonCoinbaseValidation {
       else validTx(())
     }
 
-    protected[validation] def checkGasBox(tx: Transaction): TxValidationResult[Unit] = {
-      if (GasBox.validate(tx.unsigned.startGas)) validTx(()) else invalidTx(InvalidStartGas)
+    protected[validation] def checkGasBound(tx: Transaction): TxValidationResult[Unit] = {
+      if (!GasBox.validate(tx.unsigned.startGas)) invalidTx(InvalidStartGas)
+      else if (!checkGasPrice(tx.unsigned.gasPrice)) invalidTx(InvalidGasPrice)
+      else validTx(())
+    }
+
+    private def checkGasPrice(gas: U256): Boolean = {
+      gas > U256.Zero && gas < ALF.MaxALFValue
     }
 
     protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
