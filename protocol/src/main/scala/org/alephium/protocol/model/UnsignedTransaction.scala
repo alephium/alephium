@@ -27,12 +27,12 @@ import org.alephium.util.{AVector, U256}
   * The id of the new token will be hash of the first input
   *
   * @param scriptOpt optional script for invoking stateful contracts
-  * @param gas the amount of gas can be used for tx execution
+  * @param startGas the amount of gas can be used for tx execution
   * @param inputs a vector of TxInput
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
 final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
-                                     gas: Int,
+                                     startGas: Int,
                                      inputs: AVector[TxInput],
                                      fixedOutputs: AVector[AssetOutput])
     extends HashSerde[UnsignedTransaction] {
@@ -67,8 +67,8 @@ object UnsignedTransaction {
                    AVector[TxInput],
                    AVector[AssetOutput],
                    UnsignedTransaction](UnsignedTransaction.apply,
-                                        t => (t.scriptOpt, t.gas, t.inputs, t.fixedOutputs))
-      .validate(tx => if (tx.gas < minimalGas) Left("Invalid Gas") else Right(()))
+                                        t => (t.scriptOpt, t.startGas, t.inputs, t.fixedOutputs))
+      .validate(tx => if (tx.startGas < minimalGas) Left("Invalid Gas") else Right(()))
 
   def apply(txScriptOpt: Option[StatefulScript],
             inputs: AVector[TxInput],
