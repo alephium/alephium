@@ -109,16 +109,18 @@ trait StatefulContext extends StatelessContext with ContractPool {
 }
 
 object StatefulContext {
-  def apply(tx: TransactionAbstract, worldState: WorldState): StatefulContext =
-    new Impl(tx, worldState)
+  def apply(tx: TransactionAbstract, gasRemaining: Int, worldState: WorldState): StatefulContext = {
+    require(gasRemaining >= 0)
+    new Impl(tx, worldState, gasRemaining)
+  }
 
-  final class Impl(val tx: TransactionAbstract, val initWorldState: WorldState)
+  final class Impl(val tx: TransactionAbstract,
+                   val initWorldState: WorldState,
+                   var gasRemaining: Int)
       extends StatefulContext {
     override var worldState: WorldState = initWorldState
 
     override def txHash: Hash = tx.hash
-
-    override var gasRemaining: Int = tx.unsigned.gas
 
     override val signatures: Stack[Signature] = Stack.popOnly(tx.contractSignatures)
 

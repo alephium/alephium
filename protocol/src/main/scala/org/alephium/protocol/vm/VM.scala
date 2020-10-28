@@ -180,40 +180,35 @@ final class StatefulVM(ctx: StatefulContext,
 }
 
 object StatelessVM {
+  final case class AssetScriptExecution(gasRemaining: Int) extends AnyVal
+
   def runAssetScript(txHash: Hash,
                      initialGas: Int,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signature: Signature): ExeResult[Unit] = {
+                     signature: Signature): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(txHash, initialGas, signature)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def runAssetScript(tx: TransactionAbstract,
-                     script: StatelessScript,
-                     args: AVector[Val],
-                     signatures: Stack[Signature]): ExeResult[Unit] = {
-    runAssetScript(tx.hash, tx.unsigned.gas, script, args, signatures)
-  }
-
   def runAssetScript(txHash: Hash,
                      initialGas: Int,
                      script: StatelessScript,
                      args: AVector[Val],
-                     signatures: Stack[Signature]): ExeResult[Unit] = {
+                     signatures: Stack[Signature]): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(txHash, initialGas, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def execute(context: StatelessContext,
-              obj: ContractObj[StatelessContext],
-              args: AVector[Val]): ExeResult[Unit] = {
+  private def execute(context: StatelessContext,
+                      obj: ContractObj[StatelessContext],
+                      args: AVector[Val]): ExeResult[AssetScriptExecution] = {
     val vm = new StatelessVM(context,
                              Stack.ofCapacity(frameStackMaxSize),
                              Stack.ofCapacity(opStackMaxSize))
-    vm.execute(obj, 0, args)
+    vm.execute(obj, 0, args).map(_ => AssetScriptExecution(context.gasRemaining))
   }
 
   def executeWithOutputs(context: StatelessContext,
@@ -234,8 +229,9 @@ object StatefulVM {
 
   def runTxScript(worldState: WorldState,
                   tx: TransactionAbstract,
-                  script: StatefulScript): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(tx, worldState)
+                  script: StatefulScript,
+                  gasRemaining: Int): ExeResult[TxScriptExecution] = {
+    val context = StatefulContext(tx, gasRemaining, worldState)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map(
       worldState =>

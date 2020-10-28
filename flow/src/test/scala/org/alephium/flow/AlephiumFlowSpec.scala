@@ -212,7 +212,7 @@ trait FlowFixture
       tx: TransactionTemplate,
       txScript: StatefulScript): (AVector[ContractOutputRef], AVector[TxOutput]) = {
     val worldState = blockFlow.getBestCachedTrie(mainGroup).toOption.get
-    val result     = StatefulVM.runTxScript(worldState, tx, txScript).toOption.get
+    val result     = StatefulVM.runTxScript(worldState, tx, txScript, tx.unsigned.gas).toOption.get
     result.contractInputs -> result.generatedOutputs
   }
 
