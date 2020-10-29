@@ -30,13 +30,13 @@ import org.alephium.util.{AVector, Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
 
-sealed trait Instr[-Ctx <: Context] { self: GasSchedule =>
+sealed trait Instr[-Ctx <: Context] extends GasSchedule {
   def serialize(): ByteString
 
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait InstrWithSimpleGas[-Ctx <: Context] { self: GasSimple =>
+sealed trait InstrWithSimpleGas[-Ctx <: Context] extends GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _ <- frame.ctx.chargeGas(this)
@@ -121,19 +121,16 @@ object Instr {
   val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-sealed trait StatefulInstr extends Instr[StatefulContext] { self: GasSchedule =>
-}
-sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] {
-  self: GasSchedule =>
-}
-sealed trait StatefulInstrSimpleGas extends StatefulInstr with InstrWithSimpleGas[StatefulContext] {
-  self: GasSimple =>
-}
+sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule {}
+sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
+sealed trait StatefulInstrSimpleGas
+    extends StatefulInstr
+    with InstrWithSimpleGas[StatefulContext]
+    with GasSimple {}
 sealed trait StatelessInstrSimpleGas
     extends StatelessInstr
-    with InstrWithSimpleGas[StatelessContext] {
-  self: GasSimple =>
-}
+    with InstrWithSimpleGas[StatelessContext]
+    with GasSimple {}
 
 sealed trait InstrCompanion[-Ctx <: Context] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
@@ -160,7 +157,8 @@ sealed abstract class StatefulInstrCompanion1[T: Serde] extends InstrCompanion1[
 
 sealed trait StatelessInstrCompanion0
     extends InstrCompanion[StatelessContext]
-    with Instr[StatelessContext] { self: GasSchedule =>
+    with Instr[StatelessContext]
+    with GasSchedule {
   lazy val code: Byte = Instr.toCode(this).toByte
 
   def serialize(): ByteString = ByteString(code)
@@ -171,7 +169,8 @@ sealed trait StatelessInstrCompanion0
 
 sealed trait StatefulInstrCompanion0
     extends InstrCompanion[StatefulContext]
-    with Instr[StatefulContext] { self: GasSchedule =>
+    with Instr[StatefulContext]
+    with GasSchedule {
   lazy val code: Byte = Instr.toCode(this).toByte
 
   def serialize(): ByteString = ByteString(code)
@@ -180,8 +179,7 @@ sealed trait StatefulInstrCompanion0
     Right((this, input))
 }
 
-sealed trait OperandStackInstr extends StatelessInstrSimpleGas { self: GasSimple =>
-}
+sealed trait OperandStackInstr extends StatelessInstrSimpleGas with GasSimple {}
 
 sealed trait ConstInstr extends OperandStackInstr with GasVeryLow
 object ConstInstr {
@@ -300,8 +298,7 @@ final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryL
 }
 object StoreLocal extends StatelessInstrCompanion1[Byte]
 
-sealed trait FieldInstr extends StatefulInstrSimpleGas { self: GasSimple =>
-}
+sealed trait FieldInstr extends StatefulInstrSimpleGas with GasSimple {}
 final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
   override def serialize(): ByteString = ByteString(LoadField.code, index)
   override def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -351,11 +348,12 @@ object Swap extends PureStackInstr {
   }
 }
 
-sealed trait ArithmeticInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 {
-  self: GasSimple =>
-}
+sealed trait ArithmeticInstr
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasSimple {}
 
-sealed trait BinaryArithmeticInstr extends ArithmeticInstr { self: GasSimple =>
+sealed trait BinaryArithmeticInstr extends ArithmeticInstr with GasSimple {
   protected def op(x: Val, y: Val): ExeResult[Val]
 
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -499,9 +497,10 @@ object GeU256 extends BinaryArithmeticInstr with GasVeryLow {
     BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
 }
 
-sealed trait LogicInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 {
-  self: GasSimple =>
-}
+sealed trait LogicInstr
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasSimple {}
 case object NotBool extends LogicInstr with GasVeryLow {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -531,8 +530,8 @@ case object OrBool extends LogicInstr with GasVeryLow {
 
 sealed trait ConversionInstr[R <: Val, U <: Val]
     extends StatelessInstrSimpleGas
-    with StatelessInstrCompanion0 {
-  self: GasSimple =>
+    with StatelessInstrCompanion0
+    with GasSimple {
 
   def converse(from: R): ExeResult[U]
 
@@ -578,18 +577,12 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryL
   }
 }
 
-sealed trait ObjectInstr extends StatelessInstr { self: GasSchedule =>
-}
-sealed trait NewBooleanVec extends ObjectInstr { self: GasSchedule =>
-}
-sealed trait NewByteVec extends ObjectInstr { self: GasSchedule =>
-}
-sealed trait NewI256Vec extends ObjectInstr { self: GasSchedule =>
-}
-sealed trait NewU256Vec extends ObjectInstr { self: GasSchedule =>
-}
-sealed trait NewByte256Vec extends ObjectInstr { self: GasSchedule =>
-}
+sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
+sealed trait NewBooleanVec extends ObjectInstr with GasSchedule {}
+sealed trait NewByteVec    extends ObjectInstr with GasSchedule {}
+sealed trait NewI256Vec    extends ObjectInstr with GasSchedule {}
+sealed trait NewU256Vec    extends ObjectInstr with GasSchedule {}
+sealed trait NewByte256Vec extends ObjectInstr with GasSchedule {}
 
 sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh
 
@@ -776,10 +769,8 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
   }
 }
 
-sealed trait CryptoInstr extends StatelessInstr { self: GasSchedule =>
-}
-sealed trait Signature extends CryptoInstr with StatelessInstrSimpleGas { self: GasSimple =>
-}
+sealed trait CryptoInstr extends StatelessInstr with GasSchedule {}
+sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
 
 sealed trait CheckEqT[T <: Val]
     extends StatelessInstrSimpleGas
@@ -1012,9 +1003,10 @@ object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
   }
 }
 
-sealed trait ContractInstr extends StatefulInstrSimpleGas with StatefulInstrCompanion0 {
-  self: GasSimple =>
-}
+sealed trait ContractInstr
+    extends StatefulInstrSimpleGas
+    with StatefulInstrCompanion0
+    with GasSimple {}
 
 object CreateContract extends ContractInstr with GasCreate {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
