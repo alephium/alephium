@@ -63,12 +63,10 @@ object ApiModel {
       Input(OutputRef.from(input.outputRef), serialize(input.unlockScript))
   }
 
-  final case class Output(amount: Long, createdHeight: Int, address: Address)
+  final case class Output(amount: U256, createdHeight: Int, address: Address)
   object Output {
     def from(output: TxOutput, networkType: NetworkType): Output =
-      Output(output.amount.v.longValue,
-             output.createdHeight,
-             Address(networkType, output.lockupScript))
+      Output(output.amount, output.createdHeight, Address(networkType, output.lockupScript))
   }
 
   final case class Tx(

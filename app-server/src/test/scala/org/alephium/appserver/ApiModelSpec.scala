@@ -143,6 +143,17 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(request, jsonRaw)
   }
 
+  it should "encode/decode Output with big amount" in {
+    val address    = generateAddress()
+    val addressStr = address.toBase58
+    val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
+    val amountStr  = "15000000000000000000"
+    val height     = 10
+    val request    = Output(amount, height, address)
+    val jsonRaw    = s"""{"amount":$amountStr,"createdHeight":$height,"address":"$addressStr"}"""
+    checkData(request, jsonRaw)
+  }
+
   it should "encode/decode GetGroup" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
