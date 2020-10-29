@@ -15,6 +15,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 * Stateful UTXO model combines the advantages of both eUTXO model and account model (see code, wiki to come)
   * tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
   * the same expressiveness as account model. DApps can be easily built on top of it with better security
+  * support multiple participants in a single smart contract tx call
 * Novel VM design resolves the many critical challenges of dApp platforms (see code, wiki to come)
   * it's way less IO intensive
   * flash loan is disabled on purpose
