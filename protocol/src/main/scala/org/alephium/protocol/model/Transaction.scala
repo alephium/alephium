@@ -160,9 +160,18 @@ object Transaction {
                 contractSignatures = AVector.empty)
   }
 
-  def coinbase(publicKey: PublicKey, height: Int, data: ByteString): Transaction = {
+  def coinbase(txs: AVector[Transaction],
+               publicKey: PublicKey,
+               height: Int,
+               data: ByteString): Transaction = {
+    val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+    coinbase(gasFee, publicKey, height, data)
+  }
+
+  def coinbase(gasFee: U256, publicKey: PublicKey, height: Int, data: ByteString): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val txOutput = AssetOutput(ALF.CoinBaseValue, height, pkScript, tokens = AVector.empty, data)
+    val txOutput =
+      AssetOutput(ALF.MinerReward.addUnsafe(gasFee), height, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,

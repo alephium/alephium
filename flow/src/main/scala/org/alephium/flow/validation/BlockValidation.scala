@@ -17,9 +17,10 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{Block, TxOutputRef}
+import org.alephium.util.U256
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
@@ -71,9 +72,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
-      _ <- checkCoinbase(block)
+      _ <- checkCoinbaseEasy(block)
       _ <- checkMerkleRoot(block)
       _ <- checkNonCoinbases(block, flow)
+      _ <- checkCoinbaseReward(block)
       _ <- checkFlow(block, flow)
     } yield ()
   }
@@ -87,7 +89,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (block.transactions.nonEmpty) validBlock(()) else invalidBlock(EmptyTransactionList)
   }
 
-  private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
+  private[validation] def checkCoinbaseEasy(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (unsigned.inputs.isEmpty &&
@@ -96,7 +98,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
         coinbase.inputSignatures.isEmpty &&
         coinbase.contractSignatures.isEmpty)
       validBlock(())
-    else invalidBlock(InvalidCoinbase)
+    else invalidBlock(InvalidCoinbaseFormat)
   }
 
   // TODO: use Merkle hash for transactions
@@ -136,6 +138,12 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
         }
       }
     }
+  }
+
+  private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
+    val gasFee = block.nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+    if (block.coinbaseReward == ALF.MinerReward.addUnsafe(gasFee)) validBlock(())
+    else invalidBlock(InvalidCoinbaseReward)
   }
 
   private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(

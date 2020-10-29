@@ -21,7 +21,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.{Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
@@ -70,37 +70,50 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
 
-    val coinbase1     = Transaction.coinbase(publicKey, 0, ByteString.empty)
+    val coinbase1     = Transaction.coinbase(0, publicKey, 0, ByteString.empty)
     val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
-    passCheck(checkCoinbase(block1))
+    passCheck(checkCoinbaseEasy(block1))
 
     val coinbase2 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
     val block2    = block0.copy(transactions = AVector(coinbase2))
-    failCheck(checkCoinbase(block2), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block2), InvalidCoinbaseFormat)
 
     val coinbase3 = Transaction.from(emptyInputs, emptyOutputs, testSignature)
     val block3    = block0.copy(transactions = AVector(coinbase3))
-    failCheck(checkCoinbase(block3), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block3), InvalidCoinbaseFormat)
 
     val coinbase4 = Transaction.from(emptyInputs, AVector(output0), testSignature)
     val block4    = block0.copy(transactions = AVector(coinbase4))
-    failCheck(checkCoinbase(block4), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block4), InvalidCoinbaseFormat)
 
     val coinbase5 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
     val block5    = block0.copy(transactions = AVector(coinbase5))
-    failCheck(checkCoinbase(block5), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block5), InvalidCoinbaseFormat)
 
     val coinbase6 = Transaction.from(emptyInputs, emptyOutputs, emptySignatures)
     val block6    = block0.copy(transactions = AVector(coinbase6))
-    failCheck(checkCoinbase(block6), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block6), InvalidCoinbaseFormat)
 
     val coinbase7 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), testSignature)
     val block7    = block0.copy(transactions = AVector(coinbase7))
-    failCheck(checkCoinbase(block7), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block7), InvalidCoinbaseFormat)
 
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
-    failCheck(checkCoinbase(block8), InvalidCoinbase)
+    failCheck(checkCoinbaseEasy(block8), InvalidCoinbaseFormat)
+  }
+
+  it should "check coinbase reward" in new Fixture {
+    val block = blockGenOf(brokerConfig).filter(_.nonCoinbase.nonEmpty).sample.get
+    block.coinbaseReward > ALF.MinerReward is true
+    passCheck(checkCoinbaseReward(block))
+
+    val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = ALF.MinerReward)
+    val coinbaseNew = block.coinbase.copy(
+      unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew)))
+    val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
+    val blockNew = block.copy(transactions = txsNew)
+    failCheck(checkCoinbaseReward(blockNew), InvalidCoinbaseReward)
   }
 }

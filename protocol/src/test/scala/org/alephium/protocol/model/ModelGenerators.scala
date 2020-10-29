@@ -340,9 +340,12 @@ trait BlockGenerators extends TxGenerators {
     chainIndexFrom(group).flatMap(blockGen)
 
   private def gen(chainIndex: ChainIndex, deps: AVector[Hash], txs: AVector[Transaction]): Block = {
+    val coinbase =
+      Transaction.coinbase(txs, publicKeyGen(chainIndex.to).sample.get, 0, ByteString.empty)
+    val txsWithCoinbase = txs :+ coinbase
     @tailrec
     def iter(nonce: Long): Block = {
-      val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, nonce)
+      val block = Block.from(deps, txsWithCoinbase, consensusConfig.maxMiningTarget, nonce)
       if (block.chainIndex equals chainIndex) block else iter(nonce + 1)
     }
 

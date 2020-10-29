@@ -145,9 +145,9 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       startNewTasks()
   }
 
-  private def coinbase(to: Int, height: Int): Transaction = {
+  private def coinbase(txs: AVector[Transaction], to: Int, height: Int): Transaction = {
     val minerMessage = Hash.generate.bytes
-    Transaction.coinbase(addresses(to), height, minerMessage)
+    Transaction.coinbase(txs, addresses(to), height, minerMessage)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
@@ -155,9 +155,10 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups)
     val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    BlockTemplate(flowTemplate.deps,
-                  flowTemplate.target,
-                  flowTemplate.transactions :+ coinbase(to, flowTemplate.height))
+    BlockTemplate(
+      flowTemplate.deps,
+      flowTemplate.target,
+      flowTemplate.transactions :+ coinbase(flowTemplate.transactions, to, flowTemplate.height))
   }
 
   def startTask(fromShift: Int,
