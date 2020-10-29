@@ -22,7 +22,7 @@ import org.scalatest.Assertion
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Random}
 
@@ -41,31 +41,31 @@ class BlockFlowSpec extends AlephiumSpec {
       val block1      = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block1, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block1)
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block2      = emptyBlock(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block2.header, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
       val block4      = emptyBlock(blockFlow, chainIndex4)
       addAndCheck(blockFlow, block4, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
       val chainIndex5 = ChainIndex.unsafe(0, 0)
       val block5      = transfer(blockFlow, chainIndex5)
       addAndCheck(blockFlow, block5, 5)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block5)
-      checkBalance(blockFlow, 0, genesisBalance - 3)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
     }
   }
 
@@ -105,7 +105,7 @@ class BlockFlowSpec extends AlephiumSpec {
         blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
       newBlocks1.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
 
       val newBlocks2 = for {
@@ -117,7 +117,7 @@ class BlockFlowSpec extends AlephiumSpec {
         blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
       newBlocks2.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
 
       val newBlocks3 = for {
@@ -129,7 +129,7 @@ class BlockFlowSpec extends AlephiumSpec {
         blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
-      checkBalance(blockFlow, 0, genesisBalance - 3)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
       newBlocks3.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
     }
   }
@@ -142,12 +142,12 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
-      checkBalance(blockFlow, 0, genesisBalance - 1)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
       val block13 = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block13, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block13)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block21     = emptyBlock(blockFlow, chainIndex2)
@@ -155,13 +155,13 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block21.header, 3)
       addAndCheck(blockFlow, block22.header, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
       val chainIndex3 = ChainIndex.unsafe(0, 1)
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - 2)
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
     }
   }
 
@@ -214,7 +214,7 @@ class BlockFlowSpec extends AlephiumSpec {
       blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
     }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
-    checkBalance(blockFlow1, 0, genesisBalance - 2)
+    checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
   }
 
@@ -296,8 +296,8 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block, 1)
 
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
-    checkBalance(blockFlow, pubScript, 1)
-    checkBalance(blockFlow, testGroup, genesisBalance - 1)
+    checkBalance(blockFlow, pubScript, ALF.alf(1) - defaultGasFee)
+    checkBalance(blockFlow, testGroup, genesisBalance - ALF.alf(1))
   }
 
   it should "transfer token for inter-group transactions" in new FlowFixture { Test =>
@@ -331,11 +331,11 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)
-    checkBalance(blockFlow0, fromGroup, genesisBalance - 1)
+    checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
 
     val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
     addAndCheck(blockFlow1, toGroupBlock, 2) // TODO: fix weight calculation
-    checkBalance(blockFlow1, pubScript, 1)
+    checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

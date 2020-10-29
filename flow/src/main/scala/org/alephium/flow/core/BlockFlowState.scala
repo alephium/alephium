@@ -316,19 +316,14 @@ trait BlockFlowState extends FlowTipsUtil {
       height <- getBestHeight(ChainIndex(fromLockupScript.groupIndex, toLockupScript.groupIndex))
     } yield {
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
-      if (balance >= value) {
-        Some(
-          UnsignedTransaction
-            .transferAlf(utxos.map(_._1),
-                         balance,
-                         fromLockupScript,
-                         fromUnlockScript,
-                         toLockupScript,
-                         value,
-                         height))
-      } else {
-        None
-      }
+      UnsignedTransaction
+        .transferAlf(utxos.map(_._1),
+                     balance,
+                     fromLockupScript,
+                     fromUnlockScript,
+                     toLockupScript,
+                     value,
+                     height)
     }
   }
 

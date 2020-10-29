@@ -231,7 +231,8 @@ trait TxGenerators
     } yield {
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
-      val alfAmount      = outputsToSpend.map(_.amount).reduce(_ + _)
+      val gas            = math.max(minimalGas.value, inputs.length * 20000)
+      val alfAmount      = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
       val tokenTable = {
         val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach {
@@ -255,7 +256,6 @@ trait TxGenerators
             }
           balance.toOutput(createdHeight, lockupScript, dataGen.sample.get)
       }
-      val gas = math.max(minimalGas.value, (inputs.length + outputs.length) * 10000)
       UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)
     }
 

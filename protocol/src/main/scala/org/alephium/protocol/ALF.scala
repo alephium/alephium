@@ -46,4 +46,7 @@ object ALF {
     assume(amount >= 0)
     U256.unsafe(amount).mulUnsafe(CoinInOneNanoAlf)
   }
+
+  val oneAlf: U256     = CoinInOneNanoAlf
+  val oneNanoAlf: U256 = CoinInOneNanoAlf
 }

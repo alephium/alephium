@@ -26,6 +26,7 @@ package object model {
   // TODO: improve gas mechanism
   val minimalGas: GasBox    = GasBox.unsafe(100000)
   val defaultGasPrice: U256 = ALF.nanoAlf(1)
+  val defaultGasFee: U256   = defaultGasPrice.mulUnsafe(minimalGas.toU256)
 
   type TokenId    = Hash
   type ContractId = Hash

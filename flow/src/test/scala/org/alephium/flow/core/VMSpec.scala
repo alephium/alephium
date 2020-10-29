@@ -23,6 +23,7 @@ import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.validation.BlockValidation
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -117,7 +118,7 @@ class VMSpec extends AlephiumSpec {
 
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
-    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, U256.One)
+    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, ALF.alf(1))
     lazy val block0     = payableCall(blockFlow, chainIndex, txScript0)
     lazy val contractOutputRef0 =
       TxOutputRef.unsafe(block0.transactions.head, 0).asInstanceOf[ContractOutputRef]
@@ -187,7 +188,7 @@ class VMSpec extends AlephiumSpec {
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
       val contract = Compiler.compileContract(input).toOption.get
-      val txScript = contractCreation(contract, initialState, genesisLockup, U256.One)
+      val txScript = contractCreation(contract, initialState, genesisLockup, ALF.nanoAlf(1))
       val block    = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -222,7 +223,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     def callTxScriptMulti(input: Int => String): Block = {
-      val block0 = transfer(blockFlow, chainIndex, amount = 2, numReceivers = 10)
+      val block0 = transfer(blockFlow, chainIndex, numReceivers = 10)
       addAndValidate(blockFlow, block0)
       val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
       val scripts = AVector.tabulate(newAddresses.length) { index =>
@@ -451,7 +452,7 @@ class VMSpec extends AlephiumSpec {
       swapContract,
       AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero))).key
 
-    def checkSwapBalance(alfReserve: Long, tokenReserve: Long) = {
+    def checkSwapBalance(alfReserve: U256, tokenReserve: U256) = {
       val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
       val output     = worldState.getContractAsset(swapContractKey).toOption.get
       output.amount is alfReserve
@@ -468,7 +469,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(1, 0)
+    checkSwapBalance(ALF.nanoAlf(1), 0)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -482,7 +483,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(11, 100)
+    checkSwapBalance(ALF.nanoAlf(1) + 10, 100)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -495,7 +496,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(21, 50)
+    checkSwapBalance(ALF.nanoAlf(1) + 20, 50)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -508,7 +509,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(11, 100)
+    checkSwapBalance(ALF.nanoAlf(1) + 10, 100)
   }
 
   behavior of "random execution"

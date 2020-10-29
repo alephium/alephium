@@ -41,7 +41,7 @@ import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -77,7 +77,7 @@ trait TestFixtureLike
   val apiKeyHash = Sha256.hash(apiKey)
 
   val initialBalance = Balance(genesisBalance, 1)
-  val transferAmount = 10
+  val transferAmount = ALF.alf(1)
 
   def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
 
@@ -129,7 +129,7 @@ trait TestFixtureLike
 
   def transfer(fromPubKey: String,
                toAddress: String,
-               amount: Int,
+               amount: U256,
                privateKey: String,
                restPort: Int): TxResult = eventually {
     val createTx   = createTransaction(fromPubKey, toAddress, amount)
@@ -295,7 +295,7 @@ trait TestFixtureLike
   def getBalance(address: String) =
     httpGet(s"/addresses/$address/balance")
 
-  def createTransaction(fromPubKey: String, toAddress: String, amount: Int) =
+  def createTransaction(fromPubKey: String, toAddress: String, amount: U256) =
     httpGet(
       s"/unsigned-transactions?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
     )

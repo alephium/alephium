@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, Validation}
-import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
+import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -58,7 +58,9 @@ trait FlowFixture
     LockupScript.p2pkh(publicKey)
   }
 
-  def tryToTransfer(blockFlow: BlockFlow, chainIndex: ChainIndex, amount: Int = 1): Block = {
+  def tryToTransfer(blockFlow: BlockFlow,
+                    chainIndex: ChainIndex,
+                    amount: U256 = ALF.alf(1)): Block = {
     if (blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
     } else {
@@ -68,7 +70,7 @@ trait FlowFixture
 
   def transferOnlyForIntraGroup(blockFlow: BlockFlow,
                                 chainIndex: ChainIndex,
-                                amount: Int = 1): Block = {
+                                amount: U256 = ALF.alf(1)): Block = {
     if (chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
     } else {
@@ -84,7 +86,7 @@ trait FlowFixture
                    chainIndex: ChainIndex,
                    txScript: StatefulScript): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
-    mine(blockFlow, chainIndex)(transferTxs(_, _, 1, 1, Some(txScript)))
+    mine(blockFlow, chainIndex)(transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true))
   }
 
   def simpleScriptMulti(blockFlow: BlockFlow,
@@ -95,22 +97,24 @@ trait FlowFixture
     val zipped = invokers.mapWithIndex {
       case (invoker, index) => invoker -> txScripts(index)
     }
-    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, 1))
+    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALF.alf(1) / 1000))
   }
 
   def transfer(blockFlow: BlockFlow,
                chainIndex: ChainIndex,
-               amount: Int       = 1,
-               numReceivers: Int = 1): Block = {
+               amount: U256               = ALF.alf(1),
+               numReceivers: Int          = 1,
+               gasFeeInTheAmount: Boolean = true): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from))
-    mine(blockFlow, chainIndex)(transferTxs(_, _, amount, numReceivers, None))
+    mine(blockFlow, chainIndex)(transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount))
   }
 
   def transferTxs(blockFlow: BlockFlow,
                   chainIndex: ChainIndex,
-                  amount: Int,
+                  amount: U256,
                   numReceivers: Int,
-                  txScriptOpt: Option[StatefulScript]): AVector[Transaction] = {
+                  txScriptOpt: Option[StatefulScript],
+                  gasFeeInTheAmount: Boolean): AVector[Transaction] = {
     val height                     = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
@@ -126,8 +130,17 @@ trait FlowFixture
     }
     val inputs = balances.map(_._1).map(TxInput(_, unlockScript))
 
-    val outputs    = toLockupScripts.map(TxOutput.asset(amount, height, _))
-    val remaining  = TxOutput.asset(total - amount * numReceivers, height, fromLockupScript)
+    val gasFee = defaultGasPrice * minimalGas.toU256
+    val (outputs, remaining) = if (gasFeeInTheAmount) {
+      val outputs   = toLockupScripts.map(TxOutput.asset(amount - gasFee, height, _))
+      val remaining = TxOutput.asset(total - amount * numReceivers, height, fromLockupScript)
+      outputs -> remaining
+    } else {
+      val outputs = toLockupScripts.map(TxOutput.asset(amount, height, _))
+      val remaining =
+        TxOutput.asset(total - amount * numReceivers - gasFee, height, fromLockupScript)
+      outputs -> remaining
+    }
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, outputs :+ remaining)
     AVector(Transaction.from(unsignedTx, privateKey))
   }
@@ -135,7 +148,7 @@ trait FlowFixture
   def transferTxsMulti(blockFlow: BlockFlow,
                        chainIndex: ChainIndex,
                        scripts: AVector[(LockupScript, StatefulScript)],
-                       amount: Int): AVector[Transaction] = {
+                       amount: U256): AVector[Transaction] = {
     scripts.map {
       case (lockupScript, txScript) =>
         transferTx(blockFlow, chainIndex, lockupScript, amount, Some(txScript))
@@ -145,7 +158,7 @@ trait FlowFixture
   def transferTx(blockFlow: BlockFlow,
                  chainIndex: ChainIndex,
                  fromLockupScript: LockupScript,
-                 amount: Int,
+                 amount: U256,
                  txScriptOpt: Option[StatefulScript]): Transaction = {
     val height       = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
@@ -159,7 +172,7 @@ trait FlowFixture
 
     keyManager += lockupScript -> toPrivateKey
     val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
-    val output     = TxOutput.asset(amount, height, lockupScript)
+    val output     = TxOutput.asset(amount - defaultGasFee, height, lockupScript)
     val remaining  = TxOutput.asset(total - amount, height, fromLockupScript)
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, AVector(output, remaining))
     Transaction.from(unsignedTx, privateKey)

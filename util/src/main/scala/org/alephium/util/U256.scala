@@ -96,6 +96,8 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
       ByteString.fromArrayUnsafe(Array.fill(paddingLength)(0)) ++ tmp
     } else tmp
   }
+
+  override def toString: String = v.toString()
 }
 
 object U256 {

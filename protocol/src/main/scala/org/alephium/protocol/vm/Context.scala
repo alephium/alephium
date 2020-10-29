@@ -127,6 +127,11 @@ object StatefulContext {
 
     override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
+    /*
+     * this should be used only when the tx has passed these checks in validation
+     * 1. inputs are not empty
+     * 2. gas fee bounds are validated
+     */
     override def getInitialBalances: ExeResult[Frame.Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
@@ -136,7 +141,10 @@ object StatefulContext {
             .map[ExeFailure](IOErrorLoadOutputs)
           balances <- Frame.Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
-            .toRight(InvalidBalances)
+            .toRight[ExeFailure](InvalidBalances)
+          _ <- balances
+            .subAlf(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
+            .toRight[ExeFailure](UnableToPayGasFee)
         } yield balances
       } else {
         Left(NonPayableFrame)
