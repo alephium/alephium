@@ -43,7 +43,8 @@ final case object InvalidHeaderFlow                 extends InvalidHeaderStatus
 final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
 final case class HeaderIOError(e: IOError)          extends InvalidHeaderStatus
 final case object EmptyTransactionList              extends InvalidBlockStatus
-final case object InvalidCoinbase                   extends InvalidBlockStatus
+final case object InvalidCoinbaseFormat             extends InvalidBlockStatus
+final case object InvalidCoinbaseReward             extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
 final case object InvalidFlowDeps                   extends InvalidBlockStatus

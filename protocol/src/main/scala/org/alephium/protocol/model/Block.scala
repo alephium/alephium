@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     extends HashSerde[Block]
@@ -29,6 +29,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
   override def hash: Hash = header.hash
 
   def coinbase: Transaction = transactions.last
+
+  def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 
   def nonCoinbase: AVector[Transaction] = transactions.init
 

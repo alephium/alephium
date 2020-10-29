@@ -23,8 +23,8 @@ object ALF {
   val CoinInOneALF: U256     = U256.unsafe(Number.quintillion)
   val CoinInOneNanoAlf: U256 = U256.unsafe(Number.billion)
 
-  val MaxALFValue: U256   = U256.unsafe(100) mulUnsafe U256.Million mulUnsafe CoinInOneALF
-  val CoinBaseValue: U256 = U256.unsafe(15) mulUnsafe CoinInOneALF // Note: temporary value
+  val MaxALFValue: U256 = U256.unsafe(100) mulUnsafe U256.Million mulUnsafe CoinInOneALF
+  val MinerReward: U256 = U256.unsafe(15) mulUnsafe CoinInOneALF // Note: temporary value
 
   val GenesisHeight: Int          = 0
   val GenesisWeight: BigInt       = 0

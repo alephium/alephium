@@ -80,7 +80,7 @@ object TxOutput {
   */
 final case class AssetOutput(amount: U256,
                              createdHeight: Int,
-                             lockupScript: LockupScript,
+                             lockupScript: LockupScript, // TODO: exclude p2c script
                              tokens: AVector[(TokenId, U256)],
                              additionalData: ByteString)
     extends TxOutput {
