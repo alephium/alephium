@@ -10,16 +10,23 @@ Please visit our website: [https://alephium.org/](https://alephium.org/), telegr
 The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
 
 * BlockFlow algorithm based on UTXO model enables sharding and scalability for today ([algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
+  * the first sharding algorithm supports single-step cross-shard transactions, same user experience as single chain
+  * it's pure PoW based without relying on beacon chain, simple and elegant
 * Stateful UTXO model combines the advantages of both eUTXO model and account model (see code, wiki to come)
-* New VM design eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc (see code, wiki to come)
-* Tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
+  * tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
+  * the same expressiveness as account model. DApps can be easily built on top of it with better security
+* Novel VM design resolves the many critical challenges of dApp platforms (see code, wiki to come)
+  * it's way less IO intensive
+  * flash loan is disabled on purpose
+  * it eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc
+  * execution model is fine-grained, so some of the tx actions will take effect even when the sequence of actions failed eventually
 * Front-running mitigation through random execution of transactions (see code, wiki to come)  
 * PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
 
 ## Development Status
 
 This project is currently under heavy development toward MainNet launch.
-Any contribution is welcome, so don't hesitate to send an issue or pull request. 
+Any contribution is welcome, so don't hesitate to send an issue or pull request.
 
 ## Installation
 
@@ -41,7 +48,7 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 
 In order to build the project from source the following dependencies must be installed on your system:
 - java (>= 8, 11 is recommended)
-- Python
+- Python (Python3 is recommended)
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
 ### Single JAR
