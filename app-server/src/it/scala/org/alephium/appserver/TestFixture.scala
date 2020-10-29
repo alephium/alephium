@@ -68,9 +68,9 @@ trait TestFixtureLike
     (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "T1E6WcDQHkXutd6vCiMpeBZtwD1UWGwS8U5MfGevQwS16v"
-  val publicKey               = "0287d1135007a4030505f295e774d9ceae85afa9c0a5754e70037631908c5066e7"
-  val privateKey              = "2c5309e042c78253ff4edda366cf8e13fb2ef7cef60c1a2297447546852c0e66"
+  val address                 = "T1CarrVGRS2YvEoPLgY6HJvyCAcqW91buYWRJ4roRDCPPg"
+  val publicKey               = "033cd0876b492fea9c5c61f616ca3faf006097959c67f663ce7653ecb0b71b4eb4"
+  val privateKey              = "bf38aa6f383b14e678a5fd885b93dd97d1add94aaddb70b7cfb6e4c5e8330fe9"
   val (transferAddress, _, _) = generateAccount
 
   val apiKey     = Hash.generate.toHexString
