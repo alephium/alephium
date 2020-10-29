@@ -216,10 +216,14 @@ object NonCoinbaseValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
       val inputSum = preOutputs.fold(U256.Zero)(_ addUnsafe _.amount)
-      tx.alfAmountInOutputs match {
-        case Some(outputSum) if outputSum <= inputSum => validTx(())
-        case Some(_)                                  => invalidTx(InvalidAlfBalance)
-        case None                                     => invalidTx(BalanceOverFlow)
+      val result = for {
+        outputSum <- tx.alfAmountInOutputs
+        allOutSum <- outputSum.add(tx.gasFeeUnsafe) // safe after gas bound check
+      } yield allOutSum <= inputSum
+      result match {
+        case Some(true)  => validTx(())
+        case Some(false) => invalidTx(InvalidAlfBalance)
+        case None        => invalidTx(BalanceOverFlow)
       }
     }
 

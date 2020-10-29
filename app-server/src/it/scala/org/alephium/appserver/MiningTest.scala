@@ -17,6 +17,7 @@
 package org.alephium.appserver
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
@@ -46,7 +47,7 @@ class MiningTest extends AlephiumSpec {
 
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - transferAmount, 1)
+        Balance(initialBalance.balance - transferAmount - defaultGasFee, 1)
     }
 
     val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
@@ -61,7 +62,7 @@ class MiningTest extends AlephiumSpec {
 
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - (2 * transferAmount), 1)
+        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 1)
     }
 
     server1.stop()

@@ -89,16 +89,18 @@ object UnsignedTransaction {
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
                   amount: U256,
-                  height: Int): UnsignedTransaction = {
-    assume(inputSum >= amount)
-    val remainder = inputSum.subUnsafe(amount)
+                  height: Int): Option[UnsignedTransaction] = {
+    for {
+      remainder0 <- inputSum.sub(amount)
+      remainder  <- remainder0.sub(defaultGasFee)
+    } yield {
+      val toOutput   = TxOutput.asset(amount, height, toLockupScript)
+      val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
 
-    val toOutput   = TxOutput.asset(amount, height, toLockupScript)
-    val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
-
-    val outputs =
-      if (remainder > U256.Zero) AVector[AssetOutput](toOutput, fromOutput)
-      else AVector[AssetOutput](toOutput)
-    UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
+      val outputs =
+        if (remainder > U256.Zero) AVector[AssetOutput](toOutput, fromOutput)
+        else AVector[AssetOutput](toOutput)
+      UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
+    }
   }
 }

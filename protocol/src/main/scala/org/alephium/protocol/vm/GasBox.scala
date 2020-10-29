@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import org.alephium.protocol.model.minimalGas
 import org.alephium.serde.Serde
+import org.alephium.util.U256
 
 final case class GasBox private (value: Int) extends AnyVal {
   def use(amount: Int): ExeResult[GasBox] = {
@@ -25,6 +26,8 @@ final case class GasBox private (value: Int) extends AnyVal {
       Right(GasBox(value - amount))
     } else Left(OutOfGas)
   }
+
+  def toU256: U256 = U256.unsafe(value)
 }
 
 object GasBox {
