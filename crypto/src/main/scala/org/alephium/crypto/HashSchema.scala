@@ -31,6 +31,11 @@ object HashSchema {
     new Blake2b(bs)
   }
 
+  def unsafeBlake3(bs: ByteString): Blake3 = {
+    assume(bs.size == Blake3.length)
+    new Blake3(bs)
+  }
+
   def unsafeKeccak256(bs: ByteString): Keccak256 = {
     assume(bs.size == Keccak256.length)
     new Keccak256(bs)

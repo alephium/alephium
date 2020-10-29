@@ -90,4 +90,15 @@ class HashSpec extends AlephiumSpec {
       "Hello World5" -> hex"06bacc3a528511c9066a576813e80698e041f513ac478d31dd79b39e378f0dfe"
     )
   )
+
+  check(
+    Blake3,
+    Seq(
+      "Hello World1" -> hex"17d3b5965e96993f57c248a2067fae8e39c52b004dc8a486045d123843fa95ed",
+      "Hello World2" -> hex"02754dd285e9cf1930db28406eeffba69446878a7a1df4d7ce5454f7cb685313",
+      "Hello World3" -> hex"68ec63e22d53c5bcdc5184206ad5cadec61b6ef974eba86be52bea136794a029",
+      "Hello World4" -> hex"832b8318705417c7f83404bd83bcfaeab5cc75b9eda78f0f0c7a127375332480",
+      "Hello World5" -> hex"5096d2f8343d337bacda7678fb05074995a63b3c0bcd19b83b9ba5ed4b96a3db"
+    )
+  )
 }
