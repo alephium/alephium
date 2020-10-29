@@ -60,7 +60,7 @@ class AlephiumMake(object):
 
             clean        Clean the project workspace
             build        Build the project
-            format       Check code styling of the project
+            format       format code to comply with our code style
             test         Run the test suite
             itest        Run the integration test suite
             benchmark    Run the benchmark suite
@@ -90,7 +90,7 @@ class AlephiumMake(object):
         run_exit('sbt app-server/stage')
 
     def format(self):
-        run_exit('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle doc')
+        run_exit('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle it:scalafmt it:scalastyle doc')
 
     def test(self):
         run_exit('sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck scalastyle test:scalastyle coverage test coverageReport doc')
