@@ -23,10 +23,12 @@ import org.alephium.util.U256
 package object model {
   val cliqueIdLength: Int = PublicKey.length
 
+  //scalastyle:off magic.number
   // TODO: improve gas mechanism
   val minimalGas: GasBox    = GasBox.unsafe(100000)
   val defaultGasPrice: U256 = ALF.nanoAlf(1)
   val defaultGasFee: U256   = defaultGasPrice.mulUnsafe(minimalGas.toU256)
+  //scalastyle:on magic.number
 
   type TokenId    = Hash
   type ContractId = Hash

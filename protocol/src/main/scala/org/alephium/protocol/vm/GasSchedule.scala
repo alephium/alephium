@@ -16,9 +16,11 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.model.TxOutput
 import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.TxOutput
 import org.alephium.serde._
+
+//scalastyle:off magic.number
 
 trait GasSchedule {
   protected def typeHint(): Unit // for type safety
