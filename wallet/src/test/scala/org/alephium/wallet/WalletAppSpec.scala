@@ -95,14 +95,18 @@ class WalletAppSpec
   val transferAmount             = 10
   val balanceAmount              = U256.unsafe(42)
 
-  def creationJson(size: Int)                   = s"""{"password":"$password","mnemonicSize":$size}"""
+  def creationJson(size: Int, maybeName: Option[String]) =
+    s"""{"password":"$password","mnemonicSize":${size}${maybeName
+      .map(name => s""","walletName":"$name"""")
+      .getOrElse("")}}"""
   val unlockJson                                = s"""{"password":"$password"}"""
   def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${mnemonic.asJson}}"""
 
-  def create(size: Int)           = Post(s"/wallets", entity(creationJson(size))) ~> routes
+  def create(size: Int, maybeName: Option[String] = None) =
+    Post(s"/wallets", entity(creationJson(size, maybeName))) ~> routes
   def restore(mnemonic: Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
   def unlock()                    = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
   def lock()                      = Post(s"/wallets/${wallet}/lock") ~> routes
@@ -231,6 +235,14 @@ class WalletAppSpec
     }
 
     Get(s"/docs/openapi.yaml") ~> routes ~> check {
+      status is StatusCodes.OK
+    }
+
+    create(24, Some("bad!name")) ~> check {
+      status is StatusCodes.BadRequest
+    }
+
+    create(24, Some("correct_wallet-name")) ~> check {
       status is StatusCodes.OK
     }
 

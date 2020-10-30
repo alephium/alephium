@@ -67,6 +67,10 @@ object WalletService {
     val message: String = s"Invalid mnemonic: $words"
   }
 
+  final case class InvalidWalletName(name: String) extends WalletError {
+    val message: String = s"Invalid wallet name: $name"
+  }
+
   final case class CannotCreateEncryptedFile(directory: Path) extends WalletError {
     val message: String = s"Cannot create encrypted file at $directory"
   }
@@ -321,11 +325,21 @@ object WalletService {
       }
 
     private def buildWalletFile(walletName: Option[String]): Either[WalletError, File] = {
-      for {
-        currentWallets <- listWalletsInSecretDir()
-      } yield {
-        val name = walletName.getOrElse(s"wallet-${currentWallets.length}")
-        new File(s"$secretDir/$name")
+      walletName match {
+        case Some(name) =>
+          val regex = "^[a-zA-Z0-9_-]*$".r
+          Either.cond(
+            regex.matches(name),
+            new File(s"$secretDir/$name"),
+            InvalidWalletName(name)
+          )
+        case None =>
+          for {
+            currentWallets <- listWalletsInSecretDir()
+          } yield {
+            val name = s"wallet-${currentWallets.length}"
+            new File(s"$secretDir/$name")
+          }
       }
     }
   }

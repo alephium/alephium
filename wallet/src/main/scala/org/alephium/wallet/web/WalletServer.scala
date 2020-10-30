@@ -141,6 +141,7 @@ object WalletServer {
 
     walletError match {
       case _: InvalidMnemonic           => badRequest
+      case _: InvalidWalletName         => badRequest
       case _: CannotCreateEncryptedFile => badRequest
       case _: BlockFlowClientError      => badRequest
       case _: UnknownAddress            => badRequest
