@@ -235,14 +235,16 @@ class BlockFlowSpec extends AlephiumSpec {
       val hashes0 = AVector.from(blocks.map(_.hash))
       val locators0: AVector[AVector[Hash]] =
         AVector.tabulate(groupConfig.groups) { group =>
-          if (group equals testToGroup)
+          if (group equals testToGroup) {
             AVector(config.genesisBlocks(testFromGroup)(testToGroup).hash,
                     hashes0(0),
                     hashes0(1),
                     hashes0(3),
                     hashes0(4),
                     hashes0(5))
-          else AVector(config.genesisBlocks(testFromGroup)(group).hash)
+          } else {
+            AVector(config.genesisBlocks(testFromGroup)(group).hash)
+          }
         }
       blockFlow0.getSyncLocators() isE locators0
 

@@ -228,8 +228,9 @@ object Compiler {
 
     def checkReturn(returnType: Seq[Type]): Unit = {
       val rtype = funcIdents(scope).returnType
-      if (returnType != rtype)
+      if (returnType != rtype) {
         throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
+      }
     }
   }
 

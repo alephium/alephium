@@ -60,9 +60,11 @@ object BuiltIn {
 
   val checkEq: GenericStatelessBuiltIn = new GenericStatelessBuiltIn("checkEq") {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-      if (!(inputType.length == 2) || inputType(0) != inputType(1))
+      if (!(inputType.length == 2) || inputType(0) != inputType(1)) {
         throw Error(s"Invalid args type $inputType for builtin func $name")
-      else Seq.empty
+      } else {
+        Seq.empty
+      }
     }
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {

@@ -68,8 +68,11 @@ object BaseActor {
       // The following magic string is from ActorPath.ValidSymbols
       if (Character.isLetter(char) ||
           Character.isDigit(char) ||
-          """-_.*$+:@&=,!~';""".contains(char)) char
-      else '-'
+          """-_.*$+:@&=,!~';""".contains(char)) {
+        char
+      } else {
+        '-'
+      }
     }
   }
 }

@@ -123,6 +123,12 @@
             <parameter name="group.alephium">org\.alephium\..*</parameter>
         </parameters>
     </check>
+    <check level="error" class="org.scalastyle.scalariform.IfBraceChecker" enabled="true" >
+        <parameters>
+            <parameter name="singleLineAllowed">true</parameter>
+            <parameter name="doubleLineAllowed">true</parameter>
+        </parameters>
+    </check>
     <check level="error" class="org.scalastyle.file.HeaderMatchesChecker" enabled="true">
         <parameters>
             <parameter name="header"><![CDATA[// Copyright 2018 The Alephium Authors

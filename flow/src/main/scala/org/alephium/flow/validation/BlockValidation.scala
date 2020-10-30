@@ -96,9 +96,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
         unsigned.fixedOutputs.length == 1 &&
         coinbase.generatedOutputs.isEmpty &&
         coinbase.inputSignatures.isEmpty &&
-        coinbase.contractSignatures.isEmpty)
+        coinbase.contractSignatures.isEmpty) {
       validBlock(())
-    else invalidBlock(InvalidCoinbaseFormat)
+    } else {
+      invalidBlock(InvalidCoinbaseFormat)
+    }
   }
 
   // TODO: use Merkle hash for transactions

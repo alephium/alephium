@@ -27,10 +27,12 @@ object Header {
       .tuple1[Int]
       .xfmap(
         version =>
-          if (version == Protocol.version) Right(Header(version))
-          else
+          if (version == Protocol.version) {
+            Right(Header(version))
+          } else {
             Left(
-              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}")),
+              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}"))
+        },
         header => header.version
       )
 }

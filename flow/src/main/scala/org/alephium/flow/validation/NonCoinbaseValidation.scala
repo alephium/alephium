@@ -194,9 +194,11 @@ object NonCoinbaseValidation {
       EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
         tx.getOutput(outputIndex) match {
           case output: AssetOutput =>
-            if (output.additionalData.length > ALF.MaxOutputDataSize)
+            if (output.additionalData.length > ALF.MaxOutputDataSize) {
               invalidTx(OutputDataSizeExceeded)
-            else Right(())
+            } else {
+              Right(())
+            }
           case _ => Right(())
         }
       }

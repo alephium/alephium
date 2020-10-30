@@ -70,9 +70,11 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
 
   def from(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
       implicit config: GroupConfig): Option[BrokerInfo] = {
-    if (validate(brokerId, groupNumPerBroker).isRight)
+    if (validate(brokerId, groupNumPerBroker).isRight) {
       Some(new BrokerInfo(cliqueId, brokerId, groupNumPerBroker, address))
-    else None
+    } else {
+      None
+    }
   }
 
   def unsafe(cliqueId: CliqueId,
@@ -83,12 +85,15 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
 
   def validate(id: Int, groupNumPerBroker: Int)(
       implicit config: GroupConfig): Either[String, Unit] = {
-    if (id < 0 || id >= config.groups) Left(s"BrokerInfo - invalid id: $id")
-    else if (groupNumPerBroker <= 0 || (config.groups % groupNumPerBroker != 0))
-      Left(s"BrokerInfo - invalid groupNumPerBroker: $groupNumPerBroker")
-    else if (id >= (config.groups / groupNumPerBroker))
+    if (id < 0 || id >= config.groups) {
       Left(s"BrokerInfo - invalid id: $id")
-    else Right(())
+    } else if (groupNumPerBroker <= 0 || (config.groups % groupNumPerBroker != 0)) {
+      Left(s"BrokerInfo - invalid groupNumPerBroker: $groupNumPerBroker")
+    } else if (id >= (config.groups / groupNumPerBroker)) {
+      Left(s"BrokerInfo - invalid id: $id")
+    } else {
+      Right(())
+    }
   }
 
   // Check if two segments intersect or not

@@ -32,11 +32,13 @@ final case class Method[Ctx <: Context](
     instrs: AVector[Instr[Ctx]]
 ) {
   def check(args: AVector[Val]): ExeResult[Unit] = {
-    if (args.length != argsType.length)
+    if (args.length != argsType.length) {
       Left(InvalidMethodArgLength(args.length, argsType.length))
-    else if (!args.forallWithIndex((v, index) => v.tpe == argsType(index))) {
+    } else if (!args.forallWithIndex((v, index) => v.tpe == argsType(index))) {
       Left(InvalidMethodParamsType)
-    } else Right(())
+    } else {
+      Right(())
+    }
   }
 }
 

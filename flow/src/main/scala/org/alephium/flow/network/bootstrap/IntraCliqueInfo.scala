@@ -55,9 +55,11 @@ object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
 
   private def checkGroups(info: IntraCliqueInfo)(
       implicit config: GroupConfig): Either[String, Unit] = {
-    if (info.peers.length * info.groupNumPerBroker != config.groups)
+    if (info.peers.length * info.groupNumPerBroker != config.groups) {
       Left(s"invalid groups: $info")
-    else Right(())
+    } else {
+      Right(())
+    }
   }
 
   private def checkPeers(info: IntraCliqueInfo)(

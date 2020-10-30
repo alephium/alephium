@@ -63,9 +63,11 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
 
   override def validate(info: CliqueInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     val cliqueGroups = info.brokerNum * info.groupNumPerBroker
-    if (cliqueGroups != config.groups)
+    if (cliqueGroups != config.groups) {
       Left(s"Number of groups: got: $cliqueGroups expect: ${config.groups}")
-    else Right(())
+    } else {
+      Right(())
+    }
   }
 
   def unsafe(id: CliqueId,
@@ -97,9 +99,11 @@ object InterCliqueInfo extends SafeSerdeImpl[InterCliqueInfo, GroupConfig] {
   override def validate(info: InterCliqueInfo)(
       implicit config: GroupConfig): Either[String, Unit] = {
     val cliqueGroup = info.brokerNum * info.groupNumPerBroker
-    if (cliqueGroup != config.groups)
+    if (cliqueGroup != config.groups) {
       Left(s"Number of groups: got: $cliqueGroup expect: ${config.groups}")
-    else Right(())
+    } else {
+      Right(())
+    }
   }
 
   def unsafe(id: CliqueId,

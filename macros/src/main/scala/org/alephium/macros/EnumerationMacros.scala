@@ -41,12 +41,13 @@ object EnumerationMacros {
       c.abort(c.enclosingPosition, "Can only enumerate values of a sealed trait or class.")
     } else {
       val children = symbol.knownDirectSubclasses.toList
-      if (!children.forall(_.isModuleClass))
+      if (!children.forall(_.isModuleClass)) {
         c.abort(c.enclosingPosition, "All children must be objects.")
-      else
+      } else {
         c.Expr[TreeSet[A]] {
           Apply(Select(reify(TreeSet).tree, TermName("apply")), children.map(sourceModuleRef(_)))
         }
+      }
     }
   }
 }

@@ -128,9 +128,11 @@ object HeaderValidation {
     }
     protected[validation] def checkTimeStampDrift(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (TimeStamp.now() + consensusConfig.maxHeaderTimeStampDrift <= header.timestamp)
+      if (TimeStamp.now() + consensusConfig.maxHeaderTimeStampDrift <= header.timestamp) {
         invalidHeader(TooAdvancedTimeStamp)
-      else validHeader(())
+      } else {
+        validHeader(())
+      }
     }
 
     protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit] = {

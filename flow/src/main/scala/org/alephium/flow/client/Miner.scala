@@ -78,10 +78,14 @@ object Miner {
     def iter(current: BigInt): Option[(Block, BigInt)] = {
       if (current < nonceEnd) {
         val header = template.buildHeader(current)
-        if (Validation.validateMined(header, index))
+        if (Validation.validateMined(header, index)) {
           Some((Block(header, template.transactions), current - nonceStart + 1))
-        else iter(current + 1)
-      } else None
+        } else {
+          iter(current + 1)
+        }
+      } else {
+        None
+      }
     }
     iter(nonceStart)
   }

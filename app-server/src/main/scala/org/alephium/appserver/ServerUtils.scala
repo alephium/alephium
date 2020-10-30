@@ -191,8 +191,11 @@ object ServerUtils {
       implicit groupConfig: GroupConfig): Try[Unit] = {
     val chainIndex = ChainIndex.from(hash)
     if (blockFlow.brokerConfig.contains(chainIndex.from) ||
-        blockFlow.brokerConfig.contains(chainIndex.to)) Right(())
-    else Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
+        blockFlow.brokerConfig.contains(chainIndex.to)) {
+      Right(())
+    } else {
+      Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
+    }
   }
 
   def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =

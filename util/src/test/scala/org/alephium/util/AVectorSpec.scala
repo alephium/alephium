@@ -167,9 +167,11 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     val vc0 = AVector.empty[A]
     0 to 3 * AVector.defaultSize foreach { n =>
       vc0.ensureSize(n)
-      if (n <= AVector.defaultSize)
+      if (n <= AVector.defaultSize) {
         vc0.capacity is AVector.defaultSize
-      else vc0.capacity is AVector.nextPowerOfTwo(n)
+      } else {
+        vc0.capacity is AVector.nextPowerOfTwo(n)
+      }
     }
   }
 
