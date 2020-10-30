@@ -10,19 +10,19 @@ Please visit our website: [https://alephium.org/](https://alephium.org/), telegr
 The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
 
 * BlockFlow algorithm based on UTXO model enables sharding and scalability for today ([algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
-  * the first sharding algorithm supports single-step cross-shard transactions, same user experience as single chain
-  * it's pure PoW based without relying on beacon chain, simple and elegant
-* Stateful UTXO model combines the advantages of both eUTXO model and account model (see code, wiki to come)
-  * tokens are first-class citizens and UTXO-based, which can be controlled totally by users instead of contracts
-  * the same expressiveness as account model. DApps can be easily built on top of it with better security
-  * support multiple participants in a single smart contract tx call
-* Novel VM design resolves the many critical challenges of dApp platforms (see code, wiki to come)
-  * it's way less IO intensive
-  * flash loan is disabled on purpose
-  * it eliminates many attack vectors of EVM including unlimited authorization, double dip issue, re-entrancy attack, etc
-  * execution model is fine-grained, so some of the tx actions will take effect even when the sequence of actions failed eventually
-* Front-running mitigation through random execution of transactions (see code, wiki to come)  
-* PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
+  * the first sharding algorithm supports `single-step cross-shard transactions`, same user experience as single chain
+  * the `PoW based sharding` does not rely on beacon chain, simple and elegant
+* `Stateful UTXO model` combines the advantages of both eUTXO model and account model (see code, wiki to come)
+  * tokens are first-class citizens and UTXO-based, which are safely `owned by users` directly instead of contracts
+  * the same `expressiveness as account model`. DApps can be easily built on top of it with better security
+  * support `multiple participants` in a single smart contract tx call
+* Novel VM design resolves many critical challenges of dApp platforms (see code, wiki to come)
+  * it's way `less IO intensive`
+  * `flash loan is not available` by design
+  * eliminate many `attack vectors of EVM` including unlimited authorization, double dip issue, re-entrancy attack, etc
+  * `fine-grained execution model` ensures that some of the tx actions will take effect even when the sequence of actions failed as a whole
+* `Front-running mitigation` through random execution of transactions (see code, wiki to come)  
+* PoLW algorithm `reduces the energy consumption` of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
 
 ## Development Status
 
