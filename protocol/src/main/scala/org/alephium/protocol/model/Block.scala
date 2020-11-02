@@ -17,6 +17,8 @@
 package org.alephium.protocol.model
 
 import scala.annotation.tailrec
+import scala.collection.immutable.ArraySeq
+import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
@@ -33,6 +35,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
   def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 
   def nonCoinbase: AVector[Transaction] = transactions.init
+
+  def nonCoinbaseLength: Int = transactions.length - 1
 
   override def timestamp: TimeStamp = header.timestamp
 
@@ -52,41 +56,57 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     header.uncleHash(toIndex)
   }
 
-  // we shuffle non-coinbase txs randomly for execution to mitigate front-running
-  def getExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+  // we shuffle tx scripts randomly for execution to mitigate front-running
+  def getScriptExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
     if (isGenesis) {
-      AVector.tabulate(transactions.length)(identity)
+      AVector.empty
     } else {
-      val nonCoinbaseLength = transactions.length - 1
-      val orders            = Array.tabulate(transactions.length)(identity)
+      val scriptOrders = scriptIndexes()
 
       @tailrec
-      def iter(index: Int, seed: Hash): Unit = {
-        if (index < nonCoinbaseLength - 1) {
-          val txRemaining = nonCoinbaseLength - index - 1
+      def shuffle(index: Int, seed: Hash): Unit = {
+        if (index < scriptOrders.length - 1) {
+          val txRemaining = scriptOrders.length - index
           val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
-          val tmp         = orders(index)
-          orders(index)       = orders(randomIndex)
-          orders(randomIndex) = tmp
-          iter(index + 1, transactions(randomIndex).hash)
+          val tmp         = scriptOrders(index)
+          scriptOrders(index)       = scriptOrders(randomIndex)
+          scriptOrders(randomIndex) = tmp
+          shuffle(index + 1, transactions(randomIndex).hash)
         }
       }
 
-      val initialSeed = {
-        val seed0 = transactions.fold(parentHash) {
-          case (acc, tx) => Hash.xor(acc, tx.hash)
+      if (scriptOrders.length > 1) {
+        val initialSeed = {
+          val maxIndex = nonCoinbaseLength - 1
+          val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
+          samples.foldLeft(parentHash) {
+            case (acc, index) =>
+              val tx = transactions(index)
+              Hash.xor(acc, tx.hash)
+          }
         }
-        transactions.fold(seed0) {
-          case (acc, tx) => Hash.xor(Hash.addPerByte(acc, tx.hash), tx.hash)
-        }
+        shuffle(0, initialSeed)
       }
-      iter(0, initialSeed)
-      AVector.unsafe(orders)
+      AVector.from(scriptOrders)
     }
   }
 
   def getNonCoinbaseExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
-    getExecutionOrder.init
+    assume(!isGenesis)
+    getScriptExecutionOrder ++ nonCoinbase.foldWithIndex(AVector.empty[Int]) {
+      case (acc, tx, index) => if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
+    }
+  }
+
+  def scriptIndexes(): ArrayBuffer[Int] = {
+    val indexes = ArrayBuffer.empty[Int]
+    transactions.foreachWithIndex {
+      case (tx, txIndex) =>
+        if (tx.unsigned.scriptOpt.nonEmpty) {
+          indexes.addOne(txIndex)
+        }
+    }
+    indexes
   }
 }
 
