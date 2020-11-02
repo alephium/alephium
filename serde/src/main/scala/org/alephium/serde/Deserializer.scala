@@ -24,8 +24,11 @@ trait Deserializer[T] { self =>
   def deserialize(input: ByteString): SerdeResult[T] =
     _deserialize(input).flatMap {
       case (output, rest) =>
-        if (rest.isEmpty) Right(output)
-        else Left(SerdeError.redundant(input.size - rest.size, input.size))
+        if (rest.isEmpty) {
+          Right(output)
+        } else {
+          Left(SerdeError.redundant(input.size - rest.size, input.size))
+        }
     }
 
   def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =

@@ -192,8 +192,11 @@ object DiscoveryMessage {
       signature = signaturePair._1
       rest2     = signaturePair._2
       payload <- Payload.deserialize(rest2).flatMap { payload =>
-        if (SignatureSchema.verify(rest2, signature, header.publicKey)) Right(payload)
-        else Left(SerdeError.validation(s"Invalid signature"))
+        if (SignatureSchema.verify(rest2, signature, header.publicKey)) {
+          Right(payload)
+        } else {
+          Left(SerdeError.validation(s"Invalid signature"))
+        }
       }
     } yield DiscoveryMessage(header, payload)
   }

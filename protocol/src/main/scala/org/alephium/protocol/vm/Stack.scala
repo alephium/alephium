@@ -78,7 +78,9 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
       elems.foreachWithIndex((elem, index) => underlying(currentIndex + index) = elem)
       currentIndex += elems.length
       Right(())
-    } else Left(StackOverflow)
+    } else {
+      Left(StackOverflow)
+    }
   }
 
   def pop(): ExeResult[T] = {
@@ -102,12 +104,15 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
       }
       currentIndex = start
       Right(elems)
-    } else Left(StackUnderflow)
+    } else {
+      Left(StackUnderflow)
+    }
   }
 
   def remove(total: Int): ExeResult[Unit] = {
-    if (size < total) Left(StackUnderflow)
-    else {
+    if (size < total) {
+      Left(StackUnderflow)
+    } else {
       currentIndex -= total
       Right(())
     }

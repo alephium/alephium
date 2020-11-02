@@ -40,7 +40,9 @@ trait CliqueCoordinatorState {
       brokerInfos(id)      = Some(info)
       brokerConnectors(id) = Some(sender)
       true
-    } else false
+    } else {
+      false
+    }
   }
 
   def isBrokerInfoFull: Boolean = {

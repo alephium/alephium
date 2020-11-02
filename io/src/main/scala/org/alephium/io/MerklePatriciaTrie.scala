@@ -260,7 +260,9 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
             case None =>
               Right(None)
           }
-        } else Right(None)
+        } else {
+          Right(None)
+        }
       case LeafNode(path, data) =>
         if (path == nibbles) Right(Some(data)) else Right(None)
     }
@@ -338,8 +340,11 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
       if (oldChildOptHash != childOptHash) {
         val newBranchNode = BranchNode(branchNode.path, newChildren)
         val toDelete =
-          if (oldChildOptHash.isEmpty) result.toDelete :+ branchHash
-          else result.toDelete ++ AVector(oldChildOptHash.get, branchHash)
+          if (oldChildOptHash.isEmpty) {
+            result.toDelete :+ branchHash
+          } else {
+            result.toDelete ++ AVector(oldChildOptHash.get, branchHash)
+          }
         Right(TrieUpdateActions(Some(newBranchNode), toDelete, result.toAdd :+ newBranchNode))
       } else {
         Right(TrieUpdateActions(Some(branchNode), AVector.empty, AVector.empty))
@@ -390,8 +395,9 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
           }
         case leaf: LeafNode =>
           assume(path.length == nibbles.length)
-          if (leaf.data == value) Right(TrieUpdateActions(Some(leaf), AVector.empty, AVector.empty))
-          else {
+          if (leaf.data == value) {
+            Right(TrieUpdateActions(Some(leaf), AVector.empty, AVector.empty))
+          } else {
             val newLeaf = LeafNode(path, value)
             Right(TrieUpdateActions(Some(newLeaf), AVector(leaf.hash), AVector(newLeaf)))
           }
@@ -468,7 +474,9 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
                 getAllRaw(prefixRest.tail, child, acc ++ n.path ++ ByteString(nibble))
               case None => Right(AVector.empty)
             }
-          } else Right(AVector.empty)
+          } else {
+            Right(AVector.empty)
+          }
         }
       case n: LeafNode =>
         if (n.path.take(prefix.length) == prefix) {

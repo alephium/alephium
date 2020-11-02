@@ -73,8 +73,11 @@ trait ChainDifficultyAdjustment {
     val nextTarget = currentTarget.value
       .multiply(BigInteger.valueOf(timeSpanMs))
       .divide(BigInteger.valueOf(consensusConfig.expectedTimeSpan.millis))
-    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) Target.unsafe(nextTarget)
-    else consensusConfig.maxMiningTarget
+    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
+      Target.unsafe(nextTarget)
+    } else {
+      consensusConfig.maxMiningTarget
+    }
   }
 }
 

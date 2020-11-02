@@ -92,8 +92,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   final def reorgFrom(hash: Hash, height: Int): IOResult[Unit] = {
     getHashes(height).flatMap { hashes =>
       assume(hashes.contains(hash))
-      if (hashes.head == hash) Right(())
-      else {
+      if (hashes.head == hash) {
+        Right(())
+      } else {
         for {
           _      <- heightIndexStorage.put(height, hash +: hashes.filter(_ != hash))
           parent <- getParentHash(hash)
@@ -120,8 +121,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getHeight(hash).flatMap {
       case height if height > heightUntil =>
         getBlockHeader(hash).flatMap { header =>
-          if (height > heightUntil + 1) chainBack(header.parentHash, heightUntil).map(_ :+ hash)
-          else Right(AVector(hash))
+          if (height > heightUntil + 1) {
+            chainBack(header.parentHash, heightUntil).map(_ :+ hash)
+          } else {
+            Right(AVector(hash))
+          }
         }
       case _ => Right(AVector.empty)
     }
@@ -185,8 +189,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
     @tailrec
     def iter(currentHeader: BlockHeader, currentHeight: Int, acc: AVector[Hash]): AVector[Hash] = {
-      if (currentHeight <= heightFrom) acc :+ currentHeader.hash
-      else {
+      if (currentHeight <= heightFrom) {
+        acc :+ currentHeader.hash
+      } else {
         val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
         iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
       }

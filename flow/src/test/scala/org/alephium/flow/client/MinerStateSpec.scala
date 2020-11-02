@@ -88,8 +88,11 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     }
     startNewTasks()
     (0 until brokerConfig.groups).foreach { i =>
-      if (i != to) probes(fromShift)(i).expectNoMessage()
-      else probes(fromShift)(i).expectMsgType[BlockTemplate]
+      if (i != to) {
+        probes(fromShift)(i).expectNoMessage()
+      } else {
+        probes(fromShift)(i).expectMsgType[BlockTemplate]
+      }
     }
   }
 }

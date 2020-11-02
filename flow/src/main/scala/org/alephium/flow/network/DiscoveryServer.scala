@@ -135,8 +135,11 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
       scan()
-      if (shouldScanFast()) scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
-      else scheduleOnce(self, Scan, discoveryConfig.scanFrequency)
+      if (shouldScanFast()) {
+        scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
+      } else {
+        scheduleOnce(self, Scan, discoveryConfig.scanFrequency)
+      }
       ()
     case GetNeighborCliques =>
       sender() ! NeighborCliques(getActivePeers)

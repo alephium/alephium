@@ -179,8 +179,9 @@ object ServerUtils {
 
   def checkGroup(blockFlow: BlockFlow, lockupScript: LockupScript): Try[Unit] = {
     val groupIndex = lockupScript.groupIndex(blockFlow.brokerConfig)
-    if (blockFlow.brokerConfig.contains(groupIndex)) Right(())
-    else {
+    if (blockFlow.brokerConfig.contains(groupIndex)) {
+      Right(())
+    } else {
       //TODO add `address.toBase58` to message
       //it require to have an `implicit ChainsConfig`
       Left(Response.failed(s"Address belongs to other groups"))

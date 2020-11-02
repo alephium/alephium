@@ -74,8 +74,11 @@ object Compiler {
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
-    if (tpe.length == 1) tpe(0)
-    else throw Error(s"Try to set types $tpe for varialbe $ident")
+    if (tpe.length == 1) {
+      tpe(0)
+    } else {
+      throw Error(s"Try to set types $tpe for varialbe $ident")
+    }
   }
 
   final case class VarInfo(tpe: Type, isMutable: Boolean, index: Byte)
@@ -89,8 +92,11 @@ object Compiler {
     def name: String = id.name
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-      if (inputType == argsType) returnType
-      else throw Error(s"Invalid args type $inputType for func $name")
+      if (inputType == argsType) {
+        returnType
+      } else {
+        throw Error(s"Invalid args type $inputType for func $name")
+      }
     }
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
@@ -98,8 +104,11 @@ object Compiler {
     }
 
     override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
-      if (isPublic) Seq(CallExternal(index))
-      else throw Error(s"Call external private function of $typeId")
+      if (isPublic) {
+        Seq(CallExternal(index))
+      } else {
+        throw Error(s"Call external private function of $typeId")
+      }
     }
   }
   object SimpleFunc {
@@ -194,8 +203,11 @@ object Compiler {
     def getType(ident: Ast.Ident): Type = getVariable(ident).tpe
 
     def getFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
-      if (call.isBuiltIn) getBuiltInFunc(call)
-      else getNewFunc(call)
+      if (call.isBuiltIn) {
+        getBuiltInFunc(call)
+      } else {
+        getNewFunc(call)
+      }
     }
 
     def getContract(objId: Ast.Ident): Ast.TypeId = {
@@ -249,14 +261,20 @@ object Compiler {
 
     def genLoadCode(ident: Ast.Ident): Instr[StatelessContext] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) throw Error(s"Loading state by ${ident.name} in a stateless context")
-      else LoadLocal(varInfo.index)
+      if (isField(ident)) {
+        throw Error(s"Loading state by ${ident.name} in a stateless context")
+      } else {
+        LoadLocal(varInfo.index)
+      }
     }
 
     def genStoreCode(ident: Ast.Ident): Instr[StatelessContext] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) throw Error(s"Storing state by ${ident.name} in a stateless context")
-      else StoreLocal(varInfo.index)
+      if (isField(ident)) {
+        throw Error(s"Storing state by ${ident.name} in a stateless context")
+      } else {
+        StoreLocal(varInfo.index)
+      }
     }
   }
 
@@ -275,14 +293,20 @@ object Compiler {
 
     def genLoadCode(ident: Ast.Ident): Instr[StatefulContext] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) LoadField(varInfo.index)
-      else LoadLocal(varInfo.index)
+      if (isField(ident)) {
+        LoadField(varInfo.index)
+      } else {
+        LoadLocal(varInfo.index)
+      }
     }
 
     def genStoreCode(ident: Ast.Ident): Instr[StatefulContext] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) StoreField(varInfo.index)
-      else StoreLocal(varInfo.index)
+      if (isField(ident)) {
+        StoreField(varInfo.index)
+      } else {
+        StoreLocal(varInfo.index)
+      }
     }
   }
 }

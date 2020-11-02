@@ -46,8 +46,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] = {
       val state = hashesTable(hash)
-      if (state.height > heightUntil) chainBack(state.parentOpt.get, heightUntil).map(_ :+ hash)
-      else Right(AVector.empty)
+      if (state.height > heightUntil) {
+        chainBack(state.parentOpt.get, heightUntil).map(_ :+ hash)
+      } else {
+        Right(AVector.empty)
+      }
     }
 
     def calMedianBlockTime(hash: Hash): IOResult[(TimeStamp, TimeStamp)] = {

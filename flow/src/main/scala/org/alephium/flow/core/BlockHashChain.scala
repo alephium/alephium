@@ -157,8 +157,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def getHashesAfter(height: Int, hashes: AVector[Hash]): IOResult[AVector[Hash]] = {
-    if (hashes.isEmpty) Right(AVector.empty)
-    else {
+    if (hashes.isEmpty) {
+      Right(AVector.empty)
+    } else {
       for {
         childHashes <- getHashes(height + 1)
         childPairs  <- childHashes.mapE(getLink)
@@ -172,8 +173,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     assume(height >= ALF.GenesisHeight)
     @tailrec
     def iter(currentHash: Hash, currentHeight: Int): IOResult[Hash] = {
-      if (currentHeight == height) Right(currentHash)
-      else {
+      if (currentHeight == height) {
+        Right(currentHash)
+      } else {
         getParentHash(currentHash) match {
           case Right(parentHash) => iter(parentHash, currentHeight - 1)
           case Left(error)       => Left(error)
@@ -217,8 +219,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] = {
     @tailrec
     def iter(acc: AVector[Hash], current: Hash): IOResult[AVector[Hash]] = {
-      if (isGenesis(current)) Right(acc :+ current)
-      else {
+      if (isGenesis(current)) {
+        Right(acc :+ current)
+      } else {
         getParentHash(current) match {
           case Right(parentHash) => iter(acc :+ current, parentHash)
           case Left(error)       => Left(error)
@@ -242,7 +245,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       getPredecessor(hash2, height1).map(_.equals(hash1))
     } else if (height1 == height2) {
       Right(hash1.equals(hash2))
-    } else Right(false)
+    } else {
+      Right(false)
+    }
   }
 
   def calHashDiff(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
@@ -260,8 +265,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def calHashDiffFromSameHeight(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
-    if (newHash == oldHash) Right(ChainDiff(AVector.empty, AVector.empty))
-    else {
+    if (newHash == oldHash) {
+      Right(ChainDiff(AVector.empty, AVector.empty))
+    } else {
       for {
         newParent <- getParentHash(newHash)
         oldParent <- getParentHash(oldHash)

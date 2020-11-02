@@ -99,8 +99,9 @@ final class Forest[K, T](val roots: mutable.ArrayBuffer[Node[K, T]]) {
 
   private def withRemove(key: K)(f: (Int, Node[K, T]) => Unit): Option[Node[K, T]] = {
     val index = roots.indexWhere(_.key == key)
-    if (index == -1) None
-    else {
+    if (index == -1) {
+      None
+    } else {
       val node = roots(index)
       f(index, node)
       Some(node)

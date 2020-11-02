@@ -93,7 +93,9 @@ object Ast {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
-      } else Seq(Type.Contract.stack(contractType))
+      } else {
+        Seq(Type.Contract.stack(contractType))
+      }
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
@@ -374,8 +376,11 @@ object Ast {
 
   final case class MultiTxContract(contracts: Seq[ContractWithState]) {
     def get(contractIndex: Int): ContractWithState = {
-      if (contractIndex >= 0 && contractIndex < contracts.size) contracts(contractIndex)
-      else throw Compiler.Error(s"Invalid contract index $contractIndex")
+      if (contractIndex >= 0 && contractIndex < contracts.size) {
+        contracts(contractIndex)
+      } else {
+        throw Compiler.Error(s"Invalid contract index $contractIndex")
+      }
     }
 
     def genStatefulScript(contractIndex: Int): StatefulScript = {

@@ -52,8 +52,9 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
     val sizeBefore = size
     transactions.foreachE {
       case (tx, weight) =>
-        if (isFull) Left(())
-        else {
+        if (isFull) {
+          Left(())
+        } else {
           weights += tx.hash                  -> weight
           pool += WeightedId(weight, tx.hash) -> tx
           Right(())

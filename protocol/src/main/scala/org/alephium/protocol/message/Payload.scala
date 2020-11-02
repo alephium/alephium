@@ -137,8 +137,11 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
     Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
 
   def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
-    if (message.version == Protocol.version && message.timestamp > 0) Right(())
-    else Left(s"invalid HandShake: $message")
+    if (message.version == Protocol.version && message.timestamp > 0) {
+      Right(())
+    } else {
+      Left(s"invalid HandShake: $message")
+    }
 }
 
 final case class Hello private (

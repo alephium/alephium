@@ -42,12 +42,15 @@ class U32(val v: Int) extends AnyVal with Ordered[U32] {
   def sub(that: U32): Option[U32] = {
     if (U32.checkSub(this, that)) {
       Some(U32.unsafe(this.v - that.v))
-    } else None
+    } else {
+      None
+    }
   }
 
   def mulUnsafe(that: U32): U32 = {
-    if (this.v == 0) U32.Zero
-    else {
+    if (this.v == 0) {
+      U32.Zero
+    } else {
       val underlying = this.v * that.v
       assume(U32.checkMul(this, that, underlying))
       U32.unsafe(underlying)
@@ -55,12 +58,15 @@ class U32(val v: Int) extends AnyVal with Ordered[U32] {
   }
 
   def mul(that: U32): Option[U32] = {
-    if (this.v == 0) Some(U32.Zero)
-    else {
+    if (this.v == 0) {
+      Some(U32.Zero)
+    } else {
       val underlying = this.v * that.v
       if (U32.checkMul(this, that, underlying)) {
         Some(U32.unsafe(underlying))
-      } else None
+      } else {
+        None
+      }
     }
   }
 
@@ -104,7 +110,9 @@ object U32 {
     try {
       if (validate(value)) {
         Some(unsafe(value.intValue()))
-      } else None
+      } else {
+        None
+      }
     } catch {
       case _: ArithmeticException => None
     }

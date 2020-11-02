@@ -93,7 +93,9 @@ final case class NetworkSetting(
         client.addPortMapping(bindingPort, bindingPort)
         new InetSocketAddress(client.externalAddress, bindingPort)
       }
-    } else None
+    } else {
+      None
+    }
   }
 }
 

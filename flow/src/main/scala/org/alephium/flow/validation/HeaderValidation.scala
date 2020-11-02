@@ -96,13 +96,19 @@ object HeaderValidation {
       extends HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.timestamp != TimeStamp.zero) invalidHeader(InvalidGenesisTimeStamp)
-      else validHeader(())
+      if (header.timestamp != TimeStamp.zero) {
+        invalidHeader(InvalidGenesisTimeStamp)
+      } else {
+        validHeader(())
+      }
     }
     protected[validation] def checkGenesisDependencies(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.blockDeps.nonEmpty) invalidHeader(InvalidGenesisDeps)
-      else validHeader(())
+      if (header.blockDeps.nonEmpty) {
+        invalidHeader(InvalidGenesisDeps)
+      } else {
+        validHeader(())
+      }
     }
     protected[validation] def checkGenesisWorkAmount(
         header: BlockHeader): HeaderValidationResult[Unit] = {
@@ -110,8 +116,11 @@ object HeaderValidation {
     }
     protected[validation] def checkGenesisWorkTarget(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.target != consensusConfig.maxMiningTarget) invalidHeader(InvalidGenesisWorkTarget)
-      else validHeader(())
+      if (header.target != consensusConfig.maxMiningTarget) {
+        invalidHeader(InvalidGenesisWorkTarget)
+      } else {
+        validHeader(())
+      }
     }
 
     protected[validation] def getParentHeader(
@@ -123,8 +132,11 @@ object HeaderValidation {
     protected[validation] def checkTimeStampIncreasing(
         header: BlockHeader,
         parent: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.timestamp <= parent.timestamp) invalidHeader(NoIncreasingTimeStamp)
-      else validHeader(())
+      if (header.timestamp <= parent.timestamp) {
+        invalidHeader(NoIncreasingTimeStamp)
+      } else {
+        validHeader(())
+      }
     }
     protected[validation] def checkTimeStampDrift(
         header: BlockHeader): HeaderValidationResult[Unit] = {

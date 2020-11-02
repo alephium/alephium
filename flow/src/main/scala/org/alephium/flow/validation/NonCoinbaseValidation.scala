@@ -104,22 +104,34 @@ object NonCoinbaseValidation {
   class Impl(implicit val groupConfig: GroupConfig) extends NonCoinbaseValidation {
     protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
       val inputNum = tx.unsigned.inputs.length
-      if (inputNum == 0) invalidTx(NoInputs)
-      else if (inputNum > ALF.MaxTxInputNum) invalidTx(TooManyInputs)
-      else validTx(())
+      if (inputNum == 0) {
+        invalidTx(NoInputs)
+      } else if (inputNum > ALF.MaxTxInputNum) {
+        invalidTx(TooManyInputs)
+      } else {
+        validTx(())
+      }
     }
 
     protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit] = {
       val outputNum = tx.outputsLength
-      if (outputNum == 0) invalidTx(NoOutputs)
-      else if (outputNum > ALF.MaxTxOutputNum) invalidTx(TooManyOutputs)
-      else validTx(())
+      if (outputNum == 0) {
+        invalidTx(NoOutputs)
+      } else if (outputNum > ALF.MaxTxOutputNum) {
+        invalidTx(TooManyOutputs)
+      } else {
+        validTx(())
+      }
     }
 
     protected[validation] def checkGasBound(tx: Transaction): TxValidationResult[Unit] = {
-      if (!GasBox.validate(tx.unsigned.startGas)) invalidTx(InvalidStartGas)
-      else if (!checkGasPrice(tx.unsigned.gasPrice)) invalidTx(InvalidGasPrice)
-      else validTx(())
+      if (!GasBox.validate(tx.unsigned.startGas)) {
+        invalidTx(InvalidStartGas)
+      } else if (!checkGasPrice(tx.unsigned.gasPrice)) {
+        invalidTx(InvalidGasPrice)
+      } else {
+        validTx(())
+      }
     }
 
     private def checkGasPrice(gas: U256): Boolean = {
@@ -137,8 +149,9 @@ object NonCoinbaseValidation {
         tx: Transaction): TxValidationResult[Unit] = {
       @tailrec
       def iter(outputIndex: Int): TxValidationResult[Unit] = {
-        if (outputIndex >= tx.outputsLength) validTx(())
-        else {
+        if (outputIndex >= tx.outputsLength) {
+          validTx(())
+        } else {
           val output = tx.getOutput(outputIndex)
           val ok     = output.amount.nonZero && output.tokens.forall(_._2.nonZero)
           if (ok) iter(outputIndex + 1) else invalidTx(AmountIsZero)
@@ -158,8 +171,9 @@ object NonCoinbaseValidation {
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex] = {
       val inputIndexes = tx.unsigned.inputs.map(_.fromGroup).toSet
-      if (inputIndexes.size != 1) invalidTx(InvalidInputGroupIndex)
-      else {
+      if (inputIndexes.size != 1) {
+        invalidTx(InvalidInputGroupIndex)
+      } else {
         val fromIndex = inputIndexes.head
         val outputIndexes =
           (0 until tx.outputsLength).view
@@ -182,8 +196,9 @@ object NonCoinbaseValidation {
     protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
       val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
       tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpending)
-        else {
+        if (utxoUsed.contains(input.outputRef)) {
+          invalidTx(DoubleSpending)
+        } else {
           utxoUsed += input.outputRef
           validTx(())
         }
@@ -232,8 +247,9 @@ object NonCoinbaseValidation {
     protected[validation] def checkTokenBalance(
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
-      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) validTx(())
-      else {
+      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
+        validTx(())
+      } else {
         for {
           inputBalances  <- computeTokenBalances(preOutputs)
           outputBalances <- computeTokenBalances(tx.allOutputs)
@@ -350,9 +366,13 @@ object NonCoinbaseValidation {
             StatefulVM.runTxScript(worldState, tx, script, gasRemaining) match {
               case Right(
                   StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs, newState)) =>
-                if (contractInputs != tx.contractInputs) invalidTx(InvalidContractInputs)
-                else if (generatedOutputs != tx.generatedOutputs) invalidTx(InvalidGeneratedOutputs)
-                else validTx(newState)
+                if (contractInputs != tx.contractInputs) {
+                  invalidTx(InvalidContractInputs)
+                } else if (generatedOutputs != tx.generatedOutputs) {
+                  invalidTx(InvalidGeneratedOutputs)
+                } else {
+                  validTx(newState)
+                }
               case Left(error) => invalidTx(TxScriptExeFailed(error))
             }
           case None => validTx(worldState)

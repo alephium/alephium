@@ -43,8 +43,9 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
 
     @tailrec
     def iter(currentTips: FlowTips, tips: AVector[Hash]): Option[FlowTips] = {
-      if (tips.isEmpty) Some(currentTips)
-      else {
+      if (tips.isEmpty) {
+        Some(currentTips)
+      } else {
         tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts = false) match {
           case Some(merged) => iter(merged, tips.tail)
           case None         => None

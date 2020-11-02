@@ -43,8 +43,9 @@ object Base58 {
   }
 
   def encode(bs: ByteString): String = {
-    if (bs.isEmpty) ""
-    else {
+    if (bs.isEmpty) {
+      ""
+    } else {
       val array  = bs.toArray
       val nZeros = count(array.indexWhere(_ != 0), array.length)
       val prefix = Array.fill(nZeros)(alphabet(0))
@@ -56,7 +57,9 @@ object Base58 {
           val (div, rem) = value /% base
           stringBuilder.append(alphabet(rem.intValue))
           iter(div)
-        } else stringBuilder.reverseInPlace()
+        } else {
+          stringBuilder.reverseInPlace()
+        }
       }
       iter(BigInt(1, array))
 
@@ -74,8 +77,9 @@ object Base58 {
       if (n == -1) return None else (bi * base + n)
     }
 
-    if (decodedBi == zero) Some(zeros)
-    else {
+    if (decodedBi == zero) {
+      Some(zeros)
+    } else {
       Some(zeros ++ ByteString.fromArrayUnsafe(decodedBi.toByteArray).dropWhile(_ == 0))
     }
   }

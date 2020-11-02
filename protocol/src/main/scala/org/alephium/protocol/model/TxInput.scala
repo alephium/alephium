@@ -54,8 +54,11 @@ object AssetOutputRef {
     Serde
       .forProduct2[Hint, Hash, AssetOutputRef](unsafe, t => (t.hint, t.key))
       .validate(outputRef =>
-        if (outputRef.hint.isAssetType) Right(())
-        else Left("Expect AssetOutputRef, got ContractOutputRef"))
+        if (outputRef.hint.isAssetType) {
+          Right(())
+        } else {
+          Left("Expect AssetOutputRef, got ContractOutputRef")
+      })
 
   def unsafe(hint: Hint, key: Hash): AssetOutputRef = new AssetOutputRef(hint, key)
 
@@ -78,8 +81,11 @@ object ContractOutputRef {
     Serde
       .forProduct2[Hint, Hash, ContractOutputRef](unsafe, t => (t.hint, t.key))
       .validate(outputRef =>
-        if (outputRef.hint.isContractType) Right(())
-        else Left("Expected ContractOutputRef, got AssetOutputRef"))
+        if (outputRef.hint.isContractType) {
+          Right(())
+        } else {
+          Left("Expected ContractOutputRef, got AssetOutputRef")
+      })
 
   def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 

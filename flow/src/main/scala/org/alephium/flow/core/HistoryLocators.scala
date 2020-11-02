@@ -24,9 +24,11 @@ object HistoryLocators {
   // fromHeight and toHeight are inclusive
   def sampleHeights(fromHeight: Int, toHeight: Int): AVector[Int] = {
     assume(fromHeight <= toHeight && fromHeight >= 0)
-    if (toHeight == fromHeight) AVector(fromHeight)
-    else if (toHeight == fromHeight + 1) AVector(fromHeight, toHeight)
-    else {
+    if (toHeight == fromHeight) {
+      AVector(fromHeight)
+    } else if (toHeight == fromHeight + 1) {
+      AVector(fromHeight, toHeight)
+    } else {
       val middleHeight = fromHeight + (toHeight - fromHeight) / 2
       val heights      = mutable.ArrayBuffer(fromHeight)
 

@@ -48,7 +48,9 @@ trait ContractPool extends CostStrategy {
     if (pool.size < contractPoolMaxSize) {
       pool.addOne(contractKey -> obj)
       Right(())
-    } else Left(ContractPoolOverflow)
+    } else {
+      Left(ContractPoolOverflow)
+    }
   }
 
   def commitContractStates(): ExeResult[Unit] = {
@@ -59,7 +61,9 @@ trait ContractPool extends CostStrategy {
             _ <- chargeContractUpdate()
             _ <- updateState(contractKey, AVector.from(contractObj.fields))
           } yield ()
-        } else Right(())
+        } else {
+          Right(())
+        }
     }
   }
 

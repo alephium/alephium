@@ -271,8 +271,11 @@ class BlockFlowSpec extends AlephiumSpec {
           override def groupNumPerBroker: Int = brokerConfig.groupNumPerBroker
         }
         blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
-          (if (remoteBrokerInfo.groupFrom equals testToGroup) AVector(hashes0)
-           else AVector(AVector.empty[Hash]))
+          (if (remoteBrokerInfo.groupFrom equals testToGroup) {
+             AVector(hashes0)
+           } else {
+             AVector(AVector.empty[Hash])
+           })
         blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[Hash])
       }
 

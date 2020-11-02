@@ -147,8 +147,11 @@ trait TestFixtureLike
         val json         = parse(text).toOption.get
         val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
         val blockEntry   = notification.params.as[BlockEntry].toOption.get
-        if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) ()
-        else awaitNewBlock(from, to)
+        if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) {
+          ()
+        } else {
+          awaitNewBlock(from, to)
+        }
     }
   }
 

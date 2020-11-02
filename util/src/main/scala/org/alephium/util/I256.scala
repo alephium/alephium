@@ -79,8 +79,11 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
   }
 
   def mod(that: I256): Option[I256] = {
-    if (that.isZero || (this.v == I256.lowerBound && that.v == I256.NegOne.toBigInt)) None
-    else Some(I256.unsafe(this.v.remainder(that.v)))
+    if (that.isZero || (this.v == I256.lowerBound && that.v == I256.NegOne.toBigInt)) {
+      None
+    } else {
+      Some(I256.unsafe(this.v.remainder(that.v)))
+    }
   }
 
   def compare(that: I256): Int = this.v.compareTo(that.v)

@@ -48,11 +48,15 @@ final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
   def toGroup(implicit config: GroupConfig): GroupIndex = {
     val from    = fromGroup
     val outputs = fixedOutputs
-    if (outputs.isEmpty) from
-    else {
+    if (outputs.isEmpty) {
+      from
+    } else {
       val index = outputs.indexWhere(_.toGroup != from)
-      if (index == -1) from
-      else outputs(index).toGroup
+      if (index == -1) {
+        from
+      } else {
+        outputs(index).toGroup
+      }
     }
   }
 
@@ -98,8 +102,11 @@ object UnsignedTransaction {
       val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
 
       val outputs =
-        if (remainder > U256.Zero) AVector[AssetOutput](toOutput, fromOutput)
-        else AVector[AssetOutput](toOutput)
+        if (remainder > U256.Zero) {
+          AVector[AssetOutput](toOutput, fromOutput)
+        } else {
+          AVector[AssetOutput](toOutput)
+        }
       UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
     }
   }

@@ -89,8 +89,11 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     val goal = start + n
     if (goal > capacity) {
       val size =
-        if (goal <= AVector.defaultSize) AVector.defaultSize
-        else AVector.nextPowerOfTwo(goal)
+        if (goal <= AVector.defaultSize) {
+          AVector.defaultSize
+        } else {
+          AVector.nextPowerOfTwo(goal)
+        }
       growTo(size)
     }
   }
@@ -555,8 +558,9 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def splitBy[B](f: A => B): AVector[AVector[A]] = {
-    if (isEmpty) AVector.empty
-    else {
+    if (isEmpty) {
+      AVector.empty
+    } else {
       var prev = f(head)
       var acc  = AVector.empty[A]
       var res  = AVector.empty[AVector[A]]
@@ -631,7 +635,9 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
           if (apply(i) != that(i)) return false
         }
         true
-      } else false
+      } else {
+        false
+      }
     case _ => false
   }
 

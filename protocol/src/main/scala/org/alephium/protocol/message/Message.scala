@@ -53,8 +53,11 @@ object Message {
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Message] = {
     _deserialize(input).flatMap {
       case (message, rest) =>
-        if (rest.isEmpty) Right(message)
-        else Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
+        if (rest.isEmpty) {
+          Right(message)
+        } else {
+          Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
+        }
     }
   }
 }

@@ -24,7 +24,9 @@ final case class GasBox private (value: Int) extends AnyVal {
   def use(amount: Int): ExeResult[GasBox] = {
     if (value >= amount) {
       Right(GasBox(value - amount))
-    } else Left(OutOfGas)
+    } else {
+      Left(OutOfGas)
+    }
   }
 
   def toU256: U256 = U256.unsafe(value)

@@ -852,8 +852,11 @@ case object CheckSignature extends Signature with StatelessInstrCompanion0 with 
       publicKey    <- PublicKey.from(rawPublicKey.a).toRight(InvalidPublicKey)
       signature    <- signatures.pop()
       _ <- {
-        if (SignatureSchema.verify(rawData, signature, publicKey)) Right(())
-        else Left(VerificationFailed)
+        if (SignatureSchema.verify(rawData, signature, publicKey)) {
+          Right(())
+        } else {
+          Left(VerificationFailed)
+        }
       }
     } yield ()
   }

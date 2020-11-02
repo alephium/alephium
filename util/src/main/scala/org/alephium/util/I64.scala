@@ -35,7 +35,9 @@ class I64(val v: Long) extends AnyVal with Ordered[I64] {
     val underlying = this.v + that.v
     if (I64.checkAdd(this, that, underlying)) {
       Some(I64.from(underlying))
-    } else None
+    } else {
+      None
+    }
   }
 
   def subUnsafe(that: I64): I64 = {
@@ -48,12 +50,15 @@ class I64(val v: Long) extends AnyVal with Ordered[I64] {
     val underlying = this.v - that.v
     if (I64.checkSub(this, that, underlying)) {
       Some(I64.from(underlying))
-    } else None
+    } else {
+      None
+    }
   }
 
   def mulUnsafe(that: I64): I64 = {
-    if (this.v == 0) I64.Zero
-    else {
+    if (this.v == 0) {
+      I64.Zero
+    } else {
       val underlying = this.v * that.v
       assume(I64.checkMul(this, that, underlying))
       I64.from(underlying)
@@ -61,12 +66,15 @@ class I64(val v: Long) extends AnyVal with Ordered[I64] {
   }
 
   def mul(that: I64): Option[I64] = {
-    if (this.v == 0) Some(I64.Zero)
-    else {
+    if (this.v == 0) {
+      Some(I64.Zero)
+    } else {
       val underlying = this.v * that.v
       if (I64.checkMul(this, that, underlying)) {
         Some(I64.from(underlying))
-      } else None
+      } else {
+        None
+      }
     }
   }
 
@@ -76,8 +84,11 @@ class I64(val v: Long) extends AnyVal with Ordered[I64] {
   }
 
   def div(that: I64): Option[I64] = {
-    if (!I64.checkDiv(this, that)) None
-    else Some(I64.from(this.v / that.v))
+    if (!I64.checkDiv(this, that)) {
+      None
+    } else {
+      Some(I64.from(this.v / that.v))
+    }
   }
 
   def modUnsafe(that: I64): I64 = {

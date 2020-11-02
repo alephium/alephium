@@ -59,8 +59,11 @@ final class CachedTrie[K: Serde, V: Serde](
 
   private def removeForUnderlying(key: K): IOResult[Unit] = {
     underlying.exist(key).flatMap { existed =>
-      if (existed) Right(caches.addOne(key -> Removed()))
-      else Left(IOError.KeyNotFound(key))
+      if (existed) {
+        Right(caches.addOne(key -> Removed()))
+      } else {
+        Left(IOError.KeyNotFound(key))
+      }
     }
   }
 
@@ -74,8 +77,11 @@ final class CachedTrie[K: Serde, V: Serde](
 
   private def putForUnderlying(key: K, value: V): IOResult[Unit] = {
     underlying.exist(key).flatMap { existed =>
-      if (existed) Right(caches.addOne(key -> Updated(value)))
-      else Right(caches.addOne(key         -> Inserted(value)))
+      if (existed) {
+        Right(caches.addOne(key -> Updated(value)))
+      } else {
+        Right(caches.addOne(key -> Inserted(value)))
+      }
     }
   }
 

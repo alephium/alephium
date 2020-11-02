@@ -88,8 +88,9 @@ object FlowHandler {
       extends Command {
     def filerFor(another: BrokerGroupInfo): AVector[AVector[Hash]] = {
       val (groupFrom, groupUntil) = selfBrokerInfo.calIntersection(another)
-      if (groupUntil <= groupFrom) AVector.empty
-      else {
+      if (groupUntil <= groupFrom) {
+        AVector.empty
+      } else {
         hashes.slice((groupFrom - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups,
                      (groupUntil - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups)
       }

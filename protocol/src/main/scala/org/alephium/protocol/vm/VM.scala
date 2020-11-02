@@ -106,14 +106,17 @@ final class StatefulVM(ctx: StatefulContext,
         _               <- merge(nextBalances.remaining, currentBalances.approved)
       } yield ()
       resultOpt.toRight(InvalidBalances)
-    } else Right(())
+    } else {
+      Right(())
+    }
   }
 
   protected def merge(next: Frame.Balances, current: Frame.Balances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
-      if (index >= current.all.length) Some(())
-      else {
+      if (index >= current.all.length) {
+        Some(())
+      } else {
         val (lockupScript, balancesPerLockup) = current.all(index)
         if (balancesPerLockup.scopeDepth <= 0) {
           ctx.outputBalances.add(lockupScript, balancesPerLockup)
@@ -147,15 +150,18 @@ final class StatefulVM(ctx: StatefulContext,
         _ <- resultOpt.toRight(InvalidBalances)
         _ <- outputGeneratedBalances(ctx.outputBalances)
       } yield ()
-    } else Right(())
+    } else {
+      Right(())
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def outputGeneratedBalances(outputBalances: Frame.Balances): ExeResult[Unit] = {
     @tailrec
     def iter(index: Int): ExeResult[Unit] = {
-      if (index >= outputBalances.all.length) Right(())
-      else {
+      if (index >= outputBalances.all.length) {
+        Right(())
+      } else {
         val (lockupScript, balances) = outputBalances.all(index)
         balances.toTxOutput(lockupScript) match {
           case Right(outputOpt) =>

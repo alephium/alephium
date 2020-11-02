@@ -217,8 +217,11 @@ class VMSpec extends AlephiumSpec {
     def callTxScript(input: String): Assertion = {
       val script = Compiler.compileTxScript(input).toOption.get
       val block =
-        if (script.entryMethod.isPayable) payableCall(blockFlow, chainIndex, script)
-        else simpleScript(blockFlow, chainIndex, script)
+        if (script.entryMethod.isPayable) {
+          payableCall(blockFlow, chainIndex, script)
+        } else {
+          simpleScript(blockFlow, chainIndex, script)
+        }
       addAndValidate(blockFlow, block)
     }
 

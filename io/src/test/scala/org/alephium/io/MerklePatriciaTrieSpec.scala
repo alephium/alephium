@@ -133,8 +133,9 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
     import fixture.trie
 
     val keys = (0 until 16).flatMap { i =>
-      if (i equals genesisNode.path.head.toInt) None
-      else {
+      if (i equals genesisNode.path.head.toInt) {
+        None
+      } else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
         trie = trie.putRaw(key, value).toOption.get

@@ -37,8 +37,11 @@ object BuiltIn {
     def instr: Instr[Ctx]
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-      if (inputType == argsType) returnType
-      else throw Error(s"Invalid args type $inputType for builtin func $name")
+      if (inputType == argsType) {
+        returnType
+      } else {
+        throw Error(s"Invalid args type $inputType for builtin func $name")
+      }
     }
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
@@ -99,7 +102,9 @@ object BuiltIn {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType.length != 1 || !validate(inputType(0))) {
         throw Error(s"Invalid args type $inputType for builtin func $name")
-      } else Seq(toType)
+      } else {
+        Seq(toType)
+      }
     }
   }
   object ConversionBuiltIn {

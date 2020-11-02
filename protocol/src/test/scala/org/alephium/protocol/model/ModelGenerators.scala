@@ -250,8 +250,9 @@ trait TxGenerators
       val outputs = splitBalances.mapWithIndex[AssetOutput] {
         case (balance, index) =>
           val lockupScript =
-            if (index equals selectedIndex) toLockupScript
-            else {
+            if (index equals selectedIndex) {
+              toLockupScript
+            } else {
               Gen.oneOf(fromLockupScript, toLockupScript).sample.get
             }
           balance.toOutput(createdHeight, lockupScript, dataGen.sample.get)

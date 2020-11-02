@@ -45,7 +45,9 @@ abstract class Frame[Ctx <: Context] {
     if (newPC >= 0 && newPC < method.instrs.length) {
       pc = newPC
       Right(())
-    } else Left(InvalidInstrOffset)
+    } else {
+      Left(InvalidInstrOffset)
+    }
   }
 
   def complete(): Unit = pc = method.instrs.length
@@ -189,7 +191,9 @@ final class StatefulFrame(
           }
         }
       } yield balanceStateOpt
-    } else Right(None)
+    } else {
+      Right(None)
+    }
   }
 
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
@@ -417,8 +421,9 @@ object Frame {
     def merge(balances: Balances): Option[Unit] = {
       @tailrec
       def iter(index: Int): Option[Unit] = {
-        if (index >= balances.all.length) Some(())
-        else {
+        if (index >= balances.all.length) {
+          Some(())
+        } else {
           val (lockupScript, balancesPerLockup) = balances.all(index)
           add(lockupScript, balancesPerLockup) match {
             case Some(_) => iter(index + 1)

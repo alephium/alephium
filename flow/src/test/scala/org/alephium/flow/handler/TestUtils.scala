@@ -71,6 +71,8 @@ object TestUtils {
   def clear(path: Path): Unit = {
     if (path.startsWith(AFiles.tmpDir)) {
       IOUtils.clearUnsafe(path)
-    } else throw new RuntimeException("Only files under tmp dir could be cleared")
+    } else {
+      throw new RuntimeException("Only files under tmp dir could be cleared")
+    }
   }
 }

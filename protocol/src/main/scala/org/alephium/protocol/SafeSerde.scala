@@ -28,8 +28,11 @@ trait SafeSerde[T, Config] {
   def deserialize(input: ByteString)(implicit config: Config): SerdeResult[T] = {
     _deserialize(input).flatMap {
       case (output, rest) =>
-        if (rest.isEmpty) Right(output)
-        else Left(SerdeError.redundant(input.size - rest.size, input.size))
+        if (rest.isEmpty) {
+          Right(output)
+        } else {
+          Left(SerdeError.redundant(input.size - rest.size, input.size))
+        }
     }
   }
 }

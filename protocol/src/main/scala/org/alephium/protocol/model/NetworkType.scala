@@ -53,6 +53,8 @@ object NetworkType {
       Some(Testnet -> address.drop(Testnet.prefix.length))
     } else if (address.startsWith(Devnet.prefix)) {
       Some(Devnet -> address.drop(Devnet.prefix.length))
-    } else None
+    } else {
+      None
+    }
   }
 }

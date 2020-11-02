@@ -64,16 +64,21 @@ object BIP32 {
 
     def derive(index: Int): Option[ExtendedPrivateKey] = {
       val i = {
-        if (isHardened(index)) ByteString(0) ++ privateKey.bytes ++ Bytes.from(index)
-        else privateKey.publicKey.bytes ++ Bytes.from(index)
+        if (isHardened(index)) {
+          ByteString(0) ++ privateKey.bytes ++ Bytes.from(index)
+        } else {
+          privateKey.publicKey.bytes ++ Bytes.from(index)
+        }
       }
       val (il, ir) = hmacSha512(chainCode, i).splitAt(32)
       val p        = new BigInteger(1, il.toArray)
-      if (p.compareTo(SecP256K1.params.getN) >= 0) None
-      else {
+      if (p.compareTo(SecP256K1.params.getN) >= 0) {
+        None
+      } else {
         val newPrivateKey = SecP256K1PrivateKey.unsafe(il).add(privateKey)
-        if (newPrivateKey.isZero) None
-        else {
+        if (newPrivateKey.isZero) {
+          None
+        } else {
           Some(ExtendedPrivateKey(newPrivateKey, ir, path :+ index))
         }
       }
@@ -82,8 +87,9 @@ object BIP32 {
     def derive(path: AVector[Int]): Option[ExtendedPrivateKey] = {
       @tailrec
       def iter(acc: ExtendedPrivateKey, i: Int): Option[ExtendedPrivateKey] = {
-        if (i == path.length) Some(acc)
-        else {
+        if (i == path.length) {
+          Some(acc)
+        } else {
           acc.derive(path(i)) match {
             case Some(newAcc) => iter(newAcc, i + 1)
             case None         => None
@@ -102,11 +108,13 @@ object BIP32 {
       val i        = publicKey.bytes ++ Bytes.from(index)
       val (il, ir) = hmacSha512(chainCode, i).splitAt(32)
       val p        = new BigInteger(1, il.toArray)
-      if (p.compareTo(SecP256K1.params.getN) >= 0) None
-      else {
+      if (p.compareTo(SecP256K1.params.getN) >= 0) {
+        None
+      } else {
         val ki = SecP256K1PrivateKey.unsafe(il).publicKey.unsafePoint.add(publicKey.unsafePoint) // safe by construction
-        if (ki.isInfinity) None
-        else {
+        if (ki.isInfinity) {
+          None
+        } else {
           val newPublicKey =
             SecP256K1PublicKey.unsafe(ByteString.fromArrayUnsafe(ki.getEncoded(true)))
           Some(ExtendedPublicKey(newPublicKey, ir, path :+ index))
@@ -118,8 +126,9 @@ object BIP32 {
       assume(path.forall(!isHardened(_)))
       @tailrec
       def iter(acc: ExtendedPublicKey, i: Int): Option[ExtendedPublicKey] = {
-        if (i == path.length) Some(acc)
-        else {
+        if (i == path.length) {
+          Some(acc)
+        } else {
           acc.derive(path(i)) match {
             case Some(newAcc) => iter(newAcc, i + 1)
             case None         => None

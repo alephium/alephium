@@ -104,7 +104,9 @@ trait FixedSizeSerde[T] extends Serde[T] {
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map((_, rest))
-    } else Left(SerdeError.notEnoughBytes(serdeSize, input.size))
+    } else {
+      Left(SerdeError.notEnoughBytes(serdeSize, input.size))
+    }
 }
 
 object Serde extends ProductSerde {
@@ -229,8 +231,9 @@ object Serde extends ProductSerde {
         index: Int,
         length: Int,
         builder: mutable.Builder[T, C]): SerdeResult[(C, ByteString)] = {
-      if (index == length) Right(builder.result() -> rest)
-      else {
+      if (index == length) {
+        Right(builder.result() -> rest)
+      } else {
         deserializer._deserialize(rest) match {
           case Right((t, tRest)) =>
             builder += t
@@ -253,8 +256,9 @@ object Serde extends ProductSerde {
     private def _deserializeArray(rest: ByteString,
                                   index: Int,
                                   output: Array[T]): SerdeResult[(Array[T], ByteString)] = {
-      if (index == output.length) Right(output -> rest)
-      else {
+      if (index == output.length) {
+        Right(output -> rest)
+      } else {
         deserializer._deserialize(rest) match {
           case Right((t, tRest)) =>
             output.update(index, t)

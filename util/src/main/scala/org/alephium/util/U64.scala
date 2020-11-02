@@ -46,7 +46,9 @@ class U64(val v: Long) extends AnyVal with Ordered[U64] {
   def sub(that: U64): Option[U64] = {
     if (U64.checkSub(this, that)) {
       Some(U64.unsafe(this.v - that.v))
-    } else None
+    } else {
+      None
+    }
   }
 
   def subOneUnsafe(): U64 = subUnsafe(U64.One)
@@ -54,8 +56,9 @@ class U64(val v: Long) extends AnyVal with Ordered[U64] {
   def subOne(): Option[U64] = sub(U64.One)
 
   def mulUnsafe(that: U64): U64 = {
-    if (this.v == 0) U64.Zero
-    else {
+    if (this.v == 0) {
+      U64.Zero
+    } else {
       val underlying = this.v * that.v
       assume(U64.checkMul(this, that, underlying))
       U64.unsafe(underlying)
@@ -63,12 +66,15 @@ class U64(val v: Long) extends AnyVal with Ordered[U64] {
   }
 
   def mul(that: U64): Option[U64] = {
-    if (this.v == 0) Some(U64.Zero)
-    else {
+    if (this.v == 0) {
+      Some(U64.Zero)
+    } else {
       val underlying = this.v * that.v
       if (U64.checkMul(this, that, underlying)) {
         Some(U64.unsafe(underlying))
-      } else None
+      } else {
+        None
+      }
     }
   }
 
@@ -118,7 +124,9 @@ object U64 {
     try {
       if (validate(value)) {
         Some(unsafe(value.longValue()))
-      } else None
+      } else {
+        None
+      }
     } catch {
       case _: ArithmeticException => None
     }

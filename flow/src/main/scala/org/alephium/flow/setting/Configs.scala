@@ -134,8 +134,9 @@ object Configs extends StrictLogging {
 
   def splitBalance(raw: String): Option[(LockupScript, U256)] = {
     val splitIndex = raw.indexOf(":")
-    if (splitIndex == -1) None
-    else {
+    if (splitIndex == -1) {
+      None
+    } else {
       val left  = raw.take(splitIndex)
       val right = raw.drop(splitIndex + 1)
       for {
@@ -156,7 +157,9 @@ object Configs extends StrictLogging {
           val balancesOI  = balances.filter(_._1.groupIndex.value == from)
           val transaction = Transaction.genesis(balancesOI)
           AVector(transaction)
-        } else AVector.empty[Transaction]
+        } else {
+          AVector.empty[Transaction]
+        }
         mineGenesis(ChainIndex.from(from, to).get, transactions)
     }
   }

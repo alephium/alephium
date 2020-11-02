@@ -66,8 +66,9 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   }
 
   def div(that: U256): Option[U256] = {
-    if (that.isZero) None
-    else {
+    if (that.isZero) {
+      None
+    } else {
       Some(U256.unsafe(this.v.divide(that.v)))
     }
   }
@@ -91,10 +92,13 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   def toBytes: ByteString = {
     val tmp           = ByteString.fromArrayUnsafe(v.toByteArray)
     val paddingLength = 32 - tmp.length
-    if (paddingLength < 0) tmp.tail
-    else if (paddingLength > 0) {
+    if (paddingLength < 0) {
+      tmp.tail
+    } else if (paddingLength > 0) {
       ByteString.fromArrayUnsafe(Array.fill(paddingLength)(0)) ++ tmp
-    } else tmp
+    } else {
+      tmp
+    }
   }
 
   override def toString: String = v.toString()

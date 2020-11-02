@@ -65,8 +65,11 @@ object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
   private def checkPeers(info: IntraCliqueInfo)(
       implicit config: GroupConfig): Either[String, Unit] = {
     info.peers.foreachWithIndexE { (peer, index) =>
-      if (peer.id != index) Left(s"invalid index: $peer")
-      else PeerInfo.validate(peer)
+      if (peer.id != index) {
+        Left(s"invalid index: $peer")
+      } else {
+        PeerInfo.validate(peer)
+      }
     }
   }
 }

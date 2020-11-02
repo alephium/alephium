@@ -31,8 +31,11 @@ object PureConfigUtils {
   implicit val durationConfig: ConfigReader[Duration] =
     ConfigReader[FiniteDuration].emap { dt =>
       val millis = dt.toMillis
-      if (millis >= 0) Right(Duration.ofMillisUnsafe(millis))
-      else Left(CannotConvert(dt.toString, "alephium Duration", "negative duration"))
+      if (millis >= 0) {
+        Right(Duration.ofMillisUnsafe(millis))
+      } else {
+        Left(CannotConvert(dt.toString, "alephium Duration", "negative duration"))
+      }
     }
 
   private def parseHost(unparsedHost: String): Option[InetAddress] = {

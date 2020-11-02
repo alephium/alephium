@@ -81,8 +81,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkGroup(block: Block): BlockValidationResult[Unit] = {
-    if (block.chainIndex.relateTo(brokerConfig)) validBlock(())
-    else invalidBlock(InvalidGroup)
+    if (block.chainIndex.relateTo(brokerConfig)) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidGroup)
+    }
   }
 
   private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult[Unit] = {
@@ -105,8 +108,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
-    if (block.header.txsHash == Hash.hash(block.transactions)) validBlock(())
-    else invalidBlock(InvalidMerkleRoot)
+    if (block.header.txsHash == Hash.hash(block.transactions)) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidMerkleRoot)
+    }
   }
 
   private[validation] def checkNonCoinbases(block: Block,
@@ -133,8 +139,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input.outputRef)) invalidTx(DoubleSpending)
-        else {
+        if (utxoUsed.contains(input.outputRef)) {
+          invalidTx(DoubleSpending)
+        } else {
           utxoUsed += input.outputRef
           validTx(())
         }
@@ -144,8 +151,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
     val gasFee = block.nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    if (block.coinbaseReward == ALF.MinerReward.addUnsafe(gasFee)) validBlock(())
-    else invalidBlock(InvalidCoinbaseReward)
+    if (block.coinbaseReward == ALF.MinerReward.addUnsafe(gasFee)) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidCoinbaseReward)
+    }
   }
 
   private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(

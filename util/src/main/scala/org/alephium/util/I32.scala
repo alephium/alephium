@@ -33,7 +33,9 @@ class I32(val v: Int) extends AnyVal with Ordered[I32] {
     val underlying = this.v + that.v
     if (I32.checkAdd(this, that, underlying)) {
       Some(I32.unsafe(underlying))
-    } else None
+    } else {
+      None
+    }
   }
 
   def subUnsafe(that: I32): I32 = {
@@ -46,12 +48,15 @@ class I32(val v: Int) extends AnyVal with Ordered[I32] {
     val underlying = this.v - that.v
     if (I32.checkSub(this, that, underlying)) {
       Some(I32.unsafe(underlying))
-    } else None
+    } else {
+      None
+    }
   }
 
   def mulUnsafe(that: I32): I32 = {
-    if (this.v == 0) I32.Zero
-    else {
+    if (this.v == 0) {
+      I32.Zero
+    } else {
       val underlying = this.v * that.v
       assume(I32.checkMul(this, that, underlying))
       I32.unsafe(underlying)
@@ -59,12 +64,15 @@ class I32(val v: Int) extends AnyVal with Ordered[I32] {
   }
 
   def mul(that: I32): Option[I32] = {
-    if (this.v == 0) Some(I32.Zero)
-    else {
+    if (this.v == 0) {
+      Some(I32.Zero)
+    } else {
       val underlying = this.v * that.v
       if (I32.checkMul(this, that, underlying)) {
         Some(I32.unsafe(underlying))
-      } else None
+      } else {
+        None
+      }
     }
   }
 
@@ -74,8 +82,11 @@ class I32(val v: Int) extends AnyVal with Ordered[I32] {
   }
 
   def div(that: I32): Option[I32] = {
-    if (!I32.checkDiv(this, that)) None
-    else Some(I32.unsafe(this.v / that.v))
+    if (!I32.checkDiv(this, that)) {
+      None
+    } else {
+      Some(I32.unsafe(this.v / that.v))
+    }
   }
 
   def modUnsafe(that: I32): I32 = {

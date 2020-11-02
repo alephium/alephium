@@ -27,7 +27,9 @@ sealed trait ArithOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else Seq(argsType(0))
+    } else {
+      Seq(argsType(0))
+    }
   }
 }
 case object Add extends ArithOperator {
@@ -80,7 +82,9 @@ sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else Seq(Type.Bool)
+    } else {
+      Seq(Type.Bool)
+    }
   }
 
   def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]]
@@ -187,7 +191,9 @@ case object Not extends LogicalOperator {
   override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 1 || argsType(0) != Type.Bool) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else Seq(Type.Bool)
+    } else {
+      Seq(Type.Bool)
+    }
   }
 
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
@@ -199,7 +205,9 @@ sealed trait BinaryLogicalOperator extends LogicalOperator {
   override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else Seq(Type.Bool)
+    } else {
+      Seq(Type.Bool)
+    }
   }
 }
 case object And extends BinaryLogicalOperator {

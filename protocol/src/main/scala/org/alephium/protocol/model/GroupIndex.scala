@@ -29,8 +29,11 @@ class GroupIndex(val value: Int) extends AnyVal {
   final def generateKey(implicit config: GroupConfig): (PrivateKey, PublicKey) = {
     val (privateKey, publicKey) = SignatureSchema.generatePriPub()
     val lockupScript            = LockupScript.p2pkh(Hash.hash(publicKey.bytes))
-    if (lockupScript.groupIndex == this) (privateKey, publicKey)
-    else generateKey
+    if (lockupScript.groupIndex == this) {
+      (privateKey, publicKey)
+    } else {
+      generateKey
+    }
   }
 }
 

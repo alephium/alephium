@@ -59,14 +59,17 @@ trait BlockFlow
       HistoryLocators
         .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
         .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
-    } else AVector.empty
+    } else {
+      AVector.empty
+    }
   }
 
   override protected def getSyncInventoriesUnsafe(
       locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
     locators.map { locatorsPerChain =>
-      if (locatorsPerChain.isEmpty) AVector.empty[Hash]
-      else {
+      if (locatorsPerChain.isEmpty) {
+        AVector.empty[Hash]
+      } else {
         val chainIndex = ChainIndex.from(locatorsPerChain.head)
         val chain      = getBlockChain(chainIndex)
         chain.getSyncDataUnsafe(locatorsPerChain)
@@ -184,8 +187,9 @@ object BlockFlow extends StrictLogging {
     }
 
     private def calWeightUnsafe(header: BlockHeader): BigInt = {
-      if (header.isGenesis) ALF.GenesisWeight * (2 * groups - 1)
-      else {
+      if (header.isGenesis) {
+        ALF.GenesisWeight * (2 * groups - 1)
+      } else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
         val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
         weight1 + weight2 + header.target.value
@@ -200,8 +204,9 @@ object BlockFlow extends StrictLogging {
 
     private def calGroupWeightUnsafe(hash: Hash): BigInt = {
       val header = getBlockHeaderUnsafe(hash)
-      if (header.isGenesis) ALF.GenesisWeight
-      else {
+      if (header.isGenesis) {
+        ALF.GenesisWeight
+      } else {
         header.outDeps.sumBy(getChainWeightUnsafe) + header.target.value
       }
     }
@@ -253,7 +258,9 @@ object BlockFlow extends StrictLogging {
                 acc ++ getHashChain(l, r).getAllTips
               }
               tryExtendUnsafe(tipsCur, weightCur, group, toTry)
-            } else (tipsCur, weightCur)
+            } else {
+              (tipsCur, weightCur)
+            }
         }
       flowTips2.toBlockDeps
     }
