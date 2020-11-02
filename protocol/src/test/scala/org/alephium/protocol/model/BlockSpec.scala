@@ -16,8 +16,15 @@
 
 package org.alephium.protocol.model
 
+import scala.util.Random
+
+import akka.util.ByteString
+import org.scalacheck.Gen
+
+import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.protocol.vm.StatefulScript
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
@@ -43,9 +50,68 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "calculate proper execution order" in {
     forAll(blockGen) { block =>
-      val order = block.getExecutionOrder
-      order.last is order.length - 1
-      order.sorted is AVector.tabulate(block.transactions.length)(identity)
+      val order = block.getNonCoinbaseExecutionOrder
+      order.length is block.transactions.length - 1
+      order.sorted is AVector.tabulate(block.transactions.length - 1)(identity)
+    }
+  }
+
+  it should "be random" in {
+    def gen(): Block = {
+      val header: BlockHeader =
+        BlockHeader(AVector.fill(groupConfig.chainNum)(Hash.zero),
+                    Hash.zero,
+                    TimeStamp.now(),
+                    Target.Max,
+                    0)
+      val txs: AVector[Transaction] =
+        AVector.fill(3)(
+          Transaction.from(
+            UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
+                                minimalGas,
+                                U256.unsafe(Random.nextLong(Long.MaxValue)),
+                                AVector.empty,
+                                AVector.empty),
+            AVector.empty[Signature]
+          ))
+      Block(header, txs)
+    }
+    val blockGen = Gen.const(()).map(_ => gen())
+
+    Seq(0, 1, 2).permutations.foreach { orders =>
+      val blockGen0 = blockGen.retryUntil(_.getScriptExecutionOrder equals AVector.from(orders))
+      blockGen0.sample.nonEmpty is true
+    }
+  }
+
+  it should "put non-script txs in the last" in {
+    forAll(Gen.posNum[Long], Gen.posNum[Long]) { (gasPrice0: Long, gasPrice1: Long) =>
+      val header: BlockHeader =
+        BlockHeader(AVector.fill(groupConfig.chainNum)(Hash.zero),
+                    Hash.zero,
+                    TimeStamp.now(),
+                    Target.Max,
+                    0)
+      val tx0 = Transaction.from(
+        UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
+                            minimalGas,
+                            U256.unsafe(gasPrice0),
+                            AVector.empty,
+                            AVector.empty),
+        AVector.empty[Signature]
+      )
+      val tx1 = Transaction.from(
+        UnsignedTransaction(None, minimalGas, U256.unsafe(gasPrice1), AVector.empty, AVector.empty),
+        AVector.empty[Signature]
+      )
+      val coinbase = Transaction.coinbase(U256.Zero, PublicKey.generate, 0, ByteString.empty)
+
+      val block0 = Block(header, AVector(tx0, tx1, coinbase))
+      block0.scriptIndexes().toSeq is Seq(0)
+      block0.getNonCoinbaseExecutionOrder.last is 1
+      val block1 = Block(header, AVector(tx1, tx0, coinbase))
+      block1.scriptIndexes().toSeq is Seq(1)
+      block1.getNonCoinbaseExecutionOrder.last is 0
     }
   }
 }

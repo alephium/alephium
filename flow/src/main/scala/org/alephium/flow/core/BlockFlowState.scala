@@ -415,10 +415,16 @@ object BlockFlowState {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
-      block.getExecutionOrder.foldE(worldState) {
-        case (state, index) =>
-          updateStateForInOutBlock(state, block.transactions(index), targetGroup)
-      }
+      for {
+        worldState0 <- block.getScriptExecutionOrder.foldE(worldState) {
+          case (state, index) =>
+            updateStateForTxScript(state, block.transactions(index))
+        }
+        worldState1 <- block.transactions.foldE(worldState0) {
+          case (state, tx) =>
+            updateStateForInOutBlock(state, tx, targetGroup)
+        }
+      } yield worldState1
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foldE(worldState) {
         case (state, tx) => updateStateForOutBlock(state, tx, targetGroup)
@@ -436,10 +442,9 @@ object BlockFlowState {
   def updateStateForInOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
       implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     for {
-      state0 <- updateStateForTxScript(worldState, tx)
-      state1 <- updateStateForInputs(state0, tx)
-      state2 <- updateStateForOutputs(state1, tx, targetGroup)
-    } yield state2
+      state0 <- updateStateForInputs(worldState, tx)
+      state1 <- updateStateForOutputs(state0, tx, targetGroup)
+    } yield state1
   }
 
   def updateStateForOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
