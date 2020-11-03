@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{Hash, PrivateKey}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -332,16 +332,6 @@ trait BlockFlowState extends FlowTipsUtil {
                      height)
     }
   }
-
-  def prepareTx(fromLockupScript: LockupScript,
-                fromUnlockScript: UnlockScript,
-                toLockupScript: LockupScript,
-                value: U256,
-                fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] =
-    prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value).map(_.map {
-      unsigned =>
-        Transaction.from(unsigned, fromPrivateKey)
-    })
 }
 // scalastyle:on number.of.methods
 
@@ -415,10 +405,16 @@ object BlockFlowState {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
-      block.getExecutionOrder.foldE(worldState) {
-        case (state, index) =>
-          updateStateForInOutBlock(state, block.transactions(index), targetGroup)
-      }
+      for {
+        worldState0 <- block.getScriptExecutionOrder.foldE(worldState) {
+          case (state, index) =>
+            updateStateForTxScript(state, block.transactions(index))
+        }
+        worldState1 <- block.transactions.foldE(worldState0) {
+          case (state, tx) =>
+            updateStateForInOutBlock(state, tx, targetGroup)
+        }
+      } yield worldState1
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foldE(worldState) {
         case (state, tx) => updateStateForOutBlock(state, tx, targetGroup)
@@ -436,10 +432,9 @@ object BlockFlowState {
   def updateStateForInOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
       implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
     for {
-      state0 <- updateStateForTxScript(worldState, tx)
-      state1 <- updateStateForInputs(state0, tx)
-      state2 <- updateStateForOutputs(state1, tx, targetGroup)
-    } yield state2
+      state0 <- updateStateForInputs(worldState, tx)
+      state1 <- updateStateForOutputs(state0, tx, targetGroup)
+    } yield state1
   }
 
   def updateStateForOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(

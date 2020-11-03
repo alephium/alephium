@@ -178,14 +178,6 @@ object ServerFixture {
                                    value: U256): IOResult[Option[UnsignedTransaction]] =
       Right(Some(dummyTx.unsigned))
 
-    override def prepareTx(fromLockupScript: LockupScript,
-                           fromUnlockScript: UnlockScript,
-                           toLockupScript: LockupScript,
-                           value: U256,
-                           fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] = {
-      Right(Some(dummyTx))
-    }
-
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus
     implicit def mempoolSetting  = config.mempool

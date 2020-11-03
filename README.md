@@ -9,7 +9,7 @@ Please visit our website: [https://alephium.org/](https://alephium.org/), telegr
 
 The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
 
-* BlockFlow algorithm based on UTXO model enables sharding and scalability for today ([algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
+* BlockFlow algorithm based on UTXO model enables sharding and scalability for today (code + [algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
   * the first sharding algorithm supports `single-step cross-shard transactions`, same user experience as single chain
   * the `PoW based sharding` does not rely on beacon chain, simple and elegant
 * `Stateful UTXO model` combines the advantages of both eUTXO model and account model (see code, wiki to come)
@@ -19,8 +19,8 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 * Novel VM design resolves many critical challenges of dApp platforms (see code, wiki to come)
   * it's way `less IO intensive`
   * `flash loan is not available` by design
-  * eliminate many `attack vectors of EVM` including unlimited authorization, double dip issue, re-entrancy attack, etc
-  * `fine-grained execution model` ensures that some of the tx actions will take effect even when the sequence of actions failed as a whole
+  * eliminate many `attack vectors of EVM` including unlimited authorization, double dip issue, reentrancy attack, etc
+  * Utxo style `fine-grained execution model` makes risk-free arbitrage less common
 * `Front-running mitigation` through random execution of transactions (see code, wiki to come)  
 * PoLW algorithm `reduces the energy consumption` of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
 

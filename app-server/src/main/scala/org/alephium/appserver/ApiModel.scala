@@ -26,7 +26,7 @@ import org.alephium.crypto.Sha256
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -174,6 +174,30 @@ object ApiModel {
 
   final case class SendTransaction(tx: String, signature: Signature) extends ApiModel
 
+  final case class CreateContract(fromKey: PublicKey, code: String) extends ApiModel
+
+  final case class CreateContractResult(unsignedTx: String,
+                                        hash: String,
+                                        fromGroup: Int,
+                                        toGroup: Int)
+      extends ApiModel
+  object CreateContractResult {
+    def from(unsignedTx: UnsignedTransaction)(
+        implicit groupConfig: GroupConfig): CreateContractResult =
+      CreateContractResult(Hex.toHexString(serialize(unsignedTx)),
+                           Hex.toHexString(unsignedTx.hash.bytes),
+                           unsignedTx.fromGroup.value,
+                           unsignedTx.toGroup.value)
+  }
+
+  final case class SendContract(code: String, tx: String, signature: Signature, fromGroup: Int)
+      extends ApiModel
+
+  final case class Compile(address: Address, `type`: String, code: String, state: Option[String])
+      extends ApiModel
+
+  final case class CompileResult(code: String) extends ApiModel
+
   final case class TxResult(txId: String, fromGroup: Int, toGroup: Int) extends ApiModel
 
   final case class InterCliquePeerInfo(cliqueId: CliqueId,
@@ -241,9 +265,6 @@ trait ApiModelCodec {
   implicit val publicKeyCodec: Codec[PublicKey] =
     Codec.from(publicKeyDecoder, publicKeyEncoder)
 
-  implicit val privateKeyEncoder: Encoder[PrivateKey] = bytesEncoder
-  implicit val privateKeyDecoder: Decoder[PrivateKey] = bytesDecoder(PrivateKey.from)
-
   implicit val signatureEncoder: Encoder[Signature] = bytesEncoder
   implicit val signatureDecoder: Decoder[Signature] = bytesDecoder(Signature.from)
 
@@ -298,6 +319,17 @@ trait ApiModelCodec {
     deriveCodec[CreateTransactionResult]
 
   implicit val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
+
+  implicit val createContractCodec: Codec[CreateContract] = deriveCodec[CreateContract]
+
+  implicit val createContractResultCodec: Codec[CreateContractResult] =
+    deriveCodec[CreateContractResult]
+
+  implicit val sendContractCodec: Codec[SendContract] = deriveCodec[SendContract]
+
+  implicit val compileResult: Codec[Compile] = deriveCodec[Compile]
+
+  implicit val compileResultCodec: Codec[CompileResult] = deriveCodec[CompileResult]
 
   implicit val txResultCodec: Codec[TxResult] = deriveCodec[TxResult]
 
