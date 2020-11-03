@@ -25,7 +25,7 @@ import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.{Hash, PrivateKey, PublicKey}
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -143,21 +143,6 @@ object ServerUtils {
         Right(TxResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
         Left(Response.failed("Failed in adding transaction"))
-    }
-  }
-
-  def prepareTransaction(blockFlow: BlockFlow,
-                         fromKey: PublicKey,
-                         toKey: PublicKey,
-                         value: U256,
-                         fromPrivateKey: PrivateKey): Try[Transaction] = {
-    val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(toKey)
-    val toLockupScript   = LockupScript.p2pkh(toKey)
-    blockFlow.prepareTx(fromLockupScript, fromUnlockScript, toLockupScript, value, fromPrivateKey) match {
-      case Right(Some(transaction)) => Right(transaction)
-      case Right(None)              => Left(Response.failed("Not enough balance"))
-      case Left(_)                  => failedInIO
     }
   }
 

@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{Hash, PrivateKey}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -332,16 +332,6 @@ trait BlockFlowState extends FlowTipsUtil {
                      height)
     }
   }
-
-  def prepareTx(fromLockupScript: LockupScript,
-                fromUnlockScript: UnlockScript,
-                toLockupScript: LockupScript,
-                value: U256,
-                fromPrivateKey: PrivateKey): IOResult[Option[Transaction]] =
-    prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value).map(_.map {
-      unsigned =>
-        Transaction.from(unsigned, fromPrivateKey)
-    })
 }
 // scalastyle:on number.of.methods
 
