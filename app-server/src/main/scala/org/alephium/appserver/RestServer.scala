@@ -131,12 +131,11 @@ class RestServer(
       ServerUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val minerActionLogic = minerAction.serverLogic {
-    case (_, action) =>
-      action match {
-        case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
-        case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
-      }
+  private val minerActionLogic = minerAction.serverLogic { action =>
+    action match {
+      case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
+      case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
+    }
   }
 
   private val sendContractRoute = sendContract.toRoute { query =>

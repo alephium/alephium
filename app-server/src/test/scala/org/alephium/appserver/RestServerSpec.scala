@@ -150,15 +150,13 @@ class RestServerSpec
   }
 
   it should "call POST /miners" in new RestServerFixture {
-    Post(s"/miners?action=start-mining")
-      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
+    Post(s"/miners?action=start-mining") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Start)
     }
 
-    Post(s"/miners?action=stop-mining")
-      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
+    Post(s"/miners?action=stop-mining") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Stop)

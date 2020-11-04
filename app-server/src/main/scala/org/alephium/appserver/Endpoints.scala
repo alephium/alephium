@@ -162,8 +162,8 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .out(jsonBody[TxResult])
       .description("Send a signed transaction")
 
-  val minerAction: AuthEndpoint[MinerAction, Boolean] =
-    authEndpoint.post
+  val minerAction: BaseEndpoint[MinerAction, Boolean] =
+    baseEndpoint.post
       .in("miners")
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
