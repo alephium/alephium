@@ -3,8 +3,6 @@
 This repository is the reference implementation of Alephium platform,
 which is a sharded blockchain to make programmable money scalable and secure.
 
-Please visit our website: [https://alephium.org/](https://alephium.org/), telegram: [@alephiumgroup](https://t.me/alephiumgroup) for more information.
-
 ## Main Innovations
 
 The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
@@ -26,8 +24,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 
 ## Development Status
 
-This project is currently under heavy development toward MainNet launch.
-Any contribution is welcome, so don't hesitate to send an issue or pull request.
+This project is currently under heavy development with more code consolidation, optimizations, and tests. However, it can be used to run a TestNet already.
 
 ## Installation
 
