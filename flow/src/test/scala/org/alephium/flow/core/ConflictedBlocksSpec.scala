@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Random}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Random, TimeStamp}
 
 class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with GroupConfigFixture {
   val groups   = 3
@@ -33,13 +33,21 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
         Transaction.from(AVector.from(txInputs),
                          AVector.empty[AssetOutput],
                          AVector.empty[Signature])
-      Block.from(AVector.empty, AVector(transaction), Target.Max, Random.nextNonZeroInt())
+      Block.from(AVector.empty,
+                 AVector(transaction),
+                 Target.Max,
+                 TimeStamp.now(),
+                 Random.nextNonZeroInt())
     }
 
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
       val transactions = txInputs.map(inputs =>
         Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature]))
-      Block.from(AVector.empty, AVector.from(transactions), Target.Max, Random.nextNonZeroInt())
+      Block.from(AVector.empty,
+                 AVector.from(transactions),
+                 Target.Max,
+                 TimeStamp.now(),
+                 Random.nextNonZeroInt())
     }
 
     val cache = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(10))

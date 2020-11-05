@@ -34,6 +34,9 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
 
   def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 
+  // only use this after validation
+  def gasFee: U256 = nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+
   def nonCoinbase: AVector[Transaction] = transactions.init
 
   def nonCoinbaseLength: Int = transactions.length - 1
@@ -116,11 +119,11 @@ object Block {
   def from(blockDeps: AVector[Hash],
            transactions: AVector[Transaction],
            target: Target,
+           timeStamp: TimeStamp,
            nonce: BigInt): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
     val txsHash     = Hash.hash(transactions)
-    val timestamp   = TimeStamp.now()
-    val blockHeader = BlockHeader(blockDeps, txsHash, timestamp, target, nonce)
+    val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 

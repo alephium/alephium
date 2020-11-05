@@ -25,7 +25,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, AVector, Random}
+import org.alephium.util.{ActorRefT, AVector, Random, TimeStamp}
 
 class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   trait Fixture extends MinerState {
@@ -38,7 +38,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-      BlockTemplate(flowTemplate.deps, flowTemplate.target, AVector.empty)
+      BlockTemplate(flowTemplate.deps, flowTemplate.target, TimeStamp.now(), AVector.empty)
     }
 
     override def startTask(fromShift: Int,

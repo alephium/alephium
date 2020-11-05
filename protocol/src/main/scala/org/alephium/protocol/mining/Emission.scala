@@ -19,7 +19,7 @@ package org.alephium.protocol.mining
 import java.math.BigInteger
 
 import org.alephium.protocol.ALF
-import org.alephium.protocol.model.Target
+import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, TimeStamp, U256}
 
 object Emission {
@@ -39,6 +39,9 @@ object Emission {
   val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(60))
   val a128EhPerSecond: Target = Target.unsafe(BigInteger.ONE.shiftLeft(67))
   //scalastyle:on magic.number
+
+  def miningReward(header: BlockHeader): U256 =
+    reward(header.target, header.timestamp, ALF.GenesisTimestamp)
 
   def reward(target: Target, blockTs: TimeStamp, genesisTs: TimeStamp): U256 = {
     val maxReward      = rewardMax(blockTs, genesisTs)

@@ -17,10 +17,10 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, TxOutputRef}
-import org.alephium.util.U256
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
@@ -150,8 +150,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
-    val gasFee = block.nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    if (block.coinbaseReward == ALF.MinerReward.addUnsafe(gasFee)) {
+    val reward = Emission.miningReward(block.header)
+    if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
       validBlock(())
     } else {
       invalidBlock(InvalidCoinbaseReward)
