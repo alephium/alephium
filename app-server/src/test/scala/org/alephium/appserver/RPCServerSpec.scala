@@ -17,10 +17,8 @@
 package org.alephium.appserver
 
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.{MethodRejection, UnsupportedRequestContentTypeRejection}
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import akka.stream.testkit.scaladsl.TestSink
+import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -32,8 +30,6 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Span}
 
 import org.alephium.flow.client.Miner
-import org.alephium.flow.handler.FlowHandler.BlockNotify
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
@@ -50,18 +46,6 @@ class RPCServerSpec
   import ServerFixture._
 
   behavior of "http"
-
-  it should "encode BlockNotify" in new ServerFixture {
-    val dep         = Hash.hash("foo")
-    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
-    val blockNotify = BlockNotify(header, 1)
-    val headerHash  = header.hash.toHexString
-    val chainIndex  = header.chainIndex
-
-    val result = RPCServer.blockNotifyEncode(blockNotify)
-
-    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":["${dep.toHexString}"]}"""
-  }
 
   it should "call mining_start" in new RouteHTTP {
     checkCallResult("mining_start")(true)
@@ -201,41 +185,6 @@ class RPCServerSpec
 
   behavior of "ws"
 
-  it should "receive one event" in new RouteWS {
-    checkWS {
-      sendEventAndCheck
-    }
-  }
-
-  it should "receive multiple events" in new RouteWS {
-    checkWS {
-      (0 to 3).foreach { _ =>
-        sendEventAndCheck
-      }
-    }
-  }
-
-  it should "complete on `complete` command" in new AlephiumActorSpec("Websocket") {
-    val (actorRef, source) = RPCServerAbstract.Websocket.actorRef
-    val sinkProbe          = source.runWith(TestSink.probe[String])
-    val message            = "Hello"
-    actorRef ! message
-    actorRef ! RPCServerAbstract.Websocket.Completed
-    sinkProbe.request(1).expectNext(message).expectComplete()
-  }
-
-  it should "stop on `Failed` command" in new AlephiumActorSpec("Websocket") {
-    val (actorRef, source) = RPCServerAbstract.Websocket.actorRef
-    val sinkProbe          = source.runWith(TestSink.probe[String])
-    val message            = "Hello"
-    actorRef ! message
-    actorRef ! RPCServerAbstract.Websocket.Failed
-    sinkProbe.request(1).expectNextOrError() match {
-      case Right(hello) => hello is message
-      case Left(error)  => error.getMessage is "failure on events websocket"
-    }
-  }
-
   trait RPCServerFixture extends ServerFixture {
     val minerProbe = TestProbe()
     val miner      = ActorRefT[Miner.Command](minerProbe.ref)
@@ -278,26 +227,5 @@ class RPCServerSpec
 
       HttpRequest(HttpMethods.POST, entity = entity)
     }
-  }
-
-  trait RouteWS extends RPCServerFixture {
-    val client = WSProbe()
-
-    val blockNotify = BlockNotify(blockGen.sample.get.header, height = 0)
-    def sendEventAndCheck: Assertion = {
-      node.eventBus ! blockNotify
-      val TextMessage.Strict(message) = client.expectMessage()
-
-      val json         = parse(message).toOption.get
-      val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
-
-      notification.method is "block_notify"
-    }
-
-    def checkWS[A](f: => A): A =
-      WS("/events", client.flow) ~> server.wsRoute ~> check {
-        isWebSocketUpgrade is true
-        f
-      }
   }
 }

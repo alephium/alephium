@@ -24,12 +24,10 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import io.circe._
-import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
@@ -38,7 +36,7 @@ import org.alephium.protocol.model.{ChainIndex, NetworkType}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, Service}
 
-class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Command])(
+class RPCServer(node: Node, rpcPort: Int, miner: ActorRefT[Miner.Command])(
     implicit val system: ActorSystem,
     val apiConfig: ApiConfig,
     val executionContext: ExecutionContext)
@@ -56,9 +54,6 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
 
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
-
-  def doBlockNotify(blockNotify: BlockNotify): Json =
-    blockNotifyEncode(blockNotify)
 
   def doBlockflowFetch(req: Request): FutureTry[FetchResponse] =
     Future.successful(
@@ -121,10 +116,8 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     withReqF[SendTransaction, TxResult](req)(ServerUtils.sendTransaction(txHandler, _))
 
   val httpRoute: Route = routeHttp(miner)
-  val wsRoute: Route   = routeWs(node.eventBus)
 
   private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
-  private val wsBindingPromise: Promise[Http.ServerBinding]   = Promise()
 
   override def subServices: ArraySeq[Service] = ArraySeq(node)
 
@@ -132,13 +125,9 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     for {
       httpBinding <- Http()
         .bindAndHandle(httpRoute, apiConfig.networkInterface.getHostAddress, rpcPort)
-      wsBinding <- Http()
-        .bindAndHandle(wsRoute, apiConfig.networkInterface.getHostAddress, wsPort)
     } yield {
       logger.info(s"Listening http request on $httpBinding")
-      logger.info(s"Listening ws request on $wsBinding")
       httpBindingPromise.success(httpBinding)
-      wsBindingPromise.success(wsBinding)
     }
   }
 
@@ -146,11 +135,8 @@ class RPCServer(node: Node, rpcPort: Int, wsPort: Int, miner: ActorRefT[Miner.Co
     for {
       httpBinding <- httpBindingPromise.future
       httpStop    <- httpBinding.terminate(hardDeadline = terminationHardDeadline)
-      wsBinding   <- wsBindingPromise.future
-      wsStop      <- wsBinding.terminate(hardDeadline = terminationHardDeadline)
     } yield {
       logger.info(s"http unbound with message $httpStop.")
-      logger.info(s"ws unbound with message $wsStop.")
       ()
     }
   }
@@ -164,8 +150,7 @@ object RPCServer {
       apiConfig: ApiConfig,
       executionContext: ExecutionContext): RPCServer = {
     val rpcPort = node.config.network.rpcPort
-    val wsPort  = node.config.network.wsPort
-    new RPCServer(node, rpcPort, wsPort, miner)
+    new RPCServer(node, rpcPort, miner)
   }
 
   def withReq[T: Decoder, R](req: Request)(f: T => R): Try[R] = {
@@ -201,8 +186,4 @@ object RPCServer {
       case Left(failure) => Future.successful(Left(failure))
     }
   }
-
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig,
-                                                  encoder: Encoder[BlockEntry]): Json =
-    BlockEntry.from(blockNotify).asJson
 }
