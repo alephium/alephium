@@ -56,6 +56,9 @@ class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
   def --(another: TimeStamp): Option[Duration] =
     Duration.from(millis - another.millis)
 
+  def deltaUnsafe(another: TimeStamp): Duration =
+    Duration.unsafe(millis - another.millis)
+
   def isBefore(another: TimeStamp): Boolean =
     millis < another.millis
 

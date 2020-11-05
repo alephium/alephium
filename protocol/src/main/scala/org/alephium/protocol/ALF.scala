@@ -21,6 +21,7 @@ import org.alephium.util.{Number, TimeStamp, U256}
 object ALF {
   //scalastyle:off magic.number
   val CoinInOneALF: U256     = U256.unsafe(Number.quintillion)
+  val CoinInOneCent: U256    = CoinInOneALF divUnsafe U256.unsafe(100)
   val CoinInOneNanoAlf: U256 = U256.unsafe(Number.billion)
 
   val MaxALFValue: U256 = U256.unsafe(100) mulUnsafe U256.Million mulUnsafe CoinInOneALF
@@ -40,6 +41,11 @@ object ALF {
   def alf(amount: Long): U256 = {
     assume(amount >= 0)
     U256.unsafe(amount).mulUnsafe(CoinInOneALF)
+  }
+
+  def cent(amount: Long): U256 = {
+    assume(amount >= 0)
+    U256.unsafe(amount).mulUnsafe(CoinInOneCent)
   }
 
   def nanoAlf(amount: Long): U256 = {

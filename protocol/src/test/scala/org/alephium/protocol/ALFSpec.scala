@@ -22,5 +22,6 @@ class ALFSpec extends AlephiumSpec {
   it should "use correct unit" in {
     ALF.alf(1) is ALF.nanoAlf(1).mul(U256.Billion).get
     ALF.alf(1).toBigInt.longValue() is math.pow(10, 18).longValue()
+    ALF.cent(1).mulUnsafe(U256.unsafe(100)) is ALF.alf(1)
   }
 }
