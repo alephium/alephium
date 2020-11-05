@@ -254,7 +254,6 @@ trait TestFixtureLike
           new WalletApp(walletConfig)
         }
 
-      lazy val rpcServer: RPCServer                 = RPCServer(node, miner)
       lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
       lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
       lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)

@@ -19,9 +19,9 @@ package org.alephium.appserver
 import scala.concurrent._
 
 import akka.util.Timeout
+import io.circe.Encoder
 
 import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.RPCServerAbstract.{FutureTry, Try}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
@@ -320,4 +320,20 @@ object ServerUtils {
     )
   }
   private def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
+
+  type Try[T]       = Either[Response.Failure, T]
+  type FutureTry[T] = Future[Try[T]]
+
+  def wrap[T <: ApiModel: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
+  }
+
+  // Note: use wrap when T derives RPCModel
+  def simpleWrap[T: Encoder](req: Request, result: FutureTry[T])(
+      implicit ec: ExecutionContext): Future[Response] = result.map {
+    case Right(t)    => Response.successful(req, t)
+    case Left(error) => error
+  }
 }

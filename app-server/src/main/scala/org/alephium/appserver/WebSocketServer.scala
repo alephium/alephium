@@ -121,7 +121,8 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit val system: ActorSystem,
 }
 
 object WebSocketServer {
-  import RPCServerAbstract._
+
+  val bufferSize: Int = 64
 
   def apply(node: Node)(implicit system: ActorSystem,
                         apiConfig: ApiConfig,
