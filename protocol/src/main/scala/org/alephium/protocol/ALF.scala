@@ -24,7 +24,7 @@ object ALF {
   val CoinInOneCent: U256    = CoinInOneALF divUnsafe U256.unsafe(100)
   val CoinInOneNanoAlf: U256 = U256.unsafe(Number.billion)
 
-  val MaxALFValue: U256 = U256.unsafe(100) mulUnsafe U256.Million mulUnsafe CoinInOneALF
+  val MaxALFValue: U256 = U256.Billion mulUnsafe CoinInOneALF
 
   val GenesisHeight: Int          = 0
   val GenesisWeight: BigInt       = 0

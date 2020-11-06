@@ -38,6 +38,10 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     (x >= y * (errorBase - 1) / errorBase && x <= y * (errorBase + 1) / errorBase) is true
   }
 
+  def getInflationRate(amount: U256): Double = {
+    (BigDecimal(amount.toBigInt) / BigDecimal(ALF.MaxALFValue.toBigInt)).doubleValue
+  }
+
   trait Fixture {
     val groupConfig = new GroupConfig {
       override def groups: Int = 2
@@ -45,9 +49,17 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     val emission = Emission(groupConfig)
   }
 
-  it should "compute correct constants" in {
+  it should "compute correct constants" in new Fixture {
     blocksInAboutOneYear is 492750
-    equalLong(durationToStableMaxReward.millis, Duration.ofHoursUnsafe(4 * 365 * 24).millis, 3)
+    durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
+
+    val maxRewards = blocksInAboutOneYear.mulUnsafe(Emission.initialMaxReward)
+    val maxRate    = getInflationRate(maxRewards)
+    (maxRate > 0.029 && maxRate < 0.03) is true
+
+    val stableRewards = blocksInAboutOneYear.mulUnsafe(Emission.stableMaxReward)
+    val stableRate    = getInflationRate(stableRewards)
+    (stableRate > 0.0098 && stableRate < 0.0099) is true
 
     onePhPerSecond.value is BigInteger.valueOf(1024).pow(5)
     oneEhPerSecond.value is BigInteger.valueOf(1024).pow(6)
@@ -58,10 +70,12 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     import emission._
 
     rewardMax(TimeStamp.zero, TimeStamp.zero) is initialMaxRewardPerChain
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(1 * 365 * 24), TimeStamp.zero) is ALF.alf(12)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is ALF.alf(9)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(3 * 365 * 24), TimeStamp.zero) is ALF.alf(6)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF.alf(3)
+    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(1 * 365 * 24), TimeStamp.zero) is
+      ALF.cent(1250)
+    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is ALF.alf(10)
+    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(3 * 365 * 24), TimeStamp.zero) is
+      ALF.cent(750)
+    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF.alf(5)
   }
 
   def average(target0: Target, target1: Target): Target = {
@@ -93,6 +107,8 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     import emission._
 
     reward(Target.unsafe(BigInteger.ZERO), TimeStamp.zero, TimeStamp.zero) is lowHashRateInitialRewardPerChain
-    reward(onePhPerSecond, TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is stableMaxRewardPerChain
+    reward(onePhPerSecondDivided,
+           TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
+           TimeStamp.zero) is stableMaxRewardPerChain
   }
 }

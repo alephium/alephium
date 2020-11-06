@@ -32,6 +32,16 @@ class Emission(groupConfig: GroupConfig) {
   val oneEhPerSecondDivided: Target  = share(Emission.oneEhPerSecond)
   val a128EhPerSecondDivided: Target = share(Emission.a128EhPerSecond)
 
+  val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
+    .subUnsafe(stableMaxRewardPerChain)
+    .divUnsafe(ALF.cent(1))
+    .divUnsafe(U256.unsafe(Emission.yearsUntilStable))
+    .toBigInt
+    .longValue()
+  val blocksToDropAboutOneCent: Long = Emission.blocksInAboutOneYear / yearlyCentsDropUntilStable
+  val durationToDropAboutOnceCent: Duration =
+    Emission.blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
+
   def share(amount: U256): U256 =
     amount.divUnsafe(U256.unsafe(groupConfig.chainNum))
 
@@ -53,7 +63,7 @@ class Emission(groupConfig: GroupConfig) {
     if (elapsed >= Emission.durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {
-      val reducedCents = ALF.cent(elapsed.millis / Emission.durationToDropAboutOnceCent.millis)
+      val reducedCents = ALF.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
       initialMaxRewardPerChain.subUnsafe(reducedCents)
     }
   }
@@ -85,16 +95,16 @@ object Emission {
   def apply(groupConfig: GroupConfig): Emission = new Emission(groupConfig)
 
   //scalastyle:off magic.number
-  private val initialMaxReward: U256         = ALF.alf(60)
-  private val stableMaxReward: U256          = ALF.alf(12)
-  private val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(8))
+  private[mining] val initialMaxReward: U256         = ALF.alf(60)
+  private[mining] val stableMaxReward: U256          = ALF.alf(20)
+  private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
 
-  val blockTargetTime: Duration             = Duration.ofSecondsUnsafe(64)
-  val blocksInAboutOneYear: Long            = 365L * 24L * 60L * 60L * 1000L / blockTargetTime.millis
-  val blocksToDropAboutOneCent: Long        = blocksInAboutOneYear / 300L
-  val durationToDropAboutOnceCent: Duration = blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
-  val blocksToStableMaxReward: Long         = blocksToDropAboutOneCent * 1200L
-  val durationToStableMaxReward: Duration   = blockTargetTime.timesUnsafe(blocksToStableMaxReward)
+  val yearsUntilStable: Int         = 4
+  val blockTargetTime: Duration     = Duration.ofSecondsUnsafe(64)
+  val blocksInAboutOneYear: Long    = 365L * 24L * 60L * 60L * 1000L / blockTargetTime.millis
+  val blocksToStableMaxReward: Long = blocksInAboutOneYear * yearsUntilStable
+  val durationToStableMaxReward: Duration =
+    Emission.blockTargetTime.timesUnsafe(Emission.blocksToStableMaxReward)
 
   val onePhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(50))
   val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(60))
