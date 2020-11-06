@@ -31,8 +31,6 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
 
-sealed trait ApiModel
-
 // scalastyle:off number.of.methods
 // scalastyle:off number.of.types
 object ApiModel {
@@ -63,9 +61,9 @@ object ApiModel {
 
   final case class TimeInterval(from: TimeStamp, to: TimeStamp)
 
-  final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp) extends ApiModel
+  final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp)
 
-  final case class FetchResponse(blocks: Seq[BlockEntry]) extends ApiModel
+  final case class FetchResponse(blocks: Seq[BlockEntry])
 
   final case class OutputRef(scriptHint: Int, key: String)
   object OutputRef {
@@ -107,7 +105,7 @@ object ApiModel {
       height: Int,
       deps: AVector[String],
       transactions: Option[AVector[Tx]]
-  ) extends ApiModel
+  )
   object BlockEntry {
 
     def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): BlockEntry = {
@@ -134,28 +132,27 @@ object ApiModel {
   final case class SelfClique(cliqueId: CliqueId,
                               peers: AVector[PeerAddress],
                               groupNumPerBroker: Int)
-      extends ApiModel
 
-  final case class NeighborCliques(cliques: AVector[InterCliqueInfo]) extends ApiModel
+  final case class NeighborCliques(cliques: AVector[InterCliqueInfo])
 
-  final case class GetBalance(address: Address) extends ApiModel
+  final case class GetBalance(address: Address)
 
-  final case class GetGroup(address: Address) extends ApiModel
+  final case class GetGroup(address: Address)
 
-  final case class Balance(balance: U256, utxoNum: Int) extends ApiModel
+  final case class Balance(balance: U256, utxoNum: Int)
   object Balance {
     def apply(balance_utxoNum: (U256, Int)): Balance = {
       Balance(balance_utxoNum._1, balance_utxoNum._2)
     }
   }
 
-  final case class Group(group: Int) extends ApiModel
+  final case class Group(group: Int)
 
   final case class CreateTransaction(
       fromKey: PublicKey,
       toAddress: Address,
       value: U256
-  ) extends ApiModel {
+  )  {
     def fromAddress(networkType: NetworkType): Address =
       Address(networkType, LockupScript.p2pkh(fromKey))
   }
@@ -164,7 +161,7 @@ object ApiModel {
                                            hash: String,
                                            fromGroup: Int,
                                            toGroup: Int)
-      extends ApiModel
+
   object CreateTransactionResult {
 
     def from(unsignedTx: UnsignedTransaction)(
@@ -175,15 +172,15 @@ object ApiModel {
                               unsignedTx.toGroup.value)
   }
 
-  final case class SendTransaction(tx: String, signature: Signature) extends ApiModel
+  final case class SendTransaction(tx: String, signature: Signature)
 
-  final case class CreateContract(fromKey: PublicKey, code: String) extends ApiModel
+  final case class CreateContract(fromKey: PublicKey, code: String)
 
   final case class CreateContractResult(unsignedTx: String,
                                         hash: String,
                                         fromGroup: Int,
                                         toGroup: Int)
-      extends ApiModel
+
   object CreateContractResult {
     def from(unsignedTx: UnsignedTransaction)(
         implicit groupConfig: GroupConfig): CreateContractResult =
@@ -194,32 +191,30 @@ object ApiModel {
   }
 
   final case class SendContract(code: String, tx: String, signature: Signature, fromGroup: Int)
-      extends ApiModel
+
 
   final case class Compile(address: Address, `type`: String, code: String, state: Option[String])
-      extends ApiModel
 
-  final case class CompileResult(code: String) extends ApiModel
+  final case class CompileResult(code: String)
 
-  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int) extends ApiModel
+  final case class TxResult(txId: String, fromGroup: Int, toGroup: Int)
 
   final case class InterCliquePeerInfo(cliqueId: CliqueId,
                                        brokerId: Int,
                                        address: InetSocketAddress,
                                        isSynced: Boolean)
-      extends ApiModel
+
 
   final case class GetHashesAtHeight(val fromGroup: Int, val toGroup: Int, height: Int)
-      extends ApiModel
-      with PerChain
+      extends PerChain
 
-  final case class HashesAtHeight(headers: Seq[String]) extends ApiModel
+  final case class HashesAtHeight(headers: Seq[String])
 
-  final case class GetChainInfo(val fromGroup: Int, val toGroup: Int) extends ApiModel with PerChain
+  final case class GetChainInfo(val fromGroup: Int, val toGroup: Int)  extends PerChain
 
-  final case class ChainInfo(currentHeight: Int) extends ApiModel
+  final case class ChainInfo(currentHeight: Int)
 
-  final case class GetBlock(hash: Hash) extends ApiModel
+  final case class GetBlock(hash: Hash)
 
   sealed trait MinerAction
 
