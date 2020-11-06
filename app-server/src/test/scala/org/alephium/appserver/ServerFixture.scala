@@ -23,8 +23,9 @@ import akka.testkit.TestProbe
 import io.circe.Encoder
 import io.circe.syntax._
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.CirceUtils
+import org.alephium.api.ApiModel._
+import org.alephium.api.ApiModelCodec
+import org.alephium.api.CirceUtils
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
@@ -56,12 +57,14 @@ trait ServerFixture
 
   val apiKey = ApiKey.unsafe("XDGphUFhHMHgRXoVRYU_NKrZ3jO93qYWIQ07T6hTN7k")
 
+  lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
+
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
-  lazy val dummySelfClique      = SelfClique.from(dummyIntraCliqueInfo)
+  lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
   lazy val dummyBalance         = Balance(U256.Zero, 0)

@@ -33,8 +33,9 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 import io.circe.syntax._
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.CirceUtils
+import org.alephium.api.ApiModel._
+import org.alephium.api.ApiModelCodec
+import org.alephium.api.CirceUtils
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
@@ -55,6 +56,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit val system: ActorSystem,
   implicit val chainsConfig: ChainsConfig = node.config.chains
   implicit val networkType: NetworkType   = node.config.chains.networkType
   implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
+  lazy val blockflowFetchMaxAge           = apiConfig.blockflowFetchMaxAge
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
@@ -131,9 +133,13 @@ object WebSocketServer {
     new WebSocketServer(node, wsPort)
   }
 
+  private def blockEntryfrom(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
+    BlockEntry.from(blockNotify.header, blockNotify.height)
+  }
+
   def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig,
                                                   encoder: Encoder[BlockEntry]): Json =
-    BlockEntry.from(blockNotify).asJson
+    blockEntryfrom(blockNotify).asJson
 
   object Websocket {
 

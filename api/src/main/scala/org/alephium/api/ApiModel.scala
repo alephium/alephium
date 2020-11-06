@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
+package org.alephium.api
 
 import java.net.{InetAddress, InetSocketAddress}
 
@@ -22,11 +22,8 @@ import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
-import org.alephium.appserver.CirceUtils._
+import org.alephium.api.CirceUtils._
 import org.alephium.crypto.Sha256
-import org.alephium.flow.handler.FlowHandler.BlockNotify
-import org.alephium.flow.network.InterCliqueManager
-import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
@@ -130,9 +127,6 @@ object ApiModel {
       from(block.header, height)
         .copy(transactions = Some(block.transactions.map(Tx.from(_, chainsConfig.networkType))))
 
-    def from(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
-      from(blockNotify.header, blockNotify.height)
-    }
   }
 
   final case class PeerAddress(address: InetAddress, rpcPort: Int, restPort: Int, wsPort: Int)
@@ -141,16 +135,6 @@ object ApiModel {
                               peers: AVector[PeerAddress],
                               groupNumPerBroker: Int)
       extends ApiModel
-  object SelfClique {
-    def from(cliqueInfo: IntraCliqueInfo): SelfClique = {
-      SelfClique(
-        cliqueInfo.id,
-        cliqueInfo.peers.map(peer =>
-          PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.restPort, peer.wsPort)),
-        cliqueInfo.groupNumPerBroker
-      )
-    }
-  }
 
   final case class NeighborCliques(cliques: AVector[InterCliqueInfo]) extends ApiModel
 
@@ -224,12 +208,6 @@ object ApiModel {
                                        address: InetSocketAddress,
                                        isSynced: Boolean)
       extends ApiModel
-  object InterCliquePeerInfo {
-    def from(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
-      val peerId = syncStatus.peerId
-      InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
-    }
-  }
 
   final case class GetHashesAtHeight(val fromGroup: Int, val toGroup: Int, height: Int)
       extends ApiModel
@@ -270,7 +248,7 @@ object ApiModel {
 trait ApiModelCodec {
   import ApiModel._
 
-  implicit def apiConfig: ApiConfig
+  def blockflowFetchMaxAge: Duration
   implicit def networkType: NetworkType
 
   implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
@@ -396,8 +374,8 @@ trait ApiModelCodec {
       .ensure(
         fetchRequest =>
           (fetchRequest.toTs -- fetchRequest.fromTs)
-            .exists(_ <= apiConfig.blockflowFetchMaxAge),
-        s"interval cannot be greater than ${apiConfig.blockflowFetchMaxAge}"
+            .exists(_ <= blockflowFetchMaxAge),
+        s"interval cannot be greater than ${blockflowFetchMaxAge}"
       )
   val fetchRequestEncoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
   implicit lazy val fetchRequestCodec: Codec[FetchRequest] =

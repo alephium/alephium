@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
+package org.alephium.api
 
 import scala.concurrent.Future
 
@@ -23,10 +23,10 @@ import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.CirceUtils.avectorCodec
-import org.alephium.appserver.TapirCodecs
-import org.alephium.appserver.TapirSchemas._
+import org.alephium.api.ApiModel._
+import org.alephium.api.CirceUtils.avectorCodec
+import org.alephium.api.TapirCodecs
+import org.alephium.api.TapirSchemas._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
@@ -35,13 +35,14 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
-  implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig
+
+  def maybeApiKeyHash: Option[Sha256]
 
   type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
   type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, ApiModel.Error, B, Nothing, Future]
 
-  private val apiKeyHash = apiConfig.apiKeyHash.getOrElse {
+  private val apiKeyHash = maybeApiKeyHash.getOrElse {
     val apiKey = Hash.generate.toHexString
     logger.info(s"Api Key is '$apiKey'")
     Sha256.hash(apiKey)

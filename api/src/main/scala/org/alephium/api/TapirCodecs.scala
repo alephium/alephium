@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
+package org.alephium.api
 
 import java.net.InetAddress
 
@@ -23,8 +23,8 @@ import io.circe.syntax._
 import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.CirceUtils.inetAddressCodec
+import org.alephium.api.ApiModel._
+import org.alephium.api.CirceUtils.inetAddressCodec
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}

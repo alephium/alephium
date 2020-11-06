@@ -20,7 +20,8 @@ import scala.concurrent._
 
 import akka.util.Timeout
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.ApiModel
+import org.alephium.api.ApiModel._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin

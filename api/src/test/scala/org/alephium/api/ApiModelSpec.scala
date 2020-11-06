@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
+package org.alephium.api
 
 import java.net.{InetAddress, InetSocketAddress}
 
@@ -24,9 +24,9 @@ import io.circe.syntax._
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.CirceUtils
-import org.alephium.appserver.CirceUtils._
+import org.alephium.api.ApiModel._
+import org.alephium.api.CirceUtils
+import org.alephium.api.CirceUtils._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}

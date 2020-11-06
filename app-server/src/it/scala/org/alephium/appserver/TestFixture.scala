@@ -35,7 +35,8 @@ import io.circe.parser.parse
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.ApiModel._
+import org.alephium.api.ApiModelCodec
 import org.alephium.crypto.Sha256
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
@@ -62,6 +63,8 @@ trait TestFixtureLike
   override implicit val patienceConfig       = PatienceConfig(timeout = Span(1, Minutes))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.chains.networkType
+
+  lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()

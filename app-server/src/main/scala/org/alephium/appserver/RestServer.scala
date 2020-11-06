@@ -32,7 +32,8 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.ApiModel._
+import org.alephium.api.Endpoints
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
@@ -59,6 +60,8 @@ class RestServer(
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
+  lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
+  lazy val maybeApiKeyHash                            = apiConfig.apiKeyHash
 
   implicit val groupConfig: GroupConfig   = node.config.broker
   implicit val chainsConfig: ChainsConfig = node.config.chains
@@ -68,7 +71,7 @@ class RestServer(
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
       cliqueInfo =>
-        Right(SelfClique.from(cliqueInfo))
+        Right(RestServer.selfCliqueFrom(cliqueInfo))
     }
   }
 
@@ -81,7 +84,7 @@ class RestServer(
       .ask(InterCliqueManager.GetSyncStatuses)
       .mapTo[Seq[InterCliqueManager.SyncStatus]]
       .map { syncedStatuses =>
-        Right(AVector.from(syncedStatuses.map(InterCliquePeerInfo.from)))
+        Right(AVector.from(syncedStatuses.map(RestServer.inteCliquePeerInfoFrom)))
       }
   }
 
@@ -230,5 +233,18 @@ object RestServer {
       executionContext: ExecutionContext): RestServer = {
     val restPort = node.config.network.restPort
     new RestServer(node, restPort, miner, walletServer)
+  }
+  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo): SelfClique = {
+    SelfClique(
+      cliqueInfo.id,
+      cliqueInfo.peers.map(peer =>
+        PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.restPort, peer.wsPort)),
+      cliqueInfo.groupNumPerBroker
+    )
+  }
+
+  def inteCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
+    val peerId = syncStatus.peerId
+    InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
   }
 }
