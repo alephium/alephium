@@ -21,6 +21,8 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
   * Utxo style `fine-grained execution model` makes risk-free arbitrage less common
 * `Front-running mitigation` through random execution of transactions (see code, wiki to come)  
 * PoLW algorithm `reduces the energy consumption` of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
+  * Adaptive rewards based on hashrate and timestamp are designed and implemented
+  * Internal mining cost through burning will be added when hashrate and energy consumption is significantly high
 
 ## Development Status
 
