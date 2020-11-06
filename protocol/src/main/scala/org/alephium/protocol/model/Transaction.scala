@@ -20,7 +20,6 @@ import akka.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -165,7 +164,7 @@ object Transaction {
                publicKey: PublicKey,
                data: ByteString,
                target: Target,
-               blockTs: TimeStamp): Transaction = {
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(gasFee, publicKey, data, target, blockTs)
   }
@@ -174,9 +173,9 @@ object Transaction {
                publicKey: PublicKey,
                data: ByteString,
                target: Target,
-               blockTs: TimeStamp): Transaction = {
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val reward   = Emission.reward(target, blockTs, ALF.GenesisTimestamp)
+    val reward   = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val txOutput = AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,

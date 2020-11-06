@@ -19,7 +19,6 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, TxOutputRef}
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
@@ -150,7 +149,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
-    val reward = Emission.miningReward(block.header)
+    val reward = brokerConfig.emission.miningReward(block.header)
     if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
       validBlock(())
     } else {

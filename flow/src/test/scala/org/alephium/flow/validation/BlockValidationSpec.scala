@@ -22,7 +22,6 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -114,7 +113,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block = blockGenOf(brokerConfig).filter(_.nonCoinbase.nonEmpty).sample.get
     passCheck(checkCoinbaseReward(block))
 
-    val miningReward      = Emission.miningReward(block.header)
+    val miningReward      = brokerConfig.emission.miningReward(block.header)
     val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = miningReward)
     val coinbaseNew = block.coinbase.copy(
       unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew)))
