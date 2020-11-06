@@ -31,7 +31,6 @@ import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.rpc.CirceUtils.avectorCodec
-import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
@@ -39,8 +38,8 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
   implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig
 
-  type BaseEndpoint[A, B] = Endpoint[A, Response.Failure, B, Nothing]
-  type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, Response.Failure, B, Nothing, Future]
+  type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
+  type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, ApiModel.Error, B, Nothing, Future]
 
   private val apiKeyHash = apiConfig.apiKeyHash.getOrElse {
     val apiKey = Hash.generate.toHexString
@@ -56,16 +55,16 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
 
-  private def checkApiKey(apiKey: ApiKey): Either[Response.Failure, ApiKey] =
+  private def checkApiKey(apiKey: ApiKey): Either[ApiModel.Error, ApiKey] =
     if (apiKey.hash == apiKeyHash) {
       Right(apiKey)
     } else {
-      Left(Response.failed(Error.UnauthorizedError))
+      Left(ApiModel.Error.UnauthorizedError)
     }
 
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
-      .errorOut(jsonBody[Response.Failure])
+      .errorOut(jsonBody[ApiModel.Error])
       .tag("Blockflow")
 
   private val authEndpoint: AuthEndpoint[Unit, Unit] =

@@ -19,7 +19,6 @@ package org.alephium.appserver
 import scala.concurrent._
 
 import akka.util.Timeout
-import io.circe.Encoder
 
 import org.alephium.appserver.ApiModel._
 import org.alephium.flow.core.BlockFlow
@@ -30,7 +29,6 @@ import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.rpc.model.JsonRPC._
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, AVector, Hex, U256}
 
@@ -89,9 +87,9 @@ object ServerUtils {
       askTimeout: Timeout,
       executionContext: ExecutionContext): FutureTry[TxResult] = {
     val txEither = for {
-      txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
+      txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        Response.failed(serdeError.getMessage))
+        failed(serdeError.getMessage))
     } yield {
       Transaction.from(unsignedTx, AVector.fill(unsignedTx.inputs.length)(query.signature))
     }
@@ -108,11 +106,11 @@ object ServerUtils {
       block <- blockFlow
         .getBlock(query.hash)
         .left
-        .map(_ => Response.failed(s"Fail fetching block with header ${query.hash.toHexString}"))
+        .map(_ => failed(s"Fail fetching block with header ${query.hash.toHexString}"))
       height <- blockFlow
         .getHeight(block.header)
         .left
-        .map(_ => Response.failed("Failed in IO"))
+        .map(_ => failed("Failed in IO"))
     } yield BlockEntry.from(block, height)
 
   def getHashesAtHeight(blockFlow: BlockFlow,
@@ -122,7 +120,7 @@ object ServerUtils {
       hashes <- blockFlow
         .getHashes(chainIndex, query.height)
         .left
-        .map(_ => Response.failed("Failed in IO"))
+        .map(_ => failed("Failed in IO"))
     } yield HashesAtHeight(hashes.map(_.toHexString).toArray.toIndexedSeq)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
@@ -130,7 +128,7 @@ object ServerUtils {
       maxHeight <- blockFlow
         .getMaxHeight(chainIndex)
         .left
-        .map(_ => Response.failed("Failed in IO"))
+        .map(_ => failed("Failed in IO"))
     } yield ChainInfo(maxHeight)
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: Transaction)(
@@ -142,7 +140,7 @@ object ServerUtils {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
-        Left(Response.failed("Failed in adding transaction"))
+        Left(failed("Failed in adding transaction"))
     }
   }
 
@@ -154,7 +152,7 @@ object ServerUtils {
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     blockFlow.prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
-      case Right(None)                      => Left(Response.failed("Not enough balance"))
+      case Right(None)                      => Left(failed("Not enough balance"))
       case Left(_)                          => failedInIO
     }
   }
@@ -170,7 +168,7 @@ object ServerUtils {
     } else {
       //TODO add `address.toBase58` to message
       //it require to have an `implicit ChainsConfig`
-      Left(Response.failed(s"Address belongs to other groups"))
+      Left(failed(s"Address belongs to other groups"))
     }
   }
 
@@ -181,7 +179,7 @@ object ServerUtils {
         blockFlow.brokerConfig.contains(chainIndex.to)) {
       Right(())
     } else {
-      Left(Response.failed(s"${hash.toHexString} belongs to other groups"))
+      Left(failed(s"${hash.toHexString} belongs to other groups"))
     }
   }
 
@@ -262,13 +260,13 @@ object ServerUtils {
     Future.successful((for {
       codeBytestring <- Hex
         .from(query.code)
-        .toRight(Response.failed("Cannot decode code hex string"))
+        .toRight(failed("Cannot decode code hex string"))
       script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
-        Response.failed(serdeError.getMessage))
+        failed(serdeError.getMessage))
       utx <- unignedTxFromScript(blockFlow,
                                  script,
                                  LockupScript.p2pkh(query.fromKey),
-                                 query.fromKey).left.map(error => Response.failed(error.toString))
+                                 query.fromKey).left.map(error => failed(error.toString))
     } yield utx).map(CreateContractResult.from))
   }
 
@@ -282,13 +280,13 @@ object ServerUtils {
     (for {
       codeBytestring <- Hex
         .from(query.code)
-        .toRight(Response.failed("Cannot decode code hex string"))
+        .toRight(failed("Cannot decode code hex string"))
       script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
-        Response.failed(serdeError.getMessage))
-      txByteString <- Hex.from(query.tx).toRight(Response.failed(s"Invalid hex"))
+        failed(serdeError.getMessage))
+      txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        Response.failed(serdeError.getMessage))
-      group <- GroupIndex.from(query.fromGroup).toRight(Response.failed("Invalid chain index"))
+        failed(serdeError.getMessage))
+      group <- GroupIndex.from(query.fromGroup).toRight(failed("Invalid chain index"))
       transaction <- txFromScript(
         blockFlow,
         script,
@@ -296,7 +294,7 @@ object ServerUtils {
         TransactionTemplate(unsignedTx,
                             AVector.fill(unsignedTx.inputs.length)(query.signature),
                             AVector.empty)).left
-        .map(error => Response.failed(error.toString))
+        .map(error => failed(error.toString))
     } yield transaction) match {
       case Left(error)        => Future.successful(Left(error))
       case Right(transaction) => ServerUtils.publishTx(txHandler, transaction)
@@ -316,24 +314,13 @@ object ServerUtils {
           } yield script
       }).map(script => CompileResult(Hex.toHexString(serialize(script))))
         .left
-        .map(error => Response.failed(error.toString))
+        .map(error => failed(error.toString))
     )
   }
-  private def failedInIO[T]: Try[T] = Left(Response.failed("Failed in IO"))
 
-  type Try[T]       = Either[Response.Failure, T]
+  private def failed(error: String): ApiModel.Error = ApiModel.Error.server(error)
+  private def failedInIO[T]: Try[T]                 = Left(ApiModel.Error.server("Failed in IO"))
+
+  type Try[T]       = Either[ApiModel.Error, T]
   type FutureTry[T] = Future[Try[T]]
-
-  def wrap[T <: ApiModel: Encoder](req: Request, result: FutureTry[T])(
-      implicit ec: ExecutionContext): Future[Response] = result.map {
-    case Right(t)    => Response.successful(req, t)
-    case Left(error) => error
-  }
-
-  // Note: use wrap when T derives RPCModel
-  def simpleWrap[T: Encoder](req: Request, result: FutureTry[T])(
-      implicit ec: ExecutionContext): Future[Response] = result.map {
-    case Right(t)    => Response.successful(req, t)
-    case Left(error) => error
-  }
 }
