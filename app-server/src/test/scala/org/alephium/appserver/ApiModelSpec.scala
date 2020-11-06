@@ -25,11 +25,11 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils
+import org.alephium.appserver.CirceUtils._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
-import org.alephium.rpc.CirceUtils
-import org.alephium.rpc.CirceUtils._
 import org.alephium.util._
 
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {

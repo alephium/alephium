@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.rpc
+package org.alephium.appserver
 
 import akka.util.ByteString
 import io.circe._

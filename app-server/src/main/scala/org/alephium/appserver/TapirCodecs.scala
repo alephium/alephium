@@ -24,10 +24,10 @@ import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils.inetAddressCodec
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
-import org.alephium.rpc.CirceUtils.inetAddressCodec
 import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {

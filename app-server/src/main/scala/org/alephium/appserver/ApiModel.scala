@@ -22,6 +22,7 @@ import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
 
+import org.alephium.appserver.CirceUtils._
 import org.alephium.crypto.Sha256
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.network.InterCliqueManager
@@ -30,7 +31,6 @@ import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.rpc.CirceUtils._
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
 

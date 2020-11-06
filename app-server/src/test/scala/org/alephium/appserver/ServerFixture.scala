@@ -24,6 +24,7 @@ import io.circe.Encoder
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
@@ -38,7 +39,6 @@ import org.alephium.protocol.{Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.ChainsConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
-import org.alephium.rpc.CirceUtils
 import org.alephium.serde.serialize
 import org.alephium.util._
 

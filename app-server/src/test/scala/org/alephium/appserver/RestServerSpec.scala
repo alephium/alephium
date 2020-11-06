@@ -25,10 +25,10 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils.avectorCodec
 import org.alephium.appserver.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.rpc.CirceUtils.avectorCodec
 import org.alephium.serde.serialize
 import org.alephium.util._
 

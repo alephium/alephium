@@ -34,12 +34,12 @@ import io.circe._
 import io.circe.syntax._
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
 import org.alephium.protocol.model.NetworkType
-import org.alephium.rpc.CirceUtils
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, EventBus, Service}
 

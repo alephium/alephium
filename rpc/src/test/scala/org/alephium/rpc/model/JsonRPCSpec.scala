@@ -19,17 +19,22 @@ package org.alephium.rpc.model
 import scala.concurrent.Future
 import scala.util.Success
 
-import io.circe.{Decoder, Encoder, Json, JsonObject}
+import io.circe.{Decoder, Encoder, Json, JsonObject, Printer}
 import io.circe.parser._
 import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues, Inside}
 
-import org.alephium.rpc.CirceUtils
 import org.alephium.util.AlephiumSpec
 
 class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
+  // scalastyle:off regex
+  implicit val printer: Printer = Printer.noSpaces.copy(dropNullValues = true)
+  // scalastyle:on
+
+  def print(json: Json): String = printer.print(json)
+
   def show[T](data: T)(implicit encoder: Encoder[T]): String = {
-    CirceUtils.print(data.asJson)
+    print(data.asJson)
   }
 
   val dummy = Future.successful(JsonRPC.Response.Success(Json.Null, 0))

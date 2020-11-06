@@ -24,13 +24,13 @@ import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
 
 import org.alephium.appserver.ApiModel._
+import org.alephium.appserver.CirceUtils.avectorCodec
 import org.alephium.appserver.TapirCodecs
 import org.alephium.appserver.TapirSchemas._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.rpc.CirceUtils.avectorCodec
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
