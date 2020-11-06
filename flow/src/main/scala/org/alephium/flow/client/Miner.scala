@@ -32,7 +32,7 @@ import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object Miner {
   def props(node: Node)(implicit brokerConfig: BrokerConfig, miningSetting: MiningSetting): Props =
@@ -149,9 +149,12 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       startNewTasks()
   }
 
-  private def coinbase(txs: AVector[Transaction], to: Int, height: Int): Transaction = {
+  private def coinbase(txs: AVector[Transaction],
+                       to: Int,
+                       target: Target,
+                       blockTs: TimeStamp): Transaction = {
     val minerMessage = Hash.generate.bytes
-    Transaction.coinbase(txs, addresses(to), height, minerMessage)
+    Transaction.coinbase(txs, addresses(to), minerMessage, target, blockTs)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
@@ -159,10 +162,12 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups)
     val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    BlockTemplate(
-      flowTemplate.deps,
-      flowTemplate.target,
-      flowTemplate.transactions :+ coinbase(flowTemplate.transactions, to, flowTemplate.height))
+    val blockTs      = TimeStamp.now()
+    val coinbaseTx   = coinbase(flowTemplate.transactions, to, flowTemplate.target, blockTs)
+    BlockTemplate(flowTemplate.deps,
+                  flowTemplate.target,
+                  blockTs,
+                  flowTemplate.transactions :+ coinbaseTx)
   }
 
   def startTask(fromShift: Int,

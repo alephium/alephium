@@ -205,14 +205,20 @@ trait FlowFixture
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
-    val height           = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val (_, toPublicKey) = chainIndex.to.generateKey
     val txs              = prepareTxs(blockFlow, chainIndex)
-    val coinbaseTx       = Transaction.coinbase(txs, toPublicKey, height, Hash.generate.bytes)
+    val blockTs          = TimeStamp.now()
+
+    val coinbaseTx = Transaction.coinbase(txs,
+                                          toPublicKey,
+                                          Hash.generate.bytes,
+                                          consensusConfig.maxMiningTarget,
+                                          blockTs)
 
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block = Block.from(deps, txs :+ coinbaseTx, consensusConfig.maxMiningTarget, nonce)
+      val block =
+        Block.from(deps, txs :+ coinbaseTx, consensusConfig.maxMiningTarget, blockTs, nonce)
       if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
     }
 

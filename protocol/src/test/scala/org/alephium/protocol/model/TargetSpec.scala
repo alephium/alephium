@@ -16,11 +16,24 @@
 
 package org.alephium.protocol.model
 
+import java.math.BigInteger
+
 import org.scalatest.Assertion
 
 import org.alephium.util.{AlephiumSpec, Hex}
 
 class TargetSpec extends AlephiumSpec {
+  it should "check special values" in {
+    Target.unsafe(BigInteger.ZERO).toHexString is "00000000"
+    Target.unsafe(BigInteger.ONE).toHexString is "01010000"
+    Target.unsafe(BigInteger.valueOf(0x010101)).toHexString is "03010101"
+    Target.unsafe(BigInteger.valueOf(256).pow(0xF)).toHexString is "10010000"
+    Target
+      .unsafe(BigInteger.valueOf(256).pow(0xF).multiply(BigInteger.valueOf(0xFFFFFF)))
+      .toHexString is "12ffffff"
+    Target.Max.toHexString is "20ffffff"
+  }
+
   it should "convert between big integer and compact bits" in {
     def check(bits: String): Assertion = {
       checkGeneric(bits, bits)

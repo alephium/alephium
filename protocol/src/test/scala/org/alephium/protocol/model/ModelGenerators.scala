@@ -30,7 +30,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, Number, NumericHelpers, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Number, NumericHelpers, TimeStamp, U256}
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
@@ -341,12 +341,16 @@ trait BlockGenerators extends TxGenerators {
     chainIndexFrom(group).flatMap(blockGen)
 
   private def gen(chainIndex: ChainIndex, deps: AVector[Hash], txs: AVector[Transaction]): Block = {
-    val coinbase =
-      Transaction.coinbase(txs, publicKeyGen(chainIndex.to).sample.get, 0, ByteString.empty)
+    val blockTs = TimeStamp.now()
+    val coinbase = Transaction.coinbase(txs,
+                                        publicKeyGen(chainIndex.to).sample.get,
+                                        ByteString.empty,
+                                        consensusConfig.maxMiningTarget,
+                                        blockTs)
     val txsWithCoinbase = txs :+ coinbase
     @tailrec
     def iter(nonce: Long): Block = {
-      val block = Block.from(deps, txsWithCoinbase, consensusConfig.maxMiningTarget, nonce)
+      val block = Block.from(deps, txsWithCoinbase, consensusConfig.maxMiningTarget, blockTs, nonce)
       if (block.chainIndex equals chainIndex) block else iter(nonce + 1)
     }
 

@@ -22,7 +22,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.Serde
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -162,16 +162,21 @@ object Transaction {
 
   def coinbase(txs: AVector[Transaction],
                publicKey: PublicKey,
-               height: Int,
-               data: ByteString): Transaction = {
+               data: ByteString,
+               target: Target,
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    coinbase(gasFee, publicKey, height, data)
+    coinbase(gasFee, publicKey, data, target, blockTs)
   }
 
-  def coinbase(gasFee: U256, publicKey: PublicKey, height: Int, data: ByteString): Transaction = {
+  def coinbase(gasFee: U256,
+               publicKey: PublicKey,
+               data: ByteString,
+               target: Target,
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val txOutput =
-      AssetOutput(ALF.MinerReward.addUnsafe(gasFee), height, pkScript, tokens = AVector.empty, data)
+    val reward   = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
+    val txOutput = AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,

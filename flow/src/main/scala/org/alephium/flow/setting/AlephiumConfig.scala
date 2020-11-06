@@ -30,6 +30,7 @@ import pureconfig.generic.auto._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U256}
@@ -44,14 +45,13 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 final case class ConsensusSetting(numZerosAtLeastInHash: Int,
-                                  blockTargetTime: Duration,
                                   tipsPruneInterval: Int,
                                   blockCacheCapacityPerChain: Int)
     extends ConsensusConfig {
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
-  val expectedTimeSpan: Duration = blockTargetTime
+  val expectedTimeSpan: Duration = Emission.blockTargetTime
 
   val medianTimeInterval: Int = 11
   val diffAdjustDownMax: Int  = 16

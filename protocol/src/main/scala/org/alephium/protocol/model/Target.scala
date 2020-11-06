@@ -21,14 +21,18 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.serde._
-import org.alephium.util.{Bytes, Number}
+import org.alephium.util.{Bytes, Hex, Number}
 
 /*
  * value = mantissa * 256 ^ (exponent - 3)
  * value should not be negative always
  */
-final case class Target(val bits: ByteString) {
+final case class Target(val bits: ByteString) extends Ordered[Target] {
   lazy val value: BigInteger = Target.fromCompactBitsUnsafe(bits)
+
+  override def compare(that: Target): Int = this.value.compareTo(that.value)
+
+  def toHexString: String = Hex.toHexString(bits)
 }
 
 object Target {
@@ -53,10 +57,10 @@ object Target {
     assume(bits.length == 4)
     val size: Int            = Bytes.toPosInt(bits(0))
     val mantissa: BigInteger = new BigInteger(1, bits.tail.toArray)
-    if (size >= 3) {
-      mantissa.shiftLeft(8 * (size - 3))
-    } else {
+    if (size <= 3) {
       mantissa.shiftRight(8 * (3 - size))
+    } else {
+      mantissa.shiftLeft(8 * (size - 3))
     }
   }
 

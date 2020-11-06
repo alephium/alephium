@@ -104,7 +104,11 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         UnsignedTransaction(None, minimalGas, U256.unsafe(gasPrice1), AVector.empty, AVector.empty),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(U256.Zero, PublicKey.generate, 0, ByteString.empty)
+      val coinbase = Transaction.coinbase(U256.Zero,
+                                          PublicKey.generate,
+                                          ByteString.empty,
+                                          Target.Max,
+                                          TimeStamp.zero)
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
       block0.scriptIndexes().toSeq is Seq(0)

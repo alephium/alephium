@@ -22,6 +22,7 @@ import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockTemplate(deps: AVector[Hash],
                                target: Target,
+                               blockTs: TimeStamp,
                                txHash: Hash,
                                transactions: AVector[Transaction]) {
 
@@ -38,8 +39,9 @@ object BlockTemplate {
 
   def apply(deps: AVector[Hash],
             target: Target,
+            blockTs: TimeStamp,
             transactions: AVector[Transaction]): BlockTemplate = {
     val txHash = Hash.hash(transactions)
-    BlockTemplate(deps, target, txHash, transactions)
+    BlockTemplate(deps, target, blockTs, txHash, transactions)
   }
 }
