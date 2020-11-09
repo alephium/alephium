@@ -18,24 +18,23 @@ def get_env_default(key, default):
 def get_env_default_int(key, default):
     return int(get_env_default(key, default))
 
-def rpc_call(args):
-    (host, port, method, params) = args
-    json = """{{"jsonrpc":"2.0","id": 0,"method":"{}","params": {}}}"""
-    cmd_tmp = """curl --data-binary '{}' -H 'content-type:application/json' http://{}:{}"""
-    cmd = cmd_tmp.format(json.format(method, params), host, port)
+def mining_action_call(args):
+    (host, port, action) = args
+    cmd_tmp = """curl -X POST http://{}:{}/miners?action={}-mining"""
+    cmd = cmd_tmp.format(host, port, action)
     return (host, port, cmd, run_capture(cmd))
 
-def rpc_call_all(method, params):
+def mining_action_call_all(action):
     nodes = get_env_int('NODES')
     deployedNodes = get_env_default_int('DEPLOYED_NODES', 0)
 
     calls = []
     for node in range(deployedNodes, deployedNodes + nodes):
-        port = (port_start + 1000) + node
-        calls.append(('localhost', port, method, params))
+        port = (port_start + 3000) + node
+        calls.append(('localhost', port, action))
 
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
-    results = pool.map(rpc_call, calls)
+    results = pool.map(mining_action_call, calls)
     pool.close()
 
     for (host, port, cmd, result) in results:
@@ -69,7 +68,7 @@ class AlephiumMake(object):
 
             run          Run a local testnet
             kill         kill a local running testnet
-            rpc method params    rpc call to local testnet
+            mining       Run a mining action: start or stop
         ''')
 
         parser.add_argument('command', nargs='*', help='Subcommand to run')
@@ -185,10 +184,9 @@ class AlephiumMake(object):
               'nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'\
               .format(nodedir, nodedir))
 
-    def rpc(self, params):
-        method = params[0]
-        args = params[1] if len(params) > 1 else "{}"
-        rpc_call_all(method, args)
+    def mining(self, params):
+        action = params[0]
+        mining_action_call_all(action)
 
     def kill(self):
         run("ps aux | grep -i org.alephium.appserver.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
