@@ -35,8 +35,8 @@ import io.circe.parser.parse
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.api.ApiModel._
 import org.alephium.api.ApiModelCodec
+import org.alephium.api.model._
 import org.alephium.crypto.Sha256
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}

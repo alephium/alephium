@@ -32,8 +32,8 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
-import org.alephium.api.ApiModel._
 import org.alephium.api.Endpoints
+import org.alephium.api.model._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler

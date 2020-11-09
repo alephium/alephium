@@ -33,9 +33,9 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 import io.circe.syntax._
 
-import org.alephium.api.ApiModel._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.CirceUtils
+import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify

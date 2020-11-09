@@ -16,7 +16,7 @@
 
 package org.alephium.appserver
 
-import org.alephium.api.ApiModel._
+import org.alephium.api.model._
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 

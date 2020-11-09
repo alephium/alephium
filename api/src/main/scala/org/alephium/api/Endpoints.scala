@@ -23,8 +23,8 @@ import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
 
-import org.alephium.api.ApiModel._
 import org.alephium.api.CirceUtils.avectorCodec
+import org.alephium.api.model._
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
 import org.alephium.crypto.Sha256
