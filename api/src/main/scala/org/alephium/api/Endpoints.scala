@@ -85,43 +85,47 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
     infosEndpoint.get
       .in("self-clique")
       .out(jsonBody[SelfClique])
+      .summary("Get info about your own clique")
 
   val getSelfCliqueSynced: BaseEndpoint[Unit, Boolean] =
     infosEndpoint.get
       .in("self-clique-synced")
       .out(jsonBody[Boolean])
+      .summary("Is your clique synced?")
 
   val getInterCliquePeerInfo: BaseEndpoint[Unit, AVector[InterCliquePeerInfo]] =
     infosEndpoint.get
       .in("inter-clique-peer-info")
       .out(jsonBody[AVector[InterCliquePeerInfo]])
+      .summary("Get infos about the inter cliques")
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
       .in("blockflow")
       .in(timeIntervalQuery)
       .out(jsonBody[FetchResponse])
+      .summary("List blocks on the given time interval")
 
   val getBlock: BaseEndpoint[Hash, BlockEntry] =
     blockflowEndpoint.get
       .in("blocks")
       .in(path[Hash]("block_hash"))
       .out(jsonBody[BlockEntry])
-      .description("Get a block with hash")
+      .summary("Get a block with hash")
 
   val getBalance: BaseEndpoint[Address, Balance] =
     addressesEndpoint.get
       .in(path[Address]("address"))
       .in("balance")
       .out(jsonBody[Balance])
-      .description("Get the balance of a address")
+      .summary("Get the balance of a address")
 
   val getGroup: BaseEndpoint[Address, Group] =
     addressesEndpoint.get
       .in(path[Address]("address"))
       .in("group")
       .out(jsonBody[Group])
-      .description("Get the group of a address")
+      .summary("Get the group of a address")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(GroupIndex, GroupIndex, Int), HashesAtHeight] =
@@ -131,6 +135,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(query[GroupIndex]("toGroup"))
       .in(query[Int]("height"))
       .out(jsonBody[HashesAtHeight])
+      .summary("Get all block's hashes at given height for given groups")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val getChainInfo: BaseEndpoint[(GroupIndex, GroupIndex), ChainInfo] =
@@ -139,6 +144,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
+      .summary("Get infos about the chain from the given groups")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val listUnconfirmedTransactions: BaseEndpoint[(GroupIndex, GroupIndex), AVector[Tx]] =
@@ -147,7 +153,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[AVector[Tx]])
-      .description("List unconfirmed transactions")
+      .summary("List unconfirmed transactions")
 
   val createTransaction: BaseEndpoint[(PublicKey, Address, U256), CreateTransactionResult] =
     transactionsEndpoint.get
@@ -156,39 +162,39 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(query[Address]("toAddress"))
       .in(query[U256]("value"))
       .out(jsonBody[CreateTransactionResult])
-      .description("Create an unsigned transaction")
+      .summary("Create an unsigned transaction")
 
   val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
     transactionsEndpoint.post
       .in("transactions")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
-      .description("Send a signed transaction")
+      .summary("Send a signed transaction")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
-      .description("Execute an action on miners")
+      .summary("Execute an action on miners")
 
   val compile: BaseEndpoint[Compile, CompileResult] =
     contractsEndpoint.post
       .in("compile")
       .in(jsonBody[Compile])
       .out(jsonBody[CompileResult])
-      .description("Compile a smart contract")
+      .summary("Compile a smart contract")
 
   val createContract: BaseEndpoint[CreateContract, CreateContractResult] =
     contractsEndpoint.post
       .in("unsigned-contracts")
       .in(jsonBody[CreateContract])
       .out(jsonBody[CreateContractResult])
-      .description("Create an unsigned contracts")
+      .summary("Create an unsigned contract")
 
   val sendContract: BaseEndpoint[SendContract, TxResult] =
     contractsEndpoint.post
       .in("contracts")
       .in(jsonBody[SendContract])
       .out(jsonBody[TxResult])
-      .description("Compile a smart contract")
+      .summary("Send a signed smart contract")
 }
