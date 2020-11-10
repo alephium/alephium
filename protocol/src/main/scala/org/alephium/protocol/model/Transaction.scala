@@ -174,8 +174,12 @@ object Transaction {
                data: ByteString,
                target: Target,
                blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+    val reward = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
+    coinbase(gasFee, publicKey, data, reward)
+  }
+
+  def coinbase(gasFee: U256, publicKey: PublicKey, data: ByteString, reward: U256): Transaction = {
     val pkScript = LockupScript.p2pkh(publicKey)
-    val reward   = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val txOutput = AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, data)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,

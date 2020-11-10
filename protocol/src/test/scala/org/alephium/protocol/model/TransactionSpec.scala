@@ -16,10 +16,11 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 
-import org.alephium.protocol.Hash
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.util.{AlephiumSpec, TimeStamp, U256}
 
 class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "generate distinct coinbase transactions" in {
@@ -36,5 +37,18 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
         tx.chainIndex is chainIndex
       }
     }
+  }
+
+  it should "collide hashes for coinbase txs" in {
+    val publicKey = PublicKey.generate
+    val coinbase0 = Transaction.coinbase(gasFee = U256.Zero,
+                                         publicKey,
+                                         data   = ByteString.empty,
+                                         reward = U256.Zero)
+    val coinbase1 = Transaction.coinbase(gasFee = U256.Zero,
+                                         publicKey,
+                                         data   = ByteString.empty,
+                                         reward = U256.Zero)
+    coinbase0.hash is coinbase1.hash
   }
 }
