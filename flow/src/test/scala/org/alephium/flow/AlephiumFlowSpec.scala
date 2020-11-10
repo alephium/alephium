@@ -209,11 +209,8 @@ trait FlowFixture
     val txs              = prepareTxs(blockFlow, chainIndex)
     val blockTs          = TimeStamp.now()
 
-    val coinbaseTx = Transaction.coinbase(txs,
-                                          toPublicKey,
-                                          Hash.generate.bytes,
-                                          consensusConfig.maxMiningTarget,
-                                          blockTs)
+    val coinbaseTx =
+      Transaction.coinbase(chainIndex, txs, toPublicKey, consensusConfig.maxMiningTarget, blockTs)
 
     @tailrec
     def iter(nonce: BigInt): Block = {

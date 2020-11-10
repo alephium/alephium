@@ -19,7 +19,8 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{Block, TxOutputRef}
+import org.alephium.protocol.model.{Block, CoinbaseFixedData, TxOutputRef}
+import org.alephium.serde._
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
@@ -71,10 +72,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
-      _ <- checkCoinbaseEasy(block)
+      _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
       _ <- checkNonCoinbases(block, flow)
-      _ <- checkCoinbaseReward(block)
       _ <- checkFlow(block, flow)
     } yield ()
   }
@@ -91,6 +91,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (block.transactions.nonEmpty) validBlock(()) else invalidBlock(EmptyTransactionList)
   }
 
+  private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
+    for {
+      _ <- checkCoinbaseEasy(block)
+      _ <- checkCoinbaseData(block)
+      _ <- checkCoinbaseReward(block)
+    } yield ()
+  }
+
   private[validation] def checkCoinbaseEasy(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
@@ -102,6 +110,32 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       validBlock(())
     } else {
       invalidBlock(InvalidCoinbaseFormat)
+    }
+  }
+
+  private[validation] def checkCoinbaseData(block: Block): BlockValidationResult[Unit] = {
+    val coinbase   = block.coinbase
+    val chainIndex = block.chainIndex
+    val data       = coinbase.unsigned.fixedOutputs.head.additionalData
+    _deserialize[CoinbaseFixedData](data) match {
+      case Right((coinbaseFixedData, _)) =>
+        if (coinbaseFixedData.fromGroup == chainIndex.from.value.toByte &&
+            coinbaseFixedData.toGroup == chainIndex.to.value.toByte &&
+            coinbaseFixedData.blockTs == block.header.timestamp) {
+          validBlock(())
+        } else {
+          invalidBlock(InvalidCoinbaseData)
+        }
+      case Left(_) => invalidBlock(InvalidCoinbaseData)
+    }
+  }
+
+  private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
+    val reward = brokerConfig.emission.miningReward(block.header)
+    if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidCoinbaseReward)
     }
   }
 
@@ -145,15 +179,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
           validTx(())
         }
       }
-    }
-  }
-
-  private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
-    val reward = brokerConfig.emission.miningReward(block.header)
-    if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
-      validBlock(())
-    } else {
-      invalidBlock(InvalidCoinbaseReward)
     }
   }
 

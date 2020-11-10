@@ -342,9 +342,9 @@ trait BlockGenerators extends TxGenerators {
 
   private def gen(chainIndex: ChainIndex, deps: AVector[Hash], txs: AVector[Transaction]): Block = {
     val blockTs = TimeStamp.now()
-    val coinbase = Transaction.coinbase(txs,
+    val coinbase = Transaction.coinbase(chainIndex,
+                                        txs,
                                         publicKeyGen(chainIndex.to).sample.get,
-                                        ByteString.empty,
                                         consensusConfig.maxMiningTarget,
                                         blockTs)
     val txsWithCoinbase = txs :+ coinbase

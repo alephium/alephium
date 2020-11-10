@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.Serde
+import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
@@ -160,23 +160,45 @@ object Transaction {
                 contractSignatures = AVector.empty)
   }
 
-  def coinbase(txs: AVector[Transaction],
+  def coinbase(chainIndex: ChainIndex,
+               txs: AVector[Transaction],
                publicKey: PublicKey,
-               data: ByteString,
+               target: Target,
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+    coinbase(chainIndex, txs, publicKey, ByteString.empty, target, blockTs)
+  }
+
+  def coinbase(chainIndex: ChainIndex,
+               txs: AVector[Transaction],
+               publicKey: PublicKey,
+               minerData: ByteString,
                target: Target,
                blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    coinbase(gasFee, publicKey, data, target, blockTs)
+    coinbase(chainIndex, gasFee, publicKey, minerData, target, blockTs)
   }
 
-  def coinbase(gasFee: U256,
+  def coinbase(chainIndex: ChainIndex,
+               gasFee: U256,
                publicKey: PublicKey,
-               data: ByteString,
                target: Target,
                blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
-    val pkScript = LockupScript.p2pkh(publicKey)
-    val reward   = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
-    val txOutput = AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, data)
+    coinbase(chainIndex, gasFee, publicKey, ByteString.empty, target, blockTs)
+  }
+
+  def coinbase(chainIndex: ChainIndex,
+               gasFee: U256,
+               publicKey: PublicKey,
+               minerData: ByteString,
+               target: Target,
+               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+    val reward       = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
+    val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
+    val outputData   = serialize(coinbaseData) ++ minerData
+    val pkScript     = LockupScript.p2pkh(publicKey)
+
+    val txOutput =
+      AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, outputData)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,
