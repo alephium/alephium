@@ -17,8 +17,10 @@
 package org.alephium.api
 
 import com.typesafe.scalalogging.StrictLogging
+import io.circe.{Decoder, Encoder}
 import sttp.tapir._
-import sttp.tapir.json.circe.jsonBody
+import sttp.tapir.EndpointIO.Example
+import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
 
 import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.model._
@@ -29,7 +31,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
+trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs with StrictLogging {
 
   implicit def groupConfig: GroupConfig
 
@@ -42,6 +44,11 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
         Validator.custom({ case (from, to) => from <= to }, "`fromTs` must be before `toTs`"))
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
+
+
+  private def jsonBody[T: Encoder: Decoder: Schema: Validator](
+      implicit examples: List[Example[T]]) =
+        tapirJsonBody[T].examples(examples)
 
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
