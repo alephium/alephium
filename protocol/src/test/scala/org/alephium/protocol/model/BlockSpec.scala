@@ -18,7 +18,6 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
-import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey, Signature}
@@ -104,9 +103,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         UnsignedTransaction(None, minimalGas, U256.unsafe(gasPrice1), AVector.empty, AVector.empty),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(U256.Zero,
+      val coinbase = Transaction.coinbase(ChainIndex.unsafe(0, 0),
+                                          U256.Zero,
                                           PublicKey.generate,
-                                          ByteString.empty,
                                           Target.Max,
                                           TimeStamp.zero)
 

@@ -16,13 +16,13 @@
 
 package org.alephium.flow.validation
 
-import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -60,11 +60,11 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
   }
 
-  def coinbase(gasFee: U256, publicKey: PublicKey): Transaction = {
-    Transaction.coinbase(gasFee, publicKey, ByteString.empty, Target.Max, TimeStamp.zero)
+  def coinbase(chainIndex: ChainIndex, gasFee: U256, publicKey: PublicKey): Transaction = {
+    Transaction.coinbase(chainIndex, gasFee, publicKey, Target.Max, TimeStamp.zero)
   }
 
-  it should "validate coinbase transaction" in new Fixture {
+  it should "validate coinbase transaction simple format" in new Fixture {
     val (privateKey, publicKey) = SignatureSchema.generatePriPub()
     val block0 =
       Block.from(AVector.empty, AVector.empty, consensusConfig.maxMiningTarget, TimeStamp.zero, 0)
@@ -75,7 +75,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
 
-    val coinbase1     = coinbase(0, publicKey)
+    val coinbase1     = coinbase(block0.chainIndex, 0, publicKey)
     val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
     passCheck(checkCoinbaseEasy(block1))
@@ -107,6 +107,14 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
     failCheck(checkCoinbaseEasy(block8), InvalidCoinbaseFormat)
+  }
+
+  it should "check coinbase data" in new Fixture {
+    val block        = blockGenOf(brokerConfig).sample.get
+    val chainIndex   = block.chainIndex
+    val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
+    val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
+    coinbaseData.startsWith(expected) is true
   }
 
   it should "check coinbase reward" in new Fixture {
