@@ -17,19 +17,21 @@
 package org.alephium.api
 
 import com.typesafe.scalalogging.StrictLogging
+import io.circe.{Decoder, Encoder}
 import sttp.tapir._
-import sttp.tapir.json.circe.jsonBody
+import sttp.tapir.EndpointIO.Example
+import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
 
 import org.alephium.api.CirceUtils.avectorCodec
-import org.alephium.api.model._
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
+import org.alephium.api.model._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
+trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs with StrictLogging {
 
   implicit def groupConfig: GroupConfig
 
@@ -43,125 +45,155 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
 
+  private def jsonBody[T: Encoder: Decoder: Schema: Validator](
+      implicit examples: List[Example[T]]) =
+    tapirJsonBody[T].examples(examples)
+
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
       .errorOut(jsonBody[ApiModel.Error])
+
+  private val infosEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("infos")
+      .tag("Infos")
+
+  private val addressesEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("addresses")
+      .tag("Addresses")
+
+  private val transactionsEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .tag("Transactions")
+
+  private val minersEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("miners")
+      .tag("Miners")
+
+  private val contractsEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .tag("Contracts")
+
+  private val blockflowEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
       .tag("Blockflow")
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
-    baseEndpoint.get
-      .in("infos")
+    infosEndpoint.get
       .in("self-clique")
       .out(jsonBody[SelfClique])
+      .summary("Get info about your own clique")
 
   val getSelfCliqueSynced: BaseEndpoint[Unit, Boolean] =
-    baseEndpoint.get
-      .in("infos")
+    infosEndpoint.get
       .in("self-clique-synced")
       .out(jsonBody[Boolean])
+      .summary("Is your clique synced?")
 
   val getInterCliquePeerInfo: BaseEndpoint[Unit, AVector[InterCliquePeerInfo]] =
-    baseEndpoint.get
-      .in("infos")
+    infosEndpoint.get
       .in("inter-clique-peer-info")
       .out(jsonBody[AVector[InterCliquePeerInfo]])
+      .summary("Get infos about the inter cliques")
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
-    baseEndpoint.get
+    blockflowEndpoint.get
       .in("blockflow")
       .in(timeIntervalQuery)
       .out(jsonBody[FetchResponse])
+      .summary("List blocks on the given time interval")
 
   val getBlock: BaseEndpoint[Hash, BlockEntry] =
-    baseEndpoint.get
+    blockflowEndpoint.get
       .in("blocks")
       .in(path[Hash]("block_hash"))
       .out(jsonBody[BlockEntry])
-      .description("Get a block with hash")
+      .summary("Get a block with hash")
 
   val getBalance: BaseEndpoint[Address, Balance] =
-    baseEndpoint.get
-      .in("addresses")
+    addressesEndpoint.get
       .in(path[Address]("address"))
       .in("balance")
       .out(jsonBody[Balance])
-      .description("Get the balance of a address")
+      .summary("Get the balance of a address")
 
   val getGroup: BaseEndpoint[Address, Group] =
-    baseEndpoint.get
-      .in("addresses")
+    addressesEndpoint.get
       .in(path[Address]("address"))
       .in("group")
       .out(jsonBody[Group])
-      .description("Get the group of a address")
+      .summary("Get the group of a address")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(GroupIndex, GroupIndex, Int), HashesAtHeight] =
-    baseEndpoint.get
+    blockflowEndpoint.get
       .in("hashes")
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .in(query[Int]("height"))
       .out(jsonBody[HashesAtHeight])
+      .summary("Get all block's hashes at given height for given groups")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val getChainInfo: BaseEndpoint[(GroupIndex, GroupIndex), ChainInfo] =
-    baseEndpoint.get
+    blockflowEndpoint.get
       .in("chains")
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[ChainInfo])
+      .summary("Get infos about the chain from the given groups")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val listUnconfirmedTransactions: BaseEndpoint[(GroupIndex, GroupIndex), AVector[Tx]] =
-    baseEndpoint.get
+    transactionsEndpoint.get
       .in("unconfirmed-transactions")
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[AVector[Tx]])
-      .description("List unconfirmed transactions")
+      .summary("List unconfirmed transactions")
 
   val createTransaction: BaseEndpoint[(PublicKey, Address, U256), CreateTransactionResult] =
-    baseEndpoint.get
+    transactionsEndpoint.get
       .in("unsigned-transactions")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
       .in(query[U256]("value"))
       .out(jsonBody[CreateTransactionResult])
-      .description("Create an unsigned transaction")
+      .summary("Create an unsigned transaction")
 
   val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
-    baseEndpoint.post
+    transactionsEndpoint.post
       .in("transactions")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
-      .description("Send a signed transaction")
+      .summary("Send a signed transaction")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
-    baseEndpoint.post
-      .in("miners")
+    minersEndpoint.post
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])
-      .description("Execute an action on miners")
+      .summary("Execute an action on miners")
 
   val compile: BaseEndpoint[Compile, CompileResult] =
-    baseEndpoint.post
+    contractsEndpoint.post
       .in("compile")
       .in(jsonBody[Compile])
       .out(jsonBody[CompileResult])
-      .description("Compile a smart contract")
+      .summary("Compile a smart contract")
 
   val createContract: BaseEndpoint[CreateContract, CreateContractResult] =
-    baseEndpoint.post
+    contractsEndpoint.post
       .in("unsigned-contracts")
       .in(jsonBody[CreateContract])
       .out(jsonBody[CreateContractResult])
-      .description("Create an unsigned contracts")
+      .summary("Create an unsigned contract")
 
   val sendContract: BaseEndpoint[SendContract, TxResult] =
-    baseEndpoint.post
+    contractsEndpoint.post
       .in("contracts")
       .in(jsonBody[SendContract])
       .out(jsonBody[TxResult])
-      .description("Compile a smart contract")
+      .summary("Send a signed smart contract")
 }
