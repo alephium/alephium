@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.model._
 import org.alephium.util._
 
 class InterCliqueSyncTest extends AlephiumSpec {

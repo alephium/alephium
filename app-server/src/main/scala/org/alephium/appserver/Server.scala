@@ -38,13 +38,13 @@ trait Server extends Service {
   implicit def executionContext: ExecutionContext
 
   def node: Node
-  def rpcServer: RPCServer
   def restServer: RestServer
+  def webSocketServer: WebSocketServer
   def miner: ActorRefT[Miner.Command]
   def walletService: Option[WalletService]
 
   override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq(rpcServer, restServer, node) ++ ArraySeq.from[Service](walletService.toList)
+    ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
   override protected def startSelfOnce(): Future[Unit] =
     Future.successful(())
@@ -83,7 +83,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
       config.chains.networkType,
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
-        config.network.rpcPort,
+        config.network.restPort,
         config.broker.groups
       )
     )
@@ -92,7 +92,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
   }
 
   implicit def brokerConfig: BrokerSetting      = config.broker
-  lazy val rpcServer: RPCServer                 = RPCServer(node, miner)
   lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+  lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 }

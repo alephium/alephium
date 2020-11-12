@@ -16,7 +16,7 @@
 
 package org.alephium.appserver
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.model._
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
@@ -50,7 +50,7 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - transferAmount - defaultGasFee, 1)
     }
 
-    val tx2 = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
+    val tx2 = transferFromWallet(transferAddress, transferAmount, restPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
     Thread.sleep(1000)

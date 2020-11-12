@@ -93,8 +93,20 @@ lazy val rpc = project("rpc")
   )
   .dependsOn(util % "test->test;compile->compile")
 
+lazy val api = project("api")
+  .dependsOn(protocol, crypto, serde, util % "test->test;compile->compile")
+  .settings(
+    libraryDependencies ++= Seq(
+      `circe-core`,
+      `circe-generic`,
+      `scala-logging`,
+      `tapir-core`,
+      `tapir-circe`,
+    )
+  )
+
 lazy val `app-server` = mainProject("app-server")
-  .dependsOn(rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
+  .dependsOn(api, rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
   .settings(
     mainClass in assembly := Some("org.alephium.appserver.Boot"),
     assemblyJarName in assembly := s"alephium-${version.value}.jar",

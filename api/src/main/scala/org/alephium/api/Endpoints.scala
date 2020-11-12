@@ -14,39 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
-
-import scala.concurrent.Future
+package org.alephium.api
 
 import com.typesafe.scalalogging.StrictLogging
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
-import sttp.tapir.server.PartialServerEndpoint
 
-import org.alephium.appserver.ApiModel._
-import org.alephium.appserver.TapirCodecs
-import org.alephium.appserver.TapirSchemas._
-import org.alephium.crypto.Sha256
+import org.alephium.api.CirceUtils.avectorCodec
+import org.alephium.api.model._
+import org.alephium.api.TapirCodecs
+import org.alephium.api.TapirSchemas._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.rpc.CirceUtils.avectorCodec
-import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
-  implicit def apiConfig: ApiConfig
   implicit def groupConfig: GroupConfig
 
-  type BaseEndpoint[A, B] = Endpoint[A, Response.Failure, B, Nothing]
-  type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, Response.Failure, B, Nothing, Future]
-
-  private val apiKeyHash = apiConfig.apiKeyHash.getOrElse {
-    val apiKey = Hash.generate.toHexString
-    logger.info(s"Api Key is '$apiKey'")
-    Sha256.hash(apiKey)
-  }
+  type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -56,22 +43,10 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
 
-  private def checkApiKey(apiKey: ApiKey): Either[Response.Failure, ApiKey] =
-    if (apiKey.hash == apiKeyHash) {
-      Right(apiKey)
-    } else {
-      Left(Response.failed(Error.UnauthorizedError))
-    }
-
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
-      .errorOut(jsonBody[Response.Failure])
+      .errorOut(jsonBody[ApiModel.Error])
       .tag("Blockflow")
-
-  private val authEndpoint: AuthEndpoint[Unit, Unit] =
-    baseEndpoint
-      .in(auth.apiKey(header[ApiKey]("X-API-KEY")))
-      .serverLogicForCurrent(apiKey => Future.successful(checkApiKey(apiKey)))
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     baseEndpoint.get
@@ -155,15 +130,15 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .out(jsonBody[CreateTransactionResult])
       .description("Create an unsigned transaction")
 
-  val sendTransaction: AuthEndpoint[SendTransaction, TxResult] =
-    authEndpoint.post
+  val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
+    baseEndpoint.post
       .in("transactions")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
       .description("Send a signed transaction")
 
-  val minerAction: AuthEndpoint[MinerAction, Boolean] =
-    authEndpoint.post
+  val minerAction: BaseEndpoint[MinerAction, Boolean] =
+    baseEndpoint.post
       .in("miners")
       .in(query[MinerAction]("action"))
       .out(jsonBody[Boolean])

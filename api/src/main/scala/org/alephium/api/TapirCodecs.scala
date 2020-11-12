@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.appserver
+package org.alephium.api
 
 import java.net.InetAddress
 
@@ -23,11 +23,11 @@ import io.circe.syntax._
 import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.model._
+import org.alephium.api.CirceUtils.inetAddressCodec
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
-import org.alephium.rpc.CirceUtils.inetAddressCodec
 import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
@@ -39,9 +39,6 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromCirce[Address]
-
-  implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
-    fromCirce[ApiKey]
 
   implicit val publicKeyTapirCodec: Codec[String, PublicKey, TextPlain] =
     fromCirce[PublicKey]

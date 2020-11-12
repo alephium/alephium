@@ -18,7 +18,7 @@ package org.alephium.appserver
 
 import io.circe.Json
 
-import org.alephium.appserver.ApiModel._
+import org.alephium.api.model._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.util._

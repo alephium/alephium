@@ -20,8 +20,9 @@ import java.net.InetAddress
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.ClassTag
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, Uri}
+import akka.http.scaladsl.model._
 import io.circe.{Codec, Decoder, Encoder, Json, JsonObject}
 import io.circe.generic.semiauto.{deriveCodec, deriveDecoder, deriveEncoder}
 import io.circe.syntax._
@@ -45,44 +46,47 @@ trait BlockFlowClient {
 }
 
 object BlockFlowClient {
-  def apply(httpClient: HttpClient, address: Uri, groupNum: Int, networkType: NetworkType)(
+  def apply(httpClient: HttpClient, defaultUri: Uri, groupNum: Int, networkType: NetworkType)(
       implicit executionContext: ExecutionContext): BlockFlowClient =
-    new Impl(httpClient, address, groupNum, networkType)
+    new Impl(httpClient, defaultUri, groupNum, networkType)
 
   private class Impl(httpClient: HttpClient,
-                     address: Uri,
+                     defaultUri: Uri,
                      groupNum: Int,
                      val networkType: NetworkType)(implicit executionContext: ExecutionContext)
       extends BlockFlowClient
       with Codecs {
 
     implicit private val groupConfig: GroupConfig = new GroupConfig { val groups = groupNum }
-    private def rpcRequest[P <: JsonRpc: Encoder](uri: Uri, jsonRpc: P): HttpRequest =
-      HttpRequest(
-        HttpMethods.POST,
-        uri = uri,
-        entity = HttpEntity(
-          ContentTypes.`application/json`,
-          s"""{"jsonrpc":"2.0","id": 0,"method":"${jsonRpc.method}","params":${jsonRpc.asJson}}""")
-      )
 
-    private def request[P <: JsonRpc: Encoder, R: Codec](params: P,
-                                                         uri: Uri): Future[Either[String, R]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+    private def request[P <: RestRequest: Encoder, R: Codec: ClassTag](
+        restRequest: P,
+        uri: Uri = defaultUri): Future[Either[String, R]] = {
       httpClient
-        .request[Result[R]](
-          rpcRequest(uri, params)
+        .request[R](
+          HttpRequest(
+            restRequest.method,
+            uri = Uri(uri.toString ++ restRequest.endpoint),
+            entity = {
+              if (restRequest.isEntity) {
+                HttpEntity(ContentTypes.`application/json`, restRequest.asJson.toString)
+              } else {
+                HttpEntity.Empty
+              }
+            }
+          )
         )
-        .map(_.map(_.result))
     }
 
-    private def requestFromGroup[P <: JsonRpc: Encoder, R: Codec](
+    private def requestFromGroup[P <: RestRequest: Encoder, R: Codec: ClassTag](
         fromGroup: GroupIndex,
-        params: P
+        restRequest: P
     ): Future[Either[String, R]] =
       uriFromGroup(fromGroup).flatMap {
         _.fold(
           error => Future.successful(Left(error)),
-          uri   => request[P, R](params, uri)
+          uri   => request[P, R](restRequest, uri)
         )
       }
 
@@ -91,10 +95,10 @@ object BlockFlowClient {
         for {
           selfClique <- selfCliqueEither
           peer = selfClique.peer(fromGroup)
-          rpcPort <- peer.rpcPort.toRight(
+          restPort <- peer.restPort.toRight(
             s"No rpc port for group ${fromGroup.value} (peers: ${selfClique.peers})")
         } yield {
-          Uri(s"http://${peer.address.getHostAddress}:$rpcPort")
+          Uri(s"http://${peer.address.getHostAddress}:$restPort")
         }
       }
 
@@ -128,26 +132,37 @@ object BlockFlowClient {
 
     private def getSelfClique(): Future[Either[String, SelfClique]] =
       request[GetSelfClique.type, SelfClique](
-        GetSelfClique,
-        address
+        GetSelfClique
       )
   }
 
   final case class Result[A: Codec](result: A)
 
-  sealed trait JsonRpc {
-    def method: String
+  sealed trait RestRequest {
+    def method: HttpMethod
+    def endpoint: String
+    lazy val isEntity: Boolean = false
   }
 
-  final case object GetSelfClique extends JsonRpc {
-    val method: String = "self_clique"
-    implicit val encoder: Encoder[GetSelfClique.type] = new Encoder[GetSelfClique.type] {
+  sealed trait GetRequest extends RestRequest {
+    lazy val method: HttpMethod = HttpMethods.GET
+    def endpoint: String
+  }
+
+  sealed trait PostRequest extends RestRequest {
+    lazy val method: HttpMethod = HttpMethods.POST
+    def endpoint: String
+  }
+
+  final case object GetSelfClique extends GetRequest {
+    lazy val endpoint: String = "/infos/self-clique"
+    implicit lazy val encoder: Encoder[GetSelfClique.type] = new Encoder[GetSelfClique.type] {
       final def apply(selfClique: GetSelfClique.type): Json = JsonObject.empty.asJson
     }
   }
 
-  final case class GetBalance(address: Address) extends JsonRpc {
-    val method: String = "get_balance"
+  final case class GetBalance(address: Address) extends GetRequest {
+    lazy val endpoint: String = s"/addresses/${address.toBase58}/balance"
   }
 
   final case class Balance(balance: U256, utxoNum: Int)
@@ -156,8 +171,9 @@ object BlockFlowClient {
       fromKey: String,
       toAddress: Address,
       value: U256
-  ) extends JsonRpc {
-    val method: String = "create_transaction"
+  ) extends GetRequest {
+    lazy val endpoint: String =
+      s"/unsigned-transactions?fromKey=$fromKey&toAddress=${toAddress.toBase58}&value=${value.toString}"
   }
 
   final case class CreateTransactionResult(unsignedTx: String,
@@ -165,13 +181,14 @@ object BlockFlowClient {
                                            fromGroup: Int,
                                            toGroup: Int)
 
-  final case class SendTransaction(tx: String, signature: String) extends JsonRpc {
-    val method: String = "send_transaction"
+  final case class SendTransaction(tx: String, signature: String) extends PostRequest {
+    lazy val endpoint: String           = "/transactions"
+    override lazy val isEntity: Boolean = true
   }
 
   final case class TxResult(txId: Hash, fromGroup: Int, toGroup: Int)
 
-  final case class PeerAddress(address: InetAddress, rpcPort: Option[Int], wsPort: Option[Int])
+  final case class PeerAddress(address: InetAddress, restPort: Option[Int], wsPort: Option[Int])
 
   final case class SelfClique(peers: ArraySeq[PeerAddress], groupNumPerBroker: Int) {
     def peer(groupIndex: GroupIndex): PeerAddress =
