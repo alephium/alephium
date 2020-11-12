@@ -83,7 +83,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
       config.chains.networkType,
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
-        config.network.rpcPort,
+        config.network.restPort,
         config.broker.groups
       )
     )

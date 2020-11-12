@@ -23,5 +23,5 @@ import org.alephium.util.U256
 final case class Transfer(address: Address, amount: U256)
 
 object Transfer {
-  final case class Result(txId: Hash)
+  final case class Result(txId: Hash, fromGroup: Int, toGroup: Int)
 }

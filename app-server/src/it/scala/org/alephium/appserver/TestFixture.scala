@@ -29,7 +29,8 @@ import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.{SocketUtil, TestProbe}
-import io.circe.Decoder
+import io.circe.{Codec, Decoder}
+import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Minutes, Span}
@@ -45,6 +46,7 @@ import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
+import org.alephium.wallet.api.model._
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
 
@@ -69,10 +71,14 @@ trait TestFixtureLike
     (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address                 = "T1CarrVGRS2YvEoPLgY6HJvyCAcqW91buYWRJ4roRDCPPg"
-  val publicKey               = "033cd0876b492fea9c5c61f616ca3faf006097959c67f663ce7653ecb0b71b4eb4"
-  val privateKey              = "bf38aa6f383b14e678a5fd885b93dd97d1add94aaddb70b7cfb6e4c5e8330fe9"
+  val address    = "T1CarrVGRS2YvEoPLgY6HJvyCAcqW91buYWRJ4roRDCPPg"
+  val publicKey  = "033cd0876b492fea9c5c61f616ca3faf006097959c67f663ce7653ecb0b71b4eb4"
+  val privateKey = "bf38aa6f383b14e678a5fd885b93dd97d1add94aaddb70b7cfb6e4c5e8330fe9"
+  val mnemonic =
+    "talent box celery scissors april bone pet broken borrow weather laugh property rose disorder radar saddle enemy toddler olive dance sudden idle hazard tuition"
   val (transferAddress, _, _) = generateAccount
+
+  val password = "password"
 
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
@@ -112,6 +118,8 @@ trait TestFixtureLike
     httpRequest(HttpMethods.GET, endpoint, maybeEntity)
   def httpPost(endpoint: String, maybeEntity: Option[String] = None) =
     httpRequest(HttpMethods.POST, endpoint, maybeEntity)
+  def httpPut(endpoint: String, maybeEntity: Option[String] = None) =
+    httpRequest(HttpMethods.PUT, endpoint, maybeEntity)
 
   def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
     val response = Http().singleRequest(request(port)).futureValue
@@ -136,6 +144,19 @@ trait TestFixtureLike
     val res        = request[TxResult](sendTx, restPort)
     res
   }
+
+  implicit val walletResultResultCodec: Codec[WalletRestore.Result] =
+    deriveCodec[WalletRestore.Result]
+  implicit val transferResultCodec: Codec[Transfer.Result] = deriveCodec[Transfer.Result]
+
+  def transferFromWallet(toAddress: String, amount: U256, restPort: Int): Transfer.Result =
+    eventually {
+      val walletName =
+        request[WalletRestore.Result](restoreWallet(password, mnemonic), restPort).walletName
+      val transfer = transferWallet(walletName, toAddress, amount)
+      val res      = request[Transfer.Result](transfer, restPort)
+      res
+    }
 
   @tailrec
   final def awaitNewBlock(from: Int, to: Int): Unit = {
@@ -170,7 +191,8 @@ trait TestFixtureLike
         ("alephium.network.rest-port", publicPort - 300),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
-        ("alephium.wallet.port", walletPort)
+        ("alephium.wallet.port", walletPort),
+        ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )
       override implicit lazy val config = {
         val tmp = AlephiumConfig.load(newConfig).toOption.get
@@ -243,7 +265,7 @@ trait TestFixtureLike
             config.chains.networkType,
             WalletConfig.BlockFlow(
               apiConfig.networkInterface.getHostAddress,
-              config.network.rpcPort,
+              config.network.restPort,
               config.broker.groups
             )
           )
@@ -300,6 +322,18 @@ trait TestFixtureLike
       s"/unsigned-transactions?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
     )
 
+  def restoreWallet(password: String, mnemonic: String) =
+    httpPut(
+      s"/wallets",
+      Some(s"""{"password":"${password}","mnemonic":"${mnemonic}"}""")
+    )
+
+  def transferWallet(walletName: String, address: String, amount: U256) = {
+    httpPost(
+      s"/wallets/${walletName}/transfer",
+      Some(s"""{"address":"${address}","amount":"${amount}"}""")
+    )
+  }
   def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
     val signature: Signature = SignatureSchema.sign(Hex.unsafe(createTransactionResult.hash),
                                                     PrivateKey.unsafe(Hex.unsafe(privateKey)))

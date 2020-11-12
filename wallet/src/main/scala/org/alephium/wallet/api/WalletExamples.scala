@@ -74,7 +74,7 @@ trait WalletExamples {
     simpleExample(Transfer(address, U256.Million))
 
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
-    simpleExample(Transfer.Result(Hash.generate))
+    simpleExample(Transfer.Result(Hash.generate, 2, 1))
 
   implicit val addressesExamples: List[Example[Addresses]] =
     simpleExample(Addresses(address, AVector(address)))

@@ -30,7 +30,6 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.SocketUtil
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 
@@ -263,44 +262,39 @@ object WalletAppSpec extends {
     private val peer = PeerAddress(address, Some(port), None)
 
     val routes: Route =
-      post {
-        entity(as[JsonRpc]) {
-          case GetSelfClique =>
-            complete(Result(SelfClique(ArraySeq(peer, peer), 2)))
-          case GetBalance(_) =>
-            complete(Result(Balance(42, 1)))
-          case CreateTransaction(_, _, _) =>
-            val unsignedTx = transactionGen().sample.get.unsigned
-            complete(
-              Result(
-                CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                                        Hex.toHexString(unsignedTx.hash.bytes),
-                                        unsignedTx.fromGroup.value,
-                                        unsignedTx.toGroup.value)
-              ))
-          case SendTransaction(_, _) =>
-            complete(Result(TxResult(Hash.generate, 0, 0)))
+      path("unsigned-transactions") {
+        get {
+          parameters("fromKey".as[String]) { _ =>
+            parameters("toAddress".as[String]) { _ =>
+              parameters("value".as[U256]) { _ =>
+                val unsignedTx = transactionGen().sample.get.unsigned
+                complete(
+                  CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
+                                          Hex.toHexString(unsignedTx.hash.bytes),
+                                          unsignedTx.fromGroup.value,
+                                          unsignedTx.toGroup.value)
+                )
+              }
+            }
+          }
         }
-      }
+      } ~
+        path("transactions") {
+          post {
+            entity(as[SendTransaction]) { _ =>
+              complete(TxResult(Hash.generate, 0, 0))
+            }
+          }
+        } ~
+        path("infos" / "self-clique") {
+          complete(SelfClique(ArraySeq(peer, peer), 2))
+        } ~
+        path("addresses" / Segment / "balance") { _ =>
+          get {
+            complete(Balance(42, 1))
+          }
+        }
 
     val server = Http().bindAndHandle(routes, address.getHostAddress, port)
-
-    implicit val jsonRpcDecoder: Decoder[JsonRpc] = new Decoder[JsonRpc] {
-      def decode(c: HCursor, method: String, params: Json): Decoder.Result[JsonRpc] = {
-        method match {
-          case "send_transaction"   => params.as[SendTransaction]
-          case "create_transaction" => params.as[CreateTransaction]
-          case "get_balance"        => params.as[GetBalance]
-          case "self_clique"        => Right(GetSelfClique)
-          case _                    => Left(DecodingFailure(s"$method not supported", c.history))
-        }
-      }
-      final def apply(c: HCursor): Decoder.Result[JsonRpc] =
-        for {
-          method  <- c.downField("method").as[String]
-          params  <- c.downField("params").as[Json]
-          jsonRpc <- decode(c, method, params)
-        } yield jsonRpc
-    }
   }
 }

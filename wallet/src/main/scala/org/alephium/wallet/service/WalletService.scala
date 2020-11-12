@@ -51,7 +51,9 @@ trait WalletService extends Service {
   def unlockWallet(wallet: String, password: String): Future[Either[WalletError, Unit]]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U256)]]]
   def getAddresses(wallet: String): Future[Either[WalletError, (Address, AVector[Address])]]
-  def transfer(wallet: String, address: Address, amount: U256): Future[Either[WalletError, Hash]]
+  def transfer(wallet: String,
+               address: Address,
+               amount: U256): Future[Either[WalletError, (Hash, Int, Int)]]
   def deriveNextAddress(wallet: String): Future[Either[WalletError, Address]]
   def changeActiveAddress(wallet: String, address: Address): Future[Either[WalletError, Unit]]
   def listWallets(): Future[Either[WalletError, AVector[(String, Boolean)]]]
@@ -199,7 +201,7 @@ object WalletService {
 
     override def transfer(wallet: String,
                           address: Address,
-                          amount: U256): Future[Either[WalletError, Hash]] = {
+                          amount: U256): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKey(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
@@ -209,7 +211,7 @@ object WalletService {
             val signature = SignatureSchema.sign(message, privateKey.privateKey)
             blockFlowClient
               .sendTransaction(createTxResult.unsignedTx, signature, createTxResult.fromGroup)
-              .map(_.map(_.txId))
+              .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
               .map(_.left.map(BlockFlowClientError))
         }
       }

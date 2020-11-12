@@ -110,7 +110,9 @@ class WalletServer(walletService: WalletService, val networkType: NetworkType)(
         case (wallet, tr) =>
           walletService
             .transfer(wallet, tr.address, tr.amount)
-            .map(_.map(model.Transfer.Result.apply).left.map(toApiError))
+            .map(_.map {
+              case (txId, fromGroup, toGroup) => model.Transfer.Result(txId, fromGroup, toGroup)
+            }.left.map(toApiError))
       } ~
       deriveNextAddress.toRoute { wallet =>
         walletService
