@@ -17,7 +17,6 @@
 package org.alephium.appserver
 
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestProbe
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -137,15 +136,9 @@ class RestServerSpec
     val tx =
       s"""{"tx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
     val entity = HttpEntity(ContentTypes.`application/json`, tx)
-    Post(s"/transactions", entity)
-      .addHeader(RawHeader("X-API-KEY", apiKey.value)) ~> server.route ~> check {
+    Post(s"/transactions", entity) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxResult] is dummyTransferResult
-    }
-
-    //Fail without api-key
-    Post(s"/transactions", entity) ~> server.route ~> check {
-      status is StatusCodes.BadRequest
     }
   }
 

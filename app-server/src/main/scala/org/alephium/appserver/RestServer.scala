@@ -61,7 +61,6 @@ class RestServer(
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
   lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
-  lazy val maybeApiKeyHash                            = apiConfig.apiKeyHash
 
   implicit val groupConfig: GroupConfig   = node.config.broker
   implicit val chainsConfig: ChainsConfig = node.config.chains
@@ -129,9 +128,8 @@ class RestServer(
         ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))
   }
 
-  private val sendTransactionLogic = sendTransaction.serverLogic {
-    case (_, transaction) =>
-      ServerUtils.sendTransaction(txHandler, transaction)
+  private val sendTransactionLogic = sendTransaction.serverLogic { transaction =>
+    ServerUtils.sendTransaction(txHandler, transaction)
   }
 
   private val minerActionLogic = minerAction.serverLogic { action =>

@@ -120,10 +120,6 @@ class AlephiumMake(object):
 
         deployedNodes = get_env_default_int('DEPLOYED_NODES', 0)
 
-        apiKey = uuid.uuid4().hex
-        apiKeyHash = hashlib.sha256(str.encode(apiKey)).hexdigest()
-        print("Api key: " + apiKey)
-
         for node in range(deployedNodes, deployedNodes + nodes):
             port = 9973 + node
             rpcPort = port + 1000
@@ -163,13 +159,10 @@ class AlephiumMake(object):
                   discovery {{
                     bootstrap = "{}"
                   }}
-                  api {{
-                    api-key-hash = {}
-                  }}
                   chains.network-type = "testnet"
                 }}
             """.format(brokerId, brokerNum, groups, bindAddress, bindAddress, bindAddress, coordinatorAddress,
-                    rpcPort, wsPort, restPort, bootstrap, apiKeyHash)
+                    rpcPort, wsPort, restPort, bootstrap)
 
             userConfPath = '{}/user.conf'.format(nodedir)
 

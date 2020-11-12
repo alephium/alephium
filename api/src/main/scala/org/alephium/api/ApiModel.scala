@@ -162,10 +162,6 @@ trait ApiModelCodec {
   implicit val minerActionCodec: Codec[MinerAction] =
     Codec.from(minerActionDecoder, minerActionEncoder)
 
-  implicit val apiKeyEncoder: Encoder[ApiKey] = Encoder.encodeString.contramap(_.value)
-  implicit val apiKeyDecoder: Decoder[ApiKey] = Decoder.decodeString.emap(ApiKey.createApiKey)
-  implicit val apiKeyCodec: Codec[ApiKey]     = Codec.from(apiKeyDecoder, apiKeyEncoder)
-
   implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
     Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
       (info.id, info.externalAddresses, info.groupNumPerBroker))

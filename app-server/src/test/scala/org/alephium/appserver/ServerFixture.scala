@@ -55,8 +55,6 @@ trait ServerFixture
 
   val now = TimeStamp.now()
 
-  val apiKey = ApiKey.unsafe("XDGphUFhHMHgRXoVRYU_NKrZ3jO93qYWIQ07T6hTN7k")
-
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
   lazy val dummyBlockHeader =

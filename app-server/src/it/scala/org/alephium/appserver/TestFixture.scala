@@ -25,7 +25,6 @@ import scala.concurrent.{Await, Promise}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -37,12 +36,11 @@ import org.scalatest.time.{Minutes, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.crypto.Sha256
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.protocol.{ALF, Hash, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -75,9 +73,6 @@ trait TestFixtureLike
   val publicKey               = "033cd0876b492fea9c5c61f616ca3faf006097959c67f663ce7653ecb0b71b4eb4"
   val privateKey              = "bf38aa6f383b14e678a5fd885b93dd97d1add94aaddb70b7cfb6e4c5e8330fe9"
   val (transferAddress, _, _) = generateAccount
-
-  val apiKey     = Hash.generate.toHexString
-  val apiKeyHash = Sha256.hash(apiKey)
 
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
@@ -116,7 +111,7 @@ trait TestFixtureLike
   def httpGet(endpoint: String, maybeEntity: Option[String] = None) =
     httpRequest(HttpMethods.GET, endpoint, maybeEntity)
   def httpPost(endpoint: String, maybeEntity: Option[String] = None) =
-    httpRequest(HttpMethods.POST, endpoint, maybeEntity, Some(RawHeader("X-API-KEY", apiKey)))
+    httpRequest(HttpMethods.POST, endpoint, maybeEntity)
 
   def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
     val response = Http().singleRequest(request(port)).futureValue
@@ -175,7 +170,6 @@ trait TestFixtureLike
         ("alephium.network.rest-port", publicPort - 300),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
-        ("alephium.api.api-key-hash", apiKeyHash.toHexString),
         ("alephium.wallet.port", walletPort)
       )
       override implicit lazy val config = {

@@ -16,18 +16,14 @@
 
 package org.alephium.api
 
-import scala.concurrent.Future
-
 import com.typesafe.scalalogging.StrictLogging
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
-import sttp.tapir.server.PartialServerEndpoint
 
 import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.model._
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
-import org.alephium.crypto.Sha256
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -37,16 +33,7 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
 
   implicit def groupConfig: GroupConfig
 
-  def maybeApiKeyHash: Option[Sha256]
-
   type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
-  type AuthEndpoint[A, B] = PartialServerEndpoint[ApiKey, A, ApiModel.Error, B, Nothing, Future]
-
-  private val apiKeyHash = maybeApiKeyHash.getOrElse {
-    val apiKey = Hash.generate.toHexString
-    logger.info(s"Api Key is '$apiKey'")
-    Sha256.hash(apiKey)
-  }
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -56,22 +43,10 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
 
-  private def checkApiKey(apiKey: ApiKey): Either[ApiModel.Error, ApiKey] =
-    if (apiKey.hash == apiKeyHash) {
-      Right(apiKey)
-    } else {
-      Left(ApiModel.Error.UnauthorizedError)
-    }
-
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
       .errorOut(jsonBody[ApiModel.Error])
       .tag("Blockflow")
-
-  private val authEndpoint: AuthEndpoint[Unit, Unit] =
-    baseEndpoint
-      .in(auth.apiKey(header[ApiKey]("X-API-KEY")))
-      .serverLogicForCurrent(apiKey => Future.successful(checkApiKey(apiKey)))
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     baseEndpoint.get
@@ -155,8 +130,8 @@ trait Endpoints extends ApiModelCodec with TapirCodecs with StrictLogging {
       .out(jsonBody[CreateTransactionResult])
       .description("Create an unsigned transaction")
 
-  val sendTransaction: AuthEndpoint[SendTransaction, TxResult] =
-    authEndpoint.post
+  val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
+    baseEndpoint.post
       .in("transactions")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
