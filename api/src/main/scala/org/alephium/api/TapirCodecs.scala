@@ -23,8 +23,8 @@ import io.circe.syntax._
 import sttp.tapir.{Codec, DecodeResult, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
-import org.alephium.api.model._
 import org.alephium.api.CirceUtils.inetAddressCodec
+import org.alephium.api.model._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}

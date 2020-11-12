@@ -21,7 +21,18 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(macros, util, serde, io, crypto, rpc, `app-server`, benchmark, flow, protocol, wallet)
+  .aggregate(macros,
+             util,
+             serde,
+             io,
+             crypto,
+             api,
+             rpc,
+             `app-server`,
+             benchmark,
+             flow,
+             protocol,
+             wallet)
 
 def mainProject(id: String): Project =
   project(id).enablePlugins(JavaAppPackaging).dependsOn(flow)

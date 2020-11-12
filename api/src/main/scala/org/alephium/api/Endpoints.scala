@@ -23,9 +23,9 @@ import sttp.tapir.EndpointIO.Example
 import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
 
 import org.alephium.api.CirceUtils.avectorCodec
-import org.alephium.api.model._
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
+import org.alephium.api.model._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -45,10 +45,9 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to))
 
-
   private def jsonBody[T: Encoder: Decoder: Schema: Validator](
       implicit examples: List[Example[T]]) =
-        tapirJsonBody[T].examples(examples)
+    tapirJsonBody[T].examples(examples)
 
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint

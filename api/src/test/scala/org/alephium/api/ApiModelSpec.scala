@@ -24,11 +24,10 @@ import io.circe.syntax._
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.api.ApiModel._
 import org.alephium.api.CirceUtils
 import org.alephium.api.CirceUtils._
-import org.alephium.crypto.Sha256
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.api.model._
+import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
 
@@ -44,11 +43,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
-
-  implicit val apiConfig: ApiConfig =
-    ApiConfig(dummyAddress.getAddress,
-              blockflowFetchMaxAge,
-              askTimeout = Duration.zero)
 
   val networkType = NetworkType.Mainnet
 

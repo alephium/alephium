@@ -20,68 +20,64 @@ import java.net.InetSocketAddress
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
-import org.alephium.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+// scalastyle:off magic.number
 trait EndpointsExamples {
 
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
     LockupScript.fromBase58("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val unlockScript:UnlockScript = UnlockScript.p2pkh(PublicKey.generate)
-  private val address            = Address(networkType, lockupScript)
-  private val cliqueId = CliqueId.generate
-  private val port = 12344
-  private val rpcPort = 12355
-  private val wsPort = 12366
-  private val restPort = 12377
-  private val inetSocketAddress =  new InetSocketAddress("1.2.3.4", port)
-  private val inetAddress = inetSocketAddress.getAddress
-  private val peerAddress = PeerAddress(inetAddress, rpcPort, restPort, wsPort)
-  private val peers = AVector(peerAddress)
-  private val balance = ALF.alf(U256.unsafe(1)).get
-  private val height = 42
-private val signature=Signature.generate
-  private def hash = Hash.generate.toHexString
+  private val unlockScript: UnlockScript = UnlockScript.p2pkh(PublicKey.generate)
+  private val address                    = Address(networkType, lockupScript)
+  private val cliqueId                   = CliqueId.generate
+  private val port                       = 12344
+  private val rpcPort                    = 12355
+  private val wsPort                     = 12366
+  private val restPort                   = 12377
+  private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
+  private val inetAddress                = inetSocketAddress.getAddress
+  private val peerAddress                = PeerAddress(inetAddress, rpcPort, restPort, wsPort)
+  private val peers                      = AVector(peerAddress)
+  private val balance                    = ALF.alf(U256.unsafe(1)).get
+  private val height                     = 42
+  private val signature                  = Signature.generate
+  private def hash                       = Hash.generate.toHexString
 
   private val blockEntry = BlockEntry(
-      hash,
-      timestamp = TimeStamp.now(),
-      chainFrom =  1,
-      chainTo = 2,
-      height,
-      deps = AVector(hash,hash),
-      transactions =  None,
-    )
+    hash,
+    timestamp = TimeStamp.now(),
+    chainFrom = 1,
+    chainTo   = 2,
+    height,
+    deps         = AVector(hash, hash),
+    transactions = None
+  )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
-    simpleExample(SelfClique(cliqueId,
-                              peers,
-                              groupNumPerBroker = 1,
-                              ))
-
+    simpleExample(SelfClique(cliqueId, peers, groupNumPerBroker = 1))
 
   implicit val interCliquePeerInfosExamples: List[Example[AVector[InterCliquePeerInfo]]] =
-    simpleExample(AVector(InterCliquePeerInfo(cliqueId,
-                                       brokerId = 1,
-                                       inetSocketAddress,
-                                       isSynced = true)))
+    simpleExample(
+      AVector(InterCliquePeerInfo(cliqueId, brokerId = 1, inetSocketAddress, isSynced = true)))
 
   implicit val txsExamples: List[Example[AVector[Tx]]] =
-    simpleExample(AVector(Tx(hash, AVector(Input(
-      OutputRef(scriptHint = 23412, key= hash),
-      serialize(unlockScript))
-      ), AVector(Output(amount = balance, createdHeight = height, address)))))
+    simpleExample(
+      AVector(
+        Tx(hash,
+           AVector(Input(OutputRef(scriptHint = 23412, key = hash), serialize(unlockScript))),
+           AVector(Output(amount = balance, createdHeight = height, address)))))
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(Seq(blockEntry)))
@@ -102,31 +98,32 @@ private val signature=Signature.generate
     simpleExample(ChainInfo(currentHeight = height))
 
   implicit val createTransactionResultExamples: List[Example[CreateTransactionResult]] =
-    simpleExample(CreateTransactionResult(unsignedTx =hash,
-                                           hash,
-                                           fromGroup = 2,
-                                           toGroup = 1))
+    simpleExample(CreateTransactionResult(unsignedTx = hash, hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendTransactionExamples: List[Example[SendTransaction]] =
     simpleExample(SendTransaction(tx = hash, signature))
 
   implicit val txResultExamples: List[Example[TxResult]] =
-    simpleExample(TxResult(txId =hash, fromGroup = 2, toGroup = 1))
+    simpleExample(TxResult(txId = hash, fromGroup = 2, toGroup = 1))
 
   implicit val compileExamples: List[Example[Compile]] =
-    simpleExample(Compile(address, `type` = "contract", code= "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}" , state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7")))
+    simpleExample(
+      Compile(
+        address,
+        `type` = "contract",
+        code =
+          "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
+        state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7")
+      ))
 
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(CompileResult(code = hash))
 
   implicit val createContractExamples: List[Example[CreateContract]] =
-    simpleExample(CreateContract(fromKey = PublicKey.generate, code  = hash))
+    simpleExample(CreateContract(fromKey = PublicKey.generate, code = hash))
 
   implicit val createContractResultExamples: List[Example[CreateContractResult]] =
-    simpleExample(CreateContractResult(unsignedTx = hash,
-                                        hash = hash,
-                                        fromGroup = 2,
-                                        toGroup = 1))
+    simpleExample(CreateContractResult(unsignedTx = hash, hash = hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendContractExamples: List[Example[SendContract]] =
     simpleExample(SendContract(code = hash, tx = hash, signature, fromGroup = 2))
@@ -137,3 +134,4 @@ private val signature=Signature.generate
   implicit val badRequestExamples: List[Example[ApiModel.Error]] =
     simpleExample(ApiModel.Error(-32700, "Parse error"))
 }
+// scalastyle:on magic.number
