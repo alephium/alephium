@@ -1,15 +1,6 @@
+import sbt._
+import sbt.Keys._
 import Dependencies._
-
-homepage := Some(url("https://github.com/alephium/alephium"))
-licenses := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html"))
-developers := List(
-  Developer(
-    id    = "alephium core dev",
-    name  = "alephium core dev",
-    email = "dev@alephium.org",
-    url   = url("https://alephium.org/")
-  )
-)
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
 
@@ -199,8 +190,21 @@ lazy val wallet = project("wallet")
     publish / skip := true
   )
 
-val commonSettings = Seq(
+val publishSettings = Seq(
   organization := "org.alephium",
+  homepage := Some(url("https://github.com/alephium/alephium")),
+  licenses := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html")),
+  developers := List(
+    Developer(
+      id    = "alephium core dev",
+      name  = "alephium core dev",
+      email = "dev@alephium.org",
+      url   = url("https://alephium.org/")
+    )
+  )
+)
+
+val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.13.3",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
