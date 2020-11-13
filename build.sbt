@@ -198,7 +198,7 @@ lazy val wallet = project("wallet")
   )
 
 val commonSettings = Seq(
-  organization := "org.alephium"
+  organization := "org.alephium",
   scalaVersion := "2.13.3",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
