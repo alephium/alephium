@@ -83,7 +83,7 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def assembly(self):
-        run_exit('sbt app/assembly')
+        run_exit('sbt clean app/assembly')
 
     def build(self):
         run_exit('sbt app/stage')
