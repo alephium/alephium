@@ -21,18 +21,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle := {},
     scalastyle in Test := {}
   )
-  .aggregate(macros,
-             util,
-             serde,
-             io,
-             crypto,
-             api,
-             rpc,
-             `app-server`,
-             benchmark,
-             flow,
-             protocol,
-             wallet)
+  .aggregate(macros, util, serde, io, crypto, api, rpc, app, benchmark, flow, protocol, wallet)
 
 def mainProject(id: String): Project =
   project(id).enablePlugins(JavaAppPackaging).dependsOn(flow)
@@ -116,10 +105,10 @@ lazy val api = project("api")
     )
   )
 
-lazy val `app-server` = mainProject("app-server")
+lazy val app = mainProject("app")
   .dependsOn(api, rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
   .settings(
-    mainClass in assembly := Some("org.alephium.appserver.Boot"),
+    mainClass in assembly := Some("org.alephium.app.Boot"),
     assemblyJarName in assembly := s"alephium-${version.value}.jar",
     test in assembly := {},
     assemblyMergeStrategy in assembly := {

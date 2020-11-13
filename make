@@ -83,10 +83,10 @@ class AlephiumMake(object):
             getattr(self, args.command[0])(args.command[1:])
 
     def assembly(self):
-        run_exit('sbt app-server/assembly')
+        run_exit('sbt app/assembly')
 
     def build(self):
-        run_exit('sbt app-server/stage')
+        run_exit('sbt app/stage')
 
     def format(self):
         run_exit('sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle it:scalafmt it:scalastyle doc')
@@ -98,7 +98,7 @@ class AlephiumMake(object):
         run_exit('sbt it:scalafmtCheck it:scalastyle it:test')
 
     def package(self):
-        run_exit('sbt app-server/universal:packageBin')
+        run_exit('sbt app/universal:packageBin')
 
     def publish(self):
         run_exit('sbt publishLocal')
@@ -174,7 +174,7 @@ class AlephiumMake(object):
             userConfFile.close()
 
             run('ALEPHIUM_HOME={} '\
-              'nice -n 19 ./app-server/target/universal/stage/bin/app-server &> {}/console.log &'\
+              'nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'\
               .format(nodedir, nodedir))
 
     def mining(self, params):
@@ -182,7 +182,7 @@ class AlephiumMake(object):
         mining_action_call_all(action)
 
     def kill(self):
-        run("ps aux | grep -i org.alephium.appserver.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
+        run("ps aux | grep -i org.alephium.app.Boot | awk '{print $2}' | xargs kill 2> /dev/null")
 
     def clean(self):
         run('sbt clean')

@@ -19,7 +19,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
   * `flash loan is not available` by design
   * eliminate many `attack vectors of EVM` including unlimited authorization, double dip issue, reentrancy attack, etc
   * Utxo style `fine-grained execution model` makes risk-free arbitrage less common
-* `Front-running mitigation` through random execution of transactions (see code, wiki to come)  
+* `Front-running mitigation` through random execution of transactions (see code, wiki to come)
 * PoLW algorithm `reduces the energy consumption` of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
   * Adaptive rewards based on hashrate and timestamp are designed and implemented
   * Internal mining cost through burning will be added when hashrate and energy consumption is significantly high
@@ -56,14 +56,14 @@ In order to build the project from source the following dependencies must be ins
 In order to build a single runnable JAR use the following command:
   ./make assembly
 
-The resulting assembly file will appear in `/app-server/target/scala-2.13/` directory.
+The resulting assembly file will appear in `/app/target/scala-2.13/` directory.
 
 ### Univeral Zip distribution
 
 In order to build a zip distribution including launch scripts use the following command:
   ./make package
 
-The resulting package file will appear in the `app-server/target/scala-2.12/universal` directory.
+The resulting package file will appear in the `app/target/scala-2.12/universal` directory.
 
 ## Configuration
 
@@ -71,7 +71,7 @@ You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, wh
 
 ## Testing
 
-There are two kinds of tests: 
+There are two kinds of tests:
 
 1) Unit and property tests, which can be run with the `./make test` command.
 2) Integration tests, `./make ittest`.
