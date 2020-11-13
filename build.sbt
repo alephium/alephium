@@ -70,6 +70,9 @@ lazy val serde = project("serde")
 
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
+  .settings(
+    libraryDependencies += `blake3-jni`
+  )
 
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
