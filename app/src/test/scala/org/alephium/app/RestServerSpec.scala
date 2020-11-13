@@ -48,8 +48,8 @@ class RestServerSpec
     }
   }
 
-  it should "call GET /blocks/<hash>" in new RestServerFixture {
-    Get(s"/blocks/${dummyBlockHeader.hash.toHexString}") ~> server.route ~> check {
+  it should "call GET /blockflow/blocks/<hash>" in new RestServerFixture {
+    Get(s"/blockflow/blocks/${dummyBlockHeader.hash.toHexString}") ~> server.route ~> check {
       val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
       if (brokerConfig.contains(chainIndex.from) || brokerConfig.contains(chainIndex.to)) {
         status is StatusCodes.OK
@@ -74,69 +74,69 @@ class RestServerSpec
     }
   }
 
-  it should "call GET /hashes" in new RestServerFixture {
-    Get(s"/hashes?fromGroup=1&toGroup=1&height=1") ~> server.route ~> check {
+  it should "call GET /blockflow/hashes" in new RestServerFixture {
+    Get(s"/blockflow/hashes?fromGroup=1&toGroup=1&height=1") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[HashesAtHeight] is dummyHashesAtHeight
     }
-    Get(s"/hashes?toGroup=1&height=1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?toGroup=1&height=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/hashes?fromGroup=1&height=1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?fromGroup=1&height=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/hashes?fromGroup=1&toGroup=1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/hashes?fromGroup=10&toGroup=1&height=1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?fromGroup=10&toGroup=1&height=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/hashes?fromGroup=1&toGroup=10&height=1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?fromGroup=1&toGroup=10&height=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/hashes?fromGroup=1&toGroup=10&height=-1") ~> server.route ~> check {
+    Get(s"/blockflow/hashes?fromGroup=1&toGroup=10&height=-1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
   }
 
-  it should "call GET /chains" in new RestServerFixture {
-    Get(s"/chains?fromGroup=1&toGroup=1") ~> server.route ~> check {
+  it should "call GET /blockflow/chains" in new RestServerFixture {
+    Get(s"/blockflow/chains?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[ChainInfo] is dummyChainInfo
     }
-    Get(s"/chains?toGroup=1") ~> server.route ~> check {
+    Get(s"/blockflow/chains?toGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/chains?fromGroup=1") ~> server.route ~> check {
+    Get(s"/blockflow/chains?fromGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/chains?fromGroup=10&toGroup=1") ~> server.route ~> check {
+    Get(s"/blockflow/chains?fromGroup=10&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
-    Get(s"/chains?fromGroup=1&toGroup=10") ~> server.route ~> check {
+    Get(s"/blockflow/chains?fromGroup=1&toGroup=10") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
   }
 
-  it should "call GET /unconfirmed-transactions" in new RestServerFixture {
-    Get(s"/unconfirmed-transactions?fromGroup=0&toGroup=0") ~> server.route ~> check {
+  it should "call GET /transactions/unconfirmed" in new RestServerFixture {
+    Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[AVector[Tx]] is AVector.empty[Tx]
     }
   }
 
-  it should "call GET /unsigned-transactions" in new RestServerFixture {
-    Get(s"/unsigned-transactions?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1") ~> server.route ~> check {
+  it should "call GET /transactions/build" in new RestServerFixture {
+    Get(s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1") ~> server.route ~> check {
       status is StatusCodes.OK
-      responseAs[CreateTransactionResult] is dummyCreateTransactionResult
+      responseAs[BuildTransactionResult] is dummyBuildTransactionResult
     }
   }
 
-  it should "call POST /transactions" in new RestServerFixture {
+  it should "call POST /transactions/send" in new RestServerFixture {
     val tx =
       s"""{"tx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
     val entity = HttpEntity(ContentTypes.`application/json`, tx)
-    Post(s"/transactions", entity) ~> server.route ~> check {
+    Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxResult] is dummyTransferResult
     }

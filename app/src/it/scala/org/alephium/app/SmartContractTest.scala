@@ -56,8 +56,8 @@ class SmartContractTest extends AlephiumSpec {
         restPort
       )
 
-      val createResult = request[CreateContractResult](
-        createContract(s"""
+      val buildResult = request[BuildContractResult](
+        buildContract(s"""
         {
           "fromKey": "$publicKey",
           "code": "${compileResult.code}"
@@ -65,12 +65,12 @@ class SmartContractTest extends AlephiumSpec {
         restPort
       )
 
-      val signature: Signature = SignatureSchema.sign(Hex.unsafe(createResult.hash),
+      val signature: Signature = SignatureSchema.sign(Hex.unsafe(buildResult.hash),
                                                       PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
         sendContract(s"""
           {
-            "tx": "${createResult.unsignedTx}",
+            "tx": "${buildResult.unsignedTx}",
             "code": "${compileResult.code}",
             "fromGroup": "${group.group}",
             "signature":"${signature.toHexString}"

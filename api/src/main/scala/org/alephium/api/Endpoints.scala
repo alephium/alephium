@@ -65,6 +65,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   private val transactionsEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
+      .in("transactions")
       .tag("Transactions")
 
   private val minersEndpoint: BaseEndpoint[Unit, Unit] =
@@ -74,10 +75,12 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   private val contractsEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
+      .in("contracts")
       .tag("Contracts")
 
   private val blockflowEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
+      .in("blockflow")
       .tag("Blockflow")
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
@@ -100,7 +103,6 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
-      .in("blockflow")
       .in(timeIntervalQuery)
       .out(jsonBody[FetchResponse])
       .summary("List blocks on the given time interval")
@@ -148,24 +150,24 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
   //have to be lazy to let `groupConfig` being initialized
   lazy val listUnconfirmedTransactions: BaseEndpoint[(GroupIndex, GroupIndex), AVector[Tx]] =
     transactionsEndpoint.get
-      .in("unconfirmed-transactions")
+      .in("unconfirmed")
       .in(query[GroupIndex]("fromGroup"))
       .in(query[GroupIndex]("toGroup"))
       .out(jsonBody[AVector[Tx]])
       .summary("List unconfirmed transactions")
 
-  val createTransaction: BaseEndpoint[(PublicKey, Address, U256), CreateTransactionResult] =
+  val buildTransaction: BaseEndpoint[(PublicKey, Address, U256), BuildTransactionResult] =
     transactionsEndpoint.get
-      .in("unsigned-transactions")
+      .in("build")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
       .in(query[U256]("value"))
-      .out(jsonBody[CreateTransactionResult])
-      .summary("Create an unsigned transaction")
+      .out(jsonBody[BuildTransactionResult])
+      .summary("Build an unsigned transaction")
 
   val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
     transactionsEndpoint.post
-      .in("transactions")
+      .in("send")
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
       .summary("Send a signed transaction")
@@ -183,16 +185,16 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 
-  val createContract: BaseEndpoint[CreateContract, CreateContractResult] =
+  val buildContract: BaseEndpoint[BuildContract, BuildContractResult] =
     contractsEndpoint.post
-      .in("unsigned-contracts")
-      .in(jsonBody[CreateContract])
-      .out(jsonBody[CreateContractResult])
-      .summary("Create an unsigned contract")
+      .in("build")
+      .in(jsonBody[BuildContract])
+      .out(jsonBody[BuildContractResult])
+      .summary("Build an unsigned contract")
 
   val sendContract: BaseEndpoint[SendContract, TxResult] =
     contractsEndpoint.post
-      .in("contracts")
+      .in("send")
       .in(jsonBody[SendContract])
       .out(jsonBody[TxResult])
       .summary("Send a signed smart contract")

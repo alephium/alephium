@@ -138,8 +138,8 @@ trait TestFixtureLike
                amount: U256,
                privateKey: String,
                restPort: Int): TxResult = eventually {
-    val createTx   = createTransaction(fromPubKey, toAddress, amount)
-    val unsignedTx = request[CreateTransactionResult](createTx, restPort)
+    val buildTx    = buildTransaction(fromPubKey, toAddress, amount)
+    val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val sendTx     = sendTransaction(unsignedTx, privateKey)
     val res        = request[TxResult](sendTx, restPort)
     res
@@ -317,9 +317,9 @@ trait TestFixtureLike
   def getBalance(address: String) =
     httpGet(s"/addresses/$address/balance")
 
-  def createTransaction(fromPubKey: String, toAddress: String, amount: U256) =
+  def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
     httpGet(
-      s"/unsigned-transactions?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
+      s"/transactions/build?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
     )
 
   def restoreWallet(password: String, mnemonic: String) =
@@ -334,26 +334,26 @@ trait TestFixtureLike
       Some(s"""{"address":"${address}","amount":"${amount}"}""")
     )
   }
-  def sendTransaction(createTransactionResult: CreateTransactionResult, privateKey: String) = {
-    val signature: Signature = SignatureSchema.sign(Hex.unsafe(createTransactionResult.hash),
+  def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
+    val signature: Signature = SignatureSchema.sign(Hex.unsafe(buildTransactionResult.hash),
                                                     PrivateKey.unsafe(Hex.unsafe(privateKey)))
     httpPost(
-      "/transactions",
+      "/transactions/send",
       Some(
-        s"""{"tx":"${createTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
+        s"""{"tx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
     )
   }
 
   def compileFilang(code: String) = {
-    httpPost(s"/compile", Some(code))
+    httpPost(s"/contracts/compile", Some(code))
   }
 
-  def createContract(query: String) = {
-    httpPost(s"/unsigned-contracts", Some(query))
+  def buildContract(query: String) = {
+    httpPost(s"/contracts/build", Some(query))
   }
 
   def sendContract(contract: String) = {
-    httpPost(s"/contracts", Some(contract))
+    httpPost(s"/contracts/send", Some(contract))
   }
 
   val startMining = httpPost("/miners?action=start-mining")

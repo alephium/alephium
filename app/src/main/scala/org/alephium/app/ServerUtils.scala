@@ -66,8 +66,8 @@ object ServerUtils {
       blockFlow.getPool(chainIndex).getAll(chainIndex).map(Tx.from(_, chainsConfig.networkType)))
   }
 
-  def createTransaction(blockFlow: BlockFlow, query: CreateTransaction)(
-      implicit groupConfig: GroupConfig): Try[CreateTransactionResult] = {
+  def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(
+      implicit groupConfig: GroupConfig): Try[BuildTransactionResult] = {
     val resultEither = for {
       _ <- checkGroup(blockFlow, query.fromKey)
       unsignedTx <- prepareUnsignedTransaction(blockFlow,
@@ -75,7 +75,7 @@ object ServerUtils {
                                                query.toAddress.lockupScript,
                                                query.value)
     } yield {
-      CreateTransactionResult.from(unsignedTx)
+      BuildTransactionResult.from(unsignedTx)
     }
     resultEither match {
       case Right(result) => Right(result)
@@ -256,8 +256,8 @@ object ServerUtils {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def createContract(blockFlow: BlockFlow, query: CreateContract)(
-      implicit groupConfig: GroupConfig): FutureTry[CreateContractResult] = {
+  def buildContract(blockFlow: BlockFlow, query: BuildContract)(
+      implicit groupConfig: GroupConfig): FutureTry[BuildContractResult] = {
     Future.successful((for {
       codeBytestring <- Hex
         .from(query.code)
@@ -268,7 +268,7 @@ object ServerUtils {
                                  script,
                                  LockupScript.p2pkh(query.fromKey),
                                  query.fromKey).left.map(error => failed(error.toString))
-    } yield utx).map(CreateContractResult.from))
+    } yield utx).map(BuildContractResult.from))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

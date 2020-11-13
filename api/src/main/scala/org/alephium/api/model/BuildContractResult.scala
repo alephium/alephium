@@ -16,6 +16,17 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.serde.serialize
+import org.alephium.util.Hex
 
-final case class CreateContract(fromKey: PublicKey, code: String)
+final case class BuildContractResult(unsignedTx: String, hash: String, fromGroup: Int, toGroup: Int)
+object BuildContractResult {
+  def from(unsignedTx: UnsignedTransaction)(
+      implicit groupConfig: GroupConfig): BuildContractResult =
+    BuildContractResult(Hex.toHexString(serialize(unsignedTx)),
+                        Hex.toHexString(unsignedTx.hash.bytes),
+                        unsignedTx.fromGroup.value,
+                        unsignedTx.toGroup.value)
+}

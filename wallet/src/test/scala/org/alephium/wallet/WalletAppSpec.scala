@@ -262,24 +262,24 @@ object WalletAppSpec extends {
     private val peer = PeerAddress(address, Some(port), None)
 
     val routes: Route =
-      path("unsigned-transactions") {
+      path("transactions" / "build") {
         get {
           parameters("fromKey".as[String]) { _ =>
             parameters("toAddress".as[String]) { _ =>
               parameters("value".as[U256]) { _ =>
                 val unsignedTx = transactionGen().sample.get.unsigned
                 complete(
-                  CreateTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                                          Hex.toHexString(unsignedTx.hash.bytes),
-                                          unsignedTx.fromGroup.value,
-                                          unsignedTx.toGroup.value)
+                  BuildTransactionResult(Hex.toHexString(serialize(unsignedTx)),
+                                         Hex.toHexString(unsignedTx.hash.bytes),
+                                         unsignedTx.fromGroup.value,
+                                         unsignedTx.toGroup.value)
                 )
               }
             }
           }
         }
       } ~
-        path("transactions") {
+        path("transactions" / "send") {
           post {
             entity(as[SendTransaction]) { _ =>
               complete(TxResult(Hash.generate, 0, 0))

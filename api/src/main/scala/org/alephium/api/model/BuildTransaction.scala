@@ -21,7 +21,7 @@ import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.U256
 
-final case class CreateTransaction(
+final case class BuildTransaction(
     fromKey: PublicKey,
     toAddress: Address,
     value: U256

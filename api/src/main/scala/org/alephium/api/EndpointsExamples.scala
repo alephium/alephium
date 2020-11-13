@@ -97,8 +97,8 @@ trait EndpointsExamples {
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
-  implicit val createTransactionResultExamples: List[Example[CreateTransactionResult]] =
-    simpleExample(CreateTransactionResult(unsignedTx = hash, hash, fromGroup = 2, toGroup = 1))
+  implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
+    simpleExample(BuildTransactionResult(unsignedTx = hash, hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendTransactionExamples: List[Example[SendTransaction]] =
     simpleExample(SendTransaction(tx = hash, signature))
@@ -119,11 +119,11 @@ trait EndpointsExamples {
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(CompileResult(code = hash))
 
-  implicit val createContractExamples: List[Example[CreateContract]] =
-    simpleExample(CreateContract(fromKey = PublicKey.generate, code = hash))
+  implicit val buildContractExamples: List[Example[BuildContract]] =
+    simpleExample(BuildContract(fromKey = PublicKey.generate, code = hash))
 
-  implicit val createContractResultExamples: List[Example[CreateContractResult]] =
-    simpleExample(CreateContractResult(unsignedTx = hash, hash = hash, fromGroup = 2, toGroup = 1))
+  implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
+    simpleExample(BuildContractResult(unsignedTx = hash, hash = hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendContractExamples: List[Example[SendContract]] =
     simpleExample(SendContract(code = hash, tx = hash, signature, fromGroup = 2))

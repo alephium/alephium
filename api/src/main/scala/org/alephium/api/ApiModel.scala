@@ -118,19 +118,19 @@ trait ApiModelCodec {
 
   implicit val balanceCodec: Codec[Balance] = deriveCodec[Balance]
 
-  implicit val createTransactionCodec: Codec[CreateTransaction] = deriveCodec[CreateTransaction]
+  implicit val buildTransactionCodec: Codec[BuildTransaction] = deriveCodec[BuildTransaction]
 
   implicit val groupCodec: Codec[Group] = deriveCodec[Group]
 
-  implicit val createTransactionResultCodec: Codec[CreateTransactionResult] =
-    deriveCodec[CreateTransactionResult]
+  implicit val buildTransactionResultCodec: Codec[BuildTransactionResult] =
+    deriveCodec[BuildTransactionResult]
 
   implicit val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
 
-  implicit val createContractCodec: Codec[CreateContract] = deriveCodec[CreateContract]
+  implicit val buildContractCodec: Codec[BuildContract] = deriveCodec[BuildContract]
 
-  implicit val createContractResultCodec: Codec[CreateContractResult] =
-    deriveCodec[CreateContractResult]
+  implicit val buildContractResultCodec: Codec[BuildContractResult] =
+    deriveCodec[BuildContractResult]
 
   implicit val sendContractCodec: Codec[SendContract] = deriveCodec[SendContract]
 

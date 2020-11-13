@@ -122,10 +122,10 @@ class RestServer(
       Future.successful(ServerUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
   }
 
-  private val createTransactionRoute = createTransaction.toRoute {
+  private val buildTransactionRoute = buildTransaction.toRoute {
     case (fromKey, toAddress, value) =>
       Future.successful(
-        ServerUtils.createTransaction(blockFlow, CreateTransaction(fromKey, toAddress, value)))
+        ServerUtils.buildTransaction(blockFlow, BuildTransaction(fromKey, toAddress, value)))
   }
 
   private val sendTransactionLogic = sendTransaction.serverLogic { transaction =>
@@ -143,8 +143,8 @@ class RestServer(
     ServerUtils.sendContract(blockFlow, txHandler, query)
   }
 
-  private val createContractRoute = createContract.toRoute { query =>
-    ServerUtils.createContract(blockFlow, query)
+  private val buildContractRoute = buildContract.toRoute { query =>
+    ServerUtils.buildContract(blockFlow, query)
   }
 
   private val compileRoute = compile.toRoute { query =>
@@ -163,11 +163,11 @@ class RestServer(
     getHashesAtHeight,
     getChainInfo,
     listUnconfirmedTransactions,
-    createTransaction,
+    buildTransaction,
     sendTransactionLogic.endpoint,
     sendContract,
     compile,
-    createContract,
+    buildContract,
     minerActionLogic.endpoint
   )
 
@@ -187,12 +187,12 @@ class RestServer(
       getHashesAtHeightRoute ~
       getChainInfoRoute ~
       listUnconfirmedTransactionsRoute ~
-      createTransactionRoute ~
+      buildTransactionRoute ~
       sendTransactionLogic.toRoute ~
       minerActionLogic.toRoute ~
       sendContractRoute ~
       compileRoute ~
-      createContractRoute ~
+      buildContractRoute ~
       swaggerUIRoute
 
   val route: Route =

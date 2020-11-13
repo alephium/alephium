@@ -39,7 +39,7 @@ trait BlockFlowClient {
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
-      value: U256): Future[Either[String, BlockFlowClient.CreateTransactionResult]]
+      value: U256): Future[Either[String, BlockFlowClient.BuildTransactionResult]]
   def sendTransaction(tx: String,
                       signature: Signature,
                       fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]]
@@ -110,13 +110,13 @@ object BlockFlowClient {
 
     def prepareTransaction(fromKey: String,
                            toAddress: Address,
-                           value: U256): Future[Either[String, CreateTransactionResult]] = {
+                           value: U256): Future[Either[String, BuildTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
         case None => Future.successful(Left(s"Cannot decode key $fromKey"))
         case Some(lockupScript) =>
-          requestFromGroup[CreateTransaction, CreateTransactionResult](
+          requestFromGroup[BuildTransaction, BuildTransactionResult](
             lockupScript.groupIndex,
-            CreateTransaction(fromKey, toAddress, value)
+            BuildTransaction(fromKey, toAddress, value)
           )
       }
     }
@@ -167,22 +167,22 @@ object BlockFlowClient {
 
   final case class Balance(balance: U256, utxoNum: Int)
 
-  final case class CreateTransaction(
+  final case class BuildTransaction(
       fromKey: String,
       toAddress: Address,
       value: U256
   ) extends GetRequest {
     lazy val endpoint: String =
-      s"/unsigned-transactions?fromKey=$fromKey&toAddress=${toAddress.toBase58}&value=${value.toString}"
+      s"/transactions/build?fromKey=$fromKey&toAddress=${toAddress.toBase58}&value=${value.toString}"
   }
 
-  final case class CreateTransactionResult(unsignedTx: String,
-                                           hash: String,
-                                           fromGroup: Int,
-                                           toGroup: Int)
+  final case class BuildTransactionResult(unsignedTx: String,
+                                          hash: String,
+                                          fromGroup: Int,
+                                          toGroup: Int)
 
   final case class SendTransaction(tx: String, signature: String) extends PostRequest {
-    lazy val endpoint: String           = "/transactions"
+    lazy val endpoint: String           = "/transactions/send"
     override lazy val isEntity: Boolean = true
   }
 
@@ -202,10 +202,10 @@ object BlockFlowClient {
     implicit def resultCodec[A: Codec]: Codec[Result[A]] = deriveCodec[Result[A]]
 
     implicit lazy val balanceCodec: Codec[Balance] = deriveCodec[Balance]
-    implicit lazy val createTransactionCodec: Codec[CreateTransaction] =
-      deriveCodec[CreateTransaction]
-    implicit lazy val createTransactionResultCodec: Codec[CreateTransactionResult] =
-      deriveCodec[CreateTransactionResult]
+    implicit lazy val buildTransactionCodec: Codec[BuildTransaction] =
+      deriveCodec[BuildTransaction]
+    implicit lazy val buildTransactionResultCodec: Codec[BuildTransactionResult] =
+      deriveCodec[BuildTransactionResult]
     implicit lazy val getBalanceCodec: Codec[GetBalance]     = deriveCodec[GetBalance]
     implicit lazy val peerAddressCodec: Codec[PeerAddress]   = deriveCodec[PeerAddress]
     implicit lazy val selfCliqueEncoder: Encoder[SelfClique] = deriveEncoder[SelfClique]
