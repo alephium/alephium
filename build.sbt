@@ -1,5 +1,15 @@
-import sbtrelease.ReleaseStateTransformations._
 import Dependencies._
+
+homepage := Some(url("https://github.com/alephium/alephium"))
+licenses := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html"))
+developers := List(
+  Developer(
+    id    = "alephium core dev",
+    name  = "alephium core dev",
+    email = "dev@alephium.org",
+    url   = url("https://alephium.org/")
+  )
+)
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
 
@@ -8,6 +18,7 @@ resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositori
 def baseProject(id: String): Project = {
   Project(id, file(id))
     .settings(commonSettings: _*)
+    .settings(name := s"alephium-$id")
 }
 
 val scalastyleCfgFile     = "project/scalastyle-config.xml"
@@ -16,10 +27,11 @@ val scalastyleTestCfgFile = "project/scalastyle-test-config.xml"
 lazy val root: Project = Project("alephium-scala-blockflow", file("."))
   .settings(commonSettings: _*)
   .settings(
-    // This is just a project to aggregate modules, nothing to compile or to check scalastyle for.
+    name := "alephium",
     unmanagedSourceDirectories := Seq(),
     scalastyle := {},
-    scalastyle in Test := {}
+    scalastyle in Test := {},
+    publish / skip := true
   )
   .aggregate(macros, util, serde, io, crypto, api, rpc, app, benchmark, flow, protocol, wallet)
 
@@ -44,7 +56,7 @@ def project(path: String): Project = {
 lazy val macros = project("macros")
   .settings(
     libraryDependencies += `scala-reflect`(scalaVersion.value),
-    publish := {},
+    publish / skip := true,
     wartremoverErrors in (Compile, compile) := Warts.allBut(
       wartsCompileExcludes :+ Wart.AsInstanceOf: _*)
   )
@@ -77,8 +89,7 @@ lazy val crypto = project("crypto")
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
   .settings(
-    libraryDependencies += rocksdb,
-    publish := {}
+    libraryDependencies += rocksdb
   )
 
 lazy val rpc = project("rpc")
@@ -92,7 +103,8 @@ lazy val rpc = project("rpc")
       `scala-logging`,
       `akka-test`,
       `akka-http-test`
-    )
+    ),
+    publish / skip := true
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -129,16 +141,16 @@ lazy val app = mainProject("app")
       `tapir-akka`,
       `tapir-openapi`,
       `tapir-openapi-circe`,
-      `tapir-swagger-ui`,
+      `tapir-swagger-ui`
     ),
-    publish := {},
+    publish / skip := true
   )
 
 lazy val benchmark = project("benchmark")
   .enablePlugins(JmhPlugin)
   .dependsOn(flow)
   .settings(
-    publish := {},
+    publish / skip := true,
     scalacOptions += "-Xdisable-assertions"
   )
 
@@ -152,7 +164,7 @@ lazy val flow = project("flow")
       `scala-logging`,
       weupnp
     ),
-    publish := {},
+    publish / skip := true
   )
   .dependsOn(protocol % "test->test;compile->compile")
 
@@ -182,38 +194,12 @@ lazy val wallet = project("wallet")
       `tapir-openapi-circe`,
       `tapir-swagger-ui`,
       `scala-logging`,
-      logback,
+      logback
     ),
-    publish := {}
+    publish / skip := true
   )
 
-val publishSettings = Seq(
-  publishMavenStyle := true,
-  publishMavenStyle in publishLocal := false,
-  publishArtifact in Test := false,
-  publishTo in ThisBuild := sonatypePublishToBundle.value
-)
-
-val releaseSettings =
-  releaseProcess := Seq[ReleaseStep](
-    checkSnapshotDependencies,
-    inquireVersions,
-    releaseStepCommandAndRemaining("clean"),
-    releaseStepCommandAndRemaining("test"),
-    releaseStepCommandAndRemaining("it:test"),
-    setReleaseVersion,
-    commitReleaseVersion,
-    tagRelease,
-    // TODO Relpace with `publishSigned` when publishing to sonatype
-    releaseStepCommandAndRemaining("publishLocalSigned"),
-    setNextVersion,
-    commitNextVersion,
-    // TODO Enable when publishing to sonatype
-    // releaseStepCommand("sonatypeBundleRelease"),
-    pushChanges
-  )
-
-val commonSettings = publishSettings ++ releaseSettings ++ Seq(
+val commonSettings = Seq(
   organization := "org.alephium",
   scalaVersion := "2.13.3",
   parallelExecution in Test := false,
