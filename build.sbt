@@ -1,5 +1,15 @@
-import sbtrelease.ReleaseStateTransformations._
 import Dependencies._
+
+homepage := Some(url("https://github.com/alephium/alephium"))
+licenses := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html"))
+developers := List(
+  Developer(
+    id    = "alephium core dev",
+    name  = "alephium core dev",
+    email = "dev@alephium.org",
+    url   = url("https://alephium.org/")
+  )
+)
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
 
@@ -182,39 +192,13 @@ lazy val wallet = project("wallet")
       `tapir-openapi-circe`,
       `tapir-swagger-ui`,
       `scala-logging`,
-      logback,
+      logback
     ),
     publish := {}
   )
 
-val publishSettings = Seq(
-  publishMavenStyle := true,
-  publishMavenStyle in publishLocal := false,
-  publishArtifact in Test := false,
-  publishTo in ThisBuild := sonatypePublishToBundle.value
-)
-
-val releaseSettings =
-  releaseProcess := Seq[ReleaseStep](
-    checkSnapshotDependencies,
-    inquireVersions,
-    releaseStepCommandAndRemaining("clean"),
-    releaseStepCommandAndRemaining("test"),
-    releaseStepCommandAndRemaining("it:test"),
-    setReleaseVersion,
-    commitReleaseVersion,
-    tagRelease,
-    // TODO Relpace with `publishSigned` when publishing to sonatype
-    releaseStepCommandAndRemaining("publishLocalSigned"),
-    setNextVersion,
-    commitNextVersion,
-    // TODO Enable when publishing to sonatype
-    // releaseStepCommand("sonatypeBundleRelease"),
-    pushChanges
-  )
-
-val commonSettings = publishSettings ++ releaseSettings ++ Seq(
-  organization := "org.alephium",
+val commonSettings = Seq(
+  organization := "org.alephium"
   scalaVersion := "2.13.3",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
