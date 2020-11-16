@@ -47,7 +47,6 @@ def project(path: String): Project = {
 lazy val macros = project("macros")
   .settings(
     libraryDependencies += `scala-reflect`(scalaVersion.value),
-    publish / skip := true,
     wartremoverErrors in (Compile, compile) := Warts.allBut(
       wartsCompileExcludes :+ Wart.AsInstanceOf: _*)
   )
