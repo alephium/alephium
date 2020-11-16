@@ -28,16 +28,15 @@ import org.alephium.protocol.vm.{OutOfGas => _, _}
 import org.alephium.util.{AVector, EitherF, U256}
 
 trait NonCoinbaseValidation {
-  import ValidationStatus._
-
   implicit def groupConfig: GroupConfig
 
-  def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
-    for {
-      _          <- checkStateless(tx)
-      worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
-      _          <- checkStateful(tx, worldState)
-    } yield ()
+  def validateMempoolTx(tx: TransactionTemplate, flow: BlockFlow): TxValidationResult[Unit] = {
+    ???
+//    for {
+//      _          <- checkStateless(tx)
+//      worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
+//      _          <- checkStateful(tx, worldState)
+//    } yield ()
   }
 
   protected[validation] def checkBlockTx(tx: Transaction,

@@ -140,7 +140,7 @@ class RestServer(
   }
 
   private val sendContractRoute = sendContract.toRoute { query =>
-    ServerUtils.sendContract(blockFlow, txHandler, query)
+    ServerUtils.sendContract(txHandler, query)
   }
 
   private val buildContractRoute = buildContract.toRoute { query =>

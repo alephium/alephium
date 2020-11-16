@@ -101,7 +101,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val unsignedNew = tx.unsigned.copy(inputs = AVector.empty)
         val txNew       = tx.copy(unsigned        = unsignedNew)
         failCheck(checkInputNum(txNew), NoInputs)
-        failValidation(validateMempoolTx(txNew, blockFlow), NoInputs)
+        failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), NoInputs)
         failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), NoInputs)
     }
   }
@@ -112,7 +112,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
         val txNew       = tx.copy(unsigned              = unsignedNew)
         failCheck(checkOutputNum(txNew), NoOutputs)
-        failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
+        failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), NoOutputs)
         failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), NoOutputs)
     }
   }
@@ -123,13 +123,13 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
     val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
     failCheck(checkGasBound(txNew0), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew0, blockFlow), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew0.toTemplate, blockFlow), InvalidStartGas)
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew1, blockFlow), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew1.toTemplate, blockFlow), InvalidStartGas)
     val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).extractedValue()))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew2, blockFlow), InvalidStartGas)
+    failValidation(validateMempoolTx(txNew2.toTemplate, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
     passCheck(checkGasBound(txNew3))
 
@@ -147,7 +147,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val delta     = U256.MaxValue - alfAmount + 1
           val txNew     = modifyAlfAmount(tx, delta)
           failCheck(checkOutputAmount(txNew), BalanceOverFlow)
-          failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+          failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), BalanceOverFlow)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), BalanceOverFlow)
         }
     }
@@ -159,7 +159,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         whenever(tx.unsigned.fixedOutputs.nonEmpty) {
           val txNew = zeroAlfAmount(tx)
           failCheck(checkOutputAmount(txNew), AmountIsZero)
-          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+          failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), AmountIsZero)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
         }
     }
@@ -171,7 +171,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         whenever(tx.unsigned.fixedOutputs.nonEmpty) {
           val txNew = zeroTokenAmount(tx)
           failCheck(checkOutputAmount(txNew), AmountIsZero)
-          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+          failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), AmountIsZero)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
         }
     }
@@ -196,7 +196,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         forAll(localUnsignedGen) { unsignedNew =>
           val txNew = tx.copy(unsigned = unsignedNew)
           failCheck(checkChainIndex(txNew), InvalidInputGroupIndex)
-          failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
+          failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), InvalidInputGroupIndex)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidInputGroupIndex)
         }
     }
@@ -222,7 +222,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           forAll(localUnsignedGen) { unsignedNew =>
             val txNew = tx.copy(unsigned = unsignedNew)
             failCheck(checkChainIndex(txNew), InvalidOutputGroupIndex)
-            failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
+            failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), InvalidOutputGroupIndex)
             failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidOutputGroupIndex)
           }
         }
@@ -236,7 +236,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
         val txNew       = tx.copy(unsigned = unsignedNew)
         failCheck(checkUniqueInputs(txNew), DoubleSpending)
-        failValidation(validateMempoolTx(txNew, blockFlow), DoubleSpending)
+        failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), DoubleSpending)
         failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), DoubleSpending)
     }
   }
@@ -272,7 +272,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
             tx.copy(generatedOutputs = outputsNew)
           }
           failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-          failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
+          failValidation(validateMempoolTx(txNew.toTemplate, blockFlow), OutputDataSizeExceeded)
           failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
         }
     }

@@ -30,7 +30,8 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
   it should "contain/add/remove for new transactions" in {
     val pool = TxPool.empty(3)
     forAll(blockGen) { block =>
-      val weightedTxs = block.transactions.map((_, 1.0))
+      val txTemplates = block.transactions.map(_.toTemplate)
+      val weightedTxs = txTemplates.map((_, 1.0))
       val numberAdded = pool.add(weightedTxs)
       pool.size is numberAdded
       if (block.transactions.length > pool.capacity) {
@@ -39,7 +40,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
       block.transactions.foreachWithIndex { (tx, i) =>
         if (i < pool.size) pool.contains(tx) is true else pool.contains(tx) is false
       }
-      val numberRemoved = pool.remove(block.transactions)
+      val numberRemoved = pool.remove(txTemplates)
       numberRemoved is numberAdded
       pool.size is 0
       pool.isFull is false
@@ -50,7 +51,8 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
   trait Fixture extends WithLock {
     val pool        = TxPool.empty(3)
     val block       = blockGen.sample.get
-    val weightedTxs = block.transactions.map((_, 1.0))
+    val txTemplates = block.transactions.map(_.toTemplate)
+    val weightedTxs = txTemplates.map((_, 1.0))
     val txNum       = block.transactions.length
     val rwl         = pool._getLock
 
@@ -67,6 +69,6 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
 
   it should "use write lock for removing" in new Fixture {
     pool.add(weightedTxs)
-    checkWriteLock(rwl)(0, pool.remove(block.transactions), sizeAfterAdd)
+    checkWriteLock(rwl)(0, pool.remove(txTemplates), sizeAfterAdd)
   }
 }

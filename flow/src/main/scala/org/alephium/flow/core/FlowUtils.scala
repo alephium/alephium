@@ -25,7 +25,7 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
-import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex, GroupIndex, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
@@ -66,7 +66,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       case Normal(toRemove) =>
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
           val index = ChainIndex.unsafe(mainGroup, toGroup)
-          sum + getPool(index).remove(index, txs)
+          sum + getPool(index).remove(index, txs.map(_.toTemplate))
         }
         logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
       case Reorg(toRemove, toAdd) =>
@@ -83,7 +83,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
-  private def collectTransactions(chainIndex: ChainIndex): AVector[Transaction] = {
+  private def collectTransactions(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
     getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
   }
 
@@ -91,6 +91,15 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   def reduceHeight(height: Int): Int = {
     val newHeight = height - 3
     if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
+  }
+
+  // TODO: execute tx properly in the following commits
+  private def convertTemplate(txTemplate: TransactionTemplate): Transaction = {
+    Transaction(txTemplate.unsigned,
+                AVector.empty,
+                AVector.empty,
+                txTemplate.inputSignatures,
+                txTemplate.contractSignatures)
   }
 
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
@@ -101,19 +110,21 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       target <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
       height <- getBestHeight(chainIndex).map(reduceHeight)
     } yield {
-      val transactions = collectTransactions(chainIndex)
-      BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, transactions)
+      val txTemplates = collectTransactions(chainIndex)
+      val txs         = txTemplates.map(convertTemplate)
+      BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, txs)
     }
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
     assume(brokerConfig.contains(chainIndex.from))
-    val singleChain  = getBlockChain(chainIndex)
-    val bestDeps     = getBestDeps(chainIndex.from)
-    val target       = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
-    val height       = Utils.unsafe(getBestHeight(chainIndex).map(reduceHeight))
-    val transactions = collectTransactions(chainIndex)
-    BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, transactions)
+    val singleChain = getBlockChain(chainIndex)
+    val bestDeps    = getBestDeps(chainIndex.from)
+    val target      = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
+    val height      = Utils.unsafe(getBestHeight(chainIndex).map(reduceHeight))
+    val txTemplates = collectTransactions(chainIndex)
+    val txs         = txTemplates.map(convertTemplate)
+    BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, txs)
   }
 }
 

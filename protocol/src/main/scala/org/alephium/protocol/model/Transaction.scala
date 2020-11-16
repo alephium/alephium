@@ -80,6 +80,9 @@ final case class Transaction(unsigned: UnsignedTransaction,
       sum  <- sum1.add(sum2)
     } yield sum
   }
+
+  def toTemplate: TransactionTemplate =
+    TransactionTemplate(unsigned, inputSignatures, contractSignatures)
 }
 
 object Transaction {
@@ -226,6 +229,10 @@ final case class TransactionTemplate(unsigned: UnsignedTransaction,
     extends TransactionAbstract
 
 object TransactionTemplate {
+  implicit val serde: Serde[TransactionTemplate] = Serde.forProduct3(
+    TransactionTemplate.apply,
+    t => (t.unsigned, t.inputSignatures, t.contractSignatures))
+
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
     val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)

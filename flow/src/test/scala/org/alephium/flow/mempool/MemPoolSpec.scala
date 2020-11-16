@@ -28,21 +28,22 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
 
   it should "contain/add/remove for transactions" in {
     forAll(blockGen) { block =>
+      val txTemplates = block.transactions.map(_.toTemplate)
       val group =
         GroupIndex.unsafe(
           brokerConfig.groupFrom + Random.source.nextInt(brokerConfig.groupNumPerBroker))
       val pool  = MemPool.empty(group)
       val index = block.chainIndex
       if (index.from.equals(group)) {
-        block.transactions.foreach(pool.contains(index, _) is false)
-        val weightedTxs = block.transactions.map((_, 1.0))
+        txTemplates.foreach(pool.contains(index, _) is false)
+        val weightedTxs = txTemplates.map((_, 1.0))
         pool.add(index, weightedTxs) is block.transactions.length
         pool.size is block.transactions.length
-        block.transactions.foreach(pool.contains(index, _) is true)
-        pool.remove(index, block.transactions) is block.transactions.length
+        txTemplates.foreach(pool.contains(index, _) is true)
+        pool.remove(index, txTemplates) is block.transactions.length
         pool.size is 0
       } else {
-        assertThrows[AssertionError](block.transactions.foreach(pool.contains(index, _)))
+        assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }
     }
   }
@@ -51,7 +52,8 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
     val group       = GroupIndex.unsafe(0)
     val pool        = MemPool.empty(group)
     val block       = blockGenOf(group).retryUntil(_.transactions.nonEmpty).sample.get
-    val weightedTxs = block.transactions.map((_, 1.0))
+    val txTemplates = block.transactions.map(_.toTemplate)
+    val weightedTxs = txTemplates.map((_, 1.0))
     val txNum       = block.transactions.length
     val rwl         = pool._getLock
 
@@ -60,7 +62,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
   }
 
   it should "use read lock for contains" in new Fixture {
-    checkReadLock(rwl)(true, pool.contains(chainIndex, block.transactions.head), false)
+    checkReadLock(rwl)(true, pool.contains(chainIndex, txTemplates.head), false)
   }
 
   it should "use read lock for add" in new Fixture {
@@ -70,7 +72,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
   }
 
   it should "use read lock for remove" in new Fixture {
-    checkReadLock(rwl)(1, pool.remove(chainIndex, block.transactions), 0)
+    checkReadLock(rwl)(1, pool.remove(chainIndex, txTemplates), 0)
   }
 
   it should "use write lock for reorg" in new Fixture {

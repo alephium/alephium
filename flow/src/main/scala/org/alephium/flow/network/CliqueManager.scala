@@ -54,7 +54,7 @@ object CliqueManager {
       origin: DataOrigin,
       isRecent: Boolean
   ) extends Command
-  final case class BroadCastTx(tx: Transaction,
+  final case class BroadCastTx(tx: TransactionTemplate,
                                txMsg: ByteString,
                                chainIndex: ChainIndex,
                                origin: DataOrigin)
