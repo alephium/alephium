@@ -20,13 +20,13 @@ import scala.collection.mutable
 
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.Transaction
+import org.alephium.protocol.model.{TransactionAbstract, TransactionTemplate}
 import org.alephium.util.{AVector, RWLock}
 
 /*
  * Transaction pool implementation
  */
-class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
+class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
                       weights: mutable.HashMap[Hash, Double],
                       _capacity: Int)
     extends RWLock {
@@ -36,19 +36,19 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
 
   def capacity: Int = _capacity
 
-  def contains(transaction: Transaction): Boolean = readOnly {
+  def contains(transaction: TransactionAbstract): Boolean = readOnly {
     weights.contains(transaction.hash)
   }
 
-  def collectForBlock(maxNum: Int): AVector[Transaction] = readOnly {
+  def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
     AVector.from(pool.values.take(maxNum))
   }
 
-  def getAll: AVector[Transaction] = readOnly {
+  def getAll: AVector[TransactionTemplate] = readOnly {
     AVector.from(pool.values)
   }
 
-  def add(transactions: AVector[(Transaction, Double)]): Int = writeOnly {
+  def add(transactions: AVector[(TransactionTemplate, Double)]): Int = writeOnly {
     val sizeBefore = size
     transactions.foreachE {
       case (tx, weight) =>
@@ -64,7 +64,7 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, Transaction],
     sizeAfter - sizeBefore
   }
 
-  def remove(transactions: AVector[Transaction]): Int = writeOnly {
+  def remove(transactions: AVector[TransactionTemplate]): Int = writeOnly {
     val sizeBefore = size
     transactions.foreach { tx =>
       if (contains(tx)) {

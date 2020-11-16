@@ -18,7 +18,7 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction, TransactionTemplate}
 import org.alephium.util.{AVector, RWLock}
 
 /*
@@ -35,23 +35,23 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
 
   def size: Int = pools.sumBy(_.size)
 
-  def contains(index: ChainIndex, transaction: Transaction): Boolean = readOnly {
+  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = readOnly {
     getPool(index).contains(transaction)
   }
 
-  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[Transaction] = readOnly {
+  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
     getPool(index).collectForBlock(maxNum)
   }
 
-  def getAll(index: ChainIndex): AVector[Transaction] = readOnly {
+  def getAll(index: ChainIndex): AVector[TransactionTemplate] = readOnly {
     getPool(index).getAll
   }
 
-  def add(index: ChainIndex, transactions: AVector[(Transaction, Double)]): Int = readOnly {
+  def add(index: ChainIndex, transactions: AVector[(TransactionTemplate, Double)]): Int = readOnly {
     getPool(index).add(transactions)
   }
 
-  def remove(index: ChainIndex, transactions: AVector[Transaction]): Int = readOnly {
+  def remove(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = readOnly {
     getPool(index).remove(transactions)
   }
 
@@ -61,8 +61,10 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
     assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
     // First, add transactions from short chains, then remove transactions from canonical chains
-    val added   = toAdd.foldWithIndex(0)((sum, txs, toGroup)    => sum + pools(toGroup).add(txs))
-    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).remove(txs))
+    val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + pools(toGroup).add(txs.map { case (tx, weight) => tx.toTemplate -> weight }))
+    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + pools(toGroup).remove(txs.map(_.toTemplate)))
     (removed, added)
   }
 

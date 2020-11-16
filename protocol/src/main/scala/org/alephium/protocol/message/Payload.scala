@@ -201,7 +201,7 @@ object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
 }
 
-final case class SendTxs(txs: AVector[Transaction]) extends Payload
+final case class SendTxs(txs: AVector[TransactionTemplate]) extends Payload
 
 object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)

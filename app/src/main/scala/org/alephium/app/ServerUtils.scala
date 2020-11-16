@@ -63,7 +63,7 @@ object ServerUtils {
   def listUnconfirmedTransactions(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       implicit chainsConfig: ChainsConfig): Try[AVector[Tx]] = {
     Right(
-      blockFlow.getPool(chainIndex).getAll(chainIndex).map(Tx.from(_, chainsConfig.networkType)))
+      blockFlow.getPool(chainIndex).getAll(chainIndex).map(Tx.fromTemplate(_, chainsConfig.networkType)))
   }
 
   def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(
@@ -92,7 +92,9 @@ object ServerUtils {
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
         failed(serdeError.getMessage))
     } yield {
-      Transaction.from(unsignedTx, AVector.fill(unsignedTx.inputs.length)(query.signature))
+      TransactionTemplate(unsignedTx,
+                          AVector.fill(unsignedTx.inputs.length)(query.signature),
+                          contractSignatures = AVector.empty)
     }
     txEither match {
       case Right(tx)   => publishTx(txHandler, tx)
@@ -132,7 +134,7 @@ object ServerUtils {
         .map(_ => failed("Failed in IO"))
     } yield ChainInfo(maxHeight)
 
-  private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: Transaction)(
+  private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(
       implicit config: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext): FutureTry[TxResult] = {
@@ -232,7 +234,7 @@ object ServerUtils {
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
   }
 
-  private def txFromScript(
+  def txFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
       fromGroup: GroupIndex,
@@ -272,33 +274,21 @@ object ServerUtils {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def sendContract(blockFlow: BlockFlow,
-                   txHandler: ActorRefT[TxHandler.Command],
-                   query: SendContract)(implicit groupConfig: GroupConfig,
-                                        askTimeout: Timeout,
-                                        executionContext: ExecutionContext): FutureTry[TxResult] = {
-
+  def sendContract(txHandler: ActorRefT[TxHandler.Command], query: SendContract)(
+      implicit groupConfig: GroupConfig,
+      askTimeout: Timeout,
+      executionContext: ExecutionContext): FutureTry[TxResult] = {
     (for {
-      codeBytestring <- Hex
-        .from(query.code)
-        .toRight(failed("Cannot decode code hex string"))
-      script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
-        failed(serdeError.getMessage))
       txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
-      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        failed(serdeError.getMessage))
-      group <- GroupIndex.from(query.fromGroup).toRight(failed("Invalid chain index"))
-      transaction <- txFromScript(
-        blockFlow,
-        script,
-        group,
-        TransactionTemplate(unsignedTx,
-                            AVector.fill(unsignedTx.inputs.length)(query.signature),
-                            AVector.empty)).left
-        .map(error => failed(error.toString))
-    } yield transaction) match {
-      case Left(error)        => Future.successful(Left(error))
-      case Right(transaction) => ServerUtils.publishTx(txHandler, transaction)
+      unsignedTx <- deserialize[UnsignedTransaction](txByteString)
+        .left.map(serdeError => failed(serdeError.getMessage))
+    } yield {
+      TransactionTemplate(unsignedTx,
+                          AVector.fill(unsignedTx.inputs.length)(query.signature),
+                          AVector.empty)
+    }) match {
+      case Left(error)       => Future.successful(Left(error))
+      case Right(txTemplate) => ServerUtils.publishTx(txHandler, txTemplate)
     }
   }
 

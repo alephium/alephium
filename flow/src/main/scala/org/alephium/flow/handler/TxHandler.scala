@@ -26,7 +26,7 @@ import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
-import org.alephium.protocol.model.{ChainIndex, Transaction}
+import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.util.{AVector, BaseActor}
 
 object TxHandler {
@@ -34,7 +34,7 @@ object TxHandler {
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
-  final case class AddTx(tx: Transaction, origin: DataOrigin) extends Command
+  final case class AddTx(tx: TransactionTemplate, origin: DataOrigin) extends Command
 
   sealed trait Event
   final case class AddSucceeded(hash: Hash) extends Event
@@ -48,7 +48,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
     case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)
   }
 
-  def handleTx(tx: Transaction, origin: DataOrigin): Unit = {
+  def handleTx(tx: TransactionTemplate, origin: DataOrigin): Unit = {
     val fromGroup  = tx.fromGroup
     val toGroup    = tx.toGroup
     val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -56,37 +56,37 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
     if (!mempool.contains(chainIndex, tx)) {
       nonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.shortHex} due to $s")
+          log.warning(s"failed in validating tx ${tx.hash.shortHex} due to $s")
           addFailed(tx)
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.shortHex} due to $e")
+          log.warning(s"IO failed in validating tx ${tx.hash.shortHex} due to $e")
           addFailed(tx)
       }
     } else {
-      log.debug(s"tx ${tx.shortHex} is already included")
+      log.debug(s"tx ${tx.hash.shortHex} is already included")
       addFailed(tx)
     }
   }
 
   def handleValidTx(chainIndex: ChainIndex,
-                    tx: Transaction,
+                    tx: TransactionTemplate,
                     mempool: MemPool,
                     origin: DataOrigin): Unit = {
     val count = mempool.add(chainIndex, AVector((tx, 1.0)))
-    log.info(s"Add tx ${tx.shortHex} for $chainIndex, #$count txs added")
+    log.info(s"Add tx ${tx.hash.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)))
     val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
     publishEvent(event)
     addSucceeded(tx)
   }
 
-  def addSucceeded(tx: Transaction): Unit = {
+  def addSucceeded(tx: TransactionTemplate): Unit = {
     sender() ! TxHandler.AddSucceeded(tx.hash)
   }
 
-  def addFailed(tx: Transaction): Unit = {
+  def addFailed(tx: TransactionTemplate): Unit = {
     sender() ! TxHandler.AddFailed(tx.hash)
   }
 }
