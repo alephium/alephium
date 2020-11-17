@@ -70,10 +70,28 @@ object Payload {
     }
   }
 
+  def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Payload] = {
+    deserializerCode._deserialize(input).flatMap {
+      case (code, rest) =>
+        code match {
+          case Hello        => Hello.deserialize(rest)
+          case Ping         => Ping.deserialize(rest)
+          case Pong         => Pong.deserialize(rest)
+          case SendBlocks   => SendBlocks.deserialize(rest)
+          case GetBlocks    => GetBlocks.deserialize(rest)
+          case SendHeaders  => SendHeaders.deserialize(rest)
+          case GetHeaders   => GetHeaders.deserialize(rest)
+          case SendTxs      => SendTxs.deserialize(rest)
+          case SyncRequest  => SyncRequest.deserialize(rest)
+          case SyncResponse => SyncResponse.deserialize(rest)
+        }
+    }
+  }
   sealed trait Code
 
   trait FixUnused[T] {
     def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[(T, ByteString)]
+    def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[T]
   }
 
   sealed trait Serding[T] extends FixUnused[T] {
@@ -84,6 +102,9 @@ object Payload {
     def _deserialize(input: ByteString)(
         implicit config: GroupConfig): SerdeResult[(T, ByteString)] =
       serde._deserialize(input)
+
+    def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[T] =
+      serde.deserialize(input)
   }
 
   sealed trait ValidatedSerding[T] extends Serding[T] {
