@@ -41,6 +41,10 @@ sealed trait TransactionAbstract {
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
   def gasFeeUnsafe: U256 = unsigned.gasPrice.mulUnsafe(unsigned.startGas.toU256)
+
+  def outputsLength: Int
+
+  def getOutput(index: Int): TxOutput
 }
 
 final case class Transaction(unsigned: UnsignedTransaction,
@@ -226,7 +230,11 @@ object Transaction {
 final case class TransactionTemplate(unsigned: UnsignedTransaction,
                                      inputSignatures: AVector[Signature],
                                      contractSignatures: AVector[Signature])
-    extends TransactionAbstract
+    extends TransactionAbstract {
+  override def outputsLength: Int = unsigned.fixedOutputs.length
+
+  override def getOutput(index: Int): TxOutput = unsigned.fixedOutputs(index)
+}
 
 object TransactionTemplate {
   implicit val serde: Serde[TransactionTemplate] = Serde.forProduct3(

@@ -95,14 +95,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
   }
 
-  private def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
-    Transaction(txTemplate.unsigned,
-                AVector.empty,
-                AVector.empty,
-                txTemplate.inputSignatures,
-                txTemplate.contractSignatures)
-  }
-
   private def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
     inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
   }
@@ -124,15 +116,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     }
   }
 
-  private def convertSuccessfulTx(txTemplate: TransactionTemplate,
-                                  result: TxScriptExecution): Transaction = {
-    Transaction(txTemplate.unsigned,
-                result.contractInputs,
-                result.generatedOutputs,
-                txTemplate.inputSignatures,
-                txTemplate.contractSignatures)
-  }
-
   // all the inputs and double spending should have been checked
   private def executeTxTemplates(
       chainIndex: ChainIndex,
@@ -145,7 +128,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       txTemplates.foreachWithIndex {
         case (tx, index) =>
           if (tx.unsigned.scriptOpt.isEmpty) {
-            fullTxs(index) = convertNonScriptTx(tx)
+            fullTxs(index) = FlowUtils.convertNonScriptTx(tx)
           }
       }
 
@@ -161,14 +144,14 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
                   trie
                 }
               case Right(result) =>
-                val fullTx = convertSuccessfulTx(tx, result)
+                val fullTx = FlowUtils.convertSuccessfulTx(tx, result)
                 fullTxs(scriptTxIndex) = fullTx
                 Right(result.worldState)
             }
         }
       } yield AVector.unsafe(fullTxs, 0, txTemplates.length)
     } else {
-      Right(txTemplates.map(convertNonScriptTx))
+      Right(txTemplates.map(FlowUtils.convertNonScriptTx))
     }
   }
 
@@ -185,6 +168,25 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
     Utils.unsafe(prepareBlockFlow(chainIndex))
+  }
+}
+
+object FlowUtils {
+  def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
+    Transaction(txTemplate.unsigned,
+                AVector.empty,
+                AVector.empty,
+                txTemplate.inputSignatures,
+                txTemplate.contractSignatures)
+  }
+
+  def convertSuccessfulTx(txTemplate: TransactionTemplate,
+                          result: TxScriptExecution): Transaction = {
+    Transaction(txTemplate.unsigned,
+                result.contractInputs,
+                result.generatedOutputs,
+                txTemplate.inputSignatures,
+                txTemplate.contractSignatures)
   }
 }
 

@@ -19,7 +19,7 @@ package org.alephium.flow.validation
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{BlockFlow, FlowUtils}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
@@ -28,15 +28,35 @@ import org.alephium.protocol.vm.{OutOfGas => _, _}
 import org.alephium.util.{AVector, EitherF, U256}
 
 trait NonCoinbaseValidation {
+  import ValidationStatus._
+
   implicit def groupConfig: GroupConfig
 
-  def validateMempoolTx(tx: TransactionTemplate, flow: BlockFlow): TxValidationResult[Unit] = {
-    ???
-//    for {
-//      _          <- checkStateless(tx)
-//      worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
-//      _          <- checkStateful(tx, worldState)
-//    } yield ()
+  def validateMempoolTxTemplate(tx: TransactionTemplate,
+                                flow: BlockFlow): TxValidationResult[Unit] = {
+    tx.unsigned.scriptOpt match {
+      case None =>
+        val fullTx = FlowUtils.convertNonScriptTx(tx)
+        validateMempoolTx(fullTx, flow)
+      case Some(script) =>
+        for {
+          chainIndex <- checkChainIndex(tx)
+          trie       <- from(flow.getBestCachedTrie(chainIndex.from))
+          fullTx <- StatefulVM.runTxScript(trie, tx, script, tx.unsigned.startGas) match {
+            case Left(error)   => invalidTx(TxScriptExeFailed(error))
+            case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
+          }
+          _ <- validateMempoolTx(fullTx, flow)
+        } yield ()
+    }
+  }
+
+  def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
+    for {
+      _          <- checkStateless(tx)
+      worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
+      _          <- checkStateful(tx, worldState)
+    } yield ()
   }
 
   protected[validation] def checkBlockTx(tx: Transaction,
@@ -78,9 +98,9 @@ trait NonCoinbaseValidation {
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkGasBound(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
-  protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex]
+  protected[validation] def checkChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
   protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
@@ -123,7 +143,7 @@ object NonCoinbaseValidation {
       }
     }
 
-    protected[validation] def checkGasBound(tx: Transaction): TxValidationResult[Unit] = {
+    protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit] = {
       if (!GasBox.validate(tx.unsigned.startGas)) {
         invalidTx(InvalidStartGas)
       } else if (!checkGasPrice(tx.unsigned.gasPrice)) {
@@ -168,7 +188,8 @@ object NonCoinbaseValidation {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    protected[validation] def checkChainIndex(tx: Transaction): TxValidationResult[ChainIndex] = {
+    protected[validation] def checkChainIndex(
+        tx: TransactionAbstract): TxValidationResult[ChainIndex] = {
       val inputIndexes = tx.unsigned.inputs.map(_.fromGroup).toSet
       if (inputIndexes.size != 1) {
         invalidTx(InvalidInputGroupIndex)

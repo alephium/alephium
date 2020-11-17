@@ -54,7 +54,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
     val chainIndex = ChainIndex(fromGroup, toGroup)
     val mempool    = blockFlow.getPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
-      nonCoinbaseValidation.validateMempoolTx(tx, blockFlow) match {
+      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
           log.warning(s"failed in validating tx ${tx.hash.shortHex} due to $s")
           addFailed(tx)
