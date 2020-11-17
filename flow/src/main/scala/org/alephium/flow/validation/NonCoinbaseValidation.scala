@@ -41,8 +41,8 @@ trait NonCoinbaseValidation {
       case Some(script) =>
         for {
           chainIndex <- checkChainIndex(tx)
-          trie       <- from(flow.getBestCachedTrie(chainIndex.from))
-          fullTx <- StatefulVM.runTxScript(trie, tx, script, tx.unsigned.startGas) match {
+          worldState <- from(flow.getBestCachedWorldState(chainIndex.from))
+          fullTx <- StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
             case Left(error)   => invalidTx(TxScriptExeFailed(error))
             case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
           }
@@ -54,7 +54,7 @@ trait NonCoinbaseValidation {
   def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
     for {
       _          <- checkStateless(tx)
-      worldState <- from(flow.getBestPersistedTrie(tx.chainIndex.from))
+      worldState <- from(flow.getBestPersistedWorldState(tx.chainIndex.from))
       _          <- checkStateful(tx, worldState)
     } yield ()
   }

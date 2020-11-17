@@ -179,15 +179,15 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  protected def getPersistedTrie(deps: AVector[Hash],
-                                 groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
+  protected def getPersistedWorldState(deps: AVector[Hash],
+                                       groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  protected def getCachedTrie(deps: AVector[Hash],
-                              groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+  protected def getCachedWorldState(deps: AVector[Hash],
+                                    groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
@@ -195,12 +195,12 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def getPersistedTrie(block: Block): IOResult[WorldState] = {
     val header = block.header
-    getPersistedTrie(header.blockDeps, header.chainIndex.from)
+    getPersistedWorldState(header.blockDeps, header.chainIndex.from)
   }
 
   def getCachedTrie(block: Block): IOResult[WorldState] = {
     val header = block.header
-    getCachedTrie(header.blockDeps, header.chainIndex.from)
+    getCachedWorldState(header.blockDeps, header.chainIndex.from)
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
@@ -213,16 +213,16 @@ trait BlockFlowState extends FlowTipsUtil {
     getHashChain(chainIndex.from, chainIndex.to).getHeight(bestParent)
   }
 
-  def getBestPersistedTrie(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
+  def getBestPersistedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    getPersistedTrie(deps.deps, groupIndex)
+    getPersistedWorldState(deps.deps, groupIndex)
   }
 
-  def getBestCachedTrie(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+  def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    getCachedTrie(deps.deps, groupIndex)
+    getCachedWorldState(deps.deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
@@ -281,8 +281,8 @@ trait BlockFlowState extends FlowTipsUtil {
     assume(brokerConfig.contains(groupIndex))
 
     for {
-      bestTrie <- getBestPersistedTrie(groupIndex)
-      persistedUtxos <- bestTrie
+      bestWorldState <- getBestPersistedWorldState(groupIndex)
+      persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
         .map(_.filter(p => lockedBy(p._2, lockupScript)))
     } yield persistedUtxos

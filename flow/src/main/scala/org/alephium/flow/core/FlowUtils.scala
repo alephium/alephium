@@ -113,11 +113,11 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       }
 
       for {
-        initialTrie <- getCachedTrie(deps.deps, chainIndex.from)
-        _ <- order.foldE[IOError, WorldState](initialTrie) {
-          case (trie, scriptTxIndex) =>
+        initialWorldState <- getCachedWorldState(deps.deps, chainIndex.from)
+        _ <- order.foldE[IOError, WorldState](initialWorldState) {
+          case (worldState, scriptTxIndex) =>
             val tx = txTemplates(scriptTxIndex)
-            FlowUtils.generateFullTx(trie, tx, tx.unsigned.scriptOpt.get).map {
+            FlowUtils.generateFullTx(worldState, tx, tx.unsigned.scriptOpt.get).map {
               case (fullTx, newWorldState) =>
                 fullTxs(scriptTxIndex) = fullTx
                 newWorldState

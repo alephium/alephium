@@ -225,7 +225,7 @@ trait FlowFixture
       mainGroup: GroupIndex,
       tx: TransactionTemplate,
       txScript: StatefulScript): (AVector[ContractOutputRef], AVector[TxOutput]) = {
-    val worldState = blockFlow.getBestCachedTrie(mainGroup).toOption.get
+    val worldState = blockFlow.getBestCachedWorldState(mainGroup).toOption.get
     val result = StatefulVM
       .runTxScript(worldState, tx, txScript, tx.unsigned.startGas)
       .extractedValue()
@@ -306,7 +306,7 @@ trait FlowFixture
                  outputRef: ContractOutputRef,
                  numAssets: Int    = 2,
                  numContracts: Int = 2): Assertion = {
-    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(key).fold(throw _, identity)
 
     contractState.fields is fields
