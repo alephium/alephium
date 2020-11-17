@@ -35,7 +35,7 @@ class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
         AVector.empty
       )
 
-      val worldState = blockFlow.getBestCachedTrie(groupIndex).extractedValue()
+      val worldState = blockFlow.getBestCachedWorldState(groupIndex).extractedValue()
       assets.foreach { asset =>
         worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
       }

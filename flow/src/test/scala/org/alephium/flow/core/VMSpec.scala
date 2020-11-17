@@ -93,7 +93,7 @@ class VMSpec extends AlephiumSpec {
       val txTemplate = block.transactions.head
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
     }
-    val worldState = blockFlow.getBestCachedTrie(chainIndex.from).toOption.get
+    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
     StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
       Left(StackOverflow)
   }
@@ -312,7 +312,7 @@ class VMSpec extends AlephiumSpec {
     val block    = simpleScript(blockFlow, chainIndex, script)
     blockFlow.add(block).isRight is true
 
-    val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
 
     checkState(blockFlow,
@@ -356,7 +356,7 @@ class VMSpec extends AlephiumSpec {
     val block0 = payableCall(blockFlow, chainIndex, script)
     blockFlow.add(block0).isRight is true
 
-    val worldState0 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val worldState0 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState0.getContractStates().toOption.get.length is 2
     worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
@@ -368,7 +368,7 @@ class VMSpec extends AlephiumSpec {
     val block1 = payableCall(blockFlow, chainIndex, script)
     blockFlow.add(block1).isRight is true
 
-    val worldState1 = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val worldState1 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState1.getContractStates().toOption.get.length is 2
     worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
@@ -456,7 +456,7 @@ class VMSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero))).key
 
     def checkSwapBalance(alfReserve: U256, tokenReserve: U256) = {
-      val worldState = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
       val output     = worldState.getContractAsset(swapContractKey).toOption.get
       output.amount is alfReserve
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
@@ -540,7 +540,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin)
 
     val expected      = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
-    val worldState    = blockFlow.getBestPersistedTrie(chainIndex.from).fold(throw _, identity)
+    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractKey).fold(throw _, identity)
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }

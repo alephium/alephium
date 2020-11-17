@@ -63,7 +63,10 @@ object ServerUtils {
   def listUnconfirmedTransactions(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       implicit chainsConfig: ChainsConfig): Try[AVector[Tx]] = {
     Right(
-      blockFlow.getPool(chainIndex).getAll(chainIndex).map(Tx.fromTemplate(_, chainsConfig.networkType)))
+      blockFlow
+        .getPool(chainIndex)
+        .getAll(chainIndex)
+        .map(Tx.fromTemplate(_, chainsConfig.networkType)))
   }
 
   def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(
@@ -242,7 +245,7 @@ object ServerUtils {
   ): ExeResult[Transaction] = {
     for {
       worldState <- blockFlow
-        .getBestCachedTrie(fromGroup)
+        .getBestCachedWorldState(fromGroup)
         .left
         .map[ExeFailure](error => NonCategorized(error.getMessage))
       result <- StatefulVM.runTxScript(worldState, contractTx, script, contractTx.unsigned.startGas)
@@ -280,8 +283,8 @@ object ServerUtils {
       executionContext: ExecutionContext): FutureTry[TxResult] = {
     (for {
       txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
-      unsignedTx <- deserialize[UnsignedTransaction](txByteString)
-        .left.map(serdeError => failed(serdeError.getMessage))
+      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
+        failed(serdeError.getMessage))
     } yield {
       TransactionTemplate(unsignedTx,
                           AVector.fill(unsignedTx.inputs.length)(query.signature),
