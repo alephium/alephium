@@ -96,6 +96,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
   }
 
   // all the inputs and double spending should have been checked
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def executeTxTemplates(
       chainIndex: ChainIndex,
       deps: BlockDeps,
