@@ -33,7 +33,7 @@ trait UtilCodecs {
     (as: AVector[A]) => Json.fromValues(as.toIterable.map(encoder.apply))
 
   implicit def avectorDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[AVector[A]] =
-    Decoder.decodeArray[A].map(AVector.unsafe)
+    Decoder.decodeArray[A].map(AVector.unsafe(_))
   implicit def avectorCodec[A: ClassTag](implicit encoder: Encoder[A],
                                          decoder: Decoder[A]): Codec[AVector[A]] = {
     Codec.from(avectorDecoder[A], avectorEncoder[A])

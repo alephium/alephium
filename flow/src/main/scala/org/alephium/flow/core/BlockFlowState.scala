@@ -179,15 +179,15 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  private def getPersistedTrie(deps: AVector[Hash],
-                               groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
+  protected def getPersistedTrie(deps: AVector[Hash],
+                                 groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  private def getCachedTrie(deps: AVector[Hash],
-                            groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+  protected def getCachedTrie(deps: AVector[Hash],
+                              groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
