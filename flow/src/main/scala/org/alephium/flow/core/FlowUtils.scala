@@ -23,10 +23,12 @@ import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.protocol.vm.{StatefulVM, WorldState}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
+import org.alephium.util.{AVector, U256}
 
 trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
@@ -93,8 +95,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
   }
 
-  // TODO: execute tx properly in the following commits
-  private def convertTemplate(txTemplate: TransactionTemplate): Transaction = {
+  private def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
     Transaction(txTemplate.unsigned,
                 AVector.empty,
                 AVector.empty,
@@ -102,29 +103,88 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
                 txTemplate.contractSignatures)
   }
 
+  private def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
+    inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
+  }
+
+  private def convertFailedScriptTx(chainIndex: ChainIndex,
+                                    deps: BlockDeps,
+                                    txTemplate: TransactionTemplate): IOResult[Transaction] = {
+    for {
+      trie   <- getCachedTrie(deps.deps, chainIndex.from)
+      inputs <- trie.getPreOutputsForVM(txTemplate)
+    } yield {
+      assume(inputs.forall(_.isAsset))
+      val remainingBalances = deductGas(inputs, txTemplate.gasFeeUnsafe)
+      Transaction(txTemplate.unsigned,
+                  AVector.empty,
+                  generatedOutputs = remainingBalances,
+                  txTemplate.inputSignatures,
+                  txTemplate.contractSignatures)
+    }
+  }
+
+  private def convertSuccessfulTx(txTemplate: TransactionTemplate,
+                                  result: TxScriptExecution): Transaction = {
+    Transaction(txTemplate.unsigned,
+                result.contractInputs,
+                result.generatedOutputs,
+                txTemplate.inputSignatures,
+                txTemplate.contractSignatures)
+  }
+
+  // all the inputs and double spending should have been checked
+  private def executeTxTemplates(
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      txTemplates: AVector[TransactionTemplate]): IOResult[AVector[Transaction]] = {
+    if (chainIndex.isIntraGroup) {
+      val parentHash = deps.getOutDep(chainIndex.to)
+      val order      = Block.getScriptExecutionOrder(parentHash, txTemplates)
+      val fullTxs    = Array.ofDim[Transaction](txTemplates.length + 1) // reverse 1 slot for coinbase tx
+      txTemplates.foreachWithIndex {
+        case (tx, index) =>
+          if (tx.unsigned.scriptOpt.isEmpty) {
+            fullTxs(index) = convertNonScriptTx(tx)
+          }
+      }
+
+      for {
+        initialTrie <- getCachedTrie(deps.deps, chainIndex.from)
+        _ <- order.foldE[IOError, WorldState](initialTrie) {
+          case (trie, scriptTxIndex) =>
+            val tx = txTemplates(scriptTxIndex)
+            StatefulVM.runTxScript(trie, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) match {
+              case Left(_) =>
+                convertFailedScriptTx(chainIndex, deps, tx).map { fullTx =>
+                  fullTxs(scriptTxIndex) = fullTx
+                  trie
+                }
+              case Right(result) =>
+                val fullTx = convertSuccessfulTx(tx, result)
+                fullTxs(scriptTxIndex) = fullTx
+                Right(result.worldState)
+            }
+        }
+      } yield AVector.unsafe(fullTxs, 0, txTemplates.length)
+    } else {
+      Right(txTemplates.map(convertNonScriptTx))
+    }
+  }
+
   def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
     assume(brokerConfig.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
-      target <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
-      height <- getBestHeight(chainIndex).map(reduceHeight)
-    } yield {
-      val txTemplates = collectTransactions(chainIndex)
-      val txs         = txTemplates.map(convertTemplate)
-      BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, txs)
-    }
+      target  <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
+      height  <- getBestHeight(chainIndex).map(reduceHeight)
+      fullTxs <- executeTxTemplates(chainIndex, bestDeps, collectTransactions(chainIndex))
+    } yield BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, fullTxs)
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
-    assume(brokerConfig.contains(chainIndex.from))
-    val singleChain = getBlockChain(chainIndex)
-    val bestDeps    = getBestDeps(chainIndex.from)
-    val target      = Utils.unsafe(singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to)))
-    val height      = Utils.unsafe(getBestHeight(chainIndex).map(reduceHeight))
-    val txTemplates = collectTransactions(chainIndex)
-    val txs         = txTemplates.map(convertTemplate)
-    BlockFlowTemplate(chainIndex, height, bestDeps.deps, target, txs)
+    Utils.unsafe(prepareBlockFlow(chainIndex))
   }
 }
 

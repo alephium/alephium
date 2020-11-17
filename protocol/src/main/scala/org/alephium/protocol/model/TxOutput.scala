@@ -33,6 +33,8 @@ sealed trait TxOutput {
   def hint: Hint
 
   def isAsset: Boolean
+
+  def payGasUnsafe(fee: U256): TxOutput
 }
 
 object TxOutput {
@@ -89,6 +91,9 @@ final case class AssetOutput(amount: U256,
   def hint: Hint = Hint.from(this)
 
   def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+
+  def payGasUnsafe(fee: U256): AssetOutput =
+    AssetOutput(amount.subUnsafe(fee), createdHeight, lockupScript, tokens, additionalData)
 }
 
 object AssetOutput {
@@ -106,6 +111,9 @@ final case class ContractOutput(amount: U256,
   def isAsset: Boolean = false
 
   def hint: Hint = Hint.from(this)
+
+  def payGasUnsafe(fee: U256): ContractOutput =
+    ContractOutput(amount.subUnsafe(fee), createdHeight, lockupScript, tokens)
 }
 
 object ContractOutput {

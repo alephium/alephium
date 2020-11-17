@@ -59,57 +59,17 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     header.uncleHash(toIndex)
   }
 
-  // we shuffle tx scripts randomly for execution to mitigate front-running
   def getScriptExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
     if (isGenesis) {
       AVector.empty
     } else {
-      val scriptOrders = scriptIndexes()
-
-      @tailrec
-      def shuffle(index: Int, seed: Hash): Unit = {
-        if (index < scriptOrders.length - 1) {
-          val txRemaining = scriptOrders.length - index
-          val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
-          val tmp         = scriptOrders(index)
-          scriptOrders(index)       = scriptOrders(randomIndex)
-          scriptOrders(randomIndex) = tmp
-          shuffle(index + 1, transactions(randomIndex).hash)
-        }
-      }
-
-      if (scriptOrders.length > 1) {
-        val initialSeed = {
-          val maxIndex = nonCoinbaseLength - 1
-          val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-          samples.foldLeft(parentHash) {
-            case (acc, index) =>
-              val tx = transactions(index)
-              Hash.xor(acc, tx.hash)
-          }
-        }
-        shuffle(0, initialSeed)
-      }
-      AVector.from(scriptOrders)
+      Block.getScriptExecutionOrder(parentHash, nonCoinbase)
     }
   }
 
   def getNonCoinbaseExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
     assume(!isGenesis)
-    getScriptExecutionOrder ++ nonCoinbase.foldWithIndex(AVector.empty[Int]) {
-      case (acc, tx, index) => if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
-    }
-  }
-
-  def scriptIndexes(): ArrayBuffer[Int] = {
-    val indexes = ArrayBuffer.empty[Int]
-    transactions.foreachWithIndex {
-      case (tx, txIndex) =>
-        if (tx.unsigned.scriptOpt.nonEmpty) {
-          indexes.addOne(txIndex)
-        }
-    }
-    indexes
+    Block.getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
   }
 }
 
@@ -131,5 +91,58 @@ object Block {
     val txsHash     = Hash.hash(transactions)
     val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
     Block(blockHeader, transactions)
+  }
+
+  def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {
+    val indexes = ArrayBuffer.empty[Int]
+    nonCoinbase.foreachWithIndex {
+      case (tx, txIndex) =>
+        if (tx.unsigned.scriptOpt.nonEmpty) {
+          indexes.addOne(txIndex)
+        }
+    }
+    indexes
+  }
+
+  // we shuffle tx scripts randomly for execution to mitigate front-running
+  def getScriptExecutionOrder[T <: TransactionAbstract](parentHash: Hash,
+                                                        nonCoinbase: AVector[T]): AVector[Int] = {
+    val nonCoinbaseLength = nonCoinbase.length
+    val scriptOrders      = scriptIndexes(nonCoinbase)
+
+    @tailrec
+    def shuffle(index: Int, seed: Hash): Unit = {
+      if (index < scriptOrders.length - 1) {
+        val txRemaining = scriptOrders.length - index
+        val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
+        val tmp         = scriptOrders(index)
+        scriptOrders(index)       = scriptOrders(randomIndex)
+        scriptOrders(randomIndex) = tmp
+        shuffle(index + 1, nonCoinbase(randomIndex).hash)
+      }
+    }
+
+    if (scriptOrders.length > 1) {
+      val initialSeed = {
+        val maxIndex = nonCoinbaseLength - 1
+        val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
+        samples.foldLeft(parentHash) {
+          case (acc, index) =>
+            val tx = nonCoinbase(index)
+            Hash.xor(acc, tx.hash)
+        }
+      }
+      shuffle(0, initialSeed)
+    }
+    AVector.from(scriptOrders)
+  }
+
+  def getNonCoinbaseExecutionOrder[T <: TransactionAbstract](
+      parentHash: Hash,
+      nonCoinbase: AVector[T]): AVector[Int] = {
+    getScriptExecutionOrder(parentHash, nonCoinbase) ++ nonCoinbase.foldWithIndex(
+      AVector.empty[Int]) {
+      case (acc, tx, index) => if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
+    }
   }
 }

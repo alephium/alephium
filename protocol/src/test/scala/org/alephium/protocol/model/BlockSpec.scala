@@ -110,10 +110,10 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
                                           TimeStamp.zero)
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
-      block0.scriptIndexes().toSeq is Seq(0)
+      Block.scriptIndexes(block0.nonCoinbase).toSeq is Seq(0)
       block0.getNonCoinbaseExecutionOrder.last is 1
       val block1 = Block(header, AVector(tx1, tx0, coinbase))
-      block1.scriptIndexes().toSeq is Seq(1)
+      Block.scriptIndexes(block1.nonCoinbase).toSeq is Seq(1)
       block1.getNonCoinbaseExecutionOrder.last is 0
     }
   }
