@@ -26,7 +26,7 @@ import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{StatefulVM, WorldState}
+import org.alephium.protocol.vm.{StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, U256}
 
@@ -95,27 +95,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
   }
 
-  private def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
-    inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
-  }
-
-  private def convertFailedScriptTx(chainIndex: ChainIndex,
-                                    deps: BlockDeps,
-                                    txTemplate: TransactionTemplate): IOResult[Transaction] = {
-    for {
-      trie   <- getCachedTrie(deps.deps, chainIndex.from)
-      inputs <- trie.getPreOutputsForVM(txTemplate)
-    } yield {
-      assume(inputs.forall(_.isAsset))
-      val remainingBalances = deductGas(inputs, txTemplate.gasFeeUnsafe)
-      Transaction(txTemplate.unsigned,
-                  AVector.empty,
-                  generatedOutputs = remainingBalances,
-                  txTemplate.inputSignatures,
-                  txTemplate.contractSignatures)
-    }
-  }
-
   // all the inputs and double spending should have been checked
   private def executeTxTemplates(
       chainIndex: ChainIndex,
@@ -137,16 +116,10 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
         _ <- order.foldE[IOError, WorldState](initialTrie) {
           case (trie, scriptTxIndex) =>
             val tx = txTemplates(scriptTxIndex)
-            StatefulVM.runTxScript(trie, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) match {
-              case Left(_) =>
-                convertFailedScriptTx(chainIndex, deps, tx).map { fullTx =>
-                  fullTxs(scriptTxIndex) = fullTx
-                  trie
-                }
-              case Right(result) =>
-                val fullTx = FlowUtils.convertSuccessfulTx(tx, result)
+            FlowUtils.generateFullTx(trie, tx, tx.unsigned.scriptOpt.get).map {
+              case (fullTx, newWorldState) =>
                 fullTxs(scriptTxIndex) = fullTx
-                Right(result.worldState)
+                newWorldState
             }
         }
       } yield AVector.unsafe(fullTxs, 0, txTemplates.length)
@@ -187,6 +160,37 @@ object FlowUtils {
                 result.generatedOutputs,
                 txTemplate.inputSignatures,
                 txTemplate.contractSignatures)
+  }
+
+  def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
+    inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
+  }
+
+  def convertFailedScriptTx(worldState: WorldState,
+                            txTemplate: TransactionTemplate): IOResult[Transaction] = {
+    worldState.getPreOutputsForVM(txTemplate).map { inputs =>
+      assume(inputs.forall(_.isAsset))
+      val remainingBalances = deductGas(inputs, txTemplate.gasFeeUnsafe)
+      Transaction(txTemplate.unsigned,
+                  AVector.empty,
+                  generatedOutputs = remainingBalances,
+                  txTemplate.inputSignatures,
+                  txTemplate.contractSignatures)
+    }
+  }
+
+  def generateFullTx(worldState: WorldState,
+                     tx: TransactionTemplate,
+                     script: StatefulScript): IOResult[(Transaction, WorldState)] = {
+    StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
+      case Left(_) =>
+        convertFailedScriptTx(worldState, tx).map { fullTx =>
+          fullTx -> worldState
+        }
+      case Right(result) =>
+        val fullTx = FlowUtils.convertSuccessfulTx(tx, result)
+        Right(fullTx -> result.worldState)
+    }
   }
 }
 
