@@ -283,7 +283,6 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   trait StatefulFixture extends StatelessFixture {
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
       AssetOutput(U256.Zero,
-                  0,
                   LockupScript.p2pkh(Hash.zero),
                   AVector(tokenId -> amount),
                   ByteString.empty)

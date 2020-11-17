@@ -157,31 +157,27 @@ trait TxGenerators
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256]               = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      heightGen: Gen[Int]                 = createdHeightGen,
       scriptGen: Gen[LockupScript]        = p2pkhLockupGen(groupIndex),
       dataGen: Gen[ByteString]            = dataGen
   ): Gen[AssetOutput] = {
     for {
       amount         <- _amountGen
       tokens         <- _tokensGen
-      createdHeight  <- heightGen
       lockupScript   <- scriptGen
       additionalData <- dataGen
-    } yield AssetOutput(amount, createdHeight, lockupScript, AVector.from(tokens), additionalData)
+    } yield AssetOutput(amount, lockupScript, AVector.from(tokens), additionalData)
   }
 
   def contractOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256]               = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      heightGen: Gen[Int]                 = createdHeightGen,
       scriptGen: Gen[LockupScript]        = p2pkhLockupGen(groupIndex)
   ): Gen[ContractOutput] = {
     for {
-      amount        <- _amountGen
-      tokens        <- _tokensGen
-      createdHeight <- heightGen
-      lockupScript  <- scriptGen
-    } yield ContractOutput(amount, createdHeight, lockupScript, AVector.from(tokens))
+      amount       <- _amountGen
+      tokens       <- _tokensGen
+      lockupScript <- scriptGen
+    } yield ContractOutput(amount, lockupScript, AVector.from(tokens))
   }
 
   lazy val counterContract: StatefulContract = {
@@ -199,17 +195,16 @@ trait TxGenerators
 
   lazy val assetOutputGen: Gen[AssetOutput] = for {
     value <- Gen.choose[Long](1, 5)
-  } yield TxOutput.asset(U256.unsafe(value), 0, LockupScript.p2pkh(Hash.zero))
+  } yield TxOutput.asset(U256.unsafe(value), LockupScript.p2pkh(Hash.zero))
 
   def assetInputInfoGen(balances: Balances, scriptGen: Gen[ScriptPair]): Gen[AssetInputInfo] =
     for {
       ScriptPair(lockup, unlock, privateKey) <- scriptGen
-      height                                 <- createdHeightGen
       data                                   <- dataGen
       outputHash                             <- hashGen
     } yield {
       val assetOutput =
-        AssetOutput(balances.alfAmount, height, lockup, AVector.from(balances.tokens), data)
+        AssetOutput(balances.alfAmount, lockup, AVector.from(balances.tokens), data)
       val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -220,12 +215,10 @@ trait TxGenerators
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
       lockupScriptGen: IndexLockupScriptGen = p2pkhLockupGen,
-      heightGen: Gen[Int]                   = createdHeightGen,
       dataGen: Gen[ByteString]              = dataGen
   ): Gen[UnsignedTransaction] =
     for {
       assets           <- assetsToSpend
-      createdHeight    <- heightGen
       fromLockupScript <- lockupScriptGen(chainIndex.from)
       toLockupScript   <- lockupScriptGen(chainIndex.to)
     } yield {
@@ -255,7 +248,7 @@ trait TxGenerators
             } else {
               Gen.oneOf(fromLockupScript, toLockupScript).sample.get
             }
-          balance.toOutput(createdHeight, lockupScript, dataGen.sample.get)
+          balance.toOutput(lockupScript, dataGen.sample.get)
       }
       UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)
     }
@@ -410,9 +403,9 @@ object ModelGenerators {
   final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)
 
   final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
-    def toOutput(createdHeight: Int, lockupScript: LockupScript, data: ByteString): AssetOutput = {
+    def toOutput(lockupScript: LockupScript, data: ByteString): AssetOutput = {
       val tokensVec = AVector.from(tokens)
-      AssetOutput(alfAmount, createdHeight, lockupScript, tokensVec, data)
+      AssetOutput(alfAmount, lockupScript, tokensVec, data)
     }
   }
 

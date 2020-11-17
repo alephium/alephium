@@ -77,7 +77,7 @@ trait EndpointsExamples {
       AVector(
         Tx(hash,
            AVector(Input(OutputRef(scriptHint = 23412, key = hash), serialize(unlockScript))),
-           AVector(Output(amount = balance, createdHeight = height, address)))))
+           AVector(Output(amount = balance, address)))))
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(Seq(blockEntry)))

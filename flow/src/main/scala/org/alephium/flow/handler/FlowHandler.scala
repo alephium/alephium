@@ -77,7 +77,6 @@ object FlowHandler {
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
-                                     height: Int,
                                      deps: AVector[Hash],
                                      target: Target,
                                      transactions: AVector[Transaction])

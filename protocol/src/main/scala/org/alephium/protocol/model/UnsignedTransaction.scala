@@ -92,14 +92,13 @@ object UnsignedTransaction {
                   fromLockupScript: LockupScript,
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
-                  amount: U256,
-                  height: Int): Option[UnsignedTransaction] = {
+                  amount: U256): Option[UnsignedTransaction] = {
     for {
       remainder0 <- inputSum.sub(amount)
       remainder  <- remainder0.sub(defaultGasFee)
     } yield {
-      val toOutput   = TxOutput.asset(amount, height, toLockupScript)
-      val fromOutput = TxOutput.asset(remainder, height, fromLockupScript)
+      val toOutput   = TxOutput.asset(amount, toLockupScript)
+      val fromOutput = TxOutput.asset(remainder, fromLockupScript)
 
       val outputs =
         if (remainder > U256.Zero) {
