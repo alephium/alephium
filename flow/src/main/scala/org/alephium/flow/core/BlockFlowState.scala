@@ -317,10 +317,7 @@ trait BlockFlowState extends FlowTipsUtil {
                         fromUnlockScript: UnlockScript,
                         toLockupScript: LockupScript,
                         value: U256): IOResult[Option[UnsignedTransaction]] = {
-    for {
-      utxos  <- getUtxos(fromLockupScript)
-      height <- getBestHeight(ChainIndex(fromLockupScript.groupIndex, toLockupScript.groupIndex))
-    } yield {
+    getUtxos(fromLockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
       UnsignedTransaction
         .transferAlf(utxos.map(_._1),
@@ -328,8 +325,7 @@ trait BlockFlowState extends FlowTipsUtil {
                      fromLockupScript,
                      fromUnlockScript,
                      toLockupScript,
-                     value,
-                     height)
+                     value)
     }
   }
 }

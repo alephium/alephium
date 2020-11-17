@@ -205,7 +205,7 @@ object Transaction {
     val pkScript     = LockupScript.p2pkh(publicKey)
 
     val txOutput =
-      AssetOutput(reward.addUnsafe(gasFee), 0, pkScript, tokens = AVector.empty, outputData)
+      AssetOutput(reward.addUnsafe(gasFee), pkScript, tokens = AVector.empty, outputData)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,

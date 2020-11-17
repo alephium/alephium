@@ -115,7 +115,6 @@ trait FlowFixture
                   numReceivers: Int,
                   txScriptOpt: Option[StatefulScript],
                   gasFeeInTheAmount: Boolean): AVector[Transaction] = {
-    val height                     = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
@@ -132,13 +131,13 @@ trait FlowFixture
 
     val gasFee = defaultGasPrice * minimalGas.toU256
     val (outputs, remaining) = if (gasFeeInTheAmount) {
-      val outputs   = toLockupScripts.map(TxOutput.asset(amount - gasFee, height, _))
-      val remaining = TxOutput.asset(total - amount * numReceivers, height, fromLockupScript)
+      val outputs   = toLockupScripts.map(TxOutput.asset(amount - gasFee, _))
+      val remaining = TxOutput.asset(total - amount * numReceivers, fromLockupScript)
       outputs -> remaining
     } else {
-      val outputs = toLockupScripts.map(TxOutput.asset(amount, height, _))
+      val outputs = toLockupScripts.map(TxOutput.asset(amount, _))
       val remaining =
-        TxOutput.asset(total - amount * numReceivers - gasFee, height, fromLockupScript)
+        TxOutput.asset(total - amount * numReceivers - gasFee, fromLockupScript)
       outputs -> remaining
     }
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, outputs :+ remaining)
@@ -160,7 +159,6 @@ trait FlowFixture
                  fromLockupScript: LockupScript,
                  amount: U256,
                  txScriptOpt: Option[StatefulScript]): Transaction = {
-    val height       = blockFlow.getHashChain(chainIndex).maxHeight.toOption.get
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
@@ -172,8 +170,8 @@ trait FlowFixture
 
     keyManager += lockupScript -> toPrivateKey
     val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
-    val output     = TxOutput.asset(amount - defaultGasFee, height, lockupScript)
-    val remaining  = TxOutput.asset(total - amount, height, fromLockupScript)
+    val output     = TxOutput.asset(amount - defaultGasFee, lockupScript)
+    val remaining  = TxOutput.asset(total - amount, fromLockupScript)
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, AVector(output, remaining))
     Transaction.from(unsignedTx, privateKey)
   }
