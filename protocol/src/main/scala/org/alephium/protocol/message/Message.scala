@@ -22,6 +22,11 @@ import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
+/*
+ * 4 bytes: Header
+ * 4 bytes: Payload's length
+ * ? bytes: Payload
+ */
 final case class Message(header: Header, payload: Payload)
 
 object Message {
@@ -31,7 +36,11 @@ object Message {
   }
 
   def serialize(message: Message): ByteString = {
-    serdeImpl[Header].serialize(message.header) ++ Payload.serialize(message.payload)
+    val header  = serdeImpl[Header].serialize(message.header)
+    val payload = Payload.serialize(message.payload)
+    val length  = intSerde.serialize(payload.length)
+
+    header ++ length ++ payload
   }
 
   def serialize[T <: Payload](payload: T): ByteString = {
@@ -42,12 +51,13 @@ object Message {
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {
       headerPair <- serdeImpl[Header]._deserialize(input)
-      header = headerPair._1
-      rest0  = headerPair._2
-      payloadPair <- Payload._deserialize(rest0)
-      payload = payloadPair._1
-      rest1   = payloadPair._2
-    } yield (Message(header, payload), rest1)
+      (header, lengthWithPayload) = headerPair
+      lengthPair <- intSerde._deserialize(lengthWithPayload)
+      (length, payloadRest) = lengthPair
+      _ <- checkLength(length, payloadRest)
+      (payloadBytes, rest) = payloadRest.splitAt(length)
+      payload <- Payload.deserialize(payloadBytes)
+    } yield (Message(header, payload), rest)
   }
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Message] = {
@@ -58,6 +68,16 @@ object Message {
         } else {
           Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
         }
+    }
+  }
+
+  private def checkLength(length: Int, data: ByteString) = {
+    if (length < 0) {
+      Left(SerdeError.wrongFormat(s"Negative length: $length"))
+    } else if (data.length < length) {
+      Left(SerdeError.wrongFormat(s"Too few bytes: expected $length, got ${data.length}"))
+    } else {
+      Right(())
     }
   }
 }
