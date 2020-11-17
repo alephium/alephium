@@ -73,7 +73,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
                                 AVector.empty),
             AVector.empty[Signature]
           ))
-      Block(header, txs)
+      Block(header, txs :+ txs.head) // add a fake coinbase tx
     }
     val blockGen = Gen.const(()).map(_ => gen())
 
