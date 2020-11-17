@@ -18,29 +18,35 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.Protocol
+import org.alephium.protocol.{Hash, Protocol}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
+import org.alephium.util.Hex
 
 /*
  * 4 bytes: Header
  * 4 bytes: Payload's length
+ * 4 bytes: Checksum
  * ? bytes: Payload
  */
 final case class Message(header: Header, payload: Payload)
 
 object Message {
+
+  private val checksumLength = 4
+
   def apply[T <: Payload](payload: T): Message = {
     val header = Header(Protocol.version)
     Message(header, payload)
   }
 
   def serialize(message: Message): ByteString = {
-    val header  = serdeImpl[Header].serialize(message.header)
-    val payload = Payload.serialize(message.payload)
-    val length  = intSerde.serialize(payload.length)
+    val header   = serdeImpl[Header].serialize(message.header)
+    val payload  = Payload.serialize(message.payload)
+    val length   = intSerde.serialize(payload.length)
+    val checksum = Hash.hash(payload).bytes.take(checksumLength)
 
-    header ++ length ++ payload
+    header ++ length ++ checksum ++ payload
   }
 
   def serialize[T <: Payload](payload: T): ByteString = {
@@ -50,14 +56,16 @@ object Message {
   def _deserialize(input: ByteString)(
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {
-      headerPair <- serdeImpl[Header]._deserialize(input)
-      (header, lengthWithPayload) = headerPair
-      lengthPair <- intSerde._deserialize(lengthWithPayload)
-      (length, payloadRest) = lengthPair
-      _ <- checkLength(length, payloadRest)
-      (payloadBytes, rest) = payloadRest.splitAt(length)
-      payload <- Payload.deserialize(payloadBytes)
-    } yield (Message(header, payload), rest)
+      headerLength    <- Header.serde._deserialize(input)
+      lengthChecksum  <- intSerde._deserialize(headerLength._2)
+      checksumPayload <- extractChecksum(lengthChecksum._2)
+      payloadBytes    <- extractPayloadBytes(lengthChecksum._1, checksumPayload._2)
+      _               <- checkChecksum(checksumPayload._1, payloadBytes._1)
+      payload         <- deserializeExactPayload(payloadBytes._1)
+    } yield {
+      val header = headerLength._1
+      (Message(header, payload), payloadBytes._2)
+    }
   }
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Message] = {
@@ -71,13 +79,40 @@ object Message {
     }
   }
 
-  private def checkLength(length: Int, data: ByteString) = {
+  private def extractChecksum(bytes: ByteString) = {
+    Either.cond(
+      bytes.length >= checksumLength,
+      bytes.splitAt(checksumLength),
+      SerdeError.notEnoughBytes(checksumLength, bytes.length)
+    )
+  }
+
+  private def extractPayloadBytes(length: Int,
+                                  data: ByteString): SerdeResult[(ByteString, ByteString)] = {
     if (length < 0) {
       Left(SerdeError.wrongFormat(s"Negative length: $length"))
     } else if (data.length < length) {
-      Left(SerdeError.wrongFormat(s"Too few bytes: expected $length, got ${data.length}"))
+      Left(SerdeError.notEnoughBytes(length, data.length))
     } else {
-      Right(())
+      Right(data.splitAt(length))
+    }
+  }
+
+  private def checkChecksum(checksum: ByteString, data: ByteString) = {
+    val digest = Hash.hash(data).bytes.take(checksumLength)
+    Either.cond(
+      digest == checksum,
+      (),
+      SerdeError.wrongFormat(
+        s"Wrong checksum: expected ${Hex.toHexString(digest)}, got ${Hex.toHexString(checksum)}")
+    )
+  }
+
+  private def deserializeExactPayload(payloadBytes: ByteString)(implicit config: GroupConfig) = {
+    Payload.deserialize(payloadBytes).left.map {
+      case _: SerdeError.NotEnoughBytes =>
+        SerdeError.wrongFormat("Cannot extract a correct payload from the length field")
+      case error => error
     }
   }
 }
