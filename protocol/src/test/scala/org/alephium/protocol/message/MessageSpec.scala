@@ -16,46 +16,73 @@
 
 package org.alephium.protocol.message
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Hex}
 
 class MessageSpec extends AlephiumSpec {
 
+  implicit val groupConfig: GroupConfig = new GroupConfig {
+    override def groups: Int = 4
+  }
+
+  val lengthField    = 4
+  val checksumLength = 4
+  val pong           = Pong(1)
+  val message        = Message(pong)
+  val serialized     = Message.serialize(message)
+  val payload        = Payload.serialize(pong)
+  val header         = serdeImpl[Header].serialize(message.header)
+  val payloadLength  = intSerde.serialize(payload.length)
+  val checksum       = Hash.hash(payload).bytes.take(checksumLength)
+
   it should "serde message" in {
 
-    implicit val groupConfig: GroupConfig = new GroupConfig {
-      override def groups: Int = 4
-    }
+    payload.length is 8
+    header.length is 4
 
-    val pong    = Pong(1)
-    val message = Message(pong)
+    val additionalLength = lengthField + checksumLength
 
-    val payloadLength = Payload.serialize(message.payload).length
-    val headerLength  = Header.serde.serialize(message.header).length
+    serialized.length is (payload.length + header.length + additionalLength)
 
-    payloadLength is 8
-    headerLength is 4
+    Message.deserialize(serialized) isE message
 
-    Message.serialize(message).length is (payloadLength + headerLength + 4)
+    val (deserialized, rest) = Message._deserialize(serialized ++ serialized).toOption.get
 
-    Message.deserialize(Message.serialize(message)).toOption.get is message
+    deserialized is message
+    Message.deserialize(rest) isE message
   }
 
   it should "fail to deserialize if length isn't correct" in {
 
-    implicit val groupConfig: GroupConfig = new GroupConfig {
-      override def groups: Int = 4
+    Seq(-1, 0, 1, payload.length - 1, payload.length + 1).foreach { newPayloadLength =>
+      val newPayload  = payload.take(newPayloadLength)
+      val newCheckSum = Hash.hash(newPayload).bytes.take(checksumLength)
+      val message     = header ++ serialize(newPayloadLength) ++ newCheckSum ++ newPayload
+      val result      = Message.deserialize(message).swap
+      if (newPayloadLength < 0) {
+        result isE SerdeError.wrongFormat(s"Negative length: $newPayloadLength")
+      } else if (newPayloadLength < payload.length) {
+        result isE SerdeError.wrongFormat("Cannot extract a correct payload from the length field")
+      } else {
+        result isE a[SerdeError.NotEnoughBytes]
+      }
     }
+  }
 
-    val pong    = Pong(1)
-    val message = Message(pong)
-    val payload = Payload.serialize(pong)
-    val header  = serdeImpl[Header].serialize(message.header)
+  it should "fail to deserialize if checksum doesn't match" in {
+    val wrongChecksum = Hash.generate.bytes.take(checksumLength)
 
-    // scalastyle:off no.equal
-    (-10 to 10).filterNot(_ == payload.length).map(intSerde.serialize).foreach { length =>
-      Message.deserialize(header ++ length ++ payload).isLeft is true
+    Message
+      .deserialize(header ++ payloadLength ++ wrongChecksum ++ payload)
+      .swap
+      .map(_.getMessage) isE s"Wrong checksum: expected ${Hex.toHexString(checksum)}, got ${Hex.toHexString(wrongChecksum)}"
+  }
+
+  it should "fail to deserialize if not enough bytes" in {
+    serialized.init.indices.foreach { n =>
+      Message.deserialize(serialized.take(n + 1)).swap isE a[SerdeError.NotEnoughBytes]
     }
   }
 }
