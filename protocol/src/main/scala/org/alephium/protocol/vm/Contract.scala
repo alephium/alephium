@@ -114,6 +114,16 @@ object StatefulScript {
   def validate(methods: AVector[Method[StatefulContext]]): Boolean = {
     methods.nonEmpty && methods.head.isPublic && methods.tail.forall(m => !m.isPublic)
   }
+
+  def alwaysFail: StatefulScript = StatefulScript(
+    AVector(
+      Method[StatefulContext](isPublic     = true,
+                              isPayable    = false,
+                              argsType     = AVector.empty,
+                              localsLength = 0,
+                              returnType   = AVector.empty,
+                              instrs       = AVector(ConstFalse, ConstTrue, CheckEqBool)))
+  )
 }
 
 final case class StatefulContract(
