@@ -19,6 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, EventBus}
@@ -47,7 +48,8 @@ final case class AllHandlers(
 object AllHandlers {
   def build(system: ActorSystem, blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
       implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig): AllHandlers = {
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting): AllHandlers = {
     val flowProps   = FlowHandler.props(blockFlow, eventBus)
     val flowHandler = ActorRefT.build[FlowHandler.Command](system, flowProps, "FlowHandler")
     buildWithFlowHandler(system, blockFlow, flowHandler)
@@ -56,7 +58,8 @@ object AllHandlers {
                            blockFlow: BlockFlow,
                            flowHandler: ActorRefT[FlowHandler.Command])(
       implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig): AllHandlers = {
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, "TxHandler")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, flowHandler)
@@ -68,7 +71,8 @@ object AllHandlers {
                                  blockFlow: BlockFlow,
                                  flowHandler: ActorRefT[FlowHandler.Command])(
       implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
       from <- 0 until brokerConfig.groups
       to   <- 0 until brokerConfig.groups

@@ -22,6 +22,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -30,7 +31,8 @@ import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.util.{AVector, BaseActor}
 
 object TxHandler {
-  def props(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig): Props =
+  def props(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
+                                  networkSetting: NetworkSetting): Props =
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
@@ -41,7 +43,9 @@ object TxHandler {
   final case class AddFailed(hash: Hash)    extends Event
 }
 
-class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends BaseActor {
+class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
+                                      networkSetting: NetworkSetting)
+    extends BaseActor {
   private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
   override def receive: Receive = {
@@ -76,7 +80,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig) extends
                     origin: DataOrigin): Unit = {
     val count = mempool.add(chainIndex, AVector((tx, 1.0)))
     log.info(s"Add tx ${tx.hash.shortHex} for $chainIndex, #$count txs added")
-    val txMessage = Message.serialize(SendTxs(AVector(tx)))
+    val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
     val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
     publishEvent(event)
     addSucceeded(tx)

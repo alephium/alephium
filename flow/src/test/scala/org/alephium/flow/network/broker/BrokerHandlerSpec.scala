@@ -26,6 +26,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{Hello, Payload}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
@@ -53,14 +54,16 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
 object TestBrokerHandler {
   def props(brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-            blockflow: BlockFlow)(implicit brokerConfig: BrokerConfig): Props = {
+            blockflow: BlockFlow)(implicit brokerConfig: BrokerConfig,
+                                  networkSetting: NetworkSetting): Props = {
     Props(new TestBrokerHandler(brokerConnectionHandler, blockFlowSynchronizer, blockflow))
   }
 }
 
 class TestBrokerHandler(val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
                         val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-                        val blockflow: BlockFlow)(implicit val brokerConfig: BrokerConfig)
+                        val blockflow: BlockFlow)(implicit val brokerConfig: BrokerConfig,
+                                                  val networkSetting: NetworkSetting)
     extends BrokerHandler {
   override val remoteAddress: InetSocketAddress = SocketUtil.temporaryServerAddress()
 
