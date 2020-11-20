@@ -55,11 +55,10 @@ trait AlephiumConfigFixture {
       .toOption
       .get
 
-    val newChains =
-      tmp.chains.copy(genesisBalances = genesisKeys.map(p => (LockupScript.p2pkh(p._2), p._3)))
-    tmp.copy(chains = newChains)
+    tmp.copy(genesisBalances = genesisKeys.map {
+      case (_, pubKey, amount) => (LockupScript.p2pkh(pubKey), amount)
+    })
   }
-
   implicit lazy val brokerConfig     = config.broker
   implicit lazy val consensusConfig  = config.consensus
   implicit lazy val networkSetting   = config.network

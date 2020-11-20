@@ -118,17 +118,17 @@ object Configs extends StrictLogging {
 
   def parseNetworkType(rootPath: Path): Option[NetworkType] = {
     val config = parseConfig(rootPath, None)
-    if (!config.hasPath("alephium.chains.network-type")) {
+    if (!config.hasPath("alephium.network.network-type")) {
       logger.error(s"""|The network type isn't defined!
                        |
                        |Please set the network type in your $rootPath/user.conf and try again.
                        |
                        |Example:
-                       |alephium.chains.network-type = "testnet"
+                       |alephium.network.network-type = "testnet"
                   """.stripMargin)
       sys.exit(1)
     } else {
-      Option(config.getString("alephium.chains.network-type")).flatMap(NetworkType.fromName)
+      Option(config.getString("alephium.network.network-type")).flatMap(NetworkType.fromName)
     }
   }
 

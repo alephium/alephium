@@ -62,7 +62,7 @@ trait TestFixtureLike
     with Eventually {
   override implicit val patienceConfig       = PatienceConfig(timeout = Span(1, Minutes))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
-  implicit lazy val networkType: NetworkType = config.chains.networkType
+  implicit lazy val networkType: NetworkType = config.network.networkType
 
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
@@ -262,7 +262,7 @@ trait TestFixtureLike
           val walletConfig: WalletConfig = WalletConfig(
             config.wallet.port,
             config.wallet.secretDir,
-            config.chains.networkType,
+            config.network.networkType,
             WalletConfig.BlockFlow(
               apiConfig.networkInterface.getHostAddress,
               config.network.restPort,

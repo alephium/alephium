@@ -29,7 +29,7 @@ import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.{BrokerConfig, ChainsConfig, ConsensusConfig, DiscoveryConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
@@ -70,6 +70,7 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
 final case class MiningSetting(nonceStep: BigInt)
 
 final case class NetworkSetting(
+    networkType: NetworkType,
     pingFrequency: Duration,
     retryTimeout: Duration,
     upnp: UpnpSettings,
@@ -116,39 +117,52 @@ final case class DiscoverySetting(
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
-final case class ChainsSetting(
-    networkType: NetworkType,
-    genesisBalances: AVector[(LockupScript, U256)]
-) extends ChainsConfig
-
 final case class WalletSetting(port: Int, secretDir: Path)
 
 object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)
 }
+
 final case class AlephiumConfig(
-    chains: ChainsSetting,
     broker: BrokerSetting,
     consensus: ConsensusSetting,
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
     mempool: MemPoolSetting,
-    wallet: WalletSetting
+    wallet: WalletSetting,
+    genesisBalances: AVector[(LockupScript, U256)]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
-    Configs.loadBlockFlow(chains.genesisBalances)(broker, consensus)
+    Configs.loadBlockFlow(genesisBalances)(broker, consensus)
 }
-
 object AlephiumConfig {
   import PureConfigUtils._
 
-  private final case class TempChainsSetting(networkType: NetworkType) {
-    val chainsSetting: ChainsSetting = ChainsSetting(networkType, Genesis(networkType))
+  private final case class TempAlephiumConfig(
+      broker: BrokerSetting,
+      consensus: ConsensusSetting,
+      mining: MiningSetting,
+      network: NetworkSetting,
+      discovery: DiscoverySetting,
+      mempool: MemPoolSetting,
+      wallet: WalletSetting
+  ) {
+    lazy val toAlephiumConfig: AlephiumConfig =
+      AlephiumConfig(
+        broker,
+        consensus,
+        mining,
+        network,
+        discovery,
+        mempool,
+        wallet,
+        Genesis(network.networkType)
+      )
   }
 
-  implicit val chainsSettingReader: ConfigReader[ChainsSetting] =
-    ConfigReader[TempChainsSetting].map(_.chainsSetting)
+  implicit val alephiumConfigReader: ConfigReader[AlephiumConfig] =
+    ConfigReader[TempAlephiumConfig].map(_.toAlephiumConfig)
 
   def source(config: Config): ConfigSource = {
     val path          = "alephium"

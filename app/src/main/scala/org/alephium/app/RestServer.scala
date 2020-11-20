@@ -39,7 +39,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Duration, Service}
 import org.alephium.wallet.web.WalletServer
@@ -62,11 +62,11 @@ class RestServer(
   private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
   lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
 
-  implicit val groupConfig: GroupConfig   = node.config.broker
-  implicit val chainsConfig: ChainsConfig = node.config.chains
-  implicit val networkType: NetworkType   = node.config.chains.networkType
-  implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
+  implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val networkType: NetworkType = node.config.network.networkType
+  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
+  private val serverUtils: ServerUtils = new ServerUtils(networkType)
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
       cliqueInfo =>
@@ -89,64 +89,64 @@ class RestServer(
 
   private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
     Future.successful(
-      ServerUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
+      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
   }
 
   private val getBlockRoute = getBlock.toRoute { hash =>
-    Future.successful(ServerUtils.getBlock(blockFlow, GetBlock(hash)))
+    Future.successful(serverUtils.getBlock(blockFlow, GetBlock(hash)))
   }
 
   private val getBalanceRoute = getBalance.toRoute { address =>
-    Future.successful(ServerUtils.getBalance(blockFlow, GetBalance(address)))
+    Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
   private val getGroupRoute = getGroup.toRoute { address =>
-    Future.successful(ServerUtils.getGroup(blockFlow, GetGroup(address)))
+    Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
   }
 
   private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
     case (from, to, height) =>
       Future.successful(
-        ServerUtils.getHashesAtHeight(blockFlow,
+        serverUtils.getHashesAtHeight(blockFlow,
                                       ChainIndex(from, to),
                                       GetHashesAtHeight(from.value, to.value, height)))
   }
 
   private val getChainInfoRoute = getChainInfo.toRoute {
     case (from, to) =>
-      Future.successful(ServerUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
+      Future.successful(serverUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
   private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
     case (from, to) =>
-      Future.successful(ServerUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
+      Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
   }
 
   private val buildTransactionRoute = buildTransaction.toRoute {
     case (fromKey, toAddress, value) =>
       Future.successful(
-        ServerUtils.buildTransaction(blockFlow, BuildTransaction(fromKey, toAddress, value)))
+        serverUtils.buildTransaction(blockFlow, BuildTransaction(fromKey, toAddress, value)))
   }
 
   private val sendTransactionLogic = sendTransaction.serverLogic { transaction =>
-    ServerUtils.sendTransaction(txHandler, transaction)
+    serverUtils.sendTransaction(txHandler, transaction)
   }
 
   private val minerActionLogic = minerAction.serverLogic {
-    case MinerAction.StartMining => ServerUtils.execute(miner ! Miner.Start)
-    case MinerAction.StopMining  => ServerUtils.execute(miner ! Miner.Stop)
+    case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
+    case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
   }
 
   private val sendContractRoute = sendContract.toRoute { query =>
-    ServerUtils.sendContract(txHandler, query)
+    serverUtils.sendContract(txHandler, query)
   }
 
   private val buildContractRoute = buildContract.toRoute { query =>
-    ServerUtils.buildContract(blockFlow, query)
+    serverUtils.buildContract(blockFlow, query)
   }
 
   private val compileRoute = compile.toRoute { query =>
-    ServerUtils.compile(query)
+    serverUtils.compile(query)
   }
 
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
