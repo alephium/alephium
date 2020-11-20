@@ -80,7 +80,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
     val walletConfig: WalletConfig = WalletConfig(
       config.wallet.port,
       config.wallet.secretDir,
-      config.chains.networkType,
+      config.network.networkType,
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
         config.network.restPort,

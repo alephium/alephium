@@ -27,7 +27,7 @@ import org.alephium.util.{ActorRefT, Duration}
 trait InboundBrokerHandler extends BrokerHandler {
   def selfCliqueInfo: CliqueInfo
 
-  def networkSetting: NetworkSetting
+  implicit def networkSetting: NetworkSetting
 
   def connection: ActorRefT[Tcp.Command]
 

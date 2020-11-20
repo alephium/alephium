@@ -20,6 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, Protocol}
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.NetworkType
 import org.alephium.serde._
 import org.alephium.util.Hex
 
@@ -40,23 +41,25 @@ object Message {
     Message(header, payload)
   }
 
-  def serialize(message: Message): ByteString = {
+  def serialize(message: Message, networkType: NetworkType): ByteString = {
+    val magic    = networkType.magicBytes
     val header   = serdeImpl[Header].serialize(message.header)
     val payload  = Payload.serialize(message.payload)
     val length   = intSerde.serialize(payload.length)
     val checksum = Hash.hash(payload).bytes.take(checksumLength)
 
-    header ++ length ++ checksum ++ payload
+    magic ++ header ++ length ++ checksum ++ payload
   }
 
-  def serialize[T <: Payload](payload: T): ByteString = {
-    serialize(apply(payload))
+  def serialize[T <: Payload](payload: T, networkType: NetworkType): ByteString = {
+    serialize(apply(payload), networkType)
   }
 
-  def _deserialize(input: ByteString)(
+  def _deserialize(input: ByteString, networkType: NetworkType)(
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
     for {
-      headerLength    <- Header.serde._deserialize(input)
+      rest            <- checkMagicBytes(input, networkType)
+      headerLength    <- Header.serde._deserialize(rest)
       lengthChecksum  <- intSerde._deserialize(headerLength._2)
       checksumPayload <- extractChecksum(lengthChecksum._2)
       payloadBytes    <- extractPayloadBytes(lengthChecksum._1, checksumPayload._2)
@@ -68,8 +71,9 @@ object Message {
     }
   }
 
-  def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Message] = {
-    _deserialize(input).flatMap {
+  def deserialize(input: ByteString, networkType: NetworkType)(
+      implicit config: GroupConfig): SerdeResult[Message] = {
+    _deserialize(input, networkType).flatMap {
       case (message, rest) =>
         if (rest.isEmpty) {
           Right(message)
@@ -95,6 +99,19 @@ object Message {
       Left(SerdeError.notEnoughBytes(length, data.length))
     } else {
       Right(data.splitAt(length))
+    }
+  }
+
+  private def checkMagicBytes(data: ByteString,
+                              networkType: NetworkType): SerdeResult[ByteString] = {
+    if (data.length < networkType.magicBytes.length) {
+      Left(SerdeError.notEnoughBytes(networkType.magicBytes.length, data.length))
+    } else {
+      Either.cond(
+        networkType.magicBytes == data.take(networkType.magicBytes.length),
+        data.drop(networkType.magicBytes.length),
+        SerdeError.wrongFormat(s"Wrong magic bytes")
+      )
     }
   }
 

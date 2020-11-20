@@ -31,7 +31,7 @@ object OutboundBrokerHandler {
 trait OutboundBrokerHandler extends BrokerHandler {
   def selfCliqueInfo: CliqueInfo
 
-  def networkSetting: NetworkSetting
+  implicit def networkSetting: NetworkSetting
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 

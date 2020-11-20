@@ -16,6 +16,9 @@ alephium {
   }
 
   network {
+
+    network-type = "devnet"
+
     ping-frequency = 300 second
     retry-timeout = 30 second
 
@@ -54,10 +57,6 @@ alephium {
   mempool {
     tx-pool-capacity = 1000
     tx-max-number-per-block = 1000
-  }
-
-  chains = {
-    network-type = "devnet"
   }
 
   wallet {

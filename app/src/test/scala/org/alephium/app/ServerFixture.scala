@@ -37,7 +37,6 @@ import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{Hash, PrivateKey, SignatureSchema}
-import org.alephium.protocol.config.ChainsConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde.serialize
@@ -49,9 +48,8 @@ trait ServerFixture
     with AlephiumConfigFixture
     with StoragesFixture
     with NoIndexModelGeneratorsLike {
-  implicit lazy val apiConfig: ApiConfig      = ApiConfig.load(newConfig).toOption.get
-  implicit lazy val chansConfig: ChainsConfig = config.chains
-  implicit lazy val networkType: NetworkType  = config.chains.networkType
+  implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val networkType: NetworkType = config.network.networkType
 
   val now = TimeStamp.now()
 
@@ -63,7 +61,7 @@ trait ServerFixture
   lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo)
-  lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
+  lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
   lazy val dummyBalance         = Balance(U256.Zero, 0)
   lazy val dummyGroup           = Group(0)

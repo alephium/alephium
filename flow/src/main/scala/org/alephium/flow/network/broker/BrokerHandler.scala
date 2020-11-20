@@ -26,6 +26,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.Validation
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
@@ -51,6 +52,7 @@ trait BrokerHandler extends BaseActor {
   import BrokerHandler._
 
   implicit def brokerConfig: BrokerConfig
+  implicit def networkSetting: NetworkSetting
 
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
@@ -208,7 +210,8 @@ trait BrokerHandler extends BaseActor {
   }
 
   def send(payload: Payload): Unit = {
-    brokerConnectionHandler ! ConnectionHandler.Send(Message.serialize(payload))
+    brokerConnectionHandler !
+      ConnectionHandler.Send(Message.serialize(payload, networkSetting.networkType))
   }
 
   def stop(): Unit = {

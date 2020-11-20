@@ -18,6 +18,7 @@ package org.alephium.protocol.message
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.NetworkType
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Hex}
 
@@ -27,11 +28,15 @@ class MessageSpec extends AlephiumSpec {
     override def groups: Int = 4
   }
 
+  val networkType: NetworkType = NetworkType.Testnet
+
+  val magicLength    = 4
   val lengthField    = 4
   val checksumLength = 4
+  val magic          = networkType.magicBytes
   val pong           = Pong(1)
   val message        = Message(pong)
-  val serialized     = Message.serialize(message)
+  val serialized     = Message.serialize(message, networkType)
   val payload        = Payload.serialize(pong)
   val header         = serdeImpl[Header].serialize(message.header)
   val payloadLength  = intSerde.serialize(payload.length)
@@ -42,16 +47,17 @@ class MessageSpec extends AlephiumSpec {
     payload.length is 8
     header.length is 4
 
-    val additionalLength = lengthField + checksumLength
+    val additionalLength = magicLength + lengthField + checksumLength
 
     serialized.length is (payload.length + header.length + additionalLength)
 
-    Message.deserialize(serialized) isE message
+    Message.deserialize(serialized, networkType) isE message
 
-    val (deserialized, rest) = Message._deserialize(serialized ++ serialized).toOption.get
+    val (deserialized, rest) =
+      Message._deserialize(serialized ++ serialized, networkType).toOption.get
 
     deserialized is message
-    Message.deserialize(rest) isE message
+    Message.deserialize(rest, networkType) isE message
   }
 
   it should "fail to deserialize if length isn't correct" in {
@@ -59,8 +65,8 @@ class MessageSpec extends AlephiumSpec {
     Seq(-1, 0, 1, payload.length - 1, payload.length + 1).foreach { newPayloadLength =>
       val newPayload  = payload.take(newPayloadLength)
       val newCheckSum = Hash.hash(newPayload).bytes.take(checksumLength)
-      val message     = header ++ serialize(newPayloadLength) ++ newCheckSum ++ newPayload
-      val result      = Message.deserialize(message).swap
+      val message     = magic ++ header ++ serialize(newPayloadLength) ++ newCheckSum ++ newPayload
+      val result      = Message.deserialize(message, networkType).swap
       if (newPayloadLength < 0) {
         result isE SerdeError.wrongFormat(s"Negative length: $newPayloadLength")
       } else if (newPayloadLength < payload.length) {
@@ -75,14 +81,22 @@ class MessageSpec extends AlephiumSpec {
     val wrongChecksum = Hash.generate.bytes.take(checksumLength)
 
     Message
-      .deserialize(header ++ payloadLength ++ wrongChecksum ++ payload)
+      .deserialize(magic ++ header ++ payloadLength ++ wrongChecksum ++ payload, networkType)
       .swap
       .map(_.getMessage) isE s"Wrong checksum: expected ${Hex.toHexString(checksum)}, got ${Hex.toHexString(wrongChecksum)}"
   }
 
+  it should "fail to deserialize if magic number doesn't match" in {
+    Message
+      .deserialize(Message.serialize(message, NetworkType.Mainnet), networkType)
+      .swap isE SerdeError.wrongFormat("Wrong magic bytes")
+  }
+
   it should "fail to deserialize if not enough bytes" in {
     serialized.init.indices.foreach { n =>
-      Message.deserialize(serialized.take(n + 1)).swap isE a[SerdeError.NotEnoughBytes]
+      Message
+        .deserialize(serialized.take(n + 1), networkType)
+        .swap isE a[SerdeError.NotEnoughBytes]
     }
   }
 }

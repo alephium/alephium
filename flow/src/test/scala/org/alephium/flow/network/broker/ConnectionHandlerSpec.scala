@@ -20,13 +20,13 @@ import akka.io.Tcp
 import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
-import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.message.{Message, Ping}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
 class ConnectionHandlerSpec
     extends AlephiumActorSpec("ConnectionHandler")
-    with GroupConfigFixture.Default {
+    with AlephiumConfigFixture {
   trait Fixture {
     val remoteAddress = SocketUtil.temporaryServerAddress()
     val connection    = TestProbe()
@@ -38,7 +38,7 @@ class ConnectionHandlerSpec
     connection.expectMsg(Tcp.ResumeReading)
 
     val message      = Ping(1, TimeStamp.now().millis)
-    val messageBytes = Message.serialize(message)
+    val messageBytes = Message.serialize(message, config.network.networkType)
   }
 
   it should "read data from connection" in new Fixture {

@@ -23,6 +23,7 @@ import akka.actor.Props
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
@@ -34,7 +35,8 @@ object BlockChainHandler {
   def props(blockFlow: BlockFlow,
             chainIndex: ChainIndex,
             flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
-                                                         consensusConfig: ConsensusConfig): Props =
+                                                         consensusConfig: ConsensusConfig,
+                                                         networkSetting: NetworkSetting): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
@@ -59,7 +61,8 @@ class BlockChainHandler(blockFlow: BlockFlow,
                         chainIndex: ChainIndex,
                         flowHandler: ActorRefT[FlowHandler.Command])(
     implicit brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig)
+    consensusConfig: ConsensusConfig,
+    networkSetting: NetworkSetting)
     extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
       blockFlow,
       chainIndex,
@@ -76,8 +79,10 @@ class BlockChainHandler(blockFlow: BlockFlow,
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
-    val blockMessage  = Message.serialize(SendBlocks(AVector(block)))
-    val headerMessage = Message.serialize(SendHeaders(AVector(block.header)))
+    val blockMessage =
+      Message.serialize(SendBlocks(AVector(block)), networkSetting.networkType)
+    val headerMessage =
+      Message.serialize(SendHeaders(AVector(block.header)), networkSetting.networkType)
     if (brokerConfig.contains(block.chainIndex.from)) {
       escapeIOError(blockFlow.isRecent(block)) { isRecent =>
         val event =

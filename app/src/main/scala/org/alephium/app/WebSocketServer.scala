@@ -39,7 +39,7 @@ import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
-import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, EventBus, Service}
@@ -52,11 +52,10 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit val system: ActorSystem,
     with Service {
   import WebSocketServer._
 
-  implicit val groupConfig: GroupConfig   = node.config.broker
-  implicit val chainsConfig: ChainsConfig = node.config.chains
-  implicit val networkType: NetworkType   = node.config.chains.networkType
-  implicit val askTimeout: Timeout        = Timeout(apiConfig.askTimeout.asScala)
-  lazy val blockflowFetchMaxAge           = apiConfig.blockflowFetchMaxAge
+  implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val networkType: NetworkType = node.config.network.networkType
+  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
+  lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 

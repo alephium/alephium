@@ -26,14 +26,14 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.config.{ChainsConfig, GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, AVector, Hex, U256}
 
-object ServerUtils {
+class ServerUtils(networkType: NetworkType) {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest)(
       implicit cfg: GroupConfig): Try[FetchResponse] = {
     val entriesEither = for {
@@ -60,13 +60,13 @@ object ServerUtils {
     Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
-  def listUnconfirmedTransactions(blockFlow: BlockFlow, chainIndex: ChainIndex)(
-      implicit chainsConfig: ChainsConfig): Try[AVector[Tx]] = {
+  def listUnconfirmedTransactions(blockFlow: BlockFlow,
+                                  chainIndex: ChainIndex): Try[AVector[Tx]] = {
     Right(
       blockFlow
         .getPool(chainIndex)
         .getAll(chainIndex)
-        .map(Tx.fromTemplate(_, chainsConfig.networkType)))
+        .map(Tx.fromTemplate(_, networkType)))
   }
 
   def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(
@@ -105,8 +105,7 @@ object ServerUtils {
     }
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig,
-                                                      chainsConfig: ChainsConfig): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
     for {
       _ <- checkChainIndex(blockFlow, query.hash)
       block <- blockFlow
@@ -117,7 +116,7 @@ object ServerUtils {
         .getHeight(block.header)
         .left
         .map(_ => failed("Failed in IO"))
-    } yield BlockEntry.from(block, height)
+    } yield BlockEntry.from(block, height, networkType)
 
   def getHashesAtHeight(blockFlow: BlockFlow,
                         chainIndex: ChainIndex,
@@ -172,9 +171,7 @@ object ServerUtils {
     if (blockFlow.brokerConfig.contains(groupIndex)) {
       Right(())
     } else {
-      //TODO add `address.toBase58` to message
-      //it require to have an `implicit ChainsConfig`
-      Left(failed(s"Address belongs to other groups"))
+      Left(failed(s"Address ${Address(networkType, lockupScript)} belongs to other groups"))
     }
   }
 
@@ -291,7 +288,7 @@ object ServerUtils {
                           AVector.empty)
     }) match {
       case Left(error)       => Future.successful(Left(error))
-      case Right(txTemplate) => ServerUtils.publishTx(txHandler, txTemplate)
+      case Right(txTemplate) => publishTx(txHandler, txTemplate)
     }
   }
 

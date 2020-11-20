@@ -16,14 +16,18 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveEnumerationReader
 
+import org.alephium.protocol.Hash
+import org.alephium.serde.intSerde
 import org.alephium.util.AVector
 
 sealed trait NetworkType {
   def name: String
   def prefix: String
+  lazy val magicBytes: ByteString = intSerde.serialize(Hash.hash("ALF" ++ prefix).toRandomIntUnsafe)
 }
 
 object NetworkType {

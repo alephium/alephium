@@ -25,16 +25,19 @@ import akka.actor.Props
 import akka.io.Tcp
 import akka.util.ByteString
 
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, Payload}
+import org.alephium.protocol.model.NetworkType
 import org.alephium.serde.{SerdeError, SerdeResult}
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object ConnectionHandler {
-  def clique(
-      remoteAddress: InetSocketAddress,
-      connection: ActorRefT[Tcp.Command],
-      brokerHandler: ActorRefT[BrokerHandler.Command])(implicit groupConfig: GroupConfig): Props =
+  def clique(remoteAddress: InetSocketAddress,
+             connection: ActorRefT[Tcp.Command],
+             brokerHandler: ActorRefT[BrokerHandler.Command])(
+      implicit groupConfig: GroupConfig,
+      networkSetting: NetworkSetting): Props =
     Props(new CliqueConnectionHandler(remoteAddress, connection, brokerHandler))
 
   final case class Ack(id: Long) extends Tcp.Event
@@ -43,22 +46,23 @@ object ConnectionHandler {
   case object CloseConnection                extends Command
   final case class Send(message: ByteString) extends Command
 
-  def tryDeserializePayload(data: ByteString)(
+  def tryDeserializePayload(data: ByteString, networkType: NetworkType)(
       implicit config: GroupConfig): SerdeResult[Option[(Payload, ByteString)]] = {
-    Message._deserialize(data) match {
+    Message._deserialize(data, networkType) match {
       case Right((message, newRest))          => Right(Some(message.payload -> newRest))
       case Left(_: SerdeError.NotEnoughBytes) => Right(None)
       case Left(e)                            => Left(e)
     }
   }
 
-  class CliqueConnectionHandler(
-      val remoteAddress: InetSocketAddress,
-      val connection: ActorRefT[Tcp.Command],
-      val brokerHandler: ActorRefT[BrokerHandler.Command])(implicit val groupConfig: GroupConfig)
+  class CliqueConnectionHandler(val remoteAddress: InetSocketAddress,
+                                val connection: ActorRefT[Tcp.Command],
+                                val brokerHandler: ActorRefT[BrokerHandler.Command])(
+      implicit val groupConfig: GroupConfig,
+      networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[(Payload, ByteString)]] = {
-      tryDeserializePayload(data)
+      tryDeserializePayload(data, networkSetting.networkType)
     }
 
     override def handleNewMessage(payload: Payload): Unit = {
