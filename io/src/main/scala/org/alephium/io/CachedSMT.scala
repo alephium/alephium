@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.alephium.serde.Serde
 import org.alephium.util.EitherF
 
-final class CachedTrie[K: Serde, V: Serde](
+final class CachedSMT[K: Serde, V: Serde](
     underlying: SparseMerkleTrie[K, V],
     caches: mutable.Map[K, Cache[V]]
 ) {
@@ -95,8 +95,8 @@ final class CachedTrie[K: Serde, V: Serde](
   }
 }
 
-object CachedTrie {
-  def from[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V]): CachedTrie[K, V] = {
-    new CachedTrie(trie, mutable.Map.empty)
+object CachedSMT {
+  def from[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V]): CachedSMT[K, V] = {
+    new CachedSMT(trie, mutable.Map.empty)
   }
 }

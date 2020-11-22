@@ -194,8 +194,8 @@ object WorldState {
     override def persist: IOResult[WorldState.Persisted] = Right(this)
 
     def cached: WorldState.Cached = {
-      val outputStateCache    = CachedTrie.from(outputState)
-      val contractOutputCache = CachedTrie.from(contractState)
+      val outputStateCache    = CachedSMT.from(outputState)
+      val contractOutputCache = CachedSMT.from(contractState)
       Cached(outputStateCache, contractOutputCache)
     }
 
@@ -204,8 +204,8 @@ object WorldState {
   }
 
   final case class Cached(
-      outputState: CachedTrie[TxOutputRef, TxOutput],
-      contractState: CachedTrie[Hash, ContractState]
+      outputState: CachedSMT[TxOutputRef, TxOutput],
+      contractState: CachedSMT[Hash, ContractState]
   ) extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
