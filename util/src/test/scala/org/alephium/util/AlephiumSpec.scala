@@ -28,9 +28,14 @@ import org.scalatest.matchers.dsl.ResultOfATypeInvocation
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-trait AlephiumSpec extends AnyFlatSpecLike with ScalaCheckDrivenPropertyChecks with Matchers {
+trait AlephiumSpec
+    extends AnyFlatSpecLike
+    with ScalaCheckDrivenPropertyChecks
+    with AlephiumFixture {
   @nowarn protected implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+}
 
+trait AlephiumFixture extends Matchers {
   implicit lazy val bytesArb: Arbitrary[AVector[Byte]] = Arbitrary(
     arbitrary[List[Byte]].map(AVector.from))
   implicit lazy val i32Arb: Arbitrary[I32] = Arbitrary(arbitrary[Int].map(I32.unsafe))
