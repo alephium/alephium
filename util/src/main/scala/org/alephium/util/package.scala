@@ -14,25 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium
 
-sealed trait Cache[V]
-
-sealed trait ValueExists[V] {
-  def value: V
+package object util {
+  @inline @specialized def discard[E](evaluateForSideEffectOnly: E): Unit = {
+    val _ = evaluateForSideEffectOnly
+    () //Return unit to prevent warning due to discarding value
+  }
 }
-
-sealed trait KeyExistedInUnderlying
-
-final case class Cached[V](value: V)
-    extends Cache[V]
-    with KeyExistedInUnderlying
-    with ValueExists[V]
-
-sealed trait Modified[V]               extends Cache[V]
-final case class Inserted[V](value: V) extends Modified[V] with ValueExists[V]
-final case class Removed[V]()          extends Modified[V] with KeyExistedInUnderlying
-final case class Updated[V](value: V)
-    extends Modified[V]
-    with KeyExistedInUnderlying
-    with ValueExists[V]

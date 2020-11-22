@@ -16,23 +16,8 @@
 
 package org.alephium.io
 
-sealed trait Cache[V]
+trait MutableTrie[K, V] extends ReadableTrie[K, V] {
+  def remove(key: K): IOResult[Unit]
 
-sealed trait ValueExists[V] {
-  def value: V
+  def put(key: K, value: V): IOResult[Unit]
 }
-
-sealed trait KeyExistedInUnderlying
-
-final case class Cached[V](value: V)
-    extends Cache[V]
-    with KeyExistedInUnderlying
-    with ValueExists[V]
-
-sealed trait Modified[V]               extends Cache[V]
-final case class Inserted[V](value: V) extends Modified[V] with ValueExists[V]
-final case class Removed[V]()          extends Modified[V] with KeyExistedInUnderlying
-final case class Updated[V](value: V)
-    extends Modified[V]
-    with KeyExistedInUnderlying
-    with ValueExists[V]
