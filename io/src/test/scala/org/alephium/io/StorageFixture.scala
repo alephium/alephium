@@ -21,9 +21,9 @@ import org.scalatest.Assertion
 import org.alephium.crypto.Keccak256
 import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.serde.{Serde, Serializer}
-import org.alephium.util.{AlephiumSpec, Files}
+import org.alephium.util.{AlephiumFixture, Files}
 
-trait StorageFixture extends AlephiumSpec {
+trait StorageFixture extends AlephiumFixture {
   private lazy val tmpdir = Files.tmpDir
   private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
   private lazy val dbPath = tmpdir.resolve(dbname)
