@@ -206,7 +206,7 @@ object SparseMerkleTrie {
 final class SparseMerkleTrie[K: Serde, V: Serde](
     val rootHash: Hash,
     storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-) {
+) extends ReadableTrie[K, V] {
   import SparseMerkleTrie._
 
   def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
