@@ -26,15 +26,15 @@ import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 
-class MerklePatriciaTrieSpec extends AlephiumSpec {
-  import MerklePatriciaTrie._
+class SparseMerkleTrieSpec extends AlephiumSpec {
+  import SparseMerkleTrie._
 
   behavior of "nibbles calculation"
 
   it should "calculate correct nibbles" in {
     def test(input: Byte, high: Byte, low: Byte): Assertion = {
-      MerklePatriciaTrie.getLowNibble(input) is low
-      MerklePatriciaTrie.getHighNibble(input) is high
+      SparseMerkleTrie.getLowNibble(input) is low
+      SparseMerkleTrie.getHighNibble(input) is high
     }
     test(0x00.toByte, 0x00.toByte, 0x00.toByte)
     test(0x0F.toByte, 0x00.toByte, 0x0F.toByte)
@@ -109,8 +109,8 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   }
 
   trait TrieFixture extends StorageFixture {
-    val db   = newDB[Hash, MerklePatriciaTrie.Node]
-    var trie = MerklePatriciaTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+    val db   = newDB[Hash, SparseMerkleTrie.Node]
+    var trie = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
 
     def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
       val key  = Hash.random.bytes
@@ -206,15 +206,15 @@ class MerklePatriciaTrieSpec extends AlephiumSpec {
   }
 }
 
-object MerklePatriciaTrieSpec {
-  import MerklePatriciaTrie._
+object SparseMerkleTrieSpec {
+  import SparseMerkleTrie._
 
-  def show[K: Serde, V: Serde](trie: MerklePatriciaTrie[K, V]): Unit = {
+  def show[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V]): Unit = {
     show(trie, Seq(trie.rootHash))
   }
 
   @tailrec
-  def show[K: Serde, V: Serde](trie: MerklePatriciaTrie[K, V], hashes: Seq[Hash]): Unit = {
+  def show[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V], hashes: Seq[Hash]): Unit = {
     import org.alephium.util.Hex
     val newHashes = hashes.flatMap { hash =>
       val shortHash = Hex.toHexString(hash.bytes.take(4))

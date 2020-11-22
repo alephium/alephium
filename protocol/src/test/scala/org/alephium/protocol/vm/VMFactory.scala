@@ -16,18 +16,18 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.io.{MerklePatriciaTrie, StorageFixture}
+import org.alephium.io.{SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model.minimalGas
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState = {
-    val db = newDB[Hash, MerklePatriciaTrie.Node]
+    val db = newDB[Hash, SparseMerkleTrie.Node]
     WorldState.emptyCached(db)
   }
 
   lazy val persistedWorldState: WorldState = {
-    val db = newDB[Hash, MerklePatriciaTrie.Node]
+    val db = newDB[Hash, SparseMerkleTrie.Node]
     WorldState.emptyPersisted(db)
   }
 

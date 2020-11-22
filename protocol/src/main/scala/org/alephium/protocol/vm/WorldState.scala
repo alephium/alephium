@@ -111,8 +111,8 @@ sealed abstract class WorldState {
 
 object WorldState {
   final case class Persisted(
-      outputState: MerklePatriciaTrie[TxOutputRef, TxOutput],
-      contractState: MerklePatriciaTrie[Hash, ContractState]
+      outputState: SparseMerkleTrie[TxOutputRef, TxOutput],
+      contractState: SparseMerkleTrie[Hash, ContractState]
   ) extends WorldState {
     override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
@@ -264,29 +264,28 @@ object WorldState {
     }
   }
 
-  def emptyPersisted(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Persisted = {
+  def emptyPersisted(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Persisted = {
     val genesisRef  = ContractOutputRef.forMPT
     val emptyOutput = TxOutput.forMPT
     val emptyOutputTrie =
-      MerklePatriciaTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
+      SparseMerkleTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
     val emptyState        = ContractState(StatefulContract.forMPT, AVector.empty, genesisRef)
-    val emptyContractTrie = MerklePatriciaTrie.build(storage, Hash.zero, emptyState)
+    val emptyContractTrie = SparseMerkleTrie.build(storage, Hash.zero, emptyState)
     Persisted(emptyOutputTrie, emptyContractTrie)
   }
 
-  def emptyCached(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
+  def emptyCached(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Cached = {
     emptyPersisted(storage).cached
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash) {
-    def toPersistedWorldState(
-        storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Persisted = {
-      val outputState   = MerklePatriciaTrie[TxOutputRef, TxOutput](outputStateHash, storage)
-      val contractState = MerklePatriciaTrie[Hash, ContractState](contractStateHash, storage)
+    def toPersistedWorldState(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Persisted = {
+      val outputState   = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, storage)
+      val contractState = SparseMerkleTrie[Hash, ContractState](contractStateHash, storage)
       Persisted(outputState, contractState)
     }
 
-    def toCachedWorldState(storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]): Cached = {
+    def toCachedWorldState(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Cached = {
       val initialState = toPersistedWorldState(storage)
       initialState.cached
     }
