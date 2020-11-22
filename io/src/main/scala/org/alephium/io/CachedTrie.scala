@@ -22,7 +22,7 @@ import org.alephium.serde.Serde
 import org.alephium.util.EitherF
 
 final class CachedTrie[K: Serde, V: Serde](
-    underlying: MerklePatriciaTrie[K, V],
+    underlying: SparseMerkleTrie[K, V],
     caches: mutable.Map[K, Cache[V]]
 ) {
   def get(key: K): IOResult[V] = {
@@ -85,7 +85,7 @@ final class CachedTrie[K: Serde, V: Serde](
     }
   }
 
-  def persist(): IOResult[MerklePatriciaTrie[K, V]] = {
+  def persist(): IOResult[SparseMerkleTrie[K, V]] = {
     EitherF.foldTry(caches, underlying) {
       case (trie, (_, Cached(_)))         => Right(trie)
       case (trie, (key, Inserted(value))) => trie.put(key, value)
@@ -96,7 +96,7 @@ final class CachedTrie[K: Serde, V: Serde](
 }
 
 object CachedTrie {
-  def from[K: Serde, V: Serde](trie: MerklePatriciaTrie[K, V]): CachedTrie[K, V] = {
+  def from[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V]): CachedTrie[K, V] = {
     new CachedTrie(trie, mutable.Map.empty)
   }
 }

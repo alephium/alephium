@@ -22,7 +22,7 @@ import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes}
 
-object MerklePatriciaTrie {
+object SparseMerkleTrie {
   /* branch [encodedPath, v0, ..., v15]
    * leaf   [encodedPath, data]
    * the length of encodedPath varies from 0 to 64
@@ -189,27 +189,27 @@ object MerklePatriciaTrie {
 
   def build[K: Serde, V: Serde](storage: KeyValueStorage[Hash, Node],
                                 genesisKey: K,
-                                genesisValue: V): MerklePatriciaTrie[K, V] = {
+                                genesisValue: V): SparseMerkleTrie[K, V] = {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
     val genesisNode = LeafNode(genesisPath, genesisData)
     storage.put(genesisNode.hash, genesisNode)
-    new MerklePatriciaTrie(genesisNode.hash, storage)
+    new SparseMerkleTrie(genesisNode.hash, storage)
   }
 
   def apply[K: Serde, V: Serde](rootHash: Hash,
-                                storage: KeyValueStorage[Hash, Node]): MerklePatriciaTrie[K, V] =
-    new MerklePatriciaTrie[K, V](rootHash, storage)
+                                storage: KeyValueStorage[Hash, Node]): SparseMerkleTrie[K, V] =
+    new SparseMerkleTrie[K, V](rootHash, storage)
 }
 
 // TODO: batch mode
-final class MerklePatriciaTrie[K: Serde, V: Serde](
+final class SparseMerkleTrie[K: Serde, V: Serde](
     val rootHash: Hash,
-    storage: KeyValueStorage[Hash, MerklePatriciaTrie.Node]
+    storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
 ) {
-  import MerklePatriciaTrie._
+  import SparseMerkleTrie._
 
-  def applyActions(result: TrieUpdateActions): IOResult[MerklePatriciaTrie[K, V]] = {
+  def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
     result.toAdd
       .foreachE { node =>
         storage.put(node.hash, node)
@@ -217,7 +217,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
       .map { _ =>
         result.nodeOpt match {
           case None       => this
-          case Some(node) => new MerklePatriciaTrie(node.hash, storage)
+          case Some(node) => new SparseMerkleTrie(node.hash, storage)
         }
       }
   }
@@ -241,7 +241,7 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
   }
 
   def getOptRaw(key: ByteString): IOResult[Option[ByteString]] = {
-    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
     getOpt(rootHash, nibbles)
   }
 
@@ -278,12 +278,12 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
     getOptRaw(key).map(_.nonEmpty)
   }
 
-  def remove(key: K): IOResult[MerklePatriciaTrie[K, V]] = {
+  def remove(key: K): IOResult[SparseMerkleTrie[K, V]] = {
     removeRaw(serialize[K](key))
   }
 
-  def removeRaw(key: ByteString): IOResult[MerklePatriciaTrie[K, V]] = {
-    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
+  def removeRaw(key: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
     for {
       result <- remove(rootHash, nibbles)
       trie   <- applyActions(result)
@@ -308,13 +308,13 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
             handleChildUpdateResult(hash, node, nibble, result)
           }
         } else {
-          Left(MerklePatriciaTrie.removalNoKey)
+          Left(SparseMerkleTrie.removalNoKey)
         }
       case leaf @ LeafNode(path, _) =>
         if (path == nibbles) {
           Right(TrieUpdateActions(None, AVector(leaf.hash), AVector.empty))
         } else {
-          Left(MerklePatriciaTrie.removalNoKey)
+          Left(SparseMerkleTrie.removalNoKey)
         }
     }
   }
@@ -352,12 +352,12 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
     }
   }
 
-  def put(key: K, value: V): IOResult[MerklePatriciaTrie[K, V]] = {
+  def put(key: K, value: V): IOResult[SparseMerkleTrie[K, V]] = {
     putRaw(serialize[K](key), serialize[V](value))
   }
 
-  def putRaw(key: ByteString, value: ByteString): IOResult[MerklePatriciaTrie[K, V]] = {
-    val nibbles = MerklePatriciaTrie.bytes2Nibbles(key)
+  def putRaw(key: ByteString, value: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
     for {
       result <- put(rootHash, nibbles, value)
       trie   <- applyActions(result)
@@ -426,12 +426,12 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
   }
 
   def getAll(prefix: ByteString): IOResult[AVector[(K, V)]] = {
-    val prefixNibbles = MerklePatriciaTrie.bytes2Nibbles(prefix)
+    val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
     getAllRaw(prefixNibbles, rootHash, ByteString.empty).flatMap { dataVec =>
       dataVec.mapE {
         case (nibbles, leaf) =>
           val deser = for {
-            key   <- deserialize[K](MerklePatriciaTrie.nibbles2Bytes(nibbles))
+            key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
             value <- deserialize[V](leaf.data)
           } yield (key, value)
           deser.left.map(IOError.Serde)
@@ -440,9 +440,9 @@ final class MerklePatriciaTrie[K: Serde, V: Serde](
   }
 
   def getAllRaw(prefix: ByteString): IOResult[AVector[(ByteString, ByteString)]] = {
-    val prefixNibbles = MerklePatriciaTrie.bytes2Nibbles(prefix)
+    val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
     getAllRaw(prefixNibbles, rootHash, ByteString.empty).map(_.map {
-      case (nibbles, leaf) => (MerklePatriciaTrie.nibbles2Bytes(nibbles), leaf.data)
+      case (nibbles, leaf) => (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
     })
   }
 

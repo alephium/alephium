@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.io.{KeyValueStorage, MerklePatriciaTrie, RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.io.MerklePatriciaTrie.Node
+import org.alephium.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource, SparseMerkleTrie}
+import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.util.Files
 
@@ -43,9 +43,9 @@ class TrieBench {
 
     RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
   }
-  val db: KeyValueStorage[Hash, Node]      = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
-  val trie: MerklePatriciaTrie[Hash, Hash] = MerklePatriciaTrie.build(db, Hash.zero, Hash.zero)
-  val genesisHash: Hash                    = trie.rootHash
+  val db: KeyValueStorage[Hash, Node]    = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
+  val trie: SparseMerkleTrie[Hash, Hash] = SparseMerkleTrie.build(db, Hash.zero, Hash.zero)
+  val genesisHash: Hash                  = trie.rootHash
 
   @Benchmark
   def randomInsert(): Unit = {
