@@ -62,7 +62,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       val worldState0 = worldState.addAsset(assetOutputRef, assetOutput).toOption.get
       val worldState1 =
         worldState0.createContract(code, state, contractOutputRef, contractOutput).toOption.get
-      val worldState2 = if (persist) worldState1.persist.toOption.get else worldState1
+      val worldState2 = if (persist) worldState1.persist().toOption.get else worldState1
 
       worldState2.getOutput(assetOutputRef) isE assetOutput
       worldState2.getOutput(contractOutputRef) isE contractOutput
@@ -70,7 +70,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
       val worldState3 = worldState2.removeAsset(assetOutputRef).toOption.get
       val worldState4 = worldState3.removeContract(contractKey).toOption.get
-      val worldState5 = if (persist) worldState4.persist.toOption.get else worldState4
+      val worldState5 = if (persist) worldState4.persist().toOption.get else worldState4
 
       worldState5.getOutput(assetOutputRef).isLeft is true
       worldState5.getOutput(contractOutputRef).isLeft is true

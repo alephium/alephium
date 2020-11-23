@@ -89,7 +89,7 @@ sealed abstract class WorldState {
 
   def removeContract(contractKey: Hash): IOResult[WorldState]
 
-  def persist: IOResult[WorldState.Persisted]
+  def persist(): IOResult[WorldState.Persisted]
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
     tx.unsigned.inputs.mapE { input =>
@@ -114,7 +114,7 @@ object WorldState {
       outputState: SparseMerkleTrie[TxOutputRef, TxOutput],
       contractState: SparseMerkleTrie[Hash, ContractState]
   ) extends WorldState {
-    override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
+    def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
     }
 
@@ -137,7 +137,7 @@ object WorldState {
           .asUnsafe[(ContractOutputRef, ContractOutput)])
     }
 
-    override def getContractState(key: Hash): IOResult[ContractState] = {
+    def getContractState(key: Hash): IOResult[ContractState] = {
       contractState.get(key)
     }
 
@@ -145,7 +145,7 @@ object WorldState {
       contractState.getAll(ByteString.empty)
     }
 
-    override def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
+    def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
@@ -154,10 +154,10 @@ object WorldState {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
-    override def createContract(code: StatefulContract,
-                                fields: AVector[Val],
-                                outputRef: ContractOutputRef,
-                                output: ContractOutput): IOResult[WorldState] = {
+    def createContract(code: StatefulContract,
+                       fields: AVector[Val],
+                       outputRef: ContractOutputRef,
+                       output: ContractOutput): IOResult[WorldState] = {
       val state = ContractState(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
@@ -165,7 +165,7 @@ object WorldState {
       } yield Persisted(newOutputState, newContractState)
     }
 
-    override def updateContract(key: Hash, state: ContractState): IOResult[Persisted] = {
+    def updateContract(key: Hash, state: ContractState): IOResult[Persisted] = {
       contractState.put(key, state).map(Persisted(outputState, _))
     }
 
@@ -179,11 +179,11 @@ object WorldState {
       } yield Persisted(newOutputState, newContractState)
     }
 
-    override def removeAsset(outputRef: TxOutputRef): IOResult[Persisted] = {
+    def removeAsset(outputRef: TxOutputRef): IOResult[Persisted] = {
       outputState.remove(outputRef).map(Persisted(_, contractState))
     }
 
-    override def removeContract(contractKey: Hash): IOResult[WorldState] = {
+    def removeContract(contractKey: Hash): IOResult[WorldState] = {
       for {
         state            <- getContractState(contractKey)
         newOutputState   <- outputState.remove(state.contractOutputRef)
@@ -191,7 +191,7 @@ object WorldState {
       } yield Persisted(newOutputState, newContractState)
     }
 
-    override def persist: IOResult[WorldState.Persisted] = Right(this)
+    def persist(): IOResult[WorldState.Persisted] = Right(this)
 
     def cached: WorldState.Cached = {
       val outputStateCache    = CachedSMT.from(outputState)
@@ -203,26 +203,26 @@ object WorldState {
       WorldState.Hashes(outputState.rootHash, contractState.rootHash)
   }
 
-  final case class Cached(
-      outputState: CachedSMT[TxOutputRef, TxOutput],
-      contractState: CachedSMT[Hash, ContractState]
-  ) extends WorldState {
-    override def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
+  sealed abstract class AbstractCached extends WorldState {
+    def outputState: MutableTrie[TxOutputRef, TxOutput]
+    def contractState: MutableTrie[Hash, ContractState]
+
+    def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
     }
 
-    override def getContractState(key: Hash): IOResult[ContractState] = {
+    def getContractState(key: Hash): IOResult[ContractState] = {
       contractState.get(key)
     }
 
-    override def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Cached] = {
+    def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[WorldState] = {
       outputState.put(outputRef, output).map(_ => this)
     }
 
-    override def createContract(code: StatefulContract,
-                                fields: AVector[Val],
-                                outputRef: ContractOutputRef,
-                                output: ContractOutput): IOResult[WorldState] = {
+    def createContract(code: StatefulContract,
+                       fields: AVector[Val],
+                       outputRef: ContractOutputRef,
+                       output: ContractOutput): IOResult[WorldState] = {
       val state = ContractState(code, fields, outputRef)
       for {
         _ <- outputState.put(outputRef, output)
@@ -230,7 +230,7 @@ object WorldState {
       } yield this
     }
 
-    override def updateContract(key: Hash, state: ContractState): IOResult[Cached] = {
+    def updateContract(key: Hash, state: ContractState): IOResult[WorldState] = {
       contractState.put(key, state).map(_ => this)
     }
 
@@ -244,24 +244,40 @@ object WorldState {
       } yield this
     }
 
-    override def removeAsset(outputRef: TxOutputRef): IOResult[Cached] = {
+    def removeAsset(outputRef: TxOutputRef): IOResult[WorldState] = {
       outputState.remove(outputRef).map(_ => this)
     }
 
-    override def removeContract(contractKey: Hash): IOResult[WorldState] = {
+    def removeContract(contractKey: Hash): IOResult[WorldState] = {
       for {
         state <- getContractState(contractKey)
         _     <- outputState.remove(state.contractOutputRef)
         _     <- contractState.remove(contractKey)
       } yield this
     }
+  }
 
-    override def persist: IOResult[Persisted] = {
+  final case class Cached(
+      outputState: CachedSMT[TxOutputRef, TxOutput],
+      contractState: CachedSMT[Hash, ContractState]
+  ) extends AbstractCached {
+    def persist(): IOResult[Persisted] = {
       for {
         outputStateNew   <- outputState.persist()
         contractStateNew <- contractState.persist()
       } yield Persisted(outputStateNew, contractStateNew)
     }
+  }
+
+  final case class Staging(
+      outputState: StagingSMT[TxOutputRef, TxOutput],
+      contractState: StagingSMT[Hash, ContractState]
+  ) extends AbstractCached {
+    def commit(): Cached = Cached(outputState.commit(), contractState.commit())
+
+    def rollback(): Cached = Cached(outputState.rollback(), contractState.rollback())
+
+    def persist(): IOResult[Persisted] = ??? // should not be called
   }
 
   def emptyPersisted(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Persisted = {
