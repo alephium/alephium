@@ -66,7 +66,7 @@ final case class Storages(
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
     emptyWorldState: WorldState,
-    trieHashStorage: WorldStateStorage,
+    worldStateStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage
 ) extends KeyValueSource {

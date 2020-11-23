@@ -26,18 +26,18 @@ import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.WorldState
 
 trait BlockChainWithState extends BlockChain {
-  def trieHashStorage: WorldStateStorage
+  def worldStateStorage: WorldStateStorage
 
   def getPersistedWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
-    trieHashStorage.getPersistedWorldState(hash)
+    worldStateStorage.getPersistedWorldState(hash)
   }
 
   def getCachedWorldState(hash: Hash): IOResult[WorldState.Cached] = {
-    trieHashStorage.getCachedWorldState(hash)
+    worldStateStorage.getCachedWorldState(hash)
   }
 
-  protected def addTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
-    trieHashStorage.putTrie(hash, worldState)
+  protected def addWorldState(hash: Hash, worldState: WorldState): IOResult[Unit] = {
+    worldStateStorage.putTrie(hash, worldState)
   }
 
   def updateState(worldState: WorldState, block: Block): IOResult[WorldState]
@@ -47,7 +47,7 @@ trait BlockChainWithState extends BlockChain {
       oldWorldState <- getCachedWorldState(block.parentHash)
       _             <- persistBlock(block)
       newWorldState <- updateState(oldWorldState, block)
-      _             <- addTrie(block.hash, newWorldState)
+      _             <- addWorldState(block.hash, newWorldState)
       _             <- add(block.header, weight)
     } yield ()
   }
@@ -82,7 +82,7 @@ object BlockChainWithState {
       override val blockStorage      = storages.blockStorage
       override val headerStorage     = storages.headerStorage
       override val blockStateStorage = storages.blockStateStorage
-      override val trieHashStorage   = storages.trieHashStorage
+      override val worldStateStorage = storages.worldStateStorage
       override val heightIndexStorage =
         storages.nodeStateStorage.heightIndexStorage(rootBlock.chainIndex)
       override val chainStateStorage =
@@ -102,7 +102,7 @@ object BlockChainWithState {
     for {
       _       <- chain.addGenesis(genesisBlock)
       newTrie <- chain.updateState(emptyWorldState, genesisBlock)
-      _       <- chain.addTrie(genesisBlock.hash, newTrie)
+      _       <- chain.addWorldState(genesisBlock.hash, newTrie)
     } yield ()
   }
 
