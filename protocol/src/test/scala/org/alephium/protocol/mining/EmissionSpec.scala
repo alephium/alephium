@@ -61,9 +61,9 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
 
-    onePhPerSecond.value is Target.max.divide(BigInteger.valueOf(1024).pow(5))
-    oneEhPerSecond.value is Target.max.divide(BigInteger.valueOf(1024).pow(6))
-    a128EhPerSecond.value is Target.max.divide(
+    onePhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
+    oneEhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
+    a128EhPerSecond.value is Target.maxBigInt.divide(
       BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128)))
   }
 
