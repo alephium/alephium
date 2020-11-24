@@ -14,5 +14,5 @@ jobs:
     - uses: actions/setup-java@v1
       with:
         java-version: 11
-    - run: sudo apt-get install rng-tools haveged
+    - run: sudo apt-get install rng-tools
     - run: ./make test
