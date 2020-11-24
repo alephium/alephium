@@ -38,7 +38,7 @@ final case class Target(val bits: ByteString) extends Ordered[Target] {
 object Target {
   implicit val serde: Serde[Target] = Serde.bytesSerde(4).xmap(unsafe, _.bits)
 
-  private val max: BigInteger = BigInteger.ONE.shiftLeft(256)
+  val max: BigInteger = BigInteger.ONE.shiftLeft(256)
 
   val Max: Target = unsafe(max.subtract(BigInteger.ONE))
 

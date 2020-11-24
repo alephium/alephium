@@ -69,21 +69,21 @@ class Emission(groupConfig: GroupConfig) {
   }
 
   def rewardWrtTarget(target: Target): U256 = {
-    if (target <= onePhPerSecondDivided) {
+    if (target >= onePhPerSecondDivided) {
       val rewardPlus =
         (initialMaxRewardPerChain subUnsafe lowHashRateInitialRewardPerChain).toBigInt
-          .multiply(target.value)
-          .divide(onePhPerSecondDivided.value)
+          .multiply(onePhPerSecondDivided.value)
+          .divide(target.value)
       lowHashRateInitialRewardPerChain addUnsafe U256.unsafe(rewardPlus)
-    } else if (target <= oneEhPerSecondDivided) {
+    } else if (target >= oneEhPerSecondDivided) {
       val rewardReduce = (initialMaxRewardPerChain subUnsafe stableMaxRewardPerChain).toBigInt
-        .multiply(target.value) // we don't subtract onePhPerSecond for simplification
-        .divide(oneEhPerSecondDivided.value)
+        .multiply(oneEhPerSecondDivided.value) // we don't subtract onePhPerSecond for simplification
+        .divide(target.value)
       initialMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
-    } else if (target <= a128EhPerSecondDivided) {
+    } else if (target >= a128EhPerSecondDivided) {
       val rewardReduce = stableMaxRewardPerChain.toBigInt
-        .multiply(target.value) // we don't subtract oneEhPerSecond for simplification
-        .divide(a128EhPerSecondDivided.value)
+        .multiply(a128EhPerSecondDivided.value) // we don't subtract oneEhPerSecond for simplification
+        .divide(target.value)
       stableMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
     } else {
       U256.Zero
@@ -106,8 +106,8 @@ object Emission {
   val durationToStableMaxReward: Duration =
     Emission.blockTargetTime.timesUnsafe(Emission.blocksToStableMaxReward)
 
-  val onePhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(50))
-  val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(60))
-  val a128EhPerSecond: Target = Target.unsafe(BigInteger.ONE.shiftLeft(67))
+  val onePhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 50))
+  val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 60))
+  val a128EhPerSecond: Target = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 67))
   //scalastyle:on magic.number
 }
