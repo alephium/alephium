@@ -292,6 +292,16 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
+  behavior of "Mining"
+
+  it should "sanity check rewards" in new FlowFixture {
+    val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(0, 0))
+    block.nonCoinbase.nonEmpty is true
+    val minimalReward = Seq(groupConfig.emission.lowHashRateInitialRewardPerChain,
+                            groupConfig.emission.stableMaxRewardPerChain).min
+    (block.coinbase.alfAmountInOutputs.get > minimalReward) is true
+  }
+
   behavior of "Balance"
 
   it should "transfer token inside a same group" in new FlowFixture {

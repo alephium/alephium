@@ -61,9 +61,10 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
 
-    onePhPerSecond.value is BigInteger.valueOf(1024).pow(5)
-    oneEhPerSecond.value is BigInteger.valueOf(1024).pow(6)
-    a128EhPerSecond.value is BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
+    onePhPerSecond.value is Target.max.divide(BigInteger.valueOf(1024).pow(5))
+    oneEhPerSecond.value is Target.max.divide(BigInteger.valueOf(1024).pow(6))
+    a128EhPerSecond.value is Target.max.divide(
+      BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128)))
   }
 
   it should "compute max reward based on timestamp" in new Fixture {
@@ -78,8 +79,8 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF.alf(5)
   }
 
-  def average(target0: Target, target1: Target): Target = {
-    Target.unsafe(target0.value.add(target1.value).divide(BigInteger.TWO))
+  def halfDifficulty(target: Target): Target = {
+    Target.unsafe(target.value.multiply(BigInteger.valueOf(2)))
   }
 
   def average(reward0: U256, reward1: U256): U256 = {
@@ -89,24 +90,25 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "compute reward based on target" in new Fixture {
     import emission._
 
-    rewardWrtTarget(Target.unsafe(BigInteger.ZERO)) is lowHashRateInitialRewardPerChain
-    equalU256(rewardWrtTarget(Target.unsafe(BigInteger.ONE)), lowHashRateInitialRewardPerChain)
+    equalU256(rewardWrtTarget(Target.Max), lowHashRateInitialRewardPerChain)
     rewardWrtTarget(onePhPerSecondDivided) is initialMaxRewardPerChain
     rewardWrtTarget(oneEhPerSecondDivided) is stableMaxRewardPerChain
     rewardWrtTarget(a128EhPerSecondDivided) is U256.Zero
+    rewardWrtTarget(Target.unsafe(BigInteger.ZERO)) is U256.Zero
+    rewardWrtTarget(Target.unsafe(BigInteger.ONE)) is U256.Zero
 
-    rewardWrtTarget(average(Target.unsafe(BigInteger.ZERO), onePhPerSecondDivided)) is
+    rewardWrtTarget(halfDifficulty(onePhPerSecondDivided)) is
       average(lowHashRateInitialRewardPerChain, initialMaxRewardPerChain)
-    rewardWrtTarget(average(Target.unsafe(BigInteger.ZERO), oneEhPerSecondDivided)) is
+    rewardWrtTarget(halfDifficulty(oneEhPerSecondDivided)) is
       average(initialMaxRewardPerChain, stableMaxRewardPerChain)
-    rewardWrtTarget(average(Target.unsafe(BigInteger.ZERO), a128EhPerSecondDivided)) is
+    rewardWrtTarget(halfDifficulty(a128EhPerSecondDivided)) is
       average(stableMaxRewardPerChain, U256.Zero)
   }
 
   it should "take the least reward" in new Fixture {
     import emission._
 
-    reward(Target.unsafe(BigInteger.ZERO), TimeStamp.zero, TimeStamp.zero) is lowHashRateInitialRewardPerChain
+    equalU256(reward(Target.Max, TimeStamp.zero, TimeStamp.zero), lowHashRateInitialRewardPerChain)
     reward(onePhPerSecondDivided,
            TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
            TimeStamp.zero) is stableMaxRewardPerChain
