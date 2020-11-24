@@ -16,9 +16,47 @@ jobs:
         with:
           java-version: 11
       - uses: olafurpg/setup-gpg@v3
-      - run: sbt ci-release
+      - name: Publish To Sonatype
+        run: sbt ci-release
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Get the version
+        id: get_version
+        run: |
+          version=$(echo ${GITHUB_REF/refs\/tags\//} | cut -c 2-)
+          echo ::set-output name=VERSION::$version
+        shell: bash
+      - run: ./make assembly
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          release_name: v${{ steps.get_version.outputs.VERSION }}
+          body: Some solid code
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
+          asset_name: alephium-${{ steps.get_version.outputs.VERSION }}.jar
+          asset_content_type: application/java-archive
