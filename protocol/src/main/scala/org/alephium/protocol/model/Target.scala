@@ -38,9 +38,9 @@ final case class Target(val bits: ByteString) extends Ordered[Target] {
 object Target {
   implicit val serde: Serde[Target] = Serde.bytesSerde(4).xmap(unsafe, _.bits)
 
-  val max: BigInteger = BigInteger.ONE.shiftLeft(256)
+  val maxBigInt: BigInteger = BigInteger.ONE.shiftLeft(256)
 
-  val Max: Target = unsafe(max.subtract(BigInteger.ONE))
+  val Max: Target = unsafe(maxBigInt.subtract(BigInteger.ONE))
 
   def unsafe(byteString: ByteString): Target = {
     require(byteString.length == 4)
@@ -48,7 +48,7 @@ object Target {
   }
 
   def unsafe(value: BigInteger): Target = {
-    require(Number.nonNegative(value) && value.compareTo(max) < 0)
+    require(Number.nonNegative(value) && value.compareTo(maxBigInt) < 0)
     new Target(toCompactBitsUnsafe(value))
   }
 
