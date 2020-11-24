@@ -60,11 +60,6 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     val stableRewards = blocksInAboutOneYear.mulUnsafe(Emission.stableMaxReward)
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
-
-    onePhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
-    oneEhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
-    a128EhPerSecond.value is Target.maxBigInt.divide(
-      BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128)))
   }
 
   it should "compute max reward based on timestamp" in new Fixture {

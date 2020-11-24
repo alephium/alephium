@@ -32,6 +32,11 @@ class TargetSpec extends AlephiumSpec {
       .unsafe(BigInteger.valueOf(256).pow(0xF).multiply(BigInteger.valueOf(0xFFFFFF)))
       .toHexString is "12ffffff"
     Target.Max.toHexString is "20ffffff"
+
+    Target.onePhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
+    Target.oneEhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
+    Target.a128EhPerSecond.value is Target.maxBigInt.divide(
+      BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128)))
   }
 
   it should "convert between big integer and compact bits" in {

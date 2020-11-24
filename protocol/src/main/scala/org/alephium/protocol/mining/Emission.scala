@@ -28,9 +28,9 @@ class Emission(groupConfig: GroupConfig) {
   val stableMaxRewardPerChain: U256          = share(Emission.stableMaxReward)
   val lowHashRateInitialRewardPerChain: U256 = share(Emission.lowHashRateInitialReward)
 
-  val onePhPerSecondDivided: Target  = share(Emission.onePhPerSecond)
-  val oneEhPerSecondDivided: Target  = share(Emission.oneEhPerSecond)
-  val a128EhPerSecondDivided: Target = share(Emission.a128EhPerSecond)
+  val onePhPerSecondDivided: Target  = share(Target.onePhPerSecond)
+  val oneEhPerSecondDivided: Target  = share(Target.oneEhPerSecond)
+  val a128EhPerSecondDivided: Target = share(Target.a128EhPerSecond)
 
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
@@ -105,9 +105,5 @@ object Emission {
   val blocksToStableMaxReward: Long = blocksInAboutOneYear * yearsUntilStable
   val durationToStableMaxReward: Duration =
     Emission.blockTargetTime.timesUnsafe(Emission.blocksToStableMaxReward)
-
-  val onePhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 50))
-  val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 60))
-  val a128EhPerSecond: Target = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 67))
   //scalastyle:on magic.number
 }
