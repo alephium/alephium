@@ -29,5 +29,5 @@ object ContractState {
     Serde.forProduct3(ContractState.apply, t => (t.code, t.fields, t.contractOutputRef))
 
   val forMPt: ContractState =
-    ContractState(StatefulContract.forMPT, AVector.empty, ContractOutputRef.forMPT)
+    ContractState(StatefulContract.forSMT, AVector.empty, ContractOutputRef.forSMT)
 }

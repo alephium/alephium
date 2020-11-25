@@ -66,7 +66,7 @@ object AssetOutputRef {
     unsafe(Hint.ofAsset(scriptHint), key)
 
   // Only use this to initialize Merkle tree of ouptuts
-  def forMPT: AssetOutputRef = {
+  def forSMT: AssetOutputRef = {
     val hint = Hint.ofAsset(ScriptHint.fromHash(0))
     unsafe(hint, Hash.zero)
   }
@@ -95,7 +95,7 @@ object ContractOutputRef {
   }
 
   // Only use this to initialize Merkle tree of ouptuts
-  def forMPT: ContractOutputRef = {
+  def forSMT: ContractOutputRef = {
     val hint = Hint.ofContract(ScriptHint.fromHash(0))
     unsafe(hint, Hash.zero)
   }

@@ -360,7 +360,7 @@ class VMSpec extends AlephiumSpec {
     worldState0.getContractStates().toOption.get.length is 2
     worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
-        if (ref != ContractOutputRef.forMPT) {
+        if (ref != ContractOutputRef.forSMT) {
           output.tokens.head is (contractKey -> U256.unsafe(10000000))
         }
     }
@@ -372,7 +372,7 @@ class VMSpec extends AlephiumSpec {
     worldState1.getContractStates().toOption.get.length is 2
     worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach {
       case (ref, output) =>
-        if (ref != ContractOutputRef.forMPT) {
+        if (ref != ContractOutputRef.forSMT) {
           output.tokens.head is (contractKey -> U256.unsafe(20000000))
         }
     }

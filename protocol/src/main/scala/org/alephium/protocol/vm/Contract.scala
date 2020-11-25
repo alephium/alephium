@@ -52,7 +52,7 @@ object Method {
       Method[StatefulContext],
       t => (t.isPublic, t.isPayable, t.argsType, t.localsLength, t.returnType, t.instrs))
 
-  def forMPT: Method[StatefulContext] =
+  def forSMT: Method[StatefulContext] =
     Method[StatefulContext](isPublic  = false,
                             isPayable = false,
                             AVector.empty,
@@ -146,7 +146,7 @@ object StatefulContract {
   implicit val serde: Serde[StatefulContract] =
     Serde.forProduct2(StatefulContract.apply, t => (t.fields, t.methods))
 
-  val forMPT: StatefulContract = StatefulContract(AVector.empty, AVector(Method.forMPT))
+  val forSMT: StatefulContract = StatefulContract(AVector.empty, AVector(Method.forSMT))
 }
 
 sealed trait ContractObj[Ctx <: Context] {

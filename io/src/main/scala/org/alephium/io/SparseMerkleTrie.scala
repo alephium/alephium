@@ -147,12 +147,12 @@ object SparseMerkleTrie {
                                      toDelete: AVector[Hash],
                                      toAdd: AVector[Node])
 
-  final case class MPTException(message: String) extends Exception(message)
-  object MPTException {
-    def keyNotFound(action: String): MPTException = MPTException("Key not found in " ++ action)
+  final case class SMTException(message: String) extends Exception(message)
+  object SMTException {
+    def keyNotFound(action: String): SMTException = SMTException("Key not found in " ++ action)
   }
 
-  private val removalNoKey = IOError.Other(MPTException.keyNotFound("removal"))
+  private val removalNoKey = IOError.Other(SMTException.keyNotFound("removal"))
 
   def getHighNibble(byte: Byte): Byte = {
     ((byte & 0xF0) >> 4).toByte

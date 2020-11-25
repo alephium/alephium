@@ -368,11 +368,11 @@ object WorldState {
   }
 
   def emptyPersisted(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Persisted = {
-    val genesisRef  = ContractOutputRef.forMPT
-    val emptyOutput = TxOutput.forMPT
+    val genesisRef  = ContractOutputRef.forSMT
+    val emptyOutput = TxOutput.forSMT
     val emptyOutputTrie =
       SparseMerkleTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
-    val emptyState        = ContractState(StatefulContract.forMPT, AVector.empty, genesisRef)
+    val emptyState        = ContractState(StatefulContract.forSMT, AVector.empty, genesisRef)
     val emptyContractTrie = SparseMerkleTrie.build(storage, Hash.zero, emptyState)
     Persisted(emptyOutputTrie, emptyContractTrie)
   }
