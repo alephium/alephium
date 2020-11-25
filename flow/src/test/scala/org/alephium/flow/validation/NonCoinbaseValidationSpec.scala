@@ -132,7 +132,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
     failValidation(validateMempoolTx(txNew1, blockFlow), InvalidStartGas)
-    val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).extractedValue()))
+    val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).rightValue))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
     failValidation(validateMempoolTx(txNew2, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))

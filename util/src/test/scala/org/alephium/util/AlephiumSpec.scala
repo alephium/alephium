@@ -52,15 +52,15 @@ trait AlephiumFixture extends Matchers {
   }
 
   implicit class IsEOps[A: Equality, L](left: Either[L, A])(implicit pos: Position) {
-    def extractedValue(): A = left match {
+    def rightValue: A = left match {
       case Left(error) => throw new AssertionError(error)
       case Right(a)    => a
     }
 
-    def isE(right: A): Assertion                             = extractedValue() shouldEqual right
-    def isE(right: ResultOfATypeInvocation[_]): Assertion    = extractedValue() shouldBe right
-    def isnotE(right: A): Assertion                          = extractedValue() should not equal right
-    def isnotE(right: ResultOfATypeInvocation[_]): Assertion = extractedValue() should not be right
+    def isE(right: A): Assertion                             = rightValue shouldEqual right
+    def isE(right: ResultOfATypeInvocation[_]): Assertion    = rightValue shouldBe right
+    def isnotE(right: A): Assertion                          = rightValue should not equal right
+    def isnotE(right: ResultOfATypeInvocation[_]): Assertion = rightValue should not be right
   }
   // scalastyle:on
 

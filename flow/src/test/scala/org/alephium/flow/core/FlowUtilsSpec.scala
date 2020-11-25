@@ -35,13 +35,13 @@ class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
         AVector.empty
       )
 
-      val worldState = blockFlow.getBestCachedWorldState(groupIndex).extractedValue()
+      val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
         worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
       }
       val firstInput  = assets.head.referredOutput.asInstanceOf[AssetOutput]
       val firstOutput = firstInput.copy(amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe))
-      FlowUtils.generateFullTx(worldState, tx, script).extractedValue() is
+      FlowUtils.generateFullTx(worldState, tx, script).rightValue is
         Transaction(unsignedTx,
                     AVector.empty,
                     firstOutput +: assets.tail.map(_.referredOutput),

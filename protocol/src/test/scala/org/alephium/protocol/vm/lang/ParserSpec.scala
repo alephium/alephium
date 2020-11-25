@@ -134,6 +134,6 @@ class ParserSpec extends AlephiumSpec {
                Val.Address(address.lockupScript),
                Val.ByteVec.from(bytes))
     fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
-    Compiler.compileState(stateRaw).extractedValue() is AVector.from(expected)
+    Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
   }
 }
