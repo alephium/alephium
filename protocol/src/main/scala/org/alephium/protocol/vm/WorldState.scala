@@ -24,11 +24,40 @@ import org.alephium.protocol.model._
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-sealed abstract class WorldState {
+trait WorldState[T] {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
   def getContractState(key: Hash): IOResult[ContractState]
 
+  def getContractAsset(key: Hash): IOResult[ContractOutput]
+
+  def getContractObj(key: Hash): IOResult[StatefulContractObject]
+
+  def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
+
+  def createContract(code: StatefulContract,
+                     fields: AVector[Val],
+                     outputRef: ContractOutputRef,
+                     output: ContractOutput): IOResult[T]
+
+  def updateContract(key: Hash, fields: AVector[Val]): IOResult[T]
+
+  def updateContract(key: Hash, outputRef: ContractOutputRef, output: ContractOutput): IOResult[T]
+
+  protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[T]
+
+  def removeAsset(outputRef: TxOutputRef): IOResult[T]
+
+  def removeContract(contractKey: Hash): IOResult[T]
+
+  def persist(): IOResult[WorldState.Persisted]
+
+  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]]
+
+  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]]
+}
+
+sealed abstract class MutableWorldState extends WorldState[Unit] {
   def getContractAsset(key: Hash): IOResult[ContractOutput] = {
     for {
       state     <- getContractState(key)
@@ -64,8 +93,6 @@ sealed abstract class WorldState {
     } yield state.code.toObject(key, state)
   }
 
-  def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit]
-
   def createContract(code: StatefulContract,
                      fields: AVector[Val],
                      outputRef: ContractOutputRef,
@@ -81,14 +108,6 @@ sealed abstract class WorldState {
   def updateContract(key: Hash,
                      outputRef: ContractOutputRef,
                      output: ContractOutput): IOResult[Unit]
-
-  protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[Unit]
-
-  def removeAsset(outputRef: TxOutputRef): IOResult[Unit]
-
-  def removeContract(contractKey: Hash): IOResult[Unit]
-
-  def persist(): IOResult[WorldState.Persisted]
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
     tx.unsigned.inputs.mapE { input =>
@@ -108,11 +127,7 @@ sealed abstract class WorldState {
   }
 }
 
-sealed abstract class ImmutableWorldState {
-  def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
-
-  def getContractState(key: Hash): IOResult[ContractState]
-
+sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState] {
   def getContractAsset(key: Hash): IOResult[ContractOutput] = {
     for {
       state     <- getContractState(key)
@@ -149,8 +164,6 @@ sealed abstract class ImmutableWorldState {
     } yield state.code.toObject(key, state)
   }
 
-  def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[ImmutableWorldState]
-
   def createContract(code: StatefulContract,
                      fields: AVector[Val],
                      outputRef: ContractOutputRef,
@@ -162,18 +175,6 @@ sealed abstract class ImmutableWorldState {
       newState <- updateContract(key, oldState.copy(fields = fields))
     } yield newState
   }
-
-  def updateContract(key: Hash,
-                     outputRef: ContractOutputRef,
-                     output: ContractOutput): IOResult[ImmutableWorldState]
-
-  protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[ImmutableWorldState]
-
-  def removeAsset(outputRef: TxOutputRef): IOResult[ImmutableWorldState]
-
-  def removeContract(contractKey: Hash): IOResult[ImmutableWorldState]
-
-  def persist(): IOResult[WorldState.Persisted]
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
     tx.unsigned.inputs.mapE { input =>
@@ -287,7 +288,7 @@ object WorldState {
       WorldState.Hashes(outputState.rootHash, contractState.rootHash)
   }
 
-  sealed abstract class AbstractCached extends WorldState {
+  sealed abstract class AbstractCached extends MutableWorldState {
     def outputState: MutableTrie[TxOutputRef, TxOutput]
     def contractState: MutableTrie[Hash, ContractState]
 

@@ -95,7 +95,7 @@ trait NonCoinbaseValidation {
 
   protected[validation] def getPreOutputs(
       tx: Transaction,
-      worldState: WorldState): TxValidationResult[AVector[TxOutput]]
+      worldState: MutableWorldState): TxValidationResult[AVector[TxOutput]]
 
   // format off for the sake of reading and checking rules
   // format: off
@@ -250,7 +250,7 @@ object NonCoinbaseValidation {
 
     protected[validation] def getPreOutputs(
         tx: Transaction,
-        worldState: WorldState): TxValidationResult[AVector[TxOutput]] = {
+        worldState: MutableWorldState): TxValidationResult[AVector[TxOutput]] = {
       worldState.getPreOutputs(tx) match {
         case Right(preOutputs)            => validTx(preOutputs)
         case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)

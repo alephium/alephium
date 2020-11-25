@@ -26,7 +26,7 @@ import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{StatefulScript, StatefulVM, WorldState}
+import org.alephium.protocol.vm.{MutableWorldState, StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, U256}
 
@@ -163,7 +163,7 @@ object FlowUtils {
     inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
   }
 
-  def convertFailedScriptTx(worldState: WorldState,
+  def convertFailedScriptTx(worldState: MutableWorldState,
                             txTemplate: TransactionTemplate): IOResult[Transaction] = {
     worldState.getPreOutputsForVM(txTemplate).map { inputs =>
       assume(inputs.forall(_.isAsset))
