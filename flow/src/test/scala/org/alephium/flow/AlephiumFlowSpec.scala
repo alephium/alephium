@@ -176,6 +176,31 @@ trait FlowFixture
     Transaction.from(unsignedTx, privateKey)
   }
 
+  def doubleSpendingTx(blockFlow: BlockFlow, chainIndex: ChainIndex): Transaction = {
+    val mainGroup                  = chainIndex.from
+    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val unlockScript               = UnlockScript.p2pkh(publicKey)
+
+    val balances = {
+      val balances = blockFlow.getUtxos(fromLockupScript).toOption.get
+      balances ++ balances
+    }
+    balances.length is 2 // this function is used in this particular case
+
+    val total  = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val amount = ALF.alf(1)
+
+    val (_, toPublicKey) = chainIndex.to.generateKey
+    val lockupScript     = LockupScript.p2pkh(toPublicKey)
+
+    val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
+    val output     = TxOutput.asset(amount - defaultGasFee, lockupScript)
+    val remaining  = TxOutput.asset(total - amount, fromLockupScript)
+    val unsignedTx = UnsignedTransaction(None, inputs, AVector(output, remaining))
+    Transaction.from(unsignedTx, privateKey)
+  }
+
   def payableCall(blockFlow: BlockFlow, chainIndex: ChainIndex, script: StatefulScript): Block = {
     mine(blockFlow, chainIndex)(payableCallTxs(_, _, script))
   }
@@ -210,10 +235,16 @@ trait FlowFixture
     val coinbaseTx =
       Transaction.coinbase(chainIndex, txs, toPublicKey, consensusConfig.maxMiningTarget, blockTs)
 
+    mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
+  }
+
+  def mine(chainIndex: ChainIndex,
+           deps: AVector[Hash],
+           txs: AVector[Transaction],
+           blockTs: TimeStamp): Block = {
     @tailrec
     def iter(nonce: BigInt): Block = {
-      val block =
-        Block.from(deps, txs :+ coinbaseTx, consensusConfig.maxMiningTarget, blockTs, nonce)
+      val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, blockTs, nonce)
       if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
     }
 

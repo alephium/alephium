@@ -47,6 +47,7 @@ final case object InvalidCoinbaseFormat             extends InvalidBlockStatus
 final case object InvalidCoinbaseData               extends InvalidBlockStatus
 final case object InvalidCoinbaseReward             extends InvalidBlockStatus
 final case object InvalidMerkleRoot                 extends InvalidBlockStatus
+final case object BlockDoubleSpending               extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
 final case object InvalidFlowDeps                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                    extends InvalidBlockStatus
