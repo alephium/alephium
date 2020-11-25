@@ -18,11 +18,11 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{Hash, Protocol}
+import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
-import org.alephium.serde._
-import org.alephium.util.Hex
+import org.alephium.serde
+import org.alephium.serde.{SerdeError, SerdeResult}
 
 /*
  * 4 bytes: Header
@@ -34,8 +34,6 @@ final case class Message(header: Header, payload: Payload)
 
 object Message {
 
-  private val checksumLength = 4
-
   def apply[T <: Payload](payload: T): Message = {
     val header = Header(Protocol.version)
     Message(header, payload)
@@ -43,12 +41,12 @@ object Message {
 
   def serialize(message: Message, networkType: NetworkType): ByteString = {
     val magic    = networkType.magicBytes
-    val header   = serdeImpl[Header].serialize(message.header)
+    val header   = serde.serialize[Header](message.header)
     val payload  = Payload.serialize(message.payload)
-    val length   = intSerde.serialize(payload.length)
-    val checksum = Hash.hash(payload).bytes.take(checksumLength)
+    val checksum = MessageSerde.checksum(payload)
+    val length   = MessageSerde.length(payload)
 
-    magic ++ header ++ length ++ checksum ++ payload
+    magic ++ checksum ++ length ++ header ++ payload
   }
 
   def serialize[T <: Payload](payload: T, networkType: NetworkType): ByteString = {
@@ -57,17 +55,16 @@ object Message {
 
   def _deserialize(input: ByteString, networkType: NetworkType)(
       implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
-    for {
-      rest            <- checkMagicBytes(input, networkType)
-      headerLength    <- Header.serde._deserialize(rest)
-      lengthChecksum  <- intSerde._deserialize(headerLength._2)
-      checksumPayload <- extractChecksum(lengthChecksum._2)
-      payloadBytes    <- extractPayloadBytes(lengthChecksum._1, checksumPayload._2)
-      _               <- checkChecksum(checksumPayload._1, payloadBytes._1)
-      payload         <- deserializeExactPayload(payloadBytes._1)
-    } yield {
-      val header = headerLength._1
-      (Message(header, payload), payloadBytes._2)
+    MessageSerde.unwrap(input, networkType).flatMap {
+      case (checksum, length, rest) =>
+        for {
+          headerRest   <- serde._deserialize[Header](rest)
+          payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest._2)
+          _            <- MessageSerde.checkChecksum(checksum, payloadBytes._1)
+          payload      <- deserializeExactPayload(payloadBytes._1)
+        } yield {
+          (Message(headerRest._1, payload), payloadBytes._2)
+        }
     }
   }
 
@@ -81,48 +78,6 @@ object Message {
           Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
         }
     }
-  }
-
-  private def extractChecksum(bytes: ByteString) = {
-    Either.cond(
-      bytes.length >= checksumLength,
-      bytes.splitAt(checksumLength),
-      SerdeError.notEnoughBytes(checksumLength, bytes.length)
-    )
-  }
-
-  private def extractPayloadBytes(length: Int,
-                                  data: ByteString): SerdeResult[(ByteString, ByteString)] = {
-    if (length < 0) {
-      Left(SerdeError.wrongFormat(s"Negative length: $length"))
-    } else if (data.length < length) {
-      Left(SerdeError.notEnoughBytes(length, data.length))
-    } else {
-      Right(data.splitAt(length))
-    }
-  }
-
-  private def checkMagicBytes(data: ByteString,
-                              networkType: NetworkType): SerdeResult[ByteString] = {
-    if (data.length < networkType.magicBytes.length) {
-      Left(SerdeError.notEnoughBytes(networkType.magicBytes.length, data.length))
-    } else {
-      Either.cond(
-        networkType.magicBytes == data.take(networkType.magicBytes.length),
-        data.drop(networkType.magicBytes.length),
-        SerdeError.wrongFormat(s"Wrong magic bytes")
-      )
-    }
-  }
-
-  private def checkChecksum(checksum: ByteString, data: ByteString) = {
-    val digest = Hash.hash(data).bytes.take(checksumLength)
-    Either.cond(
-      digest == checksum,
-      (),
-      SerdeError.wrongFormat(
-        s"Wrong checksum: expected ${Hex.toHexString(digest)}, got ${Hex.toHexString(checksum)}")
-    )
   }
 
   private def deserializeExactPayload(payloadBytes: ByteString)(implicit config: GroupConfig) = {

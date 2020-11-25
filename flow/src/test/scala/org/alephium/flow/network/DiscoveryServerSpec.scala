@@ -22,8 +22,8 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, GroupConfigFixture}
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, NoIndexModelGenerators}
+import org.alephium.protocol.config._
+import org.alephium.protocol.model.{CliqueId, CliqueInfo, NetworkType, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
 
 object DiscoveryServerSpec {
@@ -78,11 +78,14 @@ class DiscoveryServerSpec
     val port1               = SocketUtil.temporaryLocalPort(udp = true)
     val cliqueInfo1         = generateCliqueInfo(createAddr(port1), groupConfig)
     val (address1, config1) = createConfig(groups, port1, 1)
+    val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     val server0 =
-      system.actorOf(DiscoveryServer.props(address0)(groupConfig, config0), "server0")
+      system.actorOf(DiscoveryServer.props(address0)(groupConfig, config0, networkConfig),
+                     "server0")
     val server1 =
-      system.actorOf(DiscoveryServer.props(address1, address0)(groupConfig, config1), "server1")
+      system.actorOf(DiscoveryServer.props(address1, address0)(groupConfig, config1, networkConfig),
+                     "server1")
 
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)

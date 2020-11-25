@@ -24,7 +24,7 @@ import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo}
@@ -33,12 +33,14 @@ import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 object DiscoveryServer {
   def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
       implicit groupConfig: GroupConfig,
-      discoveryConfig: DiscoveryConfig): Props =
+      discoveryConfig: DiscoveryConfig,
+      networkConfig: NetworkConfig): Props =
     Props(new DiscoveryServer(bindAddress, bootstrap))
 
   def props(bindAddress: InetSocketAddress, peers: InetSocketAddress*)(
       implicit groupConfig: GroupConfig,
-      discoveryConfig: DiscoveryConfig): Props = {
+      discoveryConfig: DiscoveryConfig,
+      networkConfig: NetworkConfig): Props = {
     props(bindAddress, ArraySeq.from(peers))
   }
 
@@ -80,7 +82,8 @@ object DiscoveryServer {
 class DiscoveryServer(val bindAddress: InetSocketAddress,
                       val bootstrap: ArraySeq[InetSocketAddress])(
     implicit val groupConfig: GroupConfig,
-    val discoveryConfig: DiscoveryConfig)
+    val discoveryConfig: DiscoveryConfig,
+    val networkConfig: NetworkConfig)
     extends BaseActor
     with Timers
     with DiscoveryServerState {
@@ -118,7 +121,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserialize(selfCliqueInfo.id, data) match {
+      DiscoveryMessage.deserialize(selfCliqueInfo.id, data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           val sourceId = message.header.cliqueId

@@ -174,30 +174,55 @@ object DiscoveryMessage {
   val deserializerCode: Deserializer[Code[_]] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid message code '$c'")
 
-  def serialize(message: DiscoveryMessage)(implicit config: DiscoveryConfig): ByteString = {
-    val headerBytes  = Header.serialize(message.header)
-    val payloadBytes = Payload.serialize(message.payload)
-    val signature    = SignatureSchema.sign(payloadBytes, config.discoveryPrivateKey)
-    headerBytes ++ signature.bytes ++ payloadBytes
+  def serialize(message: DiscoveryMessage, networkType: NetworkType)(
+      implicit config: DiscoveryConfig): ByteString = {
+
+    val magic     = networkType.magicBytes
+    val header    = Header.serialize(message.header)
+    val payload   = Payload.serialize(message.payload)
+    val signature = SignatureSchema.sign(payload, config.discoveryPrivateKey).bytes
+    val checksum  = MessageSerde.checksum(payload)
+    val length    = MessageSerde.length(payload)
+
+    magic ++ checksum ++ length ++ signature ++ header ++ payload
   }
 
-  def deserialize(myCliqueId: CliqueId, input: ByteString)(
+  def deserialize(myCliqueId: CliqueId, input: ByteString, networkType: NetworkType)(
       implicit discoveryConfig: DiscoveryConfig,
       groupConfig: GroupConfig): SerdeResult[DiscoveryMessage] = {
-    for {
-      headerPair <- Header._deserialize(myCliqueId, input)
-      header = headerPair._1
-      rest1  = headerPair._2
-      signaturePair <- serdeImpl[Signature]._deserialize(rest1)
-      signature = signaturePair._1
-      rest2     = signaturePair._2
-      payload <- Payload.deserialize(rest2).flatMap { payload =>
-        if (SignatureSchema.verify(rest2, signature, header.publicKey)) {
-          Right(payload)
-        } else {
-          Left(SerdeError.validation(s"Invalid signature"))
-        }
+    MessageSerde
+      .unwrap(input, networkType)
+      .flatMap {
+        case (checksum, length, rest) =>
+          for {
+            signaturePair <- _deserialize[Signature](rest)
+            headerRest    <- Header._deserialize(myCliqueId, signaturePair._2)
+            payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest._2)
+            _             <- MessageSerde.checkChecksum(checksum, payloadBytes._1)
+            _             <- verifyPayloadSignature(payloadBytes._1, signaturePair._1, headerRest._1.publicKey)
+            payload       <- deserializeExactPayload(payloadBytes._1)
+          } yield {
+            DiscoveryMessage(headerRest._1, payload)
+          }
       }
-    } yield DiscoveryMessage(header, payload)
+  }
+
+  private def verifyPayloadSignature(payload: ByteString,
+                                     signature: Signature,
+                                     publicKey: PublicKey) = {
+    if (SignatureSchema.verify(payload, signature, publicKey)) {
+      Right(())
+    } else {
+      Left(SerdeError.validation(s"Invalid signature"))
+    }
+  }
+
+  private def deserializeExactPayload(
+      payloadBytes: ByteString)(implicit discoveryConfig: DiscoveryConfig, config: GroupConfig) = {
+    Payload.deserialize(payloadBytes).left.map {
+      case _: SerdeError.NotEnoughBytes =>
+        SerdeError.wrongFormat("Cannot extract a correct payload from the length field")
+      case error => error
+    }
   }
 }

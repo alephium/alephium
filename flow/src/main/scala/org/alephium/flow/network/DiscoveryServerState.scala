@@ -24,17 +24,18 @@ import scala.collection.mutable
 import akka.event.LoggingAdapter
 import akka.io.Udp
 
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
+import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
+// scalastyle:off number.of.methods
 trait DiscoveryServerState {
   implicit def groupConfig: GroupConfig
   implicit def discoveryConfig: DiscoveryConfig
+  implicit def networkConfig: NetworkConfig
   def log: LoggingAdapter
-
   def bootstrap: ArraySeq[InetSocketAddress]
   def selfCliqueInfo: CliqueInfo
   def selfCliqueId: CliqueId = selfCliqueInfo.id
@@ -152,7 +153,7 @@ trait DiscoveryServerState {
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
     val message = DiscoveryMessage.from(selfCliqueId, payload)
-    socket ! Udp.Send(DiscoveryMessage.serialize(message), remote)
+    socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
   }
 
   def tryPing(cliqueInfo: InterCliqueInfo): Unit = {
