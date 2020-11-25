@@ -50,9 +50,9 @@ trait BlockFlowState extends FlowTipsUtil {
     BlockDeps(deps1 ++ deps2)
   }
 
-  def blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState
-  def blockchainBuilder: Block                                   => BlockChain
-  def blockheaderChainBuilder: BlockHeader                       => BlockHeaderChain
+  def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
+  def blockchainBuilder: Block                                         => BlockChain
+  def blockheaderChainBuilder: BlockHeader                             => BlockHeaderChain
 
   private val intraGroupChains: AVector[BlockChainWithState] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
@@ -193,12 +193,12 @@ trait BlockFlowState extends FlowTipsUtil {
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
 
-  def getPersistedTrie(block: Block): IOResult[WorldState] = {
+  def getPersistedWorldState(block: Block): IOResult[WorldState.Persisted] = {
     val header = block.header
     getPersistedWorldState(header.blockDeps, header.chainIndex.from)
   }
 
-  def getCachedTrie(block: Block): IOResult[WorldState] = {
+  def getCachedWorldState(block: Block): IOResult[WorldState.Cached] = {
     val header = block.header
     getCachedWorldState(header.blockDeps, header.chainIndex.from)
   }
@@ -261,15 +261,16 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   // Note: update state only for intra group blocks
-  def updateState(worldState: WorldState, block: Block): IOResult[WorldState] = {
+  def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     if (block.header.isGenesis) {
       BlockFlowState.updateState(worldState, block, chainIndex.from)
     } else {
-      getBlocksForUpdates(block).flatMap { blocks =>
-        blocks.foldE(worldState)(BlockFlowState.updateState(_, _, chainIndex.from))
-      }
+      for {
+        blocks <- getBlocksForUpdates(block)
+        _      <- blocks.foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
+      } yield ()
     }
   }
 
@@ -396,86 +397,84 @@ object BlockFlowState {
     }
   }
 
-  def updateState(worldState: WorldState, block: Block, targetGroup: GroupIndex)(
-      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
+  def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(
+      implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
       for {
-        worldState0 <- block.getScriptExecutionOrder.foldE(worldState) {
-          case (state, index) =>
-            updateStateForTxScript(state, block.transactions(index))
+        _ <- block.getScriptExecutionOrder.foreachE { index =>
+          updateStateForTxScript(worldState, block.transactions(index))
         }
-        worldState1 <- block.transactions.foldE(worldState0) {
-          case (state, tx) =>
-            updateStateForInOutBlock(state, tx, targetGroup)
+        _ <- block.transactions.foreachE { tx =>
+          updateStateForInOutBlock(worldState, tx, targetGroup)
         }
-      } yield worldState1
+      } yield ()
     } else if (chainIndex.from == targetGroup) {
-      block.transactions.foldE(worldState) {
-        case (state, tx) => updateStateForOutBlock(state, tx, targetGroup)
-      }
+      block.transactions.foreachE(updateStateForOutBlock(worldState, _, targetGroup))
     } else if (chainIndex.to == targetGroup) {
-      block.transactions.foldE(worldState) {
-        case (state, tx) => updateStateForInBlock(state, tx, targetGroup)
-      }
+      block.transactions.foreachE(updateStateForInBlock(worldState, _, targetGroup))
     } else {
       // dead branch though
-      Right(worldState)
+      Right(())
     }
   }
 
-  def updateStateForInOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
+  def updateStateForInOutBlock(
+      worldState: WorldState.Cached,
+      tx: Transaction,
+      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
-      state0 <- updateStateForInputs(worldState, tx)
-      state1 <- updateStateForOutputs(state0, tx, targetGroup)
-    } yield state1
+      _ <- updateStateForInputs(worldState, tx)
+      _ <- updateStateForOutputs(worldState, tx, targetGroup)
+    } yield ()
   }
 
-  def updateStateForOutBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
+  def updateStateForOutBlock(
+      worldState: WorldState.Cached,
+      tx: Transaction,
+      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
-      state0 <- updateStateForInputs(worldState, tx)
-      state1 <- updateStateForOutputs(state0, tx, targetGroup)
-    } yield state1
+      _ <- updateStateForInputs(worldState, tx)
+      _ <- updateStateForOutputs(worldState, tx, targetGroup)
+    } yield ()
   }
 
-  def updateStateForInBlock(worldState: WorldState, tx: Transaction, targetGroup: GroupIndex)(
-      implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
+  def updateStateForInBlock(
+      worldState: WorldState.Cached,
+      tx: Transaction,
+      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     updateStateForOutputs(worldState, tx, targetGroup)
   }
 
-  def updateStateForTxScript(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
+  def updateStateForTxScript(worldState: WorldState.Cached, tx: Transaction): IOResult[Unit] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
         // we set gasRemaining = initial gas as the tx is already validated
         StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-          case Right(exeResult)                => Right(exeResult.worldState)
+          case Right(_)                        => Right(())
           case Left(IOErrorUpdateState(error)) => Left(error)
           case Left(error) =>
             throw new RuntimeException(s"Updating world state for invalid tx: $error")
         }
-      case None => Right(worldState)
+      case None => Right(())
     }
   }
 
   // Note: contract inputs are updated during the execution of tx script
-  def updateStateForInputs(worldState: WorldState, tx: Transaction): IOResult[WorldState] = {
-    tx.unsigned.inputs.foldE(worldState) {
-      case (state, txInput) => state.removeAsset(txInput.outputRef)
-    }
+  def updateStateForInputs(worldState: WorldState.Cached, tx: Transaction): IOResult[Unit] = {
+    tx.unsigned.inputs.foreachE(txInput => worldState.removeAsset(txInput.outputRef))
   }
 
   private def updateStateForOutputs(
-      worldState: WorldState,
+      worldState: WorldState.Cached,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[WorldState] = {
-    tx.allOutputs.foldWithIndexE(worldState) {
-      case (state, output: AssetOutput, index) if output.toGroup == targetGroup =>
+      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+    tx.allOutputs.foreachWithIndexE {
+      case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.hash, index))
-        state.addAsset(outputRef, output)
-      case (state, _, _) => Right(state) // contract outputs are updated in VM
+        worldState.addAsset(outputRef, output)
+      case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }
 }

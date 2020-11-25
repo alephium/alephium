@@ -101,7 +101,7 @@ trait BlockFlow
 }
 
 object BlockFlow extends StrictLogging {
-  type TrieUpdater = (WorldState, Block) => IOResult[WorldState]
+  type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
 
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
     fromGenesisUnsafe(storages, config.genesisBlocks)(config.broker,
@@ -145,9 +145,9 @@ object BlockFlow extends StrictLogging {
 
   class BlockFlowImpl(
       val genesisBlocks: AVector[AVector[Block]],
-      val blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState,
-      val blockchainBuilder: Block                                   => BlockChain,
-      val blockheaderChainBuilder: BlockHeader                       => BlockHeaderChain
+      val blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState,
+      val blockchainBuilder: Block                                         => BlockChain,
+      val blockheaderChainBuilder: BlockHeader                             => BlockHeaderChain
   )(implicit val brokerConfig: BrokerConfig,
     val consensusConfig: ConsensusSetting,
     val mempoolSetting: MemPoolSetting)

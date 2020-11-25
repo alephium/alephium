@@ -41,7 +41,7 @@ class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
       }
       val firstInput  = assets.head.referredOutput.asInstanceOf[AssetOutput]
       val firstOutput = firstInput.copy(amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe))
-      FlowUtils.generateFullTx(worldState, tx, script).extractedValue()._1 is
+      FlowUtils.generateFullTx(worldState, tx, script).extractedValue() is
         Transaction(unsignedTx,
                     AVector.empty,
                     firstOutput +: assets.tail.map(_.referredOutput),

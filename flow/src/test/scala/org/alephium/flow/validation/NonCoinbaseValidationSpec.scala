@@ -25,7 +25,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory, WorldState}
+import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
 import org.alephium.util.{AVector, Random, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -47,21 +47,26 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   class Fixture extends NonCoinbaseValidation.Impl with VMFactory {
     // TODO: prepare blockflow to test checkMempool
-    def prepareWorldState(inputInfos: AVector[AssetInputInfo]): WorldState = {
-      inputInfos.fold(cachedWorldState) {
-        case (worldState, inputInfo: AssetInputInfo) =>
-          worldState
-            .addAsset(inputInfo.txInput.outputRef, inputInfo.referredOutput)
-            .toOption
-            .get
+    def prepareWorldState(inputInfos: AVector[AssetInputInfo]): Unit = {
+      inputInfos.foreach { inputInfo =>
+        cachedWorldState.addAsset(inputInfo.txInput.outputRef, inputInfo.referredOutput) isE ()
       }
+    }
+
+    def checkBlockTx(tx: Transaction,
+                     preOutputs: AVector[AssetInputInfo]): TxValidationResult[Unit] = {
+      prepareWorldState(preOutputs)
+      for {
+        _ <- checkStateless(tx)
+        _ <- checkStateful(tx, cachedWorldState)
+      } yield ()
     }
   }
 
   it should "pass valid transactions" in new Fixture {
     forAll(transactionGenWithPreOutputs(1, 1, chainIndexGen = chainIndexGenForBroker(brokerConfig))) {
       case (tx, preOutputs) =>
-        passCheck(checkBlockTx(tx, prepareWorldState(preOutputs)))
+        passCheck(checkBlockTx(tx, preOutputs))
     }
   }
 
@@ -102,7 +107,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val txNew       = tx.copy(unsigned        = unsignedNew)
         failCheck(checkInputNum(txNew), NoInputs)
         failValidation(validateMempoolTx(txNew, blockFlow), NoInputs)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), NoInputs)
+        failCheck(checkBlockTx(txNew, preOutputs), NoInputs)
     }
   }
 
@@ -113,7 +118,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val txNew       = tx.copy(unsigned              = unsignedNew)
         failCheck(checkOutputNum(txNew), NoOutputs)
         failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), NoOutputs)
+        failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
   }
 
@@ -148,7 +153,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val txNew     = modifyAlfAmount(tx, delta)
           failCheck(checkOutputAmount(txNew), BalanceOverFlow)
           failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), BalanceOverFlow)
+          failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
         }
     }
   }
@@ -160,7 +165,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val txNew = zeroAlfAmount(tx)
           failCheck(checkOutputAmount(txNew), AmountIsZero)
           failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
+          failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
         }
     }
   }
@@ -172,7 +177,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val txNew = zeroTokenAmount(tx)
           failCheck(checkOutputAmount(txNew), AmountIsZero)
           failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), AmountIsZero)
+          failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
         }
     }
   }
@@ -197,7 +202,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val txNew = tx.copy(unsigned = unsignedNew)
           failCheck(checkChainIndex(txNew), InvalidInputGroupIndex)
           failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidInputGroupIndex)
+          failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
         }
     }
   }
@@ -223,7 +228,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
             val txNew = tx.copy(unsigned = unsignedNew)
             failCheck(checkChainIndex(txNew), InvalidOutputGroupIndex)
             failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
-            failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidOutputGroupIndex)
+            failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
           }
         }
     }
@@ -237,7 +242,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val txNew       = tx.copy(unsigned = unsignedNew)
         failCheck(checkUniqueInputs(txNew), DoubleSpending)
         failValidation(validateMempoolTx(txNew, blockFlow), DoubleSpending)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), DoubleSpending)
+        failCheck(checkBlockTx(txNew, preOutputs), DoubleSpending)
     }
   }
 
@@ -273,7 +278,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           }
           failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
           failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), OutputDataSizeExceeded)
+          failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
         }
     }
   }
@@ -331,8 +336,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   it should "get previous outputs of tx inputs" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs()) {
       case (tx, inputInfos) =>
-        val worldStateNew = prepareWorldState(inputInfos)
-        getPreOutputs(tx, worldStateNew) isE inputInfos.map(_.referredOutput)
+        prepareWorldState(inputInfos)
+        getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
     }
   }
 
@@ -341,7 +346,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       case (tx, preOutputs) =>
         passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput)))
         passCheck(checkTokenBalance(tx, preOutputs.map(_.referredOutput)))
-        passCheck(checkBlockTx(tx, prepareWorldState(preOutputs)))
+        passCheck(checkBlockTx(tx, preOutputs))
     }
   }
 
@@ -350,7 +355,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       case (tx, preOutputs) =>
         val txNew = modifyAlfAmount(tx, 1)
         failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput)), InvalidAlfBalance)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidAlfBalance)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidAlfBalance)
     }
   }
 
@@ -362,7 +367,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           val tokenAmount = getTokenAmount(tx, tokenId)
           val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
           failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
-          failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), BalanceOverFlow)
+          failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
         }
     }
   }
@@ -373,7 +378,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val tokenId = sampleToken(tx)
         val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
         failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
-        failCheck(checkBlockTx(txNew, prepareWorldState(preOutputs)), InvalidTokenBalance)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
     }
   }
 
@@ -385,7 +390,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
         val unsigned                 = tx.unsigned
         val inputs                   = unsigned.inputs
-        val preparedWorldState       = prepareWorldState(preOutputs)
+        val preparedWorldState       = preOutputs
 
         {
           val txNew = tx.copy(inputSignatures = tx.inputSignatures.init)

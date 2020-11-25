@@ -180,7 +180,7 @@ object ServerFixture {
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus
     implicit def mempoolSetting  = config.mempool
-    def blockchainWithStateBuilder: (Block, BlockFlow.TrieUpdater) => BlockChainWithState =
+    def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState =
       BlockChainWithState.fromGenesisUnsafe(storages)
     def blockchainBuilder: Block => BlockChain =
       BlockChain.fromGenesisUnsafe(storages)

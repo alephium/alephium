@@ -36,26 +36,27 @@ trait BlockChainWithState extends BlockChain {
     worldStateStorage.getCachedWorldState(hash)
   }
 
-  protected def addWorldState(hash: Hash, worldState: WorldState): IOResult[Unit] = {
+  protected def addWorldState(hash: Hash, worldState: WorldState.Persisted): IOResult[Unit] = {
     worldStateStorage.putTrie(hash, worldState)
   }
 
-  def updateState(worldState: WorldState, block: Block): IOResult[WorldState]
+  def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit]
 
   override def add(block: Block, weight: BigInt): IOResult[Unit] = {
     for {
-      oldWorldState <- getCachedWorldState(block.parentHash)
-      _             <- persistBlock(block)
-      newWorldState <- updateState(oldWorldState, block)
-      _             <- addWorldState(block.hash, newWorldState)
-      _             <- add(block.header, weight)
+      cachedWorldState <- getCachedWorldState(block.parentHash)
+      _                <- persistBlock(block)
+      _                <- updateState(cachedWorldState, block)
+      newWorldState    <- cachedWorldState.persist()
+      _                <- addWorldState(block.hash, newWorldState)
+      _                <- add(block.header, weight)
     } yield ()
   }
 }
 
 object BlockChainWithState {
   def fromGenesisUnsafe(storages: Storages)(genesisBlock: Block,
-                                            updateState: BlockFlow.TrieUpdater)(
+                                            updateState: BlockFlow.WorldStateUpdater)(
       implicit brokerConfig: BrokerConfig,
       consensusSetting: ConsensusSetting): BlockChainWithState = {
     val initialize = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
@@ -63,7 +64,7 @@ object BlockChainWithState {
   }
 
   def fromStorageUnsafe(storages: Storages)(genesisBlock: Block,
-                                            updateState: BlockFlow.TrieUpdater)(
+                                            updateState: BlockFlow.WorldStateUpdater)(
       implicit brokerConfig: BrokerConfig,
       consensusSetting: ConsensusSetting): BlockChainWithState = {
     createUnsafe(genesisBlock, storages, updateState, initializeFromStorage)
@@ -72,7 +73,7 @@ object BlockChainWithState {
   def createUnsafe(
       rootBlock: Block,
       storages: Storages,
-      _updateState: BlockFlow.TrieUpdater,
+      _updateState: BlockFlow.WorldStateUpdater,
       initialize: BlockChainWithState => IOResult[Unit]
   )(implicit _brokerConfig: BrokerConfig,
     _consensusSetting: ConsensusSetting): BlockChainWithState = {
@@ -89,7 +90,7 @@ object BlockChainWithState {
         storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
       override val genesisHash = rootBlock.hash
 
-      override def updateState(worldState: WorldState, block: Block): IOResult[WorldState] =
+      override def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] =
         _updateState(worldState, block)
     }
 
@@ -97,12 +98,14 @@ object BlockChainWithState {
     blockchain
   }
 
-  def initializeGenesis(genesisBlock: Block, emptyWorldState: WorldState)(
+  def initializeGenesis(genesisBlock: Block, emptyWorldState: WorldState.Persisted)(
       chain: BlockChainWithState): IOResult[Unit] = {
+    val initialWorldState = emptyWorldState.cached()
     for {
-      _       <- chain.addGenesis(genesisBlock)
-      newTrie <- chain.updateState(emptyWorldState, genesisBlock)
-      _       <- chain.addWorldState(genesisBlock.hash, newTrie)
+      _             <- chain.addGenesis(genesisBlock)
+      _             <- chain.updateState(initialWorldState, genesisBlock)
+      newWorldState <- initialWorldState.persist()
+      _             <- chain.addWorldState(genesisBlock.hash, newWorldState)
     } yield ()
   }
 

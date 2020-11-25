@@ -113,15 +113,12 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       }
 
       for {
-        initialWorldState <- getCachedWorldState(deps.deps, chainIndex.from)
-        _ <- order.foldE[IOError, WorldState](initialWorldState) {
-          case (worldState, scriptTxIndex) =>
-            val tx = txTemplates(scriptTxIndex)
-            FlowUtils.generateFullTx(worldState, tx, tx.unsigned.scriptOpt.get).map {
-              case (fullTx, newWorldState) =>
-                fullTxs(scriptTxIndex) = fullTx
-                newWorldState
-            }
+        cachedWorldState <- getCachedWorldState(deps.deps, chainIndex.from)
+        _ <- order.foreachE[IOError] { scriptTxIndex =>
+          val tx = txTemplates(scriptTxIndex)
+          FlowUtils
+            .generateFullTx(cachedWorldState, tx, tx.unsigned.scriptOpt.get)
+            .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
       } yield AVector.unsafe(fullTxs, 0, txTemplates.length)
     } else {
@@ -179,17 +176,12 @@ object FlowUtils {
     }
   }
 
-  def generateFullTx(worldState: WorldState,
+  def generateFullTx(worldState: WorldState.Cached,
                      tx: TransactionTemplate,
-                     script: StatefulScript): IOResult[(Transaction, WorldState)] = {
+                     script: StatefulScript): IOResult[Transaction] = {
     StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-      case Left(_) =>
-        convertFailedScriptTx(worldState, tx).map { fullTx =>
-          fullTx -> worldState
-        }
-      case Right(result) =>
-        val fullTx = FlowUtils.convertSuccessfulTx(tx, result)
-        Right(fullTx -> result.worldState)
+      case Left(_)       => convertFailedScriptTx(worldState, tx)
+      case Right(result) => Right(FlowUtils.convertSuccessfulTx(tx, result))
     }
   }
 }

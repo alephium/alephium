@@ -155,11 +155,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
     if (brokerConfig.contains(index.from)) {
       val result = for {
-        _    <- checkBlockDoubleSpending(block)
-        trie <- ValidationStatus.from(flow.getCachedTrie(block))
-        _ <- block.getNonCoinbaseExecutionOrder.foldE(trie) {
-          case (currentTrie, index) =>
-            nonCoinbaseValidation.checkBlockTx(block.transactions(index), currentTrie)
+        _          <- checkBlockDoubleSpending(block)
+        worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
+        _ <- block.getNonCoinbaseExecutionOrder.foreachE { index =>
+          nonCoinbaseValidation.checkBlockTx(block.transactions(index), worldState)
         }
       } yield ()
       convert(result)

@@ -39,7 +39,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       BlockChainWithState.createUnsafe(
         genesis,
         storages,
-        (worldState, _) => { updateCount += 1; Right(worldState) },
+        (_, _) => { updateCount += 1; Right(()) },
         BlockChainWithState.initializeGenesis(genesis, storages.emptyWorldState)(_)
       )
     }

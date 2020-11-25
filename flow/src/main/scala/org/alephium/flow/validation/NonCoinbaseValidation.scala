@@ -54,17 +54,18 @@ trait NonCoinbaseValidation {
   def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
     for {
       _          <- checkStateless(tx)
-      worldState <- from(flow.getBestPersistedWorldState(tx.chainIndex.from))
+      worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
       _          <- checkStateful(tx, worldState)
     } yield ()
   }
 
-  protected[validation] def checkBlockTx(tx: Transaction,
-                                         worldState: WorldState): TxValidationResult[WorldState] = {
+  protected[validation] def checkBlockTx(
+      tx: Transaction,
+      worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
-      _        <- checkStateless(tx)
-      newState <- checkStateful(tx, worldState)
-    } yield newState
+      _ <- checkStateless(tx)
+      _ <- checkStateful(tx, worldState)
+    } yield ()
   }
 
   protected[validation] def checkStateless(tx: Transaction): TxValidationResult[ChainIndex] = {
@@ -80,14 +81,14 @@ trait NonCoinbaseValidation {
   }
   protected[validation] def checkStateful(
       tx: Transaction,
-      worldState: WorldState): TxValidationResult[WorldState] = {
+      worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
       preOutputs   <- getPreOutputs(tx, worldState)
       _            <- checkAlfBalance(tx, preOutputs)
       _            <- checkTokenBalance(tx, preOutputs)
       gasRemaining <- checkWitnesses(tx, preOutputs)
-      newState     <- checkTxScript(tx, gasRemaining, worldState)
-    } yield newState
+      _            <- checkTxScript(tx, gasRemaining, worldState)
+    } yield ()
   }
 
   protected[validation] def getPreOutputs(
@@ -110,7 +111,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkTxScript(
       tx: Transaction,
       gasRemaining: GasBox,
-      worldState: WorldState): TxValidationResult[WorldState] // TODO: optimize it with preOutputs
+      worldState: WorldState.Cached): TxValidationResult[Unit] // TODO: optimize it with preOutputs
   // format: on
 }
 
@@ -378,27 +379,26 @@ object NonCoinbaseValidation {
     protected[validation] def checkTxScript(
         tx: Transaction,
         gasRemaining: GasBox,
-        worldState: WorldState): TxValidationResult[WorldState] = {
+        worldState: WorldState.Cached): TxValidationResult[Unit] = {
       val chainIndex = tx.chainIndex
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
             StatefulVM.runTxScript(worldState, tx, script, gasRemaining) match {
-              case Right(
-                  StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs, newState)) =>
+              case Right(StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs)) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)
                 } else if (generatedOutputs != tx.generatedOutputs) {
                   invalidTx(InvalidGeneratedOutputs)
                 } else {
-                  validTx(newState)
+                  validTx(())
                 }
               case Left(error) => invalidTx(TxScriptExeFailed(error))
             }
-          case None => validTx(worldState)
+          case None => validTx(())
         }
       } else {
-        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(worldState)
+        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(())
       }
     }
   }
