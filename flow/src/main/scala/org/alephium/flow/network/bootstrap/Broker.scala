@@ -27,7 +27,7 @@ import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.serde.SerdeResult
+import org.alephium.serde.{SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
 
 object Broker {
@@ -48,7 +48,7 @@ object Broker {
       val remoteAddress: InetSocketAddress,
       val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
       extends ConnectionHandler[Message] {
-    override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
+    override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)
     }
 

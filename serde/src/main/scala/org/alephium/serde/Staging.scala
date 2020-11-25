@@ -14,21 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.network.bootstrap
+package org.alephium.serde
 
-import org.alephium.serde.{Serde, SerdeError, SerdeResult, Staging}
+import akka.util.ByteString
 
-trait SerdeUtils {
-  implicit val peerInfoSerde: Serde[PeerInfo]          = PeerInfo._serde
-  implicit val intraCliqueInfo: Serde[IntraCliqueInfo] = IntraCliqueInfo._serde
-}
-
-object SerdeUtils {
-  def unwrap[T](deserResult: SerdeResult[Staging[T]]): SerdeResult[Option[Staging[T]]] = {
-    deserResult match {
-      case Right(pair)                        => Right(Some(pair))
-      case Left(_: SerdeError.NotEnoughBytes) => Right(None)
-      case Left(e)                            => Left(e)
-    }
-  }
+final case class Staging[+T](value: T, rest: ByteString) {
+  def mapValue[B](f: T => B): Staging[B] = Staging(f(value), rest)
 }

@@ -22,6 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
+import org.alephium.serde.Staging
 import org.alephium.util.ActorRefT
 
 class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
@@ -47,14 +48,14 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
 
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        Message.deserialize(data) isE (Message.Peer(PeerInfo.self) -> ByteString.empty)
+        Message.deserialize(data) isE Staging(Message.Peer(PeerInfo.self), ByteString.empty)
     }
 
     val randomInfo = genIntraCliqueInfo
     broker.tell(Broker.Received(Message.Clique(randomInfo)), connection.ref)
     connection.expectMsgPF() {
       case Tcp.Received(data) =>
-        Message.deserialize(data) isE (Message.Ack(brokerConfig.brokerId) -> ByteString.empty)
+        Message.deserialize(data) isE Staging(Message.Ack(brokerConfig.brokerId), ByteString.empty)
     }
 
     broker.tell(Broker.Received(Message.Ready), connection.ref)

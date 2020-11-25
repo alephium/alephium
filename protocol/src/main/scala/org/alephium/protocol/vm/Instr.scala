@@ -52,8 +52,7 @@ object Instr {
     override def serialize(input: Instr[StatelessContext]): ByteString = input.serialize()
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    override def _deserialize(
-        input: ByteString): SerdeResult[(Instr[StatelessContext], ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatelessContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatelessCompanion(code).toRight(
@@ -66,8 +65,7 @@ object Instr {
     override def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    override def _deserialize(
-        input: ByteString): SerdeResult[(Instr[StatefulContext], ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatefulContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
@@ -133,7 +131,7 @@ sealed trait StatelessInstrSimpleGas
     with GasSimple {}
 
 sealed trait InstrCompanion[-Ctx <: Context] {
-  def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)]
+  def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]]
 }
 
 sealed abstract class InstrCompanion1[Ctx <: Context, T: Serde] extends InstrCompanion[Ctx] {
@@ -143,10 +141,8 @@ sealed abstract class InstrCompanion1[Ctx <: Context, T: Serde] extends InstrCom
 
   @inline def from[C <: Ctx](t: T): Instr[C] = apply(t)
 
-  override def deserialize[C <: Ctx](input: ByteString): SerdeResult[(Instr[C], ByteString)] = {
-    serdeImpl[T]._deserialize(input).map {
-      case (t, rest) => (from(t), rest)
-    }
+  override def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]] = {
+    serdeImpl[T]._deserialize(input).map(_.mapValue(from))
   }
 }
 
@@ -163,8 +159,8 @@ sealed trait StatelessInstrCompanion0
 
   def serialize(): ByteString = ByteString(code)
 
-  def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[(Instr[C], ByteString)] =
-    Right((this, input))
+  def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[Staging[Instr[C]]] =
+    Right(Staging(this, input))
 }
 
 sealed trait StatefulInstrCompanion0
@@ -175,8 +171,8 @@ sealed trait StatefulInstrCompanion0
 
   def serialize(): ByteString = ByteString(code)
 
-  def deserialize[C <: StatefulContext](input: ByteString): SerdeResult[(Instr[C], ByteString)] =
-    Right((this, input))
+  def deserialize[C <: StatefulContext](input: ByteString): SerdeResult[Staging[Instr[C]]] =
+    Right(Staging(this, input))
 }
 
 sealed trait OperandStackInstr extends StatelessInstrSimpleGas with GasSimple {}

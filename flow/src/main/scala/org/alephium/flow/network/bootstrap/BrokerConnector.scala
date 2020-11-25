@@ -46,7 +46,7 @@ object BrokerConnector {
       val remoteAddress: InetSocketAddress,
       val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
       extends ConnectionHandler[Message] {
-    override def tryDeserialize(data: ByteString): SerdeResult[Option[(Message, ByteString)]] = {
+    override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)
     }
 

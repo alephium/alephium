@@ -31,9 +31,9 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.serialize(from(input))
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(S, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[S]] = {
       self._deserialize(input).map {
-        case (t, rest) => (to(t), rest)
+        case Staging(t, rest) => Staging(to(t), rest)
       }
     }
 
@@ -47,9 +47,9 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
       self.serialize(from(input))
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(S, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[S]] = {
       self._deserialize(input).flatMap {
-        case (t, rest) => to(t).map((_, rest))
+        case Staging(t, rest) => to(t).map(Staging(_, rest))
       }
     }
 
@@ -67,11 +67,11 @@ trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   def validate(test: T => Either[String, Unit]): Serde[T] = new Serde[T] {
     override def serialize(input: T): ByteString = self.serialize(input)
 
-    override def _deserialize(input: ByteString): SerdeResult[(T, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[T]] = {
       self._deserialize(input).flatMap {
-        case (t, rest) =>
+        case Staging(t, rest) =>
           test(t) match {
-            case Right(_)    => Right((t, rest))
+            case Right(_)    => Right(Staging(t, rest))
             case Left(error) => Left(SerdeError.validation(error))
           }
       }
@@ -100,10 +100,10 @@ trait FixedSizeSerde[T] extends Serde[T] {
       Left(SerdeError.notEnoughBytes(serdeSize, input.size))
     }
 
-  override def _deserialize(input: ByteString): SerdeResult[(T, ByteString)] =
+  override def _deserialize(input: ByteString): SerdeResult[Staging[T]] =
     if (input.size >= serdeSize) {
       val (init, rest) = input.splitAt(serdeSize)
-      deserialize(init).map((_, rest))
+      deserialize(init).map(Staging(_, rest))
     } else {
       Left(SerdeError.notEnoughBytes(serdeSize, input.size))
     }
@@ -159,11 +159,11 @@ object Serde extends ProductSerde {
       IntSerde.serialize(input.size) ++ input
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(ByteString, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[ByteString]] = {
       IntSerde._deserialize(input).flatMap {
-        case (size, rest) =>
+        case Staging(size, rest) =>
           if (rest.size >= size) {
-            Right(rest.splitAt(size))
+            Right(rest.splitAt(size) match { case (value, rest) => Staging(value, rest) })
           } else {
             Left(SerdeError.notEnoughBytes(size, rest.size))
           }
@@ -189,13 +189,13 @@ object Serde extends ProductSerde {
       case Some(t) => ByteSerde.serialize(Flags.someB) ++ serde.serialize(t)
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(Option[T], ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Option[T]]] = {
       ByteSerde._deserialize(input).flatMap {
-        case (flag, rest) =>
+        case Staging(flag, rest) =>
           if (flag == Flags.none) {
-            Right((None, rest))
+            Right(Staging(None, rest))
           } else if (flag == Flags.some) {
-            serde._deserialize(rest).map { case (t, r) => (Some(t), r) }
+            serde._deserialize(rest).map { case Staging(t, r) => Staging(Some(t), r) }
           } else {
             Left(SerdeError.wrongFormat(s"expect 0 or 1 for option flag"))
           }
@@ -210,13 +210,13 @@ object Serde extends ProductSerde {
       case Right(b) => ByteSerde.serialize(Flags.rightB) ++ serdeB.serialize(b)
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(Either[A, B], ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Either[A, B]]] = {
       ByteSerde._deserialize(input).flatMap {
-        case (flag, rest) =>
+        case Staging(flag, rest) =>
           if (flag == Flags.left) {
-            serdeA._deserialize(rest).map { case (a, r) => (Left(a), r) }
+            serdeA._deserialize(rest).map { case Staging(a, r) => Staging(Left(a), r) }
           } else if (flag == Flags.right) {
-            serdeB._deserialize(rest).map { case (b, r) => (Right(b), r) }
+            serdeB._deserialize(rest).map { case Staging(b, r) => Staging(Right(b), r) }
           } else {
             Left(SerdeError.wrongFormat(s"expect 0 or 1 for either flag"))
           }
@@ -230,12 +230,12 @@ object Serde extends ProductSerde {
         rest: ByteString,
         index: Int,
         length: Int,
-        builder: mutable.Builder[T, C]): SerdeResult[(C, ByteString)] = {
+        builder: mutable.Builder[T, C]): SerdeResult[Staging[C]] = {
       if (index == length) {
-        Right(builder.result() -> rest)
+        Right(Staging(builder.result(), rest))
       } else {
         deserializer._deserialize(rest) match {
-          case Right((t, tRest)) =>
+          case Right(Staging(t, tRest)) =>
             builder += t
             __deserializeSeq(tRest, index + 1, length, builder)
           case Left(e) => Left(e)
@@ -246,7 +246,7 @@ object Serde extends ProductSerde {
     final def _deserializeSeq[C <: mutable.IndexedSeq[T]](
         size: Int,
         input: ByteString,
-        newBuilder: => mutable.Builder[T, C]): SerdeResult[(C, ByteString)] = {
+        newBuilder: => mutable.Builder[T, C]): SerdeResult[Staging[C]] = {
       val builder = newBuilder
       builder.sizeHint(size)
       __deserializeSeq(input, 0, size, builder)
@@ -255,12 +255,12 @@ object Serde extends ProductSerde {
     @tailrec
     private def _deserializeArray(rest: ByteString,
                                   index: Int,
-                                  output: Array[T]): SerdeResult[(Array[T], ByteString)] = {
+                                  output: Array[T]): SerdeResult[Staging[Array[T]]] = {
       if (index == output.length) {
-        Right(output -> rest)
+        Right(Staging(output, rest))
       } else {
         deserializer._deserialize(rest) match {
-          case Right((t, tRest)) =>
+          case Right(Staging(t, tRest)) =>
             output.update(index, t)
             _deserializeArray(tRest, index + 1, output)
           case Left(e) => Left(e)
@@ -268,12 +268,12 @@ object Serde extends ProductSerde {
       }
     }
 
-    def _deserializeArray(n: Int, input: ByteString): SerdeResult[(Array[T], ByteString)] = {
+    def _deserializeArray(n: Int, input: ByteString): SerdeResult[Staging[Array[T]]] = {
       _deserializeArray(input, 0, Array.ofDim[T](n))
     }
 
-    def _deserializeAVector(n: Int, input: ByteString): SerdeResult[(AVector[T], ByteString)] = {
-      _deserializeArray(n, input).map(t => AVector.unsafe(t._1) -> t._2)
+    def _deserializeAVector(n: Int, input: ByteString): SerdeResult[Staging[AVector[T]]] = {
+      _deserializeArray(n, input).map(t => Staging(AVector.unsafe(t.value), t.rest))
     }
   }
 
@@ -295,7 +295,7 @@ object Serde extends ProductSerde {
         input.map(serde.serialize).fold(ByteString.empty)(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): SerdeResult[(AVector[T], ByteString)] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[AVector[T]]] = {
         _deserializeAVector(size, input)
       }
     }
@@ -310,9 +310,9 @@ object Serde extends ProductSerde {
   private[serde] class AVectorDeserializer[T: ClassTag](deserializer: Deserializer[T])
       extends BatchDeserializer[T](deserializer)
       with Deserializer[AVector[T]] {
-    override def _deserialize(input: ByteString): SerdeResult[(AVector[T], ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[AVector[T]]] = {
       IntSerde._deserialize(input).flatMap {
-        case (size, rest) => _deserializeAVector(size, rest)
+        case Staging(size, rest) => _deserializeAVector(size, rest)
       }
     }
   }
@@ -323,9 +323,9 @@ object Serde extends ProductSerde {
         input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): SerdeResult[(AVector[T], ByteString)] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[AVector[T]]] = {
         IntSerde._deserialize(input).flatMap {
-          case (size, rest) => _deserializeAVector(size, rest)
+          case Staging(size, rest) => _deserializeAVector(size, rest)
         }
       }
     }
@@ -338,9 +338,9 @@ object Serde extends ProductSerde {
         input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)
       }
 
-      override def _deserialize(input: ByteString): SerdeResult[(C, ByteString)] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[C]] = {
         IntSerde._deserialize(input).flatMap {
-          case (size, rest) => _deserializeSeq(size, rest, newBuilder)
+          case Staging(size, rest) => _deserializeSeq(size, rest, newBuilder)
         }
       }
     }

@@ -18,16 +18,16 @@ package org.alephium.protocol
 
 import akka.util.ByteString
 
-import org.alephium.serde.{Serde, SerdeError, SerdeResult, Serializer}
+import org.alephium.serde.{Serde, SerdeError, SerdeResult, Serializer, Staging}
 
 trait SafeSerde[T, Config] {
   def serialize(t: T): ByteString
 
-  def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[(T, ByteString)]
+  def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[Staging[T]]
 
   def deserialize(input: ByteString)(implicit config: Config): SerdeResult[T] = {
     _deserialize(input).flatMap {
-      case (output, rest) =>
+      case Staging(output, rest) =>
         if (rest.isEmpty) {
           Right(output)
         } else {
@@ -46,11 +46,11 @@ trait SafeSerdeImpl[T, Config] extends SafeSerde[T, Config] {
 
   def serialize(t: T): ByteString = _serde.serialize(t)
 
-  def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[(T, ByteString)] = {
+  def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[Staging[T]] = {
     _serde._deserialize(input).flatMap {
-      case (t, rest) =>
+      case Staging(t, rest) =>
         validate(t) match {
-          case Right(_)    => Right((t, rest))
+          case Right(_)    => Right(Staging(t, rest))
           case Left(error) => Left(SerdeError.validation(error))
         }
     }

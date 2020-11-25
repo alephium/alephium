@@ -29,7 +29,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, Payload}
 import org.alephium.protocol.model.NetworkType
-import org.alephium.serde.{SerdeError, SerdeResult}
+import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object ConnectionHandler {
@@ -47,9 +47,9 @@ object ConnectionHandler {
   final case class Send(message: ByteString) extends Command
 
   def tryDeserializePayload(data: ByteString, networkType: NetworkType)(
-      implicit config: GroupConfig): SerdeResult[Option[(Payload, ByteString)]] = {
+      implicit config: GroupConfig): SerdeResult[Option[Staging[Payload]]] = {
     Message._deserialize(data, networkType) match {
-      case Right((message, newRest))          => Right(Some(message.payload -> newRest))
+      case Right(Staging(message, newRest))   => Right(Some(Staging(message.payload, newRest)))
       case Left(_: SerdeError.NotEnoughBytes) => Right(None)
       case Left(e)                            => Left(e)
     }
@@ -61,7 +61,7 @@ object ConnectionHandler {
       implicit val groupConfig: GroupConfig,
       networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
-    override def tryDeserialize(data: ByteString): SerdeResult[Option[(Payload, ByteString)]] = {
+    override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Payload]]] = {
       tryDeserializePayload(data, networkSetting.networkType)
     }
 
@@ -167,13 +167,13 @@ trait ConnectionHandler[T] extends BaseActor {
     inMessageBuffer ++= data
   }
 
-  def tryDeserialize(data: ByteString): SerdeResult[Option[(T, ByteString)]]
+  def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[T]]]
   def handleNewMessage(message: T): Unit
 
   @tailrec
   final def processInMessageBuffer(): Unit = {
     tryDeserialize(inMessageBuffer) match {
-      case Right(Some((message, rest))) =>
+      case Right(Some(Staging(message, rest))) =>
         inMessageBuffer = rest
         handleNewMessage(message)
         processInMessageBuffer()

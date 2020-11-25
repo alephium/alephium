@@ -46,12 +46,12 @@ object DiscoveryMessage {
       serde.serialize((header.version, header.publicKey, header.cliqueId))
 
     def _deserialize(myCliqueId: CliqueId, input: ByteString)(
-        implicit config: DiscoveryConfig): SerdeResult[(Header, ByteString)] = {
+        implicit config: DiscoveryConfig): SerdeResult[Staging[Header]] = {
       serde._deserialize(input).flatMap {
-        case ((_version, publicKey, cliqueId), rest) =>
+        case Staging((_version, publicKey, cliqueId), rest) =>
           if (_version == version) {
             if (publicKey != config.discoveryPublicKey && cliqueId != myCliqueId) {
-              Right((Header(_version, publicKey, cliqueId), rest))
+              Right(Staging(Header(_version, publicKey, cliqueId), rest))
             } else {
               Left(SerdeError.validation(s"Peer's public key is the same as ours"))
             }
@@ -81,7 +81,7 @@ object DiscoveryMessage {
     def deserialize(input: ByteString)(implicit discoveryConfig: DiscoveryConfig,
                                        groupConfig: GroupConfig): SerdeResult[Payload] = {
       deserializerCode._deserialize(input).flatMap {
-        case (cmd, rest) =>
+        case Staging(cmd, rest) =>
           cmd match {
             case Ping      => Ping.deserialize(rest)
             case Pong      => Pong.deserialize(rest)
@@ -196,13 +196,13 @@ object DiscoveryMessage {
         case (checksum, length, rest) =>
           for {
             signaturePair <- _deserialize[Signature](rest)
-            headerRest    <- Header._deserialize(myCliqueId, signaturePair._2)
-            payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest._2)
-            _             <- MessageSerde.checkChecksum(checksum, payloadBytes._1)
-            _             <- verifyPayloadSignature(payloadBytes._1, signaturePair._1, headerRest._1.publicKey)
-            payload       <- deserializeExactPayload(payloadBytes._1)
+            headerRest    <- Header._deserialize(myCliqueId, signaturePair.rest)
+            payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
+            _             <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
+            _             <- verifyPayloadSignature(payloadBytes.value, signaturePair.value, headerRest.value.publicKey)
+            payload       <- deserializeExactPayload(payloadBytes.value)
           } yield {
-            DiscoveryMessage(headerRest._1, payload)
+            DiscoveryMessage(headerRest.value, payload)
           }
       }
   }
