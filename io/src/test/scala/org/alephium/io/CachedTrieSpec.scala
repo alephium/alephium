@@ -99,7 +99,7 @@ class CachedTrieSpec extends AlephiumSpec {
     def switchMode() = cached match {
       case c: CachedSMT[Hash, Hash] =>
         if (Random.nextBoolean()) {
-          val newTrie = c.persist().extractedValue()
+          val newTrie = c.persist().rightValue
           cached = CachedSMT.from(newTrie)
         } else {
           cached = c.staging()
@@ -116,9 +116,9 @@ class CachedTrieSpec extends AlephiumSpec {
       }
       val newTrie = cached match {
         case c: CachedSMT[Hash, Hash] =>
-          c.persist().extractedValue()
+          c.persist().rightValue
         case c: StagingSMT[Hash, Hash] =>
-          c.commit().persist().extractedValue()
+          c.commit().persist().rightValue
       }
       logs.foreach {
         case (key, _) =>
@@ -172,7 +172,7 @@ class CachedTrieSpec extends AlephiumSpec {
     val (key0, value0) = generateKV()
     val (_, value1)    = generateKV()
 
-    val cachedSMT = CachedSMT.from(unCached.put(key0, value0).extractedValue())
+    val cachedSMT = CachedSMT.from(unCached.put(key0, value0).rightValue)
     cachedSMT.remove(key0) isE ()
     cachedSMT.caches(key0) is a[Removed[_]]
 

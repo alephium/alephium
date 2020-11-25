@@ -259,7 +259,7 @@ trait FlowFixture
     val worldState = blockFlow.getBestCachedWorldState(mainGroup).toOption.get
     val result = StatefulVM
       .runTxScript(worldState, tx, txScript, tx.unsigned.startGas)
-      .extractedValue()
+      .rightValue
     result.contractInputs -> result.generatedOutputs
   }
 
