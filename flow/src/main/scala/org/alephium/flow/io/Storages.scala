@@ -65,7 +65,7 @@ final case class Storages(
     sources: AVector[KeyValueSource],
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
-    emptyWorldState: WorldState,
+    emptyWorldState: WorldState.Persisted,
     worldStateStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage

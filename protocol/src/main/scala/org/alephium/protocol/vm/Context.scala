@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{discard, AVector}
 
 trait ChainEnv
 trait BlockEnv
@@ -52,7 +52,7 @@ object StatelessContext {
 }
 
 trait StatefulContext extends StatelessContext with ContractPool {
-  var worldState: WorldState
+  def worldState: WorldState.Staging
 
   def outputBalances: Frame.Balances
 
@@ -74,11 +74,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val outputRef = nextContractOutputRef(contractOutput)
     worldState
       .createContract(code, initialFields, outputRef, contractOutput)
-      .map { newWorldState =>
-        worldState = newWorldState
-        generatedOutputs.addOne(contractOutput)
-        ()
-      }
+      .map(_ => discard(generatedOutputs.addOne(contractOutput)))
       .left
       .map(IOErrorUpdateState)
   }
@@ -87,8 +83,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     worldState
       .useContractAsset(contractId)
       .map {
-        case (contractOutputRef, contractAsset, newWorldState) =>
-          updateWorldState(newWorldState)
+        case (contractOutputRef, contractAsset) =>
           contractInputs.addOne(contractOutputRef)
           Frame.BalancesPerLockup.from(contractAsset)
       }
@@ -101,7 +96,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
                           output: ContractOutput): ExeResult[Unit] = {
     worldState
       .updateContract(contractId, outputRef, output)
-      .map(updateWorldState)
       .left
       .map(IOErrorUpdateState)
   }
@@ -110,15 +104,15 @@ trait StatefulContext extends StatelessContext with ContractPool {
 object StatefulContext {
   def apply(tx: TransactionAbstract,
             gasRemaining: GasBox,
-            worldState: WorldState): StatefulContext = {
+            worldState: WorldState.Cached): StatefulContext = {
     new Impl(tx, worldState, gasRemaining)
   }
 
   final class Impl(val tx: TransactionAbstract,
-                   val initWorldState: WorldState,
+                   val initWorldState: WorldState.Cached,
                    var gasRemaining: GasBox)
       extends StatefulContext {
-    override var worldState: WorldState = initWorldState
+    override val worldState: WorldState.Staging = initWorldState.staging()
 
     override def txHash: Hash = tx.hash
 

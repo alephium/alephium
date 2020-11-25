@@ -116,7 +116,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val balances1    = Frame.BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext = new StatefulContext {
-      var worldState: WorldState                = cachedWorldState
+      val worldState: WorldState.Staging        = cachedWorldState.staging()
       def txHash: Hash                          = Hash.zero
       var gasRemaining                          = minimalGas
       def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)

@@ -230,29 +230,28 @@ object StatelessVM {
 object StatefulVM {
   final case class TxScriptExecution(gasBox: GasBox,
                                      contractInputs: AVector[ContractOutputRef],
-                                     generatedOutputs: AVector[TxOutput],
-                                     worldState: WorldState)
+                                     generatedOutputs: AVector[TxOutput])
 
-  def runTxScript(worldState: WorldState,
+  def runTxScript(worldState: WorldState.Cached,
                   tx: TransactionAbstract,
                   script: StatefulScript,
                   gasRemaining: GasBox): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(tx, gasRemaining, worldState)
     val obj     = script.toObject
-    execute(context, obj, AVector.empty).map(
-      worldState =>
-        TxScriptExecution(context.gasRemaining,
-                          AVector.from(context.contractInputs),
-                          AVector.from(context.generatedOutputs),
-                          worldState))
+    execute(context, obj, AVector.empty).map { _ =>
+      context.worldState.commit()
+      TxScriptExecution(context.gasRemaining,
+                        AVector.from(context.contractInputs),
+                        AVector.from(context.generatedOutputs))
+    }
   }
 
   def execute(context: StatefulContext,
               obj: ContractObj[StatefulContext],
-              args: AVector[Val]): ExeResult[WorldState] = {
+              args: AVector[Val]): ExeResult[Unit] = {
     val vm =
       new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
-    vm.execute(obj, 0, args).map(_ => context.worldState)
+    vm.execute(obj, 0, args)
   }
 
   def executeWithOutputs(context: StatefulContext,

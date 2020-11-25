@@ -37,8 +37,8 @@ trait WorldStateStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
     get(hash).map(_.toCachedWorldState(trieStorage))
   }
 
-  def putTrie(hash: Hash, worldState: WorldState): IOResult[Unit] = {
-    worldState.persist().flatMap(state => put(hash, state.toHashes))
+  def putTrie(hash: Hash, worldState: WorldState.Persisted): IOResult[Unit] = {
+    put(hash, worldState.toHashes)
   }
 }
 

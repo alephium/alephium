@@ -22,11 +22,9 @@ import org.alephium.protocol.model.ContractId
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
-  var worldState: WorldState
+  def worldState: WorldState.Staging
 
   val pool = mutable.Map.empty[ContractId, StatefulContractObject]
-
-  def updateWorldState(newWorldState: WorldState): Unit = worldState = newWorldState
 
   def loadContract(contractKey: ContractId): ExeResult[StatefulContractObject] = {
     pool.get(contractKey) match {
@@ -68,13 +66,7 @@ trait ContractPool extends CostStrategy {
   }
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContract(contractKey, state) match {
-      case Left(error) =>
-        Left(IOErrorUpdateState(error))
-      case Right(state) =>
-        updateWorldState(state)
-        Right(())
-    }
+    worldState.updateContract(contractKey, state).left.map(IOErrorUpdateState)
   }
 }
 
