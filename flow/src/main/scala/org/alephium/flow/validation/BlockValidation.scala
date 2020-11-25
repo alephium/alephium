@@ -154,28 +154,27 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     assume(index.relateTo(brokerConfig))
 
     if (brokerConfig.contains(index.from)) {
-      val result = for {
+      for {
         _          <- checkBlockDoubleSpending(block)
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
-        _ <- block.getNonCoinbaseExecutionOrder.foreachE { index =>
+        _ <- convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
           nonCoinbaseValidation.checkBlockTx(block.transactions(index), worldState)
-        }
+        })
       } yield ()
-      convert(result)
     } else {
       validBlock(())
     }
   }
 
-  private[validation] def checkBlockDoubleSpending(block: Block): TxValidationResult[Unit] = {
+  private[validation] def checkBlockDoubleSpending(block: Block): BlockValidationResult[Unit] = {
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     block.nonCoinbase.foreachE { tx =>
       tx.unsigned.inputs.foreachE { input =>
         if (utxoUsed.contains(input.outputRef)) {
-          invalidTx(DoubleSpending)
+          invalidBlock(BlockDoubleSpending)
         } else {
           utxoUsed += input.outputRef
-          validTx(())
+          validBlock(())
         }
       }
     }

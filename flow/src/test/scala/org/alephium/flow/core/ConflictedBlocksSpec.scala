@@ -138,4 +138,23 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     blocks.foreach(cache0.add)
     blocks.foreach(block => cache0.isBlockCached(block) is false)
   }
+
+  trait Fixture2 extends Fixture {
+    val block0 = blockGen0(txInputs(0))
+    val block1 = blockGen0(txInputs(0))
+    val blocks = Seq(block0, block1)
+  }
+
+  it should "detect conflicts 2" in new Fixture2 {
+    blocks.foreach(cache.add)
+    blocks.foreach(block => cache.isBlockCached(block) is true)
+    cache.txCache.size is 1
+    cache.txCache(txInputs(0).outputRef).toSet is Set(block0.hash, block1.hash)
+    cache.conflictedBlocks.size is 2
+    cache.conflictedBlocks(block0.hash).toSet is Set(block1.hash)
+    cache.conflictedBlocks(block1.hash).toSet is Set(block0.hash)
+
+    cache.isConflicted(AVector(block0.hash, block1.hash),
+                       hash => blocks.filter(_.hash equals hash).head) is true
+  }
 }

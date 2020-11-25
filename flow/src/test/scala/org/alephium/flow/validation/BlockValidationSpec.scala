@@ -19,7 +19,7 @@ package org.alephium.flow.validation
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.{PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
@@ -128,5 +128,44 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
     val blockNew = block.copy(transactions = txsNew)
     failCheck(checkCoinbaseReward(blockNew), InvalidCoinbaseReward)
+  }
+
+  trait DoubleSpendingFixture extends FlowFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+  }
+
+  it should "check double spending in a same tx" in new DoubleSpendingFixture {
+    val invalidTx = doubleSpendingTx(blockFlow, chainIndex)
+    val block     = mine(blockFlow, chainIndex)((_, _) => AVector(invalidTx))
+    blockValidation.validate(block, blockFlow) is Left(Right(BlockDoubleSpending))
+  }
+
+  it should "check double spending in a same block" in new DoubleSpendingFixture {
+    val block0 = transferOnlyForIntraGroup(blockFlow, chainIndex)
+    block0.nonCoinbase.length is 1
+    blockValidation.validate(block0, blockFlow) isE ()
+
+    val block1 = mine(blockFlow, chainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
+    block1.nonCoinbase.length is 2
+    blockValidation.validate(block1, blockFlow) is Left(Right(BlockDoubleSpending))
+  }
+
+  it should "check double spending in block dependencies" in new DoubleSpendingFixture {
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+
+    addAndCheck(blockFlow, block0, 1)
+    addAndCheck(blockFlow, block1, 1)
+    blockFlow.isConflicted(AVector(block1.hash, block0.hash), blockFlow.getBlockUnsafe) is true
+
+    val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val newDeps = block2.header.blockDeps
+      .replace(brokerConfig.groups - 1, block0.hash)
+      .replace(brokerConfig.groups, block1.hash)
+    val block3 = mine(chainIndex, newDeps, block2.transactions, block2.header.timestamp)
+
+    blockFlow.isConflicted(block3.header.outDeps, blockFlow.getBlockUnsafe) is true
+    blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
   }
 }

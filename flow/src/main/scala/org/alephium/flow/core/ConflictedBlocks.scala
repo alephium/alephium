@@ -41,8 +41,8 @@ trait ConflictedBlocks {
 
   def cacheForConflicts(block: Block): Unit = getCache(block).add(block)
 
-  def isConflicted(hash: Hash, newDeps: AVector[Hash], getBlock: Hash => Block): Boolean = {
-    getCache(hash).isConflicted(hash, newDeps, getBlock)
+  def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = {
+    getCache(hashes.head).isConflicted(hashes, getBlock)
   }
 }
 
@@ -107,12 +107,19 @@ object ConflictedBlocks {
       }
     }
 
-    def isConflicted(hash: Hash, newDeps: AVector[Hash], getBlock: Hash => Block): Boolean = {
-      if (!isBlockCached(hash)) add(getBlock(hash))
-      newDeps.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
+    private def isConflicted(hash: Hash, newDeps: AVector[Hash]): Boolean = {
       conflictedBlocks.get(hash).exists { conflicts =>
         val depsSet = newDeps.toSet
         conflicts.exists(hash => depsSet.contains(hash))
+      }
+    }
+
+    def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = {
+      hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
+
+      hashes.existsWithIndex {
+        case (hash, index) =>
+          isConflicted(hash, hashes.drop(index + 1))
       }
     }
 

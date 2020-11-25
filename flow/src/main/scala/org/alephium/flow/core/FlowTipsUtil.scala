@@ -38,7 +38,7 @@ trait FlowTipsUtil {
   def getHashChain(hash: Hash): BlockHashChain
   def getHashChain(chainIndex: ChainIndex): BlockHashChain
 
-  def isConflicted(hash: Hash, newDeps: AVector[Hash], getBlock: Hash => Block): Boolean
+  def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean
 
   def getInTip(dep: Hash, currentGroup: GroupIndex): IOResult[Hash] = {
     getBlockHeader(dep).map { header =>
@@ -230,8 +230,9 @@ trait FlowTipsUtil {
 
     if (checkTxConflicts) {
       mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
-        val diffs = getTipsDiffUnsafe(mergedDeps, outTips)
-        Option.when(diffs.isEmpty || (!isConflicted(newTip, diffs, getBlockUnsafe)))(mergedDeps)
+        val diffs   = getTipsDiffUnsafe(mergedDeps, outTips)
+        val toCheck = (newTip +: diffs) ++ outTips
+        Option.when(diffs.isEmpty || (!isConflicted(toCheck, getBlockUnsafe)))(mergedDeps)
       }
     } else {
       mergeTips(outTips, newOutTips)

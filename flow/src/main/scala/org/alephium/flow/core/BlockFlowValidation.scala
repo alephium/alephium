@@ -59,9 +59,9 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
   def checkFlowTxsUnsafe(block: Block): Boolean = {
     val newOutTips = block.header.outDeps
     val intraDep   = block.header.intraDep
-    val oldOutTips = getOutTips(getBlockHeaderUnsafe(intraDep), inclusive = true)
+    val oldOutTips = getOutTips(getBlockHeaderUnsafe(intraDep), inclusive = false)
     val diff       = getTipsDiffUnsafe(newOutTips, oldOutTips)
     cacheForConflicts(block)
-    !isConflicted(block.hash, diff, getBlockUnsafe)
+    !isConflicted(block.hash +: diff, getBlockUnsafe)
   }
 }
