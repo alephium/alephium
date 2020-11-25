@@ -74,8 +74,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       _ <- checkNonEmptyTransactions(block)
       _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
-      _ <- checkNonCoinbases(block, flow)
       _ <- checkFlow(block, flow)
+      _ <- checkNonCoinbases(block, flow)
     } yield ()
   }
 
