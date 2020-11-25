@@ -53,7 +53,7 @@ trait NonCoinbaseValidation {
 
   def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
     for {
-      _          <- checkStateless(tx)
+      _          <- checkStateless(tx, checkDoubleSpending = true)
       worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
       _          <- checkStateful(tx, worldState)
     } yield ()
@@ -63,19 +63,21 @@ trait NonCoinbaseValidation {
       tx: Transaction,
       worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
-      _ <- checkStateless(tx)
+      _ <- checkStateless(tx, checkDoubleSpending = false) // it's already checked in BlockValidation
       _ <- checkStateful(tx, worldState)
     } yield ()
   }
 
-  protected[validation] def checkStateless(tx: Transaction): TxValidationResult[ChainIndex] = {
+  protected[validation] def checkStateless(
+      tx: Transaction,
+      checkDoubleSpending: Boolean): TxValidationResult[ChainIndex] = {
     for {
       _          <- checkInputNum(tx)
       _          <- checkOutputNum(tx)
       _          <- checkGasBound(tx)
       _          <- checkOutputAmount(tx)
       chainIndex <- checkChainIndex(tx)
-      _          <- checkUniqueInputs(tx)
+      _          <- checkUniqueInputs(tx, checkDoubleSpending)
       _          <- checkOutputDataSize(tx)
     } yield chainIndex
   }
@@ -102,7 +104,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
   protected[validation] def checkChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
-  protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
@@ -214,15 +216,21 @@ object NonCoinbaseValidation {
       case _: ContractOutput => fromIndex
     }
 
-    protected[validation] def checkUniqueInputs(tx: Transaction): TxValidationResult[Unit] = {
-      val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
-      tx.unsigned.inputs.foreachE { input =>
-        if (utxoUsed.contains(input.outputRef)) {
-          invalidTx(DoubleSpending)
-        } else {
-          utxoUsed += input.outputRef
-          validTx(())
+    protected[validation] def checkUniqueInputs(
+        tx: Transaction,
+        checkDoubleSpending: Boolean): TxValidationResult[Unit] = {
+      if (checkDoubleSpending) {
+        val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
+        tx.unsigned.inputs.foreachE { input =>
+          if (utxoUsed.contains(input.outputRef)) {
+            invalidTx(TxDoubleSpending)
+          } else {
+            utxoUsed += input.outputRef
+            validTx(())
+          }
         }
+      } else {
+        validTx(())
       }
     }
 

@@ -98,7 +98,7 @@ final case object AmountIsZero                          extends InvalidTxStatus
 final case object DuplicatedInputs                      extends InvalidTxStatus
 final case object InvalidInputGroupIndex                extends InvalidTxStatus
 final case object InvalidOutputGroupIndex               extends InvalidTxStatus
-final case object DoubleSpending                        extends InvalidTxStatus
+final case object TxDoubleSpending                      extends InvalidTxStatus
 final case object OutputDataSizeExceeded                extends InvalidTxStatus
 final case object NonExistInput                         extends InvalidTxStatus
 final case object InvalidAlfBalance                     extends InvalidTxStatus

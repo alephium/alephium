@@ -57,7 +57,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
                      preOutputs: AVector[AssetInputInfo]): TxValidationResult[Unit] = {
       prepareWorldState(preOutputs)
       for {
-        _ <- checkStateless(tx)
+        _ <- checkStateless(tx, checkDoubleSpending = true)
         _ <- checkStateful(tx, cachedWorldState)
       } yield ()
     }
@@ -240,9 +240,9 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         val inputs      = tx.unsigned.inputs
         val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
         val txNew       = tx.copy(unsigned = unsignedNew)
-        failCheck(checkUniqueInputs(txNew), DoubleSpending)
-        failValidation(validateMempoolTx(txNew, blockFlow), DoubleSpending)
-        failCheck(checkBlockTx(txNew, preOutputs), DoubleSpending)
+        failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
+        failValidation(validateMempoolTx(txNew, blockFlow), TxDoubleSpending)
+        failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
     }
   }
 
