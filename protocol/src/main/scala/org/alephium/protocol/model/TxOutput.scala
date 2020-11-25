@@ -67,7 +67,7 @@ object TxOutput {
   }
 
   // TODO: improve this when vm is mature
-  def forMPT: TxOutput =
+  def forSMT: TxOutput =
     ContractOutput(U256.One, LockupScript.p2pkh(Hash.zero), AVector.empty)
 }
 
