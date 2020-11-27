@@ -199,8 +199,10 @@ object DiscoveryMessage {
             headerRest    <- Header._deserialize(myCliqueId, signaturePair.rest)
             payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
             _             <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
-            _             <- verifyPayloadSignature(payloadBytes.value, signaturePair.value, headerRest.value.publicKey)
-            payload       <- deserializeExactPayload(payloadBytes.value)
+            _ <- verifyPayloadSignature(payloadBytes.value,
+                                        signaturePair.value,
+                                        headerRest.value.publicKey)
+            payload <- deserializeExactPayload(payloadBytes.value)
           } yield {
             DiscoveryMessage(headerRest.value, payload)
           }
