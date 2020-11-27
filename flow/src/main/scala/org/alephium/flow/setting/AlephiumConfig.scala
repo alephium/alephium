@@ -29,7 +29,7 @@ import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
@@ -82,7 +82,7 @@ final case class NetworkSetting(
     rpcPort: Int,
     wsPort: Int,
     restPort: Int
-) {
+) extends NetworkConfig {
   val isCoordinator: Boolean = internalAddress == coordinatorAddress
 
   def handshakeTimeout: Duration = retryTimeout

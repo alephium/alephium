@@ -65,7 +65,7 @@ class MessageSpec extends AlephiumSpec {
     Seq(-1, 0, 1, payload.length - 1, payload.length + 1).foreach { newPayloadLength =>
       val newPayload  = payload.take(newPayloadLength)
       val newCheckSum = Hash.hash(newPayload).bytes.take(checksumLength)
-      val message     = magic ++ header ++ serialize(newPayloadLength) ++ newCheckSum ++ newPayload
+      val message     = magic ++ newCheckSum ++ serialize(newPayloadLength) ++ header ++ newPayload
       val result      = Message.deserialize(message, networkType).swap
       if (newPayloadLength < 0) {
         result isE SerdeError.wrongFormat(s"Negative length: $newPayloadLength")
@@ -81,7 +81,7 @@ class MessageSpec extends AlephiumSpec {
     val wrongChecksum = Hash.generate.bytes.take(checksumLength)
 
     Message
-      .deserialize(magic ++ header ++ payloadLength ++ wrongChecksum ++ payload, networkType)
+      .deserialize(magic ++ wrongChecksum ++ payloadLength ++ header ++ payload, networkType)
       .swap
       .map(_.getMessage) isE s"Wrong checksum: expected ${Hex.toHexString(checksum)}, got ${Hex.toHexString(wrongChecksum)}"
   }

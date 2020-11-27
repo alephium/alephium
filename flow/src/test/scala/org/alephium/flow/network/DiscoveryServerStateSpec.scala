@@ -27,9 +27,9 @@ import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig}
+import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo, NoIndexModelGenerators}
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 class DiscoveryServerStateSpec
@@ -45,6 +45,7 @@ class DiscoveryServerStateSpec
     def scanFrequency: Duration  = Duration.unsafe(500)
     def expireDuration: Duration = Duration.ofHoursUnsafe(1)
     val socketProbe              = TestProbe()
+    val networkConfig            = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     implicit lazy val config: DiscoveryConfig with CliqueConfig =
       createConfig(groupSize, udpPort, peersPerGroup, scanFrequency, expireDuration)._2
@@ -52,6 +53,7 @@ class DiscoveryServerStateSpec
     val state = new DiscoveryServerState {
       implicit def groupConfig: GroupConfig         = self.config
       implicit def discoveryConfig: DiscoveryConfig = self.config
+      implicit def networkConfig: NetworkConfig     = self.networkConfig
       def log: LoggingAdapter                       = system.log
 
       def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
@@ -76,7 +78,8 @@ class DiscoveryServerStateSpec
         case send: Udp.Send =>
           val message =
             DiscoveryMessage
-              .deserialize(CliqueId.generate, send.payload)(peerConfig, peerConfig)
+              .deserialize(CliqueId.generate, send.payload, networkConfig.networkType)(peerConfig,
+                                                                                       peerConfig)
               .toOption
               .get
           message.payload is a[T]
