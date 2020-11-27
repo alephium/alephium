@@ -22,6 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGenerators
+import org.alephium.serde.Staging
 import org.alephium.util.Random
 
 class BrokerConnectorSpec
@@ -57,14 +58,14 @@ class BrokerConnectorSpec
     connection.expectMsg(Tcp.ResumeReading)
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        Message.deserialize(data) isE (Message.Clique(randomCliqueInfo) -> ByteString.empty)
+        Message.deserialize(data) isE Staging(Message.Clique(randomCliqueInfo), ByteString.empty)
     }
 
     brokerConnector ! BrokerConnector.Received(Message.Ack(randomId))
     brokerConnector ! CliqueCoordinator.Ready
     connection.expectMsgPF() {
       case Tcp.Write(data, _) =>
-        Message.deserialize(data) isE (Message.Ready -> ByteString.empty)
+        Message.deserialize(data) isE Staging(Message.Ready, ByteString.empty)
     }
 
     system.stop(brokerConnector.underlyingActor.connectionHandler.ref)

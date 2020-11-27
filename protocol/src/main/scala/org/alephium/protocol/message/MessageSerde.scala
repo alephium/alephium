@@ -38,27 +38,27 @@ object MessageSerde {
     for {
       rest         <- checkMagicBytes(input, networkType)
       checksumRest <- extractChecksum(rest)
-      lengthRest   <- intSerde._deserialize(checksumRest._2)
+      lengthRest   <- intSerde._deserialize(checksumRest.rest)
     } yield {
-      (checksumRest._1, lengthRest._1, lengthRest._2)
+      (checksumRest.value, lengthRest.value, lengthRest.rest)
     }
   }
 
-  private def extractChecksum(bytes: ByteString): SerdeResult[(ByteString, ByteString)] = {
+  private def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
     Either.cond(
       bytes.length >= checksumLength,
-      bytes.splitAt(checksumLength),
+      bytes.splitAt(checksumLength) match { case (checksum, rest) => Staging(checksum, rest) },
       SerdeError.notEnoughBytes(checksumLength, bytes.length)
     )
   }
 
-  def extractPayloadBytes(length: Int, data: ByteString): SerdeResult[(ByteString, ByteString)] = {
+  def extractPayloadBytes(length: Int, data: ByteString): SerdeResult[Staging[ByteString]] = {
     if (length < 0) {
       Left(SerdeError.wrongFormat(s"Negative length: $length"))
     } else if (data.length < length) {
       Left(SerdeError.notEnoughBytes(length, data.length))
     } else {
-      Right(data.splitAt(length))
+      Right(data.splitAt(length) match { case (payload, rest) => Staging(payload, rest) })
     }
   }
 

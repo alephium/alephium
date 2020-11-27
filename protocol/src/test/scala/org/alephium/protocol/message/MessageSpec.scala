@@ -53,7 +53,7 @@ class MessageSpec extends AlephiumSpec {
 
     Message.deserialize(serialized, networkType) isE message
 
-    val (deserialized, rest) =
+    val Staging(deserialized, rest) =
       Message._deserialize(serialized ++ serialized, networkType).toOption.get
 
     deserialized is message

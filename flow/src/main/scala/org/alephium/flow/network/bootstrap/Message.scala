@@ -37,23 +37,17 @@ object Message {
   }
 
   def deserialize(input: ByteString)(
-      implicit groupConfig: GroupConfig): SerdeResult[(Message, ByteString)] = {
+      implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
     byteSerde._deserialize(input).flatMap {
-      case (byte, rest) =>
+      case Staging(byte, rest) =>
         if (byte == 0) {
-          PeerInfo._deserialize(rest).map {
-            case (peerInfo, rest) => Peer(peerInfo) -> rest
-          }
+          PeerInfo._deserialize(rest).map(_.mapValue(Peer(_)))
         } else if (byte == 1) {
-          IntraCliqueInfo._deserialize(rest).map {
-            case (cliqueInfo, rest) => Clique(cliqueInfo) -> rest
-          }
+          IntraCliqueInfo._deserialize(rest).map(_.mapValue(Clique(_)))
         } else if (byte == 2) {
-          intSerde._deserialize(rest).map {
-            case (id, rest) => Ack(id) -> rest
-          }
+          intSerde._deserialize(rest).map(_.mapValue(Ack(_)))
         } else if (byte == 3) {
-          Right(Ready -> rest)
+          Right(Staging(Ready, rest))
         } else {
           Left(SerdeError.wrongFormat(s"Invalid bootstrap message code: $byte"))
         }
@@ -61,7 +55,7 @@ object Message {
   }
 
   def tryDeserialize(data: ByteString)(
-      implicit groupConfig: GroupConfig): SerdeResult[Option[(Message, ByteString)]] = {
+      implicit groupConfig: GroupConfig): SerdeResult[Option[Staging[Message]]] = {
     SerdeUtils.unwrap(deserialize(data))
   }
 }

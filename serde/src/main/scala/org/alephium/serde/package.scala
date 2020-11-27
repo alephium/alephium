@@ -39,7 +39,7 @@ package object serde {
     deserializer.deserialize(input)
 
   def _deserialize[T](input: ByteString)(
-      implicit deserializer: Deserializer[T]): SerdeResult[(T, ByteString)] =
+      implicit deserializer: Deserializer[T]): SerdeResult[Staging[T]] =
     deserializer._deserialize(input)
 
   implicit val boolSerde: Serde[Boolean] = BoolSerde

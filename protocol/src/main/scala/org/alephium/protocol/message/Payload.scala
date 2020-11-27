@@ -52,9 +52,9 @@ object Payload {
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
   def _deserialize(input: ByteString)(
-      implicit config: GroupConfig): SerdeResult[(Payload, ByteString)] = {
+      implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap {
-      case (code, rest) =>
+      case Staging(code, rest) =>
         code match {
           case Hello        => Hello._deserialize(rest)
           case Ping         => Ping._deserialize(rest)
@@ -72,7 +72,7 @@ object Payload {
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Payload] =
     _deserialize(input).flatMap {
-      case (output, rest) =>
+      case Staging(output, rest) =>
         if (rest.isEmpty) {
           Right(output)
         } else {
@@ -82,27 +82,26 @@ object Payload {
 
   sealed trait Code
 
-  trait FixUnused[T] {
-    def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[(T, ByteString)]
+  trait FixUnused[T <: Payload] {
+    def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Staging[T]]
   }
 
-  sealed trait Serding[T] extends FixUnused[T] {
+  sealed trait Serding[T <: Payload] extends FixUnused[T] {
     protected def serde: Serde[T]
 
     def serialize(t: T): ByteString = serde.serialize(t)
 
-    def _deserialize(input: ByteString)(
-        implicit config: GroupConfig): SerdeResult[(T, ByteString)] =
+    def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Staging[T]] =
       serde._deserialize(input)
   }
 
-  sealed trait ValidatedSerding[T] extends Serding[T] {
+  sealed trait ValidatedSerding[T <: Payload] extends Serding[T] {
     override def _deserialize(input: ByteString)(
-        implicit config: GroupConfig): SerdeResult[(T, ByteString)] = {
+        implicit config: GroupConfig): SerdeResult[Staging[T]] = {
       serde._deserialize(input).flatMap {
-        case (message, rest) =>
+        case Staging(message, rest) =>
           validate(message) match {
-            case Right(_)    => Right((message, rest))
+            case Right(_)    => Right(Staging(message, rest))
             case Left(error) => Left(SerdeError.validation(error))
           }
       }

@@ -92,13 +92,13 @@ object Boilerplate {
         .map { case (v, t) => s"serde$t.serialize($v)" }
         .mkString(" ++ ")
 
-      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}._2"
+      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}.rest"
       val deserializes = arities
         .zip(synTypes)
         .map { case (n, t) => s"pair$n <- serde$t._deserialize(${rest(n)})" }
         .mkString("; ")
 
-      val deVals = arities.map(n => s"pair$n._1").mkString(", ")
+      val deVals = arities.map(n => s"pair$n.value").mkString(", ")
 
       block"""
         |package org.alephium.serde
@@ -115,10 +115,10 @@ object Boilerplate {
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest: ByteString): SerdeResult[(T, ByteString)] = {
+        +    override def _deserialize(rest: ByteString): SerdeResult[Staging[T]] = {
         +      for {
         +        $deserializes
-        +      } yield (pack($deVals), pair${arity - 1}._2)
+        +      } yield Staging(pack($deVals), pair${arity - 1}.rest)
         +    }
         +  }
         +
@@ -128,10 +128,10 @@ object Boilerplate {
         +      $serializes
         +    }
         +
-        +    override def _deserialize(rest: ByteString): SerdeResult[((${`A..N`}), ByteString)] = {
+        +    override def _deserialize(rest: ByteString): SerdeResult[Staging[(${`A..N`})]] = {
         +      for {
         +        $deserializes
-        +      } yield (($deVals), pair${arity - 1}._2)
+        +      } yield Staging(($deVals), pair${arity - 1}.rest)
         +    }
         +  }
         |}
@@ -154,13 +154,13 @@ object Boilerplate {
         .map { case (v, t) => s"serde$t.serialize($v)" }
         .mkString(" ++ ")
 
-      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}._2"
+      def rest(n: Int): String = if (n == 0) "rest" else s"pair${n - 1}.rest"
       val deserializes = arities
         .zip(synTypes)
         .map { case (n, t) => s"pair$n <- serde$t._deserialize(${rest(n)})" }
         .mkString("; ")
 
-      val deVals = arities.map(n => s"pair$n._1").mkString(", ")
+      val deVals = arities.map(n => s"pair$n.value").mkString(", ")
 
       block"""
         |package org.alephium.serde

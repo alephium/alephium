@@ -123,19 +123,19 @@ object SparseMerkleTrie {
 
       override def serialize(node: Node): ByteString = node.serialized
 
-      override def _deserialize(input: ByteString): SerdeResult[(Node, ByteString)] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[Node]] = {
         intSerde._deserialize(input).flatMap {
-          case (flag, rest) =>
+          case Staging(flag, rest) =>
             val (length, isLeaf) = SerdeNode.decodeFlag(flag)
             val (left, right)    = rest.splitAt((length + 1) / 2)
             val path             = decodeNibbles(left, length)
             if (isLeaf) {
               bytestringSerde._deserialize(right).map {
-                case (data, rest1) => (LeafNode(path, data), rest1)
+                case Staging(data, rest1) => Staging(LeafNode(path, data), rest1)
               }
             } else {
               childrenSerde._deserialize(right).map {
-                case (children, rest1) => (BranchNode(path, children), rest1)
+                case Staging(children, rest1) => Staging(BranchNode(path, children), rest1)
               }
             }
         }

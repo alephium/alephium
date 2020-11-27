@@ -19,11 +19,11 @@ package org.alephium.serde
 import akka.util.ByteString
 
 trait Deserializer[T] { self =>
-  def _deserialize(input: ByteString): SerdeResult[(T, ByteString)]
+  def _deserialize(input: ByteString): SerdeResult[Staging[T]]
 
   def deserialize(input: ByteString): SerdeResult[T] =
     _deserialize(input).flatMap {
-      case (output, rest) =>
+      case Staging(output, rest) =>
         if (rest.isEmpty) {
           Right(output)
         } else {
@@ -34,9 +34,9 @@ trait Deserializer[T] { self =>
   def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
     (input: ByteString) => {
       self._deserialize(input).flatMap {
-        case (t, rest) =>
+        case Staging(t, rest) =>
           get(t) match {
-            case Some(u) => Right((u, rest))
+            case Some(u) => Right(Staging(u, rest))
             case None    => Left(SerdeError.wrongFormat(error(t)))
           }
       }

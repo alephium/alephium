@@ -118,7 +118,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val chainIndex = block.chainIndex
     val data       = coinbase.unsigned.fixedOutputs.head.additionalData
     _deserialize[CoinbaseFixedData](data) match {
-      case Right((coinbaseFixedData, _)) =>
+      case Right(Staging(coinbaseFixedData, _)) =>
         if (coinbaseFixedData.fromGroup == chainIndex.from.value.toByte &&
             coinbaseFixedData.toGroup == chainIndex.to.value.toByte &&
             coinbaseFixedData.blockTs == block.header.timestamp) {

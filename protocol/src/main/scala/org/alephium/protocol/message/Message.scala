@@ -22,7 +22,7 @@ import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.serde
-import org.alephium.serde.{SerdeError, SerdeResult}
+import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 
 /*
  * 4 bytes: Header
@@ -54,16 +54,16 @@ object Message {
   }
 
   def _deserialize(input: ByteString, networkType: NetworkType)(
-      implicit config: GroupConfig): SerdeResult[(Message, ByteString)] = {
+      implicit config: GroupConfig): SerdeResult[Staging[Message]] = {
     MessageSerde.unwrap(input, networkType).flatMap {
       case (checksum, length, rest) =>
         for {
           headerRest   <- serde._deserialize[Header](rest)
-          payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest._2)
-          _            <- MessageSerde.checkChecksum(checksum, payloadBytes._1)
-          payload      <- deserializeExactPayload(payloadBytes._1)
+          payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
+          _            <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
+          payload      <- deserializeExactPayload(payloadBytes.value)
         } yield {
-          (Message(headerRest._1, payload), payloadBytes._2)
+          Staging(Message(headerRest.value, payload), payloadBytes.rest)
         }
     }
   }
@@ -71,7 +71,7 @@ object Message {
   def deserialize(input: ByteString, networkType: NetworkType)(
       implicit config: GroupConfig): SerdeResult[Message] = {
     _deserialize(input, networkType).flatMap {
-      case (message, rest) =>
+      case Staging(message, rest) =>
         if (rest.isEmpty) {
           Right(message)
         } else {

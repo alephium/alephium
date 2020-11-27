@@ -25,8 +25,8 @@ import org.alephium.util.AVector
 sealed trait UnlockScript
 
 object UnlockScript {
-  val p2shSerde: Serde[P2SH] = Serde.forProduct2(new P2SH(_, _), t => (t.script, t.params))
-  val p2sSerde: Serde[P2S]   = Serde.forProduct1(new P2S(_), t     => t.params)
+  val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH(_, _), t => (t.script, t.params))
+  val p2sSerde: Serde[P2S]   = Serde.forProduct1(P2S(_), t     => t.params)
   implicit val serde: Serde[UnlockScript] = new Serde[UnlockScript] {
     override def serialize(input: UnlockScript): ByteString = {
       input match {
@@ -36,13 +36,13 @@ object UnlockScript {
       }
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(UnlockScript, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[UnlockScript]] = {
       byteSerde._deserialize(input).flatMap {
-        case (0, content) =>
-          serdeImpl[PublicKey]._deserialize(content).map(t => (new P2PKH(t._1), t._2))
-        case (1, content) => p2shSerde._deserialize(content)
-        case (2, content) => p2sSerde._deserialize(content)
-        case (n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
+        case Staging(0, content) =>
+          serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH(_)))
+        case Staging(1, content) => p2shSerde._deserialize(content)
+        case Staging(2, content) => p2sSerde._deserialize(content)
+        case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
       }
     }
   }

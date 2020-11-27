@@ -46,25 +46,25 @@ object Val {
       ByteString(input.tpe.id) ++ content
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[(Val, ByteString)] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Val]] = {
       byteSerde._deserialize(input).flatMap {
-        case (code, content) if code >= 0 && code < Type.types.length =>
+        case Staging(code, content) if code >= 0 && code < Type.types.length =>
           _deserialize(Type.types(code.toInt), content)
-        case (code, _) => Left(SerdeError.wrongFormat(s"Invalid type id: $code"))
+        case Staging(code, _) => Left(SerdeError.wrongFormat(s"Invalid type id: $code"))
       }
     }
 
-    private def _deserialize(tpe: Type, content: ByteString): SerdeResult[(Val, ByteString)] =
+    private def _deserialize(tpe: Type, content: ByteString): SerdeResult[Staging[Val]] =
       tpe match {
-        case Bool    => decode[Boolean](content).map(t              => Bool(t._1)    -> t._2)
-        case Byte    => decode[scala.Byte](content).map(t           => Byte(t._1)    -> t._2)
-        case I256    => decode[util.I256](content).map(t            => I256(t._1)    -> t._2)
-        case U256    => decode[util.U256](content).map(t            => U256(t._1)    -> t._2)
-        case BoolVec => decode[ArraySeq[Boolean]](content).map(t    => BoolVec(t._1) -> t._2)
-        case ByteVec => decode[ArraySeq[scala.Byte]](content).map(t => ByteVec(t._1) -> t._2)
-        case I256Vec => decode[ArraySeq[util.I256]](content).map(t  => I256Vec(t._1) -> t._2)
-        case U256Vec => decode[ArraySeq[util.U256]](content).map(t  => U256Vec(t._1) -> t._2)
-        case Address => decode[LockupScript](content).map(t         => Address(t._1) -> t._2)
+        case Bool    => decode[Boolean](content).map(_.mapValue(Bool(_)))
+        case Byte    => decode[scala.Byte](content).map(_.mapValue(Byte(_)))
+        case I256    => decode[util.I256](content).map(_.mapValue(I256(_)))
+        case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
+        case BoolVec => decode[ArraySeq[Boolean]](content).map(_.mapValue(BoolVec(_)))
+        case ByteVec => decode[ArraySeq[scala.Byte]](content).map(_.mapValue(ByteVec(_)))
+        case I256Vec => decode[ArraySeq[util.I256]](content).map(_.mapValue(I256Vec(_)))
+        case U256Vec => decode[ArraySeq[util.U256]](content).map(_.mapValue(U256Vec(_)))
+        case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
       }
   }
 
