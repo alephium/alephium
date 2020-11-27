@@ -159,7 +159,7 @@ class AlephiumMake(object):
                   discovery {{
                     bootstrap = "{}"
                   }}
-                  chains.network-type = "testnet"
+                  network.network-type = "testnet"
                 }}
             """.format(brokerId, brokerNum, groups, bindAddress, bindAddress, bindAddress, coordinatorAddress,
                     rpcPort, wsPort, restPort, bootstrap)
@@ -174,7 +174,7 @@ class AlephiumMake(object):
             userConfFile.close()
 
             run('ALEPHIUM_HOME={} '\
-              'nice -n 19 ./app/target/universal/stage/bin/app &> {}/console.log &'\
+              'nice -n 19 ./app/target/universal/stage/bin/alephium-app &> {}/console.log &'\
               .format(nodedir, nodedir))
 
     def mining(self, params):
