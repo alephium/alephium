@@ -19,63 +19,58 @@ package org.alephium.flow.core
 import java.math.BigInteger
 
 import scala.collection.mutable
+import scala.util.Random
 
 import org.scalatest.Assertion
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, Target}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.model.Target
+import org.alephium.util.{AVector, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
-  case class HashState(parentOpt: Option[Hash], timestamp: TimeStamp, height: Int)
+  trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
+    implicit val consensusConfig: ConsensusSetting = ConsensusSetting(18, 100, 25)
 
-  trait Fixture extends ChainDifficultyAdjustment {
-    override val consensusConfig: ConsensusSetting = Test.consensusConfig
+    val chainInfo = mutable.HashMap.empty[Hash, (Int, TimeStamp)] // block hash -> (height, timestamp)
+    val threshold = consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow
 
-    val hashesTable = mutable.HashMap.empty[Hash, HashState]
-    hashesTable(Hash.zero) = HashState(None, TimeStamp.zero, 0)
+    def getHeight(hash: Hash): IOResult[Int] = Right(chainInfo(hash)._1)
 
-    def getHeight(hash: Hash): IOResult[Int] =
-      Right(hashesTable(hash).height)
+    def getHash(height: Int): Hash = chainInfo.filter(_._2._1 equals height).head._1
 
-    def getTimestamp(hash: Hash): IOResult[TimeStamp] =
-      Right(hashesTable(hash).timestamp)
+    def getTimestamp(hash: Hash): IOResult[TimeStamp] = Right(chainInfo(hash)._2)
 
     def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] = {
-      val state = hashesTable(hash)
-      if (state.height > heightUntil) {
-        chainBack(state.parentOpt.get, heightUntil).map(_ :+ hash)
-      } else {
-        Right(AVector.empty)
+      val maxHeight: Int = getHeight(hash).rightValue
+      val hashes = AVector
+        .from(chainInfo.filter {
+          case (_, (height, _)) => height > heightUntil && height <= maxHeight
+        }.keys)
+        .sortBy(getHeight(_).rightValue)
+      Right(hashes)
+    }
+
+    def setup(data: AVector[(Hash, TimeStamp)]): Unit = {
+      assume(chainInfo.isEmpty)
+      data.foreachWithIndex {
+        case ((hash, timestamp), height) => chainInfo(hash) = height -> timestamp
       }
     }
 
     def calMedianBlockTime(hash: Hash): IOResult[(TimeStamp, TimeStamp)] = {
-      calMedianBlockTime(hash, hashesTable(hash).height)
-    }
-
-    var currentHash   = Hash.zero
-    var currentHeight = 0
-    def addNewHash(n: Int): Unit = {
-      val timestamp = TimeStamp.unsafe(n.toLong)
-      val newHash   = Hash.random
-      hashesTable(newHash) = HashState(Some(currentHash), timestamp, currentHeight + 1)
-      currentHash = newHash
-      currentHeight += 1
+      calMedianBlockTime(hash, getHeight(hash).rightValue)
     }
   }
 
-  it should "calculate target correctly" in new Fixture {
-    val genesis       = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
-    val gHeader       = genesis.header
-    val currentTarget = Target.unsafe((gHeader.target / 4).underlying())
-    reTarget(currentTarget, consensusConfig.expectedTimeSpan.millis) is currentTarget
-    reTarget(currentTarget, (consensusConfig.expectedTimeSpan timesUnsafe 2).millis).value is
+  it should "calculate target correctly" in new MockFixture {
+    val currentTarget = Target.unsafe((consensusConfig.maxMiningTarget / 4).underlying())
+    reTarget(currentTarget, consensusConfig.expectedWindowTimeSpan.millis) is currentTarget
+    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis).value is
       (currentTarget * 2).underlying()
-    reTarget(currentTarget, (consensusConfig.expectedTimeSpan divUnsafe 2).millis) is
+    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis) is
       Target.unsafe((currentTarget.value / 2).underlying())
   }
 
@@ -84,44 +79,144 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     def checkCalMedian(tss: AVector[Long], expected1: Long, expected2: Long): Assertion = {
       val expected = (TimeStamp.unsafe(expected1), TimeStamp.unsafe(expected2))
-      calMedian(tss.map(TimeStamp.unsafe)) is expected
+      calMedian(tss.map(TimeStamp.unsafe), 7) is expected
     }
 
     checkCalMedian(AVector(0, 1, 2, 3, 4, 5, 6, 7), 4, 3)
     checkCalMedian(AVector(7, 6, 5, 4, 3, 2, 1, 0), 3, 4)
   }
 
-  it should "calculate correct median block time" in new Fixture {
-    assertThrows[AssertionError](calMedianBlockTime(currentHash))
-
-    for (i <- 1 until consensusConfig.medianTimeInterval) {
-      addNewHash(i)
+  it should "calculate correct median block time" in new MockFixture {
+    val genesisTs = TimeStamp.now()
+    val data = AVector.tabulate(threshold + 1) { height =>
+      Hash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
     }
-    assertThrows[AssertionError](calMedianBlockTime(currentHash))
+    setup(data)
 
-    addNewHash(consensusConfig.medianTimeInterval)
-    assertThrows[AssertionError](calMedianBlockTime(currentHash))
-
-    addNewHash(consensusConfig.medianTimeInterval + 1)
-    val median1 = TimeStamp.unsafe(((consensusConfig.medianTimeInterval + 3) / 2).toLong)
-    val median2 = TimeStamp.unsafe(((consensusConfig.medianTimeInterval + 1) / 2).toLong)
-    calMedianBlockTime(currentHash) isE (median1 -> median2)
+    val median1 = data(18 + consensusConfig.medianTimeInterval / 2)._2
+    val median2 = data(1 + consensusConfig.medianTimeInterval / 2)._2
+    calMedianBlockTime(data.last._1) isE (median1 -> median2)
   }
 
-  it should "adjust difficulty properly" in new Fixture {
-    for (i <- 1 until consensusConfig.medianTimeInterval) {
-      addNewHash(i)
+  it should "return initial target when few blocks" in {
+    val maxHeight =
+      ALF.GenesisHeight + consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow
+    (1 until maxHeight).foreach { n =>
+      val data       = AVector.fill(n)(Hash.random -> TimeStamp.zero)
+      val fixture    = new MockFixture { setup(data) }
+      val latestHash = data.last._1
+      fixture.chainBack(latestHash, 0) isE data.tail.map(_._1)
+      val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
+      fixture.calHashTarget(latestHash, currentTarget) isE currentTarget
     }
-    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
-      Target.unsafe(BigInteger.valueOf(9999))
+  }
 
-    addNewHash(consensusConfig.medianTimeInterval)
-    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
-      Target.unsafe(BigInteger.valueOf(9999))
+  it should "return the same target when block times are exact" in new MockFixture {
+    val genesisTs = TimeStamp.now()
+    val data = AVector.tabulate(2 * threshold) { height =>
+      Hash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
+    }
+    setup(data)
 
-    addNewHash(consensusConfig.medianTimeInterval + 1)
-    val expected = BigInt(9999) * consensusConfig.timeSpanMin.millis / consensusConfig.expectedTimeSpan.millis
-    calHashTarget(currentHash, Target.unsafe(BigInteger.valueOf(9999))) isE
-      Target.unsafe(expected.underlying())
+    (threshold until 2 * threshold).foreach { height =>
+      val hash          = getHash(height)
+      val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
+      calMedianBlockTime(hash, height) isE
+        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calHashTarget(hash, currentTarget) isE currentTarget
+    }
+  }
+
+  it should "decrease the target when blocktime keep increasing" in new MockFixture {
+    var currentTs = TimeStamp.now()
+    var ratio     = 1.0
+    val data = AVector.tabulate(2 * threshold) { _ =>
+      ratio = ratio * 1.2
+      val delta = (consensusConfig.expectedTimeSpan.millis * ratio).toLong
+      currentTs = currentTs.plusMillisUnsafe(delta)
+      Hash.random -> currentTs
+    }
+    setup(data)
+
+    (threshold until 2 * threshold).foreach { height =>
+      val hash          = getHash(height)
+      val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
+      calMedianBlockTime(hash, height) isE
+        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calHashTarget(hash, currentTarget) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
+    }
+  }
+
+  it should "increase the target when blocktime keep decreasing" in new MockFixture {
+    var currentTs = TimeStamp.now()
+    var ratio     = 1.0
+    val data = AVector.tabulate(2 * threshold) { _ =>
+      ratio = ratio * 1.2
+      val delta = (consensusConfig.expectedTimeSpan.millis / ratio).toLong
+      currentTs = currentTs.plusMillisUnsafe(delta)
+      Hash.random -> currentTs
+    }
+    setup(data)
+
+    (threshold until 2 * threshold).foreach { height =>
+      val hash          = getHash(height)
+      val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
+      calMedianBlockTime(hash, height) isE
+        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calHashTarget(hash, currentTarget) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+    }
+  }
+
+  trait SimulationFixture extends MockFixture {
+    var currentTs = TimeStamp.now()
+    val data = AVector.tabulate(2 * threshold) { _ =>
+      currentTs = currentTs + consensusConfig.expectedTimeSpan
+      Hash.random -> currentTs
+    }
+    setup(data)
+
+    var currentHeight = chainInfo.values.map(_._1).max
+    def addNew(hash: Hash, timestamp: TimeStamp) = {
+      currentHeight += 1
+      currentTs = timestamp
+      chainInfo += hash -> (currentHeight -> timestamp)
+    }
+
+    val initialTarget =
+      Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
+    var currentTarget = calHashTarget(getHash(currentHeight), initialTarget).rightValue
+    currentTarget is initialTarget
+    def stepSimulation(finalTarget: Target) = {
+      val ratio =
+        (BigDecimal(finalTarget.value) / BigDecimal(currentTarget.value)).toDouble
+      val error    = (Random.nextDouble() - 0.5) / 20
+      val duration = consensusConfig.expectedTimeSpan.millis * ratio * (1 + error)
+      val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
+      val newHash  = Hash.random
+      addNew(newHash, nextTs)
+      currentTarget = calHashTarget(newHash, currentTarget).rightValue
+    }
+  }
+
+  it should "simulate hashrate increasing" in new SimulationFixture {
+    val finalTarget = Target.unsafe(initialTarget.value.divide(BigInteger.valueOf(100)))
+    (0 until 1000).foreach { _ =>
+      stepSimulation(finalTarget)
+      println(s"target: ${currentTarget.value}")
+      val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
+      println(s"ratio: ${ratio.doubleValue}")
+    }
+  }
+
+  it should "simulate hashrate decreasing" in new SimulationFixture {
+    val finalTarget = Target.unsafe(initialTarget.value.multiply(BigInteger.valueOf(100)))
+    (0 until 1000).foreach { _ =>
+      stepSimulation(finalTarget)
+      println(s"target: ${currentTarget.value}")
+      val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
+      println(s"ratio: ${ratio.doubleValue}")
+    }
   }
 }

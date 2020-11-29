@@ -51,13 +51,17 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
-  val expectedTimeSpan: Duration = Emission.blockTargetTime
+  val expectedTimeSpan: Duration       = Emission.blockTargetTime
+  val powAveragingWindow: Int          = 17
+  val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
   val medianTimeInterval: Int = 11
   val diffAdjustDownMax: Int  = 16
   val diffAdjustUpMax: Int    = 8
-  val timeSpanMin: Duration   = (expectedTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
-  val timeSpanMax: Duration   = (expectedTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
+  val windowTimeSpanMin
+    : Duration = (expectedWindowTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
+  val windowTimeSpanMax
+    : Duration = (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
   //scalastyle:off magic.number
   val recentBlockHeightDiff: Int         = 30
