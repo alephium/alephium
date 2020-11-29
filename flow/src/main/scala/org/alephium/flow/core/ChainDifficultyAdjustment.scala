@@ -37,23 +37,21 @@ trait ChainDifficultyAdjustment {
 
   final protected[core] def calMedianBlockTime(hash: Hash,
                                                height: Int): IOResult[(TimeStamp, TimeStamp)] = {
-    val earlyHeight = height - consensusConfig.medianTimeInterval - consensusConfig.powAveragingWindow
+    val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALF.GenesisHeight)
     for {
       hashes     <- chainBack(hash, earlyHeight)
       timestamps <- hashes.mapE(h => getTimestamp(h))
     } yield {
-      assume(
-        timestamps.length == consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow)
-      calMedian(timestamps, consensusConfig.medianTimeInterval)
+      assume(timestamps.length == consensusConfig.powAveragingWindow + 1)
+      calMedian(timestamps, 1)
     }
   }
 
   // Digi Shield DAA
   final protected[core] def calHashTarget(hash: Hash, currentTarget: Target): IOResult[Target] = {
     getHeight(hash).flatMap {
-      case height
-          if height >= ALF.GenesisHeight + consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow =>
+      case height if height >= ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
         calMedianBlockTime(hash, height).map {
           case (_median1, _median2) =>
             val median1 = _median1.millis
@@ -84,10 +82,11 @@ trait ChainDifficultyAdjustment {
 }
 
 object ChainDifficultyAdjustment {
+  // timestamps should be sorted
   def calMedian(timestamps: AVector[TimeStamp], interval: Int): (TimeStamp, TimeStamp) = {
     val index   = interval / 2
-    val median1 = timestamps.takeRight(interval).sorted.apply(index)
-    val median2 = timestamps.take(interval).sorted.apply(index)
+    val median1 = timestamps.takeRight(interval).apply(index)
+    val median2 = timestamps.take(interval).apply(index)
     (median1, median2)
   }
 }

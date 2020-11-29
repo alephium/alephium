@@ -35,7 +35,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     implicit val consensusConfig: ConsensusSetting = ConsensusSetting(18, 100, 25)
 
     val chainInfo = mutable.HashMap.empty[Hash, (Int, TimeStamp)] // block hash -> (height, timestamp)
-    val threshold = consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow
+    val threshold = consensusConfig.powAveragingWindow + 1
 
     def getHeight(hash: Hash): IOResult[Int] = Right(chainInfo(hash)._1)
 
@@ -93,14 +93,13 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
     setup(data)
 
-    val median1 = data(18 + consensusConfig.medianTimeInterval / 2)._2
-    val median2 = data(1 + consensusConfig.medianTimeInterval / 2)._2
+    val median1 = data(18)._2
+    val median2 = data(1)._2
     calMedianBlockTime(data.last._1) isE (median1 -> median2)
   }
 
   it should "return initial target when few blocks" in {
-    val maxHeight =
-      ALF.GenesisHeight + consensusConfig.medianTimeInterval + consensusConfig.powAveragingWindow
+    val maxHeight = ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1
     (1 until maxHeight).foreach { n =>
       val data       = AVector.fill(n)(Hash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }
@@ -121,8 +120,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      calMedianBlockTime(hash, height) isE
-        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE currentTarget
     }
   }
@@ -141,8 +139,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calMedianBlockTime(hash, height) isE
-        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
@@ -162,8 +159,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calMedianBlockTime(hash, height) isE
-        (data(height - 11 / 2)._2 -> data(height - 17 - 11 / 2)._2)
+      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
@@ -198,25 +194,27 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       addNew(newHash, nextTs)
       currentTarget = calHashTarget(newHash, currentTarget).rightValue
     }
+
+    def checkRatio(ratio: Double, expected: Double) = {
+      ratio >= expected * 0.95 && ratio <= expected * 1.05
+    }
   }
 
   it should "simulate hashrate increasing" in new SimulationFixture {
     val finalTarget = Target.unsafe(initialTarget.value.divide(BigInteger.valueOf(100)))
     (0 until 1000).foreach { _ =>
       stepSimulation(finalTarget)
-      println(s"target: ${currentTarget.value}")
-      val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
-      println(s"ratio: ${ratio.doubleValue}")
     }
+    val ratio = BigDecimal(initialTarget.value) / BigDecimal(currentTarget.value)
+    checkRatio(ratio.toDouble, 100.0) is true
   }
 
   it should "simulate hashrate decreasing" in new SimulationFixture {
     val finalTarget = Target.unsafe(initialTarget.value.multiply(BigInteger.valueOf(100)))
     (0 until 1000).foreach { _ =>
       stepSimulation(finalTarget)
-      println(s"target: ${currentTarget.value}")
-      val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
-      println(s"ratio: ${ratio.doubleValue}")
     }
+    val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
+    checkRatio(ratio.toDouble, 100.0) is true
   }
 }

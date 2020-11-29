@@ -55,9 +55,8 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val powAveragingWindow: Int          = 17
   val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
-  val medianTimeInterval: Int = 11
-  val diffAdjustDownMax: Int  = 16
-  val diffAdjustUpMax: Int    = 8
+  val diffAdjustDownMax: Int = 16
+  val diffAdjustUpMax: Int   = 8
   val windowTimeSpanMin
     : Duration = (expectedWindowTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
   val windowTimeSpanMax
