@@ -22,11 +22,9 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model.Target
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
-  import ChainDifficultyAdjustment._
-
   implicit def consensusConfig: ConsensusSetting
 
   def getHeight(hash: Hash): IOResult[Int]
@@ -35,35 +33,29 @@ trait ChainDifficultyAdjustment {
 
   def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]]
 
-  final protected[core] def calMedianBlockTime(hash: Hash,
-                                               height: Int): IOResult[(TimeStamp, TimeStamp)] = {
+  // TODO: optimize this
+  final protected[core] def calTimeSpan(hash: Hash, height: Int): IOResult[Duration] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALF.GenesisHeight)
     for {
-      hashes     <- chainBack(hash, earlyHeight)
-      timestamps <- hashes.mapE(h => getTimestamp(h))
-    } yield {
-      assume(timestamps.length == consensusConfig.powAveragingWindow + 1)
-      calMedian(timestamps, 1)
-    }
+      hashes        <- chainBack(hash, earlyHeight)
+      timestampNow  <- getTimestamp(hash)
+      timestampLast <- getTimestamp(hashes.head)
+    } yield timestampNow.deltaUnsafe(timestampLast)
   }
 
-  // Digi Shield DAA
+  // DigiShield DAA V3 variant
   final protected[core] def calHashTarget(hash: Hash, currentTarget: Target): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
-        calMedianBlockTime(hash, height).map {
-          case (_median1, _median2) =>
-            val median1 = _median1.millis
-            val median2 = _median2.millis
-            assume(median1 >= median2)
-            var timeSpan = consensusConfig.expectedWindowTimeSpan.millis + (median1 - median2 - consensusConfig.expectedWindowTimeSpan.millis) / 4
-            if (timeSpan < consensusConfig.windowTimeSpanMin.millis) {
-              timeSpan = consensusConfig.windowTimeSpanMin.millis
-            } else if (timeSpan > consensusConfig.windowTimeSpanMax.millis) {
-              timeSpan = consensusConfig.windowTimeSpanMax.millis
-            }
-            reTarget(currentTarget, timeSpan)
+        calTimeSpan(hash, height).map { timeSpan =>
+          var clippedTimeSpan = consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
+          if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
+            clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
+          } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
+            clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
+          }
+          reTarget(currentTarget, clippedTimeSpan)
         }
       case _ => Right(currentTarget)
     }
@@ -78,15 +70,5 @@ trait ChainDifficultyAdjustment {
     } else {
       consensusConfig.maxMiningTarget
     }
-  }
-}
-
-object ChainDifficultyAdjustment {
-  // timestamps should be sorted
-  def calMedian(timestamps: AVector[TimeStamp], interval: Int): (TimeStamp, TimeStamp) = {
-    val index   = interval / 2
-    val median1 = timestamps.takeRight(interval).apply(index)
-    val median2 = timestamps.take(interval).apply(index)
-    (median1, median2)
   }
 }

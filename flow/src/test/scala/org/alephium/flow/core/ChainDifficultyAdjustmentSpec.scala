@@ -21,14 +21,12 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.Random
 
-import org.scalatest.Assertion
-
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model.Target
-import org.alephium.util.{AVector, NumericHelpers, TimeStamp}
+import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
@@ -60,8 +58,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       }
     }
 
-    def calMedianBlockTime(hash: Hash): IOResult[(TimeStamp, TimeStamp)] = {
-      calMedianBlockTime(hash, getHeight(hash).rightValue)
+    def calTimeSpan(hash: Hash): IOResult[Duration] = {
+      calTimeSpan(hash, getHeight(hash).rightValue)
     }
   }
 
@@ -74,19 +72,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       Target.unsafe((currentTarget.value / 2).underlying())
   }
 
-  it should "compute the correct median value" in {
-    import ChainDifficultyAdjustment.calMedian
-
-    def checkCalMedian(tss: AVector[Long], expected1: Long, expected2: Long): Assertion = {
-      val expected = (TimeStamp.unsafe(expected1), TimeStamp.unsafe(expected2))
-      calMedian(tss.map(TimeStamp.unsafe), 7) is expected
-    }
-
-    checkCalMedian(AVector(0, 1, 2, 3, 4, 5, 6, 7), 4, 3)
-    checkCalMedian(AVector(7, 6, 5, 4, 3, 2, 1, 0), 3, 4)
-  }
-
-  it should "calculate correct median block time" in new MockFixture {
+  it should "calculate correct time span" in new MockFixture {
     val genesisTs = TimeStamp.now()
     val data = AVector.tabulate(threshold + 1) { height =>
       Hash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
@@ -95,7 +81,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     val median1 = data(18)._2
     val median2 = data(1)._2
-    calMedianBlockTime(data.last._1) isE (median1 -> median2)
+    calTimeSpan(data.last._1) isE (median1 deltaUnsafe median2)
   }
 
   it should "return initial target when few blocks" in {
@@ -120,7 +106,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
+      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE currentTarget
     }
   }
@@ -139,7 +125,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
+      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
@@ -159,7 +145,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calMedianBlockTime(hash, height) isE (data(height)._2 -> data(height - 17)._2)
+      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
       calHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
