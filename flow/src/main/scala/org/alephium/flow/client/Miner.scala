@@ -24,6 +24,7 @@ import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
+import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
@@ -88,6 +89,19 @@ object Miner {
       }
     }
     iter(nonceStart)
+  }
+
+  def nextTimeStamp(template: BlockFlowTemplate): TimeStamp = {
+    nextTimeStamp(template.parentTs)
+  }
+
+  def nextTimeStamp(parentTs: TimeStamp): TimeStamp = {
+    val resultTs = TimeStamp.now()
+    if (resultTs <= parentTs) {
+      parentTs.plusMillisUnsafe(1)
+    } else {
+      resultTs
+    }
   }
 }
 
@@ -162,7 +176,7 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
       0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups)
     val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    val blockTs      = TimeStamp.now()
+    val blockTs      = Miner.nextTimeStamp(flowTemplate)
     val coinbaseTx   = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
     BlockTemplate(flowTemplate.deps,
                   flowTemplate.target,

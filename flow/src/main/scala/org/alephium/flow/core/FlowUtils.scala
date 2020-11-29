@@ -131,9 +131,10 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
-      target  <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
-      fullTxs <- executeTxTemplates(chainIndex, bestDeps, collectTransactions(chainIndex))
-    } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target, fullTxs)
+      target       <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
+      parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
+      fullTxs      <- executeTxTemplates(chainIndex, bestDeps, collectTransactions(chainIndex))
+    } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target, parentHeader.timestamp, fullTxs)
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
