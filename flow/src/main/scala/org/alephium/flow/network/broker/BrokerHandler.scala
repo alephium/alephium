@@ -107,10 +107,10 @@ trait BrokerHandler extends BaseActor {
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
-      log.debug(s"Download blocks ${Utils.show(hashes)} from $remoteAddress")
+      log.debug(s"Download blocks ${Utils.showDigest(hashes)} from $remoteAddress")
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
-      log.debug(s"Received blocks ${Utils.showHash(blocks)} from $remoteAddress")
+      log.debug(s"Received blocks ${Utils.showDataDigest(blocks)} from $remoteAddress")
       Validation.validateFlowDAG(blocks) match {
         case Some(forests) =>
           forests.foreach { forest =>
@@ -127,7 +127,7 @@ trait BrokerHandler extends BaseActor {
         send(SendBlocks(blocks))
       }
     case Received(SendHeaders(headers)) =>
-      log.debug(s"Received headers ${Utils.showHash(headers)} from $remoteAddress")
+      log.debug(s"Received headers ${Utils.showDataDigest(headers)} from $remoteAddress")
       headers.foreach { header =>
         val message = HeaderChainHandler.addOneHeader(header, dataOrigin)
         allHandlers.getHeaderHandler(header.chainIndex) ! message
@@ -137,7 +137,7 @@ trait BrokerHandler extends BaseActor {
         send(SendHeaders(headers))
       }
     case Received(SendTxs(txs)) =>
-      log.debug(s"SendTxs received: ${Utils.show(txs.map(_.hash))}")
+      log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.hash))}")
       txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddTx(tx, dataOrigin))
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)

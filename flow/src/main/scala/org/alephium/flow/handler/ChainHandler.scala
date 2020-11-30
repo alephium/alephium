@@ -103,7 +103,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command
                         hashes: AVector[Hash],
                         broker: ActorRefT[ChainHandler.Event],
                         origin: DataOrigin): Unit = {
-    log.debug(s"${data.shortHex} missing depes: ${Utils.show(hashes)}")
+    log.debug(s"${data.shortHex} missing deps: ${Utils.showDigest(hashes)}")
     val missings = mutable.HashSet.from(hashes.toIterable)
     pendingToFlowHandler(data, missings, broker, origin, ActorRefT[Command](self))
   }

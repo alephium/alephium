@@ -62,9 +62,8 @@ trait BlockHashPool {
 
   def show(hash: Hash): String = {
     val shortHash = hash.shortHex
-    val weight    = getWeight(hash).getOrElse(BigInt(-1))
     val hashNum   = numHashes - 1 // exclude genesis block
     val height    = getHeight(hash).getOrElse(-1)
-    s"hash: $shortHash; weight: $weight; height: $height/$hashNum"
+    s"hash: $shortHash; height: $height/$hashNum"
   }
 }

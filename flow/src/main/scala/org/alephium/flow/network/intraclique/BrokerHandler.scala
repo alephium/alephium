@@ -50,8 +50,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       case FlowHandler.SyncInventories(inventories) =>
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
-        log.debug(
-          s"Received sync response ${Utils.show(hashes.flatMap(identity))} from intra clique broker")
+        log.debug(s"Received sync response ${Utils.showFlow(hashes)} from intra clique broker")
         blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
     }
     receive

@@ -22,16 +22,20 @@ import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
 object Utils {
-  def show[T <: RandomBytes](elems: AVector[T]): String = {
-    elems.map(_.shortHex).mkString("-")
+  def showDigest[T <: RandomBytes](elems: AVector[T]): String = {
+    if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
   }
 
-  def showHash[T <: FlowData](elems: AVector[T]): String = {
-    showHashIter(elems.toIterable)
+  def showFlow[T <: RandomBytes](elems: AVector[AVector[T]]): String = {
+    elems.map(showDigest).mkString(", ")
   }
 
-  def showHashIter[T <: FlowData](elems: Iterable[T]): String = {
-    elems.view.map(_.shortHex).mkString("-")
+  def showDataDigest[T <: FlowData](elems: AVector[T]): String = {
+    if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
+  }
+
+  def showDataFlow[T <: FlowData](elems: AVector[AVector[T]]): String = {
+    elems.map(showDataDigest).mkString(", ")
   }
 
   def unsafe[T](e: IOResult[T]): T = e match {
