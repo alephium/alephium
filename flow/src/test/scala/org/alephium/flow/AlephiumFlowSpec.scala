@@ -238,6 +238,17 @@ trait FlowFixture
     mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }
 
+  def mineWithoutCoinbase(chainIndex: ChainIndex,
+                          txs: AVector[Transaction],
+                          blockTs: TimeStamp): Block = {
+    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val (_, toPublicKey) = chainIndex.to.generateKey
+    val coinbaseTx =
+      Transaction.coinbase(chainIndex, txs, toPublicKey, consensusConfig.maxMiningTarget, blockTs)
+
+    mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
+  }
+
   def mine(chainIndex: ChainIndex,
            deps: AVector[Hash],
            txs: AVector[Transaction],

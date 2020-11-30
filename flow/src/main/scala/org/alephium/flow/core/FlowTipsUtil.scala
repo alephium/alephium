@@ -94,7 +94,7 @@ trait FlowTipsUtil {
     getHashChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
-  protected def getTipsDiffUnsafe(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
+  def getTipsDiffUnsafe(newTips: AVector[Hash], oldTips: AVector[Hash]): AVector[Hash] = {
     Utils.unsafe(getTipsDiff(newTips, oldTips))
   }
 
