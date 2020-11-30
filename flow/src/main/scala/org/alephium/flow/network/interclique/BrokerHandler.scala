@@ -44,27 +44,27 @@ trait BrokerHandler extends BaseBrokerHandler {
 
     val receive: Receive = {
       case BaseBrokerHandler.SyncLocators(locators) =>
-        log.debug(s"Send sync locators to $remoteAddress: ${show(locators)}")
+        log.debug(s"Send sync locators to $remoteAddress: ${Utils.showFlow(locators)}")
         send(SyncRequest(locators))
       case BaseBrokerHandler.Received(SyncRequest(locators)) =>
         if (validate(locators)) {
-          log.debug(s"Received sync request from $remoteAddress: ${show(locators)}")
+          log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
           allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
         } else {
-          log.warning(s"Invalid locators from $remoteAddress: ${show(locators)}")
+          log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
         }
       case FlowHandler.SyncInventories(inventories) =>
-        log.debug(s"Send sync response to $remoteAddress: ${show(inventories)}")
+        log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
         if (hashes.forall(_.isEmpty)) {
           cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
         } else {
           if (validate(hashes)) {
-            log.debug(s"Received sync response ${show(hashes)} from $remoteAddress")
+            log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
             blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
           } else {
-            log.warning(s"Invalid sync response from $remoteAddress: ${show(hashes)}")
+            log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
           }
         }
     }
@@ -75,9 +75,5 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def validate(locators: AVector[AVector[Hash]]): Boolean = {
     locators.forall(_.forall(hash => brokerConfig.contains(ChainIndex.from(hash).from)))
-  }
-
-  def show(hashes: AVector[AVector[Hash]]): String = {
-    Utils.show(hashes.flatMap(identity))
   }
 }

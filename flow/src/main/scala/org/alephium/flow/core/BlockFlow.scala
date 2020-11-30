@@ -139,7 +139,7 @@ object BlockFlow extends StrictLogging {
       BlockHeaderChain.fromStorageUnsafe(storages)
     )
     logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers")
-    blockflow.updateBestDepsUnsafe()
+    blockflow.updateBestDepsAfterLoadingUnsafe()
     blockflow
   }
 
@@ -269,6 +269,12 @@ object BlockFlow extends StrictLogging {
       brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateMemPoolUnsafe(mainGroup, deps)
+        updateBestDeps(mainGroup, deps)
+      }
+
+    def updateBestDepsAfterLoadingUnsafe(): Unit =
+      brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
+        val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateBestDeps(mainGroup, deps)
       }
 
