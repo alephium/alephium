@@ -26,7 +26,7 @@ trait ConsensusConfig {
   def maxMiningTarget: Target
 
   // scalastyle:off magic.number
-  def maxHeaderTimeStampDrift: Duration = Emission.blockTargetTime.timesUnsafe(16)
+  def maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
   // scalastyle:on magic.number
 
   def tipsPruneInterval: Int
