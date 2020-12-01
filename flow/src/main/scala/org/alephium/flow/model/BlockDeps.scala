@@ -18,7 +18,7 @@ package org.alephium.flow.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 /*
@@ -28,7 +28,11 @@ import org.alephium.util.AVector
  */
 final case class BlockDeps(deps: AVector[Hash]) {
   def getOutDep(to: GroupIndex)(implicit config: GroupConfig): Hash = {
-    deps.takeRight(config.groups)(to.value)
+    outDeps.apply(to.value)
+  }
+
+  def parentHash(chainIndex: ChainIndex)(implicit config: GroupConfig): Hash = {
+    getOutDep(chainIndex.to)
   }
 
   def outDeps(implicit config: GroupConfig): AVector[Hash] = {

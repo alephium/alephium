@@ -79,6 +79,7 @@ object FlowHandler {
   final case class BlockFlowTemplate(index: ChainIndex,
                                      deps: AVector[Hash],
                                      target: Target,
+                                     parentTs: TimeStamp,
                                      transactions: AVector[Transaction])
       extends Event
   final case class BlocksLocated(blocks: AVector[Block])           extends Event

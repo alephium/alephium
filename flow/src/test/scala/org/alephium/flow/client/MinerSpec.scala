@@ -22,9 +22,18 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.ActorRefT
+import org.alephium.util.{ActorRefT, Duration, TimeStamp}
 
 class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
+  it should "use proper timestamp" in {
+    val currentTs = TimeStamp.now()
+    val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
+    val futureTs  = currentTs.plusHoursUnsafe(1)
+    Miner.nextTimeStamp(pastTs) > currentTs is true
+    Miner.nextTimeStamp(currentTs) > currentTs is true
+    Miner.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
+  }
+
   it should "initialize FairMiner" in {
     val flowHandler          = TestProbe("flowHandler")
     val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)

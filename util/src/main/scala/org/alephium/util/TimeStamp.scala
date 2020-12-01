@@ -63,6 +63,8 @@ class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
     millis < another.millis
 
   def compare(that: TimeStamp): Int = millis compare that.millis
+
+  override def toString: String = s"TimeStamp(${millis}ms)"
 }
 
 object TimeStamp {
