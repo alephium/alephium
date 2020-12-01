@@ -56,7 +56,10 @@ object ConflictedBlocks {
     def isBlockCached(block: Block): Boolean = isBlockCached(block.hash)
     def isBlockCached(hash: Hash): Boolean   = blockCache.contains(hash)
 
-    def add(block: Block): Unit = if (!isBlockCached(block)) {
+    def add(block: Block): Unit = this.synchronized(addUnsafe(block))
+
+    // thread unsafe
+    def addUnsafe(block: Block): Unit = if (!isBlockCached(block)) {
       blockCache.addOne(block.hash -> block)
 
       val conflicts = mutable.HashSet.empty[Hash]
@@ -85,6 +88,7 @@ object ConflictedBlocks {
       }
     }
 
+    // thread unsafe
     def remove(block: Block): Unit = if (isBlockCached(block)) {
       blockCache.remove(block.hash)
 
@@ -114,7 +118,7 @@ object ConflictedBlocks {
       }
     }
 
-    def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = {
+    def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = this.synchronized {
       hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
 
       val result = hashes.existsWithIndex {

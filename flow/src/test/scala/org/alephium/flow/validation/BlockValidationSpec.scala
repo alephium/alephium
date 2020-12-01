@@ -174,15 +174,15 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val newBlockTs = ALF.GenesisTimestamp.plusSecondsUnsafe(1)
     val block1     = mineWithoutCoinbase(chainIndex, block0.nonCoinbase, newBlockTs)
-    blockValidation.validate(block1, blockFlow) isE ()
 
     val newOutTips = block1.header.outDeps
     val intraDep   = block1.header.intraDep
     val oldOutTips =
       blockFlow.getOutTips(blockFlow.getBlockHeaderUnsafe(intraDep), inclusive = false)
     val diff = blockFlow.getTipsDiffUnsafe(newOutTips, oldOutTips)
-    blockFlow.cacheForConflicts(block1)
     assertThrows[IOError.KeyNotFound[_]](
       !blockFlow.isConflicted(block1.hash +: diff, blockFlow.getBlockUnsafe))
+
+    blockValidation.validate(block1, blockFlow) isE ()
   }
 }

@@ -61,7 +61,6 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     val intraDep   = block.header.intraDep
     val oldOutTips = getOutTips(getBlockHeaderUnsafe(intraDep), inclusive = false)
     val diff       = getTipsDiffUnsafe(newOutTips, oldOutTips)
-    cacheForConflicts(block)
     !isConflicted(block.hash +: diff,
                   hash => if (hash == block.hash) block else getBlockUnsafe(hash))
   }
