@@ -31,7 +31,8 @@ trait ConflictedBlocks {
   def consensusConfig: ConsensusSetting
 
   lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
-    ConflictedBlocks.emptyCache(consensusConfig.conflictCacheKeepDuration))
+    ConflictedBlocks.emptyCache(consensusConfig.blockCacheCapacityPerChain * brokerConfig.groups,
+                                consensusConfig.conflictCacheKeepDuration))
 
   def getCache(block: Block): GroupCache =
     caches(block.chainIndex.from.value - brokerConfig.groupFrom)
@@ -47,7 +48,8 @@ trait ConflictedBlocks {
 }
 
 object ConflictedBlocks {
-  final case class GroupCache(keepDuration: Duration,
+  final case class GroupCache(cacheSizeBoundary: Int,
+                              keepDuration: Duration,
                               blockCache: mutable.HashMap[Hash, Block],
                               txCache: mutable.HashMap[TxOutputRef, ArrayBuffer[Hash]],
                               conflictedBlocks: mutable.HashMap[Hash, ArrayBuffer[Hash]]) {
@@ -81,8 +83,6 @@ object ConflictedBlocks {
           }
         }
       }
-
-      uncacheOldTips(keepDuration)
     }
 
     def remove(block: Block): Unit = if (isBlockCached(block)) {
@@ -117,19 +117,32 @@ object ConflictedBlocks {
     def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = {
       hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
 
-      hashes.existsWithIndex {
+      val result = hashes.existsWithIndex {
         case (hash, index) =>
           isConflicted(hash, hashes.drop(index + 1))
       }
+
+      uncacheOldTips(keepDuration, hashes.head)
+      result
     }
 
-    def uncacheOldTips(duration: Duration): Unit = {
-      val earliestTs = TimeStamp.now().minusUnsafe(duration)
-      val toRemove   = blockCache.values.filter(_.timestamp < earliestTs)
-      toRemove.foreach(block => blockCache.remove(block.hash))
+    private def uncacheOldTips(duration: Duration, hash: Hash): Unit = {
+      if (blockCache.size >= cacheSizeBoundary) {
+        val block = blockCache(hash)
+        assume(!block.isGenesis)
+        val earliestTs1 = TimeStamp.now().minusUnsafe(duration)
+        val earliestTs2 = block.header.timestamp.minusUnsafe(duration)
+        val earliestTs  = if (earliestTs1 < earliestTs2) earliestTs1 else earliestTs2
+        val toRemove    = blockCache.values.filter(_.timestamp <= earliestTs)
+        toRemove.foreach(block => remove(block))
+      }
     }
   }
 
-  def emptyCache(keepDuration: Duration): GroupCache =
-    GroupCache(keepDuration, mutable.HashMap.empty, mutable.HashMap.empty, mutable.HashMap.empty)
+  def emptyCache(cacheSizeBoundary: Int, keepDuration: Duration): GroupCache =
+    GroupCache(cacheSizeBoundary,
+               keepDuration,
+               mutable.HashMap.empty,
+               mutable.HashMap.empty,
+               mutable.HashMap.empty)
 }

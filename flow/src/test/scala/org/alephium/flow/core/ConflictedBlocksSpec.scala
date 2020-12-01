@@ -50,7 +50,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
                  Random.nextNonZeroInt())
     }
 
-    val cache = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(10))
+    val cache = ConflictedBlocks.emptyCache(0, Duration.ofMinutesUnsafe(10))
   }
 
   it should "add block into cache" in new Fixture {
@@ -82,7 +82,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     val block0 = blockGen0(txInputs(0), txInputs(1))
     val block1 = blockGen0(txInputs(1), txInputs(2))
     val block2 = blockGen0(txInputs(2), txInputs(3))
-    val blocks = Seq(block0, block1, block2)
+    val blocks = AVector(block0, block1, block2)
   }
 
   it should "detect conflicts" in new Fixture1 {
@@ -131,12 +131,28 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     cache.conflictedBlocks.size is 0
   }
 
-  it should "cache nothing when keep duration is 0" in new Fixture1 {
+  it should "cache nothing when keep duration is 0 and cache size is small" in new Fixture1 {
     Thread.sleep(10) // make sure blocks are old now
 
-    val cache0 = ConflictedBlocks.emptyCache(Duration.ofMinutesUnsafe(0))
+    val cache0 = ConflictedBlocks.emptyCache(0, Duration.ofMinutesUnsafe(0))
     blocks.foreach(cache0.add)
-    blocks.foreach(block => cache0.isBlockCached(block) is false)
+    blocks.foreach(block => cache0.isBlockCached(block) is true)
+
+    val latestBlock = blocks.maxBy(_.header.timestamp)
+    cache0.isConflicted((latestBlock +: blocks).map(_.hash), _ => ???)
+    blocks.foreach(cache0.isBlockCached(_) is false)
+  }
+
+  it should "cache everything when keep duration is 0 but cache size is big" in new Fixture1 {
+    Thread.sleep(10) // make sure blocks are old now
+
+    val cache0 = ConflictedBlocks.emptyCache(blocks.length + 1, Duration.ofMinutesUnsafe(0))
+    blocks.foreach(cache0.add)
+    blocks.foreach(block => cache0.isBlockCached(block) is true)
+
+    val latestBlock = blocks.maxBy(_.header.timestamp)
+    cache0.isConflicted((latestBlock +: blocks).map(_.hash), _ => ???)
+    blocks.foreach(cache0.isBlockCached(_) is true)
   }
 
   trait Fixture2 extends Fixture {
