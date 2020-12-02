@@ -276,7 +276,9 @@ trait TestFixtureLike
           new WalletApp(walletConfig)
         }
 
-      lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+      lazy val blocksExporter = new BlocksExporter(node)
+      lazy val restServer: RestServer =
+        RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
       lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
       lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 

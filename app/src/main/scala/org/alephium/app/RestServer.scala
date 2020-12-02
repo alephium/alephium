@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import java.io.File
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
@@ -41,7 +43,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManage
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, Service}
+import org.alephium.util.{ActorRefT, AVector, Duration, Service, TimeStamp}
 import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
@@ -49,6 +51,7 @@ class RestServer(
     node: Node,
     port: Int,
     miner: ActorRefT[Miner.Command],
+    blocksExporter: BlocksExporter,
     walletServer: Option[WalletServer]
 )(implicit val apiConfig: ApiConfig,
   val actorSystem: ActorSystem,
@@ -149,6 +152,10 @@ class RestServer(
     serverUtils.compile(query)
   }
 
+  private val exportBlocksRoute = exportBlocks.toRoute { _ =>
+    Future.successful(
+      Right(blocksExporter.export(new File(s"blocks-dump-${TimeStamp.now().millis}"))))
+  }
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
     getSelfClique,
@@ -190,6 +197,7 @@ class RestServer(
       minerActionLogic.toRoute ~
       sendContractRoute ~
       compileRoute ~
+      exportBlocksRoute ~
       buildContractRoute ~
       swaggerUIRoute
 
@@ -223,12 +231,14 @@ class RestServer(
 }
 
 object RestServer {
-  def apply(node: Node, miner: ActorRefT[Miner.Command], walletServer: Option[WalletServer])(
-      implicit system: ActorSystem,
-      apiConfig: ApiConfig,
-      executionContext: ExecutionContext): RestServer = {
+  def apply(node: Node,
+            miner: ActorRefT[Miner.Command],
+            blocksExporter: BlocksExporter,
+            walletServer: Option[WalletServer])(implicit system: ActorSystem,
+                                                apiConfig: ApiConfig,
+                                                executionContext: ExecutionContext): RestServer = {
     val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner, walletServer)
+    new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
   def selfCliqueFrom(cliqueInfo: IntraCliqueInfo): SelfClique = {
     SelfClique(

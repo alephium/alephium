@@ -38,6 +38,7 @@ trait Server extends Service {
   implicit def executionContext: ExecutionContext
 
   def node: Node
+  def blocksExporter: BlocksExporter
   def restServer: RestServer
   def webSocketServer: WebSocketServer
   def miner: ActorRefT[Miner.Command]
@@ -91,8 +92,10 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
     new WalletApp(walletConfig)
   }
 
-  implicit def brokerConfig: BrokerSetting      = config.broker
-  lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+  implicit def brokerConfig: BrokerSetting = config.broker
+  lazy val blocksExporter: BlocksExporter  = new BlocksExporter(node)
+  lazy val restServer: RestServer =
+    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
   lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 }
