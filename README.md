@@ -63,7 +63,7 @@ The resulting assembly file will appear in `/app/target/scala-2.13/` directory.
 In order to build a zip distribution including launch scripts use the following command:
   ./make package
 
-The resulting package file will appear in the `app/target/scala-2.12/universal` directory.
+The resulting package file will appear in the `app/target/scala-2.13/universal` directory.
 
 ## Configuration
 
