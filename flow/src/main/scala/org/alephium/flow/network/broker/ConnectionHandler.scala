@@ -92,7 +92,6 @@ trait ConnectionHandler[T] extends BaseActor {
 
   def reading: Receive = {
     case Tcp.Received(data) =>
-      log.debug(s"Received data ${data.length} bytes from $remoteAddress")
       bufferInMessage(data)
       processInMessageBuffer()
       connection ! Tcp.ResumeReading

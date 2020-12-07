@@ -70,7 +70,9 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
           val index = ChainIndex.unsafe(mainGroup, toGroup)
           sum + getPool(index).remove(index, txs.map(_.toTemplate))
         }
-        logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
+        if (removed > 0) {
+          logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
+        }
       case Reorg(toRemove, toAdd) =>
         val (removed, added) = getPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
