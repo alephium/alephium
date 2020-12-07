@@ -17,20 +17,7 @@
 package org.alephium.protocol.config
 
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.Target
-import org.alephium.util.Duration
 
-trait ConsensusConfigFixture {
-  implicit val consensusConfig: ConsensusConfig = new ConsensusConfig {
-    override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-    override val numZerosAtLeastInHash: Int = 0
-    override val maxMiningTarget: Target    = Target.Max
-    override val tipsPruneInterval: Int     = 2
-
-    override val emission: Emission =
-      Emission(new GroupConfig {
-        override def groups: Int = 3
-      }, blockTargetTime)
-  }
+trait EmissionConfig {
+  def emission: Emission
 }

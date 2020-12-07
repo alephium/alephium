@@ -16,11 +16,11 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
-trait ConsensusConfig {
+trait ConsensusConfig extends EmissionConfig {
+  def blockTargetTime: Duration
 
   def numZerosAtLeastInHash: Int
   def maxMiningTarget: Target
@@ -30,5 +30,5 @@ trait ConsensusConfig {
   // scalastyle:on magic.number
 
   def tipsPruneInterval: Int
-  def tipsPruneDuration: Duration = Emission.blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
+  def tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
 }

@@ -25,12 +25,17 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
-    implicit val consensusConfig: ConsensusSetting = ConsensusSetting(18, 100, 25)
+    implicit val consensusConfig: ConsensusSetting = {
+      val blockTargetTime = Duration.ofSecondsUnsafe(64)
+      val emission        = Emission(Test.groupConfig, blockTargetTime)
+      ConsensusSetting(blockTargetTime, 18, 100, 25, emission)
+    }
 
     val chainInfo = mutable.HashMap.empty[Hash, (Int, TimeStamp)] // block hash -> (height, timestamp)
     val threshold = consensusConfig.powAveragingWindow + 1

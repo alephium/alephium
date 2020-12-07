@@ -30,16 +30,19 @@ import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.flow.validation.Validation
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object Miner {
-  def props(node: Node)(implicit brokerConfig: BrokerConfig, miningSetting: MiningSetting): Props =
+  def props(node: Node)(implicit brokerConfig: BrokerConfig,
+                        emissionConfig: EmissionConfig,
+                        miningSetting: MiningSetting): Props =
     props(node.blockFlow, node.allHandlers)
 
   def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
+                                                            emissionConfig: EmissionConfig,
                                                             miningSetting: MiningSetting): Props = {
     val addresses = AVector.tabulate(brokerConfig.groups) { i =>
       val index          = GroupIndex.unsafe(i)
@@ -51,6 +54,7 @@ object Miner {
 
   def props(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,
+      emissionConfig: EmissionConfig,
       miningConfig: MiningSetting): Props = {
     require(addresses.length == brokerConfig.groups)
     addresses.foreachWithIndex { (publicKey, i) =>
@@ -107,6 +111,7 @@ object Miner {
 
 class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
+    val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting)
     extends BaseActor
     with MinerState {

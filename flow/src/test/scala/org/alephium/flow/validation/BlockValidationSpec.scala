@@ -122,7 +122,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block = blockGenOf(brokerConfig).filter(_.nonCoinbase.nonEmpty).sample.get
     passCheck(checkCoinbaseReward(block))
 
-    val miningReward      = brokerConfig.emission.miningReward(block.header)
+    val miningReward      = consensusConfig.emission.miningReward(block.header)
     val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = miningReward)
     val coinbaseNew = block.coinbase.copy(
       unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew)))

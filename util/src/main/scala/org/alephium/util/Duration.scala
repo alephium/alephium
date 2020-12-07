@@ -50,7 +50,7 @@ class Duration(val millis: Long) extends AnyVal with Ordered[Duration] {
 
   def compare(that: Duration): Int = millis compare that.millis
 
-  override def toString: String = s"$Duration({millis}ms)"
+  override def toString: String = s"$Duration(${millis}ms)"
 }
 
 object Duration {

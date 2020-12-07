@@ -16,23 +16,26 @@
 
 package org.alephium.flow.setting
 
-import java.io.File
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
 
-import com.typesafe.config.ConfigFactory
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.model.NetworkType
+import org.alephium.util.{AlephiumSpec, Duration}
 
 class AlephiumConfigSpec extends AlephiumSpec {
-  it should "load alephium config" in {
-    val path   = getClass.getResource(s"/system_test.conf.tmpl").getPath
-    val file   = new File(path)
-    val config = ConfigFactory.parseFile(file)
-    AlephiumConfig.load(config.getConfig("alephium")).isRight is true
+  it should "load alephium config" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.groups", "13"),
+      ("alephium.consensus.block-target-time", "11 seconds")
+    )
+
+    config.broker.groups is 13
+    config.network.networkType is NetworkType.Devnet
+    config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
   }
 
   it should "load bootstrap config" in {

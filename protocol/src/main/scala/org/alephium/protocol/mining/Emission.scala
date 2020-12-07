@@ -23,7 +23,12 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, TimeStamp, U256}
 
-class Emission(groupConfig: GroupConfig) {
+class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
+  val yearsUntilStable: Int               = 4
+  val blocksInAboutOneYear: Long          = 365L * 24L * 60L * 60L * 1000L / blockTargetTime.millis
+  val blocksToStableMaxReward: Long       = blocksInAboutOneYear * yearsUntilStable
+  val durationToStableMaxReward: Duration = blockTargetTime.timesUnsafe(blocksToStableMaxReward)
+
   val initialMaxRewardPerChain: U256         = share(Emission.initialMaxReward)
   val stableMaxRewardPerChain: U256          = share(Emission.stableMaxReward)
   val lowHashRateInitialRewardPerChain: U256 = share(Emission.lowHashRateInitialReward)
@@ -35,12 +40,11 @@ class Emission(groupConfig: GroupConfig) {
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
     .divUnsafe(ALF.cent(1))
-    .divUnsafe(U256.unsafe(Emission.yearsUntilStable))
+    .divUnsafe(U256.unsafe(yearsUntilStable))
     .toBigInt
     .longValue()
-  val blocksToDropAboutOneCent: Long = Emission.blocksInAboutOneYear / yearlyCentsDropUntilStable
-  val durationToDropAboutOnceCent: Duration =
-    Emission.blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
+  val blocksToDropAboutOneCent: Long        = blocksInAboutOneYear / yearlyCentsDropUntilStable
+  val durationToDropAboutOnceCent: Duration = blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
 
   def share(amount: U256): U256 =
     amount.divUnsafe(U256.unsafe(groupConfig.chainNum))
@@ -60,7 +64,7 @@ class Emission(groupConfig: GroupConfig) {
   def rewardMax(blockTs: TimeStamp, genesisTs: TimeStamp): U256 = {
     require(blockTs >= genesisTs)
     val elapsed = blockTs.deltaUnsafe(genesisTs)
-    if (elapsed >= Emission.durationToStableMaxReward) {
+    if (elapsed >= durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {
       val reducedCents = ALF.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
@@ -92,18 +96,12 @@ class Emission(groupConfig: GroupConfig) {
 }
 
 object Emission {
-  def apply(groupConfig: GroupConfig): Emission = new Emission(groupConfig)
+  def apply(groupConfig: GroupConfig, blockTargetTime: Duration): Emission =
+    new Emission(groupConfig, blockTargetTime)
 
   //scalastyle:off magic.number
   private[mining] val initialMaxReward: U256         = ALF.alf(60)
   private[mining] val stableMaxReward: U256          = ALF.alf(20)
   private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
-
-  val yearsUntilStable: Int         = 4
-  val blockTargetTime: Duration     = Duration.ofSecondsUnsafe(64)
-  val blocksInAboutOneYear: Long    = 365L * 24L * 60L * 60L * 1000L / blockTargetTime.millis
-  val blocksToStableMaxReward: Long = blocksInAboutOneYear * yearsUntilStable
-  val durationToStableMaxReward: Duration =
-    Emission.blockTargetTime.timesUnsafe(Emission.blocksToStableMaxReward)
   //scalastyle:on magic.number
 }

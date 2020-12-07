@@ -16,14 +16,10 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.mining.Emission
-
 trait GroupConfig {
   def groups: Int
 
   def chainNum: Int = groups * groups
 
   def depsNum: Int = 2 * groups - 1
-
-  lazy val emission: Emission = Emission(this)
 }

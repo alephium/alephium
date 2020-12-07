@@ -131,7 +131,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
-    val reward = brokerConfig.emission.miningReward(block.header)
+    val reward = consensusConfig.emission.miningReward(block.header)
     if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
       validBlock(())
     } else {

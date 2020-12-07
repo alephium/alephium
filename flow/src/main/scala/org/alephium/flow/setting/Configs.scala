@@ -22,7 +22,7 @@ import java.nio.file.Path
 import scala.annotation.tailrec
 import scala.util.control.Exception.allCatch
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
@@ -80,28 +80,46 @@ object Configs extends StrictLogging {
     file
   }
 
-  def parseConfig(rootPath: Path, networkType: Option[NetworkType]): Config = {
-    networkType match {
-      case Some(networkType) =>
-        ConfigFactory
-          .parseFile(getConfigUser(rootPath))
-          .withFallback(
-            ConfigFactory
-              .parseFile(getConfigNetwork(rootPath, networkType))
-              .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
-          )
-          .resolve()
+  def parseConfigFile(file: File): Either[String, Config] =
+    try {
+      Right(ConfigFactory.parseFile(file))
+    } catch {
+      case e: ConfigException =>
+        Left(s"Cannot parse config file: $file, exception: ${e}")
+    }
 
-      case None =>
-        ConfigFactory
-          .parseFile(getConfigUser(rootPath))
-          .withFallback(ConfigFactory.parseFile(getConfigSystem(rootPath)))
-          .resolve()
+  def parseNetworkType(rootPath: Path, config: Config): Either[String, NetworkType] = {
+    if (!config.hasPath("alephium.network.network-type")) {
+      Left(s"""|The network type isn't defined!
+               |
+               |Please set the network type in your $rootPath/user.conf and try again.
+               |
+               |Example:
+               |alephium.network.network-type = "testnet"
+          """.stripMargin)
+    } else {
+      val rawNetworkType = config.getString("alephium.network.network-type")
+      NetworkType.fromName(rawNetworkType).toRight(s"Invalid network type: $rawNetworkType")
     }
   }
 
-  def parseConfigAndValidate(rootPath: Path, networkType: Option[NetworkType]): Config = {
-    val config = parseConfig(rootPath, networkType)
+  def parseConfig(rootPath: Path): Config = {
+    val resultEither = for {
+      userConfig    <- parseConfigFile(getConfigUser(rootPath))
+      systemConfig  <- parseConfigFile(getConfigSystem(rootPath))
+      networkType   <- parseNetworkType(rootPath, userConfig.withFallback(systemConfig).resolve())
+      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType))
+    } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
+    resultEither match {
+      case Right(config) => config
+      case Left(error) =>
+        logger.error(error)
+        sys.exit(1)
+    }
+  }
+
+  def parseConfigAndValidate(rootPath: Path): Config = {
+    val config = parseConfig(rootPath)
     if (!config.hasPath("alephium.discovery.bootstrap")) {
       logger.error(s"""|The bootstrap nodes are not defined!
                        |
@@ -113,22 +131,6 @@ object Configs extends StrictLogging {
       sys.exit(1)
     } else {
       config
-    }
-  }
-
-  def parseNetworkType(rootPath: Path): Option[NetworkType] = {
-    val config = parseConfig(rootPath, None)
-    if (!config.hasPath("alephium.network.network-type")) {
-      logger.error(s"""|The network type isn't defined!
-                       |
-                       |Please set the network type in your $rootPath/user.conf and try again.
-                       |
-                       |Example:
-                       |alephium.network.network-type = "testnet"
-                  """.stripMargin)
-      sys.exit(1)
-    } else {
-      Option(config.getString("alephium.network.network-type")).flatMap(NetworkType.fromName)
     }
   }
 
