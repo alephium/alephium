@@ -24,7 +24,7 @@ import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{MutableWorldState, StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
@@ -89,12 +89,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 
   private def collectTransactions(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
     getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
-  }
-
-  // Reduce height by 3 to make tx valid with high probability in case of forks
-  def reduceHeight(height: Int): Int = {
-    val newHeight = height - 3
-    if (newHeight >= ALF.GenesisHeight) newHeight else ALF.GenesisHeight
   }
 
   // all the inputs and double spending should have been checked
