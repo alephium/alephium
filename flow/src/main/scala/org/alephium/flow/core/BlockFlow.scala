@@ -188,7 +188,7 @@ object BlockFlow extends StrictLogging {
 
     private def calWeightUnsafe(header: BlockHeader): BigInt = {
       if (header.isGenesis) {
-        ALF.GenesisWeight * (2 * groups - 1)
+        ALF.GenesisWeight * brokerConfig.depsNum
       } else {
         val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
         val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)

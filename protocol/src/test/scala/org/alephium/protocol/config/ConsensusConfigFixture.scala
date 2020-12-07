@@ -24,9 +24,7 @@ trait ConsensusConfigFixture {
   implicit val consensusConfig: ConsensusConfig = new ConsensusConfig {
     override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
 
-    override val numZerosAtLeastInHash: Int = 0
-    override val maxMiningTarget: Target    = Target.Max
-    override val tipsPruneInterval: Int     = 2
+    override val maxMiningTarget: Target = Target.Max
 
     override val emission: Emission =
       Emission(new GroupConfig {

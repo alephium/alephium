@@ -21,14 +21,9 @@ import org.alephium.util.Duration
 
 trait ConsensusConfig extends EmissionConfig {
   def blockTargetTime: Duration
-
-  def numZerosAtLeastInHash: Int
   def maxMiningTarget: Target
 
   // scalastyle:off magic.number
-  def maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
+  val maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
   // scalastyle:on magic.number
-
-  def tipsPruneInterval: Int
-  def tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
 }

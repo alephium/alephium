@@ -36,13 +36,10 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
-  override val chainNum: Int = groups * groups
-
-  override val depsNum: Int = 2 * groups - 1
-
   override lazy val groupNumPerBroker: Int = groups / brokerNum
 }
 
+//scalastyle:off magic.number
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 final case class ConsensusSetting(blockTargetTime: Duration,
                                   numZerosAtLeastInHash: Int,
@@ -64,13 +61,13 @@ final case class ConsensusSetting(blockTargetTime: Duration,
   val windowTimeSpanMax
     : Duration = (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
-  //scalastyle:off magic.number
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
-  //scalastyle:on
 
+  val tipsPruneDuration: Duration         = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
   val conflictCacheKeepDuration: Duration = expectedTimeSpan timesUnsafe 20
 }
+//scalastyle:on
 
 final case class MiningSetting(nonceStep: BigInt, batchDelay: Duration)
 
