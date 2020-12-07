@@ -65,9 +65,10 @@ object Miner {
   }
 
   sealed trait Command
-  case object Start          extends Command
-  case object Stop           extends Command
-  case object UpdateTemplate extends Command
+  case object Start                                                 extends Command
+  case object Stop                                                  extends Command
+  case object UpdateTemplate                                        extends Command
+  final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
   final case class MiningResult(blockOpt: Option[Block],
                                 chainIndex: ChainIndex,
                                 miningCount: BigInt)
@@ -141,6 +142,7 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
   }
 
   def handleMining: Receive = {
+    case Miner.Mine(index, template) => mine(index, template)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       assume(brokerConfig.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - brokerConfig.groupFrom
@@ -193,13 +195,17 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
                 to: Int,
                 template: BlockTemplate,
                 blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
+    val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
+    scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
+  }
+
+  def mine(index: ChainIndex, template: BlockTemplate): Unit = {
     val task = Future {
-      val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
           log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
           val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
-          blockHandler ! handlerMessage
+          allHandlers.getBlockHandler(index) ! handlerMessage
           self ! Miner.MiningResult(Some(block), index, miningCount)
         case None =>
           self ! Miner.MiningResult(None, index, miningConfig.nonceStep)

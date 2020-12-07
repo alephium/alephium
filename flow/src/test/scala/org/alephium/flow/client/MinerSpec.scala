@@ -24,7 +24,7 @@ import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, Duration, TimeStamp}
 
-class MinerSpec extends AlephiumFlowActorSpec("FairMiner") {
+class MinerSpec extends AlephiumFlowActorSpec("Miner") {
   it should "use proper timestamp" in {
     val currentTs = TimeStamp.now()
     val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))

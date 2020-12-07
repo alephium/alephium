@@ -72,7 +72,7 @@ final case class ConsensusSetting(blockTargetTime: Duration,
   val conflictCacheKeepDuration: Duration = expectedTimeSpan timesUnsafe 20
 }
 
-final case class MiningSetting(nonceStep: BigInt)
+final case class MiningSetting(nonceStep: BigInt, batchDelay: Duration)
 
 final case class NetworkSetting(
     networkType: NetworkType,
