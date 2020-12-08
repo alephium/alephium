@@ -29,29 +29,28 @@ import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, DiscoveryConfig, NetworkConfig}
+import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
-  override val chainNum: Int = groups * groups
-
-  override val depsNum: Int = 2 * groups - 1
-
   override lazy val groupNumPerBroker: Int = groups / brokerNum
 }
 
+//scalastyle:off magic.number
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-final case class ConsensusSetting(numZerosAtLeastInHash: Int,
+final case class ConsensusSetting(blockTargetTime: Duration,
+                                  numZerosAtLeastInHash: Int,
                                   tipsPruneInterval: Int,
-                                  blockCacheCapacityPerChain: Int)
+                                  blockCacheCapacityPerChain: Int,
+                                  emission: Emission)
     extends ConsensusConfig {
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
-  val expectedTimeSpan: Duration       = Emission.blockTargetTime
+  val expectedTimeSpan: Duration       = blockTargetTime
   val powAveragingWindow: Int          = 17
   val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
@@ -62,15 +61,15 @@ final case class ConsensusSetting(numZerosAtLeastInHash: Int,
   val windowTimeSpanMax
     : Duration = (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
-  //scalastyle:off magic.number
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
-  //scalastyle:on
 
+  val tipsPruneDuration: Duration         = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
   val conflictCacheKeepDuration: Duration = expectedTimeSpan timesUnsafe 20
 }
+//scalastyle:on
 
-final case class MiningSetting(nonceStep: BigInt)
+final case class MiningSetting(nonceStep: BigInt, batchDelay: Duration)
 
 final case class NetworkSetting(
     networkType: NetworkType,
@@ -142,19 +141,34 @@ final case class AlephiumConfig(
 object AlephiumConfig {
   import PureConfigUtils._
 
+  private final case class TempConsensusSetting(blockTargetTime: Duration,
+                                                numZerosAtLeastInHash: Int,
+                                                tipsPruneInterval: Int,
+                                                blockCacheCapacityPerChain: Int) {
+    def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
+      val emission = Emission(groupConfig, blockTargetTime)
+      ConsensusSetting(blockTargetTime,
+                       numZerosAtLeastInHash,
+                       tipsPruneInterval,
+                       blockCacheCapacityPerChain,
+                       emission)
+    }
+  }
+
   private final case class TempAlephiumConfig(
       broker: BrokerSetting,
-      consensus: ConsensusSetting,
+      consensus: TempConsensusSetting,
       mining: MiningSetting,
       network: NetworkSetting,
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
       wallet: WalletSetting
   ) {
-    lazy val toAlephiumConfig: AlephiumConfig =
+    lazy val toAlephiumConfig: AlephiumConfig = {
+      val consensusExtracted = consensus.toConsensusSetting(broker)
       AlephiumConfig(
         broker,
-        consensus,
+        consensusExtracted,
         mining,
         network,
         discovery,
@@ -162,6 +176,7 @@ object AlephiumConfig {
         wallet,
         Genesis(network.networkType)
       )
+    }
   }
 
   implicit val alephiumConfigReader: ConfigReader[AlephiumConfig] =
@@ -173,9 +188,7 @@ object AlephiumConfig {
     ConfigSource.fromConfig(configLocated)
   }
 
-  def load(rootPath: Path): Result[AlephiumConfig] = {
-    load(Configs.parseConfig(rootPath, None))
-  }
+  def load(rootPath: Path): Result[AlephiumConfig] = load(Configs.parseConfig(rootPath))
   def load(config: Config): Result[AlephiumConfig] = source(config).load[AlephiumConfig]
   def loadOrThrow(config: Config): AlephiumConfig  = source(config).loadOrThrow[AlephiumConfig]
 }

@@ -40,13 +40,13 @@ akka {
 
 alephium {
   consensus {
-    num-zeros-at-least-in-hash = 18
     tips-prune-interval = 100
     block-cache-capacity-per-chain = 25
   }
 
   mining {
     nonce-step = 10000
+    batch-delay = 0 milli
   }
 
   network {

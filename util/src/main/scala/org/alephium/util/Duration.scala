@@ -50,7 +50,7 @@ class Duration(val millis: Long) extends AnyVal with Ordered[Duration] {
 
   def compare(that: Duration): Int = millis compare that.millis
 
-  override def toString: String = s"$Duration({millis}ms)"
+  override def toString: String = s"$Duration(${millis}ms)"
 }
 
 object Duration {
@@ -76,6 +76,9 @@ object Duration {
 
   def ofHours(hours: Long): Option[Duration] = from(hours * 60 * 60 * 1000)
   def ofHoursUnsafe(hours: Long): Duration   = unsafe(hours * 60 * 60 * 1000)
+
+  def ofDays(days: Long): Option[Duration] = from(days * 24 * 60 * 60 * 1000)
+  def ofDaysUnsafe(days: Long): Duration   = unsafe(days * 24 * 60 * 60 * 1000)
 
   def from(dt: JDuration): Option[Duration] = ofMillis(dt.toMillis)
 }

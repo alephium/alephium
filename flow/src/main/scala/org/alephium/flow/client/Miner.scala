@@ -30,16 +30,19 @@ import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.flow.validation.Validation
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object Miner {
-  def props(node: Node)(implicit brokerConfig: BrokerConfig, miningSetting: MiningSetting): Props =
+  def props(node: Node)(implicit brokerConfig: BrokerConfig,
+                        emissionConfig: EmissionConfig,
+                        miningSetting: MiningSetting): Props =
     props(node.blockFlow, node.allHandlers)
 
   def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
+                                                            emissionConfig: EmissionConfig,
                                                             miningSetting: MiningSetting): Props = {
     val addresses = AVector.tabulate(brokerConfig.groups) { i =>
       val index          = GroupIndex.unsafe(i)
@@ -51,6 +54,7 @@ object Miner {
 
   def props(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,
+      emissionConfig: EmissionConfig,
       miningConfig: MiningSetting): Props = {
     require(addresses.length == brokerConfig.groups)
     addresses.foreachWithIndex { (publicKey, i) =>
@@ -61,9 +65,10 @@ object Miner {
   }
 
   sealed trait Command
-  case object Start          extends Command
-  case object Stop           extends Command
-  case object UpdateTemplate extends Command
+  case object Start                                                 extends Command
+  case object Stop                                                  extends Command
+  case object UpdateTemplate                                        extends Command
+  final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
   final case class MiningResult(blockOpt: Option[Block],
                                 chainIndex: ChainIndex,
                                 miningCount: BigInt)
@@ -107,6 +112,7 @@ object Miner {
 
 class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
+    val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting)
     extends BaseActor
     with MinerState {
@@ -136,6 +142,7 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
   }
 
   def handleMining: Receive = {
+    case Miner.Mine(index, template) => mine(index, template)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       assume(brokerConfig.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - brokerConfig.groupFrom
@@ -188,13 +195,17 @@ class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: Al
                 to: Int,
                 template: BlockTemplate,
                 blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
+    val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
+    scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
+  }
+
+  def mine(index: ChainIndex, template: BlockTemplate): Unit = {
     val task = Future {
-      val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
           log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
           val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
-          blockHandler ! handlerMessage
+          allHandlers.getBlockHandler(index) ! handlerMessage
           self ! Miner.MiningResult(Some(block), index, miningCount)
         case None =>
           self ! Miner.MiningResult(None, index, miningConfig.nonceStep)

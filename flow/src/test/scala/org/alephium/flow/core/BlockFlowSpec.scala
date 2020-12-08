@@ -297,8 +297,8 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "sanity check rewards" in new FlowFixture {
     val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(0, 0))
     block.nonCoinbase.nonEmpty is true
-    val minimalReward = Seq(groupConfig.emission.lowHashRateInitialRewardPerChain,
-                            groupConfig.emission.stableMaxRewardPerChain).min
+    val minimalReward = Seq(consensusConfig.emission.lowHashRateInitialRewardPerChain,
+                            consensusConfig.emission.stableMaxRewardPerChain).min
     (block.coinbase.alfAmountInOutputs.get > minimalReward) is true
   }
 

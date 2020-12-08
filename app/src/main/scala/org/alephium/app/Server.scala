@@ -71,7 +71,7 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
   lazy val miner: ActorRefT[Miner.Command] = {
     val props =
       Miner
-        .props(node)(config.broker, config.mining)
+        .props(node)(config.broker, config.consensus, config.mining)
         .withDispatcher("akka.actor.mining-dispatcher")
     ActorRefT.build(system, props, s"FairMiner")
   }

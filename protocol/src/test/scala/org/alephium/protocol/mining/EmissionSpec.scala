@@ -26,8 +26,6 @@ import org.alephium.protocol.model.Target
 import org.alephium.util.{AlephiumSpec, Duration, NumericHelpers, TimeStamp, U256}
 
 class EmissionSpec extends AlephiumSpec with NumericHelpers {
-  import Emission._
-
   def equalLong(x: Long, y: Long, errorOrder: Long = 8): Assertion = {
     val errorBase = math.pow(10.0, errorOrder.toDouble).toLong
     (x >= y * (errorBase - 1) / errorBase && x <= y * (errorBase + 1) / errorBase) is true
@@ -46,18 +44,18 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     val groupConfig = new GroupConfig {
       override def groups: Int = 2
     }
-    val emission = Emission(groupConfig)
+    val emission = Emission(groupConfig, Duration.ofSecondsUnsafe(64))
   }
 
   it should "compute correct constants" in new Fixture {
-    blocksInAboutOneYear is 492750
-    durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
+    emission.blocksInAboutOneYear is 492750
+    emission.durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
 
-    val maxRewards = blocksInAboutOneYear.mulUnsafe(Emission.initialMaxReward)
+    val maxRewards = emission.blocksInAboutOneYear.mulUnsafe(Emission.initialMaxReward)
     val maxRate    = getInflationRate(maxRewards)
     (maxRate > 0.029 && maxRate < 0.03) is true
 
-    val stableRewards = blocksInAboutOneYear.mulUnsafe(Emission.stableMaxReward)
+    val stableRewards = emission.blocksInAboutOneYear.mulUnsafe(Emission.stableMaxReward)
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
   }

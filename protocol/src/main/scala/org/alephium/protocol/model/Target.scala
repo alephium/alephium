@@ -33,6 +33,8 @@ final case class Target(val bits: ByteString) extends Ordered[Target] {
   override def compare(that: Target): Int = this.value.compareTo(that.value)
 
   def toHexString: String = Hex.toHexString(bits)
+
+  override def toString: String = s"Target(toHexString)"
 }
 
 object Target {

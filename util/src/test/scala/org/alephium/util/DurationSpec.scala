@@ -52,6 +52,9 @@ class DurationSpec extends AlephiumSpec {
 
         val hours = minutes / 60
         check(Duration.ofHoursUnsafe(hours), JDuration.ofHours(hours))
+
+        val days = hours / 24
+        check(Duration.ofDaysUnsafe(days), JDuration.ofDays(days))
       } else {
         assertThrows[AssertionError](Duration.ofMillisUnsafe(millis))
         Duration.ofMillis(millis) is None

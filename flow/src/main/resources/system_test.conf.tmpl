@@ -6,17 +6,16 @@ alephium {
   }
 
   consensus {
-    num-zeros-at-least-in-hash = 0
     tips-prune-interval = 2
     block-cache-capacity-per-chain = 4
   }
 
   mining {
     nonce-step = 400
+    batch-delay = 50 milli
   }
 
   network {
-
     network-type = "devnet"
 
     ping-frequency = 300 second

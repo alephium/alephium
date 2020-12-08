@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol._
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{EmissionConfig, GroupConfig}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -171,7 +171,7 @@ object Transaction {
                txs: AVector[Transaction],
                publicKey: PublicKey,
                target: Target,
-               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+               blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
     coinbase(chainIndex, txs, publicKey, ByteString.empty, target, blockTs)
   }
 
@@ -180,7 +180,7 @@ object Transaction {
                publicKey: PublicKey,
                minerData: ByteString,
                target: Target,
-               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+               blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(chainIndex, gasFee, publicKey, minerData, target, blockTs)
   }
@@ -189,7 +189,7 @@ object Transaction {
                gasFee: U256,
                publicKey: PublicKey,
                target: Target,
-               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
+               blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
     coinbase(chainIndex, gasFee, publicKey, ByteString.empty, target, blockTs)
   }
 
@@ -198,8 +198,8 @@ object Transaction {
                publicKey: PublicKey,
                minerData: ByteString,
                target: Target,
-               blockTs: TimeStamp)(implicit config: GroupConfig): Transaction = {
-    val reward       = config.emission.reward(target, blockTs, ALF.GenesisTimestamp)
+               blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
+    val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val pkScript     = LockupScript.p2pkh(publicKey)
