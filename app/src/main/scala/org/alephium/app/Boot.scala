@@ -44,7 +44,7 @@ object Boot extends App with StrictLogging {
   val flowMonitor: ActorRefT[FlowMonitor.Command] =
     ActorRefT.build(system, FlowMonitor.props(stop()), "FlowMonitor")
 
-  val server: Server = new ServerImpl(rootPath)
+  val server: Server = Server(rootPath)
 
   server
     .start()

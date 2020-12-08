@@ -38,17 +38,13 @@ import org.scalatest.time.{Second, Seconds, Span}
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
-import org.alephium.flow.client.{Miner, Node}
-import org.alephium.flow.io.StoragesFixture
+import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
-import org.alephium.wallet.WalletApp
 import org.alephium.wallet.api.model._
-import org.alephium.wallet.config.WalletConfig
-import org.alephium.wallet.service.WalletService
 
 class TestFixture(val name: String) extends TestFixtureLike
 
@@ -178,8 +174,8 @@ trait TestFixtureLike
                masterPort: Int,
                walletPort: Int,
                brokerId: Int,
-               brokerNum: Int                       = 2,
-               bootstrap: Option[InetSocketAddress] = None) = {
+               brokerNum: Int,
+               bootstrap: Option[InetSocketAddress]) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
         ("alephium.network.bind-address", s"localhost:$publicPort"),
@@ -205,6 +201,8 @@ trait TestFixtureLike
           case None => tmp
         }
       }
+
+      val storages: Storages =  StoragesFixture.buildStorages(rootPath)
     }
   }
 
@@ -230,14 +228,17 @@ trait TestFixtureLike
                masterPort: Int                      = defaultMasterPort,
                walletPort: Int                      = defaultWalletPort,
                bootstrap: Option[InetSocketAddress] = None): Server = {
-    val platformEnv        = buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
-    implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
+    val platformEnv =
+      buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
         ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
-      implicit val config           = platformEnv.config
+
+      implicit val config    = platformEnv.config
+      implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
+      val storages           = platformEnv.storages
 
       ActorRefT.build(
         system,
@@ -281,7 +282,6 @@ trait TestFixtureLike
         RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
       lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
       lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
-
     }
 
     server

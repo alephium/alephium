@@ -86,7 +86,7 @@ class RestServer(
       .ask(InterCliqueManager.GetSyncStatuses)
       .mapTo[Seq[InterCliqueManager.SyncStatus]]
       .map { syncedStatuses =>
-        Right(AVector.from(syncedStatuses.map(RestServer.inteCliquePeerInfoFrom)))
+        Right(AVector.from(syncedStatuses.map(RestServer.interCliquePeerInfoFrom)))
       }
   }
 
@@ -240,6 +240,7 @@ object RestServer {
     val restPort = node.config.network.restPort
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
+
   def selfCliqueFrom(cliqueInfo: IntraCliqueInfo): SelfClique = {
     SelfClique(
       cliqueInfo.id,
@@ -249,7 +250,7 @@ object RestServer {
     )
   }
 
-  def inteCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
+  def interCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
     val peerId = syncStatus.peerId
     InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
   }
