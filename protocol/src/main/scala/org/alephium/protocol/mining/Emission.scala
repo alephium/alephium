@@ -24,10 +24,12 @@ import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, TimeStamp, U256}
 
 class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
+  // scalastyle:off magic.number
   val yearsUntilStable: Int               = 4
-  val blocksInAboutOneYear: Long          = 365L * 24L * 60L * 60L * 1000L / blockTargetTime.millis
+  val blocksInAboutOneYear: Long          = Duration.ofDaysUnsafe(365L).millis / blockTargetTime.millis
   val blocksToStableMaxReward: Long       = blocksInAboutOneYear * yearsUntilStable
   val durationToStableMaxReward: Duration = blockTargetTime.timesUnsafe(blocksToStableMaxReward)
+  // scalastyle:on magic.number
 
   val initialMaxRewardPerChain: U256         = share(Emission.initialMaxReward)
   val stableMaxRewardPerChain: U256          = share(Emission.stableMaxReward)
