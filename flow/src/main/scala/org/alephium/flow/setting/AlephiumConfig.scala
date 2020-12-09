@@ -69,7 +69,7 @@ final case class ConsensusSetting(blockTargetTime: Duration,
 }
 //scalastyle:on
 
-final case class MiningSetting(nonceStep: BigInt, batchDelay: Duration)
+final case class MiningSetting(nonceStep: U256, batchDelay: Duration)
 
 final case class NetworkSetting(
     networkType: NetworkType,

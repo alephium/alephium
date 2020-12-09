@@ -21,7 +21,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.ActorRefT
+import org.alephium.util.{ActorRefT, U256}
 
 trait MinerState {
   implicit def brokerConfig: BrokerConfig
@@ -30,12 +30,12 @@ trait MinerState {
   def handlers: AllHandlers
 
   protected val miningCounts =
-    Array.fill[BigInt](brokerConfig.groupNumPerBroker, brokerConfig.groups)(0)
+    Array.fill[U256](brokerConfig.groupNumPerBroker, brokerConfig.groups)(U256.Zero)
   protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
   protected lazy val pendingTasks =
     Array.tabulate(brokerConfig.groupNumPerBroker, brokerConfig.groups)(prepareTemplate)
 
-  def getMiningCount(fromShift: Int, to: Int): BigInt = miningCounts(fromShift)(to)
+  def getMiningCount(fromShift: Int, to: Int): U256 = miningCounts(fromShift)(to)
 
   def isRunning(fromShift: Int, to: Int): Boolean = running(fromShift)(to)
 
@@ -47,8 +47,8 @@ trait MinerState {
     miningCounts.map(_.mkString(",")).mkString(",")
   }
 
-  def increaseCounts(fromShift: Int, to: Int, count: BigInt): Unit = {
-    miningCounts(fromShift)(to) += count
+  def increaseCounts(fromShift: Int, to: Int, count: U256): Unit = {
+    miningCounts(fromShift)(to) = miningCounts(fromShift)(to).addUnsafe(count)
   }
 
   def updateTasks(): Unit = {
@@ -63,12 +63,12 @@ trait MinerState {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
-    val minCount = miningCounts.map(_.min).min
+    val minCount   = miningCounts.map(_.min).min
+    val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     for {
       fromShift <- 0 until brokerConfig.groupNumPerBroker
       to        <- 0 until brokerConfig.groups
-      if miningCounts(fromShift)(to) <= minCount + miningConfig.nonceStep &&
-        !isRunning(fromShift, to)
+      if miningCounts(fromShift)(to) <= countBound && !isRunning(fromShift, to)
     } yield {
       (fromShift, to, pendingTasks(fromShift)(to))
     }

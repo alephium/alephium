@@ -37,8 +37,8 @@ class MiningBench {
 
   @Benchmark
   def mineGenesis(): Boolean = {
-    val nonce = Random.source.nextInt()
-    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, BigInt(nonce))
+    val nonce = Random.nextU256()
+    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, nonce)
     val i     = Random.source.nextInt(groupConfig.groups)
     val j     = Random.source.nextInt(groupConfig.groups)
     PoW.checkMined(block, ChainIndex.unsafe(i, j))

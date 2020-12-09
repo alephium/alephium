@@ -170,12 +170,12 @@ object Configs extends StrictLogging {
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): Block = {
     @tailrec
-    def iter(nonce: BigInt): Block = {
+    def iter(nonce: U256): Block = {
       val block = Block.genesis(transactions, consensusConfig.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
-      if (block.chainIndex == chainIndex) block else iter(nonce + 1)
+      if (block.chainIndex == chainIndex) block else iter(nonce.addOneUnsafe())
     }
 
-    iter(0)
+    iter(U256.Zero)
   }
 }

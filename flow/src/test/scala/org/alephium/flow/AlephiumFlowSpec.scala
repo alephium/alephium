@@ -255,9 +255,9 @@ trait FlowFixture
            txs: AVector[Transaction],
            blockTs: TimeStamp): Block = {
     @tailrec
-    def iter(nonce: BigInt): Block = {
+    def iter(nonce: U256): Block = {
       val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, blockTs, nonce)
-      if (PoW.checkMined(block, chainIndex)) block else iter(nonce + 1)
+      if (PoW.checkMined(block, chainIndex)) block else iter(nonce.addOneUnsafe())
     }
 
     iter(0)

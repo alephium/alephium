@@ -19,8 +19,8 @@ package org.alephium.protocol.model
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.PoW
-import org.alephium.serde._
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.serde.{u256Serde => _, _}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 /** The header of a block with index.from == _group_
   *
@@ -34,7 +34,7 @@ final case class BlockHeader(
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target,
-    nonce: BigInt
+    nonce: U256
 ) extends FlowData {
   lazy val hash: Hash = PoW.hash(this)
 
@@ -71,10 +71,13 @@ final case class BlockHeader(
 }
 
 object BlockHeader {
+  // use fixed width bytes for U256 serialization
+  private implicit val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
+
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: Hash, target: Target, nonce: BigInt): BlockHeader = {
+  def genesis(txsHash: Hash, target: Target, nonce: U256): BlockHeader = {
     BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 }

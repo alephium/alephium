@@ -18,7 +18,7 @@ package org.alephium.flow.client
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 
 import akka.actor.Props
 
@@ -33,7 +33,7 @@ import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Random, TimeStamp, U256}
 
 object Miner {
   def props(node: Node)(implicit brokerConfig: BrokerConfig,
@@ -69,25 +69,24 @@ object Miner {
   case object Stop                                                  extends Command
   case object UpdateTemplate                                        extends Command
   final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
-  final case class MiningResult(blockOpt: Option[Block],
-                                chainIndex: ChainIndex,
-                                miningCount: BigInt)
+  final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
       extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
       implicit groupConfig: GroupConfig,
-      miningConfig: MiningSetting): Option[(Block, BigInt)] = {
-    val nonceStart = BigInt(Random.nextInt(Integer.MAX_VALUE))
-    val nonceEnd   = nonceStart + miningConfig.nonceStep
+      miningConfig: MiningSetting): Option[(Block, U256)] = {
+    val nonceStart = Random.nextU256NonUniform(U256.HalfMaxValue)
+    val nonceEnd   = nonceStart.addUnsafe(miningConfig.nonceStep)
 
     @tailrec
-    def iter(current: BigInt): Option[(Block, BigInt)] = {
+    def iter(current: U256): Option[(Block, U256)] = {
       if (current < nonceEnd) {
         val header = template.buildHeader(current)
         if (PoW.checkMined(header, index)) {
-          Some((Block(header, template.transactions), current - nonceStart + 1))
+          val numTry = current.subUnsafe(nonceStart).addOneUnsafe()
+          Some((Block(header, template.transactions), numTry))
         } else {
-          iter(current + 1)
+          iter(current.addOneUnsafe())
         }
       } else {
         None

@@ -28,4 +28,18 @@ object Random {
     val random = source.nextInt()
     if (random != 0) random else nextNonZeroInt()
   }
+
+  def nextNonNegative(): Int = {
+    source.nextInt(Int.MaxValue)
+  }
+
+  def nextU256(): U256 = {
+    val buffer = new Array[Byte](32)
+    source.nextBytes(buffer)
+    U256.unsafe(buffer)
+  }
+
+  def nextU256NonUniform(bound: U256): U256 = {
+    nextU256().modUnsafe(bound)
+  }
 }

@@ -25,7 +25,7 @@ import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Block, BlockHeader, Target, Transaction, UnsignedTransaction}
 import org.alephium.protocol.vm.StatefulScript
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -36,7 +36,7 @@ class TxOrderBench {
   }
   val txNum: Int = 2000
   val header: BlockHeader =
-    BlockHeader(AVector.fill(7)(Hash.zero), Hash.zero, TimeStamp.zero, Target.Max, 0)
+    BlockHeader(AVector.fill(7)(Hash.zero), Hash.zero, TimeStamp.zero, Target.Max, U256.Zero)
   val txs: AVector[Transaction] =
     AVector.fill(txNum)(
       Transaction.from(UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),

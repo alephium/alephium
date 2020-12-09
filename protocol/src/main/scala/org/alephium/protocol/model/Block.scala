@@ -74,14 +74,14 @@ object Block {
            transactions: AVector[Transaction],
            target: Target,
            timeStamp: TimeStamp,
-           nonce: BigInt): Block = {
+           nonce: U256): Block = {
     // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
     val txsHash     = Hash.hash(transactions)
     val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: AVector[Transaction], target: Target, nonce: BigInt): Block = {
+  def genesis(transactions: AVector[Transaction], target: Target, nonce: U256): Block = {
     val txsHash     = Hash.hash(transactions)
     val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
     Block(blockHeader, transactions)
