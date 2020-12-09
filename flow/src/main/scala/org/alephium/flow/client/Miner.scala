@@ -28,9 +28,9 @@ import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
-import org.alephium.flow.validation.Validation
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
@@ -84,7 +84,7 @@ object Miner {
     def iter(current: BigInt): Option[(Block, BigInt)] = {
       if (current < nonceEnd) {
         val header = template.buildHeader(current)
-        if (Validation.validateMined(header, index)) {
+        if (PoW.checkMined(header, index)) {
           Some((Block(header, template.transactions), current - nonceStart + 1))
         } else {
           iter(current + 1)

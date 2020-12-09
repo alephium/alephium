@@ -16,8 +16,9 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{ALF, Hash, HashSerde}
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.mining.PoW
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -34,13 +35,8 @@ final case class BlockHeader(
     timestamp: TimeStamp,
     target: Target,
     nonce: BigInt
-) extends HashSerde[BlockHeader]
-    with FlowData {
-  override lazy val hash: Hash = _getHash
-
-  def chainIndex(implicit config: GroupConfig): ChainIndex = {
-    ChainIndex.from(hash)
-  }
+) extends FlowData {
+  lazy val hash: Hash = PoW.hash(this)
 
   def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 

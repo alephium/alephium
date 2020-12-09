@@ -20,14 +20,12 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class Block(header: BlockHeader, transactions: AVector[Transaction])
-    extends HashSerde[Block]
-    with FlowData {
+final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
   override def hash: Hash = header.hash
 
   def coinbase: Transaction = transactions.last
@@ -44,10 +42,6 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
   override def timestamp: TimeStamp = header.timestamp
 
   override def target: Target = header.target
-
-  def chainIndex(implicit config: GroupConfig): ChainIndex = {
-    header.chainIndex
-  }
 
   def isGenesis: Boolean = header.isGenesis
 

@@ -14,28 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.protocol.mining
 
+import org.alephium.crypto.{Blake2b, Blake3}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.util.TimeStamp
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
+import org.alephium.serde._
 
-trait FlowData {
-  def timestamp: TimeStamp
-
-  def target: Target
-
-  def hash: Hash
-
-  def chainIndex(implicit config: GroupConfig): ChainIndex = {
-    ChainIndex.from(hash)
+object PoW {
+  def hash(header: BlockHeader): Hash = {
+    val serialized = serialize(header)
+    val hash0      = Blake3.hash(serialized)
+    val hash1      = Blake2b.hash(hash0.bytes)
+    hash1
   }
 
-  def isGenesis: Boolean
+  def checkWork(data: FlowData): Boolean = {
+    val current = BigInt(1, data.hash.bytes.toArray)
+    current.compareTo(data.target.value) <= 0
+  }
 
-  def parentHash(implicit config: GroupConfig): Hash
-
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash
-
-  def shortHex: String = hash.shortHex
+  def checkMined(data: FlowData, index: ChainIndex)(implicit config: GroupConfig): Boolean = {
+    data.chainIndex == index && checkWork(data)
+  }
 }

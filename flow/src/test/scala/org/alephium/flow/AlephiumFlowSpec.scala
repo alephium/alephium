@@ -26,8 +26,9 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{BlockValidation, HeaderValidation, Validation}
+import org.alephium.flow.validation.{BlockValidation, HeaderValidation}
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey}
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -256,7 +257,7 @@ trait FlowFixture
     @tailrec
     def iter(nonce: BigInt): Block = {
       val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, blockTs, nonce)
-      if (Validation.validateMined(block, chainIndex)) block else iter(nonce + 1)
+      if (PoW.checkMined(block, chainIndex)) block else iter(nonce + 1)
     }
 
     iter(0)

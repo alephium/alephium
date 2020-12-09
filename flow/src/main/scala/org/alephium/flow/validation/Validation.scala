@@ -41,14 +41,4 @@ object Validation {
     val builds = splits.map(ds => Forest.tryBuild[Hash, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
   }
-
-  def validateMined[T <: FlowData](data: T, index: ChainIndex)(
-      implicit config: GroupConfig): Boolean = {
-    data.chainIndex == index && checkWorkAmount(data)
-  }
-
-  protected[validation] def checkWorkAmount[T <: FlowData](data: T): Boolean = {
-    val current = BigInt(1, data.hash.bytes.toArray)
-    current.compareTo(data.target.value) <= 0
-  }
 }

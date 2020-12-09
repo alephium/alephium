@@ -18,6 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.TimeStamp
 
@@ -148,7 +149,7 @@ object HeaderValidation {
     }
 
     protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (Validation.checkWorkAmount(header)) validHeader(()) else invalidHeader(InvalidWorkAmount)
+      if (PoW.checkWork(header)) validHeader(()) else invalidHeader(InvalidWorkAmount)
     }
 
     // TODO: check algorithm validatity of dependencies
