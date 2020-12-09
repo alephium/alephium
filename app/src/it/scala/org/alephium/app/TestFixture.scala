@@ -37,7 +37,7 @@ import org.scalatest.time.{Second, Seconds, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.flow.{AlephiumFlowSpec, FlowMonitor}
+import org.alephium.flow.FlowMonitor
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
@@ -51,8 +51,8 @@ class TestFixture(val name: String) extends TestFixtureLike
 // scalastyle:off method.length
 trait TestFixtureLike
     extends AlephiumActorSpecLike
-    with AlephiumFlowSpec
     with AlephiumConfigFixture
+    with NumericHelpers
     with ApiModelCodec
     with ScalaFutures
     with Eventually {
@@ -170,6 +170,21 @@ trait TestFixtureLike
     }
   }
 
+  @tailrec
+  final def awaitNBlocks(number: Int): Unit = {
+    assume(number > 0)
+      val timeout = Duration.ofMinutesUnsafe(2).asScala
+      blockNotifyProbe.receiveOne(max = timeout) match {
+        case TextMessage.Strict(_) =>
+          if (number <= 1) {
+            ()
+          } else {
+            awaitNBlocks(number - 1)
+          }
+      }
+    }
+  }
+
   def buildEnv(publicPort: Int,
                masterPort: Int,
                walletPort: Int,
@@ -202,7 +217,7 @@ trait TestFixtureLike
         }
       }
 
-      val storages: Storages =  StoragesFixture.buildStorages(rootPath)
+      val storages: Storages = StoragesFixture.buildStorages(rootPath)
     }
   }
 
@@ -321,6 +336,9 @@ trait TestFixtureLike
 
   def getBalance(address: String) =
     httpGet(s"/addresses/$address/balance")
+
+  def getChainInfo(fromGroup: Int, toGroup: Int) =
+    httpGet(s"/blockflow/chains?fromGroup=$fromGroup&toGroup=$toGroup")
 
   def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
     httpGet(
