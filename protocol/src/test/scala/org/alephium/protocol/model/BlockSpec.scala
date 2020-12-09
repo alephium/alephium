@@ -37,7 +37,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "hash" in {
     forAll(blockGen) { block =>
-      val expected = Blake2b.hash(Blake3.hash(serialize(block.header)).bytes)
+      val expected = Blake3.hash(Blake3.hash(serialize(block.header)).bytes)
       block.hash is block.header.hash
       block.hash is expected
     }

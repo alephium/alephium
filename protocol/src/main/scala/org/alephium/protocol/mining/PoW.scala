@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.mining
 
-import org.alephium.crypto.{Blake2b, Blake3}
+import org.alephium.crypto.Blake3
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
@@ -26,7 +26,7 @@ object PoW {
   def hash(header: BlockHeader): BlockHash = {
     val serialized = serialize(header)
     val hash0      = Blake3.hash(serialized)
-    val hash1      = Blake2b.hash(hash0.bytes)
+    val hash1      = Blake3.hash(hash0.bytes)
     hash1
   }
 
