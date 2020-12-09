@@ -24,7 +24,7 @@ import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{MutableWorldState, StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
@@ -184,18 +184,22 @@ object FlowUtils {
 }
 
 trait SyncUtils {
-  def getIntraSyncInventories(remoteBroker: BrokerGroupInfo): IOResult[AVector[AVector[Hash]]] =
+  def getIntraSyncInventories(
+      remoteBroker: BrokerGroupInfo): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getIntraSyncInventoriesUnsafe(remoteBroker))
 
-  def getSyncLocators(): IOResult[AVector[AVector[Hash]]] =
+  def getSyncLocators(): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncLocatorsUnsafe())
 
-  def getSyncInventories(locators: AVector[AVector[Hash]]): IOResult[AVector[AVector[Hash]]] =
+  def getSyncInventories(
+      locators: AVector[AVector[BlockHash]]): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators))
 
-  protected def getIntraSyncInventoriesUnsafe(remoteBroker: BrokerGroupInfo): AVector[AVector[Hash]]
+  protected def getIntraSyncInventoriesUnsafe(
+      remoteBroker: BrokerGroupInfo): AVector[AVector[BlockHash]]
 
-  protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]]
+  protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]]
 
-  protected def getSyncInventoriesUnsafe(locators: AVector[AVector[Hash]]): AVector[AVector[Hash]]
+  protected def getSyncInventoriesUnsafe(
+      locators: AVector[AVector[BlockHash]]): AVector[AVector[BlockHash]]
 }

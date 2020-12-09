@@ -22,7 +22,7 @@ import akka.testkit.TestActorRef
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
@@ -52,14 +52,14 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
 
     val downloadTrack = TestActorRef[TestDownloadTracker](TestDownloadTracker.props())
 
-    val randomHashes = AVector.fill(5)(Hash.generate)
+    val randomHashes = AVector.fill(5)(BlockHash.generate)
   }
 
   it should "track downloading" in new Fixture {
     hashes.foreach(hash => blockFlow.contains(hash) isE true)
 
     downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes))
-    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[Hash]))
+    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[BlockHash]))
     downloadTrack.underlyingActor.downloading.isEmpty is true
 
     downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
@@ -67,7 +67,7 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 
     downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
-    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[Hash]))
+    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[BlockHash]))
     downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
 
     hashes.foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))

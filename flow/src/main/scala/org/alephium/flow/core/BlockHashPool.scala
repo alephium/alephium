@@ -18,49 +18,49 @@ package org.alephium.flow.core
 
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.util.AVector
 
 trait BlockHashPool {
   def numHashes: Int
 
-  def contains(hash: Hash): IOResult[Boolean]
+  def contains(hash: BlockHash): IOResult[Boolean]
 
-  def containsUnsafe(hash: Hash): Boolean
+  def containsUnsafe(hash: BlockHash): Boolean
 
-  def getState(hash: Hash): IOResult[BlockState]
+  def getState(hash: BlockHash): IOResult[BlockState]
 
-  def getStateUnsafe(hash: Hash): BlockState
+  def getStateUnsafe(hash: BlockHash): BlockState
 
-  def getWeight(hash: Hash): IOResult[BigInt]
+  def getWeight(hash: BlockHash): IOResult[BigInt]
 
-  def getWeightUnsafe(hash: Hash): BigInt
+  def getWeightUnsafe(hash: BlockHash): BigInt
 
-  def getChainWeight(hash: Hash): IOResult[BigInt]
+  def getChainWeight(hash: BlockHash): IOResult[BigInt]
 
-  def getChainWeightUnsafe(hash: Hash): BigInt
+  def getChainWeightUnsafe(hash: BlockHash): BigInt
 
-  def getHeight(hash: Hash): IOResult[Int]
+  def getHeight(hash: BlockHash): IOResult[Int]
 
-  def getHeightUnsafe(hash: Hash): Int
+  def getHeightUnsafe(hash: BlockHash): Int
 
-  def isTip(hash: Hash): Boolean
+  def isTip(hash: BlockHash): Boolean
 
   // The return excludes locator
-  def getHashesAfter(locator: Hash): IOResult[AVector[Hash]]
+  def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]]
 
-  def getPredecessor(hash: Hash, height: Int): IOResult[Hash]
+  def getPredecessor(hash: BlockHash, height: Int): IOResult[BlockHash]
 
-  def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]]
+  def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]]
 
   // Hashes ordered by height
-  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]]
+  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
-  def getBestTipUnsafe: Hash
+  def getBestTipUnsafe: BlockHash
 
-  def getAllTips: AVector[Hash]
+  def getAllTips: AVector[BlockHash]
 
-  def show(hash: Hash): String = {
+  def show(hash: BlockHash): String = {
     val shortHash = hash.shortHex
     val hashNum   = numHashes - 1 // exclude genesis block
     val height    = getHeight(hash).getOrElse(-1)

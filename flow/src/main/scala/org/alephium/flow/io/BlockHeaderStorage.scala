@@ -20,10 +20,10 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
 
-trait BlockHeaderStorage extends KeyValueStorage[Hash, BlockHeader] {
+trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
   def put(blockHeader: BlockHeader): IOResult[Unit] = put(blockHeader.hash, blockHeader)
 
   def putUnsafe(blockHeader: BlockHeader): Unit = putUnsafe(blockHeader.hash, blockHeader)
@@ -51,5 +51,5 @@ class BlockHeaderRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockHeader](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[BlockHash, BlockHeader](storage, cf, writeOptions, readOptions)
     with BlockHeaderStorage {}

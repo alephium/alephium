@@ -24,7 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util._
@@ -42,14 +42,14 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command
   import ChainHandler.Event
 
   // TODO: validate continuity
-  def handleDatas(datas: Forest[Hash, T],
+  def handleDatas(datas: Forest[BlockHash, T],
                   broker: ActorRefT[ChainHandler.Event],
                   origin: DataOrigin): Unit = {
     addTasks(broker, datas)
     handleReadies(broker, origin, t => blockFlow.contains(t.parentHash))
   }
 
-  def checkContinuity(datas: Forest[Hash, T],
+  def checkContinuity(datas: Forest[BlockHash, T],
                       broker: ActorRefT[ChainHandler.Event]): IOResult[Boolean] = {
     AVector.from(datas.roots).forallE { node =>
       blockFlow
@@ -100,7 +100,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command
   }
 
   def handleMissingDeps(data: T,
-                        hashes: AVector[Hash],
+                        hashes: AVector[BlockHash],
                         broker: ActorRefT[ChainHandler.Event],
                         origin: DataOrigin): Unit = {
     log.debug(s"${data.shortHex} missing deps: ${Utils.showDigest(hashes)}")
@@ -146,7 +146,7 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command
   def addToFlowHandler(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit
 
   def pendingToFlowHandler(data: T,
-                           missings: mutable.HashSet[Hash],
+                           missings: mutable.HashSet[BlockHash],
                            broker: ActorRefT[ChainHandler.Event],
                            origin: DataOrigin,
                            self: ActorRefT[Command]): Unit
@@ -161,9 +161,9 @@ abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command
 abstract class ChainHandlerState[T <: FlowData: ClassTag] {
   import ChainHandler.Event
 
-  private val tasks = mutable.HashMap.empty[ActorRefT[ChainHandler.Event], Forest[Hash, T]]
+  private val tasks = mutable.HashMap.empty[ActorRefT[ChainHandler.Event], Forest[BlockHash, T]]
 
-  def addTasks(broker: ActorRefT[ChainHandler.Event], forest: Forest[Hash, T]): Unit = {
+  def addTasks(broker: ActorRefT[ChainHandler.Event], forest: Forest[BlockHash, T]): Unit = {
     tasks.get(broker) match {
       case Some(existing) => existing.simpleMerge(forest)
       case None           => tasks(broker) = forest
@@ -179,7 +179,7 @@ abstract class ChainHandlerState[T <: FlowData: ClassTag] {
     }
   }
 
-  def isProcessing(broker: ActorRefT[ChainHandler.Event], task: Hash): Boolean = {
+  def isProcessing(broker: ActorRefT[ChainHandler.Event], task: BlockHash): Boolean = {
     tasks.get(broker).exists(_.contains(task))
   }
 

@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.vm.ExeFailure
 import org.alephium.util.AVector
 
@@ -30,27 +30,27 @@ sealed trait InvalidBlockStatus extends InvalidStatus
 sealed trait InvalidHeaderStatus extends InvalidBlockStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
-final case object InvalidGroup                      extends InvalidBlockStatus
-final case object InvalidGenesisTimeStamp           extends InvalidHeaderStatus
-final case object InvalidGenesisDeps                extends InvalidHeaderStatus
-final case object InvalidGenesisWorkTarget          extends InvalidHeaderStatus
-final case object NoIncreasingTimeStamp             extends InvalidHeaderStatus
-final case object TooAdvancedTimeStamp              extends InvalidHeaderStatus
-final case object InvalidTimeStamp                  extends InvalidHeaderStatus
-final case object InvalidWorkAmount                 extends InvalidHeaderStatus
-final case object InvalidWorkTarget                 extends InvalidHeaderStatus
-final case object InvalidHeaderFlow                 extends InvalidHeaderStatus
-final case class MissingDeps(hashes: AVector[Hash]) extends InvalidHeaderStatus
-final case class HeaderIOError(e: IOError)          extends InvalidHeaderStatus
-final case object EmptyTransactionList              extends InvalidBlockStatus
-final case object InvalidCoinbaseFormat             extends InvalidBlockStatus
-final case object InvalidCoinbaseData               extends InvalidBlockStatus
-final case object InvalidCoinbaseReward             extends InvalidBlockStatus
-final case object InvalidMerkleRoot                 extends InvalidBlockStatus
-final case object BlockDoubleSpending               extends InvalidBlockStatus
-final case class ExistInvalidTx(e: InvalidTxStatus) extends InvalidBlockStatus
-final case object InvalidFlowDeps                   extends InvalidBlockStatus
-final case object InvalidFlowTxs                    extends InvalidBlockStatus
+final case object InvalidGroup                           extends InvalidBlockStatus
+final case object InvalidGenesisTimeStamp                extends InvalidHeaderStatus
+final case object InvalidGenesisDeps                     extends InvalidHeaderStatus
+final case object InvalidGenesisWorkTarget               extends InvalidHeaderStatus
+final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
+final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
+final case object InvalidTimeStamp                       extends InvalidHeaderStatus
+final case object InvalidWorkAmount                      extends InvalidHeaderStatus
+final case object InvalidWorkTarget                      extends InvalidHeaderStatus
+final case object InvalidHeaderFlow                      extends InvalidHeaderStatus
+final case class MissingDeps(hashes: AVector[BlockHash]) extends InvalidHeaderStatus
+final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
+final case object EmptyTransactionList                   extends InvalidBlockStatus
+final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
+final case object InvalidCoinbaseData                    extends InvalidBlockStatus
+final case object InvalidCoinbaseReward                  extends InvalidBlockStatus
+final case object InvalidMerkleRoot                      extends InvalidBlockStatus
+final case object BlockDoubleSpending                    extends InvalidBlockStatus
+final case class ExistInvalidTx(e: InvalidTxStatus)      extends InvalidBlockStatus
+final case object InvalidFlowDeps                        extends InvalidBlockStatus
+final case object InvalidFlowTxs                         extends InvalidBlockStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

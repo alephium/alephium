@@ -19,12 +19,12 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockHeader}
 import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
-  def getBlockUnsafe(hash: Hash): Block
+  def getBlockUnsafe(hash: BlockHash): Block
 
   def checkFlowDeps(block: Block): IOResult[Boolean] =
     IOUtils.tryExecute(checkFlowDepsUnsafe(block.header))
@@ -42,7 +42,7 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     val initialTips = getFlowTipsUnsafe(blockDeps.head, targetGroup)
 
     @tailrec
-    def iter(currentTips: FlowTips, tips: AVector[Hash]): Option[FlowTips] = {
+    def iter(currentTips: FlowTips, tips: AVector[BlockHash]): Option[FlowTips] = {
       if (tips.isEmpty) {
         Some(currentTips)
       } else {

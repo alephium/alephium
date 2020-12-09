@@ -24,7 +24,7 @@ import scala.util.Random
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
@@ -37,16 +37,16 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ConsensusSetting(blockTargetTime, 18, 100, 25, emission)
     }
 
-    val chainInfo = mutable.HashMap.empty[Hash, (Int, TimeStamp)] // block hash -> (height, timestamp)
+    val chainInfo = mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
     val threshold = consensusConfig.powAveragingWindow + 1
 
-    def getHeight(hash: Hash): IOResult[Int] = Right(chainInfo(hash)._1)
+    def getHeight(hash: BlockHash): IOResult[Int] = Right(chainInfo(hash)._1)
 
-    def getHash(height: Int): Hash = chainInfo.filter(_._2._1 equals height).head._1
+    def getHash(height: Int): BlockHash = chainInfo.filter(_._2._1 equals height).head._1
 
-    def getTimestamp(hash: Hash): IOResult[TimeStamp] = Right(chainInfo(hash)._2)
+    def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = Right(chainInfo(hash)._2)
 
-    def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] = {
+    def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
       val maxHeight: Int = getHeight(hash).rightValue
       val hashes = AVector
         .from(chainInfo.filter {
@@ -56,14 +56,14 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       Right(hashes)
     }
 
-    def setup(data: AVector[(Hash, TimeStamp)]): Unit = {
+    def setup(data: AVector[(BlockHash, TimeStamp)]): Unit = {
       assume(chainInfo.isEmpty)
       data.foreachWithIndex {
         case ((hash, timestamp), height) => chainInfo(hash) = height -> timestamp
       }
     }
 
-    def calTimeSpan(hash: Hash): IOResult[Duration] = {
+    def calTimeSpan(hash: BlockHash): IOResult[Duration] = {
       calTimeSpan(hash, getHeight(hash).rightValue)
     }
   }
@@ -80,7 +80,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   it should "calculate correct time span" in new MockFixture {
     val genesisTs = TimeStamp.now()
     val data = AVector.tabulate(threshold + 1) { height =>
-      Hash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
+      BlockHash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
     }
     setup(data)
 
@@ -92,7 +92,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   it should "return initial target when few blocks" in {
     val maxHeight = ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1
     (1 until maxHeight).foreach { n =>
-      val data       = AVector.fill(n)(Hash.random -> TimeStamp.zero)
+      val data       = AVector.fill(n)(BlockHash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }
       val latestHash = data.last._1
       fixture.chainBack(latestHash, 0) isE data.tail.map(_._1)
@@ -104,7 +104,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   it should "return the same target when block times are exact" in new MockFixture {
     val genesisTs = TimeStamp.now()
     val data = AVector.tabulate(2 * threshold) { height =>
-      Hash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
+      BlockHash.random -> (genesisTs + consensusConfig.expectedTimeSpan.timesUnsafe(height.toLong))
     }
     setup(data)
 
@@ -123,7 +123,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ratio = ratio * 1.2
       val delta = (consensusConfig.expectedTimeSpan.millis * ratio).toLong
       currentTs = currentTs.plusMillisUnsafe(delta)
-      Hash.random -> currentTs
+      BlockHash.random -> currentTs
     }
     setup(data)
 
@@ -143,7 +143,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ratio = ratio * 1.2
       val delta = (consensusConfig.expectedTimeSpan.millis / ratio).toLong
       currentTs = currentTs.plusMillisUnsafe(delta)
-      Hash.random -> currentTs
+      BlockHash.random -> currentTs
     }
     setup(data)
 
@@ -160,12 +160,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     var currentTs = TimeStamp.now()
     val data = AVector.tabulate(2 * threshold) { _ =>
       currentTs = currentTs + consensusConfig.expectedTimeSpan
-      Hash.random -> currentTs
+      BlockHash.random -> currentTs
     }
     setup(data)
 
     var currentHeight = chainInfo.values.map(_._1).max
-    def addNew(hash: Hash, timestamp: TimeStamp) = {
+    def addNew(hash: BlockHash, timestamp: TimeStamp) = {
       currentHeight += 1
       currentTs = timestamp
       chainInfo += hash -> (currentHeight -> timestamp)
@@ -181,7 +181,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val error    = (Random.nextDouble() - 0.5) / 20
       val duration = consensusConfig.expectedTimeSpan.millis * ratio * (1 + error)
       val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
-      val newHash  = Hash.random
+      val newHash  = BlockHash.random
       addNew(newHash, nextTs)
       currentTarget = calHashTarget(newHash, currentTarget).rightValue
     }

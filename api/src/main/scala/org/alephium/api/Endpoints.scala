@@ -26,7 +26,7 @@ import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
 import org.alephium.api.model._
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{BlockHash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -107,10 +107,10 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[FetchResponse])
       .summary("List blocks on the given time interval")
 
-  val getBlock: BaseEndpoint[Hash, BlockEntry] =
+  val getBlock: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
       .in("blocks")
-      .in(path[Hash]("block_hash"))
+      .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 

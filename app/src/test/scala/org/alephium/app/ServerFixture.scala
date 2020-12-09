@@ -36,7 +36,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{Hash, PrivateKey, SignatureSchema}
+import org.alephium.protocol.{BlockHash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde.serialize
@@ -187,15 +187,15 @@ object ServerFixture {
     def blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
       BlockHeaderChain.fromGenesisUnsafe(storages)
 
-    override def getHeight(hash: Hash): IOResult[Int]              = Right(1)
-    override def getBlockHeader(hash: Hash): IOResult[BlockHeader] = Right(block.header)
-    override def getBlock(hash: Hash): IOResult[Block]             = Right(block)
+    override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
+    override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
+    override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = ???
-    def getAllTips: AVector[Hash]                       = ???
-    def getBestTipUnsafe: Hash                          = ???
+    def getAllTips: AVector[BlockHash]                  = ???
+    def getBestTipUnsafe: BlockHash                     = ???
     def add(header: org.alephium.protocol.model.BlockHeader,
-            parentHash: Hash,
+            parentHash: BlockHash,
             weight: Int): IOResult[Unit]         = ???
     def updateBestDepsUnsafe(): Unit             = ???
     def updateBestDeps(): IOResult[Unit]         = ???

@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation}
-import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey}
+import org.alephium.protocol.{ALF, BlockHash, Hash, PrivateKey, PublicKey}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -251,7 +251,7 @@ trait FlowFixture
   }
 
   def mine(chainIndex: ChainIndex,
-           deps: AVector[Hash],
+           deps: AVector[BlockHash],
            txs: AVector[Transaction],
            blockTs: TimeStamp): Block = {
     @tailrec

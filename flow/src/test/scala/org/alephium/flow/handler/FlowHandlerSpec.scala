@@ -22,7 +22,7 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, BrokerGroupInfo, NoIndexModelGeneratorsLike}
 import org.alephium.util.{ActorRefT, AVector}
@@ -34,12 +34,12 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     genPending(block, mutable.HashSet.empty)
   }
 
-  def genPending(missings: mutable.HashSet[Hash]): PendingBlock = {
+  def genPending(missings: mutable.HashSet[BlockHash]): PendingBlock = {
     val block = blockGen.sample.get
     genPending(block, missings)
   }
 
-  def genPending(block: Block, missings: mutable.HashSet[Hash]): PendingBlock = {
+  def genPending(block: Block, missings: mutable.HashSet[BlockHash]): PendingBlock = {
     PendingBlock(block,
                  missings,
                  DataOrigin.Local,
@@ -55,7 +55,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     val state = new FlowHandlerState { override def statusSizeLimit: Int = 2 }
     state.pendingStatus.size is 0
 
-    val pending0 = genPending(mutable.HashSet.empty[Hash])
+    val pending0 = genPending(mutable.HashSet.empty[BlockHash])
     state.addStatus(pending0)
     state.pendingStatus.size is 1
     state.pendingStatus.head._2 is pending0
@@ -64,7 +64,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.pendingHashes.contains(pending0.hash) is true
     state.counter is 1
 
-    val pending1 = genPending(mutable.HashSet.empty[Hash])
+    val pending1 = genPending(mutable.HashSet.empty[BlockHash])
     state.addStatus(pending1)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending0
@@ -73,7 +73,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     state.pendingHashes.contains(pending1.hash) is true
     state.counter is 2
 
-    val pending2 = genPending(mutable.HashSet.empty[Hash])
+    val pending2 = genPending(mutable.HashSet.empty[BlockHash])
     state.addStatus(pending2)
     state.pendingStatus.size is 2
     state.pendingStatus.head._2 is pending1
@@ -117,7 +117,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     val state = new FlowHandlerState { override def statusSizeLimit: Int = 3 }
     val block = blockGen.sample.get
 
-    val pending = genPending(block, mutable.HashSet.empty[Hash])
+    val pending = genPending(block, mutable.HashSet.empty[BlockHash])
     state.addStatus(pending)
     state.pendingStatus.size is 1
     state.pendingHashes.size is 1
@@ -153,7 +153,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
     }
 
     val locators = AVector.tabulate(3 * 6) { k =>
-      AVector.fill(k)(Hash.generate)
+      AVector.fill(k)(BlockHash.generate)
     }
     val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locators)
     flowEvent.filerFor(brokerGroupInfo0) is locators

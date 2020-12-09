@@ -16,7 +16,7 @@
 
 package org.alephium.flow.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.AVector
@@ -26,20 +26,20 @@ import org.alephium.util.AVector
  * The first groups - 1 hashes are for the incoming chains of a specific group
  * The last groups hashes are for the outcoming chains of a specific group
  */
-final case class BlockDeps(deps: AVector[Hash]) {
-  def getOutDep(to: GroupIndex)(implicit config: GroupConfig): Hash = {
+final case class BlockDeps(deps: AVector[BlockHash]) {
+  def getOutDep(to: GroupIndex)(implicit config: GroupConfig): BlockHash = {
     outDeps.apply(to.value)
   }
 
-  def parentHash(chainIndex: ChainIndex)(implicit config: GroupConfig): Hash = {
+  def parentHash(chainIndex: ChainIndex)(implicit config: GroupConfig): BlockHash = {
     getOutDep(chainIndex.to)
   }
 
-  def outDeps(implicit config: GroupConfig): AVector[Hash] = {
+  def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     deps.takeRight(config.groups)
   }
 
-  def inDeps(implicit config: GroupConfig): AVector[Hash] = {
+  def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     deps.dropRight(config.groups)
   }
 }

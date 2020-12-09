@@ -25,7 +25,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.handler.FlowHandler.BlockNotify
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
@@ -42,7 +42,7 @@ class WebSocketServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new ServerFixture {
-    val dep         = Hash.hash("foo")
+    val dep         = BlockHash.hash("foo")
     val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
     val blockNotify = BlockNotify(header, 1)
     val headerHash  = header.hash.toHexString

@@ -20,13 +20,13 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
-  override def hash: Hash = header.hash
+  override def hash: BlockHash = header.hash
 
   def coinbase: Transaction = transactions.last
 
@@ -45,11 +45,11 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 
   def isGenesis: Boolean = header.isGenesis
 
-  def parentHash(implicit config: GroupConfig): Hash = {
+  def parentHash(implicit config: GroupConfig): BlockHash = {
     header.parentHash
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
     header.uncleHash(toIndex)
   }
 
@@ -70,7 +70,7 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
 
-  def from(blockDeps: AVector[Hash],
+  def from(blockDeps: AVector[BlockHash],
            transactions: AVector[Transaction],
            target: Target,
            timeStamp: TimeStamp,
@@ -99,7 +99,7 @@ object Block {
   }
 
   // we shuffle tx scripts randomly for execution to mitigate front-running
-  def getScriptExecutionOrder[T <: TransactionAbstract](parentHash: Hash,
+  def getScriptExecutionOrder[T <: TransactionAbstract](parentHash: BlockHash,
                                                         nonCoinbase: AVector[T]): AVector[Int] = {
     val nonCoinbaseLength = nonCoinbase.length
     val scriptOrders      = scriptIndexes(nonCoinbase)
@@ -120,7 +120,7 @@ object Block {
       val initialSeed = {
         val maxIndex = nonCoinbaseLength - 1
         val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-        samples.foldLeft(parentHash) {
+        samples.foldLeft(Hash.unsafe(parentHash.bytes)) {
           case (acc, index) =>
             val tx = nonCoinbase(index)
             Hash.xor(acc, tx.hash)
@@ -132,7 +132,7 @@ object Block {
   }
 
   def getNonCoinbaseExecutionOrder[T <: TransactionAbstract](
-      parentHash: Hash,
+      parentHash: BlockHash,
       nonCoinbase: AVector[T]): AVector[Int] = {
     getScriptExecutionOrder(parentHash, nonCoinbase) ++ nonCoinbase.foldWithIndex(
       AVector.empty[Int]) {

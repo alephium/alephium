@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -26,12 +26,12 @@ trait BlockHeaderPool extends BlockHashPool {
   def contains(bh: BlockHeader): IOResult[Boolean] = contains(bh.hash)
 
   // Assuming the entity is in the pool
-  def getBlockHeader(hash: Hash): IOResult[BlockHeader]
-  def getBlockHeaderUnsafe(hash: Hash): BlockHeader
+  def getBlockHeader(hash: BlockHash): IOResult[BlockHeader]
+  def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit]
 
-  def getHeadersAfter(locator: Hash): IOResult[AVector[BlockHeader]] = {
+  def getHeadersAfter(locator: BlockHash): IOResult[AVector[BlockHeader]] = {
     for {
       hashes  <- getHashesAfter(locator)
       headers <- hashes.mapE(getBlockHeader)

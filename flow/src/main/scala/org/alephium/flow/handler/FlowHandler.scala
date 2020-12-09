@@ -24,7 +24,7 @@ import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOUtils
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
@@ -43,50 +43,50 @@ object FlowHandler {
       extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
-  final case class GetBlocks(locators: AVector[Hash])                   extends Command
-  final case class GetHeaders(locators: AVector[Hash])                  extends Command
-  case object GetSyncLocators                                           extends Command
-  final case class GetSyncInventories(locators: AVector[AVector[Hash]]) extends Command
-  final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)      extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)             extends Command
-  final case class Register(miner: ActorRefT[Miner.Command])            extends Command
-  case object UnRegister                                                extends Command
+  final case class GetBlocks(locators: AVector[BlockHash])                   extends Command
+  final case class GetHeaders(locators: AVector[BlockHash])                  extends Command
+  case object GetSyncLocators                                                extends Command
+  final case class GetSyncInventories(locators: AVector[AVector[BlockHash]]) extends Command
+  final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)           extends Command
+  final case class PrepareBlockFlow(chainIndex: ChainIndex)                  extends Command
+  final case class Register(miner: ActorRefT[Miner.Command])                 extends Command
+  case object UnRegister                                                     extends Command
 
   sealed trait PendingData {
-    def hash: Hash
-    def missingDeps: mutable.HashSet[Hash]
+    def hash: BlockHash
+    def missingDeps: mutable.HashSet[BlockHash]
   }
   final case class PendingBlock(block: Block,
-                                missingDeps: mutable.HashSet[Hash],
+                                missingDeps: mutable.HashSet[BlockHash],
                                 origin: DataOrigin,
                                 broker: ActorRefT[ChainHandler.Event],
                                 chainHandler: ActorRefT[BlockChainHandler.Command])
       extends PendingData
       with Command {
-    override def hash: Hash = block.hash
+    override def hash: BlockHash = block.hash
   }
   final case class PendingHeader(header: BlockHeader,
-                                 missingDeps: mutable.HashSet[Hash],
+                                 missingDeps: mutable.HashSet[BlockHash],
                                  origin: DataOrigin,
                                  broker: ActorRefT[ChainHandler.Event],
                                  chainHandler: ActorRefT[HeaderChainHandler.Command])
       extends PendingData
       with Command {
-    override def hash: Hash = header.hash
+    override def hash: BlockHash = header.hash
   }
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
-                                     deps: AVector[Hash],
+                                     deps: AVector[BlockHash],
                                      target: Target,
                                      parentTs: TimeStamp,
                                      transactions: AVector[Transaction])
       extends Event
-  final case class BlocksLocated(blocks: AVector[Block])           extends Event
-  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Event
-  final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[Hash]])
+  final case class BlocksLocated(blocks: AVector[Block])                extends Event
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Event
+  final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[BlockHash]])
       extends Command {
-    def filerFor(another: BrokerGroupInfo): AVector[AVector[Hash]] = {
+    def filerFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
       val (groupFrom, groupUntil) = selfBrokerInfo.calIntersection(another)
       if (groupUntil <= groupFrom) {
         AVector.empty
@@ -132,7 +132,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
         case Right(headers) =>
           sender() ! Message(SendHeaders(headers))
       }
-    case GetBlocks(locators: AVector[Hash]) =>
+    case GetBlocks(locators: AVector[BlockHash]) =>
       locators.flatMapE(blockFlow.getBlocksAfter) match {
         case Left(error) =>
           log.warning(s"IO Failure while getting blocks: $error")
@@ -235,7 +235,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
   }
 
-  def updateUponNewData(hash: Hash): Unit = {
+  def updateUponNewData(hash: BlockHash): Unit = {
     val readies = updateStatus(hash)
     if (readies.nonEmpty) {
       log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
@@ -282,7 +282,7 @@ trait FlowHandlerState {
 
   var counter: Int  = 0
   val pendingStatus = mutable.SortedMap.empty[Int, PendingData]
-  val pendingHashes = mutable.Set.empty[Hash]
+  val pendingHashes = mutable.Set.empty[BlockHash]
 
   def increaseAndCounter(): Int = {
     counter += 1
@@ -297,7 +297,7 @@ trait FlowHandlerState {
     }
   }
 
-  def updateStatus(hash: Hash): IndexedSeq[PendingData] = {
+  def updateStatus(hash: BlockHash): IndexedSeq[PendingData] = {
     val toRemove = pendingStatus.collect[Int] {
       case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
         ts

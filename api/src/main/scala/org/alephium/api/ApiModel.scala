@@ -22,7 +22,7 @@ import io.circe.generic.semiauto._
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.serde.RandomBytes
 import org.alephium.util._
@@ -75,10 +75,10 @@ trait ApiModelCodec {
   implicit val signatureEncoder: Encoder[Signature] = bytesEncoder
   implicit val signatureDecoder: Decoder[Signature] = bytesDecoder(Signature.from)
 
-  implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
-  implicit val hashDecoder: Decoder[Hash] =
-    byteStringDecoder.emap(Hash.from(_).toRight("cannot decode hash"))
-  implicit val hashCodec: Codec[Hash] = Codec.from(hashDecoder, hashEncoder)
+  implicit val blockHashEncoder: Encoder[BlockHash] = hash => Json.fromString(hash.toHexString)
+  implicit val blockHashDecoder: Decoder[BlockHash] =
+    byteStringDecoder.emap(BlockHash.from(_).toRight("cannot decode block hash"))
+  implicit val blockHashCodec: Codec[BlockHash] = Codec.from(blockHashDecoder, blockHashEncoder)
 
   lazy val addressEncoder: Encoder[Address] =
     Encoder.encodeString.contramap[Address](_.toBase58)

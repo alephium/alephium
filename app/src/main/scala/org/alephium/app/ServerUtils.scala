@@ -25,7 +25,7 @@ import org.alephium.api.model._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{BlockHash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -175,7 +175,7 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def checkChainIndex(blockFlow: BlockFlow, hash: Hash)(
+  def checkChainIndex(blockFlow: BlockFlow, hash: BlockHash)(
       implicit groupConfig: GroupConfig): Try[Unit] = {
     val chainIndex = ChainIndex.from(hash)
     if (blockFlow.brokerConfig.contains(chainIndex.from) ||
