@@ -29,6 +29,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") {
     val currentTs = TimeStamp.now()
     val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
     val futureTs  = currentTs.plusHoursUnsafe(1)
+
+    Thread.sleep(10)
     Miner.nextTimeStamp(pastTs) > currentTs is true
     Miner.nextTimeStamp(currentTs) > currentTs is true
     Miner.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
