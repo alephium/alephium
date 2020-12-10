@@ -82,6 +82,10 @@ akka {
         periodic-keep-alive-mode = pong
         periodic-keep-alive-max-idle = 30 seconds
       }
+
+      socket-options {
+        so-reuse-address = true
+      }
     }
   }
 }
