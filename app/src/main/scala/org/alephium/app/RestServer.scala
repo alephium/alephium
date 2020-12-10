@@ -16,8 +16,6 @@
 
 package org.alephium.app
 
-import java.io.File
-
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
@@ -34,7 +32,7 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
-import org.alephium.api.Endpoints
+import org.alephium.api.{ApiModel, Endpoints}
 import org.alephium.api.model._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
@@ -43,7 +41,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManage
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, Service, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Duration, Service}
 import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
@@ -152,9 +150,21 @@ class RestServer(
     serverUtils.compile(query)
   }
 
-  private val exportBlocksRoute = exportBlocks.toRoute { _ =>
+  private val exportBlocksRoute = exportBlocks.toRoute { exportFile =>
+    //Run the export in background
     Future.successful(
-      Right(blocksExporter.export(new File(s"blocks-dump-${TimeStamp.now().millis}"))))
+      blocksExporter
+        .export(exportFile.filename)
+        .left
+        .map(error => logger.error(error.getMessage)))
+    //Just validate the filename and return success
+    Future.successful {
+      blocksExporter
+        .validateFilename(exportFile.filename)
+        .map(_ => ())
+        .left
+        .map(error => ApiModel.Error.server(error.getMessage))
+    }
   }
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(

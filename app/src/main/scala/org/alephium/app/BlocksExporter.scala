@@ -17,63 +17,72 @@
 package org.alephium.app
 
 import java.io.{File, PrintWriter}
+import java.nio.file.Path
 
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
-import org.alephium.io.IOResult
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.{AVector, EitherF, Hex}
 
-class BlocksExporter(node: Node)(implicit groupConfig: GroupConfig) extends StrictLogging {
+class BlocksExporter(blockflow: BlockFlow, rootPath: Path)(implicit groupConfig: GroupConfig)
+    extends StrictLogging {
 
-  private val blockflow: BlockFlow = node.blockFlow
-  private val groupNum             = groupConfig.groups
+  private lazy val chainIndexes: AVector[ChainIndex] =
+    AVector.from(
+      for {
+        i <- 0 to groupConfig.groups - 1
+        j <- 0 to groupConfig.groups - 1
+      } yield (ChainIndex.unsafe(i, j))
+    )
 
-  private val chainIndexes: Seq[ChainIndex] = for {
-    i <- 0 to groupNum - 1
-    j <- 0 to groupNum - 1
-  } yield (ChainIndex.unsafe(i, j))
-
-  var acc: AVector[Block] = AVector.empty
-  def export(file: File): Unit = {
-    chainIndexes.foreach { chainIndex =>
-      exportChain(chainIndex)
-    }
-
-    val writer = new PrintWriter(file)
-
-    acc.sortBy(_.header.timestamp).foreach { block =>
-      writer.write(Hex.toHexString(serialize(block)) ++ "\n")
-    }
-    acc = AVector.empty
-    writer.close()
-  }
-
-  private def exportChain(chainIndex: ChainIndex): IOResult[Unit] = {
+  def export(filename: String): IOResult[Unit] = {
     for {
-      maxHeight <- blockflow.getMaxHeight(chainIndex)
-      _         <- AVector.from(0 to maxHeight).mapE(height => exportAt(chainIndex, height))
+      file   <- validateFilename(filename)
+      blocks <- chainIndexes.flatMapE(chainIndex => fetchChain(chainIndex))
+      _      <- exportBlocks(blocks, file)
     } yield ()
   }
 
-  private def exportAt(
-      chainIndex: ChainIndex,
-      height: Int
-  ): IOResult[Unit] = {
-    for {
-      hashes <- blockflow.getHashes(chainIndex, height)
-      blocks <- hashes.mapE(hash => blockflow.getBlock(hash))
-    } yield {
-      exportBlocks(blocks)
+  def validateFilename(filename: String): IOResult[File] = {
+    val regex = "^[a-zA-Z0-9_-[.]]*$".r
+    Either.cond(
+      regex.matches(filename),
+      rootPath.resolve(filename).toFile,
+      IOError.Other(new Throwable(s"Invalid filename: $filename"))
+    )
+  }
+  private def exportBlocks(blocks: AVector[Block], file: File): IOResult[Unit] = {
+    IOUtils.tryExecute {
+      val writer = new PrintWriter(file)
+
+      blocks.sortBy(_.header.timestamp).foreach { block =>
+        writer.write(Hex.toHexString(serialize(block)) ++ "\n")
+      }
+      writer.close()
     }
   }
 
-  private def exportBlocks(blocks: AVector[Block]): Unit =
-    blocks.foreach { block =>
-      acc = acc :+ block
-    }
+  private def fetchChain(chainIndex: ChainIndex): IOResult[AVector[Block]] = {
+    for {
+      maxHeight <- blockflow.getMaxHeight(chainIndex)
+      blocks <- EitherF.foldTry((0 to maxHeight), AVector.empty[Block]) {
+        case (blocks, height) =>
+          fetchBlocksAt(chainIndex, height).map(newBlocks => blocks ++ newBlocks)
+      }
+    } yield blocks
+  }
+
+  private def fetchBlocksAt(
+      chainIndex: ChainIndex,
+      height: Int
+  ): IOResult[AVector[Block]] = {
+    for {
+      hashes <- blockflow.getHashes(chainIndex, height)
+      blocks <- hashes.mapE(hash => blockflow.getBlock(hash))
+    } yield (blocks)
+  }
 }

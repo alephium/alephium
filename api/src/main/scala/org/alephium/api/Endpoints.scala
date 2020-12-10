@@ -199,8 +199,9 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[TxResult])
       .summary("Send a signed smart contract")
 
-  val exportBlocks: BaseEndpoint[Unit, Unit] =
+  val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")
+      .in(jsonBody[ExportFile])
       .summary("exports all the blocks")
 }

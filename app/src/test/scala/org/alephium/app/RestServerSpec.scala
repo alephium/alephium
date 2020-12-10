@@ -176,7 +176,7 @@ class RestServerSpec
                                   blockFlowProbe.ref,
                                   dummyTx,
                                   storages)
-    lazy val blocksExporter     = new BlocksExporter(node)
+    lazy val blocksExporter     = new BlocksExporter(node.blockFlow, rootPath)
     lazy val server: RestServer = RestServer(node, miner, blocksExporter, None)
   }
 }

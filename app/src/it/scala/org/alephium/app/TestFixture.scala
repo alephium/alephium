@@ -173,15 +173,14 @@ trait TestFixtureLike
   @tailrec
   final def awaitNBlocks(number: Int): Unit = {
     assume(number > 0)
-      val timeout = Duration.ofMinutesUnsafe(2).asScala
-      blockNotifyProbe.receiveOne(max = timeout) match {
-        case TextMessage.Strict(_) =>
-          if (number <= 1) {
-            ()
-          } else {
-            awaitNBlocks(number - 1)
-          }
-      }
+    val timeout = Duration.ofMinutesUnsafe(2).asScala
+    blockNotifyProbe.receiveOne(max = timeout) match {
+      case TextMessage.Strict(_) =>
+        if (number <= 1) {
+          ()
+        } else {
+          awaitNBlocks(number - 1)
+        }
     }
   }
 
@@ -254,6 +253,8 @@ trait TestFixtureLike
       implicit val config    = platformEnv.config
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
       val storages           = platformEnv.storages
+      val blockExporter: BlocksExporter =
+        new BlocksExporter(node.blockFlow, rootPath)(config.broker)
 
       ActorRefT.build(
         system,
@@ -381,6 +382,9 @@ trait TestFixtureLike
 
   val startMining = httpPost("/miners?action=start-mining")
   val stopMining  = httpPost("/miners?action=stop-mining")
+
+  def exportBlocks(filename: String) =
+    httpPost(s"/export-blocks", Some(s"""{"filename": "${filename}"}"""))
 
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
     httpGet(s"/blockflow?fromTs=${fromTs.millis}&toTs=${toTs.millis}")

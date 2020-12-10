@@ -55,19 +55,16 @@ object BlocksImporter extends StrictLogging {
     }
   }
 
-  private def validateGenesis(genesis: Iterator[String], node: Node): IOResult[Unit] = {
-    val invalidGenesisExists = genesis.exists { rawGenesis =>
-      deserialize[Block](Hex.unsafe(rawGenesis.stripLineEnd))
-        .map { genesis =>
-          !node.config.genesisBlocks.flatMap(identity).contains(genesis)
-        }
-        .getOrElse(true)
-    }
-    if (invalidGenesisExists) {
-      Left(IOError.Other(new Throwable("Invalid genesis blocks")))
-    } else {
-      Right(())
-    }
+  private def validateGenesis(rawGenesises: Iterator[String], node: Node): IOResult[Unit] = {
+    val genesis: Set[Block] = rawGenesises.flatMap { rawGenesis =>
+      deserialize[Block](Hex.unsafe(rawGenesis.stripLineEnd)).toOption
+    }.toSet
+
+    Either.cond(
+      node.config.genesisBlocks.flatMap(_.map(_.hash)).toSet == genesis.map(_.hash),
+      (),
+      IOError.Other(new Throwable("Invalid genesis blocks"))
+    )
   }
 
   private def handleRawBlocksIterator(it: Iterator[String], node: Node)(

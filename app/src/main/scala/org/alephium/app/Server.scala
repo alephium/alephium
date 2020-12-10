@@ -87,7 +87,9 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
 
     new WalletApp(walletConfig)
   }
-  lazy val restServer: RestServer               = RestServer(node, miner, walletApp.map(_.walletServer))
+  def blockExporter: BlocksExporter
+  lazy val restServer: RestServer =
+    RestServer(node, miner, blockExporter, walletApp.map(_.walletServer))
   lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
@@ -127,5 +129,7 @@ object Server {
     val storages: Storages = {
       Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
     }
+
+    val blockExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }
 }
