@@ -25,7 +25,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
@@ -40,21 +40,21 @@ object BlockChainHandler {
     Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
 
   def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
-    val forets = Forest.build[Hash, Block](block, _.hash)
-    AddBlocks(forets, origin)
+    val forest = Forest.build[BlockHash, Block](block, _.hash)
+    AddBlocks(forest, origin)
   }
 
   sealed trait Command
-  final case class AddBlocks(blocks: Forest[Hash, Block], origin: DataOrigin) extends Command
+  final case class AddBlocks(blocks: Forest[BlockHash, Block], origin: DataOrigin) extends Command
   final case class AddPendingBlock(block: Block,
                                    broker: ActorRefT[ChainHandler.Event],
                                    origin: DataOrigin)
       extends Command
 
-  sealed trait Event                        extends ChainHandler.Event
-  final case class BlockAdded(hash: Hash)   extends Event
-  case object BlockAddingFailed             extends Event
-  final case class InvalidBlock(hash: Hash) extends Event
+  sealed trait Event                             extends ChainHandler.Event
+  final case class BlockAdded(hash: BlockHash)   extends Event
+  case object BlockAddingFailed                  extends Event
+  final case class InvalidBlock(hash: BlockHash) extends Event
 }
 
 class BlockChainHandler(blockFlow: BlockFlow,
@@ -99,7 +99,7 @@ class BlockChainHandler(blockFlow: BlockFlow,
   }
 
   override def pendingToFlowHandler(block: Block,
-                                    missings: mutable.HashSet[Hash],
+                                    missings: mutable.HashSet[BlockHash],
                                     broker: ActorRefT[ChainHandler.Event],
                                     origin: DataOrigin,
                                     self: ActorRefT[BlockChainHandler.Command]): Unit = {

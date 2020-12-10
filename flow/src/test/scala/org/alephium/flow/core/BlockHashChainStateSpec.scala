@@ -23,7 +23,7 @@ import org.scalatest.Assertion
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.ChainStateStorage
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
@@ -35,18 +35,18 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
       override def chainStateStorage: ChainStateStorage =
         Test.storages.nodeStateStorage.chainStateStorage(dummyIndex)
 
-      override def getTimestamp(hash: Hash): IOResult[TimeStamp] = ???
+      override def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = ???
 
       def state: BlockHashChain.State = chainStateStorage.loadState().toOption.get
 
-      def allTipsInMem: ConcurrentHashMap[Hash, TimeStamp] = tips
+      def allTipsInMem: ConcurrentHashMap[BlockHash, TimeStamp] = tips
 
       chainStateStorage.clearState().isRight is true
     }
 
-    val hashes = Seq.fill(10)(Hash.random)
+    val hashes = Seq.fill(10)(BlockHash.random)
 
-    def checkState(numHashes: Int, expected: Set[Hash]): Assertion = {
+    def checkState(numHashes: Int, expected: Set[BlockHash]): Assertion = {
       chainState.numHashes is numHashes
       chainState.allTipsInMem.keys.toSet is expected
       chainState.state.tips.toSet is expected

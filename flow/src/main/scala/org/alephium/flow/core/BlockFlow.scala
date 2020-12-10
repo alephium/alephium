@@ -23,7 +23,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
@@ -39,11 +39,12 @@ trait BlockFlow
 
   def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
 
-  override protected def getSyncLocatorsUnsafe(): AVector[AVector[Hash]] = {
+  override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
   }
 
-  private def getSyncLocatorsUnsafe(peerBrokerInfo: BrokerGroupInfo): AVector[AVector[Hash]] = {
+  private def getSyncLocatorsUnsafe(
+      peerBrokerInfo: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
     val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
     AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
       val offset    = index / groups
@@ -53,7 +54,7 @@ trait BlockFlow
     }
   }
 
-  private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[Hash] = {
+  private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[BlockHash] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain = getHeaderChain(chainIndex)
       HistoryLocators
@@ -65,10 +66,10 @@ trait BlockFlow
   }
 
   override protected def getSyncInventoriesUnsafe(
-      locators: AVector[AVector[Hash]]): AVector[AVector[Hash]] = {
+      locators: AVector[AVector[BlockHash]]): AVector[AVector[BlockHash]] = {
     locators.map { locatorsPerChain =>
       if (locatorsPerChain.isEmpty) {
-        AVector.empty[Hash]
+        AVector.empty[BlockHash]
       } else {
         val chainIndex = ChainIndex.from(locatorsPerChain.head)
         val chain      = getBlockChain(chainIndex)
@@ -78,7 +79,7 @@ trait BlockFlow
   }
 
   override protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerGroupInfo): AVector[AVector[Hash]] = {
+      remoteBroker: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
       val k         = index / remoteBroker.groupNumPerBroker
       val l         = index % remoteBroker.groupNumPerBroker
@@ -202,7 +203,7 @@ object BlockFlow extends StrictLogging {
       weight1 + weight2
     }
 
-    private def calGroupWeightUnsafe(hash: Hash): BigInt = {
+    private def calGroupWeightUnsafe(hash: BlockHash): BigInt = {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) {
         ALF.GenesisWeight
@@ -211,19 +212,19 @@ object BlockFlow extends StrictLogging {
       }
     }
 
-    def getBestTipUnsafe: Hash = {
-      val ordering = Ordering.BigInt.on[Hash](getWeightUnsafe)
+    def getBestTipUnsafe: BlockHash = {
+      val ordering = Ordering.BigInt.on[BlockHash](getWeightUnsafe)
       aggregateHash(_.getBestTipUnsafe)(ordering.max)
     }
 
-    override def getAllTips: AVector[Hash] = {
+    override def getAllTips: AVector[BlockHash] = {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
     def tryExtendUnsafe(tipsCur: FlowTips,
                         weightCur: BigInt,
                         group: GroupIndex,
-                        toTry: AVector[Hash]): (FlowTips, BigInt) = {
+                        toTry: AVector[BlockHash]): (FlowTips, BigInt) = {
       toTry
         .fold[(FlowTips, BigInt)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
@@ -253,7 +254,7 @@ object BlockFlow extends StrictLogging {
           case ((tipsCur, weightCur), _l) =>
             val l = GroupIndex.unsafe(_l)
             if (l != bestIndex.from) {
-              val toTry = (0 until groups).foldLeft(AVector.empty[Hash]) { (acc, _r) =>
+              val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
                 val r = GroupIndex.unsafe(_r)
                 acc ++ getHashChain(l, r).getAllTips
               }

@@ -16,10 +16,11 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{ALF, Hash, HashSerde}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.serde._
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.protocol.mining.PoW
+import org.alephium.serde.{u256Serde => _, _}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 /** The header of a block with index.from == _group_
   *
@@ -29,56 +30,54 @@ import org.alephium.util.{AVector, TimeStamp}
   *                  the rest G hashes are from all the chain related to _group_
   */
 final case class BlockHeader(
-    blockDeps: AVector[Hash],
+    blockDeps: AVector[BlockHash],
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target,
-    nonce: BigInt
-) extends HashSerde[BlockHeader]
-    with FlowData {
-  override lazy val hash: Hash = _getHash
-
-  def chainIndex(implicit config: GroupConfig): ChainIndex = {
-    ChainIndex.from(hash)
-  }
+    nonce: U256
+) extends FlowData {
+  lazy val hash: BlockHash = PoW.hash(this)
 
   def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
-  def parentHash(implicit config: GroupConfig): Hash = {
+  def parentHash(implicit config: GroupConfig): BlockHash = {
     uncleHash(chainIndex.to)
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): Hash = {
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups)(toIndex.value)
   }
 
-  def inDeps(implicit config: GroupConfig): AVector[Hash] = {
+  def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.dropRight(config.groups)
   }
 
-  def outDeps(implicit config: GroupConfig): AVector[Hash] = {
+  def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups)
   }
 
-  def intraDep(implicit config: GroupConfig): Hash = {
+  def intraDep(implicit config: GroupConfig): BlockHash = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups)(chainIndex.from.value)
   }
 
-  def outTips(implicit config: GroupConfig): AVector[Hash] = {
+  def outTips(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
   }
 }
 
 object BlockHeader {
+  // use fixed width bytes for U256 serialization
+  private implicit val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
+
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: Hash, target: Target, nonce: BigInt): BlockHeader = {
+  def genesis(txsHash: Hash, target: Target, nonce: U256): BlockHeader = {
     BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 }

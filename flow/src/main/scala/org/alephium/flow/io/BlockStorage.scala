@@ -20,10 +20,10 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.Block
 
-trait BlockStorage extends KeyValueStorage[Hash, Block] {
+trait BlockStorage extends KeyValueStorage[BlockHash, Block] {
   def put(block: Block): IOResult[Unit] = put(block.hash, block)
 
   def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
@@ -43,9 +43,9 @@ class BlockRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, Block](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[BlockHash, Block](storage, cf, writeOptions, readOptions)
     with BlockStorage {
-  override def delete(key: Hash): IOResult[Unit] = ???
+  override def delete(key: BlockHash): IOResult[Unit] = ???
 
-  override def deleteUnsafe(key: Hash): Unit = ???
+  override def deleteUnsafe(key: BlockHash): Unit = ???
 }

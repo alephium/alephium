@@ -20,7 +20,8 @@ import scala.util.Random
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.crypto.{Blake2b, Blake3}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.vm.StatefulScript
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
@@ -36,7 +37,16 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "hash" in {
     forAll(blockGen) { block =>
+      val expected = Blake3.hash(Blake3.hash(serialize(block.header)).bytes)
       block.hash is block.header.hash
+      block.hash is expected
+    }
+  }
+
+  it should "hash transactions" in {
+    forAll(blockGen) { block =>
+      val expected = Blake2b.hash(serialize(block.transactions))
+      block.header.txsHash is expected
     }
   }
 
@@ -58,7 +68,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "be random" in {
     def gen(): Block = {
       val header: BlockHeader =
-        BlockHeader(AVector.fill(groupConfig.chainNum)(Hash.zero),
+        BlockHeader(AVector.fill(groupConfig.chainNum)(BlockHash.zero),
                     Hash.zero,
                     TimeStamp.now(),
                     Target.Max,
@@ -86,7 +96,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "put non-script txs in the last" in {
     forAll(Gen.posNum[Long], Gen.posNum[Long]) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
-        BlockHeader(AVector.fill(groupConfig.chainNum)(Hash.zero),
+        BlockHeader(AVector.fill(groupConfig.chainNum)(BlockHash.zero),
                     Hash.zero,
                     TimeStamp.now(),
                     Target.Max,

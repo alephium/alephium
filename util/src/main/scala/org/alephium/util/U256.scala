@@ -33,6 +33,8 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     U256.unsafe(underlying)
   }
 
+  def addOneUnsafe(): U256 = addUnsafe(U256.One)
+
   def add(that: U256): Option[U256] = {
     val underlying = this.v.add(that.v)
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
@@ -43,6 +45,8 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     assume(validate(underlying))
     U256.unsafe(underlying)
   }
+
+  def subOneUnsafe(): U256 = subUnsafe(U256.One)
 
   def sub(that: U256): Option[U256] = {
     val underlying = this.v.subtract(that.v)
@@ -125,9 +129,13 @@ object U256 {
     new U256(BigInteger.valueOf(value))
   }
 
-  def unsafe(bytes: ByteString): U256 = {
+  def unsafe(bytes: Array[Byte]): U256 = {
     assume(bytes.length == 32)
-    new U256(new BigInteger(1, bytes.toArray))
+    new U256(new BigInteger(1, bytes))
+  }
+
+  def unsafe(bytes: ByteString): U256 = {
+    unsafe(bytes.toArray)
   }
 
   def from(value: BigInteger): Option[U256] = {
@@ -152,6 +160,8 @@ object U256 {
   val Ten: U256      = unsafe(BigInteger.TEN)
   val MaxValue: U256 = unsafe(upperBound.subtract(BigInteger.ONE))
   val MinValue: U256 = Zero
+
+  val HalfMaxValue: U256 = MaxValue.divUnsafe(U256.Two)
 
   val Million: U256 = unsafe(Number.million)
   val Billion: U256 = unsafe(Number.billion)

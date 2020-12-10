@@ -19,21 +19,21 @@ package org.alephium.flow.core
 import org.alephium.flow.io.ChainStateStorage
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 
 trait BlockHashChainState {
   var numHashes: Int = 0
 
-  protected val tips = ConcurrentHashMap.empty[Hash, TimeStamp]
+  protected val tips = ConcurrentHashMap.empty[BlockHash, TimeStamp]
 
   implicit def consensusConfig: ConsensusSetting
 
   protected def chainStateStorage: ChainStateStorage
 
-  def getTimestamp(hash: Hash): IOResult[TimeStamp]
+  def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
 
-  def setGenesisState(newTip: Hash, timeStamp: TimeStamp): IOResult[Unit] = {
+  def setGenesisState(newTip: BlockHash, timeStamp: TimeStamp): IOResult[Unit] = {
     numHashes += 1
     tips.add(newTip, timeStamp)
     pruneDueto(timeStamp)
@@ -53,7 +53,7 @@ trait BlockHashChainState {
     }
   }
 
-  def updateState(newTip: Hash, timeStamp: TimeStamp, parent: Hash): IOResult[Unit] = {
+  def updateState(newTip: BlockHash, timeStamp: TimeStamp, parent: BlockHash): IOResult[Unit] = {
     numHashes += 1
     tips.add(newTip, timeStamp)
     tips.remove(parent)

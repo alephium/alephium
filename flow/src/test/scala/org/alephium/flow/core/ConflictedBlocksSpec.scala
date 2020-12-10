@@ -37,7 +37,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
                  AVector(transaction),
                  Target.Max,
                  TimeStamp.now(),
-                 Random.nextNonZeroInt())
+                 Random.nextNonNegative())
     }
 
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
@@ -47,7 +47,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
                  AVector.from(transactions),
                  Target.Max,
                  TimeStamp.now(),
-                 Random.nextNonZeroInt())
+                 Random.nextNonNegative())
     }
 
     val cache = ConflictedBlocks.emptyCache(0, Duration.ofMinutesUnsafe(10))

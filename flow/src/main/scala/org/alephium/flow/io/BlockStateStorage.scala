@@ -22,10 +22,10 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.flow.model.BlockState
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 
-trait BlockStateStorage extends KeyValueStorage[Hash, BlockState] {
-  override def storageKey(key: Hash): ByteString =
+trait BlockStateStorage extends KeyValueStorage[BlockHash, BlockState] {
+  override def storageKey(key: BlockHash): ByteString =
     key.bytes ++ ByteString(Storages.blockStatePostfix)
 }
 
@@ -43,5 +43,5 @@ class BlockStateRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockState](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[BlockHash, BlockState](storage, cf, writeOptions, readOptions)
     with BlockStateStorage

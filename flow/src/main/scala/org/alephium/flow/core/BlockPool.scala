@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
 
@@ -26,12 +26,12 @@ trait BlockPool extends BlockHashPool {
   def contains(block: Block): IOResult[Boolean] = contains(block.hash)
 
   // Assuming the hash is in the pool
-  def getBlock(hash: Hash): IOResult[Block]
+  def getBlock(hash: BlockHash): IOResult[Block]
 
   // Assuming the block is verified
   def add(block: Block, weight: BigInt): IOResult[Unit]
 
-  def getBlocksAfter(locator: Hash): IOResult[AVector[Block]] = {
+  def getBlocksAfter(locator: BlockHash): IOResult[AVector[Block]] = {
     for {
       hashes <- getHashesAfter(locator)
       blocks <- hashes.mapE(getBlock)
@@ -43,7 +43,7 @@ trait BlockPool extends BlockHashPool {
   def getWeight(block: Block): IOResult[BigInt] = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
-  def getBlockSlice(hash: Hash): IOResult[AVector[Block]] = {
+  def getBlockSlice(hash: BlockHash): IOResult[AVector[Block]] = {
     for {
       hashes <- getBlockHashSlice(hash)
       blocks <- hashes.mapE(getBlock)

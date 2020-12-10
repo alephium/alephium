@@ -22,7 +22,7 @@ import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util.{AVector, EitherF, TimeStamp}
 
@@ -30,16 +30,16 @@ import org.alephium.util.{AVector, EitherF, TimeStamp}
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
   implicit def brokerConfig: BrokerConfig
 
-  def genesisHash: Hash
+  def genesisHash: BlockHash
 
-  def isGenesis(hash: Hash): Boolean = hash == genesisHash
+  def isGenesis(hash: BlockHash): Boolean = hash == genesisHash
 
   def blockStateStorage: BlockStateStorage
 
   def heightIndexStorage: HeightIndexStorage
 
-  protected def addHash(hash: Hash,
-                        parentHash: Hash,
+  protected def addHash(hash: BlockHash,
+                        parentHash: BlockHash,
                         height: Int,
                         weight: BigInt,
                         chainWeight: BigInt,
@@ -52,7 +52,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield ()
   }
 
-  protected def addGenesis(hash: Hash): IOResult[Unit] = {
+  protected def addGenesis(hash: BlockHash): IOResult[Unit] = {
     assume(hash == genesisHash)
     val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight)
     for {
@@ -67,7 +67,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @inline
-  private def updateHeightIndex(hash: Hash, height: Int, isCanonical: Boolean): IOResult[Unit] = {
+  private def updateHeightIndex(hash: BlockHash,
+                                height: Int,
+                                isCanonical: Boolean): IOResult[Unit] = {
     heightIndexStorage.getOpt(height).flatMap {
       case Some(hashes) =>
         if (isCanonical) {
@@ -79,7 +81,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def getParentHash(hash: Hash): IOResult[Hash]
+  def getParentHash(hash: BlockHash): IOResult[BlockHash]
 
   def maxWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) { (weight, hash) =>
     getWeight(hash).map(weight.max)
@@ -98,35 +100,36 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     math.max(getHeightUnsafe(hash), height)
   }
 
-  def isCanonicalUnsafe(hash: Hash): Boolean = {
+  def isCanonicalUnsafe(hash: BlockHash): Boolean = {
     blockStateStorage.getOptUnsafe(hash).exists { state =>
       val hashes = getHashesUnsafe(state.height)
       hashes.head == hash // .head is safe here
     }
   }
 
-  def contains(hash: Hash): IOResult[Boolean]      = blockStateStorage.exists(hash)
-  def containsUnsafe(hash: Hash): Boolean          = blockStateStorage.existsUnsafe(hash)
-  def getState(hash: Hash): IOResult[BlockState]   = blockStateStorage.get(hash)
-  def getStateUnsafe(hash: Hash): BlockState       = blockStateStorage.getUnsafe(hash)
-  def getHeight(hash: Hash): IOResult[Int]         = blockStateStorage.get(hash).map(_.height)
-  def getHeightUnsafe(hash: Hash): Int             = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: Hash): IOResult[BigInt]      = blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: Hash): BigInt          = blockStateStorage.getUnsafe(hash).weight
-  def getChainWeight(hash: Hash): IOResult[BigInt] = blockStateStorage.get(hash).map(_.chainWeight)
-  def getChainWeightUnsafe(hash: Hash): BigInt     = blockStateStorage.getUnsafe(hash).chainWeight
+  def contains(hash: BlockHash): IOResult[Boolean]    = blockStateStorage.exists(hash)
+  def containsUnsafe(hash: BlockHash): Boolean        = blockStateStorage.existsUnsafe(hash)
+  def getState(hash: BlockHash): IOResult[BlockState] = blockStateStorage.get(hash)
+  def getStateUnsafe(hash: BlockHash): BlockState     = blockStateStorage.getUnsafe(hash)
+  def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
+  def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
+  def getWeight(hash: BlockHash): IOResult[BigInt]    = blockStateStorage.get(hash).map(_.weight)
+  def getWeightUnsafe(hash: BlockHash): BigInt        = blockStateStorage.getUnsafe(hash).weight
+  def getChainWeight(hash: BlockHash): IOResult[BigInt] =
+    blockStateStorage.get(hash).map(_.chainWeight)
+  def getChainWeightUnsafe(hash: BlockHash): BigInt = blockStateStorage.getUnsafe(hash).chainWeight
 
-  def isTip(hash: Hash): Boolean = tips.contains(hash)
+  def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 
-  def getHashesUnsafe(height: Int): AVector[Hash] = {
+  def getHashesUnsafe(height: Int): AVector[BlockHash] = {
     heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
   }
 
-  def getHashes(height: Int): IOResult[AVector[Hash]] = {
+  def getHashes(height: Int): IOResult[AVector[BlockHash]] = {
     heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
   }
 
-  def getBestTipUnsafe: Hash = {
+  def getBestTipUnsafe: BlockHash = {
     assume(tips.size != 0)
     val weighted = getAllTips.map { hash =>
       hash -> getWeightUnsafe(hash)
@@ -134,15 +137,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     weighted.maxBy(_._2)._1
   }
 
-  def getAllTips: AVector[Hash] = {
+  def getAllTips: AVector[BlockHash] = {
     AVector.from(tips.keys)
   }
 
-  private def getLink(hash: Hash): IOResult[BlockHashChain.Link] = {
+  private def getLink(hash: BlockHash): IOResult[BlockHashChain.Link] = {
     getParentHash(hash).map(BlockHashChain.Link(_, hash))
   }
 
-  def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] = {
+  def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]] = {
     contains(locator).flatMap {
       case false => Right(AVector.empty)
       case true =>
@@ -156,7 +159,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def getHashesAfter(height: Int, hashes: AVector[Hash]): IOResult[AVector[Hash]] = {
+  private def getHashesAfter(height: Int,
+                             hashes: AVector[BlockHash]): IOResult[AVector[BlockHash]] = {
     if (hashes.isEmpty) {
       Right(AVector.empty)
     } else {
@@ -169,10 +173,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def getPredecessor(hash: Hash, height: Int): IOResult[Hash] = {
+  def getPredecessor(hash: BlockHash, height: Int): IOResult[BlockHash] = {
     assume(height >= ALF.GenesisHeight)
     @tailrec
-    def iter(currentHash: Hash, currentHeight: Int): IOResult[Hash] = {
+    def iter(currentHash: BlockHash, currentHeight: Int): IOResult[BlockHash] = {
       if (currentHeight == height) {
         Right(currentHash)
       } else {
@@ -187,7 +191,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
-  def getBlockHashesBetween(newHash: Hash, oldHash: Hash): IOResult[AVector[Hash]] = {
+  def getBlockHashesBetween(newHash: BlockHash,
+                            oldHash: BlockHash): IOResult[AVector[BlockHash]] = {
     for {
       newHeight <- getHeight(newHash)
       oldHeight <- getHeight(oldHash)
@@ -195,13 +200,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield result
   }
 
-  def getBlockHashesBetween(newHash: Hash,
+  def getBlockHashesBetween(newHash: BlockHash,
                             newHeight: Int,
-                            oldHash: Hash,
-                            oldHeight: Int): IOResult[AVector[Hash]] = {
+                            oldHash: BlockHash,
+                            oldHeight: Int): IOResult[AVector[BlockHash]] = {
     assume(oldHeight >= ALF.GenesisHeight)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(acc: AVector[Hash], currentHash: Hash, currentHeight: Int): IOResult[AVector[Hash]] = {
+    def iter(acc: AVector[BlockHash],
+             currentHash: BlockHash,
+             currentHeight: Int): IOResult[AVector[BlockHash]] = {
       if (currentHeight > oldHeight) {
         getParentHash(currentHash).flatMap(iter(acc :+ currentHash, _, currentHeight - 1))
       } else if (currentHeight == oldHeight && currentHash == oldHash) {
@@ -216,9 +223,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     iter(AVector.empty, newHash, newHeight).map(_.reverse)
   }
 
-  def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] = {
+  def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]] = {
     @tailrec
-    def iter(acc: AVector[Hash], current: Hash): IOResult[AVector[Hash]] = {
+    def iter(acc: AVector[BlockHash], current: BlockHash): IOResult[AVector[BlockHash]] = {
       if (isGenesis(current)) {
         Right(acc :+ current)
       } else {
@@ -232,7 +239,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     iter(AVector.empty, hash).map(_.reverse)
   }
 
-  def isBefore(hash1: Hash, hash2: Hash): IOResult[Boolean] = {
+  def isBefore(hash1: BlockHash, hash2: BlockHash): IOResult[Boolean] = {
     for {
       height1 <- getHeight(hash1)
       height2 <- getHeight(hash2)
@@ -240,7 +247,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield result
   }
 
-  private def isBefore(hash1: Hash, height1: Int, hash2: Hash, height2: Int): IOResult[Boolean] = {
+  private def isBefore(hash1: BlockHash,
+                       height1: Int,
+                       hash2: BlockHash,
+                       height2: Int): IOResult[Boolean] = {
     if (height1 < height2) {
       getPredecessor(hash2, height1).map(_.equals(hash1))
     } else if (height1 == height2) {
@@ -250,7 +260,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def calHashDiff(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
+  def calHashDiff(newHash: BlockHash, oldHash: BlockHash): IOResult[ChainDiff] = {
     for {
       newHeight <- getHeight(newHash)
       oldHeight <- getHeight(oldHash)
@@ -264,7 +274,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def calHashDiffFromSameHeight(newHash: Hash, oldHash: Hash): IOResult[ChainDiff] = {
+  private def calHashDiffFromSameHeight(newHash: BlockHash,
+                                        oldHash: BlockHash): IOResult[ChainDiff] = {
     if (newHash == oldHash) {
       Right(ChainDiff(AVector.empty, AVector.empty))
     } else {
@@ -276,7 +287,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def isRecent(hash: Hash): IOResult[Boolean] = {
+  def isRecent(hash: BlockHash): IOResult[Boolean] = {
     getHeight(hash).flatMap(isRecent)
   }
 
@@ -287,11 +298,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 // scalastyle:on number.of.methods
 
 object BlockHashChain {
-  final case class ChainDiff(toRemove: AVector[Hash], toAdd: AVector[Hash])
+  final case class ChainDiff(toRemove: AVector[BlockHash], toAdd: AVector[BlockHash])
 
-  final case class Link(parentHash: Hash, hash: Hash)
+  final case class Link(parentHash: BlockHash, hash: BlockHash)
 
-  final case class State(numHashes: Int, tips: AVector[Hash])
+  final case class State(numHashes: Int, tips: AVector[BlockHash])
 
   object State {
     import org.alephium.serde._

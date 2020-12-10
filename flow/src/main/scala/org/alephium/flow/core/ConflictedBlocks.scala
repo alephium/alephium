@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.flow.core.ConflictedBlocks.GroupCache
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex, TxOutputRef}
 import org.alephium.util.{AVector, Duration, TimeStamp}
@@ -37,24 +37,25 @@ trait ConflictedBlocks {
   def getCache(block: Block): GroupCache =
     caches(block.chainIndex.from.value - brokerConfig.groupFrom)
 
-  def getCache(hash: Hash): GroupCache =
+  def getCache(hash: BlockHash): GroupCache =
     caches(ChainIndex.from(hash).from.value - brokerConfig.groupFrom)
 
   def cacheForConflicts(block: Block): Unit = getCache(block).add(block)
 
-  def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = {
+  def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean = {
     getCache(hashes.head).isConflicted(hashes, getBlock)
   }
 }
 
 object ConflictedBlocks {
-  final case class GroupCache(cacheSizeBoundary: Int,
-                              keepDuration: Duration,
-                              blockCache: mutable.HashMap[Hash, Block],
-                              txCache: mutable.HashMap[TxOutputRef, ArrayBuffer[Hash]],
-                              conflictedBlocks: mutable.HashMap[Hash, ArrayBuffer[Hash]]) {
-    def isBlockCached(block: Block): Boolean = isBlockCached(block.hash)
-    def isBlockCached(hash: Hash): Boolean   = blockCache.contains(hash)
+  final case class GroupCache(
+      cacheSizeBoundary: Int,
+      keepDuration: Duration,
+      blockCache: mutable.HashMap[BlockHash, Block],
+      txCache: mutable.HashMap[TxOutputRef, ArrayBuffer[BlockHash]],
+      conflictedBlocks: mutable.HashMap[BlockHash, ArrayBuffer[BlockHash]]) {
+    def isBlockCached(block: Block): Boolean    = isBlockCached(block.hash)
+    def isBlockCached(hash: BlockHash): Boolean = blockCache.contains(hash)
 
     def add(block: Block): Unit = this.synchronized(addUnsafe(block))
 
@@ -62,7 +63,7 @@ object ConflictedBlocks {
     def addUnsafe(block: Block): Unit = if (!isBlockCached(block)) {
       blockCache.addOne(block.hash -> block)
 
-      val conflicts = mutable.HashSet.empty[Hash]
+      val conflicts = mutable.HashSet.empty[BlockHash]
       block.transactions.foreach { tx =>
         tx.unsigned.inputs.foreach { input =>
           txCache.get(input.outputRef) match {
@@ -111,26 +112,27 @@ object ConflictedBlocks {
       }
     }
 
-    private def isConflicted(hash: Hash, newDeps: AVector[Hash]): Boolean = {
+    private def isConflicted(hash: BlockHash, newDeps: AVector[BlockHash]): Boolean = {
       conflictedBlocks.get(hash).exists { conflicts =>
         val depsSet = newDeps.toSet
         conflicts.exists(hash => depsSet.contains(hash))
       }
     }
 
-    def isConflicted(hashes: AVector[Hash], getBlock: Hash => Block): Boolean = this.synchronized {
-      hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
+    def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean =
+      this.synchronized {
+        hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
 
-      val result = hashes.existsWithIndex {
-        case (hash, index) =>
-          isConflicted(hash, hashes.drop(index + 1))
+        val result = hashes.existsWithIndex {
+          case (hash, index) =>
+            isConflicted(hash, hashes.drop(index + 1))
+        }
+
+        uncacheOldTips(keepDuration, hashes.head)
+        result
       }
 
-      uncacheOldTips(keepDuration, hashes.head)
-      result
-    }
-
-    private def uncacheOldTips(duration: Duration, hash: Hash): Unit = {
+    private def uncacheOldTips(duration: Duration, hash: BlockHash): Unit = {
       if (blockCache.size >= cacheSizeBoundary) {
         val block = blockCache(hash)
         assume(!block.isGenesis)

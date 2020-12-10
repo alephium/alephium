@@ -99,7 +99,7 @@ class U256Spec extends AlephiumSpec {
   }
 
   it should "convert to/from bytes" in {
-    val cases = List(U256.Zero, U256.One, U256.MaxValue, U256.MinValue)
+    val cases = List(U256.Zero, U256.One, U256.MaxValue, U256.HalfMaxValue, U256.MinValue)
     for (u256 <- cases) {
       U256.unsafe(u256.toBytes) is u256
     }
@@ -113,5 +113,15 @@ class U256Spec extends AlephiumSpec {
         assertThrows[AssertionError](U256.unsafe(x))
       }
     }
+  }
+
+  it should "increase/decrease by one" in {
+    U256.Zero.addOneUnsafe() is U256.One
+    U256.One.addOneUnsafe() is U256.Two
+    U256.Two.subOneUnsafe() is U256.One
+    U256.One.subOneUnsafe() is U256.Zero
+
+    assertThrows[AssertionError](U256.MaxValue.addOneUnsafe())
+    assertThrows[AssertionError](U256.Zero.subOneUnsafe())
   }
 }

@@ -21,7 +21,7 @@ import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
 import org.alephium.util.AVector
@@ -29,11 +29,11 @@ import org.alephium.util.AVector
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def blockStorage: BlockStorage
 
-  def getBlock(hash: Hash): IOResult[Block] = {
+  def getBlock(hash: BlockHash): IOResult[Block] = {
     blockStorage.get(hash)
   }
 
-  def getBlockUnsafe(hash: Hash): Block = {
+  def getBlockUnsafe(hash: BlockHash): Block = {
     blockStorage.getUnsafe(hash)
   }
 
@@ -72,15 +72,15 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     ()
   }
 
-  def calBlockDiffUnsafe(newTip: Hash, oldTip: Hash): ChainDiff = {
+  def calBlockDiffUnsafe(newTip: BlockHash, oldTip: BlockHash): ChainDiff = {
     val hashDiff = Utils.unsafe(calHashDiff(newTip, oldTip))
     ChainDiff(hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
   }
 
-  def getLatestHashesUnsafe(): AVector[Hash] = {
+  def getLatestHashesUnsafe(): AVector[BlockHash] = {
     val toHeight   = maxHeightUnsafe
     val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 100)
-    (fromHeight to toHeight).foldLeft(AVector.empty[Hash]) {
+    (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) {
       case (acc, height) => acc ++ Utils.unsafe(getHashes(height))
     }
   }
@@ -115,7 +115,7 @@ object BlockChain {
         storages.nodeStateStorage.heightIndexStorage(rootBlock.chainIndex)
       override val chainStateStorage =
         storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
-      override val genesisHash: Hash = rootBlock.hash
+      override val genesisHash: BlockHash = rootBlock.hash
     }
 
     Utils.unsafe(initialize(blockchain))

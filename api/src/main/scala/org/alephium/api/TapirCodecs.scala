@@ -25,7 +25,7 @@ import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.api.CirceUtils.inetAddressCodec
 import org.alephium.api.model._
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
 import org.alephium.util.{TimeStamp, U256}
@@ -36,6 +36,9 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val hashTapirCodec: Codec[String, Hash, TextPlain] =
     fromCirce[Hash]
+
+  implicit val blockHashTapirCodec: Codec[String, BlockHash, TextPlain] =
+    fromCirce[BlockHash]
 
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromCirce[Address]

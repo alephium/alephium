@@ -40,16 +40,16 @@ object Genesis {
   )
 
   private val testnet: AVector[(LockupScript, U256)] = AVector(
-    build("T1BLeXRTZfktdNrtBC95uVMXSRn7x3Zt9bGNbXywxNTXJ9", ALF.alf(Number.million), Testnet),
-    build("T1CarrVGRS2YvEoPLgY6HJvyCAcqW91buYWRJ4roRDCPPg", ALF.alf(Number.million), Testnet),
-    build("T18vgWStW8yz2vpeb9gGU5VBcnX72GYbRMPjx8rxXK7R2i", ALF.alf(Number.million), Testnet),
-    build("T1Ad1kFbKN64Jq6GeQuLVCwZwQHK7gK9ifPNJqP6mWmQTD", ALF.alf(Number.million), Testnet)
+    build("T149bUQbTo6tHa35U3QC1tsAkEDaryyQGJD2S8eomYfcZx", ALF.alf(Number.million), Testnet),
+    build("T1D9PBcRXK5uzrNYokNMB7oh6JpW86sZajJ5gD845cshED", ALF.alf(Number.million), Testnet),
+    build("T1CcSu3nFtFGwaWHnCK4wQkcoJQ2qumDUSH2Xerd35mnUd", ALF.alf(Number.million), Testnet),
+    build("T1GGgP5pyNoe8Y9qJ7Wr1nEiJJXk8vAECXKYZKACpMxTZ4", ALF.alf(Number.million), Testnet)
   )
 
   private val devnet: AVector[(LockupScript, U256)] = AVector(
-    build("D1Cpcv6VKJMCxfqEf9fWDxmeSAkairbxYSWziN2YdKmfm8", ALF.alf(Number.million), Devnet),
-    build("D197jT2NZiXQz4ru7NfmPfeWRuKKdPGpeBVfcc7vZA2QdF", ALF.alf(Number.million), Devnet),
-    build("D1EfN4cKQar8JE2gChzgUgapMqVEHbTnKKeqfwB95XynsF", ALF.alf(Number.million), Devnet)
+    build("D19zzHckZmX9Sjs6yERD15JBLa7HhVXfdrUAMRmLgKFpcr", ALF.alf(Number.million), Devnet),
+    build("D15kHgMQX6ZMH3prxEFcFDkFBv4B7dcffCwVSRCr8nUe7N", ALF.alf(Number.million), Devnet),
+    build("D1GarGSbjFGWEQzJkAPrPoTghHBBDU1FgGSMp2TYdqcx64", ALF.alf(Number.million), Devnet)
   )
   // scalastyle:on magic.number
 

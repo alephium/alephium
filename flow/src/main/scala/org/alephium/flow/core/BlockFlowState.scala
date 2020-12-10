@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -99,11 +99,11 @@ trait BlockFlowState extends FlowTipsUtil {
 
   // Cache latest blocks for assisting merkle trie
   private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
-    LruCache[Hash, BlockCache, IOError](
+    LruCache[BlockHash, BlockCache, IOError](
       consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum)
   }
 
-  def getGroupCache(groupIndex: GroupIndex): LruCache[Hash, BlockCache, IOError] = {
+  def getGroupCache(groupIndex: GroupIndex): LruCache[BlockHash, BlockCache, IOError] = {
     assume(brokerConfig.contains(groupIndex))
     groupCaches(groupIndex.value - brokerConfig.groupFrom)
   }
@@ -119,7 +119,7 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  def getBlockCache(groupIndex: GroupIndex, hash: Hash): IOResult[BlockCache] = {
+  def getBlockCache(groupIndex: GroupIndex, hash: BlockHash): IOResult[BlockCache] = {
     assume(ChainIndex.from(hash).relateTo(groupIndex))
     getGroupCache(groupIndex).get(hash) {
       getBlockChain(hash).getBlock(hash).map(convertBlock(_, groupIndex))
@@ -146,7 +146,7 @@ trait BlockFlowState extends FlowTipsUtil {
     }(op)
   }
 
-  def getBlockChain(hash: Hash): BlockChain
+  def getBlockChain(hash: BlockHash): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
     assume(brokerConfig.contains(from) || brokerConfig.contains(to))
@@ -179,14 +179,14 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  protected def getPersistedWorldState(deps: AVector[Hash],
+  protected def getPersistedWorldState(deps: AVector[BlockHash],
                                        groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  protected def getCachedWorldState(deps: AVector[Hash],
+  protected def getCachedWorldState(deps: AVector[BlockHash],
                                     groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
@@ -242,7 +242,7 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield blocks
   }
 
-  def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[Hash]] = {
+  def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
     val bestDeps     = getBestDeps(groupIndex)
     val bestOutDeps  = bestDeps.outDeps
     val bestIntraDep = bestOutDeps(groupIndex.value)

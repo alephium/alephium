@@ -20,21 +20,21 @@ import java.math.BigInteger
 
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
   implicit def consensusConfig: ConsensusSetting
 
-  def getHeight(hash: Hash): IOResult[Int]
+  def getHeight(hash: BlockHash): IOResult[Int]
 
-  def getTimestamp(hash: Hash): IOResult[TimeStamp]
+  def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
 
-  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]]
+  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
   // TODO: optimize this
-  final protected[core] def calTimeSpan(hash: Hash, height: Int): IOResult[Duration] = {
+  final protected[core] def calTimeSpan(hash: BlockHash, height: Int): IOResult[Duration] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALF.GenesisHeight)
     for {
@@ -45,7 +45,8 @@ trait ChainDifficultyAdjustment {
   }
 
   // DigiShield DAA V3 variant
-  final protected[core] def calHashTarget(hash: Hash, currentTarget: Target): IOResult[Target] = {
+  final protected[core] def calHashTarget(hash: BlockHash,
+                                          currentTarget: Target): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
         calTimeSpan(hash, height).map { timeSpan =>

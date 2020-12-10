@@ -22,7 +22,7 @@ import org.scalatest.EitherValues._
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.model.{Block, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -275,7 +275,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "test chainBack" in new UnforkedFixture {
-    chain.chainBack(genesis.hash, ALF.GenesisHeight) isE AVector.empty[Hash]
+    chain.chainBack(genesis.hash, ALF.GenesisHeight) isE AVector.empty[BlockHash]
     chain.chainBack(blocks.last.hash, ALF.GenesisHeight) isE blocks.map(_.hash)
     chain.chainBack(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.tail.map(_.hash)
     chain.chainBack(blocks.init.last.hash, ALF.GenesisHeight) isE blocks.init.map(_.hash)
@@ -307,7 +307,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.getHashesAfter(chain1.head.hash) isE chain1.tail.map(_.hash)
     chain.getHashesAfter(genesis.hash).toOption.get.toSet is allHashes
 
-    chain.getHashesAfter(blockGen.sample.get.hash) isE AVector.empty[Hash]
+    chain.getHashesAfter(blockGen.sample.get.hash) isE AVector.empty[BlockHash]
   }
 
   it should "test isBefore" in new ForkedFixture {
@@ -324,9 +324,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "test getBlockHashesBetween" in new ForkedFixture {
-    chain.getBlockHashesBetween(genesis.hash, genesis.hash) isE AVector.empty[Hash]
-    chain.getBlockHashesBetween(chain0.head.hash, chain0.head.hash) isE AVector.empty[Hash]
-    chain.getBlockHashesBetween(chain1.head.hash, chain1.head.hash) isE AVector.empty[Hash]
+    chain.getBlockHashesBetween(genesis.hash, genesis.hash) isE AVector.empty[BlockHash]
+    chain.getBlockHashesBetween(chain0.head.hash, chain0.head.hash) isE AVector.empty[BlockHash]
+    chain.getBlockHashesBetween(chain1.head.hash, chain1.head.hash) isE AVector.empty[BlockHash]
 
     chain.getBlockHashesBetween(chain0.last.hash, genesis.hash) isE chain0.map(_.hash)
     chain.getBlockHashesBetween(chain0.last.hash, chain0.head.hash) isE chain0.tail.map(_.hash)

@@ -18,7 +18,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -182,7 +182,7 @@ object SendBlocks extends Payload.Serding[SendBlocks] with Payload.Code {
   implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
 }
 
-final case class GetBlocks(locators: AVector[Hash]) extends Payload
+final case class GetBlocks(locators: AVector[BlockHash]) extends Payload
 
 object GetBlocks extends Payload.Serding[GetBlocks] with Payload.Code {
   implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
@@ -194,7 +194,7 @@ object SendHeaders extends Payload.Serding[SendHeaders] with Payload.Code {
   implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
 }
 
-final case class GetHeaders(locators: AVector[Hash]) extends Payload
+final case class GetHeaders(locators: AVector[BlockHash]) extends Payload
 
 object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
   implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
@@ -206,13 +206,13 @@ object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }
 
-final case class SyncRequest(locators: AVector[AVector[Hash]]) extends Payload
+final case class SyncRequest(locators: AVector[AVector[BlockHash]]) extends Payload
 
 object SyncRequest extends Payload.Serding[SyncRequest] with Payload.Code {
   implicit val serde: Serde[SyncRequest] = Serde.forProduct1(apply, p => p.locators)
 }
 
-final case class SyncResponse(hashes: AVector[AVector[Hash]]) extends Payload
+final case class SyncResponse(hashes: AVector[AVector[BlockHash]]) extends Payload
 
 object SyncResponse extends Payload.Serding[SyncResponse] with Payload.Code {
   implicit val serde: Serde[SyncResponse] = Serde.forProduct1(apply, p => p.hashes)

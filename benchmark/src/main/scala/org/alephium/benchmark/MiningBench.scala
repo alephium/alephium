@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
-import org.alephium.flow.validation.Validation
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, Random}
 
@@ -37,10 +37,10 @@ class MiningBench {
 
   @Benchmark
   def mineGenesis(): Boolean = {
-    val nonce = Random.source.nextInt()
-    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, BigInt(nonce))
+    val nonce = Random.nextU256()
+    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, nonce)
     val i     = Random.source.nextInt(groupConfig.groups)
     val j     = Random.source.nextInt(groupConfig.groups)
-    Validation.validateMined(block, ChainIndex.unsafe(i, j))
+    PoW.checkMined(block, ChainIndex.unsafe(i, j))
   }
 }

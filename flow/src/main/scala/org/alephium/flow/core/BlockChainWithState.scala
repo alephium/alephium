@@ -20,7 +20,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.WorldState
@@ -28,15 +28,15 @@ import org.alephium.protocol.vm.WorldState
 trait BlockChainWithState extends BlockChain {
   def worldStateStorage: WorldStateStorage
 
-  def getPersistedWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
+  def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
     worldStateStorage.getPersistedWorldState(hash)
   }
 
-  def getCachedWorldState(hash: Hash): IOResult[WorldState.Cached] = {
+  def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
     worldStateStorage.getCachedWorldState(hash)
   }
 
-  protected def addWorldState(hash: Hash, worldState: WorldState.Persisted): IOResult[Unit] = {
+  protected def addWorldState(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
     worldStateStorage.putTrie(hash, worldState)
   }
 

@@ -22,7 +22,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{SyncRequest, SyncResponse}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector}
@@ -73,7 +73,7 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
-  def validate(locators: AVector[AVector[Hash]]): Boolean = {
+  def validate(locators: AVector[AVector[BlockHash]]): Boolean = {
     locators.forall(_.forall(hash => brokerConfig.contains(ChainIndex.from(hash).from)))
   }
 }

@@ -29,7 +29,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.Validation
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
@@ -37,13 +37,13 @@ import org.alephium.util._
 
 object BrokerHandler {
   sealed trait Command
-  case object HandShakeTimeout                                  extends Command
-  final case class Send(data: ByteString)                       extends Command
-  final case class Received(payload: Payload)                   extends Command
-  case object SendPing                                          extends Command
-  final case class SyncLocators(hashes: AVector[AVector[Hash]]) extends Command
-  final case class DownloadHeaders(fromHashes: AVector[Hash])   extends Command
-  final case class DownloadBlocks(hashes: AVector[Hash])        extends Command
+  case object HandShakeTimeout                                       extends Command
+  final case class Send(data: ByteString)                            extends Command
+  final case class Received(payload: Payload)                        extends Command
+  case object SendPing                                               extends Command
+  final case class SyncLocators(hashes: AVector[AVector[BlockHash]]) extends Command
+  final case class DownloadHeaders(fromHashes: AVector[BlockHash])   extends Command
+  final case class DownloadBlocks(hashes: AVector[BlockHash])        extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }

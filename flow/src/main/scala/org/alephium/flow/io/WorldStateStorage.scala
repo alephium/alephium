@@ -21,23 +21,24 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.vm.WorldState
 
-trait WorldStateStorage extends KeyValueStorage[Hash, WorldState.Hashes] {
+trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
 
-  override def storageKey(key: Hash): ByteString = key.bytes ++ ByteString(Storages.trieHashPostfix)
+  override def storageKey(key: BlockHash): ByteString =
+    key.bytes ++ ByteString(Storages.trieHashPostfix)
 
-  def getPersistedWorldState(hash: Hash): IOResult[WorldState.Persisted] = {
+  def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
     get(hash).map(_.toPersistedWorldState(trieStorage))
   }
 
-  def getCachedWorldState(hash: Hash): IOResult[WorldState.Cached] = {
+  def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
     get(hash).map(_.toCachedWorldState(trieStorage))
   }
 
-  def putTrie(hash: Hash, worldState: WorldState.Persisted): IOResult[Unit] = {
+  def putTrie(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
     put(hash, worldState.toHashes)
   }
 }
@@ -65,5 +66,8 @@ class WorldStateRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, WorldState.Hashes](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[BlockHash, WorldState.Hashes](storage,
+                                                                 cf,
+                                                                 writeOptions,
+                                                                 readOptions)
     with WorldStateStorage

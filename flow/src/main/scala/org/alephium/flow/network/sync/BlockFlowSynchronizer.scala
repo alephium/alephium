@@ -23,7 +23,7 @@ import akka.actor.{Cancellable, Props, Terminated}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration}
 
@@ -32,10 +32,10 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
-  final case class HandShaked(brokerInfo: BrokerInfo)              extends Command
-  case object Sync                                                 extends Command
-  final case class SyncInventories(hashes: AVector[AVector[Hash]]) extends Command
-  final case class BlockFinalized(hash: Hash)                      extends Command
+  final case class HandShaked(brokerInfo: BrokerInfo)                   extends Command
+  case object Sync                                                      extends Command
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
+  final case class BlockFinalized(hash: BlockHash)                      extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)

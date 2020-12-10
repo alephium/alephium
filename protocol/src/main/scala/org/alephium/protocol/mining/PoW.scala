@@ -14,19 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.core
+package org.alephium.protocol.mining
 
-import org.alephium.flow.model.BlockDeps
+import org.alephium.crypto.Blake3
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.GroupIndex
-import org.alephium.util.AVector
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
+import org.alephium.serde._
 
-final case class FlowTips(targetGroup: GroupIndex,
-                          inTips: AVector[BlockHash],
-                          outTips: AVector[BlockHash]) {
-  def toBlockDeps: BlockDeps = BlockDeps(inTips ++ outTips)
-}
+object PoW {
+  def hash(header: BlockHeader): BlockHash = {
+    val serialized = serialize(header)
+    val hash0      = Blake3.hash(serialized)
+    val hash1      = Blake3.hash(hash0.bytes)
+    hash1
+  }
 
-object FlowTips {
-  final case class Light(inTips: AVector[BlockHash], outTip: BlockHash)
+  def checkWork(data: FlowData): Boolean = {
+    val current = BigInt(1, data.hash.bytes.toArray)
+    current.compareTo(data.target.value) <= 0
+  }
+
+  def checkMined(data: FlowData, index: ChainIndex)(implicit config: GroupConfig): Boolean = {
+    data.chainIndex == index && checkWork(data)
+  }
 }

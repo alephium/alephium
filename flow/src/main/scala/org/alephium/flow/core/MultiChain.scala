@@ -20,7 +20,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -42,19 +42,19 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
   /* BlockHash apis */
-  def contains(hash: Hash): IOResult[Boolean] = {
+  def contains(hash: BlockHash): IOResult[Boolean] = {
     val index = ChainIndex.from(hash)
     val chain = getHashChain(index)
     chain.contains(hash)
   }
 
-  def containsUnsafe(hash: Hash): Boolean = {
+  def containsUnsafe(hash: BlockHash): Boolean = {
     val index = ChainIndex.from(hash)
     val chain = getHashChain(index)
     chain.containsUnsafe(hash)
   }
 
-  def getIndex(hash: Hash): ChainIndex = {
+  def getIndex(hash: BlockHash): ChainIndex = {
     ChainIndex.from(hash)
   }
 
@@ -64,12 +64,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(chainIndex.from, chainIndex.to)
   }
 
-  def getHashChain(hash: Hash): BlockHashChain = {
+  def getHashChain(hash: BlockHash): BlockHashChain = {
     val index = ChainIndex.from(hash)
     getHashChain(index.from, index.to)
   }
 
-  def isTip(hash: Hash): Boolean = {
+  def isTip(hash: BlockHash): Boolean = {
     getHashChain(hash).isTip(hash)
   }
 
@@ -77,40 +77,40 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
                               toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
     aggregateHeaderE(_.getHeightedBlockHeaders(fromTs, toTs))(_ ++ _)
 
-  def getHashesAfter(locator: Hash): IOResult[AVector[Hash]] =
+  def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]] =
     getHashChain(locator).getHashesAfter(locator)
 
-  def getPredecessor(hash: Hash, height: Int): IOResult[Hash] =
+  def getPredecessor(hash: BlockHash, height: Int): IOResult[BlockHash] =
     getHashChain(hash).getPredecessor(hash, height)
 
-  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] =
+  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] =
     getHashChain(hash).chainBack(hash, heightUntil)
 
-  def getState(hash: Hash): IOResult[BlockState] =
+  def getState(hash: BlockHash): IOResult[BlockState] =
     getHashChain(hash).getState(hash)
 
-  def getStateUnsafe(hash: Hash): BlockState =
+  def getStateUnsafe(hash: BlockHash): BlockState =
     getHashChain(hash).getStateUnsafe(hash)
 
-  def getHeight(hash: Hash): IOResult[Int] =
+  def getHeight(hash: BlockHash): IOResult[Int] =
     getHashChain(hash).getHeight(hash)
 
-  def getHeightUnsafe(hash: Hash): Int =
+  def getHeightUnsafe(hash: BlockHash): Int =
     getHashChain(hash).getHeightUnsafe(hash)
 
-  def getWeight(hash: Hash): IOResult[BigInt] =
+  def getWeight(hash: BlockHash): IOResult[BigInt] =
     getHashChain(hash).getWeight(hash)
 
-  def getWeightUnsafe(hash: Hash): BigInt =
+  def getWeightUnsafe(hash: BlockHash): BigInt =
     getHashChain(hash).getWeightUnsafe(hash)
 
-  def getChainWeight(hash: Hash): IOResult[BigInt] =
+  def getChainWeight(hash: BlockHash): IOResult[BigInt] =
     getHashChain(hash).getChainWeight(hash)
 
-  def getChainWeightUnsafe(hash: Hash): BigInt =
+  def getChainWeightUnsafe(hash: BlockHash): BigInt =
     getHashChain(hash).getChainWeightUnsafe(hash)
 
-  def getBlockHashSlice(hash: Hash): IOResult[AVector[Hash]] =
+  def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]] =
     getHashChain(hash).getBlockHashSlice(hash)
 
   /* BlockHeader apis */
@@ -123,18 +123,18 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getHeaderChain(header: BlockHeader): BlockHeaderChain =
     getHeaderChain(header.chainIndex)
 
-  def getHeaderChain(hash: Hash): BlockHeaderChain =
+  def getHeaderChain(hash: BlockHash): BlockHeaderChain =
     getHeaderChain(ChainIndex.from(hash))
 
-  def getBlockHeader(hash: Hash): IOResult[BlockHeader] =
+  def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] =
     getHeaderChain(hash).getBlockHeader(hash)
 
-  def getBlockHeaderUnsafe(hash: Hash): BlockHeader =
+  def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader =
     getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
   def add(header: BlockHeader): IOResult[Unit]
 
-  def getHashes(chainIndex: ChainIndex, height: Int): IOResult[AVector[Hash]] =
+  def getHashes(chainIndex: ChainIndex, height: Int): IOResult[AVector[BlockHash]] =
     getHeaderChain(chainIndex).getHashes(height)
 
   def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
@@ -149,15 +149,15 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getBlockChain(block: Block): BlockChain = getBlockChain(block.chainIndex)
 
-  def getBlockChain(hash: Hash): BlockChain = {
+  def getBlockChain(hash: BlockHash): BlockChain = {
     getBlockChain(ChainIndex.from(hash))
   }
 
-  def getBlockUnsafe(hash: Hash): Block = {
+  def getBlockUnsafe(hash: BlockHash): Block = {
     getBlockChain(hash).getBlockUnsafe(hash)
   }
 
-  def getBlock(hash: Hash): IOResult[Block] = {
+  def getBlock(hash: BlockHash): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
   }
 

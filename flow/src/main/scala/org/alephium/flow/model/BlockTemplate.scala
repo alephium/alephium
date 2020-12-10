@@ -16,21 +16,21 @@
 
 package org.alephium.flow.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.{BlockHeader, Target, Transaction}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class BlockTemplate(deps: AVector[Hash],
+final case class BlockTemplate(deps: AVector[BlockHash],
                                target: Target,
                                blockTs: TimeStamp,
                                txHash: Hash,
                                transactions: AVector[Transaction]) {
-  def buildHeader(nonce: BigInt): BlockHeader =
+  def buildHeader(nonce: U256): BlockHeader =
     BlockHeader(deps, txHash, blockTs, target, nonce)
 }
 
 object BlockTemplate {
-  def apply(deps: AVector[Hash],
+  def apply(deps: AVector[BlockHash],
             target: Target,
             blockTs: TimeStamp,
             transactions: AVector[Transaction]): BlockTemplate = {

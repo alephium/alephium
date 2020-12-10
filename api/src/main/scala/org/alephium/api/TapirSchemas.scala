@@ -22,7 +22,7 @@ import akka.util.ByteString
 import sttp.tapir.Schema
 import sttp.tapir.SchemaType.SInteger
 
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -34,6 +34,7 @@ object TapirSchemas {
   implicit val pulblicKeySchema: Schema[PublicKey]          = Schema(Schema.schemaForString.schemaType)
   implicit val groupIndexSchema: Schema[GroupIndex]         = Schema(Schema.schemaForInt.schemaType)
   implicit val hashSchema: Schema[Hash]                     = Schema(Schema.schemaForString.schemaType)
+  implicit val blockHashSchema: Schema[BlockHash]           = Schema(Schema.schemaForString.schemaType)
   implicit val pubScriptSchema: Schema[LockupScript]        = Schema(Schema.schemaForString.schemaType)
   implicit val signatureSchema: Schema[Signature]           = Schema(Schema.schemaForString.schemaType)
   implicit val timestampSchema: Schema[TimeStamp]           = Schema(Schema.schemaForLong.schemaType)

@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{AVector, TimeStamp}
@@ -30,19 +30,19 @@ import org.alephium.util.{AVector, TimeStamp}
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
 
-  def getBlockHeader(hash: Hash): IOResult[BlockHeader] = {
+  def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
     headerStorage.get(hash)
   }
 
-  def getBlockHeaderUnsafe(hash: Hash): BlockHeader = {
+  def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader = {
     headerStorage.getUnsafe(hash)
   }
 
-  def getParentHash(hash: Hash): IOResult[Hash] = {
+  def getParentHash(hash: BlockHash): IOResult[BlockHash] = {
     getBlockHeader(hash).map(_.parentHash)
   }
 
-  def getTimestamp(hash: Hash): IOResult[TimeStamp] = {
+  def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = {
     getBlockHeader(hash).map(_.timestamp)
   }
 
@@ -89,7 +89,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def reorgFrom(hash: Hash, height: Int): IOResult[Unit] = {
+  final def reorgFrom(hash: BlockHash, height: Int): IOResult[Unit] = {
     getHashes(height).flatMap { hashes =>
       assume(hashes.contains(hash))
       if (hashes.head == hash) {
@@ -117,7 +117,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def chainBack(hash: Hash, heightUntil: Int): IOResult[AVector[Hash]] = {
+  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
     getHeight(hash).flatMap {
       case height if height > heightUntil =>
         getBlockHeader(hash).flatMap { header =>
@@ -131,7 +131,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getHashTarget(hash: Hash): IOResult[Target] = {
+  def getHashTarget(hash: BlockHash): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
       newTarget <- calHashTarget(hash, header.target)
@@ -168,7 +168,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getSyncDataUnsafe(locators: AVector[Hash]): AVector[Hash] = {
+  def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
     val reversed           = locators.reverse
     val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
     if (lastCanonicalIndex == -1) {
@@ -186,9 +186,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   // heightFrom is exclusive, heightTo is inclusive
-  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
+  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     @tailrec
-    def iter(currentHeader: BlockHeader, currentHeight: Int, acc: AVector[Hash]): AVector[Hash] = {
+    def iter(currentHeader: BlockHeader,
+             currentHeight: Int,
+             acc: AVector[BlockHash]): AVector[BlockHash] = {
       if (currentHeight <= heightFrom) {
         acc :+ currentHeader.hash
       } else {
@@ -201,7 +203,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     iter(startHeader, heightTo, AVector.empty).reverse
   }
 
-  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[Hash] = {
+  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
   }
 }

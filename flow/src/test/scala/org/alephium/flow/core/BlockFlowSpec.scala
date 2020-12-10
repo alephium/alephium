@@ -22,7 +22,7 @@ import org.scalatest.Assertion
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Random}
 
@@ -233,7 +233,7 @@ class BlockFlowSpec extends AlephiumSpec {
         block
       }
       val hashes0 = AVector.from(blocks.map(_.hash))
-      val locators0: AVector[AVector[Hash]] =
+      val locators0: AVector[AVector[BlockHash]] =
         AVector.tabulate(groupConfig.groups) { group =>
           if (group equals testToGroup) {
             AVector(config.genesisBlocks(testFromGroup)(testToGroup).hash,
@@ -249,21 +249,21 @@ class BlockFlowSpec extends AlephiumSpec {
       blockFlow0.getSyncLocators() isE locators0
 
       val blockFlow1 = isolatedBlockFlow()
-      val locators1: AVector[AVector[Hash]] = AVector.tabulate(config.broker.groups) { group =>
+      val locators1: AVector[AVector[BlockHash]] = AVector.tabulate(config.broker.groups) { group =>
         AVector(config.genesisBlocks(testFromGroup)(group).hash)
       }
       blockFlow1.getSyncLocators() isE locators1
 
       blockFlow0.getSyncInventories(locators0) isE
-        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+        AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
       blockFlow0.getSyncInventories(locators1) isE
         AVector.tabulate(groupConfig.groups) { group =>
-          if (group equals testToGroup) hashes0 else AVector.empty[Hash]
+          if (group equals testToGroup) hashes0 else AVector.empty[BlockHash]
         }
       blockFlow1.getSyncInventories(locators0) isE
-        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+        AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
       blockFlow1.getSyncInventories(locators1) isE
-        AVector.fill(groupConfig.groups)(AVector.empty[Hash])
+        AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
 
       (0 until brokerConfig.brokerNum).foreach { id =>
         val remoteBrokerInfo = new BrokerGroupInfo {
@@ -274,9 +274,9 @@ class BlockFlowSpec extends AlephiumSpec {
           (if (remoteBrokerInfo.groupFrom equals testToGroup) {
              AVector(hashes0)
            } else {
-             AVector(AVector.empty[Hash])
+             AVector(AVector.empty[BlockHash])
            })
-        blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[Hash])
+        blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[BlockHash])
       }
 
       val remoteBrokerInfo = new BrokerGroupInfo {
@@ -285,10 +285,10 @@ class BlockFlowSpec extends AlephiumSpec {
       }
       blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
         AVector.tabulate(brokerConfig.groups) { k =>
-          if (k equals testToGroup) hashes0 else AVector.empty[Hash]
+          if (k equals testToGroup) hashes0 else AVector.empty[BlockHash]
         }
       blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE
-        AVector.fill(brokerConfig.groups)(AVector.empty[Hash])
+        AVector.fill(brokerConfig.groups)(AVector.empty[BlockHash])
     }
   }
 
