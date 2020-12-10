@@ -33,7 +33,7 @@ import io.circe.{Codec, Decoder}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Minutes, Span}
+import org.scalatest.time.{Second, Seconds, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -60,7 +60,8 @@ trait TestFixtureLike
     with ApiModelCodec
     with ScalaFutures
     with Eventually {
-  override implicit val patienceConfig       = PatienceConfig(timeout = Span(1, Minutes))
+  override implicit val patienceConfig =
+    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -75,7 +76,7 @@ trait TestFixtureLike
   val publicKey  = "03ee6c463816f1b7f3d23ccff248fa73d114ac5eabd616b1fd0d35e6f5ec1eb092"
   val privateKey = "a13841774e62ef76b4d9aac1531b68a46e93baf09ba9c692d57a0edc64b973d4"
   val mnemonic =
-    "talent box celery scissors april bone pet broken borrow weather laugh property rose disorder radar saddle enemy toddler olive dance sudden idle hazard tuition"
+    "inform ocean drama click lazy ridge unit cause decrease notable cat trumpet describe mushroom truly gospel chaos bless female web festival birth bread embark"
   val (transferAddress, _, _) = generateAccount
 
   val password = "password"
@@ -111,7 +112,6 @@ trait TestFixtureLike
       case None         => requestWithEntity
     }
     res
-
   }
 
   def httpGet(endpoint: String, maybeEntity: Option[String] = None) =
