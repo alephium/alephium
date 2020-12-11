@@ -23,6 +23,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Random}
 
@@ -90,9 +91,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in new FlowFixture {
-    override val configValues = Map(
-      ("alephium.broker.broker-num", 1)
-    )
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     if (brokerConfig.groups >= 2) {
       val blockFlow = genesisBlockFlow()
 
@@ -351,6 +351,18 @@ class BlockFlowSpec extends AlephiumSpec {
     val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
     addAndCheck(blockFlow1, toGroupBlock, 2) // TODO: fix weight calculation
     checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
+  }
+
+  behavior of "Utilities"
+
+  it should "generate random group orders" in new GroupConfigFixture {
+    override def groups: Int = 3
+    Seq(0, 1, 2).permutations.foreach { orders =>
+      val hashGen = Gen
+        .resultOf[Unit, BlockHash](_ => BlockHash.random)
+        .retryUntil(hash => BlockFlow.randomGroupOrders(hash) equals AVector.from(orders))
+      hashGen.sample.nonEmpty is true
+    }
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

@@ -192,8 +192,8 @@ trait TestFixtureLike
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
-        ("alephium.consensus.num-zeros-at-least-in-hash", "10"),
-        ("alephium.mining.batch-delay", "200 milli"), // increase this if still flaky
+        ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
+        ("alephium.mining.batch-delay", "500 milli"), // increase this if still flaky
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )

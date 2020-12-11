@@ -56,13 +56,13 @@ class MiningTest extends AlephiumSpec {
     Thread.sleep(1000)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
-    selfClique.peers.foreach { peer =>
-      request[Boolean](stopMining, peer.restPort) is true
-    }
-
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 1)
+    }
+
+    selfClique.peers.foreach { peer =>
+      request[Boolean](stopMining, peer.restPort) is true
     }
 
     server1.stop()

@@ -214,7 +214,9 @@ class SmartContractTest extends AlephiumSpec {
       |$swapContract
       |""".stripMargin)
 
-    request[Balance](getBalance(address), restPort) isnot initialBalance
+    eventually {
+      request[Balance](getBalance(address), restPort) isnot initialBalance
+    }
 
     server1.stop()
     server0.stop()
