@@ -37,14 +37,11 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
   def checkFlowDeps(header: BlockHeader): IOResult[Boolean] =
     IOUtils.tryExecute(checkFlowDepsUnsafe(header))
 
-  def checkFlowDepsUnsafe(header: BlockHeader): Boolean = {
-    val targetGroup = header.chainIndex.from
-
-    val bestDep     = header.blockDeps.max(blockHashOrdering)
+  def checkFlowDepsUnsafe(blockDeps: BlockDeps, targetGroup: GroupIndex): Boolean = {
+    val bestDep     = blockDeps.deps.max(blockHashOrdering)
     val initialTips = getFlowTipsUnsafe(bestDep, targetGroup)
 
-    val sortedDeps =
-      BlockFlowValidation.sortDeps(BlockDeps(header.blockDeps), bestDep, header.chainIndex.from)
+    val sortedDeps = BlockFlowValidation.sortDeps(blockDeps, bestDep, targetGroup)
 
     @tailrec
     def iter(currentTips: FlowTips, tips: AVector[BlockHash]): Option[FlowTips] = {
@@ -59,9 +56,14 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     }
 
     iter(initialTips, sortedDeps.filter(_ != bestDep)) match {
-      case Some(flowTips) => flowTips.isDepsFor(header)
+      case Some(flowTips) => flowTips.sameAs(blockDeps)
       case None           => false
     }
+  }
+
+  def checkFlowDepsUnsafe(header: BlockHeader): Boolean = {
+    val targetGroup = header.chainIndex.from
+    checkFlowDepsUnsafe(BlockDeps(header.blockDeps), targetGroup)
   }
 
   def checkFlowTxsUnsafe(block: Block): Boolean = {

@@ -30,6 +30,7 @@ trait FlowTipsUtil {
   implicit def brokerConfig: BrokerConfig
 
   def groups: Int
+  def bestGenesisHashes: AVector[BlockHash]
   def genesisBlocks: AVector[AVector[Block]]
 
   def getBlockUnsafe(hash: BlockHash): Block
@@ -129,9 +130,9 @@ trait FlowTipsUtil {
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         val g = if (i < targetGroup.value) i else i + 1
-        genesisBlocks(g)(g).hash
+        bestGenesisHashes(g)
       }
-      val targetTip = genesisBlocks(targetGroup.value)(targetGroup.value).hash
+      val targetTip = bestGenesisHashes(targetGroup.value)
       FlowTips.Light(inTips, targetTip)
     } else {
       val inTips = AVector.tabulate(groups - 1) { i =>

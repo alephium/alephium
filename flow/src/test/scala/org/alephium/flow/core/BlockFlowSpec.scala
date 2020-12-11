@@ -70,6 +70,15 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
+  it should "set proper initial bestDeps" in new FlowFixture {
+    val validation = blockFlow.bestDeps.zipWithIndex.forall {
+      case (bestDep, fromShift) =>
+        val mainGroup = GroupIndex.unsafe(brokerConfig.groupFrom + fromShift)
+        blockFlow.checkFlowDepsUnsafe(bestDep, mainGroup)
+    }
+    validation is true
+  }
+
   it should "compute cached blocks" in new FlowFixture {
     val newBlocks = for {
       i <- 0 to 1
@@ -85,7 +94,9 @@ class BlockFlowSpec extends AlephiumSpec {
     }
 
     val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).toOption.get
-    cache0.length is 2
+    val expected =
+      if (blockFlow.blockHashOrdering.lt(newBlocks(2).hash, newBlocks(3).hash)) 1 else 2
+    cache0.length is expected
     cache0.contains(newBlocks(0).hash) is false
     cache0.contains(newBlocks(1).hash) is true
   }
