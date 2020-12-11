@@ -17,6 +17,7 @@
 package org.alephium.util
 
 import scala.annotation.nowarn
+import scala.language.implicitConversions
 
 import org.scalacheck.{Arbitrary, Shrink}
 import org.scalacheck.Arbitrary._
@@ -73,4 +74,24 @@ trait AlephiumFixture extends Matchers {
   implicit class BigIntegerWrapper(val n: BigInteger) extends Ordered[BigIntegerWrapper] {
     override def compare(that: BigIntegerWrapper): Int = this.n.compareTo(that.n)
   }
+
+  implicit val bigIntegerNumeric: Numeric[BigInteger] = new Numeric[BigInteger] {
+    def fromInt(x: Int): java.math.BigInteger = BigInt(x).bigInteger
+    def minus(x: java.math.BigInteger, y: java.math.BigInteger): java.math.BigInteger =
+      x.subtract(y)
+    def negate(x: java.math.BigInteger): java.math.BigInteger = x.negate()
+    def parseString(str: String): Option[java.math.BigInteger] =
+      scala.util.Try(new BigInteger(str)).toOption
+    def plus(x: java.math.BigInteger, y: java.math.BigInteger): java.math.BigInteger = x.add(y)
+    def times(x: java.math.BigInteger, y: java.math.BigInteger): java.math.BigInteger =
+      x.multiply(y)
+    def toDouble(x: java.math.BigInteger): Double                      = x.doubleValue
+    def toFloat(x: java.math.BigInteger): Float                        = x.floatValue
+    def toInt(x: java.math.BigInteger): Int                            = x.intValue
+    def toLong(x: java.math.BigInteger): Long                          = x.longValue
+    def compare(x: java.math.BigInteger, y: java.math.BigInteger): Int = x.compareTo(y)
+  }
+
+  implicit def intToBigInteger(x: Int): BigInteger       = BigInt(x).bigInteger
+  implicit def bigIntToBigInteger(x: BigInt): BigInteger = x.bigInteger
 }

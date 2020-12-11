@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.ChainDiff
 import org.alephium.flow.io._
@@ -37,7 +39,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     blockStorage.getUnsafe(hash)
   }
 
-  def add(block: Block, weight: BigInt): IOResult[Unit] = {
+  def add(block: Block, weight: BigInteger): IOResult[Unit] = {
     assume {
       val assertion = for {
         isNewIncluded    <- contains(block.hash)

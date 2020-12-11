@@ -82,7 +82,8 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     case (hash0, hash1) =>
       val weight0 = getWeightUnsafe(hash0)
       val weight1 = getWeightUnsafe(hash1)
-      weight0 < weight1 ||
+
+      weight0.compareTo(weight1) < 0 ||
       (weight0 == weight1 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
   }
 

@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.annotation.tailrec
 
 import org.alephium.flow.core.BlockHashChain.ChainDiff
@@ -41,8 +43,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   protected def addHash(hash: BlockHash,
                         parentHash: BlockHash,
                         height: Int,
-                        weight: BigInt,
-                        chainWeight: BigInt,
+                        weight: BigInteger,
+                        chainWeight: BigInteger,
                         timestamp: TimeStamp,
                         isCanonical: Boolean): IOResult[Unit] = {
     for {
@@ -83,11 +85,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash]
 
-  def maxWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) { (weight, hash) =>
-    getWeight(hash).map(weight.max)
+  def maxWeight: IOResult[BigInteger] = EitherF.foldTry(tips.keys, BigInteger.ZERO) {
+    (weight, hash) =>
+      getWeight(hash).map(weight.max)
   }
 
-  def maxChainWeight: IOResult[BigInt] = EitherF.foldTry(tips.keys, BigInt(0)) {
+  def maxChainWeight: IOResult[BigInteger] = EitherF.foldTry(tips.keys, BigInteger.ZERO) {
     (chainWeight, hash) =>
       getChainWeight(hash).map(chainWeight.max)
   }
@@ -113,11 +116,14 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def getStateUnsafe(hash: BlockHash): BlockState     = blockStateStorage.getUnsafe(hash)
   def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
   def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: BlockHash): IOResult[BigInt]    = blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: BlockHash): BigInt        = blockStateStorage.getUnsafe(hash).weight
-  def getChainWeight(hash: BlockHash): IOResult[BigInt] =
-    blockStateStorage.get(hash).map(_.chainWeight)
-  def getChainWeightUnsafe(hash: BlockHash): BigInt = blockStateStorage.getUnsafe(hash).chainWeight
+  def getWeight(hash: BlockHash): IOResult[BigInteger] =
+    blockStateStorage.get(hash).map(_.weight.bigInteger)
+  def getWeightUnsafe(hash: BlockHash): BigInteger =
+    blockStateStorage.getUnsafe(hash).weight.bigInteger
+  def getChainWeight(hash: BlockHash): IOResult[BigInteger] =
+    blockStateStorage.get(hash).map(_.chainWeight.bigInteger)
+  def getChainWeightUnsafe(hash: BlockHash): BigInteger =
+    blockStateStorage.getUnsafe(hash).chainWeight.bigInteger
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 

@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.annotation.tailrec
 
 import org.alephium.flow.Utils
@@ -46,7 +48,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getBlockHeader(hash).map(_.timestamp)
   }
 
-  def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = {
+  def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = {
     assume(!header.isGenesis)
     val parentHash = header.parentHash
     assume {
@@ -67,7 +69,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
                    parentHash,
                    height,
                    weight,
-                   chainWeight,
+                   chainWeight.bigInteger,
                    header.timestamp,
                    isCanonical)
     } yield ()
@@ -82,7 +84,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   def reorgFor(header: BlockHeader, chainWeight: BigInt, height: Int): IOResult[Boolean] = {
-    maxChainWeight.map(_ < chainWeight).flatMap {
+    maxChainWeight.map(_.compareTo(chainWeight) < 0).flatMap {
       case true  => reorgFrom(header.parentHash, height - 1).map(_ => true)
       case false => Right(false)
     }
