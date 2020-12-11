@@ -20,7 +20,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes}
 
 class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "generate failed tx" in new FlowFixture {
@@ -48,5 +48,30 @@ class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
                     tx.inputSignatures,
                     tx.contractSignatures)
     }
+  }
+
+  it should "check hash order" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val newBlocks = for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
+    newBlocks.foreach { block =>
+      addAndCheck(blockFlow, block, 1)
+      blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
+    }
+
+    newBlocks.map(_.hash).sorted(blockFlow.blockHashOrdering).map(_.bytes) is
+      newBlocks.map(_.hash.bytes).sorted(Bytes.byteStringOrdering)
+
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(0)(0).hash, newBlocks(0).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(0)(1).hash, newBlocks(0).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(0)(0).hash, newBlocks(1).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(0)(1).hash, newBlocks(1).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(0).hash, newBlocks(2).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(1).hash, newBlocks(2).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(0).hash, newBlocks(3).hash) is true
+    blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(1).hash, newBlocks(3).hash) is true
   }
 }

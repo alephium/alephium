@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
@@ -24,7 +26,7 @@ import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
@@ -213,8 +215,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def getBestTipUnsafe: BlockHash = {
-      val ordering = Ordering.BigInt.on[BlockHash](getWeightUnsafe)
-      aggregateHash(_.getBestTipUnsafe)(ordering.max)
+      aggregateHash(_.getBestTipUnsafe)(blockHashOrdering.max)
     }
 
     override def getAllTips: AVector[BlockHash] = {
@@ -224,44 +225,50 @@ object BlockFlow extends StrictLogging {
     def tryExtendUnsafe(tipsCur: FlowTips,
                         weightCur: BigInt,
                         group: GroupIndex,
-                        toTry: AVector[BlockHash]): (FlowTips, BigInt) = {
+                        toTry: AVector[BlockHash],
+                        bestTip: BlockHash): (FlowTips, BigInt) = {
       toTry
         .fold[(FlowTips, BigInt)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
-            tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
-              case Some(merged) =>
-                val weight = calWeightUnsafe(merged)
-                if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
-              case None => (maxTips, maxWeight)
+            // only consider tips < bestTip
+            if (blockHashOrdering.lt(tip, bestTip)) {
+              tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
+                case Some(merged) =>
+                  val weight = calWeightUnsafe(merged)
+                  if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
+                case None => (maxTips, maxWeight)
+              }
+            } else {
+              maxTips -> maxWeight
             }
         }
     }
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
-      val bestTip   = getBestTipUnsafe
-      val bestIndex = ChainIndex.from(bestTip)
-      val flowTips0 = getFlowTipsUnsafe(bestTip, group)
-      val weight0   = calWeightUnsafe(flowTips0)
-      val (flowTips1, weight1) = (0 until groups).foldLeft(flowTips0 -> weight0) {
-        case ((tipsCur, weightCur), _r) =>
-          val r     = GroupIndex.unsafe(_r)
-          val chain = getHashChain(group, r)
-          tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips)
-      }
-      val (flowTips2, _) = (0 until groups)
-        .filter(_ != group.value)
-        .foldLeft(flowTips1 -> weight1) {
+      val bestTip    = getBestTipUnsafe
+      val bestIndex  = ChainIndex.from(bestTip)
+      val flowTips0  = getFlowTipsUnsafe(bestTip, group)
+      val weight0    = calWeightUnsafe(flowTips0)
+      val groupOrder = BlockFlow.randomGroupOrders(bestTip)
+
+      val (flowTips1, weight1) =
+        (if (bestIndex.from == group) groupOrder.filter(_ != bestIndex.to.value) else groupOrder)
+          .fold(flowTips0 -> weight0) {
+            case ((tipsCur, weightCur), _r) =>
+              val r     = GroupIndex.unsafe(_r)
+              val chain = getHashChain(group, r)
+              tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips, bestTip)
+          }
+      val (flowTips2, _) = groupOrder
+        .filter(g => g != group.value && g != bestIndex.from.value)
+        .fold(flowTips1 -> weight1) {
           case ((tipsCur, weightCur), _l) =>
             val l = GroupIndex.unsafe(_l)
-            if (l != bestIndex.from) {
-              val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
-                val r = GroupIndex.unsafe(_r)
-                acc ++ getHashChain(l, r).getAllTips
-              }
-              tryExtendUnsafe(tipsCur, weightCur, group, toTry)
-            } else {
-              (tipsCur, weightCur)
+            val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
+              val r = GroupIndex.unsafe(_r)
+              acc ++ getHashChain(l, r).getAllTips
             }
+            tryExtendUnsafe(tipsCur, weightCur, group, toTry, bestTip)
         }
       flowTips2.toBlockDeps
     }
@@ -282,5 +289,24 @@ object BlockFlow extends StrictLogging {
     def updateBestDeps(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
+  }
+
+  def randomGroupOrders(hash: BlockHash)(implicit config: GroupConfig): AVector[Int] = {
+    val groupOrders = Array.tabulate(config.groups)(identity)
+
+    @tailrec
+    def shuffle(index: Int, seed: BlockHash): Unit = {
+      if (index < groupOrders.length - 1) {
+        val groupRemaining = groupOrders.length - index
+        val randomIndex    = index + Math.floorMod(seed.toRandomIntUnsafe, groupRemaining)
+        val tmp            = groupOrders(index)
+        groupOrders(index)       = groupOrders(randomIndex)
+        groupOrders(randomIndex) = tmp
+        shuffle(index + 1, BlockHash.hash(seed.bytes))
+      }
+    }
+
+    shuffle(0, hash)
+    AVector.unsafe(groupOrders)
   }
 }
