@@ -29,29 +29,17 @@ import org.alephium.util.AVector
 final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
   def length: Int = deps.length
 
-  def getOutDep(to: GroupIndex)(implicit config: GroupConfig): BlockHash = {
-    outDeps.apply(to.value)
-  }
+  def getOutDep(to: GroupIndex): BlockHash = outDeps(to.value)
 
-  def parentHash(chainIndex: ChainIndex)(implicit config: GroupConfig): BlockHash = {
-    getOutDep(chainIndex.to)
-  }
+  def parentHash(chainIndex: ChainIndex): BlockHash = getOutDep(chainIndex.to)
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
-    getOutDep(toIndex)
-  }
+  def uncleHash(toIndex: GroupIndex): BlockHash = getOutDep(toIndex)
 
-  def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
-    deps.takeRight(config.groups)
-  }
+  def outDeps: AVector[BlockHash] = deps.drop(deps.length / 2)
 
-  def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
-    deps.dropRight(config.groups)
-  }
+  def inDeps: AVector[BlockHash] = deps.take(deps.length / 2)
 
-  def intraDep(chainIndex: ChainIndex)(implicit config: GroupConfig): BlockHash = {
-    getOutDep(chainIndex.from)
-  }
+  def intraDep(chainIndex: ChainIndex): BlockHash = getOutDep(chainIndex.from)
 }
 
 object BlockDeps {

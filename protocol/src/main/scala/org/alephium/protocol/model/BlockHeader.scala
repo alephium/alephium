@@ -40,32 +40,32 @@ final case class BlockHeader(
 
   def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
-  def parentHash(implicit config: GroupConfig): BlockHash = {
+  def parentHash: BlockHash = {
     assume(!isGenesis)
     blockDeps.uncleHash(chainIndex.to)
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
+  def uncleHash(toIndex: GroupIndex): BlockHash = {
     assume(!isGenesis)
     blockDeps.uncleHash(toIndex)
   }
 
-  def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
+  def inDeps: AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.inDeps
   }
 
-  def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
+  def outDeps: AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.outDeps
   }
 
-  def intraDep(implicit config: GroupConfig): BlockHash = {
+  def intraDep: BlockHash = {
     assume(!isGenesis)
     blockDeps.intraDep(chainIndex)
   }
 
-  def outTips(implicit config: GroupConfig): AVector[BlockHash] = {
+  def outTips: AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.outDeps.replace(chainIndex.to.value, hash)
   }

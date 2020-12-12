@@ -49,15 +49,15 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 
   def blockDeps: BlockDeps = header.blockDeps
 
-  def parentHash(implicit config: GroupConfig): BlockHash = {
+  def parentHash: BlockHash = {
     header.parentHash
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
+  def uncleHash(toIndex: GroupIndex): BlockHash = {
     header.uncleHash(toIndex)
   }
 
-  def getScriptExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+  def getScriptExecutionOrder: AVector[Int] = {
     if (isGenesis) {
       AVector.empty
     } else {
@@ -65,7 +65,7 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
     }
   }
 
-  def getNonCoinbaseExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+  def getNonCoinbaseExecutionOrder: AVector[Int] = {
     assume(!isGenesis)
     Block.getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
   }

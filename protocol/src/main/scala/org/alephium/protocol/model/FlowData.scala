@@ -17,7 +17,6 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.TimeStamp
 
 trait FlowData {
@@ -33,9 +32,9 @@ trait FlowData {
 
   def blockDeps: BlockDeps
 
-  def parentHash(implicit config: GroupConfig): BlockHash
+  def parentHash: BlockHash
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash
+  def uncleHash(toIndex: GroupIndex): BlockHash
 
   def shortHex: String = hash.shortHex
 }
