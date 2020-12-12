@@ -33,6 +33,7 @@ sealed trait InvalidHeaderStatus extends InvalidBlockStatus
 final case object InvalidGroup                           extends InvalidBlockStatus
 final case object InvalidGenesisTimeStamp                extends InvalidHeaderStatus
 final case object InvalidGenesisDeps                     extends InvalidHeaderStatus
+final case object InvalidGenesisWorkAmount               extends InvalidHeaderStatus
 final case object InvalidGenesisWorkTarget               extends InvalidHeaderStatus
 final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
 final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
@@ -40,7 +41,10 @@ final case object InvalidTimeStamp                       extends InvalidHeaderSt
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus
 final case object InvalidWorkTarget                      extends InvalidHeaderStatus
 final case object InvalidHeaderFlow                      extends InvalidHeaderStatus
+final case object InvalidDepsNum                         extends InvalidHeaderStatus
+final case object InvalidDepsIndex                       extends InvalidHeaderStatus
 final case class MissingDeps(hashes: AVector[BlockHash]) extends InvalidHeaderStatus
+final case object InvalidTxsHash                         extends InvalidHeaderStatus
 final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
 final case object EmptyTransactionList                   extends InvalidBlockStatus
 final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus

@@ -41,10 +41,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     checkBlockAfterDependencies(block, flow)
   }
 
-  def validateAfterHeader(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-    checkBlockAfterHeader(block, flow)
-  }
-
   private[validation] def checkBlockUntilDependencies(
       block: Block,
       flow: BlockFlow): BlockValidationResult[Unit] = {

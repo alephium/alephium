@@ -72,8 +72,8 @@ abstract class HashSchema[T: TypeTag](unsafe: ByteString => T, toBytes: T => Byt
     hash(ByteString.fromString(input, charset))
   }
 
-  def hash[S](input: S)(implicit serializer: Serializer[S]): T = {
-    hash(serializer.serialize(input))
+  def hash[S: Serializer](input: S): T = {
+    hash(serialize(input))
   }
 
   def xor(hash0: T, hash1: T): T = {
