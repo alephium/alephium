@@ -170,9 +170,9 @@ trait FlowTipsUtil {
   private[core] def getInTip(header: BlockHeader, targetGroup: GroupIndex): BlockHash = {
     val from = header.chainIndex.from
     if (targetGroup.value < from.value) {
-      header.blockDeps(targetGroup.value)
+      header.blockDeps.deps(targetGroup.value)
     } else if (targetGroup.value > from.value) {
-      header.blockDeps(targetGroup.value - 1)
+      header.blockDeps.deps(targetGroup.value - 1)
     } else {
       header.hash
     }

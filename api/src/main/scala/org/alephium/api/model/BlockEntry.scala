@@ -36,7 +36,7 @@ object BlockEntry {
       chainFrom    = header.chainIndex.from.value,
       chainTo      = header.chainIndex.to.value,
       height       = height,
-      deps         = header.blockDeps.map(_.toHexString),
+      deps         = header.blockDeps.deps.map(_.toHexString),
       transactions = None
     )
   }

@@ -20,6 +20,7 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.BlockHash
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
@@ -105,10 +106,11 @@ object HeaderValidation {
     }
     protected[validation] def checkGenesisDependencies(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.blockDeps.nonEmpty) {
-        invalidHeader(InvalidGenesisDeps)
-      } else {
+      val deps = header.blockDeps.deps
+      if (deps.length == brokerConfig.depsNum && deps.forall(_ == BlockHash.zero)) {
         validHeader(())
+      } else {
+        invalidHeader(InvalidGenesisDeps)
       }
     }
     protected[validation] def checkGenesisWorkAmount(
@@ -155,7 +157,7 @@ object HeaderValidation {
     // TODO: check algorithm validatity of dependencies
     protected[validation] def checkDependencies(header: BlockHeader,
                                                 flow: BlockFlow): HeaderValidationResult[Unit] = {
-      ValidationStatus.from(header.blockDeps.filterNotE(flow.contains)).flatMap { missings =>
+      ValidationStatus.from(header.blockDeps.deps.filterNotE(flow.contains)).flatMap { missings =>
         if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
       }
     }

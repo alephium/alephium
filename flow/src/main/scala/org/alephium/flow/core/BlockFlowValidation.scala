@@ -18,11 +18,10 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
-import org.alephium.flow.model.BlockDeps
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHeader, GroupIndex}
+import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, GroupIndex}
 import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
@@ -63,7 +62,7 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
 
   def checkFlowDepsUnsafe(header: BlockHeader): Boolean = {
     val targetGroup = header.chainIndex.from
-    checkFlowDepsUnsafe(BlockDeps(header.blockDeps), targetGroup)
+    checkFlowDepsUnsafe(header.blockDeps, targetGroup)
   }
 
   def checkFlowTxsUnsafe(block: Block): Boolean = {

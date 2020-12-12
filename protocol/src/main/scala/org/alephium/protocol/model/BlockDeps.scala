@@ -14,19 +14,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.protocol.model
 
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
+import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 /*
  * There are 2 * groups - 1 dependent hashes for each block
- * The first groups - 1 hashes are for the incoming chains of a specific group
- * The last groups hashes are for the outcoming chains of a specific group
+ * The first G - 1 hashes are from groups different from this group
+ * The rest G hashes are from all the chain related to this group
  */
-final case class BlockDeps(deps: AVector[BlockHash]) {
+final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
+  def length: Int = deps.length
+
   def getOutDep(to: GroupIndex)(implicit config: GroupConfig): BlockHash = {
     outDeps.apply(to.value)
   }
@@ -35,11 +37,32 @@ final case class BlockDeps(deps: AVector[BlockHash]) {
     getOutDep(chainIndex.to)
   }
 
+  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
+    getOutDep(toIndex)
+  }
+
   def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     deps.takeRight(config.groups)
   }
 
   def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     deps.dropRight(config.groups)
+  }
+
+  def intraDep(chainIndex: ChainIndex)(implicit config: GroupConfig): BlockHash = {
+    deps.takeRight(config.groups)(chainIndex.from.value)
+  }
+}
+
+object BlockDeps {
+  implicit val serde: Serde[BlockDeps] = Serde.forProduct1(unsafe, t => t.deps)
+
+  def unsafe(deps: AVector[BlockHash]): BlockDeps = {
+    new BlockDeps(deps)
+  }
+
+  def build(deps: AVector[BlockHash])(implicit config: GroupConfig): BlockDeps = {
+    require(deps.length == config.depsNum)
+    new BlockDeps(deps)
   }
 }

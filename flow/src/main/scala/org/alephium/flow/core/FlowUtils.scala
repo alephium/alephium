@@ -21,7 +21,6 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
-import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
@@ -117,7 +116,7 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
       }
 
       for {
-        cachedWorldState <- getCachedWorldState(deps.deps, chainIndex.from)
+        cachedWorldState <- getCachedWorldState(deps, chainIndex.from)
         _ <- order.foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
           FlowUtils

@@ -30,7 +30,6 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
-import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.BrokerManager

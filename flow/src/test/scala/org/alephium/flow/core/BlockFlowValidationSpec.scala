@@ -19,7 +19,6 @@ package org.alephium.flow.core
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.model.BlockDeps
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -28,10 +27,9 @@ class BlockFlowValidationSpec extends AlephiumSpec {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     def test(block: Block): Assertion = {
-      val bestDep     = block.header.blockDeps.max(blockFlow.blockHashOrdering)
-      val blockDeps   = BlockDeps(block.header.blockDeps)
+      val bestDep     = block.header.blockDeps.deps.max(blockFlow.blockHashOrdering)
       val targetGroup = block.chainIndex.from
-      val result      = BlockFlowValidation.sortDeps(blockDeps, bestDep, targetGroup)
+      val result      = BlockFlowValidation.sortDeps(block.header.blockDeps, bestDep, targetGroup)
       result.take(groups0).map(hash => ChainIndex.from(hash)) is
         AVector.from((0 until groups0).map(ChainIndex.unsafe(targetGroup.value, _)))
       result.takeRight(groups0 - 1).map(hash => ChainIndex.from(hash).from.value) is

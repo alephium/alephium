@@ -43,14 +43,16 @@ class WebSocketServerSpec
 
   it should "encode BlockNotify" in new ServerFixture {
     val dep         = BlockHash.hash("foo")
-    val header      = BlockHeader(AVector(dep), Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
+    val deps        = AVector.fill(groupConfig.depsNum)(dep)
+    val header      = BlockHeader.unsafe(deps, Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
     val blockNotify = BlockNotify(header, 1)
     val headerHash  = header.hash.toHexString
     val chainIndex  = header.chainIndex
 
     val result = WebSocketServer.blockNotifyEncode(blockNotify)
 
-    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":["${dep.toHexString}"]}"""
+    val depsString = AVector.fill(groupConfig.depsNum)(s""""${dep.toHexString}"""").mkString(",")
+    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString]}"""
   }
 
   behavior of "ws"

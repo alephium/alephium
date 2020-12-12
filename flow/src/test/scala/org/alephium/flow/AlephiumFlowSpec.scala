@@ -310,7 +310,7 @@ trait FlowFixture
         val weight = blockFlow.getWeightUnsafe(tip)
         val header = blockFlow.getBlockHeaderUnsafe(tip)
         val index  = header.chainIndex
-        val deps   = header.blockDeps.map(_.shortHex).mkString("-")
+        val deps   = header.blockDeps.deps.map(_.shortHex).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
       }
       .mkString("", "\n", "\n")

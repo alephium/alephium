@@ -22,15 +22,8 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.serde.{u256Serde => _, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-/** The header of a block with index.from == _group_
-  *
-  * @param blockDeps If the block is genesis, then it's empty.
-  *                  Otherwise, 2 * G - 1 deps in total:
-  *                  the first G - 1 hashes are from groups different from _group_
-  *                  the rest G hashes are from all the chain related to _group_
-  */
 final case class BlockHeader(
-    blockDeps: AVector[BlockHash],
+    blockDeps: BlockDeps,
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target,
@@ -51,27 +44,27 @@ final case class BlockHeader(
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
     assume(!isGenesis)
-    blockDeps.takeRight(config.groups)(toIndex.value)
+    blockDeps.uncleHash(toIndex)
   }
 
   def inDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
-    blockDeps.dropRight(config.groups)
+    blockDeps.inDeps
   }
 
   def outDeps(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
-    blockDeps.takeRight(config.groups)
+    blockDeps.outDeps
   }
 
   def intraDep(implicit config: GroupConfig): BlockHash = {
     assume(!isGenesis)
-    blockDeps.takeRight(config.groups)(chainIndex.from.value)
+    blockDeps.intraDep(chainIndex)
   }
 
   def outTips(implicit config: GroupConfig): AVector[BlockHash] = {
     assume(!isGenesis)
-    blockDeps.takeRight(config.groups).replace(chainIndex.to.value, hash)
+    blockDeps.outDeps.replace(chainIndex.to.value, hash)
   }
 }
 
@@ -84,7 +77,16 @@ object BlockHeader {
 
   def genesis(txsHash: Hash, target: Target, nonce: U256)(
       implicit config: GroupConfig): BlockHeader = {
-    val deps = AVector.fill(config.depsNum)(BlockHash.zero)
+    val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
     BlockHeader(deps, txsHash, ALF.GenesisTimestamp, target, nonce)
+  }
+
+  def unsafe(deps: AVector[BlockHash],
+             txsHash: Hash,
+             timestamp: TimeStamp,
+             target: Target,
+             nonce: U256)(implicit config: GroupConfig): BlockHeader = {
+    val blockDeps = BlockDeps.build(deps)
+    BlockHeader(blockDeps, txsHash, timestamp, target, nonce)
   }
 }

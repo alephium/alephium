@@ -29,7 +29,7 @@ import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.config.{BrokerConfig, EmissionConfig}
+import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -73,7 +73,8 @@ object Miner {
       extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
-      implicit miningConfig: MiningSetting): Option[(Block, U256)] = {
+      implicit groupConfig: GroupConfig,
+      miningConfig: MiningSetting): Option[(Block, U256)] = {
     val nonceStart = Random.nextU256NonUniform(U256.HalfMaxValue)
     val nonceEnd   = nonceStart.addUnsafe(miningConfig.nonceStep)
 

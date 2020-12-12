@@ -16,16 +16,15 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.model.BlockDeps
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{BlockDeps, GroupIndex}
 import org.alephium.util.AVector
 
 final case class FlowTips(targetGroup: GroupIndex,
                           inTips: AVector[BlockHash],
                           outTips: AVector[BlockHash]) {
-  def toBlockDeps: BlockDeps = BlockDeps(inTips ++ outTips)
+  def toBlockDeps: BlockDeps = BlockDeps.unsafe(inTips ++ outTips)
 
   def sameAs(blockDeps: BlockDeps)(implicit config: GroupConfig): Boolean = {
     inTips == blockDeps.inDeps && outTips == blockDeps.outDeps

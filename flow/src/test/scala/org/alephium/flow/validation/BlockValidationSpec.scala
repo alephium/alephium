@@ -21,7 +21,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, BlockHash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -68,7 +68,11 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "validate coinbase transaction simple format" in new Fixture {
     val (privateKey, publicKey) = SignatureSchema.generatePriPub()
     val block0 =
-      Block.from(AVector.empty, AVector.empty, consensusConfig.maxMiningTarget, TimeStamp.zero, 0)
+      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+                 AVector.empty,
+                 consensusConfig.maxMiningTarget,
+                 TimeStamp.zero,
+                 0)
 
     val input0          = txInputGen.sample.get
     val output0         = assetOutputGen.sample.get
@@ -161,7 +165,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     blockFlow.isConflicted(AVector(block1.hash, block0.hash), blockFlow.getBlockUnsafe) is true
 
     val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val newDeps = block2.header.blockDeps
+    val newDeps = block2.header.blockDeps.deps
       .replace(brokerConfig.groups - 1, block0.hash)
       .replace(brokerConfig.groups, block1.hash)
     val block3 = mine(chainIndex, newDeps, block2.transactions, block2.header.timestamp)

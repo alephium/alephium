@@ -68,11 +68,11 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "be random" in {
     def gen(): Block = {
       val header: BlockHeader =
-        BlockHeader(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                    Hash.zero,
-                    TimeStamp.now(),
-                    Target.Max,
-                    0)
+        BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+                           Hash.zero,
+                           TimeStamp.now(),
+                           Target.Max,
+                           0)
       val txs: AVector[Transaction] =
         AVector.fill(3)(
           Transaction.from(
@@ -96,11 +96,11 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "put non-script txs in the last" in {
     forAll(Gen.posNum[Long], Gen.posNum[Long]) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
-        BlockHeader(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                    Hash.zero,
-                    TimeStamp.now(),
-                    Target.Max,
-                    0)
+        BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+                           Hash.zero,
+                           TimeStamp.now(),
+                           Target.Max,
+                           0)
       val tx0 = Transaction.from(
         UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
                             minimalGas,

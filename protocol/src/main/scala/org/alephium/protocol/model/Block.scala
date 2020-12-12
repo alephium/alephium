@@ -72,13 +72,13 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
 
-  def from(blockDeps: AVector[BlockHash],
+  def from(deps: AVector[BlockHash],
            transactions: AVector[Transaction],
            target: Target,
            timeStamp: TimeStamp,
-           nonce: U256): Block = {
-    // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
+           nonce: U256)(implicit config: GroupConfig): Block = {
     val txsHash     = Hash.hash(transactions)
+    val blockDeps   = BlockDeps.build(deps)
     val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
