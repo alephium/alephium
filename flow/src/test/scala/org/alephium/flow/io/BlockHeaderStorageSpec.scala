@@ -26,7 +26,7 @@ import org.alephium.util.{AlephiumSpec, Files}
 class BlockHeaderStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
   import RocksDBSource.ColumnFamily
 
-  trait Fixture extends ConsensusConfigFixture {
+  trait Fixture extends ConsensusConfigFixture.Default {
     val tmpdir = Files.tmpDir
     val dbname = "foo"
     val dbPath = tmpdir.resolve(dbname)
