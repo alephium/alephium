@@ -23,12 +23,12 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash}
-import org.alephium.protocol.model.{Block, NoIndexModelGenerators}
+import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
   trait Fixture extends AlephiumConfigFixture {
-    val genesis  = Block.genesis(AVector.empty, consensusConfig.maxMiningTarget, 0)
+    val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
     val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
     val chainGen = chainGenOf(4, genesis)
 

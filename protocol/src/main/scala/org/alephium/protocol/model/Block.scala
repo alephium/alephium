@@ -21,7 +21,7 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -83,11 +83,19 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: AVector[Transaction], target: Target, nonce: U256)(
-      implicit config: GroupConfig): Block = {
-    val txsHash     = Hash.hash(transactions)
-    val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
-    Block(blockHeader, transactions)
+  def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
+      implicit groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig): Block = {
+    val txsHash = Hash.hash(transactions)
+
+    @tailrec
+    def iter(nonce: U256): BlockHeader = {
+      val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
+      // Note: we do not validate difficulty target here
+      if (header.chainIndex == chainIndex) header else iter(nonce.addOneUnsafe())
+    }
+
+    Block(iter(U256.Zero), transactions)
   }
 
   def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {

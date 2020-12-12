@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{AVector, Random}
@@ -32,13 +32,13 @@ import org.alephium.util.{AVector, Random}
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class MiningBench {
 
-  val config: AlephiumConfig            = AlephiumConfig.load(Platform.getRootPath()).toOption.get
-  implicit val groupConfig: GroupConfig = config.broker
+  val config: AlephiumConfig                    = AlephiumConfig.load(Platform.getRootPath()).toOption.get
+  implicit val groupConfig: GroupConfig         = config.broker
+  implicit val consensusConfig: ConsensusConfig = config.consensus
 
   @Benchmark
   def mineGenesis(): Boolean = {
-    val nonce = Random.nextU256()
-    val block = Block.genesis(AVector.empty, config.consensus.maxMiningTarget, nonce)
+    val block = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
     val i     = Random.source.nextInt(groupConfig.groups)
     val j     = Random.source.nextInt(groupConfig.groups)
     PoW.checkMined(block, ChainIndex.unsafe(i, j))
