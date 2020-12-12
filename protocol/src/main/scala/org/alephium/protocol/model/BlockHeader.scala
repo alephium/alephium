@@ -39,7 +39,8 @@ final case class BlockHeader(
   def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
   def parentHash(implicit config: GroupConfig): BlockHash = {
-    uncleHash(chainIndex.to)
+    assume(!isGenesis)
+    blockDeps.uncleHash(chainIndex.to)
   }
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {

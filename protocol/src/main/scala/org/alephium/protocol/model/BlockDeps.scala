@@ -50,7 +50,7 @@ final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
   }
 
   def intraDep(chainIndex: ChainIndex)(implicit config: GroupConfig): BlockHash = {
-    deps.takeRight(config.groups)(chainIndex.from.value)
+    getOutDep(chainIndex.from)
   }
 }
 
