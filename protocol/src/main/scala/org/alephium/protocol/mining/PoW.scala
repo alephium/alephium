@@ -18,7 +18,6 @@ package org.alephium.protocol.mining
 
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde._
 
@@ -35,7 +34,7 @@ object PoW {
     current.compareTo(data.target.value) <= 0
   }
 
-  def checkMined(data: FlowData, index: ChainIndex)(implicit config: GroupConfig): Boolean = {
+  def checkMined(data: FlowData, index: ChainIndex): Boolean = {
     data.chainIndex == index && checkWork(data)
   }
 }

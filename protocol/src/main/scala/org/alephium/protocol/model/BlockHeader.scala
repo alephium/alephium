@@ -38,6 +38,11 @@ final case class BlockHeader(
 ) extends FlowData {
   lazy val hash: BlockHash = PoW.hash(this)
 
+  lazy val chainIndex: ChainIndex = {
+    val groups = (blockDeps.length + 1) / 2
+    ChainIndex.from(hash, groups)
+  }
+
   def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
 
   def parentHash(implicit config: GroupConfig): BlockHash = {
@@ -77,7 +82,9 @@ object BlockHeader {
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: Hash, target: Target, nonce: U256): BlockHeader = {
-    BlockHeader(AVector.empty, txsHash, ALF.GenesisTimestamp, target, nonce)
+  def genesis(txsHash: Hash, target: Target, nonce: U256)(
+      implicit config: GroupConfig): BlockHeader = {
+    val deps = AVector.fill(config.depsNum)(BlockHash.zero)
+    BlockHeader(deps, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 }

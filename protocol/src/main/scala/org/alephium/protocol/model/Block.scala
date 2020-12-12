@@ -26,7 +26,9 @@ import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
-  override def hash: BlockHash = header.hash
+  def hash: BlockHash = header.hash
+
+  def chainIndex: ChainIndex = header.chainIndex
 
   def coinbase: Transaction = transactions.last
 
@@ -81,7 +83,8 @@ object Block {
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: AVector[Transaction], target: Target, nonce: U256): Block = {
+  def genesis(transactions: AVector[Transaction], target: Target, nonce: U256)(
+      implicit config: GroupConfig): Block = {
     val txsHash     = Hash.hash(transactions)
     val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
     Block(blockHeader, transactions)

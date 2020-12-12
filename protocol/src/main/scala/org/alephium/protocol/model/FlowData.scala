@@ -27,9 +27,7 @@ trait FlowData {
 
   def hash: BlockHash
 
-  def chainIndex(implicit config: GroupConfig): ChainIndex = {
-    ChainIndex.from(hash)
-  }
+  def chainIndex: ChainIndex
 
   def isGenesis: Boolean
 
