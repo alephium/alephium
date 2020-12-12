@@ -31,6 +31,8 @@ trait FlowData {
 
   def isGenesis: Boolean
 
+  def blockDeps: BlockDeps
+
   def parentHash(implicit config: GroupConfig): BlockHash
 
   def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash

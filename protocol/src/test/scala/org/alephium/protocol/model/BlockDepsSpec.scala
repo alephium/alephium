@@ -20,8 +20,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.util.{AlephiumSpec, AVector}
 
-class BlockDepsSpec extends AlephiumSpec with GroupConfigFixture {
-  override def groups: Int = 3
+class BlockDepsSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   it should "validate number of deps" in {
     val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash.hash(Seq(i.toByte)))
