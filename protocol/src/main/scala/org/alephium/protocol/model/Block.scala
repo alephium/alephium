@@ -47,6 +47,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 
   def isGenesis: Boolean = header.isGenesis
 
+  def blockDeps: BlockDeps = header.blockDeps
+
   def parentHash(implicit config: GroupConfig): BlockHash = {
     header.parentHash
   }
@@ -87,15 +89,7 @@ object Block {
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): Block = {
     val txsHash = Hash.hash(transactions)
-
-    @tailrec
-    def iter(nonce: U256): BlockHeader = {
-      val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
-      // Note: we do not validate difficulty target here
-      if (header.chainIndex == chainIndex) header else iter(nonce.addOneUnsafe())
-    }
-
-    Block(iter(U256.Zero), transactions)
+    Block(BlockHeader.genesis(chainIndex, txsHash), transactions)
   }
 
   def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {
