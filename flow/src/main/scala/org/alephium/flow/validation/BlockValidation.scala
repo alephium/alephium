@@ -140,7 +140,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (block.header.txsHash == Hash.hash(block.transactions)) {
       validBlock(())
     } else {
-      invalidBlock(InvalidMerkleRoot)
+      invalidBlock(InvalidTxsMerkleRoot)
     }
   }
 

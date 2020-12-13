@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
@@ -38,7 +38,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
     checkHeaderAfterDependencies(header, flow)
   }
 
-  protected[validation] def checkGenesisHeader(
+  protected[validation] def validateGenesisHeader(
       genesis: BlockHeader): HeaderValidationResult[Unit] = {
     for {
       _ <- checkGenesisTimeStamp(genesis)
@@ -63,9 +63,9 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       parent <- getParentHeader(flow, header) // parent should exist as checked in ChainHandler
       _      <- checkTimeStampIncreasing(header, parent)
       _      <- checkTimeStampDrift(header)
-      _      <- checkWorkAmount(header)
       _      <- checkDepsNum(header)
       _      <- checkDepsIndex(header)
+      _      <- checkWorkAmount(header)
       _      <- checkWorkTarget(header, flow.getHeaderChain(header))
       _      <- checkDepsMissing(header, flow)
     } yield ()
@@ -113,7 +113,7 @@ object HeaderValidation {
       extends HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.timestamp != TimeStamp.zero) {
+      if (header.timestamp != ALF.GenesisTimestamp) {
         invalidHeader(InvalidGenesisTimeStamp)
       } else {
         validHeader(())
