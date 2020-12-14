@@ -116,7 +116,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   trait HeaderFixture extends Fixture with FlowFixture {
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.consensus.num-zeros-at-least-in-hash", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 1)
     )
 
     val chainIndex = ChainIndex.unsafe(1, 2)
@@ -138,7 +138,6 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
         .posNum[Long]
         .map(nonce => modified.copy(nonce = nonce))
         .retryUntil { newHeader =>
-          println(s"update: ${newHeader.shortHex}, ${newHeader.chainIndex}")
           (newHeader.chainIndex equals chainIndex) &&
           (new BigInteger(1, newHeader.hash.bytes.toArray).compareTo(newHeader.target.value) <= 0)
         }
