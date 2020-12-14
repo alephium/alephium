@@ -61,7 +61,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
     for {
       parentState <- getState(parentHash)
-      chainWeight = parentState.chainWeight + header.target.value
+      chainWeight = parentState.chainWeight add header.target.value
       height      = parentState.height + 1
       _           <- addHeader(header)
       isCanonical <- reorgFor(header, chainWeight, height)
@@ -69,7 +69,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
                    parentHash,
                    height,
                    weight,
-                   chainWeight.bigInteger,
+                   chainWeight,
                    header.timestamp,
                    isCanonical)
     } yield ()

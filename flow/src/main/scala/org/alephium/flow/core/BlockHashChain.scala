@@ -117,13 +117,13 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
   def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
   def getWeight(hash: BlockHash): IOResult[BigInteger] =
-    blockStateStorage.get(hash).map(_.weight.bigInteger)
+    blockStateStorage.get(hash).map(_.weight)
   def getWeightUnsafe(hash: BlockHash): BigInteger =
-    blockStateStorage.getUnsafe(hash).weight.bigInteger
+    blockStateStorage.getUnsafe(hash).weight
   def getChainWeight(hash: BlockHash): IOResult[BigInteger] =
-    blockStateStorage.get(hash).map(_.chainWeight.bigInteger)
+    blockStateStorage.get(hash).map(_.chainWeight)
   def getChainWeightUnsafe(hash: BlockHash): BigInteger =
-    blockStateStorage.getUnsafe(hash).chainWeight.bigInteger
+    blockStateStorage.getUnsafe(hash).chainWeight
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 

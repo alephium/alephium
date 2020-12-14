@@ -16,6 +16,7 @@
 
 package org.alephium
 
+import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress, UnknownHostException}
 
 import scala.collection.mutable
@@ -101,6 +102,9 @@ package object serde {
 
   implicit val bigIntSerde: Serde[BigInt] =
     avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
+
+  implicit val bigIntegerSerde: Serde[BigInteger] =
+    avectorSerde[Byte].xmap(vc => new BigInteger(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
 
   /*
    * Note: only ipv4 and ipv6 addresses are supported in the following serdes

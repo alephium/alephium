@@ -16,9 +16,11 @@
 
 package org.alephium.flow.model
 
+import java.math.BigInteger
+
 import org.alephium.serde.Serde
 
-final case class BlockState(height: Int, weight: BigInt, chainWeight: BigInt)
+final case class BlockState(height: Int, weight: BigInteger, chainWeight: BigInteger)
 
 object BlockState {
   implicit val serde: Serde[BlockState] =
