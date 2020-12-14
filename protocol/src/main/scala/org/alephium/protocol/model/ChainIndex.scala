@@ -74,8 +74,12 @@ object ChainIndex {
     0 <= from && from < config.groups && 0 <= to && to < config.groups
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def from(randomBytes: RandomBytes)(implicit config: GroupConfig): ChainIndex = {
+    from(randomBytes, config.groups)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def from(randomBytes: RandomBytes, groups: Int): ChainIndex = {
     val bytes = randomBytes.bytes
     assume(bytes.length >= 2)
 
@@ -84,7 +88,8 @@ object ChainIndex {
     val bigIndex   = beforeLast << 8 | last
     assume(bigIndex >= 0)
 
-    val index = bigIndex % config.chainNum
-    ChainIndex.unsafe(index / config.groups, index % config.groups)
+    val chainNum = groups * groups
+    val index    = bigIndex % chainNum
+    new ChainIndex(new GroupIndex(index / groups), new GroupIndex(index % groups))
   }
 }

@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core._
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
@@ -35,8 +35,7 @@ abstract class Validation[T <: FlowData, I <: InvalidStatus] {
 
 object Validation {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def validateFlowDAG[T <: FlowData](datas: AVector[T])(
-      implicit config: GroupConfig): Option[AVector[Forest[BlockHash, T]]] = {
+  def validateFlowDAG[T <: FlowData](datas: AVector[T]): Option[AVector[Forest[BlockHash, T]]] = {
     val splits = datas.splitBy(_.chainIndex)
     val builds = splits.map(ds => Forest.tryBuild[BlockHash, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None

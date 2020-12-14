@@ -33,7 +33,7 @@ import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Random, TimeStamp, U256}
+import org.alephium.util._
 
 object Miner {
   def props(node: Node)(implicit brokerConfig: BrokerConfig,

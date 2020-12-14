@@ -21,12 +21,14 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
-  override def hash: BlockHash = header.hash
+  def hash: BlockHash = header.hash
+
+  def chainIndex: ChainIndex = header.chainIndex
 
   def coinbase: Transaction = transactions.last
 
@@ -45,15 +47,17 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 
   def isGenesis: Boolean = header.isGenesis
 
-  def parentHash(implicit config: GroupConfig): BlockHash = {
+  def blockDeps: BlockDeps = header.blockDeps
+
+  def parentHash: BlockHash = {
     header.parentHash
   }
 
-  def uncleHash(toIndex: GroupIndex)(implicit config: GroupConfig): BlockHash = {
+  def uncleHash(toIndex: GroupIndex): BlockHash = {
     header.uncleHash(toIndex)
   }
 
-  def getScriptExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+  def getScriptExecutionOrder: AVector[Int] = {
     if (isGenesis) {
       AVector.empty
     } else {
@@ -61,7 +65,7 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
     }
   }
 
-  def getNonCoinbaseExecutionOrder(implicit config: GroupConfig): AVector[Int] = {
+  def getNonCoinbaseExecutionOrder: AVector[Int] = {
     assume(!isGenesis)
     Block.getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
   }
@@ -70,21 +74,22 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
 
-  def from(blockDeps: AVector[BlockHash],
+  def from(deps: AVector[BlockHash],
            transactions: AVector[Transaction],
            target: Target,
            timeStamp: TimeStamp,
-           nonce: U256): Block = {
-    // TODO: validate all the block dependencies; the first block dep should be previous block in the same chain
+           nonce: U256)(implicit config: GroupConfig): Block = {
     val txsHash     = Hash.hash(transactions)
+    val blockDeps   = BlockDeps.build(deps)
     val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 
-  def genesis(transactions: AVector[Transaction], target: Target, nonce: U256): Block = {
-    val txsHash     = Hash.hash(transactions)
-    val blockHeader = BlockHeader.genesis(txsHash, target, nonce)
-    Block(blockHeader, transactions)
+  def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
+      implicit groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig): Block = {
+    val txsHash = Hash.hash(transactions)
+    Block(BlockHeader.genesis(chainIndex, txsHash), transactions)
   }
 
   def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {

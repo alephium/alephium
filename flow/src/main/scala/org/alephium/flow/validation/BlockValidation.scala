@@ -41,10 +41,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     checkBlockAfterDependencies(block, flow)
   }
 
-  def validateAfterHeader(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-    checkBlockAfterHeader(block, flow)
-  }
-
   private[validation] def checkBlockUntilDependencies(
       block: Block,
       flow: BlockFlow): BlockValidationResult[Unit] = {
@@ -144,7 +140,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (block.header.txsHash == Hash.hash(block.transactions)) {
       validBlock(())
     } else {
-      invalidBlock(InvalidMerkleRoot)
+      invalidBlock(InvalidTxsMerkleRoot)
     }
   }
 

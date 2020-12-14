@@ -16,7 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Block, BlockHeader, NetworkType}
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -30,21 +29,19 @@ final case class BlockEntry(
     transactions: Option[AVector[Tx]]
 )
 object BlockEntry {
-
-  def from(header: BlockHeader, height: Int)(implicit config: GroupConfig): BlockEntry = {
+  def from(header: BlockHeader, height: Int): BlockEntry = {
     BlockEntry(
       hash         = header.hash.toHexString,
       timestamp    = header.timestamp,
       chainFrom    = header.chainIndex.from.value,
       chainTo      = header.chainIndex.to.value,
       height       = height,
-      deps         = header.blockDeps.map(_.toHexString),
+      deps         = header.blockDeps.deps.map(_.toHexString),
       transactions = None
     )
   }
 
-  def from(block: Block, height: Int, networkType: NetworkType)(
-      implicit config: GroupConfig): BlockEntry =
+  def from(block: Block, height: Int, networkType: NetworkType): BlockEntry =
     from(block.header, height)
       .copy(transactions = Some(block.transactions.map(Tx.from(_, networkType))))
 

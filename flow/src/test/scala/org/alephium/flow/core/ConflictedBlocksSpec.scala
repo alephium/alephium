@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.{BlockHash, Signature}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Random, TimeStamp}
@@ -33,7 +33,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
         Transaction.from(AVector.from(txInputs),
                          AVector.empty[AssetOutput],
                          AVector.empty[Signature])
-      Block.from(AVector.empty,
+      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
                  AVector(transaction),
                  Target.Max,
                  TimeStamp.now(),
@@ -43,7 +43,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
       val transactions = txInputs.map(inputs =>
         Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature]))
-      Block.from(AVector.empty,
+      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
                  AVector.from(transactions),
                  Target.Max,
                  TimeStamp.now(),

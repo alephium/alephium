@@ -370,7 +370,7 @@ trait BlockGenerators extends TxGenerators {
         case (acc, block) =>
           val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
           val currentHeader = block.header
-          val deps          = AVector.fill(groupConfig.depsNum)(prevHash)
+          val deps          = BlockDeps.build(AVector.fill(groupConfig.depsNum)(prevHash))
           val newHeader     = currentHeader.copy(blockDeps = deps)
           val newBlock      = block.copy(header = newHeader)
           acc :+ newBlock

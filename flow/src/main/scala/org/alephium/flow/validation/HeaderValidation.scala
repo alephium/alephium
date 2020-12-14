@@ -17,22 +17,15 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
+import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   def validate(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit] = {
     checkHeader(header, flow)
-  }
-
-  protected[validation] def checkHeader(header: BlockHeader,
-                                        flow: BlockFlow): HeaderValidationResult[Unit] = {
-    for {
-      _ <- checkHeaderUntilDependencies(header, flow)
-      _ <- checkHeaderAfterDependencies(header, flow)
-    } yield ()
   }
 
   def validateUntilDependencies(header: BlockHeader,
@@ -45,31 +38,52 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
     checkHeaderAfterDependencies(header, flow)
   }
 
+  protected[validation] def validateGenesisHeader(
+      genesis: BlockHeader): HeaderValidationResult[Unit] = {
+    for {
+      _ <- checkGenesisTimeStamp(genesis)
+      _ <- checkGenesisDependencies(genesis)
+      _ <- checkGenesisWorkAmount(genesis)
+      _ <- checkGenesisWorkTarget(genesis)
+    } yield ()
+  }
+
+  protected[validation] def checkHeader(header: BlockHeader,
+                                        flow: BlockFlow): HeaderValidationResult[Unit] = {
+    for {
+      _ <- checkHeaderUntilDependencies(header, flow)
+      _ <- checkHeaderAfterDependencies(header, flow)
+    } yield ()
+  }
+
   protected[validation] def checkHeaderUntilDependencies(
       header: BlockHeader,
       flow: BlockFlow): HeaderValidationResult[Unit] = {
     for {
-      parent <- getParentHeader(flow, header)
+      parent <- getParentHeader(flow, header) // parent should exist as checked in ChainHandler
       _      <- checkTimeStampIncreasing(header, parent)
       _      <- checkTimeStampDrift(header)
+      _      <- checkDepsNum(header)
+      _      <- checkDepsIndex(header)
       _      <- checkWorkAmount(header)
-      _      <- checkDependencies(header, flow)
+      _      <- checkWorkTarget(header, flow.getHeaderChain(header))
+      _      <- checkDepsMissing(header, flow)
     } yield ()
   }
 
   protected[validation] def checkHeaderAfterDependencies(
       header: BlockHeader,
       flow: BlockFlow): HeaderValidationResult[Unit] = {
-    val headerChain = flow.getHeaderChain(header)
     for {
-      _ <- checkWorkTarget(header, headerChain)
       _ <- checkFlow(header, flow)
     } yield ()
   }
 
   protected[validation] def getParentHeader(
       blockFlow: BlockFlow,
-      header: BlockHeader): HeaderValidationResult[BlockHeader]
+      header: BlockHeader): HeaderValidationResult[BlockHeader] = {
+    ValidationStatus.from(blockFlow.getBlockHeader(header.parentHash))
+  }
 
   // format off for the sake of reading and checking rules
   // format: off
@@ -81,7 +95,9 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampDrift(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
-  protected[validation] def checkDependencies(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
+  protected[validation] def checkDepsNum(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkDepsIndex(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkDepsMissing(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain): HeaderValidationResult[Unit]
   protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   // format: on
@@ -97,7 +113,7 @@ object HeaderValidation {
       extends HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.timestamp != TimeStamp.zero) {
+      if (header.timestamp != ALF.GenesisTimestamp) {
         invalidHeader(InvalidGenesisTimeStamp)
       } else {
         validHeader(())
@@ -105,15 +121,16 @@ object HeaderValidation {
     }
     protected[validation] def checkGenesisDependencies(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.blockDeps.nonEmpty) {
-        invalidHeader(InvalidGenesisDeps)
-      } else {
+      val deps = header.blockDeps.deps
+      if (deps.length == brokerConfig.depsNum && deps.forall(_ == BlockHash.zero)) {
         validHeader(())
+      } else {
+        invalidHeader(InvalidGenesisDeps)
       }
     }
     protected[validation] def checkGenesisWorkAmount(
         header: BlockHeader): HeaderValidationResult[Unit] = {
-      validHeader(()) // TODO: validate this when initial target is configurable
+      validHeader(()) // we don't check work for genesis headers
     }
     protected[validation] def checkGenesisWorkTarget(
         header: BlockHeader): HeaderValidationResult[Unit] = {
@@ -122,12 +139,6 @@ object HeaderValidation {
       } else {
         validHeader(())
       }
-    }
-
-    protected[validation] def getParentHeader(
-        blockFlow: BlockFlow,
-        header: BlockHeader): HeaderValidationResult[BlockHeader] = {
-      ValidationStatus.from(blockFlow.getBlockHeader(header.parentHash))
     }
 
     protected[validation] def checkTimeStampIncreasing(
@@ -152,10 +163,36 @@ object HeaderValidation {
       if (PoW.checkWork(header)) validHeader(()) else invalidHeader(InvalidWorkAmount)
     }
 
-    // TODO: check algorithm validatity of dependencies
-    protected[validation] def checkDependencies(header: BlockHeader,
-                                                flow: BlockFlow): HeaderValidationResult[Unit] = {
-      ValidationStatus.from(header.blockDeps.filterNotE(flow.contains)).flatMap { missings =>
+    protected[validation] def checkDepsNum(header: BlockHeader): HeaderValidationResult[Unit] = {
+      if (header.blockDeps.length == brokerConfig.depsNum) {
+        validHeader(())
+      } else {
+        invalidHeader(InvalidDepsNum)
+      }
+    }
+
+    protected[validation] def checkDepsIndex(header: BlockHeader): HeaderValidationResult[Unit] = {
+      val headerIndex = header.chainIndex
+      val ok1 = header.inDeps.forallWithIndex {
+        case (dep, index) =>
+          val depIndex = ChainIndex.from(dep)
+          if (index < headerIndex.from.value) {
+            depIndex.from.value == index
+          } else {
+            depIndex.from.value == index + 1
+          }
+      }
+      val ok2 = header.outDeps.forallWithIndex {
+        case (dep, index) =>
+          val depIndex = ChainIndex.from(dep)
+          depIndex.from == headerIndex.from && depIndex.to.value == index
+      }
+      if (ok1 && ok2) validHeader(()) else invalidHeader(InvalidDepsIndex)
+    }
+
+    protected[validation] def checkDepsMissing(header: BlockHeader,
+                                               flow: BlockFlow): HeaderValidationResult[Unit] = {
+      ValidationStatus.from(header.blockDeps.deps.filterNotE(flow.contains)).flatMap { missings =>
         if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
       }
     }

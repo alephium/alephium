@@ -19,7 +19,6 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
@@ -51,7 +50,7 @@ trait BlockFlowState extends FlowTipsUtil {
       }
     }
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
-    BlockDeps(deps1 ++ deps2)
+    BlockDeps.build(deps1 ++ deps2)
   }
 
   def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
@@ -183,17 +182,17 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  protected def getPersistedWorldState(deps: AVector[BlockHash],
+  protected def getPersistedWorldState(deps: BlockDeps,
                                        groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
-    val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
+    val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  protected def getCachedWorldState(deps: AVector[BlockHash],
+  protected def getCachedWorldState(deps: BlockDeps,
                                     groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(deps.length == brokerConfig.depsNum)
-    val hash = deps(brokerConfig.groups - 1 + groupIndex.value)
+    val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
 
@@ -220,13 +219,13 @@ trait BlockFlowState extends FlowTipsUtil {
   def getBestPersistedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    getPersistedWorldState(deps.deps, groupIndex)
+    getPersistedWorldState(deps, groupIndex)
   }
 
   def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
-    getCachedWorldState(deps.deps, groupIndex)
+    getCachedWorldState(deps, groupIndex)
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {

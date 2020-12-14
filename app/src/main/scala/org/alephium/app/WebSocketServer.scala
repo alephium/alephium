@@ -132,12 +132,11 @@ object WebSocketServer {
     new WebSocketServer(node, wsPort)
   }
 
-  private def blockEntryfrom(blockNotify: BlockNotify)(implicit config: GroupConfig): BlockEntry = {
+  private def blockEntryfrom(blockNotify: BlockNotify): BlockEntry = {
     BlockEntry.from(blockNotify.header, blockNotify.height)
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit config: GroupConfig,
-                                                  encoder: Encoder[BlockEntry]): Json =
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit encoder: Encoder[BlockEntry]): Json =
     blockEntryfrom(blockNotify).asJson
 
   object Websocket {

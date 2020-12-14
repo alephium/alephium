@@ -33,6 +33,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
 
+// scalastyle:off number.of.methods
 trait FlowFixture
     extends AlephiumSpec
     with AlephiumConfigFixture
@@ -253,11 +254,23 @@ trait FlowFixture
   def mine(chainIndex: ChainIndex,
            deps: AVector[BlockHash],
            txs: AVector[Transaction],
-           blockTs: TimeStamp): Block = {
+           blockTs: TimeStamp,
+           target: Target = consensusConfig.maxMiningTarget): Block = {
+    val txsHash = Hash.hash(txs)
+    Block(mineHeader(chainIndex, deps, txsHash, blockTs, target), txs)
+  }
+
+  def mineHeader(chainIndex: ChainIndex,
+                 deps: AVector[BlockHash],
+                 txsHash: Hash,
+                 blockTs: TimeStamp,
+                 target: Target = consensusConfig.maxMiningTarget): BlockHeader = {
+    val blockDeps = BlockDeps.build(deps)
+
     @tailrec
-    def iter(nonce: U256): Block = {
-      val block = Block.from(deps, txs, consensusConfig.maxMiningTarget, blockTs, nonce)
-      if (PoW.checkMined(block, chainIndex)) block else iter(nonce.addOneUnsafe())
+    def iter(nonce: U256): BlockHeader = {
+      val header = BlockHeader(blockDeps, txsHash, blockTs, target, nonce)
+      if (PoW.checkMined(header, chainIndex)) header else iter(nonce.addOneUnsafe())
     }
 
     iter(0)
@@ -273,6 +286,13 @@ trait FlowFixture
       .runTxScript(worldState, tx, txScript, tx.unsigned.startGas)
       .rightValue
     result.contractInputs -> result.generatedOutputs
+  }
+
+  def addAndCheck(blockFlow: BlockFlow, block: Block): Assertion = {
+    val blockValidation =
+      BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+    blockValidation.validate(block, blockFlow).isRight is true
+    blockFlow.add(block).isRight is true
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
@@ -310,7 +330,7 @@ trait FlowFixture
         val weight = blockFlow.getWeightUnsafe(tip)
         val header = blockFlow.getBlockHeaderUnsafe(tip)
         val index  = header.chainIndex
-        val deps   = header.blockDeps.map(_.shortHex).mkString("-")
+        val deps   = header.blockDeps.deps.map(_.shortHex).mkString("-")
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
       }
       .mkString("", "\n", "\n")

@@ -22,7 +22,6 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
-import org.alephium.flow.model.BlockDeps
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}

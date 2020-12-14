@@ -26,7 +26,7 @@ import org.alephium.util.{AlephiumSpec, Files}
 class BlockStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
   import RocksDBSource.ColumnFamily
 
-  trait Fixture extends ConsensusConfigFixture {
+  trait Fixture extends ConsensusConfigFixture.Default {
     val tmpdir = Files.tmpDir
     val dbname = "block-storage-spec"
     val dbPath = tmpdir.resolve(dbname)
@@ -39,7 +39,7 @@ class BlockStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "save and read blocks" in new Fixture with ConsensusConfigFixture {
+  it should "save and read blocks" in new Fixture {
     forAll(blockGen) { block =>
       storage.exists(block.hash) isE false
       storage.existsUnsafe(block.hash) is false
@@ -52,7 +52,7 @@ class BlockStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
     postTest()
   }
 
-  it should "fail to delete" in new Fixture with ConsensusConfigFixture {
+  it should "fail to delete" in new Fixture {
     forAll(blockGen) { block =>
       storage.put(block).isRight is true
       assertThrows[NotImplementedError] {

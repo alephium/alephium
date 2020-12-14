@@ -34,8 +34,7 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, AVector, Hex, U256}
 
 class ServerUtils(networkType: NetworkType) {
-  def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest)(
-      implicit cfg: GroupConfig): Try[FetchResponse] = {
+  def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
     val entriesEither = for {
       headers <- blockFlow.getHeightedBlockHeaders(fetchRequest.fromTs, fetchRequest.toTs)
     } yield headers.map { case (header, height) => BlockEntry.from(header, height) }

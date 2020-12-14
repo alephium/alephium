@@ -19,7 +19,6 @@ package org.alephium.flow.setting
 import java.io.File
 import java.nio.file.Path
 
-import scala.annotation.tailrec
 import scala.util.control.Exception.allCatch
 
 import com.typesafe.config.{Config, ConfigException, ConfigFactory}
@@ -162,20 +161,7 @@ object Configs extends StrictLogging {
         } else {
           AVector.empty[Transaction]
         }
-        mineGenesis(ChainIndex.from(from, to).get, transactions)
+        Block.genesis(ChainIndex.from(from, to).get, transactions)
     }
-  }
-
-  private def mineGenesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
-      implicit groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig): Block = {
-    @tailrec
-    def iter(nonce: U256): Block = {
-      val block = Block.genesis(transactions, consensusConfig.maxMiningTarget, nonce)
-      // Note: we do not validate difficulty target here
-      if (block.chainIndex == chainIndex) block else iter(nonce.addOneUnsafe())
-    }
-
-    iter(U256.Zero)
   }
 }

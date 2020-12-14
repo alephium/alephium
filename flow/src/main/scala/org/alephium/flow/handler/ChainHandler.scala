@@ -25,7 +25,6 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.util._
 
@@ -36,7 +35,7 @@ object ChainHandler {
 abstract class ChainHandler[T <: FlowData: ClassTag, S <: InvalidStatus, Command](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
-    validator: Validation[T, S])(implicit brokerConfig: BrokerConfig)
+    validator: Validation[T, S])
     extends ChainHandlerState[T]
     with IOBaseActor {
   import ChainHandler.Event
