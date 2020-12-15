@@ -20,7 +20,7 @@ import scala.util.Random
 
 import org.scalacheck.Gen
 
-import org.alephium.crypto.{Blake2b, Blake3}
+import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.vm.{LockupScript, StatefulScript}
 import org.alephium.serde._
@@ -45,7 +45,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "hash transactions" in {
     forAll(blockGen) { block =>
-      val expected = Blake2b.hash(serialize(block.transactions))
+      val expected = MerkleHashable.rootHash(Blake2b, block.transactions)
       block.header.txsHash is expected
     }
   }

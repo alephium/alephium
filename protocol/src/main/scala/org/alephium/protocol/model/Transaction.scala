@@ -18,8 +18,10 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
 import org.alephium.protocol.config.{EmissionConfig, GroupConfig}
+import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -52,8 +54,12 @@ final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              inputSignatures: AVector[Signature],
                              contractSignatures: AVector[Signature])
-    extends TransactionAbstract {
-  override val id: Hash = unsigned.hash
+    extends TransactionAbstract
+    with MerkleHashable[Hash] {
+  def toMerkleTx: MerkelTx =
+    MerkelTx(id, contractInputs, generatedOutputs, inputSignatures, contractSignatures)
+
+  def merkleHash: Hash = Hash.hash(serialize(toMerkleTx))
 
   def allOutputs: AVector[TxOutput] = unsigned.fixedOutputs.as[TxOutput] ++ generatedOutputs
 
@@ -227,6 +233,17 @@ object Transaction {
                 generatedOutputs   = AVector.empty,
                 inputSignatures    = AVector.empty,
                 contractSignatures = AVector.empty)
+  }
+
+  private[model] final case class MerkelTx(id: Hash,
+                                           contractInputs: AVector[ContractOutputRef],
+                                           generatedOutputs: AVector[TxOutput],
+                                           inputSignatures: AVector[Signature],
+                                           contractSignatures: AVector[Signature])
+  object MerkelTx {
+    implicit val serde: Serde[MerkelTx] = Serde.forProduct5(
+      MerkelTx.apply,
+      t => (t.id, t.contractInputs, t.generatedOutputs, t.inputSignatures, t.contractSignatures))
   }
 }
 

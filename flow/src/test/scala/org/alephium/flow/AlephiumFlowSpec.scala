@@ -261,7 +261,7 @@ trait FlowFixture
            txs: AVector[Transaction],
            blockTs: TimeStamp,
            target: Target = consensusConfig.maxMiningTarget): Block = {
-    val txsHash = Hash.hash(txs)
+    val txsHash = Block.calTxsHash(txs)
     Block(mineHeader(chainIndex, deps, txsHash, blockTs, target), txs)
   }
 

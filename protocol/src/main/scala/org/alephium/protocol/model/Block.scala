@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.serde.Serde
@@ -74,12 +75,15 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 object Block {
   implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
 
+  def calTxsHash(transactions: AVector[Transaction]): Hash =
+    MerkleHashable.rootHash(Hash, transactions)
+
   def from(deps: AVector[BlockHash],
            transactions: AVector[Transaction],
            target: Target,
            timeStamp: TimeStamp,
            nonce: U256)(implicit config: GroupConfig): Block = {
-    val txsHash     = Hash.hash(transactions)
+    val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)
     val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
@@ -88,7 +92,7 @@ object Block {
   def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
       implicit groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig): Block = {
-    val txsHash = Hash.hash(transactions)
+    val txsHash = calTxsHash(transactions)
     Block(BlockHeader.genesis(chainIndex, txsHash), transactions)
   }
 
