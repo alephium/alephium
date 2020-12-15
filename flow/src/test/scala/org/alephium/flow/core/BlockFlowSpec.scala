@@ -25,7 +25,8 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Random}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.util.{AlephiumSpec, AVector, Random, TimeStamp}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -374,6 +375,33 @@ class BlockFlowSpec extends AlephiumSpec {
         .retryUntil(hash => BlockFlow.randomGroupOrders(hash) equals AVector.from(orders))
       hashGen.sample.nonEmpty is true
     }
+  }
+
+  it should "prepare tx with lock time" in new FlowFixture {
+    def test(lockTimeOpt: Option[TimeStamp]) = {
+      val (_, publicKey, _) = genesisKeys(0)
+      val fromLockupScript  = LockupScript.p2pkh(publicKey)
+      val unlockScript      = UnlockScript.p2pkh(publicKey)
+      val (_, toPublicKey)  = GroupIndex.unsafe(1).generateKey
+      val toLockupScript    = LockupScript.p2pkh(toPublicKey)
+
+      val unsigned =
+        blockFlow
+          .prepareUnsignedTx(fromLockupScript,
+                             unlockScript,
+                             toLockupScript,
+                             lockTimeOpt,
+                             ALF.alf(1))
+          .rightValue
+          .get
+      unsigned.fixedOutputs.length is 2
+      unsigned.fixedOutputs(0).lockTime is lockTimeOpt.getOrElse(TimeStamp.zero)
+      unsigned.fixedOutputs(1).lockTime is TimeStamp.zero
+    }
+
+    test(None)
+    test(Some(TimeStamp.unsafe(1)))
+    test(Some(TimeStamp.now()))
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

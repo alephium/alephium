@@ -156,11 +156,13 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[AVector[Tx]])
       .summary("List unconfirmed transactions")
 
-  val buildTransaction: BaseEndpoint[(PublicKey, Address, U256), BuildTransactionResult] =
+  val buildTransaction
+    : BaseEndpoint[(PublicKey, Address, Option[TimeStamp], U256), BuildTransactionResult] =
     transactionsEndpoint.get
       .in("build")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
+      .in(query[Option[TimeStamp]]("lockTime"))
       .in(query[U256]("value"))
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction")

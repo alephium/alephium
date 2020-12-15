@@ -130,6 +130,10 @@ class RestServerSpec
       status is StatusCodes.OK
       responseAs[BuildTransactionResult] is dummyBuildTransactionResult
     }
+    Get(s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&lockTime=1234&value=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[BuildTransactionResult] isnot dummyBuildTransactionResult
+    }
   }
 
   it should "call POST /transactions/send" in new RestServerFixture {

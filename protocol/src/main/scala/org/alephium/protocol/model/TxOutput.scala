@@ -55,7 +55,18 @@ object TxOutput {
   }
 
   def asset(amount: U256, lockupScript: LockupScript): AssetOutput = {
-    AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.empty, ByteString.empty)
+    asset(amount, lockupScript, TimeStamp.zero)
+  }
+
+  def asset(amount: U256, lockupScript: LockupScript, lockTime: TimeStamp): AssetOutput = {
+    AssetOutput(amount, lockupScript, lockTime, AVector.empty, ByteString.empty)
+  }
+
+  def asset(amount: U256,
+            lockupScript: LockupScript,
+            lockTimeOpt: Option[TimeStamp]): AssetOutput = {
+    val lockTime = lockTimeOpt.getOrElse(TimeStamp.zero)
+    asset(amount, lockupScript, lockTime)
   }
 
   def contract(amount: U256, lockupScript: LockupScript): ContractOutput = {

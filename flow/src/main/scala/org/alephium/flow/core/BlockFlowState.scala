@@ -320,6 +320,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def prepareUnsignedTx(fromLockupScript: LockupScript,
                         fromUnlockScript: UnlockScript,
                         toLockupScript: LockupScript,
+                        lockTimeOpt: Option[TimeStamp],
                         value: U256): IOResult[Option[UnsignedTransaction]] = {
     getUtxos(fromLockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
@@ -329,6 +330,7 @@ trait BlockFlowState extends FlowTipsUtil {
                      fromLockupScript,
                      fromUnlockScript,
                      toLockupScript,
+                     lockTimeOpt,
                      value)
     }
   }

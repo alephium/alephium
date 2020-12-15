@@ -173,8 +173,15 @@ object ServerFixture {
     override def prepareUnsignedTx(fromLockupScript: LockupScript,
                                    fromUnlockScript: UnlockScript,
                                    toLockupScript: LockupScript,
+                                   lockTimeOpt: Option[TimeStamp],
                                    value: U256): IOResult[Option[UnsignedTransaction]] =
-      Right(Some(dummyTx.unsigned))
+      lockTimeOpt match {
+        case None => Right(Some(dummyTx.unsigned))
+        case Some(lockTime) =>
+          val outputs    = dummyTx.unsigned.fixedOutputs
+          val newOutputs = outputs.map(_.copy(lockTime = lockTime))
+          Right(Some(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
+      }
 
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus
