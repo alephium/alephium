@@ -27,7 +27,7 @@ import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.setting.MiningSetting
+import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
@@ -35,21 +35,10 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 object Miner {
-  def props(node: Node)(implicit brokerConfig: BrokerConfig,
-                        emissionConfig: EmissionConfig,
-                        miningSetting: MiningSetting): Props =
-    props(node.blockFlow, node.allHandlers)
-
-  def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
-                                                            emissionConfig: EmissionConfig,
-                                                            miningSetting: MiningSetting): Props = {
-    val addresses: AVector[LockupScript] = AVector.tabulate(brokerConfig.groups) { i =>
-      val index          = GroupIndex.unsafe(i)
-      val (_, publicKey) = index.generateKey
-      LockupScript.p2pkh(publicKey)
-    }
-    props(addresses, blockFlow, allHandlers)
-  }
+  def props(node: Node)(implicit config: AlephiumConfig): Props =
+    props(config.minerAddresses, node.blockFlow, node.allHandlers)(config.broker,
+                                                                   config.consensus,
+                                                                   config.mining)
 
   def props(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,

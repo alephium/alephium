@@ -25,6 +25,7 @@ import scala.collection.immutable.ArraySeq
 import com.typesafe.config.Config
 import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
+import pureconfig.error._
 import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
@@ -133,7 +134,8 @@ final case class AlephiumConfig(
     discovery: DiscoverySetting,
     mempool: MemPoolSetting,
     wallet: WalletSetting,
-    genesisBalances: AVector[(LockupScript, U256)]
+    genesisBalances: AVector[(LockupScript, U256)],
+    minerAddresses: AVector[LockupScript]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -162,25 +164,29 @@ object AlephiumConfig {
       network: NetworkSetting,
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
-      wallet: WalletSetting
+      wallet: WalletSetting,
+      minerAddresses: Option[Seq[String]]
   ) {
-    lazy val toAlephiumConfig: AlephiumConfig = {
-      val consensusExtracted = consensus.toConsensusSetting(broker)
-      AlephiumConfig(
-        broker,
-        consensusExtracted,
-        mining,
-        network,
-        discovery,
-        mempool,
-        wallet,
-        Genesis(network.networkType)
-      )
+    lazy val toAlephiumConfig: Either[FailureReason, AlephiumConfig] = {
+      parseMiners(minerAddresses, network.networkType, broker).map { minerAddresses =>
+        val consensusExtracted = consensus.toConsensusSetting(broker)
+        AlephiumConfig(
+          broker,
+          consensusExtracted,
+          mining,
+          network,
+          discovery,
+          mempool,
+          wallet,
+          Genesis(network.networkType),
+          minerAddresses
+        )
+      }
     }
   }
 
   implicit val alephiumConfigReader: ConfigReader[AlephiumConfig] =
-    ConfigReader[TempAlephiumConfig].map(_.toAlephiumConfig)
+    ConfigReader[TempAlephiumConfig].emap(_.toAlephiumConfig)
 
   def source(config: Config): ConfigSource = {
     val path          = "alephium"
