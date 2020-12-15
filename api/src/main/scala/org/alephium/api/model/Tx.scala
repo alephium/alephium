@@ -24,10 +24,12 @@ final case class Tx(
     inputs: AVector[Input],
     outputs: AVector[Output]
 )
+
 object Tx {
   def from(tx: Transaction, networkType: NetworkType): Tx = Tx(
     tx.hash.toHexString,
-    tx.unsigned.inputs.map(Input.from),
+    tx.unsigned.inputs.map(Input.from) ++
+      tx.contractInputs.map(Input.from),
     tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
       tx.generatedOutputs.map(Output.from(_, networkType))
   )

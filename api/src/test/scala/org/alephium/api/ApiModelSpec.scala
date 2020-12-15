@@ -30,6 +30,7 @@ import org.alephium.api.model._
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = {
@@ -134,14 +135,40 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(request, jsonRaw)
   }
 
+  it should "encode/decode Input" in {
+    val key       = "dummyKey"
+    val outputRef = OutputRef(1234, key)
+
+    {
+      val data    = Input(outputRef, None)
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"}}"""
+      checkData(data, jsonRaw)
+    }
+
+    {
+      val data    = Input(outputRef, Some(hex"abcd"))
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"},"unlockScript":"abcd"}"""
+      checkData(data, jsonRaw)
+    }
+  }
+
   it should "encode/decode Output with big amount" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
     val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
     val amountStr  = "15000000000000000000"
-    val request    = Output(amount, address)
-    val jsonRaw    = s"""{"amount":$amountStr,"address":"$addressStr"}"""
-    checkData(request, jsonRaw)
+
+    {
+      val request = Output(amount, address, None)
+      val jsonRaw = s"""{"amount":$amountStr,"address":"$addressStr"}"""
+      checkData(request, jsonRaw)
+    }
+
+    {
+      val request = Output(amount, address, Some(TimeStamp.unsafe(1234)))
+      val jsonRaw = s"""{"amount":$amountStr,"address":"$addressStr","lockTime":1234}"""
+      checkData(request, jsonRaw)
+    }
   }
 
   it should "encode/decode GetGroup" in {
