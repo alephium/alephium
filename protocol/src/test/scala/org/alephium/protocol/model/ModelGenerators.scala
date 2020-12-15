@@ -197,14 +197,17 @@ trait TxGenerators
     value <- Gen.choose[Long](1, 5)
   } yield TxOutput.asset(U256.unsafe(value), LockupScript.p2pkh(Hash.zero))
 
-  def assetInputInfoGen(balances: Balances, scriptGen: Gen[ScriptPair]): Gen[AssetInputInfo] =
+  def assetInputInfoGen(balances: Balances,
+                        scriptGen: Gen[ScriptPair],
+                        lockTimeGen: Gen[TimeStamp]): Gen[AssetInputInfo] =
     for {
       ScriptPair(lockup, unlock, privateKey) <- scriptGen
+      lockTime                               <- lockTimeGen
       data                                   <- dataGen
       outputHash                             <- hashGen
     } yield {
       val assetOutput =
-        AssetOutput(balances.alfAmount, lockup, TimeStamp.zero, AVector.from(balances.tokens), data)
+        AssetOutput(balances.alfAmount, lockup, lockTime, AVector.from(balances.tokens), data)
       val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -215,12 +218,14 @@ trait TxGenerators
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
       lockupScriptGen: IndexLockupScriptGen = p2pkhLockupGen,
+      lockTimeGen: Gen[TimeStamp]           = Gen.const(TimeStamp.zero),
       dataGen: Gen[ByteString]              = dataGen
   ): Gen[UnsignedTransaction] =
     for {
       assets           <- assetsToSpend
       fromLockupScript <- lockupScriptGen(chainIndex.from)
       toLockupScript   <- lockupScriptGen(chainIndex.to)
+      lockTime         <- lockTimeGen
     } yield {
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
@@ -248,7 +253,7 @@ trait TxGenerators
             } else {
               Gen.oneOf(fromLockupScript, toLockupScript).sample.get
             }
-          balance.toOutput(lockupScript, dataGen.sample.get)
+          balance.toOutput(lockupScript, dataGen.sample.get).copy(lockTime = lockTime)
       }
       UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)
     }
@@ -259,17 +264,19 @@ trait TxGenerators
       tokens    <- tokensGen(inputNum, minTokens, maxTokens)
     } yield Balances(alfAmount, tokens)
 
-  def assetsToSpendGen(minInputs: Int,
-                       maxInputs: Int,
-                       minTokens: Int,
-                       maxTokens: Int,
-                       scriptGen: Gen[ScriptPair]): Gen[AVector[AssetInputInfo]] =
+  def assetsToSpendGen(
+      minInputs: Int,
+      maxInputs: Int,
+      minTokens: Int,
+      maxTokens: Int,
+      scriptGen: Gen[ScriptPair],
+      lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)): Gen[AVector[AssetInputInfo]] =
     for {
       inputNum      <- Gen.choose(minInputs, maxInputs)
       totalBalances <- balancesGen(inputNum, minTokens, maxTokens)
       inputs <- {
         val inputBalances = split(totalBalances, inputNum)
-        val gens          = inputBalances.toSeq.map(assetInputInfoGen(_, scriptGen))
+        val gens          = inputBalances.toSeq.map(assetInputInfoGen(_, scriptGen, lockTimeGen))
         Gen.sequence[Seq[AssetInputInfo], AssetInputInfo](gens)
       }
     } yield AVector.from(inputs)
@@ -281,7 +288,8 @@ trait TxGenerators
       maxTokens: Int                  = 3,
       chainIndexGen: Gen[ChainIndex]  = chainIndexGen,
       scriptGen: IndexScriptPairGen   = p2pkScriptGen,
-      lockupGen: IndexLockupScriptGen = p2pkhLockupGen
+      lockupGen: IndexLockupScriptGen = p2pkhLockupGen,
+      lockTimeGen: Gen[TimeStamp]     = Gen.const(TimeStamp.zero)
   ): Gen[(Transaction, AVector[AssetInputInfo])] =
     for {
       chainIndex <- chainIndexGen
@@ -289,7 +297,8 @@ trait TxGenerators
                                      maxInputs,
                                      minTokens,
                                      maxTokens,
-                                     scriptGen(chainIndex.from))
+                                     scriptGen(chainIndex.from),
+                                     lockTimeGen)
       unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
       signatures = assetInfos.map(info =>
         SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))

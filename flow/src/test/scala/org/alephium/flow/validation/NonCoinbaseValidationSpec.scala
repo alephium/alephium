@@ -54,11 +54,12 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
 
     def checkBlockTx(tx: Transaction,
-                     preOutputs: AVector[AssetInputInfo]): TxValidationResult[Unit] = {
+                     preOutputs: AVector[AssetInputInfo],
+                     headerTs: TimeStamp = TimeStamp.now()): TxValidationResult[Unit] = {
       prepareWorldState(preOutputs)
       for {
         _ <- checkStateless(tx, checkDoubleSpending = true)
-        _ <- checkStateful(tx, TimeStamp.now(), cachedWorldState)
+        _ <- checkStateful(tx, headerTs, cachedWorldState)
       } yield ()
     }
   }
@@ -339,6 +340,23 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       case (tx, inputInfos) =>
         prepareWorldState(inputInfos)
         getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
+    }
+  }
+
+  it should "check lock time" in new StatefulFixture {
+    val currentTs = TimeStamp.now()
+    val futureTs  = currentTs.plusMillisUnsafe(1)
+    forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(currentTs))) {
+      case (_, preOutputs) =>
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), LockedTx)
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs))
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
+    }
+    forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(futureTs))) {
+      case (_, preOutputs) =>
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), LockedTx)
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs), LockedTx)
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
     }
   }
 
