@@ -253,7 +253,7 @@ trait TxGenerators
             } else {
               Gen.oneOf(fromLockupScript, toLockupScript).sample.get
             }
-          balance.toOutput(lockupScript, dataGen.sample.get).copy(lockTime = lockTime)
+          balance.toOutput(lockupScript, lockTime, dataGen.sample.get)
       }
       UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)
     }
@@ -414,9 +414,9 @@ object ModelGenerators {
   final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)
 
   final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
-    def toOutput(lockupScript: LockupScript, data: ByteString): AssetOutput = {
+    def toOutput(lockupScript: LockupScript, lockTime: TimeStamp, data: ByteString): AssetOutput = {
       val tokensVec = AVector.from(tokens)
-      AssetOutput(alfAmount, lockupScript, TimeStamp.zero, tokensVec, data)
+      AssetOutput(alfAmount, lockupScript, lockTime, tokensVec, data)
     }
   }
 
