@@ -177,11 +177,11 @@ object BlockFlowClient {
   }
 
   final case class BuildTransactionResult(unsignedTx: String,
-                                          hash: String,
+                                          txId: String,
                                           fromGroup: Int,
                                           toGroup: Int)
 
-  final case class SendTransaction(tx: String, signature: String) extends PostRequest {
+  final case class SendTransaction(unsignedTx: String, signature: String) extends PostRequest {
     lazy val endpoint: String           = "/transactions/send"
     override lazy val isEntity: Boolean = true
   }

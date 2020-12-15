@@ -64,7 +64,7 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
                                          script,
                                          target  = Target.Max,
                                          blockTs = TimeStamp.now())
-    (coinbase0.hash equals coinbase1.hash) is false
-    (coinbase0.hash equals coinbase2.hash) is false
+    (coinbase0.id equals coinbase1.id) is false
+    (coinbase0.id equals coinbase2.id) is false
   }
 }

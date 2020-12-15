@@ -37,7 +37,7 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
   def capacity: Int = _capacity
 
   def contains(transaction: TransactionAbstract): Boolean = readOnly {
-    weights.contains(transaction.hash)
+    weights.contains(transaction.id)
   }
 
   def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
@@ -55,8 +55,8 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
         if (isFull) {
           Left(())
         } else {
-          weights += tx.hash                  -> weight
-          pool += WeightedId(weight, tx.hash) -> tx
+          weights += tx.id                  -> weight
+          pool += WeightedId(weight, tx.id) -> tx
           Right(())
         }
     }
@@ -68,9 +68,9 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
     val sizeBefore = size
     transactions.foreach { tx =>
       if (contains(tx)) {
-        val weight = weights(tx.hash)
-        weights -= tx.hash
-        pool -= WeightedId(weight, tx.hash)
+        val weight = weights(tx.id)
+        weights -= tx.id
+        pool -= WeightedId(weight, tx.id)
       }
     }
     val sizeAfter = size

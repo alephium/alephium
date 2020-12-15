@@ -29,7 +29,7 @@ sealed trait TransactionAbstract {
   def inputSignatures: AVector[Signature]
   def contractSignatures: AVector[Signature]
 
-  def hash: Hash = unsigned.hash
+  def id: Hash = unsigned.hash
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
@@ -52,9 +52,8 @@ final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              inputSignatures: AVector[Signature],
                              contractSignatures: AVector[Signature])
-    extends HashSerde[Transaction]
-    with TransactionAbstract {
-  override val hash: Hash = unsigned.hash
+    extends TransactionAbstract {
+  override val id: Hash = unsigned.hash
 
   def allOutputs: AVector[TxOutput] = unsigned.fixedOutputs.as[TxOutput] ++ generatedOutputs
 

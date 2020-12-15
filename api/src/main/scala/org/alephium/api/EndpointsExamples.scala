@@ -103,7 +103,7 @@ trait EndpointsExamples {
     simpleExample(BuildTransactionResult(unsignedTx = hash, hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendTransactionExamples: List[Example[SendTransaction]] =
-    simpleExample(SendTransaction(tx = hash, signature))
+    simpleExample(SendTransaction(unsignedTx = hash, signature))
 
   implicit val txResultExamples: List[Example[TxResult]] =
     simpleExample(TxResult(txId = hash, fromGroup = 2, toGroup = 1))

@@ -137,7 +137,7 @@ trait BrokerHandler extends BaseActor {
         send(SendHeaders(headers))
       }
     case Received(SendTxs(txs)) =>
-      log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.hash))}")
+      log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.id))}")
       txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddTx(tx, dataOrigin))
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)

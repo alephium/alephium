@@ -22,7 +22,7 @@ import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
 final case class BuildTransactionResult(unsignedTx: String,
-                                        hash: String,
+                                        txId: String,
                                         fromGroup: Int,
                                         toGroup: Int)
 object BuildTransactionResult {

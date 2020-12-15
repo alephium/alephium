@@ -78,7 +78,7 @@ trait ServerFixture
     SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
                          PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
-    dummyTx.hash.toHexString,
+    dummyTx.id.toHexString,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
@@ -137,7 +137,7 @@ object ServerFixture {
       }), "clique-manager")
 
     val txHandlerRef =
-      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.hash)))
+      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
     val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
 
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),

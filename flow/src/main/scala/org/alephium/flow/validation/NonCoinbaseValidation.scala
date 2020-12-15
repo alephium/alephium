@@ -373,7 +373,7 @@ object NonCoinbaseValidation {
       } else {
         signatures.pop() match {
           case Right(signature) =>
-            if (!SignatureSchema.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+            if (!SignatureSchema.verify(tx.id.bytes, signature, unlock.publicKey)) {
               invalidTx(InvalidSignature)
             } else {
               gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
@@ -397,7 +397,7 @@ object NonCoinbaseValidation {
         script: StatelessScript,
         params: AVector[Val],
         signatures: Stack[Signature]): TxValidationResult[GasBox] = {
-      StatelessVM.runAssetScript(tx.hash, gasRemaining, script, params, signatures) match {
+      StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
         case Right(result) => validTx(result.gasRemaining)
         case Left(e)       => invalidTx(InvalidUnlockScript(e))
       }

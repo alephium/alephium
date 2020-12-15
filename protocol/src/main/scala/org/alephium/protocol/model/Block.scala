@@ -117,7 +117,7 @@ object Block {
         val tmp         = scriptOrders(index)
         scriptOrders(index)       = scriptOrders(randomIndex)
         scriptOrders(randomIndex) = tmp
-        shuffle(index + 1, nonCoinbase(randomIndex).hash)
+        shuffle(index + 1, nonCoinbase(randomIndex).id)
       }
     }
 
@@ -128,7 +128,7 @@ object Block {
         samples.foldLeft(Hash.unsafe(parentHash.bytes)) {
           case (acc, index) =>
             val tx = nonCoinbase(index)
-            Hash.xor(acc, tx.hash)
+            Hash.xor(acc, tx.id)
         }
       }
       shuffle(0, initialSeed)

@@ -36,7 +36,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       override val worldState: WorldState.Staging                = cachedWorldState.staging()
       override def outputBalances: Frame.Balances                = ???
       override def nextOutputIndex: Int                          = ???
-      override def txHash: Hash                                  = Hash.zero
+      override def txId: Hash                                    = Hash.zero
       override def signatures: Stack[protocol.Signature]         = Stack.ofCapacity(0)
       override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
       override var gasRemaining: GasBox                          = gasLimit

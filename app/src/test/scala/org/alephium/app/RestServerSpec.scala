@@ -138,7 +138,7 @@ class RestServerSpec
 
   it should "call POST /transactions/send" in new RestServerFixture {
     val tx =
-      s"""{"tx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
+      s"""{"unsignedTx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
     val entity = HttpEntity(ContentTypes.`application/json`, tx)
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.OK

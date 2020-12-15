@@ -91,7 +91,7 @@ class ServerUtils(networkType: NetworkType) {
       askTimeout: Timeout,
       executionContext: ExecutionContext): FutureTry[TxResult] = {
     val txEither = for {
-      txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
+      txByteString <- Hex.from(query.unsignedTx).toRight(failed(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
         failed(serdeError.getMessage))
     } yield {
@@ -143,7 +143,7 @@ class ServerUtils(networkType: NetworkType) {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
-        Right(TxResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
+        Right(TxResult(tx.id.toHexString, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
         Left(failed("Failed in adding transaction"))
     }

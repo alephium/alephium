@@ -20,14 +20,14 @@ import org.alephium.protocol.model.{NetworkType, Transaction, TransactionTemplat
 import org.alephium.util.AVector
 
 final case class Tx(
-    hash: String,
+    id: String,
     inputs: AVector[Input],
     outputs: AVector[Output]
 )
 
 object Tx {
   def from(tx: Transaction, networkType: NetworkType): Tx = Tx(
-    tx.hash.toHexString,
+    tx.id.toHexString,
     tx.unsigned.inputs.map(Input.from) ++
       tx.contractInputs.map(Input.from),
     tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
@@ -35,7 +35,7 @@ object Tx {
   )
 
   def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx = Tx(
-    tx.hash.toHexString,
+    tx.id.toHexString,
     tx.unsigned.inputs.map(Input.from),
     tx.unsigned.fixedOutputs.map(Output.from(_, networkType))
   )
