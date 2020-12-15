@@ -30,8 +30,19 @@ import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{ActorRefT, AVector}
 
+object Boot extends App {
+  if (!sys.env.get("ALEPHIUM_HOME").isDefined) {
+    import org.alephium.util.Files
+    // We set the environment varible to the default for logback
+    val path = Files.homeDir.resolve(".alephium")
+    System.setProperty("ALEPHIUM_HOME", path.toFile.toString)
+  }
+
+  BootUp.init()
+}
+
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-object Boot extends App with StrictLogging {
+object BootUp extends StrictLogging {
   val rootPath: Path                              = Platform.getRootPath()
   val typesafeConfig: Config                      = Configs.parseConfigAndValidate(rootPath)
   implicit val config: AlephiumConfig             = AlephiumConfig.loadOrThrow(typesafeConfig)
@@ -39,25 +50,27 @@ object Boot extends App with StrictLogging {
   implicit val system: ActorSystem                = ActorSystem("Root", typesafeConfig)
   implicit val executionContext: ExecutionContext = system.dispatcher
 
-  logConfig()
-
   val flowMonitor: ActorRefT[FlowMonitor.Command] =
     ActorRefT.build(system, FlowMonitor.props(stop()), "FlowMonitor")
 
   val server: Server = Server(rootPath)
 
-  server
-    .start()
-    .onComplete {
-      case Success(_) => ()
-      case Failure(e) =>
-        logger.error("Fatal error during initialization.", e)
-        stop()
-    }
+  def init(): Unit = {
+    logConfig()
 
-  Runtime.getRuntime.addShutdownHook(new Thread(() => {
-    stop()
-  }))
+    server
+      .start()
+      .onComplete {
+        case Success(_) => ()
+        case Failure(e) =>
+          logger.error("Fatal error during initialization.", e)
+          stop()
+      }
+
+    Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      stop()
+    }))
+  }
 
   def stop(): Unit =
     Await.result(for {
