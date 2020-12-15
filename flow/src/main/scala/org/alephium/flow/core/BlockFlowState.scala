@@ -277,18 +277,23 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  private def lockedBy(output: TxOutput, lockupScript: LockupScript): Boolean =
-    output.lockupScript == lockupScript
+  private def ableToUse(output: TxOutput,
+                        lockupScript: LockupScript,
+                        currentTs: TimeStamp): Boolean = output match {
+    case o: AssetOutput    => o.lockupScript == lockupScript && o.lockTime <= currentTs
+    case _: ContractOutput => false
+  }
 
   def getUtxos(lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val groupIndex = lockupScript.groupIndex
+    val currentTs  = TimeStamp.now()
     assume(brokerConfig.contains(groupIndex))
 
     for {
       bestWorldState <- getBestPersistedWorldState(groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
-        .map(_.filter(p => lockedBy(p._2, lockupScript)))
+        .map(_.filter(p => ableToUse(p._2, lockupScript, currentTs)))
     } yield persistedUtxos
   }
 
@@ -303,6 +308,7 @@ trait BlockFlowState extends FlowTipsUtil {
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(AssetOutputRef, AssetOutput)])
     : IOResult[(AVector[TxOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
+    val currentTs = TimeStamp.now()
     getBlocksForUpdates(groupIndex).map { blockCaches =>
       val usedUtxos = blockCaches.flatMap[TxOutputRef] { blockCache =>
         AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
@@ -310,7 +316,7 @@ trait BlockFlowState extends FlowTipsUtil {
       val newUtxos = blockCaches.flatMap { blockCache =>
         AVector
           .from(blockCache.relatedOutputs.view.filter(p =>
-            lockedBy(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset))
+            ableToUse(p._2, lockupScript, currentTs) && p._1.isAssetType && p._2.isAsset))
           .asUnsafe[(AssetOutputRef, AssetOutput)]
       }
       (usedUtxos, newUtxos)

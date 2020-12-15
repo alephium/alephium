@@ -104,11 +104,13 @@ trait FlowFixture
 
   def transfer(blockFlow: BlockFlow,
                chainIndex: ChainIndex,
-               amount: U256               = ALF.alf(1),
-               numReceivers: Int          = 1,
-               gasFeeInTheAmount: Boolean = true): Block = {
+               amount: U256                   = ALF.alf(1),
+               numReceivers: Int              = 1,
+               gasFeeInTheAmount: Boolean     = true,
+               lockTimeOpt: Option[TimeStamp] = None): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from))
-    mine(blockFlow, chainIndex)(transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount))
+    mine(blockFlow, chainIndex)(
+      transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt))
   }
 
   def transferTxs(blockFlow: BlockFlow,
@@ -116,7 +118,8 @@ trait FlowFixture
                   amount: U256,
                   numReceivers: Int,
                   txScriptOpt: Option[StatefulScript],
-                  gasFeeInTheAmount: Boolean): AVector[Transaction] = {
+                  gasFeeInTheAmount: Boolean,
+                  lockTimeOpt: Option[TimeStamp] = None): AVector[Transaction] = {
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
@@ -133,11 +136,11 @@ trait FlowFixture
 
     val gasFee = defaultGasPrice * minimalGas.toU256
     val (outputs, remaining) = if (gasFeeInTheAmount) {
-      val outputs   = toLockupScripts.map(TxOutput.asset(amount - gasFee, _))
+      val outputs   = toLockupScripts.map(TxOutput.asset(amount - gasFee, _, lockTimeOpt))
       val remaining = TxOutput.asset(total - amount * numReceivers, fromLockupScript)
       outputs -> remaining
     } else {
-      val outputs = toLockupScripts.map(TxOutput.asset(amount, _))
+      val outputs = toLockupScripts.map(TxOutput.asset(amount, _, lockTimeOpt))
       val remaining =
         TxOutput.asset(total - amount * numReceivers - gasFee, fromLockupScript)
       outputs -> remaining

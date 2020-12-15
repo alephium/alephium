@@ -404,6 +404,23 @@ class BlockFlowSpec extends AlephiumSpec {
     test(Some(TimeStamp.now()))
   }
 
+  it should "spend locked outputs" in new FlowFixture {
+    val lockTime       = TimeStamp.now().plusSecondsUnsafe(2)
+    val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
+    val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
+    val toPrivateKey   = keyManager(toLockupScript)
+    val toUnlockScript = UnlockScript.p2pkh(toPrivateKey.publicKey)
+    addAndCheck(blockFlow, block)
+    blockFlow
+      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .rightValue is None
+    Thread.sleep(2000)
+    blockFlow
+      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .rightValue
+      .nonEmpty is true
+  }
+
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
     blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }
