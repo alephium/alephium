@@ -154,7 +154,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
         _          <- checkBlockDoubleSpending(block)
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
         _ <- convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
-          nonCoinbaseValidation.checkBlockTx(block.transactions(index), worldState)
+          nonCoinbaseValidation.checkBlockTx(block.transactions(index), block.header, worldState)
         })
       } yield ()
     } else {

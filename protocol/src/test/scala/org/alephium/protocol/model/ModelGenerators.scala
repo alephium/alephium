@@ -165,7 +165,7 @@ trait TxGenerators
       tokens         <- _tokensGen
       lockupScript   <- scriptGen
       additionalData <- dataGen
-    } yield AssetOutput(amount, lockupScript, AVector.from(tokens), additionalData)
+    } yield AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.from(tokens), additionalData)
   }
 
   def contractOutputGen(groupIndex: GroupIndex)(
@@ -204,7 +204,7 @@ trait TxGenerators
       outputHash                             <- hashGen
     } yield {
       val assetOutput =
-        AssetOutput(balances.alfAmount, lockup, AVector.from(balances.tokens), data)
+        AssetOutput(balances.alfAmount, lockup, TimeStamp.zero, AVector.from(balances.tokens), data)
       val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -407,7 +407,7 @@ object ModelGenerators {
   final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
     def toOutput(lockupScript: LockupScript, data: ByteString): AssetOutput = {
       val tokensVec = AVector.from(tokens)
-      AssetOutput(alfAmount, lockupScript, tokensVec, data)
+      AssetOutput(alfAmount, lockupScript, TimeStamp.zero, tokensVec, data)
     }
   }
 

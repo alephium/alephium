@@ -202,9 +202,14 @@ object Transaction {
     val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
+    val lockTime     = blockTs.plusHoursUnsafe(1)
 
     val txOutput =
-      AssetOutput(reward.addUnsafe(gasFee), lockupScript, tokens = AVector.empty, outputData)
+      AssetOutput(reward.addUnsafe(gasFee),
+                  lockupScript,
+                  lockTime,
+                  tokens = AVector.empty,
+                  outputData)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,

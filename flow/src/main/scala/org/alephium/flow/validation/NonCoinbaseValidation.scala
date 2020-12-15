@@ -25,7 +25,7 @@ import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{OutOfGas => _, _}
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 trait NonCoinbaseValidation {
   import ValidationStatus._
@@ -55,16 +55,17 @@ trait NonCoinbaseValidation {
     for {
       _          <- checkStateless(tx, checkDoubleSpending = true)
       worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
-      _          <- checkStateful(tx, worldState)
+      _          <- checkStateful(tx, TimeStamp.now(), worldState)
     } yield ()
   }
 
   protected[validation] def checkBlockTx(
       tx: Transaction,
+      header: BlockHeader,
       worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(tx, checkDoubleSpending = false) // it's already checked in BlockValidation
-      _ <- checkStateful(tx, worldState)
+      _ <- checkStateful(tx, header.timestamp, worldState)
     } yield ()
   }
 
@@ -83,9 +84,11 @@ trait NonCoinbaseValidation {
   }
   protected[validation] def checkStateful(
       tx: Transaction,
+      headerTs: TimeStamp,
       worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
       preOutputs   <- getPreOutputs(tx, worldState)
+      _            <- checkLockTime(preOutputs, headerTs)
       _            <- checkAlfBalance(tx, preOutputs)
       _            <- checkTokenBalance(tx, preOutputs)
       gasRemaining <- checkWitnesses(tx, preOutputs)
@@ -107,6 +110,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
+  protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[GasBox]
@@ -257,6 +261,21 @@ object NonCoinbaseValidation {
         case Left(error)                  => Left(Left(error))
       }
     }
+
+    protected[validation] def checkLockTime(preOutputs: AVector[TxOutput],
+                                            headerTs: TimeStamp): TxValidationResult[Unit] = {
+      if (preOutputs.forall(checkLockTime(_, headerTs))) {
+        validTx(())
+      } else {
+        invalidTx(LockedTx)
+      }
+    }
+
+    @inline private def checkLockTime(output: TxOutput, headerTs: TimeStamp): Boolean =
+      output match {
+        case o: AssetOutput if o.lockTime > headerTs => false
+        case _                                       => true
+      }
 
     protected[validation] def checkAlfBalance(
         tx: Transaction,

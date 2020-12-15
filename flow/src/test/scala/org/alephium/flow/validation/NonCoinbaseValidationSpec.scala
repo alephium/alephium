@@ -26,7 +26,7 @@ import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
-import org.alephium.util.{AVector, Random, U256}
+import org.alephium.util.{AVector, Random, TimeStamp, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
@@ -58,7 +58,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       prepareWorldState(preOutputs)
       for {
         _ <- checkStateless(tx, checkDoubleSpending = true)
-        _ <- checkStateful(tx, cachedWorldState)
+        _ <- checkStateful(tx, TimeStamp.now(), cachedWorldState)
       } yield ()
     }
   }
@@ -289,6 +289,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
       AssetOutput(U256.Zero,
                   LockupScript.p2pkh(Hash.zero),
+                  TimeStamp.zero,
                   AVector(tokenId -> amount),
                   ByteString.empty)
     }
