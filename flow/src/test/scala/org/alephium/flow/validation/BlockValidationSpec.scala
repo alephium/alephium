@@ -21,8 +21,9 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, BlockHash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, BlockHash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -61,12 +62,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
   }
 
-  def coinbase(chainIndex: ChainIndex, gasFee: U256, publicKey: PublicKey): Transaction = {
-    Transaction.coinbase(chainIndex, gasFee, publicKey, Target.Max, TimeStamp.zero)
+  def coinbase(chainIndex: ChainIndex, gasFee: U256, lockupScript: LockupScript): Transaction = {
+    Transaction.coinbase(chainIndex, gasFee, lockupScript, Target.Max, TimeStamp.zero)
   }
 
   it should "validate coinbase transaction simple format" in new Fixture {
     val (privateKey, publicKey) = SignatureSchema.generatePriPub()
+    val lockupScript            = LockupScript.p2pkh(publicKey)
     val block0 =
       Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
                  AVector.empty,
@@ -80,7 +82,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
 
-    val coinbase1     = coinbase(block0.chainIndex, 0, publicKey)
+    val coinbase1     = coinbase(block0.chainIndex, 0, lockupScript)
     val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
     passCheck(checkCoinbaseEasy(block1))

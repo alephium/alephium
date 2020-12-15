@@ -231,11 +231,12 @@ trait FlowFixture
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey
+    val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val txs              = prepareTxs(blockFlow, chainIndex)
     val blockTs          = TimeStamp.now()
 
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, toPublicKey, consensusConfig.maxMiningTarget, blockTs)
+      Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
     mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }
@@ -245,8 +246,9 @@ trait FlowFixture
                           blockTs: TimeStamp): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey
+    val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, toPublicKey, consensusConfig.maxMiningTarget, blockTs)
+      Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
     mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }

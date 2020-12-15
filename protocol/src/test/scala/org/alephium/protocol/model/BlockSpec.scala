@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
-import org.alephium.protocol.vm.StatefulScript
+import org.alephium.protocol.vm.{LockupScript, StatefulScript}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
@@ -115,7 +115,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       )
       val coinbase = Transaction.coinbase(ChainIndex.unsafe(0, 0),
                                           U256.Zero,
-                                          PublicKey.generate,
+                                          LockupScript.p2pkh(PublicKey.generate),
                                           Target.Max,
                                           TimeStamp.zero)
 
