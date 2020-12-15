@@ -57,6 +57,11 @@ trait AlephiumFixture extends Matchers {
       case Right(a)    => a
     }
 
+    def leftValue: L = left match {
+      case Left(error) => error
+      case Right(a)    => throw new AssertionError(a)
+    }
+
     def isE(right: A): Assertion                             = rightValue shouldEqual right
     def isE(right: ResultOfATypeInvocation[_]): Assertion    = rightValue shouldBe right
     def isnotE(right: A): Assertion                          = rightValue should not equal right
