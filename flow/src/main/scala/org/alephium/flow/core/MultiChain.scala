@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.reflect.ClassTag
 
 import org.alephium.flow.model.BlockState
@@ -98,16 +100,16 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getHeightUnsafe(hash: BlockHash): Int =
     getHashChain(hash).getHeightUnsafe(hash)
 
-  def getWeight(hash: BlockHash): IOResult[BigInt] =
+  def getWeight(hash: BlockHash): IOResult[BigInteger] =
     getHashChain(hash).getWeight(hash)
 
-  def getWeightUnsafe(hash: BlockHash): BigInt =
+  def getWeightUnsafe(hash: BlockHash): BigInteger =
     getHashChain(hash).getWeightUnsafe(hash)
 
-  def getChainWeight(hash: BlockHash): IOResult[BigInt] =
+  def getChainWeight(hash: BlockHash): IOResult[BigInteger] =
     getHashChain(hash).getChainWeight(hash)
 
-  def getChainWeightUnsafe(hash: BlockHash): BigInt =
+  def getChainWeightUnsafe(hash: BlockHash): BigInteger =
     getHashChain(hash).getChainWeightUnsafe(hash)
 
   def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]] =

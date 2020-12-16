@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.annotation.tailrec
 
 import com.typesafe.scalalogging.StrictLogging
@@ -36,9 +38,9 @@ trait BlockFlow
     with FlowUtils
     with ConflictedBlocks
     with BlockFlowValidation {
-  def add(block: Block, weight: BigInt): IOResult[Unit] = ???
+  def add(block: Block, weight: BigInteger): IOResult[Unit] = ???
 
-  def add(header: BlockHeader, weight: BigInt): IOResult[Unit] = ???
+  def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = ???
 
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
@@ -154,6 +156,9 @@ object BlockFlow extends StrictLogging {
     val consensusConfig: ConsensusSetting,
     val mempoolSetting: MemPoolSetting)
       extends BlockFlow {
+
+    private val depsNum: BigInteger = BigInt(brokerConfig.depsNum).bigInteger
+
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
       assume(index.relateTo(brokerConfig))
@@ -180,36 +185,46 @@ object BlockFlow extends StrictLogging {
       } yield ()
     }
 
-    private def calWeight(block: Block): IOResult[BigInt] = {
+    private def calWeight(block: Block): IOResult[BigInteger] = {
       calWeight(block.header)
     }
 
-    private def calWeight(header: BlockHeader): IOResult[BigInt] = {
+    private def calWeight(header: BlockHeader): IOResult[BigInteger] = {
       IOUtils.tryExecute(calWeightUnsafe(header))
     }
 
-    private def calWeightUnsafe(header: BlockHeader): BigInt = {
+    private def calWeightUnsafe(header: BlockHeader): BigInteger = {
       if (header.isGenesis) {
-        ALF.GenesisWeight * brokerConfig.depsNum
+        ALF.GenesisWeight multiply depsNum
       } else {
-        val weight1 = header.inDeps.sumBy(calGroupWeightUnsafe)
-        val weight2 = header.outDeps.sumBy(getChainWeightUnsafe)
-        weight1 + weight2 + header.target.value
+        val weight1 = header.inDeps.fold(BigInteger.ZERO) {
+          case (a, b) => a.add(calGroupWeightUnsafe(b))
+        }
+        val weight2 = header.outDeps.fold(BigInteger.ZERO) {
+          case (a, b) => a.add(getChainWeightUnsafe(b))
+        }
+        weight1 add weight2 add header.target.value
       }
     }
 
-    private def calWeightUnsafe(flowTips: FlowTips): BigInt = {
-      val weight1 = flowTips.inTips.sumBy(calGroupWeightUnsafe)
-      val weight2 = flowTips.outTips.sumBy(getChainWeightUnsafe)
-      weight1 + weight2
+    private def calWeightUnsafe(flowTips: FlowTips): BigInteger = {
+      val weight1 = flowTips.inTips.fold(BigInteger.ZERO) {
+        case (a, b) => a.add(calGroupWeightUnsafe(b))
+      }
+      val weight2 = flowTips.outTips.fold(BigInteger.ZERO) {
+        case (a, b) => a.add(getChainWeightUnsafe(b))
+      }
+      weight1 add weight2
     }
 
-    private def calGroupWeightUnsafe(hash: BlockHash): BigInt = {
+    private def calGroupWeightUnsafe(hash: BlockHash): BigInteger = {
       val header = getBlockHeaderUnsafe(hash)
       if (header.isGenesis) {
         ALF.GenesisWeight
       } else {
-        header.outDeps.sumBy(getChainWeightUnsafe) + header.target.value
+        header.outDeps
+          .fold(BigInteger.ZERO) { case (a, b) => a.add(getChainWeightUnsafe(b)) }
+          .add(header.target.value)
       }
     }
 
@@ -222,20 +237,20 @@ object BlockFlow extends StrictLogging {
     }
 
     def tryExtendUnsafe(tipsCur: FlowTips,
-                        weightCur: BigInt,
+                        weightCur: BigInteger,
                         group: GroupIndex,
                         toTry: AVector[BlockHash],
-                        bestTip: BlockHash): (FlowTips, BigInt) = {
+                        bestTip: BlockHash): (FlowTips, BigInteger) = {
       toTry
         .sorted(blockHashOrdering.reverse)
-        .fold[(FlowTips, BigInt)](tipsCur -> weightCur) {
+        .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
             // only consider tips < bestTip
             if (blockHashOrdering.lt(tip, bestTip)) {
               tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
                 case Some(merged) =>
                   val weight = calWeightUnsafe(merged)
-                  if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
+                  if (weight.compareTo(maxWeight) > 0) (merged, weight) else (maxTips, maxWeight)
                 case None => (maxTips, maxWeight)
               }
             } else {

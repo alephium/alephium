@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
@@ -32,13 +34,13 @@ trait BlockHashPool {
 
   def getStateUnsafe(hash: BlockHash): BlockState
 
-  def getWeight(hash: BlockHash): IOResult[BigInt]
+  def getWeight(hash: BlockHash): IOResult[BigInteger]
 
-  def getWeightUnsafe(hash: BlockHash): BigInt
+  def getWeightUnsafe(hash: BlockHash): BigInteger
 
-  def getChainWeight(hash: BlockHash): IOResult[BigInt]
+  def getChainWeight(hash: BlockHash): IOResult[BigInteger]
 
-  def getChainWeightUnsafe(hash: BlockHash): BigInt
+  def getChainWeightUnsafe(hash: BlockHash): BigInteger
 
   def getHeight(hash: BlockHash): IOResult[Int]
 
