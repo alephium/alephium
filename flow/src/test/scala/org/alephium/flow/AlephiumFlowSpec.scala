@@ -37,7 +37,7 @@ import org.alephium.util._
 trait FlowFixture
     extends AlephiumSpec
     with AlephiumConfigFixture
-    with StoragesFixture
+    with StoragesFixture.Default
     with NumericHelpers {
   lazy val blockFlow: BlockFlow = genesisBlockFlow()
 

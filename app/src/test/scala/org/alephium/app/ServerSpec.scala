@@ -36,7 +36,7 @@ class ServerSpec extends AlephiumSpec with ScalaFutures {
     implicit val system: ActorSystem                = ActorSystem("Root", rawConfig)
     implicit val executionContext: ExecutionContext = system.dispatcher
 
-    val server = new ServerImpl(rootPath)
+    val server = Server(rootPath)
 
     server.start().futureValue is ()
     server.stop().futureValue is ()

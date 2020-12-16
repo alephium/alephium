@@ -31,8 +31,8 @@ trait AlephiumConfigFixture {
 
   val genesisBalance: U256 = ALF.alf(Number.million)
 
-  val env      = Env.resolve()
-  val rootPath = Platform.getRootPath(env)
+  lazy val env      = Env.resolve()
+  lazy val rootPath = Platform.getRootPath(env)
 
   lazy val newConfig = ConfigFactory
     .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)

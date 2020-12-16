@@ -45,7 +45,7 @@ trait ServerFixture
     extends InfoFixture
     with ApiModelCodec
     with AlephiumConfigFixture
-    with StoragesFixture
+    with StoragesFixture.Default
     with NoIndexModelGeneratorsLike {
   implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType

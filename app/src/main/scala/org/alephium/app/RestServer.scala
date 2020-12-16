@@ -32,7 +32,7 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
-import org.alephium.api.Endpoints
+import org.alephium.api.{ApiModel, Endpoints}
 import org.alephium.api.model._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
@@ -49,6 +49,7 @@ class RestServer(
     node: Node,
     port: Int,
     miner: ActorRefT[Miner.Command],
+    blocksExporter: BlocksExporter,
     walletServer: Option[WalletServer]
 )(implicit val apiConfig: ApiConfig,
   val actorSystem: ActorSystem,
@@ -83,7 +84,7 @@ class RestServer(
       .ask(InterCliqueManager.GetSyncStatuses)
       .mapTo[Seq[InterCliqueManager.SyncStatus]]
       .map { syncedStatuses =>
-        Right(AVector.from(syncedStatuses.map(RestServer.inteCliquePeerInfoFrom)))
+        Right(AVector.from(syncedStatuses.map(RestServer.interCliquePeerInfoFrom)))
       }
   }
 
@@ -149,6 +150,22 @@ class RestServer(
     serverUtils.compile(query)
   }
 
+  private val exportBlocksRoute = exportBlocks.toRoute { exportFile =>
+    //Run the export in background
+    Future.successful(
+      blocksExporter
+        .export(exportFile.filename)
+        .left
+        .map(error => logger.error(error.getMessage)))
+    //Just validate the filename and return success
+    Future.successful {
+      blocksExporter
+        .validateFilename(exportFile.filename)
+        .map(_ => ())
+        .left
+        .map(error => ApiModel.Error.server(error.getMessage))
+    }
+  }
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
     getSelfClique,
@@ -190,6 +207,7 @@ class RestServer(
       minerActionLogic.toRoute ~
       sendContractRoute ~
       compileRoute ~
+      exportBlocksRoute ~
       buildContractRoute ~
       swaggerUIRoute
 
@@ -223,13 +241,16 @@ class RestServer(
 }
 
 object RestServer {
-  def apply(node: Node, miner: ActorRefT[Miner.Command], walletServer: Option[WalletServer])(
-      implicit system: ActorSystem,
-      apiConfig: ApiConfig,
-      executionContext: ExecutionContext): RestServer = {
+  def apply(node: Node,
+            miner: ActorRefT[Miner.Command],
+            blocksExporter: BlocksExporter,
+            walletServer: Option[WalletServer])(implicit system: ActorSystem,
+                                                apiConfig: ApiConfig,
+                                                executionContext: ExecutionContext): RestServer = {
     val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner, walletServer)
+    new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
+
   def selfCliqueFrom(cliqueInfo: IntraCliqueInfo): SelfClique = {
     SelfClique(
       cliqueInfo.id,
@@ -239,7 +260,7 @@ object RestServer {
     )
   }
 
-  def inteCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
+  def interCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
     val peerId = syncStatus.peerId
     InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
   }

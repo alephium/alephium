@@ -23,10 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 
 trait StoragesFixture {
-  def rootPath: Path
-  implicit def groupConfig: GroupConfig
-
-  lazy val storages = StoragesFixture.buildStorages(rootPath)
+  def storages: Storages
 
   def cleanStorages(): Unit = {
     storages.dESTROYUnsafe()
@@ -42,5 +39,12 @@ object StoragesFixture {
     val storages: Storages =
       Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
     storages
+  }
+
+  trait Default extends StoragesFixture {
+    def rootPath: Path
+    implicit def groupConfig: GroupConfig
+
+    lazy val storages = StoragesFixture.buildStorages(rootPath)
   }
 }

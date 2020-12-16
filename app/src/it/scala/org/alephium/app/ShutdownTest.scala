@@ -30,6 +30,7 @@ class ShutdownTest extends AlephiumSpec {
     IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress("localhost", defaultMasterPort))
 
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0)
+    server.restServer // need to call it as restServer is lazy val
     server.system.whenTerminated.futureValue is a[Terminated]
   }
 

@@ -109,6 +109,8 @@ trait ApiModelCodec {
 
   implicit val txCodec: Codec[Tx] = deriveCodec[Tx]
 
+  implicit val exportFile: Codec[ExportFile] = deriveCodec[ExportFile]
+
   implicit val blockEntryCodec: Codec[BlockEntry] = deriveCodec[BlockEntry]
 
   implicit val peerAddressCodec: Codec[PeerAddress] = deriveCodec[PeerAddress]

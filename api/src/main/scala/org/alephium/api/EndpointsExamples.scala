@@ -128,6 +128,9 @@ trait EndpointsExamples {
   implicit val sendContractExamples: List[Example[SendContract]] =
     simpleExample(SendContract(code = hash, tx = hash, signature, fromGroup = 2))
 
+  implicit val exportFileExamples: List[Example[ExportFile]] =
+    simpleExample(ExportFile("exported-blocks-file"))
+
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
