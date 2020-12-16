@@ -169,43 +169,42 @@ object Transaction {
 
   def coinbase(chainIndex: ChainIndex,
                txs: AVector[Transaction],
-               publicKey: PublicKey,
+               lockupScript: LockupScript,
                target: Target,
                blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
-    coinbase(chainIndex, txs, publicKey, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs)
   }
 
   def coinbase(chainIndex: ChainIndex,
                txs: AVector[Transaction],
-               publicKey: PublicKey,
+               lockupScript: LockupScript,
                minerData: ByteString,
                target: Target,
                blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    coinbase(chainIndex, gasFee, publicKey, minerData, target, blockTs)
+    coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs)
   }
 
   def coinbase(chainIndex: ChainIndex,
                gasFee: U256,
-               publicKey: PublicKey,
+               lockupScript: LockupScript,
                target: Target,
                blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
-    coinbase(chainIndex, gasFee, publicKey, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs)
   }
 
   def coinbase(chainIndex: ChainIndex,
                gasFee: U256,
-               publicKey: PublicKey,
+               lockupScript: LockupScript,
                minerData: ByteString,
                target: Target,
                blockTs: TimeStamp)(implicit emissionConfig: EmissionConfig): Transaction = {
     val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
-    val pkScript     = LockupScript.p2pkh(publicKey)
 
     val txOutput =
-      AssetOutput(reward.addUnsafe(gasFee), pkScript, tokens = AVector.empty, outputData)
+      AssetOutput(reward.addUnsafe(gasFee), lockupScript, tokens = AVector.empty, outputData)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,

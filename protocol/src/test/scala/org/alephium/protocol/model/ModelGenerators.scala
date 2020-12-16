@@ -339,7 +339,7 @@ trait BlockGenerators extends TxGenerators {
     val blockTs = TimeStamp.now()
     val coinbase = Transaction.coinbase(chainIndex,
                                         txs,
-                                        publicKeyGen(chainIndex.to).sample.get,
+                                        p2pkhLockupGen(chainIndex.to).sample.get,
                                         consensusConfig.maxMiningTarget,
                                         blockTs)
     val txsWithCoinbase = txs :+ coinbase

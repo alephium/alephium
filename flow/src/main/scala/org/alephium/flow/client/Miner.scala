@@ -27,8 +27,7 @@ import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.setting.MiningSetting
-import org.alephium.protocol.PublicKey
+import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
@@ -36,29 +35,17 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 object Miner {
-  def props(node: Node)(implicit brokerConfig: BrokerConfig,
-                        emissionConfig: EmissionConfig,
-                        miningSetting: MiningSetting): Props =
-    props(node.blockFlow, node.allHandlers)
+  def props(node: Node)(implicit config: AlephiumConfig): Props =
+    props(config.minerAddresses, node.blockFlow, node.allHandlers)(config.broker,
+                                                                   config.consensus,
+                                                                   config.mining)
 
-  def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
-                                                            emissionConfig: EmissionConfig,
-                                                            miningSetting: MiningSetting): Props = {
-    val addresses = AVector.tabulate(brokerConfig.groups) { i =>
-      val index          = GroupIndex.unsafe(i)
-      val (_, publicKey) = index.generateKey
-      publicKey
-    }
-    props(addresses, blockFlow, allHandlers)
-  }
-
-  def props(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+  def props(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
       implicit brokerConfig: BrokerConfig,
       emissionConfig: EmissionConfig,
       miningConfig: MiningSetting): Props = {
     require(addresses.length == brokerConfig.groups)
-    addresses.foreachWithIndex { (publicKey, i) =>
-      val lockupScript = LockupScript.p2pkh(publicKey)
+    addresses.foreachWithIndex { (lockupScript, i) =>
       require(lockupScript.groupIndex.value == i)
     }
     Props(new Miner(addresses, blockFlow, allHandlers))
@@ -109,7 +96,7 @@ object Miner {
   }
 }
 
-class Miner(addresses: AVector[PublicKey], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
     val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting)

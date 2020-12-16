@@ -42,7 +42,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") {
     val allHandlers: AllHandlers =
       AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref))
 
-    val miner = system.actorOf(Miner.props(blockFlow, allHandlers))
+    val miner = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.Start
     flowHandler.expectMsgType[FlowHandler.Register]
@@ -63,7 +63,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") {
   it should "ignore handled mining result when it's stopped" in {
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val (allHandlers, _) = TestUtils.createBlockHandlersProbe
-    val miner            = system.actorOf(Miner.props(blockFlow, allHandlers))
+    val miner            = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
   }

@@ -19,12 +19,15 @@ package org.alephium.flow.setting
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
+import scala.jdk.CollectionConverters._
 
+import com.typesafe.config.ConfigValueFactory
 import pureconfig.ConfigSource
+import pureconfig.error._
 import pureconfig.generic.auto._
 
-import org.alephium.protocol.model.NetworkType
-import org.alephium.util.{AlephiumSpec, Duration}
+import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   it should "load alephium config" in new AlephiumConfigFixture {
@@ -57,5 +60,64 @@ class AlephiumConfigSpec extends AlephiumSpec {
     ConfigSource
       .string("""{ addresses = "" }""")
       .load[Bootstrap] isE Bootstrap(ArraySeq.empty)
+  }
+
+  it should "load miner's addresses" in new AlephiumConfigFixture {
+    val minerAddresses = AVector(
+      "D19zzHckZmX9Sjs6yERD15JBLa7HhVXfdrUAMRmLgKFpcr",
+      "D15kHgMQX6ZMH3prxEFcFDkFBv4B7dcffCwVSRCr8nUe7N"
+    )
+
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
+    )
+
+    config.minerAddresses is minerAddresses.map(str =>
+      Address.fromBase58(str, NetworkType.Devnet).get.lockupScript)
+  }
+
+  it should "fail to load if miner's addresses are wrong" in new AlephiumConfigFixture {
+    val minerAddresses = AVector(
+      "T149bUQbTo6tHa35U3QC1tsAkEDaryyQGJD2S8eomYfcZx",
+      "T1D9PBcRXK5uzrNYokNMB7oh6JpW86sZajJ5gD845cshED"
+    )
+
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
+    )
+
+    AlephiumConfig.load(newConfig.getConfig("alephium")).leftValue is a[ConfigReaderFailures]
+  }
+
+  it should "fail to load if `mainnet` is set but no miner's addresses" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-type", "mainnet")
+    )
+
+    AlephiumConfig.load(newConfig.getConfig("alephium")).leftValue is a[ConfigReaderFailures]
+  }
+
+  it should "generate miner's addresses if not set and network is `testnet`" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-type", "testnet")
+    )
+
+    config.network.networkType is NetworkType.Testnet
+    config.minerAddresses.length is config.broker.groups
+    config.minerAddresses.foreachWithIndex { (miner, i) =>
+      miner.groupIndex.value is i
+    }
+  }
+
+  it should "generate miner's addresses if not set and network is `devnet`" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-type", "devnet")
+    )
+
+    config.network.networkType is NetworkType.Devnet
+    config.minerAddresses.length is config.broker.groups
+    config.minerAddresses.foreachWithIndex { (miner, i) =>
+      miner.groupIndex.value is i
+    }
   }
 }

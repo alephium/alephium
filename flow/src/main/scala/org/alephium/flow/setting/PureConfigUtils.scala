@@ -22,10 +22,13 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.FiniteDuration
 
 import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
+import pureconfig.error._
 
 import org.alephium.crypto.Sha256
-import org.alephium.util.{Duration, Hex}
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, Duration, Hex}
 
 object PureConfigUtils {
   implicit val durationConfig: ConfigReader[Duration] =
@@ -91,4 +94,45 @@ object PureConfigUtils {
   @SuppressWarnings(Array("org.wartremover.warts.PublicInference"))
   implicit val bootstrapReader =
     ConfigReader[ArraySeq[InetSocketAddress]].orElse(bootstrapStringReader)
+
+  def parseMiners(
+      minerAddressesOpt: Option[Seq[String]],
+      networkType: NetworkType,
+      brokerConfig: BrokerConfig
+  ): Either[FailureReason, AVector[LockupScript]] = {
+    minerAddressesOpt match {
+      case Some(minerAddresses) =>
+        AVector.from(minerAddresses).mapE(parseLockupScript(_, networkType))
+      case None => generateMiners(networkType, brokerConfig)
+    }
+  }
+
+  private def generateMiners(
+      networkType: NetworkType,
+      brokerConfig: BrokerConfig
+  ): Either[FailureReason, AVector[LockupScript]] = {
+    networkType match {
+      case NetworkType.Mainnet =>
+        Left(
+          ExceptionThrown(
+            new Throwable(s"`miner-addresses` field is mandatory for ${networkType.name}")))
+      case _ =>
+        Right {
+          AVector.tabulate(brokerConfig.groups) { i =>
+            val index          = GroupIndex.unsafe(i)(brokerConfig)
+            val (_, publicKey) = index.generateKey(brokerConfig)
+            LockupScript.p2pkh(publicKey)
+          }
+        }
+    }
+  }
+
+  private def parseLockupScript(
+      rawAddress: String,
+      networkType: NetworkType
+  ): Either[FailureReason, LockupScript] = {
+    Address.fromBase58(rawAddress, networkType).map(_.lockupScript).toRight {
+      CannotConvert(rawAddress, "Address", "Invalid base58 or network-type")
+    }
+  }
 }

@@ -255,7 +255,7 @@ trait TestFixtureLike
       override val node: Node = Node.build(platformEnv.storages)
       lazy val miner: ActorRefT[Miner.Command] = {
         val props = Miner
-          .props(node)(config.broker, config.consensus, config.mining)
+          .props(node)
           .withDispatcher("akka.actor.mining-dispatcher")
         ActorRefT.build(system, props, s"FairMiner")
       }

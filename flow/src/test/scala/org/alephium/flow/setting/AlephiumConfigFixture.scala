@@ -51,9 +51,7 @@ trait AlephiumConfigFixture {
 
   implicit lazy val config = {
     val tmp = AlephiumConfig
-      .load(newConfig.getConfig("alephium"))
-      .toOption
-      .get
+      .loadOrThrow(newConfig.getConfig("alephium"))
 
     tmp.copy(genesisBalances = genesisKeys.map {
       case (_, pubKey, amount) => (LockupScript.p2pkh(pubKey), amount)
