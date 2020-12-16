@@ -253,7 +253,7 @@ trait TestFixtureLike
       implicit val config    = platformEnv.config
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
       val storages           = platformEnv.storages
-      val blockExporter: BlocksExporter =
+      override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
 
       ActorRefT.build(
@@ -268,36 +268,6 @@ trait TestFixtureLike
           )
         )
       )
-
-      override val node: Node = Node.build(platformEnv.storages)
-      lazy val miner: ActorRefT[Miner.Command] = {
-        val props = Miner
-          .props(node)
-          .withDispatcher("akka.actor.mining-dispatcher")
-        ActorRefT.build(system, props, s"FairMiner")
-      }
-
-      private val walletApp: Option[WalletApp] =
-        Option.when(config.network.isCoordinator) {
-          val walletConfig: WalletConfig = WalletConfig(
-            config.wallet.port,
-            config.wallet.secretDir,
-            config.network.networkType,
-            WalletConfig.BlockFlow(
-              apiConfig.networkInterface.getHostAddress,
-              config.network.restPort,
-              config.broker.groups
-            )
-          )
-
-          new WalletApp(walletConfig)
-        }
-
-      lazy val blocksExporter = new BlocksExporter(node)
-      lazy val restServer: RestServer =
-        RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
-      lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
-      lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
     }
 
     server

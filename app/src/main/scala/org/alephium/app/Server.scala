@@ -40,40 +40,8 @@ trait Server extends Service {
   implicit def apiConfig: ApiConfig
   def storages: Storages
 
-  override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
-  }
-  override protected def startSelfOnce(): Future[Unit] =
-    Future.successful(())
-
-  override protected def stopSelfOnce(): Future[Unit] = {
-    Future.successful(())
-  }
-}
-
-class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
-                                 val apiConfig: ApiConfig,
-                                 val system: ActorSystem,
-                                 val executionContext: ExecutionContext)
-    extends Server {
-  private val storages: Storages = {
-    val postfix  = s"${config.broker.brokerId}-${config.network.bindAddress.getPort}"
-    val dbFolder = "db-" + postfix
-
-    Storages.createUnsafe(rootPath, dbFolder, Settings.writeOptions)(config.broker)
-  }
-
-  val node: Node = Node.build(storages)
-
-  lazy val miner: ActorRefT[Miner.Command] = {
-    val props =
-      Miner
-        .props(node)
-        .withDispatcher("akka.actor.mining-dispatcher")
-    ActorRefT.build(system, props, s"FairMiner")
-  }
-
-  private lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
+  lazy val node: Node = Node.build(storages)
+  lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
     val walletConfig: WalletConfig = WalletConfig(
       config.wallet.port,
       config.wallet.secretDir,
@@ -87,16 +55,18 @@ class ServerImpl(rootPath: Path)(implicit val config: AlephiumConfig,
 
     new WalletApp(walletConfig)
   }
-  def blockExporter: BlocksExporter
+
+  def blocksExporter: BlocksExporter
+
   lazy val restServer: RestServer =
-    RestServer(node, miner, blockExporter, walletApp.map(_.walletServer))
+    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
   lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
     val props =
       Miner
-        .props(node)(config.broker, config.consensus, config.mining)
+        .props(node)
         .withDispatcher("akka.actor.mining-dispatcher")
     ActorRefT.build(system, props, s"Miner")
   }
@@ -130,6 +100,6 @@ object Server {
       Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
     }
 
-    val blockExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
+    val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }
 }
