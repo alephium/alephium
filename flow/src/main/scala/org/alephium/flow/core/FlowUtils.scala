@@ -27,7 +27,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{MutableWorldState, StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.util.{AVector, Bytes, U256}
+import org.alephium.util.{AVector, U256}
 
 trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
@@ -76,15 +76,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
         val (removed, added) = getPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
     }
-  }
-
-  final val blockHashOrdering: Ordering[BlockHash] = Ordering.fromLessThan[BlockHash] {
-    case (hash0, hash1) =>
-      val weight0 = getWeightUnsafe(hash0)
-      val weight1 = getWeightUnsafe(hash1)
-
-      weight0.compareTo(weight1) < 0 ||
-      (weight0 == weight1 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps

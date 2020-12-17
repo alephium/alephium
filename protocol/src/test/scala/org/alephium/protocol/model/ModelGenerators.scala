@@ -408,7 +408,7 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
 trait NoIndexModelGenerators
     extends NoIndexModelGeneratorsLike
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture
+    with ConsensusConfigFixture.Default
 
 object ModelGenerators {
   final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)

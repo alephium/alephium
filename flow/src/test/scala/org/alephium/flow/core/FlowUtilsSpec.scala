@@ -22,8 +22,8 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
 import org.alephium.util.{AlephiumSpec, AVector, Bytes}
 
-class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
-  it should "generate failed tx" in new FlowFixture {
+class FlowUtilsSpec extends AlephiumSpec {
+  it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
     val groupIndex = GroupIndex.unsafe(0)
     forAll(assetsToSpendGen(2, 2, 0, 1, p2pkScriptGen(groupIndex))) { assets =>
       val inputs     = assets.map(_.txInput)

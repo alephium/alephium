@@ -136,11 +136,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getBestTipUnsafe: BlockHash = {
-    assume(tips.size != 0)
-    val weighted = getAllTips.map { hash =>
-      hash -> getWeightUnsafe(hash)
-    }
-    weighted.maxBy(_._2)._1
+    getAllTips.max(blockHashOrdering)
   }
 
   def getAllTips: AVector[BlockHash] = {
