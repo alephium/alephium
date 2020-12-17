@@ -192,10 +192,9 @@ class BlockFlowSpec extends AlephiumSpec {
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
-          blockAdded is block12.hash
-          blockFlow.getPool(chainIndex).size is block11.transactions.length - 1
+          blockFlow.getPool(chainIndex).size is 1 // the conflicted tx is kept
           val template = blockFlow.prepareBlockFlow(chainIndex).toOption.get
-          template.transactions.length is block11.transactions.length - 1
+          template.transactions.length is 0 // the conflicted tx will not be used
         }
       }
     }

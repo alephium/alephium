@@ -74,4 +74,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(0).hash, newBlocks(3).hash) is true
     blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(1).hash, newBlocks(3).hash) is true
   }
+
+  it should "filter double spending txs" in new NoIndexModelGenerators {
+    val tx0 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    val tx1 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    val tx2 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is AVector(tx0, tx1, tx2)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
+  }
 }

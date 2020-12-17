@@ -20,6 +20,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.Utils
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
@@ -246,14 +247,22 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
-    val bestDeps     = getBestDeps(groupIndex)
-    val bestOutDeps  = bestDeps.outDeps
-    val bestIntraDep = bestOutDeps(groupIndex.value)
+    val bestDeps = getBestDeps(groupIndex)
+    getHashesForUpdates(groupIndex, bestDeps)
+  }
+
+  def getHashesForUpdates(groupIndex: GroupIndex, deps: BlockDeps): IOResult[AVector[BlockHash]] = {
+    val outDeps      = deps.outDeps
+    val bestIntraDep = outDeps(groupIndex.value)
     for {
-      newTips <- bestDeps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ bestOutDeps)
+      newTips <- deps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ outDeps)
       oldTips <- getInOutTips(bestIntraDep, groupIndex, inclusive = true)
       diff    <- getTipsDiff(newTips, oldTips)
     } yield diff
+  }
+
+  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash] = {
+    Utils.unsafe(getHashesForUpdates(groupIndex, deps))
   }
 
   def getBlocksForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {

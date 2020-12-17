@@ -23,12 +23,14 @@ import org.alephium.flow.core.ConflictedBlocks.GroupCache
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, ChainIndex, TxOutputRef}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ConflictedBlocks {
   implicit def brokerConfig: BrokerConfig
   def consensusConfig: ConsensusSetting
+
+  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash]
 
   lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
     ConflictedBlocks.emptyCache(consensusConfig.blockCacheCapacityPerChain * brokerConfig.groups,
@@ -40,10 +42,21 @@ trait ConflictedBlocks {
   def getCache(hash: BlockHash): GroupCache =
     caches(ChainIndex.from(hash).from.value - brokerConfig.groupFrom)
 
+  def getCache(target: GroupIndex): GroupCache =
+    caches(target.value - brokerConfig.groupFrom)
+
   def cacheForConflicts(block: Block): Unit = getCache(block).add(block)
 
   def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean = {
     getCache(hashes.head).isConflicted(hashes, getBlock)
+  }
+
+  def filterConflicts(target: GroupIndex,
+                      deps: BlockDeps,
+                      txs: AVector[TransactionTemplate],
+                      getBlock: BlockHash => Block): AVector[TransactionTemplate] = {
+    val diffs = getHashesForUpdatesUnsafe(target, deps)
+    getCache(target).filterConflicts(diffs, txs, getBlock)
   }
 }
 
@@ -119,9 +132,18 @@ object ConflictedBlocks {
       }
     }
 
+    private def isConflicted(tx: TransactionTemplate, diffs: AVector[BlockHash]): Boolean = {
+      tx.unsigned.inputs.exists(input =>
+        txCache.get(input.outputRef).exists(_.exists(diffs.contains)))
+    }
+
+    def cacheAll(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Unit = {
+      hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
+    }
+
     def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean =
       this.synchronized {
-        hashes.foreach(hash => if (!isBlockCached(hash)) add(getBlock(hash)))
+        cacheAll(hashes, getBlock)
 
         val result = hashes.existsWithIndex {
           case (hash, index) =>
@@ -130,6 +152,14 @@ object ConflictedBlocks {
 
         uncacheOldTips(keepDuration, hashes.head)
         result
+      }
+
+    def filterConflicts(diffs: AVector[BlockHash],
+                        txs: AVector[TransactionTemplate],
+                        getBlock: BlockHash => Block): AVector[TransactionTemplate] =
+      this.synchronized {
+        cacheAll(diffs, getBlock)
+        txs.filterNot(tx => isConflicted(tx, diffs))
       }
 
     private def uncacheOldTips(duration: Duration, hash: BlockHash): Unit = {
