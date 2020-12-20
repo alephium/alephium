@@ -267,7 +267,7 @@ object NonCoinbaseValidation {
       if (preOutputs.forall(checkLockTime(_, headerTs))) {
         validTx(())
       } else {
-        invalidTx(LockedTx)
+        invalidTx(TimeLockedTx)
       }
     }
 

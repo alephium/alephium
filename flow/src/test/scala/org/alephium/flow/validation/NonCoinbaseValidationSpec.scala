@@ -348,14 +348,14 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     val futureTs  = currentTs.plusMillisUnsafe(1)
     forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(currentTs))) {
       case (_, preOutputs) =>
-        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), LockedTx)
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), TimeLockedTx)
         passCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs))
         passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
     }
     forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(futureTs))) {
       case (_, preOutputs) =>
-        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), LockedTx)
-        failCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs), LockedTx)
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), TimeLockedTx)
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs), TimeLockedTx)
         passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
     }
   }

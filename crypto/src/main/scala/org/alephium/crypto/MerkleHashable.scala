@@ -30,13 +30,18 @@ object MerkleHashable {
   def rootHash[Hash <: RandomBytes: ClassTag, T <: MerkleHashable[Hash]](
       hashAlgo: HashSchema[Hash],
       nodes: AVector[T]): Hash = {
-    require(nodes.nonEmpty)
-    val buffer = Array.tabulate(nodes.length)(nodes(_).merkleHash)
-    rootHash(hashAlgo, buffer)
+    if (nodes.isEmpty) {
+      hashAlgo.zero
+    } else {
+      val buffer = Array.tabulate(nodes.length)(nodes(_).merkleHash)
+      rootHash(hashAlgo, buffer)
+    }
   }
 
   private[crypto] def rootHash[Hash <: RandomBytes](hashAlgo: HashSchema[Hash],
                                                     buffer: Array[Hash]): Hash = {
+    assume(buffer.nonEmpty)
+
     @inline def updateDoubleLeaves(index: Int): Unit = {
       buffer(index) = hashAlgo.hash(buffer(2 * index).bytes ++ buffer(2 * index + 1).bytes)
     }
