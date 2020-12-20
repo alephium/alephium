@@ -218,7 +218,7 @@ class SmartContractTest extends AlephiumSpec {
       request[Balance](getBalance(address), restPort) isnot initialBalance
     }
 
-    server1.stop()
-    server0.stop()
+    server1.stop().futureValue is ()
+    server0.stop().futureValue is ()
   }
 }

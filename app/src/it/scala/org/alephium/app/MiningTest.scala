@@ -65,7 +65,7 @@ class MiningTest extends AlephiumSpec {
       request[Boolean](stopMining, peer.restPort) is true
     }
 
-    server1.stop()
-    server0.stop()
+    server1.stop().futureValue is ()
+    server0.stop().futureValue is ()
   }
 }
