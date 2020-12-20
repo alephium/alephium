@@ -132,7 +132,7 @@ object ConflictedBlocks {
       }
     }
 
-    private def isConflicted(tx: TransactionTemplate, diffs: AVector[BlockHash]): Boolean = {
+    def isConflicted(tx: TransactionAbstract, diffs: AVector[BlockHash]): Boolean = {
       tx.unsigned.inputs.exists(input =>
         txCache.get(input.outputRef).exists(_.exists(diffs.contains)))
     }
