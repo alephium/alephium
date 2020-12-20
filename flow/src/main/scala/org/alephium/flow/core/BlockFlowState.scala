@@ -19,8 +19,8 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.flow.Utils
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
