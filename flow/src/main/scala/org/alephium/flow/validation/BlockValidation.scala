@@ -17,7 +17,6 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{Block, CoinbaseFixedData, TxOutputRef}
 import org.alephium.serde._
@@ -137,7 +136,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
-    if (block.header.txsHash == Hash.hash(block.transactions)) {
+    if (block.header.txsHash == Block.calTxsHash(block.transactions)) {
       validBlock(())
     } else {
       invalidBlock(InvalidTxsMerkleRoot)
@@ -154,7 +153,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
         _          <- checkBlockDoubleSpending(block)
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
         _ <- convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
-          nonCoinbaseValidation.checkBlockTx(block.transactions(index), worldState)
+          nonCoinbaseValidation.checkBlockTx(block.transactions(index), block.header, worldState)
         })
       } yield ()
     } else {

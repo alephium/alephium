@@ -124,9 +124,10 @@ class RestServer(
   }
 
   private val buildTransactionRoute = buildTransaction.toRoute {
-    case (fromKey, toAddress, value) =>
+    case (fromKey, toAddress, lockTime, value) =>
       Future.successful(
-        serverUtils.buildTransaction(blockFlow, BuildTransaction(fromKey, toAddress, value)))
+        serverUtils.buildTransaction(blockFlow,
+                                     BuildTransaction(fromKey, toAddress, lockTime, value)))
   }
 
   private val sendTransactionLogic = sendTransaction.serverLogic { transaction =>

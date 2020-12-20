@@ -207,8 +207,8 @@ object WalletService {
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
           case Right(buildTxResult) =>
-            val message   = Hex.unsafe(buildTxResult.hash)
-            val signature = SignatureSchema.sign(message, privateKey.privateKey)
+            val txId      = Hex.unsafe(buildTxResult.txId)
+            val signature = SignatureSchema.sign(txId, privateKey.privateKey)
             blockFlowClient
               .sendTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
               .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))

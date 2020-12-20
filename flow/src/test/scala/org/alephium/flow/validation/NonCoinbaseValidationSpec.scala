@@ -26,7 +26,7 @@ import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
-import org.alephium.util.{AVector, Random, U256}
+import org.alephium.util.{AVector, Random, TimeStamp, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
@@ -54,11 +54,12 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
 
     def checkBlockTx(tx: Transaction,
-                     preOutputs: AVector[AssetInputInfo]): TxValidationResult[Unit] = {
+                     preOutputs: AVector[AssetInputInfo],
+                     headerTs: TimeStamp = TimeStamp.now()): TxValidationResult[Unit] = {
       prepareWorldState(preOutputs)
       for {
         _ <- checkStateless(tx, checkDoubleSpending = true)
-        _ <- checkStateful(tx, cachedWorldState)
+        _ <- checkStateful(tx, headerTs, cachedWorldState)
       } yield ()
     }
   }
@@ -289,6 +290,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
       AssetOutput(U256.Zero,
                   LockupScript.p2pkh(Hash.zero),
+                  TimeStamp.zero,
                   AVector(tokenId -> amount),
                   ByteString.empty)
     }
@@ -338,6 +340,23 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       case (tx, inputInfos) =>
         prepareWorldState(inputInfos)
         getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
+    }
+  }
+
+  it should "check lock time" in new StatefulFixture {
+    val currentTs = TimeStamp.now()
+    val futureTs  = currentTs.plusMillisUnsafe(1)
+    forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(currentTs))) {
+      case (_, preOutputs) =>
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), TimeLockedTx)
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs))
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
+    }
+    forAll(transactionGenWithPreOutputs(lockTimeGen = Gen.const(futureTs))) {
+      case (_, preOutputs) =>
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), TimeStamp.zero), TimeLockedTx)
+        failCheck(checkLockTime(preOutputs.map(_.referredOutput), currentTs), TimeLockedTx)
+        passCheck(checkLockTime(preOutputs.map(_.referredOutput), futureTs))
     }
   }
 

@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
+import org.alephium.flow.Utils
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
@@ -246,14 +247,22 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
-    val bestDeps     = getBestDeps(groupIndex)
-    val bestOutDeps  = bestDeps.outDeps
-    val bestIntraDep = bestOutDeps(groupIndex.value)
+    val bestDeps = getBestDeps(groupIndex)
+    getHashesForUpdates(groupIndex, bestDeps)
+  }
+
+  def getHashesForUpdates(groupIndex: GroupIndex, deps: BlockDeps): IOResult[AVector[BlockHash]] = {
+    val outDeps      = deps.outDeps
+    val bestIntraDep = outDeps(groupIndex.value)
     for {
-      newTips <- bestDeps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ bestOutDeps)
+      newTips <- deps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ outDeps)
       oldTips <- getInOutTips(bestIntraDep, groupIndex, inclusive = true)
       diff    <- getTipsDiff(newTips, oldTips)
     } yield diff
+  }
+
+  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash] = {
+    Utils.unsafe(getHashesForUpdates(groupIndex, deps))
   }
 
   def getBlocksForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {
@@ -277,18 +286,23 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  private def lockedBy(output: TxOutput, lockupScript: LockupScript): Boolean =
-    output.lockupScript == lockupScript
+  private def ableToUse(output: TxOutput,
+                        lockupScript: LockupScript,
+                        currentTs: TimeStamp): Boolean = output match {
+    case o: AssetOutput    => o.lockupScript == lockupScript && o.lockTime <= currentTs
+    case _: ContractOutput => false
+  }
 
   def getUtxos(lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val groupIndex = lockupScript.groupIndex
+    val currentTs  = TimeStamp.now()
     assume(brokerConfig.contains(groupIndex))
 
     for {
       bestWorldState <- getBestPersistedWorldState(groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
-        .map(_.filter(p => lockedBy(p._2, lockupScript)))
+        .map(_.filter(p => ableToUse(p._2, lockupScript, currentTs)))
     } yield persistedUtxos
   }
 
@@ -303,6 +317,7 @@ trait BlockFlowState extends FlowTipsUtil {
                       groupIndex: GroupIndex,
                       persistedUtxos: AVector[(AssetOutputRef, AssetOutput)])
     : IOResult[(AVector[TxOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
+    val currentTs = TimeStamp.now()
     getBlocksForUpdates(groupIndex).map { blockCaches =>
       val usedUtxos = blockCaches.flatMap[TxOutputRef] { blockCache =>
         AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
@@ -310,7 +325,7 @@ trait BlockFlowState extends FlowTipsUtil {
       val newUtxos = blockCaches.flatMap { blockCache =>
         AVector
           .from(blockCache.relatedOutputs.view.filter(p =>
-            lockedBy(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset))
+            ableToUse(p._2, lockupScript, currentTs) && p._1.isAssetType && p._2.isAsset))
           .asUnsafe[(AssetOutputRef, AssetOutput)]
       }
       (usedUtxos, newUtxos)
@@ -320,6 +335,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def prepareUnsignedTx(fromLockupScript: LockupScript,
                         fromUnlockScript: UnlockScript,
                         toLockupScript: LockupScript,
+                        lockTimeOpt: Option[TimeStamp],
                         value: U256): IOResult[Option[UnsignedTransaction]] = {
     getUtxos(fromLockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
@@ -329,6 +345,7 @@ trait BlockFlowState extends FlowTipsUtil {
                      fromLockupScript,
                      fromUnlockScript,
                      toLockupScript,
+                     lockTimeOpt,
                      value)
     }
   }
@@ -475,7 +492,7 @@ object BlockFlowState {
       targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
-        val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.hash, index))
+        val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
         worldState.addAsset(outputRef, output)
       case (_, _) => Right(()) // contract outputs are updated in VM
     }

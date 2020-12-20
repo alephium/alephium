@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.reflect.ClassTag
+
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
@@ -27,9 +29,14 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{MutableWorldState, StatefulScript, StatefulVM, WorldState}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.util.{AVector, Bytes, U256}
+import org.alephium.util.{AVector, U256}
 
-trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with StrictLogging {
+trait FlowUtils
+    extends MultiChain
+    with BlockFlowState
+    with SyncUtils
+    with ConflictedBlocks
+    with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
 
   val mempools = AVector.tabulate(brokerConfig.groupNumPerBroker) { idx =>
@@ -78,15 +85,6 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     }
   }
 
-  final val blockHashOrdering: Ordering[BlockHash] = Ordering.fromLessThan[BlockHash] {
-    case (hash0, hash1) =>
-      val weight0 = getWeightUnsafe(hash0)
-      val weight1 = getWeightUnsafe(hash1)
-
-      weight0.compareTo(weight1) < 0 ||
-      (weight0 == weight1 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
-  }
-
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
   def updateBestDeps(): IOResult[Unit]
@@ -95,9 +93,26 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
-  private def collectTransactions(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
+  def collectPooledTxs(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
     getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
   }
+
+  def filterValidInputsUnsafe(chainIndex: ChainIndex,
+                              deps: BlockDeps,
+                              txs: AVector[TransactionTemplate]): AVector[TransactionTemplate] = {
+    val cachedWorldState = Utils.unsafe(getCachedWorldState(deps, chainIndex.from))
+    txs.filter(tx => Utils.unsafe(cachedWorldState.containsAllInputs(tx)))
+  }
+
+  def collectTransactions(chainIndex: ChainIndex,
+                          deps: BlockDeps): IOResult[AVector[TransactionTemplate]] =
+    IOUtils.tryExecute {
+      val candidates0 = collectPooledTxs(chainIndex)
+      val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
+      val candidates2 = filterValidInputsUnsafe(chainIndex, deps, candidates1)
+      val candidates3 = filterConflicts(chainIndex.from, deps, candidates2, getBlockUnsafe)
+      candidates3
+    }
 
   // all the inputs and double spending should have been checked
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -137,7 +152,8 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
     for {
       target       <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
-      fullTxs      <- executeTxTemplates(chainIndex, bestDeps, collectTransactions(chainIndex))
+      candidates   <- collectTransactions(chainIndex, bestDeps)
+      fullTxs      <- executeTxTemplates(chainIndex, bestDeps, candidates)
     } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target, parentHeader.timestamp, fullTxs)
   }
 
@@ -147,6 +163,18 @@ trait FlowUtils extends MultiChain with BlockFlowState with SyncUtils with Stric
 }
 
 object FlowUtils {
+  def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
+    var output   = AVector.ofSize[T](txs.length)
+    val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
+    txs.foreach { tx =>
+      if (tx.unsigned.inputs.forall(input => !utxoUsed.contains(input.outputRef))) {
+        utxoUsed.addAll(tx.unsigned.inputs.toIterable.view.map(_.outputRef))
+        output = output :+ tx
+      }
+    }
+    output
+  }
+
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
     Transaction(txTemplate.unsigned,
                 AVector.empty,

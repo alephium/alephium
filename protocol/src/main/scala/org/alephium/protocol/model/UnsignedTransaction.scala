@@ -20,7 +20,7 @@ import org.alephium.protocol.{Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 /**
   * Upto one new token might be issued in each transaction exception for the coinbase transaction
@@ -92,12 +92,13 @@ object UnsignedTransaction {
                   fromLockupScript: LockupScript,
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
+                  lockTimeOpt: Option[TimeStamp],
                   amount: U256): Option[UnsignedTransaction] = {
     for {
       remainder0 <- inputSum.sub(amount)
       remainder  <- remainder0.sub(defaultGasFee)
     } yield {
-      val toOutput   = TxOutput.asset(amount, toLockupScript)
+      val toOutput   = TxOutput.asset(amount, toLockupScript, lockTimeOpt)
       val fromOutput = TxOutput.asset(remainder, fromLockupScript)
 
       val outputs =

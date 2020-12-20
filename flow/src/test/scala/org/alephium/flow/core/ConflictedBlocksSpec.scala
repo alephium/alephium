@@ -93,10 +93,24 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     cache.txCache(txInputs(1).outputRef).toSet is Set(block0.hash, block1.hash)
     cache.txCache(txInputs(2).outputRef).toSet is Set(block1.hash, block2.hash)
     cache.txCache(txInputs(3).outputRef).toSet is Set(block2.hash)
+
     cache.conflictedBlocks.size is 3
     cache.conflictedBlocks(block0.hash).toSet is Set(block1.hash)
     cache.conflictedBlocks(block1.hash).toSet is Set(block0.hash, block2.hash)
     cache.conflictedBlocks(block2.hash).toSet is Set(block1.hash)
+
+    cache.isConflicted(block0.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
+    cache.isConflicted(block1.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
+    cache.isConflicted(block2.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
+    cache.isConflicted(block0.transactions.head, AVector(block0.hash)) is true
+    cache.isConflicted(block0.transactions.head, AVector(block1.hash)) is true
+    cache.isConflicted(block0.transactions.head, AVector(block2.hash)) is false
+    cache.isConflicted(block1.transactions.head, AVector(block0.hash)) is true
+    cache.isConflicted(block1.transactions.head, AVector(block1.hash)) is true
+    cache.isConflicted(block1.transactions.head, AVector(block2.hash)) is true
+    cache.isConflicted(block2.transactions.head, AVector(block0.hash)) is false
+    cache.isConflicted(block2.transactions.head, AVector(block1.hash)) is true
+    cache.isConflicted(block2.transactions.head, AVector(block2.hash)) is true
   }
 
   it should "add, remove blocks properly 0" in new Fixture1 {

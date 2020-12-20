@@ -22,7 +22,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 sealed trait TxOutput {
   def amount: U256
@@ -50,12 +50,23 @@ object TxOutput {
   def from(amount: U256, tokens: AVector[(TokenId, U256)], lockupScript: LockupScript): TxOutput = {
     lockupScript match {
       case _: LockupScript.P2C => ContractOutput(amount, lockupScript, tokens)
-      case _                   => AssetOutput(amount, lockupScript, tokens, ByteString.empty)
+      case _                   => AssetOutput(amount, lockupScript, TimeStamp.zero, tokens, ByteString.empty)
     }
   }
 
   def asset(amount: U256, lockupScript: LockupScript): AssetOutput = {
-    AssetOutput(amount, lockupScript, AVector.empty, ByteString.empty)
+    asset(amount, lockupScript, TimeStamp.zero)
+  }
+
+  def asset(amount: U256, lockupScript: LockupScript, lockTime: TimeStamp): AssetOutput = {
+    AssetOutput(amount, lockupScript, lockTime, AVector.empty, ByteString.empty)
+  }
+
+  def asset(amount: U256,
+            lockupScript: LockupScript,
+            lockTimeOpt: Option[TimeStamp]): AssetOutput = {
+    val lockTime = lockTimeOpt.getOrElse(TimeStamp.zero)
+    asset(amount, lockupScript, lockTime)
   }
 
   def contract(amount: U256, lockupScript: LockupScript): ContractOutput = {
@@ -80,6 +91,7 @@ object TxOutput {
   */
 final case class AssetOutput(amount: U256,
                              lockupScript: LockupScript, // TODO: exclude p2c script
+                             lockTime: TimeStamp,
                              tokens: AVector[(TokenId, U256)],
                              additionalData: ByteString)
     extends TxOutput {
@@ -90,14 +102,14 @@ final case class AssetOutput(amount: U256,
   def toGroup(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 
   def payGasUnsafe(fee: U256): AssetOutput =
-    AssetOutput(amount.subUnsafe(fee), lockupScript, tokens, additionalData)
+    AssetOutput(amount.subUnsafe(fee), lockupScript, lockTime, tokens, additionalData)
 }
 
 object AssetOutput {
   private[model] implicit val tokenSerde: Serde[(TokenId, U256)] = Serde.tuple2[TokenId, U256]
   implicit val serde: Serde[AssetOutput] =
-    Serde.forProduct4(AssetOutput.apply,
-                      t => (t.amount, t.lockupScript, t.tokens, t.additionalData))
+    Serde.forProduct5(AssetOutput.apply,
+                      t => (t.amount, t.lockupScript, t.lockTime, t.tokens, t.additionalData))
 }
 
 final case class ContractOutput(amount: U256,

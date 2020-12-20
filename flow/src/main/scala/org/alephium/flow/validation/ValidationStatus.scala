@@ -103,6 +103,7 @@ final case object InvalidOutputGroupIndex               extends InvalidTxStatus
 final case object TxDoubleSpending                      extends InvalidTxStatus
 final case object OutputDataSizeExceeded                extends InvalidTxStatus
 final case object NonExistInput                         extends InvalidTxStatus
+final case object TimeLockedTx                          extends InvalidTxStatus
 final case object InvalidAlfBalance                     extends InvalidTxStatus
 final case object InvalidTokenBalance                   extends InvalidTxStatus
 final case object BalanceOverFlow                       extends InvalidTxStatus

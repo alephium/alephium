@@ -24,17 +24,15 @@ import io.circe.syntax._
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.api.CirceUtils
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
-  def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    CirceUtils.print(t.asJson)
-  }
+  def show[T](t: T)(implicit encoder: Encoder[T]): String = CirceUtils.print(t.asJson)
 
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString), None)
@@ -134,14 +132,40 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(request, jsonRaw)
   }
 
+  it should "encode/decode Input" in {
+    val key       = "dummyKey"
+    val outputRef = OutputRef(1234, key)
+
+    {
+      val data    = Input(outputRef, None)
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"}}"""
+      checkData(data, jsonRaw)
+    }
+
+    {
+      val data    = Input(outputRef, Some(hex"abcd"))
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"},"unlockScript":"abcd"}"""
+      checkData(data, jsonRaw)
+    }
+  }
+
   it should "encode/decode Output with big amount" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
     val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
     val amountStr  = "15000000000000000000"
-    val request    = Output(amount, address)
-    val jsonRaw    = s"""{"amount":$amountStr,"address":"$addressStr"}"""
-    checkData(request, jsonRaw)
+
+    {
+      val request = Output(amount, address, None)
+      val jsonRaw = s"""{"amount":$amountStr,"address":"$addressStr"}"""
+      checkData(request, jsonRaw)
+    }
+
+    {
+      val request = Output(amount, address, Some(TimeStamp.unsafe(1234)))
+      val jsonRaw = s"""{"amount":$amountStr,"address":"$addressStr","lockTime":1234}"""
+      checkData(request, jsonRaw)
+    }
   }
 
   it should "encode/decode GetGroup" in {
@@ -174,15 +198,25 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val fromKey   = PublicKey.generate
     val toKey     = PublicKey.generate
     val toAddress = Address.p2pkh(networkType, toKey)
-    val transfer  = BuildTransaction(fromKey, toAddress, 1)
-    val jsonRaw =
-      s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
-    checkData(transfer, jsonRaw)
+
+    {
+      val transfer = BuildTransaction(fromKey, toAddress, None, 1)
+      val jsonRaw =
+        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":1}"""
+      checkData(transfer, jsonRaw)
+    }
+
+    {
+      val transfer = BuildTransaction(fromKey, toAddress, Some(TimeStamp.unsafe(1234)), 1)
+      val jsonRaw =
+        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","lockTime":1234,"value":1}"""
+      checkData(transfer, jsonRaw)
+    }
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val result  = BuildTransactionResult("tx", "txHash", 1, 2)
-    val jsonRaw = """{"unsignedTx":"tx","hash":"txHash","fromGroup":1,"toGroup":2}"""
+    val result  = BuildTransactionResult("tx", "txId", 1, 2)
+    val jsonRaw = """{"unsignedTx":"tx","txId":"txId","fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }
 
@@ -190,7 +224,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val signature = Signature.generate
     val transfer  = SendTransaction("tx", signature)
     val jsonRaw =
-      s"""{"tx":"tx","signature":"${signature.toHexString}"}"""
+      s"""{"unsignedTx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
   }
 }

@@ -23,15 +23,17 @@ import org.alephium.util.Duration
 trait ConsensusConfigFixture {
   def groupConfig: GroupConfig
 
-  implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
-    override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-    override val maxMiningTarget: Target = Target.Max
-
-    override val emission: Emission = Emission(groupConfig, blockTargetTime)
-  }
+  def consensusConfig: ConsensusConfig
 }
 
 object ConsensusConfigFixture {
-  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default
+  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default {
+    implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
+      override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
+
+      override val maxMiningTarget: Target = Target.Max
+
+      override val emission: Emission = Emission(groupConfig, blockTargetTime)
+    }
+  }
 }

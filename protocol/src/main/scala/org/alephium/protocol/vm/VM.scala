@@ -188,22 +188,22 @@ final class StatefulVM(ctx: StatefulContext,
 object StatelessVM {
   final case class AssetScriptExecution(gasRemaining: GasBox)
 
-  def runAssetScript(txHash: Hash,
+  def runAssetScript(txId: Hash,
                      initialGas: GasBox,
                      script: StatelessScript,
                      args: AVector[Val],
                      signature: Signature): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txHash, initialGas, signature)
+    val context = StatelessContext(txId, initialGas, signature)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def runAssetScript(txHash: Hash,
+  def runAssetScript(txId: Hash,
                      initialGas: GasBox,
                      script: StatelessScript,
                      args: AVector[Val],
                      signatures: Stack[Signature]): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txHash, initialGas, signatures)
+    val context = StatelessContext(txId, initialGas, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }

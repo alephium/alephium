@@ -22,8 +22,8 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
 import org.alephium.util.{AlephiumSpec, AVector, Bytes}
 
-class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
-  it should "generate failed tx" in new FlowFixture {
+class FlowUtilsSpec extends AlephiumSpec {
+  it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
     val groupIndex = GroupIndex.unsafe(0)
     forAll(assetsToSpendGen(2, 2, 0, 1, p2pkScriptGen(groupIndex))) { assets =>
       val inputs     = assets.map(_.txInput)
@@ -73,5 +73,15 @@ class FlowUtilsSpec extends AlephiumSpec with NoIndexModelGenerators {
     blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(1).hash, newBlocks(2).hash) is true
     blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(0).hash, newBlocks(3).hash) is true
     blockFlow.blockHashOrdering.lt(blockFlow.genesisBlocks(1)(1).hash, newBlocks(3).hash) is true
+  }
+
+  it should "filter double spending txs" in new NoIndexModelGenerators {
+    val tx0 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    val tx1 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    val tx2 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is AVector(tx0, tx1, tx2)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
   }
 }

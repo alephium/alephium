@@ -29,7 +29,7 @@ trait TxEnv
 trait ContractEnv
 
 trait Context extends CostStrategy {
-  def txHash: Hash
+  def txId: Hash
   def signatures: Stack[Signature]
   def getInitialBalances: ExeResult[Frame.Balances]
 }
@@ -37,15 +37,15 @@ trait Context extends CostStrategy {
 trait StatelessContext extends Context
 
 object StatelessContext {
-  def apply(txHash: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
+  def apply(txId: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
     val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    apply(txHash, txGas, stack)
+    apply(txId, txGas, stack)
   }
 
-  def apply(txHash: Hash, txGas: GasBox, signatures: Stack[Signature]): StatelessContext =
-    new Impl(txHash, signatures, txGas)
+  def apply(txId: Hash, txGas: GasBox, signatures: Stack[Signature]): StatelessContext =
+    new Impl(txId, signatures, txGas)
 
-  final class Impl(val txHash: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
+  final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
     override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
   }
@@ -62,12 +62,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextOutputIndex: Int
 
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
-    ContractOutputRef.unsafe(txHash, output, nextOutputIndex)
+    ContractOutputRef.unsafe(txId, output, nextOutputIndex)
 
   def createContract(code: StatefulContract,
                      initialBalances: Frame.BalancesPerLockup,
                      initialFields: AVector[Val]): ExeResult[Unit] = {
-    val contractId = TxOutputRef.key(txHash, nextOutputIndex)
+    val contractId = TxOutputRef.key(txId, nextOutputIndex)
     val contractOutput = ContractOutput(initialBalances.alfAmount,
                                         LockupScript.p2c(contractId),
                                         initialBalances.tokenVector)
@@ -114,7 +114,7 @@ object StatefulContext {
       extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
 
-    override def txHash: Hash = tx.hash
+    override def txId: Hash = tx.id
 
     override val signatures: Stack[Signature] = Stack.popOnly(tx.contractSignatures)
 

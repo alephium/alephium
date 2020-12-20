@@ -25,7 +25,7 @@ import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{OutOfGas => _, _}
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 trait NonCoinbaseValidation {
   import ValidationStatus._
@@ -55,16 +55,17 @@ trait NonCoinbaseValidation {
     for {
       _          <- checkStateless(tx, checkDoubleSpending = true)
       worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
-      _          <- checkStateful(tx, worldState)
+      _          <- checkStateful(tx, TimeStamp.now(), worldState)
     } yield ()
   }
 
   protected[validation] def checkBlockTx(
       tx: Transaction,
+      header: BlockHeader,
       worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(tx, checkDoubleSpending = false) // it's already checked in BlockValidation
-      _ <- checkStateful(tx, worldState)
+      _ <- checkStateful(tx, header.timestamp, worldState)
     } yield ()
   }
 
@@ -83,9 +84,11 @@ trait NonCoinbaseValidation {
   }
   protected[validation] def checkStateful(
       tx: Transaction,
+      headerTs: TimeStamp,
       worldState: WorldState.Cached): TxValidationResult[Unit] = {
     for {
       preOutputs   <- getPreOutputs(tx, worldState)
+      _            <- checkLockTime(preOutputs, headerTs)
       _            <- checkAlfBalance(tx, preOutputs)
       _            <- checkTokenBalance(tx, preOutputs)
       gasRemaining <- checkWitnesses(tx, preOutputs)
@@ -107,6 +110,7 @@ trait NonCoinbaseValidation {
   protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
+  protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[GasBox]
@@ -258,6 +262,21 @@ object NonCoinbaseValidation {
       }
     }
 
+    protected[validation] def checkLockTime(preOutputs: AVector[TxOutput],
+                                            headerTs: TimeStamp): TxValidationResult[Unit] = {
+      if (preOutputs.forall(checkLockTime(_, headerTs))) {
+        validTx(())
+      } else {
+        invalidTx(TimeLockedTx)
+      }
+    }
+
+    @inline private def checkLockTime(output: TxOutput, headerTs: TimeStamp): Boolean =
+      output match {
+        case o: AssetOutput if o.lockTime > headerTs => false
+        case _                                       => true
+      }
+
     protected[validation] def checkAlfBalance(
         tx: Transaction,
         preOutputs: AVector[TxOutput]): TxValidationResult[Unit] = {
@@ -354,7 +373,7 @@ object NonCoinbaseValidation {
       } else {
         signatures.pop() match {
           case Right(signature) =>
-            if (!SignatureSchema.verify(tx.hash.bytes, signature, unlock.publicKey)) {
+            if (!SignatureSchema.verify(tx.id.bytes, signature, unlock.publicKey)) {
               invalidTx(InvalidSignature)
             } else {
               gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
@@ -378,7 +397,7 @@ object NonCoinbaseValidation {
         script: StatelessScript,
         params: AVector[Val],
         signatures: Stack[Signature]): TxValidationResult[GasBox] = {
-      StatelessVM.runAssetScript(tx.hash, gasRemaining, script, params, signatures) match {
+      StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
         case Right(result) => validTx(result.gasRemaining)
         case Left(e)       => invalidTx(InvalidUnlockScript(e))
       }

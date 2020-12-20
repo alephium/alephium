@@ -88,6 +88,9 @@ class InterCliqueSyncTest extends AlephiumSpec {
         request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique1)).blocks.toSet is
           request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique2)).blocks.toSet
       }
+
+      clique1.foreach(_.stop().futureValue is ())
+      clique2.foreach(_.stop().futureValue is ())
     }
   }
 }

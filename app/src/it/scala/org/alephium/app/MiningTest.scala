@@ -42,7 +42,7 @@ class MiningTest extends AlephiumSpec {
     }
 
     awaitNewBlock(tx.fromGroup, tx.toGroup)
-    Thread.sleep(1000)
+    Thread.sleep(2000)
     awaitNewBlock(tx.fromGroup, tx.fromGroup)
 
     eventually {
@@ -53,7 +53,7 @@ class MiningTest extends AlephiumSpec {
     val tx2 = transferFromWallet(transferAddress, transferAmount, restPort)
 
     awaitNewBlock(tx2.fromGroup, tx2.toGroup)
-    Thread.sleep(1000)
+    Thread.sleep(2000)
     awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
 
     eventually {
@@ -65,7 +65,7 @@ class MiningTest extends AlephiumSpec {
       request[Boolean](stopMining, peer.restPort) is true
     }
 
-    server1.stop()
-    server0.stop()
+    server1.stop().futureValue is ()
+    server0.stop().futureValue is ()
   }
 }

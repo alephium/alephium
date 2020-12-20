@@ -23,7 +23,7 @@ import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 class BlockHeaderSpec
     extends AlephiumSpec
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture {
+    with ConsensusConfigFixture.Default {
   it should "have correct data" in {
     for {
       i <- 0 until groups

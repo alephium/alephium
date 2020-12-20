@@ -31,7 +31,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util.{ActorRefT, AVector, Hex, U256}
+import org.alephium.util.{ActorRefT, AVector, Hex, TimeStamp, U256}
 
 class ServerUtils(networkType: NetworkType) {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
@@ -75,6 +75,7 @@ class ServerUtils(networkType: NetworkType) {
       unsignedTx <- prepareUnsignedTransaction(blockFlow,
                                                query.fromKey,
                                                query.toAddress.lockupScript,
+                                               query.lockTime,
                                                query.value)
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -90,7 +91,7 @@ class ServerUtils(networkType: NetworkType) {
       askTimeout: Timeout,
       executionContext: ExecutionContext): FutureTry[TxResult] = {
     val txEither = for {
-      txByteString <- Hex.from(query.tx).toRight(failed(s"Invalid hex"))
+      txByteString <- Hex.from(query.unsignedTx).toRight(failed(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
         failed(serdeError.getMessage))
     } yield {
@@ -142,7 +143,7 @@ class ServerUtils(networkType: NetworkType) {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
-        Right(TxResult(tx.hash.toHexString, tx.fromGroup.value, tx.toGroup.value))
+        Right(TxResult(tx.id.toHexString, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
         Left(failed("Failed in adding transaction"))
     }
@@ -151,10 +152,15 @@ class ServerUtils(networkType: NetworkType) {
   def prepareUnsignedTransaction(blockFlow: BlockFlow,
                                  fromKey: PublicKey,
                                  toLockupScript: LockupScript,
+                                 lockTimeOpt: Option[TimeStamp],
                                  value: U256): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
-    blockFlow.prepareUnsignedTx(fromLockupScript, fromUnlockScript, toLockupScript, value) match {
+    blockFlow.prepareUnsignedTx(fromLockupScript,
+                                fromUnlockScript,
+                                toLockupScript,
+                                lockTimeOpt,
+                                value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(None)                      => Left(failed("Not enough balance"))
       case Left(_)                          => failedInIO

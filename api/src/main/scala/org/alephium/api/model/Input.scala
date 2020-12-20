@@ -18,12 +18,21 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.TxInput
+import org.alephium.protocol.model.{ContractOutputRef, TxInput, TxOutputRef}
+import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde.serialize
 
-final case class Input(outputRef: OutputRef, unlockScript: ByteString)
+final case class Input(outputRef: OutputRef, unlockScript: Option[ByteString])
 
 object Input {
-  def from(input: TxInput): Input =
-    Input(OutputRef.from(input.outputRef), serialize(input.unlockScript))
+  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Input = {
+    Input(OutputRef.from(outputRef), Some(serialize(unlockScript)))
+  }
+
+  def from(input: TxInput): Input = {
+    Input(input.outputRef, input.unlockScript)
+  }
+
+  def from(input: ContractOutputRef): Input =
+    Input(OutputRef.from(input), unlockScript = None)
 }

@@ -841,7 +841,7 @@ case object Keccak256ByteVec
 
 case object CheckSignature extends Signature with StatelessInstrCompanion0 with GasSignature {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    val rawData    = frame.ctx.txHash.bytes
+    val rawData    = frame.ctx.txId.bytes
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popT[Val.ByteVec]()

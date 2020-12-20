@@ -20,6 +20,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, TimeStamp, U256}
 
 class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
@@ -64,7 +65,21 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
                                          script,
                                          target  = Target.Max,
                                          blockTs = TimeStamp.now())
-    (coinbase0.hash equals coinbase1.hash) is false
-    (coinbase0.hash equals coinbase2.hash) is false
+    (coinbase0.id equals coinbase1.id) is false
+    (coinbase0.id equals coinbase2.id) is false
+  }
+
+  it should "calculate the merkle hash" in {
+    forAll(transactionGen(chainIndexGen = chainIndexGen)) { tx =>
+      val txSerialized       = serialize(tx)
+      val merkelTxSerialized = serialize(tx.toMerkleTx)
+      val idSerialized       = serialize(tx.id)
+      val unsignedSerialized = serialize(tx.unsigned)
+      txSerialized.startsWith(unsignedSerialized)
+      merkelTxSerialized.startsWith(idSerialized)
+      txSerialized.drop(unsignedSerialized.length) is merkelTxSerialized.drop(idSerialized.length)
+
+      tx.merkleHash is Hash.hash(merkelTxSerialized)
+    }
   }
 }

@@ -117,7 +117,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
     def mockContext(): StatefulContext = new StatefulContext {
       val worldState: WorldState.Staging        = cachedWorldState.staging()
-      def txHash: Hash                          = Hash.zero
+      def txId: Hash                            = Hash.zero
       var gasRemaining                          = minimalGas
       def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
       def nextOutputIndex: Int                  = 0

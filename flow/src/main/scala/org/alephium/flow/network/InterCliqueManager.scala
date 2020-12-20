@@ -127,7 +127,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         }
       }
     case message: CliqueManager.BroadCastTx =>
-      log.debug(s"Broadcasting tx ${message.tx.hash.shortHex} for ${message.chainIndex}")
+      log.debug(s"Broadcasting tx ${message.tx.id.shortHex} for ${message.chainIndex}")
       iterBrokers { (peerId, brokerState) =>
         if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(message.chainIndex)) {
           log.debug(s"Send tx to broker $peerId")

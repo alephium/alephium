@@ -78,7 +78,7 @@ trait ServerFixture
     SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
                          PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
-    dummyTx.hash.toHexString,
+    dummyTx.id.toHexString,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
@@ -137,7 +137,7 @@ object ServerFixture {
       }), "clique-manager")
 
     val txHandlerRef =
-      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.hash)))
+      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
     val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
 
     val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),
@@ -173,8 +173,15 @@ object ServerFixture {
     override def prepareUnsignedTx(fromLockupScript: LockupScript,
                                    fromUnlockScript: UnlockScript,
                                    toLockupScript: LockupScript,
+                                   lockTimeOpt: Option[TimeStamp],
                                    value: U256): IOResult[Option[UnsignedTransaction]] =
-      Right(Some(dummyTx.unsigned))
+      lockTimeOpt match {
+        case None => Right(Some(dummyTx.unsigned))
+        case Some(lockTime) =>
+          val outputs    = dummyTx.unsigned.fixedOutputs
+          val newOutputs = outputs.map(_.copy(lockTime = lockTime))
+          Right(Some(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
+      }
 
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus

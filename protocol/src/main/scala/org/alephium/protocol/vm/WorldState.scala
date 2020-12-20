@@ -27,6 +27,8 @@ import org.alephium.util.AVector
 trait WorldState[T] {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
+  def existOutput(outputRef: TxOutputRef): IOResult[Boolean]
+
   def getContractState(key: Hash): IOResult[ContractState]
 
   def getContractAsset(key: Hash): IOResult[ContractOutput]
@@ -54,7 +56,20 @@ trait WorldState[T] {
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]]
 
-  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]]
+  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
+    for {
+      fixedInputs <- tx.unsigned.inputs.mapE { input =>
+        getOutput(input.outputRef)
+      }
+      contractInputs <- tx.contractInputs.mapE { outputRef =>
+        getOutput(outputRef)
+      }
+    } yield (fixedInputs ++ contractInputs)
+  }
+
+  def containsAllInputs(tx: TransactionTemplate): IOResult[Boolean] = {
+    tx.unsigned.inputs.forallE(input => existOutput(input.outputRef))
+  }
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit] {
@@ -114,17 +129,6 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
       getOutput(input.outputRef)
     }
   }
-
-  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
-    for {
-      fixedInputs <- tx.unsigned.inputs.mapE { input =>
-        getOutput(input.outputRef)
-      }
-      contractInputs <- tx.contractInputs.mapE { outputRef =>
-        getOutput(outputRef)
-      }
-    } yield (fixedInputs ++ contractInputs)
-  }
 }
 
 sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState] {
@@ -181,17 +185,6 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
       getOutput(input.outputRef)
     }
   }
-
-  def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
-    for {
-      fixedInputs <- tx.unsigned.inputs.mapE { input =>
-        getOutput(input.outputRef)
-      }
-      contractInputs <- tx.contractInputs.mapE { outputRef =>
-        getOutput(outputRef)
-      }
-    } yield (fixedInputs ++ contractInputs)
-  }
 }
 
 object WorldState {
@@ -201,6 +194,10 @@ object WorldState {
   ) extends ImmutableWorldState {
     def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
+    }
+
+    def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
+      outputState.exist(outputRef)
     }
 
     def getAllOutputs(outputRefPrefix: ByteString): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
@@ -294,6 +291,10 @@ object WorldState {
 
     def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
+    }
+
+    def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
+      outputState.exist(outputRef)
     }
 
     def getContractState(key: Hash): IOResult[ContractState] = {

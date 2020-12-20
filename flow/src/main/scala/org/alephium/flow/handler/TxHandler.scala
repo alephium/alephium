@@ -39,8 +39,8 @@ object TxHandler {
   final case class AddTx(tx: TransactionTemplate, origin: DataOrigin) extends Command
 
   sealed trait Event
-  final case class AddSucceeded(hash: Hash) extends Event
-  final case class AddFailed(hash: Hash)    extends Event
+  final case class AddSucceeded(txId: Hash) extends Event
+  final case class AddFailed(txId: Hash)    extends Event
 }
 
 class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
@@ -60,16 +60,16 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
     if (!mempool.contains(chainIndex, tx)) {
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.hash.shortHex} due to $s")
+          log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s")
           addFailed(tx)
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.hash.shortHex} due to $e")
+          log.warning(s"IO failed in validating tx ${tx.id.shortHex} due to $e")
           addFailed(tx)
       }
     } else {
-      log.debug(s"tx ${tx.hash.shortHex} is already included")
+      log.debug(s"tx ${tx.id.shortHex} is already included")
       addFailed(tx)
     }
   }
@@ -79,7 +79,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
                     mempool: MemPool,
                     origin: DataOrigin): Unit = {
     val count = mempool.add(chainIndex, AVector((tx, 1.0)))
-    log.info(s"Add tx ${tx.hash.shortHex} for $chainIndex, #$count txs added")
+    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
     val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
     publishEvent(event)
@@ -87,10 +87,10 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
   }
 
   def addSucceeded(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddSucceeded(tx.hash)
+    sender() ! TxHandler.AddSucceeded(tx.id)
   }
 
   def addFailed(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddFailed(tx.hash)
+    sender() ! TxHandler.AddFailed(tx.id)
   }
 }

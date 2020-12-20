@@ -18,8 +18,10 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
 import org.alephium.protocol.config.{EmissionConfig, GroupConfig}
+import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -29,7 +31,7 @@ sealed trait TransactionAbstract {
   def inputSignatures: AVector[Signature]
   def contractSignatures: AVector[Signature]
 
-  def hash: Hash = unsigned.hash
+  def id: Hash = unsigned.hash
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
@@ -52,9 +54,12 @@ final case class Transaction(unsigned: UnsignedTransaction,
                              generatedOutputs: AVector[TxOutput],
                              inputSignatures: AVector[Signature],
                              contractSignatures: AVector[Signature])
-    extends HashSerde[Transaction]
-    with TransactionAbstract {
-  override val hash: Hash = unsigned.hash
+    extends TransactionAbstract
+    with MerkleHashable[Hash] {
+  def toMerkleTx: MerkelTx =
+    MerkelTx(id, contractInputs, generatedOutputs, inputSignatures, contractSignatures)
+
+  def merkleHash: Hash = Hash.hash(serialize(toMerkleTx))
 
   def allOutputs: AVector[TxOutput] = unsigned.fixedOutputs.as[TxOutput] ++ generatedOutputs
 
@@ -202,9 +207,14 @@ object Transaction {
     val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
+    val lockTime     = blockTs.plusHoursUnsafe(1)
 
     val txOutput =
-      AssetOutput(reward.addUnsafe(gasFee), lockupScript, tokens = AVector.empty, outputData)
+      AssetOutput(reward.addUnsafe(gasFee),
+                  lockupScript,
+                  lockTime,
+                  tokens = AVector.empty,
+                  outputData)
     val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
     Transaction(unsigned,
                 contractInputs     = AVector.empty,
@@ -223,6 +233,17 @@ object Transaction {
                 generatedOutputs   = AVector.empty,
                 inputSignatures    = AVector.empty,
                 contractSignatures = AVector.empty)
+  }
+
+  private[model] final case class MerkelTx(id: Hash,
+                                           contractInputs: AVector[ContractOutputRef],
+                                           generatedOutputs: AVector[TxOutput],
+                                           inputSignatures: AVector[Signature],
+                                           contractSignatures: AVector[Signature])
+  object MerkelTx {
+    implicit val serde: Serde[MerkelTx] = Serde.forProduct5(
+      MerkelTx.apply,
+      t => (t.id, t.contractInputs, t.generatedOutputs, t.inputSignatures, t.contractSignatures))
   }
 }
 

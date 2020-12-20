@@ -25,7 +25,8 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Random}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.util.{AlephiumSpec, AVector, Random, TimeStamp}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -191,10 +192,9 @@ class BlockFlowSpec extends AlephiumSpec {
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
-          blockAdded is block12.hash
-          blockFlow.getPool(chainIndex).size is block11.transactions.length - 1
+          blockFlow.getPool(chainIndex).size is 1 // the conflicted tx is kept
           val template = blockFlow.prepareBlockFlow(chainIndex).toOption.get
-          template.transactions.length is block11.transactions.length - 1
+          template.transactions.length is 0 // the conflicted tx will not be used
         }
       }
     }
@@ -374,6 +374,50 @@ class BlockFlowSpec extends AlephiumSpec {
         .retryUntil(hash => BlockFlow.randomGroupOrders(hash) equals AVector.from(orders))
       hashGen.sample.nonEmpty is true
     }
+  }
+
+  it should "prepare tx with lock time" in new FlowFixture {
+    def test(lockTimeOpt: Option[TimeStamp]) = {
+      val (_, publicKey, _) = genesisKeys(0)
+      val fromLockupScript  = LockupScript.p2pkh(publicKey)
+      val unlockScript      = UnlockScript.p2pkh(publicKey)
+      val (_, toPublicKey)  = GroupIndex.unsafe(1).generateKey
+      val toLockupScript    = LockupScript.p2pkh(toPublicKey)
+
+      val unsigned =
+        blockFlow
+          .prepareUnsignedTx(fromLockupScript,
+                             unlockScript,
+                             toLockupScript,
+                             lockTimeOpt,
+                             ALF.alf(1))
+          .rightValue
+          .get
+      unsigned.fixedOutputs.length is 2
+      unsigned.fixedOutputs(0).lockTime is lockTimeOpt.getOrElse(TimeStamp.zero)
+      unsigned.fixedOutputs(1).lockTime is TimeStamp.zero
+    }
+
+    test(None)
+    test(Some(TimeStamp.unsafe(1)))
+    test(Some(TimeStamp.now()))
+  }
+
+  it should "spend locked outputs" in new FlowFixture {
+    val lockTime       = TimeStamp.now().plusSecondsUnsafe(2)
+    val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
+    val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
+    val toPrivateKey   = keyManager(toLockupScript)
+    val toUnlockScript = UnlockScript.p2pkh(toPrivateKey.publicKey)
+    addAndCheck(blockFlow, block)
+    blockFlow
+      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .rightValue is None
+    Thread.sleep(2000)
+    blockFlow
+      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .rightValue
+      .nonEmpty is true
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
