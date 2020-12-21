@@ -74,5 +74,5 @@ You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, wh
 There are two kinds of tests:
 
 1) Unit and property tests, which can be run with the `./make test` command.
-2) Integration tests, `./make ittest`.
+2) Integration tests, `./make itest`.
 
