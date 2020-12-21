@@ -19,7 +19,7 @@ package org.alephium.util
 import scala.annotation.nowarn
 import scala.language.implicitConversions
 
-import org.scalacheck.{Arbitrary, Shrink}
+import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
@@ -43,6 +43,9 @@ trait AlephiumFixture extends Matchers {
   implicit lazy val u32Arb: Arbitrary[U32] = Arbitrary(arbitrary[Int].map(U32.unsafe))
   implicit lazy val i64Arb: Arbitrary[I64] = Arbitrary(arbitrary[Long].map(I64.from))
   implicit lazy val u64Arb: Arbitrary[U64] = Arbitrary(arbitrary[Long].map(U64.unsafe))
+
+  lazy val posLongGen: Gen[Long] = Gen.chooseNum(0L, Long.MaxValue)
+  lazy val negLongGen: Gen[Long] = Gen.chooseNum(Long.MinValue, -1L)
 
   // scalastyle:off no.should
   implicit class IsOps[A: Equality](left: A)(implicit pos: Position) {

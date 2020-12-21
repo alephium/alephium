@@ -21,7 +21,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import io.circe.{Codec, Decoder, Encoder}
 import io.circe.parser._
 import io.circe.syntax._
-import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.CirceUtils._
@@ -68,12 +67,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode TimeStamp" in {
     checkData(TimeStamp.unsafe(0), "0")
 
-    forAll(Gen.posNum[Long]) { long =>
+    forAll(posLongGen) { long =>
       val timestamp = TimeStamp.unsafe(long)
       checkData(timestamp, s"$long")
     }
 
-    forAll(Gen.negNum[Long]) { long =>
+    forAll(negLongGen) { long =>
       parseFail[TimeStamp](s"$long") is "expect positive timestamp"
     }
   }
