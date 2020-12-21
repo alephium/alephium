@@ -76,9 +76,9 @@ class NumericHelpersSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "find min/max value in the list" in {
-    forAll(Gen.nonEmptyListOf(Gen.posNum[Int])) { ns: Seq[Int] =>
-      min(ns.map(n => U256.unsafe(n.toLong)): _*) is ns.min
-      max(ns.map(n => U256.unsafe(n.toLong)): _*) is ns.max
+    forAll(Gen.nonEmptyListOf(posLongGen)) { ns: Seq[Long] =>
+      min(ns.map(n => U256.unsafe(n)): _*) is ns.min
+      max(ns.map(n => U256.unsafe(n)): _*) is ns.max
     }
   }
 }

@@ -94,7 +94,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "put non-script txs in the last" in {
-    forAll(Gen.posNum[Long], Gen.posNum[Long]) { (gasPrice0: Long, gasPrice1: Long) =>
+    forAll(posLongGen, posLongGen) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
         BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
                            Hash.zero,
