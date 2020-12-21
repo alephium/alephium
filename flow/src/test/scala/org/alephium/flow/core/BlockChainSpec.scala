@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
+import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
@@ -80,6 +81,40 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
       val diff = chain.calHashDiff(block.hash, genesis.hash).toOption.get
       diff.toAdd is AVector(block.hash)
       diff.toRemove.isEmpty is true
+    }
+  }
+
+  it should "persiste txs" in new Fixture {
+    val chain = buildBlockChain()
+    forAll(blockGen) { block0 =>
+      chain.add(block0, 1).isRight is true
+      block0.transactions.foreachWithIndex {
+        case (tx, index) =>
+          val txIndex = TxIndex(block0.hash, index)
+          if (brokerConfig.contains(block0.chainIndex.from)) {
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex))
+          } else {
+            chain.txStorage.exists(tx.id) isE false
+          }
+      }
+      val block1 = block0.copy(header = block0.header.copy(nonce = 123456))
+      chain.add(block1, 1).isRight is true
+      block1.transactions.foreachWithIndex {
+        case (tx, index) =>
+          val txIndex0 = TxIndex(block0.hash, index)
+          val txIndex1 = TxIndex(block1.hash, index)
+          (brokerConfig.contains(block0.chainIndex.from),
+           brokerConfig.contains(block1.chainIndex.from)) match {
+            case (true, true) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
+            case (true, false) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
+            case (false, true) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex1))
+            case (false, false) =>
+              chain.txStorage.exists(tx.id) isE false
+          }
+      }
     }
   }
 

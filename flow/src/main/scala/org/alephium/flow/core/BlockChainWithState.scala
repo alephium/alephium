@@ -48,6 +48,7 @@ trait BlockChainWithState extends BlockChain {
     for {
       cachedWorldState <- getCachedWorldState(block.parentHash)
       _                <- persistBlock(block)
+      _                <- persistTxs(block)
       _                <- updateState(cachedWorldState, block)
       newWorldState    <- cachedWorldState.persist()
       _                <- addWorldState(block.hash, newWorldState)
@@ -83,6 +84,7 @@ object BlockChainWithState {
       override val brokerConfig      = _brokerConfig
       override val consensusConfig   = _consensusSetting
       override val blockStorage      = storages.blockStorage
+      override val txStorage         = storages.txStorage
       override val headerStorage     = storages.headerStorage
       override val blockStateStorage = storages.blockStateStorage
       override val worldStateStorage = storages.worldStateStorage

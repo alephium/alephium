@@ -41,6 +41,7 @@ object Storages {
     val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
     val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
+    val txStorage         = TxRocksDBStorage(db, ColumnFamily.All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
@@ -49,6 +50,7 @@ object Storages {
     Storages(AVector(db),
              headerStorage,
              blockStorage,
+             txStorage,
              emptyWorldState,
              trieHashStorage,
              blockStateStorage,
@@ -65,6 +67,7 @@ final case class Storages(
     sources: AVector[KeyValueSource],
     headerStorage: BlockHeaderStorage,
     blockStorage: BlockStorage,
+    txStorage: TxStorage,
     emptyWorldState: WorldState.Persisted,
     worldStateStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
