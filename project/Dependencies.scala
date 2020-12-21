@@ -60,5 +60,5 @@ object Dependencies {
   lazy val `tapir-openapi-circe` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-circe-yaml"   % Version.tapir
   lazy val `tapir-swagger-ui`    = "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-akka-http" % Version.tapir
 
-  lazy val `blake3-jni` = "org.alephium" %% "blake3-jni" % "0.2.0"
+  lazy val `blake3-jni` = "org.alephium" %% "blake3-jni" % "0.3.0"
 }
