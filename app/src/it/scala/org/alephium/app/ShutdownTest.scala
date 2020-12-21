@@ -32,7 +32,6 @@ class ShutdownTest extends AlephiumSpec {
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server.restServer // need to call it as restServer is lazy val
     server.system.whenTerminated.futureValue is a[Terminated]
-    server.stop().futureValue is ()
   }
 
   it should "shutdown the clique when one node of the clique is down" in new TestFixture("2-nodes") {
@@ -42,6 +41,5 @@ class ShutdownTest extends AlephiumSpec {
 
     server0.stop().futureValue is ()
     server1.system.whenTerminated.futureValue is a[Terminated]
-    server1.stop().futureValue is ()
   }
 }
