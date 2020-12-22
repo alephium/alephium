@@ -19,11 +19,11 @@ package org.alephium.flow.core
 import java.math.BigInteger
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex}
+import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
 import org.alephium.serde.Serde
@@ -85,6 +85,21 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       }
     } else {
       Right(())
+    }
+  }
+
+  def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] = IOUtils.tryExecute {
+    txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
+      val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
+      if (canonicalIndex.nonEmpty) {
+        val selectedIndex      = canonicalIndex.head
+        val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
+        val maxHeight          = maxHeightUnsafe
+        val chainConfirmations = maxHeight - selectedHeight + 1
+        Some(TxStatus(selectedIndex, chainConfirmations))
+      } else {
+        None
+      }
     }
   }
 
@@ -158,4 +173,6 @@ object BlockChain {
   object TxIndexes {
     implicit val serde: Serde[TxIndexes] = Serde.forProduct1(TxIndexes.apply, t => t.indexes)
   }
+
+  final case class TxStatus(index: TxIndex, confirmations: Int)
 }

@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes}
+import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
@@ -29,9 +29,9 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
   trait Fixture extends AlephiumConfigFixture {
-    val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
-    val chainGen = chainGenOf(4, genesis)
+    lazy val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
+    lazy val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
+    lazy val chainGen = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
       val storages = StoragesFixture.buildStorages(rootPath)
@@ -115,6 +115,119 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
               chain.txStorage.exists(tx.id) isE false
           }
       }
+    }
+  }
+
+  it should "return correct tx status for forks 0" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val chain      = buildBlockChain()
+
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, shortChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
+        }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, longChain)
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
+        }
+    }
+  }
+
+  it should "return correct tx status for forks 1" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val longChain = chainGenOf(4, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get.mapWithIndex {
+      case (block, index) =>
+        block.copy(transactions = longChain(index).transactions)
+    }
+    val chain = buildBlockChain()
+
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, shortChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
+        }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            if (blockIndex < shortChain.length) {
+              chain.getTxStatus(tx.id) isE Some(
+                TxStatus(TxIndex(shortChain(blockIndex).hash, txIndex),
+                         shortChain.length - blockIndex))
+            } else {
+              chain.getTxStatus(tx.id) isE None
+            }
+        }
+    }
+
+    addBlocks(chain, longChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
+            )
+        }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
+        }
     }
   }
 
