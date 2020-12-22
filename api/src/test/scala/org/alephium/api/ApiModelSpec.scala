@@ -33,6 +33,7 @@ import org.alephium.util.Hex.HexStringSyntax
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = CirceUtils.print(t.asJson)
 
+  val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(BlockHash.zero, TimeStamp.unsafe(i.toLong), i, i, i, AVector(BlockHash.zero), None)
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
@@ -95,7 +96,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode FetchResponse" in {
     val response = FetchResponse((0 to 1).map(entryDummy))
     val jsonRaw =
-      """{"blocks":[{"hash":"0","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["0"]},{"hash":"1","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["1"]}]}"""
+      s"""{"blocks":[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"]}]}"""
     checkData(response, jsonRaw)
   }
 
@@ -132,13 +133,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     {
       val data    = Input(outputRef, None)
-      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"}}"""
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"}}"""
       checkData(data, jsonRaw)
     }
 
     {
-      val data    = Input(outputRef, Some(hex"abcd"))
-      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"},"unlockScript":"abcd"}"""
+      val data = Input(outputRef, Some(hex"abcd"))
+      val jsonRaw =
+        s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
       checkData(data, jsonRaw)
     }
   }
@@ -212,7 +214,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode BuildTransactionResult" in {
     val txId    = Hash.generate
     val result  = BuildTransactionResult("tx", txId, 1, 2)
-    val jsonRaw = """{"unsignedTx":"tx","txId":"txId","fromGroup":1,"toGroup":2}"""
+    val jsonRaw = s"""{"unsignedTx":"tx","txId":"${txId.toHexString}","fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }
 
