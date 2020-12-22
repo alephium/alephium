@@ -21,6 +21,7 @@ import java.nio.file.Path
 import akka.http.scaladsl.model.Uri
 
 import org.alephium.protocol.model.NetworkType
+import org.alephium.util.Duration
 
 final case class WalletConfig(port: Int,
                               secretDir: Path,
@@ -28,7 +29,7 @@ final case class WalletConfig(port: Int,
                               blockflow: WalletConfig.BlockFlow)
 
 object WalletConfig {
-  final case class BlockFlow(host: String, port: Int, groups: Int) {
+  final case class BlockFlow(host: String, port: Int, groups: Int, blockflowFetchMaxAge: Duration) {
     val uri: Uri = Uri(s"http://$host:$port")
   }
 }

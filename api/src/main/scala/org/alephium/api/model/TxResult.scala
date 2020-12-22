@@ -16,4 +16,6 @@
 
 package org.alephium.api.model
 
-final case class TxResult(txId: String, fromGroup: Int, toGroup: Int)
+import org.alephium.protocol.Hash
+
+final case class TxResult(txId: Hash, fromGroup: Int, toGroup: Int)

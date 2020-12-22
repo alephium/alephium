@@ -168,7 +168,7 @@ lazy val protocol = project("protocol")
   )
 
 lazy val wallet = project("wallet")
-  .dependsOn(crypto, util % "test->test", protocol % "compile->compile;test->test")
+  .dependsOn(api, crypto, util % "test->test", protocol % "compile->compile;test->test")
   .settings(
     libraryDependencies ++= Seq(
       `akka-http`,
@@ -183,6 +183,8 @@ lazy val wallet = project("wallet")
       `tapir-openapi`,
       `tapir-openapi-circe`,
       `tapir-swagger-ui`,
+      `tapir-client`,
+      `sttp-akka-http-backend`,
       `scala-logging`,
       logback
     ),

@@ -50,14 +50,16 @@ trait EndpointsExamples {
   private val height                     = 42
   private val signature                  = Signature.generate
   private def hash                       = Hash.generate.toHexString
+  private def blockHash                  = BlockHash.generate.toHexString
+  private val hexString                  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
 
   private val blockEntry = BlockEntry(
-    hash,
+    blockHash,
     timestamp = TimeStamp.now(),
     chainFrom = 1,
     chainTo   = 2,
     height,
-    deps         = AVector(hash, hash),
+    deps         = AVector(blockHash, blockHash),
     transactions = None
   )
 
@@ -94,19 +96,19 @@ trait EndpointsExamples {
     simpleExample(Group(group = 2))
 
   implicit val hashesAtHeightExamples: List[Example[HashesAtHeight]] =
-    simpleExample(HashesAtHeight(headers = Seq(hash, hash, hash)))
+    simpleExample(HashesAtHeight(headers = Seq(blockHash, blockHash, blockHash)))
 
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
-    simpleExample(BuildTransactionResult(unsignedTx = hash, hash, fromGroup = 2, toGroup = 1))
+    simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendTransactionExamples: List[Example[SendTransaction]] =
-    simpleExample(SendTransaction(unsignedTx = hash, signature))
+    simpleExample(SendTransaction(unsignedTx = hexString, signature))
 
   implicit val txResultExamples: List[Example[TxResult]] =
-    simpleExample(TxResult(txId = hash, fromGroup = 2, toGroup = 1))
+    simpleExample(TxResult(txId = Hash.generate, fromGroup = 2, toGroup = 1))
 
   implicit val compileExamples: List[Example[Compile]] =
     simpleExample(
@@ -119,16 +121,17 @@ trait EndpointsExamples {
       ))
 
   implicit val compileResultExamples: List[Example[CompileResult]] =
-    simpleExample(CompileResult(code = hash))
+    simpleExample(CompileResult(code = hexString))
 
   implicit val buildContractExamples: List[Example[BuildContract]] =
-    simpleExample(BuildContract(fromKey = PublicKey.generate, code = hash))
+    simpleExample(BuildContract(fromKey = PublicKey.generate, code = hexString))
 
   implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
-    simpleExample(BuildContractResult(unsignedTx = hash, hash = hash, fromGroup = 2, toGroup = 1))
+    simpleExample(
+      BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1))
 
   implicit val sendContractExamples: List[Example[SendContract]] =
-    simpleExample(SendContract(code = hash, tx = hash, signature, fromGroup = 2))
+    simpleExample(SendContract(code = hexString, tx = hexString, signature, fromGroup = 2))
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))

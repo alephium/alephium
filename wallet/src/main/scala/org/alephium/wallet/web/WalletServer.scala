@@ -28,15 +28,16 @@ import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.NetworkType
-import org.alephium.util.U256
+import org.alephium.util.{Duration, U256}
 import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.service.WalletService._
 
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-class WalletServer(walletService: WalletService, val networkType: NetworkType)(
-    implicit executionContext: ExecutionContext)
+class WalletServer(walletService: WalletService,
+                   val networkType: NetworkType,
+                   val blockflowFetchMaxAge: Duration)(implicit executionContext: ExecutionContext)
     extends WalletEndpoints
     with AkkaDecodeFailureHandler {
   import WalletServer.toApiError

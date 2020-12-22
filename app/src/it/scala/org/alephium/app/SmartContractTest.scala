@@ -36,8 +36,6 @@ class SmartContractTest extends AlephiumSpec {
     val index      = group.group / selfClique.groupNumPerBroker
     val restPort   = selfClique.peers(index).restPort
 
-    def txId(txId: String): Hash = Hash.from(Hex.unsafe(txId)).get
-
     def contract(code: String, state: Option[String] = None): Hash = {
       execute("contract", code, state)
     }
@@ -82,7 +80,7 @@ class SmartContractTest extends AlephiumSpec {
       Thread.sleep(1000)
       awaitNewBlock(tx.fromGroup, tx.toGroup)
 
-      TxOutputRef.key(txId(tx.txId), 0)
+      TxOutputRef.key(tx.txId, 0)
     }
 
     request[Balance](getBalance(address), restPort) is initialBalance

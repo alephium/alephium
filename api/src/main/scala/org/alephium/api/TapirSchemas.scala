@@ -22,12 +22,13 @@ import akka.util.ByteString
 import sttp.tapir.Schema
 import sttp.tapir.SchemaType.SInteger
 
+import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-object TapirSchemas {
+trait TapirSchemasLike {
   implicit def avectorSchema[T: Schema]: Schema[AVector[T]] = implicitly[Schema[T]].asArrayElement
   implicit val addressSchema: Schema[Address]               = Schema(Schema.schemaForString.schemaType)
   implicit val byteStringSchema: Schema[ByteString]         = Schema(Schema.schemaForString.schemaType)
@@ -42,5 +43,9 @@ object TapirSchemas {
   implicit val inetAddressSchema: Schema[InetAddress]       = Schema(Schema.schemaForString.schemaType)
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
     Schema.schemaForString.schemaType)
-  implicit val cliqueIdSchema: Schema[CliqueId] = Schema(Schema.schemaForString.schemaType)
+  implicit val cliqueIdSchema: Schema[CliqueId]          = Schema(Schema.schemaForString.schemaType)
+  implicit val mnemonicSchema: Schema[Mnemonic]          = Schema(Schema.schemaForString.schemaType)
+  implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(Schema.schemaForInt.schemaType)
 }
+
+object TapirSchemas extends TapirSchemasLike

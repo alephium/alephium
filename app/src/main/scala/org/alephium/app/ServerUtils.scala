@@ -143,7 +143,7 @@ class ServerUtils(networkType: NetworkType) {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
-        Right(TxResult(tx.id.toHexString, tx.fromGroup.value, tx.toGroup.value))
+        Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
         Left(failed("Failed in adding transaction"))
     }

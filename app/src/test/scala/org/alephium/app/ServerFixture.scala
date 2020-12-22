@@ -78,7 +78,7 @@ trait ServerFixture
     SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
                          PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
-    dummyTx.id.toHexString,
+    dummyTx.id,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )

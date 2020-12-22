@@ -49,7 +49,8 @@ trait Server extends Service {
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
         config.network.restPort,
-        config.broker.groups
+        config.broker.groups,
+        apiConfig.blockflowFetchMaxAge
       )
     )
 

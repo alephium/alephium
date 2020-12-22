@@ -25,7 +25,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
-import org.alephium.protocol.{PublicKey, Signature}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -188,8 +188,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode TxResult" in {
-    val result  = TxResult("txId", 0, 1)
-    val jsonRaw = """{"txId":"txId","fromGroup":0,"toGroup":1}"""
+    val hash    = Hash.generate
+    val result  = TxResult(hash, 0, 1)
+    val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
 

@@ -210,7 +210,7 @@ object WalletService {
             val txId      = Hex.unsafe(buildTxResult.txId)
             val signature = SignatureSchema.sign(txId, privateKey.privateKey)
             blockFlowClient
-              .sendTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+              .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
               .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
               .map(_.left.map(BlockFlowClientError))
         }
@@ -278,7 +278,7 @@ object WalletService {
 
     private def getBalance(address: Address): Future[Either[WalletError, (Address, U256)]] = {
       blockFlowClient
-        .getBalance(address)
+        .fetchBalance(address)
         .map(_.map(amount => (address, amount)).left.map(message =>
           BlockFlowClientError(message): WalletError))
     }

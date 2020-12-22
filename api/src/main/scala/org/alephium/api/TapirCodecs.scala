@@ -25,6 +25,7 @@ import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.api.CirceUtils.inetAddressCodec
 import org.alephium.api.model._
+import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
@@ -79,12 +80,21 @@ trait TapirCodecs extends ApiModelCodec {
           DecodeResult.Error(s"$int", new IllegalArgumentException("Invalid group index"))
     })(_.value)
 
-  private def fromCirce[A: circe.Codec]: Codec[String, A, TextPlain] =
+  implicit val mnemonicSizeTapirCodec: Codec[String, Mnemonic.Size, TextPlain] =
+    fromCirce[Mnemonic.Size]
+
+  def fromCirce[A: circe.Codec]: Codec[String, A, TextPlain] =
     Codec.string.mapDecode[A] { raw =>
       raw.asJson.as[A] match {
         case Right(a) => DecodeResult.Value(a)
         case Left(error) =>
           DecodeResult.Error(raw, new IllegalArgumentException(error.getMessage))
       }
-    }(_.asJson.toString)
+    } { a =>
+      val json = a.asJson
+      json.asString match {
+        case Some(string) => string
+        case None         => json.toString
+      }
+    }
 }

@@ -16,7 +16,12 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.CliqueId
+import org.alephium.protocol.model.{CliqueId, GroupIndex}
 import org.alephium.util.AVector
 
-final case class SelfClique(cliqueId: CliqueId, peers: AVector[PeerAddress], groupNumPerBroker: Int)
+final case class SelfClique(cliqueId: CliqueId,
+                            peers: AVector[PeerAddress],
+                            groupNumPerBroker: Int) {
+  def peer(groupIndex: GroupIndex): PeerAddress =
+    peers((groupIndex.value / groupNumPerBroker) % peers.length)
+}
