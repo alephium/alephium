@@ -178,18 +178,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(
       implicit brokerConfig: BrokerConfig): BlockValidationResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
-      for {
-        _ <- ValidationStatus.from(blockFlow.checkFlowDeps(block)).flatMap { ok =>
-          if (ok) validBlock(()) else invalidBlock(InvalidFlowDeps)
-        }
-        _ <- ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { ok =>
-          if (ok) validBlock(()) else invalidBlock(InvalidFlowTxs)
-        }
-      } yield ()
-    } else {
-      ValidationStatus.from(blockFlow.checkFlowDeps(block.header)).flatMap { ok =>
-        if (ok) validBlock(()) else invalidBlock(InvalidHeaderFlow)
+      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { ok =>
+        if (ok) validBlock(()) else invalidBlock(InvalidFlowTxs)
       }
+    } else {
+      validBlock(())
     }
   }
 }

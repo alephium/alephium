@@ -27,9 +27,6 @@ import org.alephium.util.AVector
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
   def getBlockUnsafe(hash: BlockHash): Block
 
-  def checkFlowDeps(block: Block): IOResult[Boolean] =
-    IOUtils.tryExecute(checkFlowDepsUnsafe(block.header))
-
   def checkFlowTxs(block: Block): IOResult[Boolean] =
     IOUtils.tryExecute(checkFlowTxsUnsafe(block))
 
@@ -83,12 +80,17 @@ object BlockFlowValidation {
     val inDeps      = blockDeps.inDeps
 
     val sortedDeps = Array.ofDim[BlockHash](groupConfig.depsNum)
-    groupOrders.foreach { index =>
-      sortedDeps(index) = outDeps(index)
-      if (index < targetGroup.value) {
-        sortedDeps(groupConfig.groups + index) = inDeps(index)
-      } else if (index > targetGroup.value) {
-        sortedDeps(groupConfig.groups + index - 1) = inDeps(index - 1)
+    (0 until groupConfig.groups).foreach { k =>
+      sortedDeps(k) = outDeps(groupOrders(k))
+    }
+    var count = 0
+    groupOrders.foreach { order =>
+      if (order < targetGroup.value) {
+        sortedDeps(groupConfig.groups + count) = inDeps(order)
+        count += 1
+      } else if (order > targetGroup.value) {
+        sortedDeps(groupConfig.groups + count) = inDeps(order - 1)
+        count += 1
       }
     }
 

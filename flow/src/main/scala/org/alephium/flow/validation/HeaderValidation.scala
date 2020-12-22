@@ -207,12 +207,8 @@ object HeaderValidation {
 
     protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(
         implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit] = {
-      if (!brokerConfig.contains(header.chainIndex.from)) {
-        ValidationStatus.from(flow.checkFlowDeps(header)).flatMap { ok =>
-          if (ok) validHeader(()) else invalidHeader(InvalidHeaderFlow)
-        }
-      } else {
-        validHeader(())
+      ValidationStatus.from(flow.checkFlowDeps(header)).flatMap { ok =>
+        if (ok) validHeader(()) else invalidHeader(InvalidHeaderFlow)
       }
     }
   }

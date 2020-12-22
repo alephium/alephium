@@ -20,7 +20,7 @@ import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.AlephiumSpec
 
 class BlockFlowValidationSpec extends AlephiumSpec {
   it should "sort Deps" in new FlowFixture {
@@ -30,10 +30,14 @@ class BlockFlowValidationSpec extends AlephiumSpec {
       val bestDep     = block.header.blockDeps.deps.max(blockFlow.blockHashOrdering)
       val targetGroup = block.chainIndex.from
       val result      = BlockFlowValidation.sortDeps(block.header.blockDeps, bestDep, targetGroup)
-      result.take(groups0).map(hash => ChainIndex.from(hash)) is
-        AVector.from((0 until groups0).map(ChainIndex.unsafe(targetGroup.value, _)))
-      result.takeRight(groups0 - 1).map(hash => ChainIndex.from(hash).from.value) is
-        AVector.from((0 until groups0).filter(_ != targetGroup.value))
+
+      val groupOrder = BlockFlow.randomGroupOrders(bestDep)
+      val expected = groupOrder.map(block.header.outDeps.apply) ++
+        groupOrder
+          .filter(_ != targetGroup.value)
+          .map(i => if (i < targetGroup.value) i else i - 1)
+          .map(block.header.inDeps.apply)
+      result is expected
     }
 
     val newBlocks = for {
