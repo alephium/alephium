@@ -105,7 +105,6 @@ trait Generators extends NumericHelpers {
       ip3  <- Gen.choose(0, 255)
       port <- portGen
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
-
 }
 
 trait DefaultGenerators extends Generators {

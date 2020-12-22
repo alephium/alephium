@@ -38,13 +38,13 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
         pool.isFull is true
       }
       block.transactions.foreachWithIndex { (tx, i) =>
-        if (i < pool.size) pool.contains(tx) is true else pool.contains(tx) is false
+        if (i < pool.size) pool.contains(tx.id) is true else pool.contains(tx.id) is false
       }
       val numberRemoved = pool.remove(txTemplates)
       numberRemoved is numberAdded
       pool.size is 0
       pool.isFull is false
-      block.transactions.foreach(tx => pool.contains(tx) is false)
+      block.transactions.foreach(tx => pool.contains(tx.id) is false)
     }
   }
 
@@ -60,7 +60,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
   }
 
   it should "use read lock for containing" in new Fixture {
-    checkReadLock(rwl)(true, pool.contains(block.transactions.head), false)
+    checkReadLock(rwl)(true, pool.contains(block.transactions.head.id), false)
   }
 
   it should "use write lock for adding" in new Fixture {

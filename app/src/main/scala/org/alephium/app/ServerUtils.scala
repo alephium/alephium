@@ -34,6 +34,7 @@ import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, AVector, Hex, TimeStamp, U256}
 
+// scalastyle:off number.of.methods
 class ServerUtils(networkType: NetworkType) {
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
     val entriesEither = for {
@@ -42,7 +43,7 @@ class ServerUtils(networkType: NetworkType) {
 
     entriesEither match {
       case Right(entries) => Right(FetchResponse(entries))
-      case Left(error)    => failedInIO[FetchResponse](error)
+      case Left(error)    => failed[FetchResponse](error)
     }
   }
 
@@ -53,7 +54,7 @@ class ServerUtils(networkType: NetworkType) {
         .getBalance(balanceRequest.address.lockupScript)
         .map(Balance(_))
         .left
-        .flatMap(failedInIO)
+        .flatMap(failed)
     } yield balance
 
   def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = {
@@ -91,7 +92,14 @@ class ServerUtils(networkType: NetworkType) {
       implicit config: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext): FutureTry[TxResult] = {
-    val txEither = for {
+    createTxTemplate(query) match {
+      case Right(tx)   => publishTx(txHandler, tx)
+      case Left(error) => Future.successful(Left(error))
+    }
+  }
+
+  def createTxTemplate(query: SendTransaction): Try[TransactionTemplate] = {
+    for {
       txByteString <- Hex.from(query.unsignedTx).toRight(apiError(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
         apiError(serdeError.getMessage))
@@ -99,10 +107,6 @@ class ServerUtils(networkType: NetworkType) {
       TransactionTemplate(unsignedTx,
                           AVector.fill(unsignedTx.inputs.length)(query.signature),
                           contractSignatures = AVector.empty)
-    }
-    txEither match {
-      case Right(tx)   => publishTx(txHandler, tx)
-      case Left(error) => Future.successful(Left(error))
     }
   }
 
@@ -113,18 +117,23 @@ class ServerUtils(networkType: NetworkType) {
       implicit groupConfig: GroupConfig): Try[TxStatus] = {
     for {
       chainIndex <- checkTxChainIndex(blockFlow, fromGroup, toGroup)
-      chain = blockFlow.getBlockChain(chainIndex)
-      statusOpt <- chain.getTxStatus(txId).left.map(apiError)
-    } yield {
-      statusOpt match {
-        case Some(status) => convert(status)
-        case None         => getMemPoolStatus(blockFlow, txId, fromGroup, toGroup)
-      }
+      status     <- getTransactionStatus(blockFlow, txId, chainIndex)
+    } yield status
+  }
+
+  def getTransactionStatus(blockFlow: BlockFlow,
+                           txId: Hash,
+                           chainIndex: ChainIndex): Try[TxStatus] = {
+    val chain = blockFlow.getBlockChain(chainIndex)
+    chain.getTxStatus(txId).left.map(apiError).map {
+      case Some(status) => convert(status)
+      case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
     }
   }
 
-  def getMemPoolStatus(blockFlow: BlockFlow, txId: Hash, fromGroup: Int, toGroup: Int): TxStatus =
-    ???
+  def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
+    blockFlow.getPool(chainIndex).contains(chainIndex, txId)
+  }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
     for {
@@ -184,7 +193,7 @@ class ServerUtils(networkType: NetworkType) {
                                 value) match {
       case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(None)                      => Left(apiError("Not enough balance"))
-      case Left(error)                      => failedInIO(error)
+      case Left(error)                      => failed(error)
     }
   }
 
@@ -343,6 +352,7 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compile(query: Compile): FutureTry[CompileResult] = {
     Future.successful(
       (query.`type` match {
@@ -354,6 +364,7 @@ class ServerUtils(networkType: NetworkType) {
             state  <- parseState(query.state)
             script <- buildContract(code, query.address, state, U256.One)
           } yield script
+        case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))
       }).map(script => CompileResult(Hex.toHexString(serialize(script))))
         .left
         .map(error => apiError(error.toString))
@@ -363,7 +374,7 @@ class ServerUtils(networkType: NetworkType) {
   private def apiError(error: IOError): ApiModel.Error =
     ApiModel.Error.server(s"Failed in IO: $error")
   private def apiError(error: String): ApiModel.Error = ApiModel.Error.server(error)
-  private def failedInIO[T](error: IOError): Try[T]   = Left(apiError(error))
+  private def failed[T](error: IOError): Try[T]       = Left(apiError(error))
 
   type Try[T]       = Either[ApiModel.Error, T]
   type FutureTry[T] = Future[Try[T]]
