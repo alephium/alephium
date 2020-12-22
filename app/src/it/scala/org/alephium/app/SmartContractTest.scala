@@ -63,8 +63,8 @@ class SmartContractTest extends AlephiumSpec {
         restPort
       )
 
-      val signature: Signature = SignatureSchema.sign(Hex.unsafe(buildResult.hash),
-                                                      PrivateKey.unsafe(Hex.unsafe(privateKey)))
+      val signature: Signature =
+        SignatureSchema.sign(buildResult.hash.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
         sendContract(s"""
           {

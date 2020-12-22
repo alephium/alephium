@@ -329,7 +329,7 @@ trait TestFixtureLike
     )
   }
   def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
-    val signature: Signature = SignatureSchema.sign(Hex.unsafe(buildTransactionResult.txId),
+    val signature: Signature = SignatureSchema.sign(buildTransactionResult.txId.bytes,
                                                     PrivateKey.unsafe(Hex.unsafe(privateKey)))
     httpPost(
       "/transactions/send",

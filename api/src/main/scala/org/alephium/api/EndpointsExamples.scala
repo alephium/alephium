@@ -49,8 +49,8 @@ trait EndpointsExamples {
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42
   private val signature                  = Signature.generate
-  private def hash                       = Hash.generate.toHexString
-  private def blockHash                  = BlockHash.generate.toHexString
+  private def hash                       = Hash.generate
+  private def blockHash                  = BlockHash.generate
   private val hexString                  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
 
   private val blockEntry = BlockEntry(

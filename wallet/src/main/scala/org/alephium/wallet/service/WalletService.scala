@@ -28,7 +28,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.util.{AVector, Hex, Service, U256}
+import org.alephium.util.{AVector, Service, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -207,8 +207,7 @@ object WalletService {
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
           case Right(buildTxResult) =>
-            val txId      = Hex.unsafe(buildTxResult.txId)
-            val signature = SignatureSchema.sign(txId, privateKey.privateKey)
+            val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
             blockFlowClient
               .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
               .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))

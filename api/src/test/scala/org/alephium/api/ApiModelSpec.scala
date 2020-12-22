@@ -25,7 +25,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -34,7 +34,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   def show[T](t: T)(implicit encoder: Encoder[T]): String = CirceUtils.print(t.asJson)
 
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString), None)
+    BlockEntry(BlockHash.zero, TimeStamp.unsafe(i.toLong), i, i, i, AVector(BlockHash.zero), None)
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
@@ -42,11 +42,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
   val networkType = NetworkType.Mainnet
-
-  def generateKeyHash(): String = {
-    val address = PublicKey.generate
-    Hex.toHexString(address.bytes)
-  }
 
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
@@ -132,7 +127,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Input" in {
-    val key       = "dummyKey"
+    val key       = Hash.generate
     val outputRef = OutputRef(1234, key)
 
     {
@@ -215,7 +210,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val result  = BuildTransactionResult("tx", "txId", 1, 2)
+    val txId    = Hash.generate
+    val result  = BuildTransactionResult("tx", txId, 1, 2)
     val jsonRaw = """{"unsignedTx":"tx","txId":"txId","fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }

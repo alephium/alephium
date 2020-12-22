@@ -16,4 +16,6 @@
 
 package org.alephium.api.model
 
-final case class HashesAtHeight(headers: Seq[String])
+import org.alephium.protocol.BlockHash
+
+final case class HashesAtHeight(headers: Seq[BlockHash])

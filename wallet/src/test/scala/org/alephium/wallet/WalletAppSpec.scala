@@ -276,7 +276,7 @@ object WalletAppSpec extends {
                 val unsignedTx = transactionGen().sample.get.unsigned
                 complete(
                   BuildTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                                         Hex.toHexString(unsignedTx.hash.bytes),
+                                         unsignedTx.hash,
                                          unsignedTx.fromGroup.value,
                                          unsignedTx.toGroup.value)
                 )

@@ -126,7 +126,7 @@ class ServerUtils(networkType: NetworkType) {
         .getHashes(chainIndex, query.height)
         .left
         .map(_ => failed("Failed in IO"))
-    } yield HashesAtHeight(hashes.map(_.toHexString).toArray.toIndexedSeq)
+    } yield HashesAtHeight(hashes.toArray.toIndexedSeq)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
     for {
