@@ -18,8 +18,8 @@
         </rollingPolicy>
     </appender>
 
-    <appender name="LOGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME}/logs/alephium.log</file>
+    <appender name="INFOFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${ALEPHIUM_HOME}/logs/alephium-info.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>INFO</level>
@@ -65,7 +65,7 @@
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ERRFILE"/>
-        <appender-ref ref="LOGFILE"/>
+        <appender-ref ref="INFOFILE"/>
         <appender-ref ref="DEBUGFILE"/>
     </root>
 </configuration>

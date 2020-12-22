@@ -38,11 +38,11 @@ object Boot extends App {
     System.setProperty("ALEPHIUM_HOME", path.toFile.toString)
   }
 
-  BootUp.init()
+  (new BootUp).init()
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-object BootUp extends StrictLogging {
+class BootUp extends StrictLogging {
   val rootPath: Path                              = Platform.getRootPath()
   val typesafeConfig: Config                      = Configs.parseConfigAndValidate(rootPath)
   implicit val config: AlephiumConfig             = AlephiumConfig.loadOrThrow(typesafeConfig)
