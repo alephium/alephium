@@ -65,6 +65,22 @@ final case class BlockHeader(
     blockDeps.intraDep(chainIndex)
   }
 
+  def getOutTip(toIndex: GroupIndex): BlockHash = {
+    assume(!isGenesis)
+    if (toIndex == chainIndex.to) hash else blockDeps.getOutDep(toIndex)
+  }
+
+  def getGroupTip(targetGroup: GroupIndex): BlockHash = {
+    assume(!isGenesis)
+    if (targetGroup.value < chainIndex.from.value) {
+      blockDeps.deps(targetGroup.value)
+    } else if (targetGroup.value > chainIndex.from.value) {
+      blockDeps.deps(targetGroup.value - 1)
+    } else {
+      hash
+    }
+  }
+
   def outTips: AVector[BlockHash] = {
     assume(!isGenesis)
     blockDeps.outDeps.replace(chainIndex.to.value, hash)

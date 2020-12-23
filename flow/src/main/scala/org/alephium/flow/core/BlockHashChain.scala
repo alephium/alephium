@@ -20,6 +20,7 @@ import java.math.BigInteger
 
 import scala.annotation.tailrec
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
@@ -239,6 +240,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
 
     iter(AVector.empty, hash).map(_.reverse)
+  }
+
+  def isBeforeUnsafe(hash1: BlockHash, hash2: BlockHash): Boolean = {
+    Utils.unsafe(isBefore(hash1, hash2))
   }
 
   def isBefore(hash1: BlockHash, hash2: BlockHash): IOResult[Boolean] = {

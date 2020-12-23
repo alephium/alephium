@@ -16,13 +16,15 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.alephium.flow.Utils
+import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.BlockHash
+import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -151,6 +153,8 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getBlockChain(hash: BlockHash): BlockChain
+
+  def getBlockChain(chainIndex: ChainIndex): BlockChain
 
   protected def getBlockChain(from: GroupIndex, to: GroupIndex): BlockChain = {
     assume(brokerConfig.contains(from) || brokerConfig.contains(to))
@@ -349,6 +353,91 @@ trait BlockFlowState extends FlowTipsUtil {
                      value)
     }
   }
+
+  def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
+    IOUtils.tryExecute {
+      assume(brokerConfig.contains(chainIndex.from))
+      val chain = getBlockChain(chainIndex)
+      chain.getTxStatusUnsafe(txId) match {
+        case None => None
+        case Some(chainStatus) =>
+          val confirmations = chainStatus.confirmations
+          if (chainIndex.isIntraGroup) {
+            Some(TxStatus(chainStatus.index, confirmations, confirmations, confirmations))
+          } else {
+            val confirmHash = chainStatus.index.hash
+            val fromGroupConfirmations =
+              getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
+            val toGroupConfirmations =
+              getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
+            Some(
+              TxStatus(chainStatus.index,
+                       confirmations,
+                       fromGroupConfirmations,
+                       toGroupConfirmations))
+          }
+      }
+    }
+
+  def getFromGroupConfirmationsUnsafe(hash: BlockHash, chainIndex: ChainIndex): Int = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    val header        = getBlockHeaderUnsafe(hash)
+    val fromChain     = getHeaderChain(chainIndex.from, chainIndex.from)
+    val fromTip       = getOutTip(header, chainIndex.from)
+    val fromTipHeight = fromChain.getHeightUnsafe(fromTip)
+
+    @tailrec
+    def iter(height: Int): Option[Int] = {
+      val hashes = fromChain.getHashesUnsafe(height)
+      if (hashes.isEmpty) {
+        None
+      } else {
+        val header   = fromChain.getBlockHeaderUnsafe(hashes.head)
+        val chainDep = header.uncleHash(chainIndex.to)
+        if (fromChain.isBeforeUnsafe(hash, chainDep)) Some(height) else iter(height + 1)
+      }
+    }
+
+    iter(fromTipHeight + 1) match {
+      case None => 0
+      case Some(firstConfirmationHeight) =>
+        fromChain.maxHeightUnsafe - firstConfirmationHeight + 1
+    }
+  }
+
+  def getToGroupConfirmationsUnsafe(hash: BlockHash, chainIndex: ChainIndex): Int = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    val header        = getBlockHeaderUnsafe(hash)
+    val toChain       = getHeaderChain(chainIndex.to, chainIndex.to)
+    val toGroupTip    = getGroupTip(header, chainIndex.to)
+    val toGroupHeader = getBlockHeaderUnsafe(toGroupTip)
+    val toTip         = getOutTip(toGroupHeader, chainIndex.to)
+    val toTipHeight   = toChain.getHeightUnsafe(toTip)
+
+    assume(ChainIndex.from(toTip) == ChainIndex(chainIndex.to, chainIndex.to))
+
+    @tailrec
+    def iter(height: Int): Option[Int] = {
+      val hashes = toChain.getHashesUnsafe(height)
+      if (hashes.isEmpty) {
+        None
+      } else {
+        val header   = toChain.getBlockHeaderUnsafe(hashes.head)
+        val chainDep = getGroupTip(header, chainIndex.from)
+        if (isExtendingUnsafe(chainDep, hash)) Some(height) else iter(height + 1)
+      }
+    }
+
+    if (header.isGenesis) {
+      toChain.maxHeightUnsafe - ALF.GenesisHeight + 1
+    } else {
+      iter(toTipHeight + 1) match {
+        case None => 0
+        case Some(firstConfirmationHeight) =>
+          toChain.maxHeightUnsafe - firstConfirmationHeight + 1
+      }
+    }
+  }
 }
 // scalastyle:on number.of.methods
 
@@ -497,4 +586,9 @@ object BlockFlowState {
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }
+
+  final case class TxStatus(index: TxIndex,
+                            chainConfirmations: Int,
+                            fromGroupConfirmations: Int,
+                            toGroupConfirmations: Int)
 }

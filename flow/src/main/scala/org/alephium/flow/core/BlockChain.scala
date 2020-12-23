@@ -60,6 +60,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def addGenesis(block: Block): IOResult[Unit] = {
     for {
       _ <- persistBlock(block)
+      _ <- persistTxs(block)
       _ <- addGenesis(block.header)
     } yield ()
   }
@@ -88,7 +89,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] = IOUtils.tryExecute {
+  def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] =
+    IOUtils.tryExecute(getTxStatusUnsafe(txId))
+
+  def getTxStatusUnsafe(txId: Hash): Option[TxStatus] = {
     txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
       val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
       if (canonicalIndex.nonEmpty) {

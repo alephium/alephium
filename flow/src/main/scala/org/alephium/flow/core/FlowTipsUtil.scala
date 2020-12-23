@@ -52,6 +52,14 @@ trait FlowTipsUtil {
     }
   }
 
+  def getOutTip(header: BlockHeader, outGroup: GroupIndex): BlockHash = {
+    if (header.isGenesis) {
+      genesisBlocks(header.chainIndex.from.value)(outGroup.value).hash
+    } else {
+      header.getOutTip(outGroup)
+    }
+  }
+
   def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[BlockHash] = {
     val index = header.chainIndex
     if (header.isGenesis) {
@@ -65,10 +73,19 @@ trait FlowTipsUtil {
     }
   }
 
+  def getGroupTip(header: BlockHeader, targetGroup: GroupIndex): BlockHash = {
+    if (header.isGenesis) {
+      bestGenesisHashes(targetGroup.value)
+    } else {
+      header.getGroupTip(targetGroup)
+    }
+  }
+
   // if inclusive is true, the current header would be included
   def getInOutTips(header: BlockHeader,
                    currentGroup: GroupIndex,
                    inclusive: Boolean): IOResult[AVector[BlockHash]] = {
+    assume(currentGroup == header.chainIndex.from)
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         if (i < currentGroup.value) {
@@ -137,9 +154,9 @@ trait FlowTipsUtil {
     } else {
       val inTips = AVector.tabulate(groups - 1) { i =>
         val g = if (i < targetGroup.value) i else i + 1
-        getInTip(header, GroupIndex.unsafe(g))
+        header.getGroupTip(GroupIndex.unsafe(g))
       }
-      val targetTip = getInTip(header, targetGroup)
+      val targetTip = header.getGroupTip(targetGroup)
       FlowTips.Light(inTips, targetTip)
     }
   }
@@ -163,18 +180,7 @@ trait FlowTipsUtil {
     if (index.from == targetGroup) {
       getOutTips(header, inclusive)
     } else {
-      getOutTipsUnsafe(getInTip(header, targetGroup), inclusive)
-    }
-  }
-
-  private[core] def getInTip(header: BlockHeader, targetGroup: GroupIndex): BlockHash = {
-    val from = header.chainIndex.from
-    if (targetGroup.value < from.value) {
-      header.blockDeps.deps(targetGroup.value)
-    } else if (targetGroup.value > from.value) {
-      header.blockDeps.deps(targetGroup.value - 1)
-    } else {
-      header.hash
+      getOutTipsUnsafe(header.getGroupTip(targetGroup), inclusive)
     }
   }
 
