@@ -36,26 +36,17 @@ class MiningTest extends AlephiumSpec {
     startWS(defaultWsMasterPort)
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
-
     selfClique.peers.foreach { peer =>
       request[Boolean](startMining, peer.restPort) is true
     }
-
-    awaitNewBlock(tx.fromGroup, tx.toGroup)
-    Thread.sleep(2000)
-    awaitNewBlock(tx.fromGroup, tx.fromGroup)
-
+    confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance(initialBalance.balance - transferAmount - defaultGasFee, 1)
     }
 
     val tx2 = transferFromWallet(transferAddress, transferAmount, restPort)
-
-    awaitNewBlock(tx2.fromGroup, tx2.toGroup)
-    Thread.sleep(2000)
-    awaitNewBlock(tx2.fromGroup, tx2.fromGroup)
-
+    confirmTx(tx2, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 1)
@@ -64,7 +55,6 @@ class MiningTest extends AlephiumSpec {
     selfClique.peers.foreach { peer =>
       request[Boolean](stopMining, peer.restPort) is true
     }
-
     server1.stop().futureValue is ()
     server0.stop().futureValue is ()
   }

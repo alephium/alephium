@@ -75,10 +75,7 @@ class SmartContractTest extends AlephiumSpec {
           }"""),
         restPort
       )
-
-      awaitNewBlock(tx.fromGroup, tx.toGroup)
-      Thread.sleep(1000)
-      awaitNewBlock(tx.fromGroup, tx.toGroup)
+      confirmTx(tx, restPort)
 
       TxOutputRef.key(tx.txId, 0)
     }

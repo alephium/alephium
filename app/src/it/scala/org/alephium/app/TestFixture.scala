@@ -32,6 +32,7 @@ import akka.testkit.{SocketUtil, TestProbe}
 import io.circe.{Codec, Decoder}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
+import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Second, Seconds, Span}
 
@@ -49,6 +50,7 @@ import org.alephium.wallet.api.model._
 class TestFixture(val name: String) extends TestFixtureLike
 
 // scalastyle:off method.length
+// scalastyle:off number.of.methods
 trait TestFixtureLike
     extends AlephiumActorSpecLike
     with AlephiumConfigFixture
@@ -57,7 +59,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig =
-    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -139,6 +141,28 @@ trait TestFixtureLike
     val sendTx     = sendTransaction(unsignedTx, privateKey)
     val res        = request[TxResult](sendTx, restPort)
     res
+  }
+
+  def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {
+    val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
+    print(txStatus) // keep this for easier CI analysis
+    print("\n")
+    checkConfirmations(txStatus)
+  }
+
+  def confirmTx(tx: Transfer.Result, restPort: Int): Assertion = eventually {
+    val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
+    print(txStatus) // keep this for easier CI analysis
+    print("\n")
+    checkConfirmations(txStatus)
+  }
+
+  def checkConfirmations(txStatus: TxStatus): Assertion = {
+    txStatus is a[Confirmed]
+    val confirmed = txStatus.asInstanceOf[Confirmed]
+    confirmed.chainConfirmations > 1 is true
+    confirmed.fromGroupConfirmations > 1 is true
+    confirmed.toGroupConfirmations > 1 is true
   }
 
   implicit val walletResultResultCodec: Codec[WalletRestore.Result] =
@@ -336,6 +360,14 @@ trait TestFixtureLike
       Some(
         s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
     )
+  }
+  def getTransactionStatus(tx: TxResult) = {
+    httpGet(
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
+  }
+  def getTransactionStatus(tx: Transfer.Result) = {
+    httpGet(
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
   }
 
   def compileFilang(code: String) = {
