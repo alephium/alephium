@@ -40,8 +40,8 @@ trait BlockFlowState extends FlowTipsUtil {
   def groups: Int = brokerConfig.groups
   def genesisBlocks: AVector[AVector[Block]]
 
-  lazy val bestGenesisHashes: AVector[BlockHash] =
-    genesisBlocks.map(_.map(_.hash).maxBy(_.bytes))
+  lazy val genesisHashes: AVector[AVector[BlockHash]] = genesisBlocks.map(_.map(_.hash))
+  lazy val bestGenesisHashes: AVector[BlockHash]      = genesisHashes.map(_.maxBy(_.bytes))
 
   protected[core] val bestDeps = Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
     val mainGroup = brokerConfig.groupFrom + fromShift

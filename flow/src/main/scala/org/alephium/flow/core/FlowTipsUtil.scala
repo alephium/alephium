@@ -31,7 +31,7 @@ trait FlowTipsUtil {
 
   def groups: Int
   def bestGenesisHashes: AVector[BlockHash]
-  def genesisBlocks: AVector[AVector[Block]]
+  def genesisHashes: AVector[AVector[BlockHash]]
 
   def getBlockUnsafe(hash: BlockHash): Block
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader]
@@ -45,7 +45,7 @@ trait FlowTipsUtil {
     getBlockHeader(dep).map { header =>
       val from = header.chainIndex.from
       if (header.isGenesis) {
-        genesisBlocks(from.value)(currentGroup.value).hash
+        genesisHashes(from.value)(currentGroup.value)
       } else {
         if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
       }
@@ -54,7 +54,7 @@ trait FlowTipsUtil {
 
   def getOutTip(header: BlockHeader, outGroup: GroupIndex): BlockHash = {
     if (header.isGenesis) {
-      genesisBlocks(header.chainIndex.from.value)(outGroup.value).hash
+      genesisHashes(header.chainIndex.from.value)(outGroup.value)
     } else {
       header.getOutTip(outGroup)
     }
@@ -63,10 +63,10 @@ trait FlowTipsUtil {
   def getOutTips(header: BlockHeader, inclusive: Boolean): AVector[BlockHash] = {
     val index = header.chainIndex
     if (header.isGenesis) {
-      genesisBlocks(index.from.value).map(_.hash)
+      genesisHashes(index.from.value)
     } else {
       if (inclusive) {
-        header.outDeps.replace(index.to.value, header.hash)
+        header.outTips
       } else {
         header.outDeps
       }
@@ -89,12 +89,12 @@ trait FlowTipsUtil {
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         if (i < currentGroup.value) {
-          genesisBlocks(i)(currentGroup.value).hash
+          genesisHashes(i)(currentGroup.value)
         } else {
-          genesisBlocks(i + 1)(currentGroup.value).hash
+          genesisHashes(i + 1)(currentGroup.value)
         }
       }
-      val outTips = genesisBlocks(currentGroup.value).map(_.hash)
+      val outTips = genesisHashes(currentGroup.value)
       Right(inTips ++ outTips)
     } else {
       val outTips = getOutTips(header, inclusive)
@@ -180,7 +180,11 @@ trait FlowTipsUtil {
     if (index.from == targetGroup) {
       getOutTips(header, inclusive)
     } else {
-      getOutTipsUnsafe(header.getGroupTip(targetGroup), inclusive)
+      if (header.isGenesis) {
+        genesisHashes(targetGroup.value)
+      } else {
+        getOutTipsUnsafe(header.getGroupTip(targetGroup), inclusive)
+      }
     }
   }
 
