@@ -28,6 +28,7 @@ import org.alephium.api.CirceUtils
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
+import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
@@ -35,7 +36,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, PrivateKey, SignatureSchema}
+import org.alephium.protocol.{BlockHash, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde.serialize
@@ -88,6 +89,7 @@ trait ServerFixture
     dummyTx.unsigned.fromGroup.value,
     dummyTx.unsigned.toGroup.value
   )
+  lazy val dummyTxStatus: TxStatus = Confirmed(BlockHash.zero, 0, 1, 2, 3)
 }
 
 object ServerFixture {
@@ -182,6 +184,10 @@ object ServerFixture {
           val newOutputs = outputs.map(_.copy(lockTime = lockTime))
           Right(Some(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
       }
+
+    override def getTxStatus(txId: Hash,
+                             chainIndex: ChainIndex): IOResult[Option[BlockFlowState.TxStatus]] =
+      Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
 
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus

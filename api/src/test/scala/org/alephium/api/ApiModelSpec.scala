@@ -225,4 +225,15 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       s"""{"unsignedTx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
   }
+
+  it should "encode/decode TxStatus" in {
+    val blockHash         = BlockHash.generate
+    val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
+    val jsonRaw0 =
+      s"""{"Confirmed":{"blockHash":"${blockHash.toHexString}","blockIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}}"""
+    checkData(status0, jsonRaw0)
+
+    checkData(MemPooled: TxStatus, s"""{"MemPooled":{}}""")
+    checkData(NotFound: TxStatus, s"""{"NotFound":{}}""")
+  }
 }

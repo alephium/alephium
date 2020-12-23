@@ -27,6 +27,7 @@ import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -143,6 +144,13 @@ class RestServerSpec
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxResult] is dummyTransferResult
+    }
+  }
+
+  it should "call GET /transactions/status" in new RestServerFixture {
+    Get(s"/transactions/status?txId=${Hash.zero.toHexString}&fromGroup=0&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[TxStatus] is dummyTxStatus
     }
   }
 

@@ -135,6 +135,8 @@ trait ApiModelCodec {
 
   implicit val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
 
+  implicit val txStatusCodec: Codec[TxStatus] = deriveCodec[TxStatus]
+
   implicit val buildContractCodec: Codec[BuildContract] = deriveCodec[BuildContract]
 
   implicit val buildContractResultCodec: Codec[BuildContractResult] =
