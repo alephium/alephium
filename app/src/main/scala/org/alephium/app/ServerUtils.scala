@@ -22,7 +22,7 @@ import akka.util.Timeout
 
 import org.alephium.api.ApiModel
 import org.alephium.api.model._
-import org.alephium.flow.core.{BlockChain, BlockFlow}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
@@ -32,7 +32,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util.{ActorRefT, AVector, Hex, TimeStamp, U256}
+import org.alephium.util._
 
 // scalastyle:off number.of.methods
 class ServerUtils(networkType: NetworkType) {
@@ -110,8 +110,12 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def convert(status: BlockChain.TxStatus): TxStatus =
-    Confirmed(status.index.hash, status.index.index, status.confirmations)
+  def convert(status: BlockFlowState.TxStatus): TxStatus =
+    Confirmed(status.index.hash,
+              status.index.index,
+              status.chainConfirmations,
+              status.fromGroupConfirmations,
+              status.toGroupConfirmations)
 
   def getTransactionStatus(blockFlow: BlockFlow, txId: Hash, fromGroup: Int, toGroup: Int)(
       implicit groupConfig: GroupConfig): Try[TxStatus] = {
@@ -124,8 +128,7 @@ class ServerUtils(networkType: NetworkType) {
   def getTransactionStatus(blockFlow: BlockFlow,
                            txId: Hash,
                            chainIndex: ChainIndex): Try[TxStatus] = {
-    val chain = blockFlow.getBlockChain(chainIndex)
-    chain.getTxStatus(txId).left.map(apiError).map {
+    blockFlow.getTxStatus(txId, chainIndex).left.map(apiError).map {
       case Some(status) => convert(status)
       case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
     }
