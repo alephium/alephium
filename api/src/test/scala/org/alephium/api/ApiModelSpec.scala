@@ -102,10 +102,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "encode/decode SelfClique" in {
     val cliqueId    = CliqueId.generate
-    val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), 9000, 9001, 9002)
+    val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), 9001, 9002)
     val selfClique  = SelfClique(cliqueId, AVector(peerAddress), 1)
     val jsonRaw =
-      s"""{"cliqueId":"${cliqueId.toHexString}","peers":[{"address":"127.0.0.1","rpcPort":9000,"restPort":9001,"wsPort":9002}],"groupNumPerBroker":1}"""
+      s"""{"cliqueId":"${cliqueId.toHexString}","peers":[{"address":"127.0.0.1","restPort":9001,"wsPort":9002}],"groupNumPerBroker":1}"""
     checkData(selfClique, jsonRaw)
   }
 

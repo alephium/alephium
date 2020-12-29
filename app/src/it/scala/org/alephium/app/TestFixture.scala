@@ -219,7 +219,6 @@ trait TestFixtureLike
         ("alephium.network.internal-address", s"localhost:$publicPort"),
         ("alephium.network.coordinator-address", s"localhost:$masterPort"),
         ("alephium.network.external-address", s"localhost:$publicPort"),
-        ("alephium.network.rpc-port", publicPort - 100),
         ("alephium.network.ws-port", publicPort - 200),
         ("alephium.network.rest-port", publicPort - 300),
         ("alephium.broker.broker-num", brokerNum),

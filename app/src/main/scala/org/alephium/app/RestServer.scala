@@ -263,7 +263,7 @@ object RestServer {
     SelfClique(
       cliqueInfo.id,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.restPort, peer.wsPort)),
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
       cliqueInfo.groupNumPerBroker
     )
   }
