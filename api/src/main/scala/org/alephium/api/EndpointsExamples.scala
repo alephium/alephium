@@ -84,7 +84,7 @@ trait EndpointsExamples {
         )))
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
-    simpleExample(FetchResponse(Seq(blockEntry)))
+    simpleExample(FetchResponse(AVector(blockEntry)))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
@@ -96,7 +96,7 @@ trait EndpointsExamples {
     simpleExample(Group(group = 2))
 
   implicit val hashesAtHeightExamples: List[Example[HashesAtHeight]] =
-    simpleExample(HashesAtHeight(headers = Seq(blockHash, blockHash, blockHash)))
+    simpleExample(HashesAtHeight(headers = AVector(blockHash, blockHash, blockHash)))
 
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))

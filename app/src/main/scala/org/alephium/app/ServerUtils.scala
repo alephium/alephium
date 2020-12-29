@@ -40,7 +40,7 @@ class ServerUtils(networkType: NetworkType) {
     } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
 
     entriesEither match {
-      case Right(entries) => Right(FetchResponse(entries.toArray.toIndexedSeq))
+      case Right(entries) => Right(FetchResponse(entries))
       case Left(_)        => failedInIO[FetchResponse]
     }
   }
@@ -126,7 +126,7 @@ class ServerUtils(networkType: NetworkType) {
         .getHashes(chainIndex, query.height)
         .left
         .map(_ => failed("Failed in IO"))
-    } yield HashesAtHeight(hashes.toArray.toIndexedSeq)
+    } yield HashesAtHeight(hashes)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
     for {

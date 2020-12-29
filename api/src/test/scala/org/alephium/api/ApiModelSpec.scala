@@ -87,14 +87,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode empty FetchResponse" in {
-    val response = FetchResponse(Seq.empty)
+    val response = FetchResponse(AVector.empty)
     val jsonRaw =
       """{"blocks":[]}"""
     checkData(response, jsonRaw)
   }
 
   it should "encode/decode FetchResponse" in {
-    val response = FetchResponse((0 to 1).map(entryDummy))
+    val response = FetchResponse(AVector.tabulate(2)(entryDummy))
     val jsonRaw =
       s"""{"blocks":[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"]}]}"""
     checkData(response, jsonRaw)

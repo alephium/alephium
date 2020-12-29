@@ -57,7 +57,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
+  lazy val dummyFetchResponse   = FetchResponse(AVector(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
@@ -68,7 +68,7 @@ trait ServerFixture
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
   lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get
 
-  lazy val dummyHashesAtHeight = HashesAtHeight(Seq.empty)
+  lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)
   lazy val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
