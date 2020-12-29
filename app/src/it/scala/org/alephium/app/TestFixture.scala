@@ -16,11 +16,13 @@
 
 package org.alephium.app
 
-import java.net.InetSocketAddress
+import java.net.{DatagramSocket, InetSocketAddress}
+import java.nio.channels.DatagramChannel
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{Await, Promise}
+import scala.util.control.NonFatal
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -28,7 +30,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.testkit.{SocketUtil, TestProbe}
+import akka.testkit.TestProbe
 import io.circe.{Codec, Decoder}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
@@ -82,10 +84,27 @@ trait TestFixtureLike
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
 
-  def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+  def generatePort: Int = {
+    val tcpPort              = 40000 + Random.source.nextInt(5000) * 4
+    val tcp: DatagramSocket  = DatagramChannel.open().socket()
+    val rest: DatagramSocket = DatagramChannel.open().socket()
+    val ws: DatagramSocket   = DatagramChannel.open().socket()
+    try {
+      tcp.bind(new InetSocketAddress("localhost", tcpPort))
+      rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+      ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
+      tcpPort
+    } catch {
+      case NonFatal(_) => generatePort
+    } finally {
+      tcp.close()
+      rest.close()
+      ws.close()
+    }
+  }
 
-  def wsPort(port: Int)   = port - 200
-  def restPort(port: Int) = port - 300
+  def wsPort(port: Int)   = port - 1
+  def restPort(port: Int) = port - 2
 
   val defaultMasterPort     = generatePort
   val defaultRestMasterPort = restPort(defaultMasterPort)
@@ -219,8 +238,8 @@ trait TestFixtureLike
         ("alephium.network.internal-address", s"localhost:$publicPort"),
         ("alephium.network.coordinator-address", s"localhost:$masterPort"),
         ("alephium.network.external-address", s"localhost:$publicPort"),
-        ("alephium.network.ws-port", publicPort - 200),
-        ("alephium.network.rest-port", publicPort - 300),
+        ("alephium.network.ws-port", wsPort(publicPort)),
+        ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
