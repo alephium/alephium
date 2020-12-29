@@ -358,24 +358,22 @@ trait BlockFlowState extends FlowTipsUtil {
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
-      chain.getTxStatusUnsafe(txId) match {
-        case None => None
-        case Some(chainStatus) =>
-          val confirmations = chainStatus.confirmations
-          if (chainIndex.isIntraGroup) {
-            Some(TxStatus(chainStatus.index, confirmations, confirmations, confirmations))
-          } else {
-            val confirmHash = chainStatus.index.hash
-            val fromGroupConfirmations =
-              getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
-            val toGroupConfirmations =
-              getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-            Some(
-              TxStatus(chainStatus.index,
-                       confirmations,
-                       fromGroupConfirmations,
-                       toGroupConfirmations))
-          }
+      chain.getTxStatusUnsafe(txId).flatMap { chainStatus =>
+        val confirmations = chainStatus.confirmations
+        if (chainIndex.isIntraGroup) {
+          Some(TxStatus(chainStatus.index, confirmations, confirmations, confirmations))
+        } else {
+          val confirmHash = chainStatus.index.hash
+          val fromGroupConfirmations =
+            getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
+          val toGroupConfirmations =
+            getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
+          Some(
+            TxStatus(chainStatus.index,
+                     confirmations,
+                     fromGroupConfirmations,
+                     toGroupConfirmations))
+        }
       }
     }
 

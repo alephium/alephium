@@ -145,19 +145,18 @@ trait TestFixtureLike
 
   def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
-    print(txStatus) // keep this for easier CI analysis
-    print("\n")
     checkConfirmations(txStatus)
   }
 
   def confirmTx(tx: Transfer.Result, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
-    print(txStatus) // keep this for easier CI analysis
-    print("\n")
     checkConfirmations(txStatus)
   }
 
   def checkConfirmations(txStatus: TxStatus): Assertion = {
+    print(txStatus) // keep this for easier CI analysis
+    print("\n")
+
     txStatus is a[Confirmed]
     val confirmed = txStatus.asInstanceOf[Confirmed]
     confirmed.chainConfirmations > 1 is true
