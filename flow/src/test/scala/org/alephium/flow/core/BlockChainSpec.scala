@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
+import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
@@ -28,9 +29,9 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
   trait Fixture extends AlephiumConfigFixture {
-    val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
-    val chainGen = chainGenOf(4, genesis)
+    lazy val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
+    lazy val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
+    lazy val chainGen = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
       val storages = StoragesFixture.buildStorages(rootPath)
@@ -66,90 +67,232 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "add block correctly" in new Fixture {
-    forAll(blockGen) { block =>
-      val chain = buildBlockChain()
-      chain.numHashes is 1
-      val blocksSize1 = chain.numHashes
-      chain.add(block, 1).isRight is true
-      val blocksSize2 = chain.numHashes
-      blocksSize1 + 1 is blocksSize2
+    val block = blockGen.sample.get
+    val chain = buildBlockChain()
+    chain.numHashes is 1
+    val blocksSize1 = chain.numHashes
+    chain.add(block, 1).isRight is true
+    val blocksSize2 = chain.numHashes
+    blocksSize1 + 1 is blocksSize2
 
-      chain.getHeightUnsafe(block.hash) is (ALF.GenesisHeight + 1)
-      chain.getHeight(block.hash) isE (ALF.GenesisHeight + 1)
+    chain.getHeightUnsafe(block.hash) is (ALF.GenesisHeight + 1)
+    chain.getHeight(block.hash) isE (ALF.GenesisHeight + 1)
 
-      val diff = chain.calHashDiff(block.hash, genesis.hash).toOption.get
-      diff.toAdd is AVector(block.hash)
-      diff.toRemove.isEmpty is true
+    val diff = chain.calHashDiff(block.hash, genesis.hash).toOption.get
+    diff.toAdd is AVector(block.hash)
+    diff.toRemove.isEmpty is true
+  }
+
+  it should "persiste txs" in new Fixture {
+    val chain = buildBlockChain()
+    forAll(blockGen) { block0 =>
+      chain.add(block0, 1).isRight is true
+      block0.transactions.foreachWithIndex {
+        case (tx, index) =>
+          val txIndex = TxIndex(block0.hash, index)
+          if (brokerConfig.contains(block0.chainIndex.from)) {
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex))
+          } else {
+            chain.txStorage.exists(tx.id) isE false
+          }
+      }
+      val block1 = block0.copy(header = block0.header.copy(nonce = 123456))
+      chain.add(block1, 1).isRight is true
+      block1.transactions.foreachWithIndex {
+        case (tx, index) =>
+          val txIndex0 = TxIndex(block0.hash, index)
+          val txIndex1 = TxIndex(block1.hash, index)
+          (brokerConfig.contains(block0.chainIndex.from),
+           brokerConfig.contains(block1.chainIndex.from)) match {
+            case (true, true) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
+            case (true, false) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
+            case (false, true) =>
+              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex1))
+            case (false, false) =>
+              chain.txStorage.exists(tx.id) isE false
+          }
+      }
+    }
+  }
+
+  it should "return correct tx status for forks 0" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val chain      = buildBlockChain()
+
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, shortChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
+        }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, longChain)
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
+        }
+    }
+  }
+
+  it should "return correct tx status for forks 1" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val longChain = chainGenOf(4, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get.mapWithIndex {
+      case (block, index) =>
+        block.copy(transactions = longChain(index).transactions)
+    }
+    val chain = buildBlockChain()
+
+    shortChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+    longChain.foreach { block =>
+      block.transactions.foreach { tx =>
+        chain.getTxStatus(tx.id) isE None
+      }
+    }
+
+    addBlocks(chain, shortChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
+        }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            if (blockIndex < shortChain.length) {
+              chain.getTxStatus(tx.id) isE Some(
+                TxStatus(TxIndex(shortChain(blockIndex).hash, txIndex),
+                         shortChain.length - blockIndex))
+            } else {
+              chain.getTxStatus(tx.id) isE None
+            }
+        }
+    }
+
+    addBlocks(chain, longChain)
+    shortChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
+            )
+        }
+    }
+    longChain.foreachWithIndex {
+      case (block, blockIndex) =>
+        block.transactions.foreachWithIndex {
+          case (tx, txIndex) =>
+            chain.getTxStatus(tx.id) isE Some(
+              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
+        }
     }
   }
 
   it should "add blocks correctly" in new Fixture {
-    forAll(chainGen) { blocks =>
-      val chain       = buildBlockChain()
-      val blocksSize1 = chain.numHashes
-      addBlocks(chain, blocks)
-      val blocksSize2 = chain.numHashes
-      blocksSize1 + blocks.length is blocksSize2
+    val blocks      = chainGen.sample.get
+    val chain       = buildBlockChain()
+    val blocksSize1 = chain.numHashes
+    addBlocks(chain, blocks)
+    val blocksSize2 = chain.numHashes
+    blocksSize1 + blocks.length is blocksSize2
 
-      val midHashes = chain.getBlockHashesBetween(blocks.last.hash, blocks.head.hash)
-      val expected  = blocks.tail.map(_.hash)
-      midHashes isE expected
-    }
+    val midHashes = chain.getBlockHashesBetween(blocks.last.hash, blocks.head.hash)
+    val expected  = blocks.tail.map(_.hash)
+    midHashes isE expected
   }
 
   it should "work correctly for a chain of blocks" in new Fixture {
-    forAll(chainGenOf(4, genesis)) { blocks =>
-      val chain = buildBlockChain()
-      addBlocks(chain, blocks)
-      val headBlock     = genesis
-      val lastBlock     = blocks.last
-      val chainExpected = AVector(genesis) ++ blocks
+    val blocks = chainGenOf(4, genesis).sample.get
+    val chain  = buildBlockChain()
+    addBlocks(chain, blocks)
+    val headBlock     = genesis
+    val lastBlock     = blocks.last
+    val chainExpected = AVector(genesis) ++ blocks
 
-      chain.getHeight(headBlock) isE ALF.GenesisHeight
-      chain.getHeight(lastBlock) isE blocks.length
-      chain.getBlockSlice(headBlock) isE AVector(headBlock)
-      chain.getBlockSlice(lastBlock) isE chainExpected
-      chain.isTip(headBlock) is false
-      chain.isTip(lastBlock) is true
-      chain.getBestTipUnsafe is lastBlock.hash
-      chain.maxHeight isE blocks.length
-      chain.getAllTips is AVector(lastBlock.hash)
+    chain.getHeight(headBlock) isE ALF.GenesisHeight
+    chain.getHeight(lastBlock) isE blocks.length
+    chain.getBlockSlice(headBlock) isE AVector(headBlock)
+    chain.getBlockSlice(lastBlock) isE chainExpected
+    chain.isTip(headBlock) is false
+    chain.isTip(lastBlock) is true
+    chain.getBestTipUnsafe is lastBlock.hash
+    chain.maxHeight isE blocks.length
+    chain.getAllTips is AVector(lastBlock.hash)
 
-      val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).toOption.get
-      diff.toRemove.isEmpty is true
-      diff.toAdd is blocks.map(_.hash)
-    }
+    val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).toOption.get
+    diff.toRemove.isEmpty is true
+    diff.toAdd is blocks.map(_.hash)
   }
 
   it should "work correctly with two chains of blocks" in new Fixture {
-    forAll(chainGenOf(4, genesis)) { longChain =>
-      forAll(chainGenOf(2, genesis)) { shortChain =>
-        val chain = buildBlockChain()
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val chain      = buildBlockChain()
 
-        addBlocks(chain, shortChain)
-        chain.getHeight(shortChain.head) isE 1
-        chain.getHeight(shortChain.last) isE shortChain.length
-        chain.getBlockSlice(shortChain.head) isE AVector(genesis, shortChain.head)
-        chain.getBlockSlice(shortChain.last) isE AVector(genesis) ++ shortChain
-        chain.isTip(shortChain.head) is false
-        chain.isTip(shortChain.last) is true
+    addBlocks(chain, shortChain)
+    chain.getHeight(shortChain.head) isE 1
+    chain.getHeight(shortChain.last) isE shortChain.length
+    chain.getBlockSlice(shortChain.head) isE AVector(genesis, shortChain.head)
+    chain.getBlockSlice(shortChain.last) isE AVector(genesis) ++ shortChain
+    chain.isTip(shortChain.head) is false
+    chain.isTip(shortChain.last) is true
 
-        addBlocks(chain, longChain.init)
-        chain.maxHeight isE longChain.length - 1
-        chain.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
+    addBlocks(chain, longChain.init)
+    chain.maxHeight isE longChain.length - 1
+    chain.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
-        chain.add(longChain.last, longChain.length)
-        chain.getHeight(longChain.head) isE 1
-        chain.getHeight(longChain.last) isE longChain.length
-        chain.getBlockSlice(longChain.head) isE AVector(genesis, longChain.head)
-        chain.getBlockSlice(longChain.last) isE AVector(genesis) ++ longChain
-        chain.isTip(longChain.head) is false
-        chain.isTip(longChain.last) is true
-        chain.getBestTipUnsafe is longChain.last.hash
-        chain.maxHeight isE longChain.length
-        chain.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
-      }
-    }
+    chain.add(longChain.last, longChain.length)
+    chain.getHeight(longChain.head) isE 1
+    chain.getHeight(longChain.last) isE longChain.length
+    chain.getBlockSlice(longChain.head) isE AVector(genesis, longChain.head)
+    chain.getBlockSlice(longChain.last) isE AVector(genesis) ++ longChain
+    chain.isTip(longChain.head) is false
+    chain.isTip(longChain.last) is true
+    chain.getBestTipUnsafe is longChain.last.hash
+    chain.maxHeight isE longChain.length
+    chain.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
   }
 
   it should "check isCanonical" in new Fixture {
@@ -234,36 +377,33 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "compute correct weights for a single chain" in new Fixture {
-    forAll(chainGenOf(5)) { blocks =>
-      val chain = createBlockChain(blocks.init)
-      blocks.init.foreach(block => chain.contains(block) isE true)
-      chain.maxHeight isE 3
-      chain.maxWeight isE 6
-      chain.add(blocks.last, 8)
-      chain.contains(blocks.last) isE true
-      chain.maxHeight isE 4
-      chain.maxWeight isE 8
-    }
+    val blocks = chainGenOf(5).sample.get
+    val chain  = createBlockChain(blocks.init)
+    blocks.init.foreach(block => chain.contains(block) isE true)
+    chain.maxHeight isE 3
+    chain.maxWeight isE 6
+    chain.add(blocks.last, 8)
+    chain.contains(blocks.last) isE true
+    chain.maxHeight isE 4
+    chain.maxWeight isE 8
   }
 
-  it should "compute corrent weights for two chains with same root" in new Fixture {
-    forAll(chainGenOf(5)) { blocks1 =>
-      forAll(chainGenOf(1, blocks1.head)) { blocks2 =>
-        val chain = createBlockChain(blocks1)
-        addBlocks(chain, blocks2)
+  it should "compute correct weights for two chains with same root" in new Fixture {
+    val blocks1 = chainGenOf(5).sample.get
+    val blocks2 = chainGenOf(1, blocks1.head).sample.get
+    val chain   = createBlockChain(blocks1)
+    addBlocks(chain, blocks2)
 
-        blocks1.foreach(block => chain.contains(block) isE true)
-        blocks2.foreach(block => chain.contains(block) isE true)
-        chain.maxHeight isE 4
-        chain.maxWeight isE 8
-        chain.getHashesAfter(blocks1.head.hash) isE {
-          val branch1 = blocks1.tail
-          AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
-        }
-        chain.getHashesAfter(blocks2.head.hash).map(_.length) isE 0
-        chain.getHashesAfter(blocks1.tail.head.hash) isE blocks1.tail.tail.map(_.hash)
-      }
+    blocks1.foreach(block => chain.contains(block) isE true)
+    blocks2.foreach(block => chain.contains(block) isE true)
+    chain.maxHeight isE 4
+    chain.maxWeight isE 8
+    chain.getHashesAfter(blocks1.head.hash) isE {
+      val branch1 = blocks1.tail
+      AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
     }
+    chain.getHashesAfter(blocks2.head.hash).map(_.length) isE 0
+    chain.getHashesAfter(blocks1.tail.head.hash) isE blocks1.tail.tail.map(_.hash)
   }
 
   behavior of "Block tree algorithm"

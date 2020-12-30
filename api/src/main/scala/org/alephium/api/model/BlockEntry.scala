@@ -16,27 +16,28 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockHeader, NetworkType}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockEntry(
-    hash: String,
+    hash: BlockHash,
     timestamp: TimeStamp,
     chainFrom: Int,
     chainTo: Int,
     height: Int,
-    deps: AVector[String],
+    deps: AVector[BlockHash],
     transactions: Option[AVector[Tx]]
 )
 object BlockEntry {
   def from(header: BlockHeader, height: Int): BlockEntry = {
     BlockEntry(
-      hash         = header.hash.toHexString,
+      hash         = header.hash,
       timestamp    = header.timestamp,
       chainFrom    = header.chainIndex.from.value,
       chainTo      = header.chainIndex.to.value,
       height       = height,
-      deps         = header.blockDeps.deps.map(_.toHexString),
+      deps         = header.blockDeps.deps,
       transactions = None
     )
   }

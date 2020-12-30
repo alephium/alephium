@@ -16,11 +16,13 @@
 
 package org.alephium.app
 
-import java.net.InetSocketAddress
+import java.net.{DatagramSocket, InetSocketAddress}
+import java.nio.channels.DatagramChannel
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{Await, Promise}
+import scala.util.control.NonFatal
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -28,10 +30,11 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.testkit.{SocketUtil, TestProbe}
+import akka.testkit.TestProbe
 import io.circe.{Codec, Decoder}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
+import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Second, Seconds, Span}
 
@@ -49,6 +52,7 @@ import org.alephium.wallet.api.model._
 class TestFixture(val name: String) extends TestFixtureLike
 
 // scalastyle:off method.length
+// scalastyle:off number.of.methods
 trait TestFixtureLike
     extends AlephiumActorSpecLike
     with AlephiumConfigFixture
@@ -57,7 +61,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig =
-    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -80,10 +84,27 @@ trait TestFixtureLike
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
 
-  def generatePort = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+  def generatePort: Int = {
+    val tcpPort              = 40000 + Random.source.nextInt(5000) * 4
+    val tcp: DatagramSocket  = DatagramChannel.open().socket()
+    val rest: DatagramSocket = DatagramChannel.open().socket()
+    val ws: DatagramSocket   = DatagramChannel.open().socket()
+    try {
+      tcp.bind(new InetSocketAddress("localhost", tcpPort))
+      rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+      ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
+      tcpPort
+    } catch {
+      case NonFatal(_) => generatePort
+    } finally {
+      tcp.close()
+      rest.close()
+      ws.close()
+    }
+  }
 
-  def wsPort(port: Int)   = port - 200
-  def restPort(port: Int) = port - 300
+  def wsPort(port: Int)   = port - 1
+  def restPort(port: Int) = port - 2
 
   val defaultMasterPort     = generatePort
   val defaultRestMasterPort = restPort(defaultMasterPort)
@@ -141,6 +162,27 @@ trait TestFixtureLike
     res
   }
 
+  def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {
+    val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
+    checkConfirmations(txStatus)
+  }
+
+  def confirmTx(tx: Transfer.Result, restPort: Int): Assertion = eventually {
+    val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
+    checkConfirmations(txStatus)
+  }
+
+  def checkConfirmations(txStatus: TxStatus): Assertion = {
+    print(txStatus) // keep this for easier CI analysis
+    print("\n")
+
+    txStatus is a[Confirmed]
+    val confirmed = txStatus.asInstanceOf[Confirmed]
+    confirmed.chainConfirmations > 1 is true
+    confirmed.fromGroupConfirmations > 1 is true
+    confirmed.toGroupConfirmations > 1 is true
+  }
+
   implicit val walletResultResultCodec: Codec[WalletRestore.Result] =
     deriveCodec[WalletRestore.Result]
   implicit val transferResultCodec: Codec[Transfer.Result] = deriveCodec[Transfer.Result]
@@ -196,9 +238,8 @@ trait TestFixtureLike
         ("alephium.network.internal-address", s"localhost:$publicPort"),
         ("alephium.network.coordinator-address", s"localhost:$masterPort"),
         ("alephium.network.external-address", s"localhost:$publicPort"),
-        ("alephium.network.rpc-port", publicPort - 100),
-        ("alephium.network.ws-port", publicPort - 200),
-        ("alephium.network.rest-port", publicPort - 300),
+        ("alephium.network.ws-port", wsPort(publicPort)),
+        ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
@@ -329,13 +370,21 @@ trait TestFixtureLike
     )
   }
   def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
-    val signature: Signature = SignatureSchema.sign(Hex.unsafe(buildTransactionResult.txId),
+    val signature: Signature = SignatureSchema.sign(buildTransactionResult.txId.bytes,
                                                     PrivateKey.unsafe(Hex.unsafe(privateKey)))
     httpPost(
       "/transactions/send",
       Some(
         s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
     )
+  }
+  def getTransactionStatus(tx: TxResult) = {
+    httpGet(
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
+  }
+  def getTransactionStatus(tx: Transfer.Result) = {
+    httpGet(
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
   }
 
   def compileFilang(code: String) = {

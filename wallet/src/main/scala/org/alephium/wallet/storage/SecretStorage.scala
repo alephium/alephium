@@ -27,13 +27,13 @@ import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 
+import org.alephium.api.CirceUtils._
 import org.alephium.crypto.AES
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.serde.{deserialize, serialize, Serde}
 import org.alephium.util.AVector
 import org.alephium.wallet.Constants
-import org.alephium.wallet.circe.UtilCodecs
 
 trait SecretStorage {
   def lock(): Unit
@@ -46,7 +46,7 @@ trait SecretStorage {
   def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit]
 }
 
-object SecretStorage extends UtilCodecs {
+object SecretStorage {
 
   sealed trait Error
 

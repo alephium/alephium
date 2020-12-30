@@ -82,7 +82,6 @@ final case class NetworkSetting(
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
-    rpcPort: Int,
     wsPort: Int,
     restPort: Int
 ) extends NetworkConfig {

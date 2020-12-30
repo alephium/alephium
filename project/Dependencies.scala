@@ -21,7 +21,8 @@ object Version {
   lazy val `akka-http` = "10.1.12"
   lazy val circe       = "0.13.0"
   lazy val metrics     = "4.0.6"
-  lazy val tapir       = "0.16.5"
+  lazy val tapir       = "0.16.16"
+  lazy val sttp        = "2.2.5"
 }
 
 object Dependencies {
@@ -53,12 +54,14 @@ object Dependencies {
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 
-  lazy val `tapir-core`          = "com.softwaremill.sttp.tapir" %% "tapir-core"                 % Version.tapir
-  lazy val `tapir-circe`         = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"           % Version.tapir
-  lazy val `tapir-akka`          = "com.softwaremill.sttp.tapir" %% "tapir-akka-http-server"     % Version.tapir
-  lazy val `tapir-openapi`       = "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs"         % Version.tapir
-  lazy val `tapir-openapi-circe` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-circe-yaml"   % Version.tapir
-  lazy val `tapir-swagger-ui`    = "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-akka-http" % Version.tapir
+  lazy val `tapir-core`             = "com.softwaremill.sttp.tapir"  %% "tapir-core"                 % Version.tapir
+  lazy val `tapir-circe`            = "com.softwaremill.sttp.tapir"  %% "tapir-json-circe"           % Version.tapir
+  lazy val `tapir-akka`             = "com.softwaremill.sttp.tapir"  %% "tapir-akka-http-server"     % Version.tapir
+  lazy val `tapir-openapi`          = "com.softwaremill.sttp.tapir"  %% "tapir-openapi-docs"         % Version.tapir
+  lazy val `tapir-openapi-circe`    = "com.softwaremill.sttp.tapir"  %% "tapir-openapi-circe-yaml"   % Version.tapir
+  lazy val `tapir-swagger-ui`       = "com.softwaremill.sttp.tapir"  %% "tapir-swagger-ui-akka-http" % Version.tapir
+  lazy val `tapir-client`           = "com.softwaremill.sttp.tapir"  %% "tapir-sttp-client"          % Version.tapir
+  lazy val `sttp-akka-http-backend` = "com.softwaremill.sttp.client" %% "akka-http-backend"          % Version.sttp
 
   lazy val `blake3-jni` = "org.alephium" %% "blake3-jni" % "0.3.0"
 }

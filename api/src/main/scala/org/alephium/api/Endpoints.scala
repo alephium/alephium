@@ -26,7 +26,7 @@ import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemas._
 import org.alephium.api.model._
-import org.alephium.protocol.{BlockHash, PublicKey}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -173,6 +173,15 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(jsonBody[SendTransaction])
       .out(jsonBody[TxResult])
       .summary("Send a signed transaction")
+
+  lazy val getTransactionStatus: BaseEndpoint[(Hash, GroupIndex, GroupIndex), TxStatus] =
+    transactionsEndpoint.get
+      .in("status")
+      .in(query[Hash]("txId"))
+      .in(query[GroupIndex]("fromGroup"))
+      .in(query[GroupIndex]("toGroup"))
+      .out(jsonBody[TxStatus])
+      .summary("Get tx status")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post

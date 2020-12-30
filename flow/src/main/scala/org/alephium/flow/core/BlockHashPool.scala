@@ -63,8 +63,8 @@ trait BlockHashPool {
       val weight0 = getWeightUnsafe(hash0)
       val weight1 = getWeightUnsafe(hash1)
 
-      weight0.compareTo(weight1) < 0 ||
-      (weight0 == weight1 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
+      val comp = weight0.compareTo(weight1)
+      comp < 0 || (comp == 0 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
   }
 
   def getBestTipUnsafe: BlockHash

@@ -22,6 +22,7 @@ import io.circe.generic.semiauto._
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
+import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.serde.RandomBytes
@@ -134,6 +135,8 @@ trait ApiModelCodec {
 
   implicit val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
 
+  implicit val txStatusCodec: Codec[TxStatus] = deriveCodec[TxStatus]
+
   implicit val buildContractCodec: Codec[BuildContract] = deriveCodec[BuildContract]
 
   implicit val buildContractResultCodec: Codec[BuildContractResult] =
@@ -193,6 +196,17 @@ trait ApiModelCodec {
   val fetchRequestEncoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
   implicit lazy val fetchRequestCodec: Codec[FetchRequest] =
     Codec.from(fetchRequestDecoder, fetchRequestEncoder)
+
+  implicit val mnemonicSizeEncoder: Encoder[Mnemonic.Size] =
+    Encoder.encodeInt.contramap[Mnemonic.Size](_.value)
+  implicit val mnemonicSizeDecoder: Decoder[Mnemonic.Size] = Decoder.decodeInt.emap { size =>
+    Mnemonic
+      .Size(size)
+      .toRight(
+        s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}")
+  }
+  implicit val mnemonicSizeCodec: Codec[Mnemonic.Size] =
+    Codec.from(mnemonicSizeDecoder, mnemonicSizeEncoder)
 
   private def bytesEncoder[T <: RandomBytes]: Encoder[T] =
     Encoder.encodeString.contramap[T](_.toHexString)

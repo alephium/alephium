@@ -20,6 +20,8 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.BlockChain.TxIndex
+import org.alephium.flow.core.BlockFlowState.TxStatus
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash}
@@ -418,6 +420,120 @@ class BlockFlowSpec extends AlephiumSpec {
       .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue
       .nonEmpty is true
+  }
+
+  behavior of "confirmations"
+
+  it should "return correct confirmations for genesis txs" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    blockFlow.genesisBlocks.foreachWithIndex {
+      case (blocks, from) =>
+        blocks.foreachWithIndex {
+          case (block, to) =>
+            block.transactions.foreachWithIndex {
+              case (tx, index) =>
+                from is to
+                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+                  Some(TxStatus(TxIndex(block.hash, index), 1, 1, 1))
+            }
+        }
+    }
+
+    val newBlocks = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield {
+      emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    }
+
+    val newBlocks0  = Gen.someOf(newBlocks).retryUntil(_.nonEmpty).sample.get
+    val newIndexes0 = newBlocks0.map(_.chainIndex)
+    val newBlocks1  = newBlocks.filterNot(newBlocks0.contains)
+
+    def count(bool: Boolean): Int = if (bool) 1 else 0
+
+    newBlocks0.foreach(addAndCheck(blockFlow, _))
+    blockFlow.genesisBlocks.foreachWithIndex {
+      case (blocks, from) =>
+        blocks.foreachWithIndex {
+          case (block, to) =>
+            block.transactions.foreachWithIndex {
+              case (tx, index) =>
+                val chainConfirmations = 1 +
+                  count(newIndexes0.contains(ChainIndex.unsafe(from, to)))
+                val fromConfirmations = 1 +
+                  count(newIndexes0.contains(ChainIndex.unsafe(from, from)))
+                val toConfirmations = 1 +
+                  count(newIndexes0.contains(ChainIndex.unsafe(to, to)))
+                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+                  Some(
+                    TxStatus(TxIndex(block.hash, index),
+                             chainConfirmations,
+                             fromConfirmations,
+                             toConfirmations))
+            }
+        }
+    }
+
+    newBlocks1.foreach(addAndCheck(blockFlow, _))
+    blockFlow.genesisBlocks.foreachWithIndex {
+      case (blocks, from) =>
+        blocks.foreachWithIndex {
+          case (block, to) =>
+            block.transactions.foreachWithIndex {
+              case (tx, index) =>
+                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+                  Some(TxStatus(TxIndex(block.hash, index), 2, 2, 2))
+            }
+        }
+    }
+  }
+
+  it should "return correct confirmations for intra group txs" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    for {
+      targetGroup <- 0 until groups0
+    } {
+      val blockFlow0 = isolatedBlockFlow()
+      val chainIndex = ChainIndex.unsafe(targetGroup, targetGroup)
+      val block      = transfer(blockFlow0, chainIndex)
+      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE None
+
+      addAndCheck(blockFlow0, block)
+      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE
+        Some(TxStatus(TxIndex(block.hash, 0), 1, 1, 1))
+    }
+  }
+
+  it should "return correct confirmations for inter group txs" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+      if from != to
+    } {
+      val blockFlow0 = isolatedBlockFlow()
+      val chainIndex = ChainIndex.unsafe(from, to)
+      val block0     = transfer(blockFlow0, chainIndex)
+      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE None
+
+      addAndCheck(blockFlow0, block0)
+      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+        Some(TxStatus(TxIndex(block0.hash, 0), 1, 0, 0))
+
+      val block1 = emptyBlock(blockFlow0, ChainIndex.unsafe(from, from))
+      addAndCheck(blockFlow0, block1)
+      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+        Some(TxStatus(TxIndex(block0.hash, 0), 1, 1, 0))
+
+      val block2 = emptyBlock(blockFlow0, ChainIndex.unsafe(to, to))
+      addAndCheck(blockFlow0, block2)
+      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+        Some(TxStatus(TxIndex(block0.hash, 0), 1, 1, 1))
+    }
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

@@ -19,11 +19,13 @@ package org.alephium.wallet.circe
 import io.circe._
 import io.circe.generic.semiauto.deriveCodec
 
+import org.alephium.api.ApiModelCodec
+import org.alephium.api.CirceUtils._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 
-trait ModelCodecs extends ProtocolCodecs {
+trait ModelCodecs extends ApiModelCodec {
 
   implicit val addressesCodec: Codec[Addresses] = deriveCodec[Addresses]
 

@@ -16,12 +16,15 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{CliqueId, GroupIndex}
-import org.alephium.util.AVector
+import org.alephium.protocol.BlockHash
 
-final case class SelfClique(cliqueId: CliqueId,
-                            peers: AVector[PeerAddress],
-                            groupNumPerBroker: Int) {
-  def peer(groupIndex: GroupIndex): PeerAddress =
-    peers((groupIndex.value / groupNumPerBroker) % peers.length)
-}
+sealed trait TxStatus
+
+final case class Confirmed(blockHash: BlockHash,
+                           blockIndex: Int,
+                           chainConfirmations: Int,
+                           fromGroupConfirmations: Int,
+                           toGroupConfirmations: Int)
+    extends TxStatus
+final case object MemPooled extends TxStatus
+final case object NotFound  extends TxStatus

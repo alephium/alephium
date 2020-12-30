@@ -60,7 +60,10 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
 
   def awaitStart: Receive = {
     case TcpController.Start(bootstrapper) =>
-      tcpManager ! Tcp.Bind(self, bindAddress, pullMode = true)
+      tcpManager ! Tcp.Bind(self,
+                            bindAddress,
+                            pullMode = true,
+                            options  = Seq(Tcp.SO.ReuseAddress(true)))
       context.become(binding(bootstrapper))
   }
 

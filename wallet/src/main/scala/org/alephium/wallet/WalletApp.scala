@@ -25,7 +25,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.OverflowStrategy
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.util.Service
@@ -38,22 +37,19 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
     extends Service
     with StrictLogging {
 
-  // scalastyle:off magic.number
-  val httpClient: HttpClient = HttpClient(512, OverflowStrategy.fail)
-  // scalastyle:on magic.number
-
   val blockFlowClient: BlockFlowClient =
-    BlockFlowClient.apply(httpClient,
-                          config.blockflow.uri,
+    BlockFlowClient.apply(config.blockflow.uri,
                           config.blockflow.groups,
-                          config.networkType)
+                          config.networkType,
+                          config.blockflow.blockflowFetchMaxAge)
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private val secretDir = Paths.get(config.secretDir.toString, config.networkType.name)
   val walletService: WalletService =
     WalletService.apply(blockFlowClient, secretDir, config.networkType)
 
-  val walletServer: WalletServer = new WalletServer(walletService, config.networkType)
+  val walletServer: WalletServer =
+    new WalletServer(walletService, config.networkType, config.blockflow.blockflowFetchMaxAge)
 
   val routes: Route = walletServer.route ~ walletServer.docsRoute
 

@@ -28,7 +28,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.util.{AVector, Hex, Service, U256}
+import org.alephium.util.{AVector, Service, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -207,10 +207,9 @@ object WalletService {
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
           case Right(buildTxResult) =>
-            val txId      = Hex.unsafe(buildTxResult.txId)
-            val signature = SignatureSchema.sign(txId, privateKey.privateKey)
+            val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
             blockFlowClient
-              .sendTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+              .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
               .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
               .map(_.left.map(BlockFlowClientError))
         }
@@ -278,7 +277,7 @@ object WalletService {
 
     private def getBalance(address: Address): Future[Either[WalletError, (Address, U256)]] = {
       blockFlowClient
-        .getBalance(address)
+        .fetchBalance(address)
         .map(_.map(amount => (address, amount)).left.map(message =>
           BlockFlowClientError(message): WalletError))
     }

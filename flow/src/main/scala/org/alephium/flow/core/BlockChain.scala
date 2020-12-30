@@ -19,17 +19,19 @@ package org.alephium.flow.core
 import java.math.BigInteger
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.BlockChain.ChainDiff
+import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
+import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def blockStorage: BlockStorage
+  def txStorage: TxStorage
 
   def getBlock(hash: BlockHash): IOResult[Block] = {
     blockStorage.get(hash)
@@ -50,6 +52,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
     for {
       _ <- persistBlock(block)
+      _ <- persistTxs(block)
       _ <- add(block.header, weight)
     } yield ()
   }
@@ -57,6 +60,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def addGenesis(block: Block): IOResult[Unit] = {
     for {
       _ <- persistBlock(block)
+      _ <- persistTxs(block)
       _ <- addGenesis(block.header)
     } yield ()
   }
@@ -72,6 +76,35 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def persistBlockUnsafe(block: Block): Unit = {
     blockStorage.putUnsafe(block)
     ()
+  }
+
+  protected def persistTxs(block: Block): IOResult[Unit] = {
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      block.transactions.foreachWithIndexE {
+        case (tx, index) =>
+          txStorage.add(tx.id, TxIndex(block.hash, index))
+      }
+    } else {
+      Right(())
+    }
+  }
+
+  def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] =
+    IOUtils.tryExecute(getTxStatusUnsafe(txId))
+
+  def getTxStatusUnsafe(txId: Hash): Option[TxStatus] = {
+    txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
+      val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
+      if (canonicalIndex.nonEmpty) {
+        val selectedIndex      = canonicalIndex.head
+        val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
+        val maxHeight          = maxHeightUnsafe
+        val chainConfirmations = maxHeight - selectedHeight + 1
+        Some(TxStatus(selectedIndex, chainConfirmations))
+      } else {
+        None
+      }
+    }
   }
 
   def calBlockDiffUnsafe(newTip: BlockHash, oldTip: BlockHash): ChainDiff = {
@@ -111,6 +144,7 @@ object BlockChain {
       override val brokerConfig      = _brokerConfig
       override val consensusConfig   = _consensusSetting
       override val blockStorage      = storages.blockStorage
+      override val txStorage         = storages.txStorage
       override val headerStorage     = storages.headerStorage
       override val blockStateStorage = storages.blockStateStorage
       override val heightIndexStorage =
@@ -133,4 +167,16 @@ object BlockChain {
   }
 
   final case class ChainDiff(toRemove: AVector[Block], toAdd: AVector[Block])
+
+  final case class TxIndex(hash: BlockHash, index: Int)
+  object TxIndex {
+    implicit val serde: Serde[TxIndex] = Serde.forProduct2(TxIndex.apply, t => (t.hash, t.index))
+  }
+
+  final case class TxIndexes(indexes: AVector[TxIndex])
+  object TxIndexes {
+    implicit val serde: Serde[TxIndexes] = Serde.forProduct1(TxIndexes.apply, t => t.indexes)
+  }
+
+  final case class TxStatus(index: TxIndex, confirmations: Int)
 }

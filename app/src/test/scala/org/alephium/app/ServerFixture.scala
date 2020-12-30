@@ -28,6 +28,7 @@ import org.alephium.api.CirceUtils
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
+import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
@@ -35,7 +36,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, PrivateKey, SignatureSchema}
+import org.alephium.protocol.{BlockHash, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde.serialize
@@ -57,7 +58,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyFetchResponse   = FetchResponse(Seq(BlockEntry.from(dummyBlockHeader, 1)))
+  lazy val dummyFetchResponse   = FetchResponse(AVector(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
@@ -68,7 +69,7 @@ trait ServerFixture
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
   lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get
 
-  lazy val dummyHashesAtHeight = HashesAtHeight(Seq.empty)
+  lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)
   lazy val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
@@ -78,16 +79,17 @@ trait ServerFixture
     SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
                          PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
   lazy val dummyTransferResult = TxResult(
-    dummyTx.id.toHexString,
+    dummyTx.id,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
   lazy val dummyBuildTransactionResult = BuildTransactionResult(
     Hex.toHexString(serialize(dummyTx.unsigned)),
-    dummyTx.unsigned.hash.toHexString,
+    dummyTx.unsigned.hash,
     dummyTx.unsigned.fromGroup.value,
     dummyTx.unsigned.toGroup.value
   )
+  lazy val dummyTxStatus: TxStatus = Confirmed(BlockHash.zero, 0, 1, 2, 3)
 }
 
 object ServerFixture {
@@ -182,6 +184,10 @@ object ServerFixture {
           val newOutputs = outputs.map(_.copy(lockTime = lockTime))
           Right(Some(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
       }
+
+    override def getTxStatus(txId: Hash,
+                             chainIndex: ChainIndex): IOResult[Option[BlockFlowState.TxStatus]] =
+      Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
 
     implicit def brokerConfig    = config.broker
     implicit def consensusConfig = config.consensus

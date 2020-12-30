@@ -16,4 +16,6 @@
 
 package org.alephium.api.model
 
-final case class FetchResponse(blocks: Seq[BlockEntry])
+import org.alephium.util.AVector
+
+final case class FetchResponse(blocks: AVector[BlockEntry])

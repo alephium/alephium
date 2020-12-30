@@ -17,6 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction, TransactionTemplate}
 import org.alephium.util.{AVector, RWLock}
@@ -36,7 +37,11 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
   def size: Int = pools.sumBy(_.size)
 
   def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = readOnly {
-    getPool(index).contains(transaction)
+    contains(index, transaction.id)
+  }
+
+  def contains(index: ChainIndex, txId: Hash): Boolean = readOnly {
+    getPool(index).contains(txId)
   }
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {

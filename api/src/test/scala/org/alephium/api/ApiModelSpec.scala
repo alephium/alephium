@@ -25,7 +25,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
-import org.alephium.protocol.{PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -33,8 +33,9 @@ import org.alephium.util.Hex.HexStringSyntax
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
   def show[T](t: T)(implicit encoder: Encoder[T]): String = CirceUtils.print(t.asJson)
 
+  val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(i.toString, TimeStamp.unsafe(i.toLong), i, i, i, AVector(i.toString), None)
+    BlockEntry(BlockHash.zero, TimeStamp.unsafe(i.toLong), i, i, i, AVector(BlockHash.zero), None)
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
@@ -42,11 +43,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
   val networkType = NetworkType.Mainnet
-
-  def generateKeyHash(): String = {
-    val address = PublicKey.generate
-    Hex.toHexString(address.bytes)
-  }
 
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
@@ -91,25 +87,25 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode empty FetchResponse" in {
-    val response = FetchResponse(Seq.empty)
+    val response = FetchResponse(AVector.empty)
     val jsonRaw =
       """{"blocks":[]}"""
     checkData(response, jsonRaw)
   }
 
   it should "encode/decode FetchResponse" in {
-    val response = FetchResponse((0 to 1).map(entryDummy))
+    val response = FetchResponse(AVector.tabulate(2)(entryDummy))
     val jsonRaw =
-      """{"blocks":[{"hash":"0","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["0"]},{"hash":"1","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["1"]}]}"""
+      s"""{"blocks":[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"]}]}"""
     checkData(response, jsonRaw)
   }
 
   it should "encode/decode SelfClique" in {
     val cliqueId    = CliqueId.generate
-    val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), 9000, 9001, 9002)
+    val peerAddress = PeerAddress(InetAddress.getByName("127.0.0.1"), 9001, 9002)
     val selfClique  = SelfClique(cliqueId, AVector(peerAddress), 1)
     val jsonRaw =
-      s"""{"cliqueId":"${cliqueId.toHexString}","peers":[{"address":"127.0.0.1","rpcPort":9000,"restPort":9001,"wsPort":9002}],"groupNumPerBroker":1}"""
+      s"""{"cliqueId":"${cliqueId.toHexString}","peers":[{"address":"127.0.0.1","restPort":9001,"wsPort":9002}],"groupNumPerBroker":1}"""
     checkData(selfClique, jsonRaw)
   }
 
@@ -132,18 +128,19 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Input" in {
-    val key       = "dummyKey"
+    val key       = Hash.generate
     val outputRef = OutputRef(1234, key)
 
     {
       val data    = Input(outputRef, None)
-      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"}}"""
+      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"}}"""
       checkData(data, jsonRaw)
     }
 
     {
-      val data    = Input(outputRef, Some(hex"abcd"))
-      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"dummyKey"},"unlockScript":"abcd"}"""
+      val data = Input(outputRef, Some(hex"abcd"))
+      val jsonRaw =
+        s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
       checkData(data, jsonRaw)
     }
   }
@@ -188,8 +185,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode TxResult" in {
-    val result  = TxResult("txId", 0, 1)
-    val jsonRaw = """{"txId":"txId","fromGroup":0,"toGroup":1}"""
+    val hash    = Hash.generate
+    val result  = TxResult(hash, 0, 1)
+    val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
 
@@ -214,8 +212,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val result  = BuildTransactionResult("tx", "txId", 1, 2)
-    val jsonRaw = """{"unsignedTx":"tx","txId":"txId","fromGroup":1,"toGroup":2}"""
+    val txId    = Hash.generate
+    val result  = BuildTransactionResult("tx", txId, 1, 2)
+    val jsonRaw = s"""{"unsignedTx":"tx","txId":"${txId.toHexString}","fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }
 
@@ -225,5 +224,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val jsonRaw =
       s"""{"unsignedTx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)
+  }
+
+  it should "encode/decode TxStatus" in {
+    val blockHash         = BlockHash.generate
+    val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
+    val jsonRaw0 =
+      s"""{"Confirmed":{"blockHash":"${blockHash.toHexString}","blockIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}}"""
+    checkData(status0, jsonRaw0)
+
+    checkData(MemPooled: TxStatus, s"""{"MemPooled":{}}""")
+    checkData(NotFound: TxStatus, s"""{"NotFound":{}}""")
   }
 }

@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{TransactionAbstract, TransactionTemplate}
+import org.alephium.protocol.model.TransactionTemplate
 import org.alephium.util.{AVector, RWLock}
 
 /*
@@ -36,8 +36,8 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
 
   def capacity: Int = _capacity
 
-  def contains(transaction: TransactionAbstract): Boolean = readOnly {
-    weights.contains(transaction.id)
+  def contains(txId: Hash): Boolean = readOnly {
+    weights.contains(txId)
   }
 
   def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
@@ -67,7 +67,7 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
   def remove(transactions: AVector[TransactionTemplate]): Int = writeOnly {
     val sizeBefore = size
     transactions.foreach { tx =>
-      if (contains(tx)) {
+      if (contains(tx.id)) {
         val weight = weights(tx.id)
         weights -= tx.id
         pool -= WeightedId(weight, tx.id)

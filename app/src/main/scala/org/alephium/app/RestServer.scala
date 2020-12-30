@@ -130,11 +130,16 @@ class RestServer(
                                      BuildTransaction(fromKey, toAddress, lockTime, value)))
   }
 
-  private val sendTransactionLogic = sendTransaction.serverLogic { transaction =>
+  private val sendTransactionRoute = sendTransaction.toRoute { transaction =>
     serverUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val minerActionLogic = minerAction.serverLogic {
+  private val getTransactionStatusRoute = getTransactionStatus.toRoute {
+    case (txId, from, to) =>
+      Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to)))
+  }
+
+  private val minerActionRoute = minerAction.toRoute {
     case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
     case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
   }
@@ -180,11 +185,12 @@ class RestServer(
     getChainInfo,
     listUnconfirmedTransactions,
     buildTransaction,
-    sendTransactionLogic.endpoint,
+    sendTransaction,
+    getTransactionStatus,
     sendContract,
     compile,
     buildContract,
-    minerActionLogic.endpoint
+    minerAction
   )
 
   private val docs: OpenAPI =
@@ -204,8 +210,9 @@ class RestServer(
       getChainInfoRoute ~
       listUnconfirmedTransactionsRoute ~
       buildTransactionRoute ~
-      sendTransactionLogic.toRoute ~
-      minerActionLogic.toRoute ~
+      sendTransactionRoute ~
+      getTransactionStatusRoute ~
+      minerActionRoute ~
       sendContractRoute ~
       compileRoute ~
       exportBlocksRoute ~
@@ -256,7 +263,7 @@ object RestServer {
     SelfClique(
       cliqueInfo.id,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.rpcPort, peer.restPort, peer.wsPort)),
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
       cliqueInfo.groupNumPerBroker
     )
   }

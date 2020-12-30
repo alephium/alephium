@@ -24,18 +24,11 @@ trait InfoFixture extends ModelGenerators {
   lazy val intraCliqueInfoGen: Gen[IntraCliqueInfo] = {
     for {
       info     <- cliqueInfoGen
-      rpcPort  <- portGen
       restPort <- portGen
       wsPort   <- portGen
     } yield {
       val peers = info.internalAddresses.mapWithIndex { (address, id) =>
-        PeerInfo.unsafe(id,
-                        info.groupNumPerBroker,
-                        Some(address),
-                        address,
-                        rpcPort,
-                        restPort,
-                        wsPort)
+        PeerInfo.unsafe(id, info.groupNumPerBroker, Some(address), address, restPort, wsPort)
       }
       IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker)
     }

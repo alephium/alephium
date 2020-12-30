@@ -230,6 +230,11 @@ trait FlowFixture
     AVector(fullTx)
   }
 
+  def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex)
+    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
+  }
+
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps

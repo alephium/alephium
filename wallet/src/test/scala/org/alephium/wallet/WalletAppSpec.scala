@@ -19,7 +19,6 @@ package org.alephium.wallet
 import java.net.InetAddress
 import java.nio.file.Files
 
-import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration._
 
 import akka.actor.ActorSystem
@@ -33,12 +32,15 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 
+import org.alephium.api.ApiModelCodec
+import org.alephium.api.CirceUtils.avectorDecoder
+import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, NetworkType, TxGenerators}
+import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
@@ -64,6 +66,8 @@ class WalletAppSpec
 
   val networkType = NetworkType.Mainnet
 
+  val blockflowFetchMaxAge = Duration.unsafe(1000)
+
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
   val blockflowBinding = blockFlowMock.server.futureValue
@@ -75,7 +79,7 @@ class WalletAppSpec
     walletPort,
     tempSecretDir,
     networkType,
-    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum))
+    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge))
 
   val walletApp: WalletApp =
     new WalletApp(config)
@@ -250,27 +254,29 @@ class WalletAppSpec
 }
 
 object WalletAppSpec extends {
-  import org.alephium.wallet.web.BlockFlowClient._
 
   class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(
       implicit val groupConfig: GroupConfig,
       system: ActorSystem)
       extends FailFastCirceSupport
       with TxGenerators
-      with Codecs {
+      with ApiModelCodec {
 
-    private val peer = PeerAddress(address, Some(port), None)
+    private val cliqueId = CliqueId.generate
+    private val peer     = PeerAddress(address, port, port)
+
+    val blockflowFetchMaxAge = Duration.unsafe(1000)
 
     val routes: Route =
       path("transactions" / "build") {
         get {
           parameters("fromKey".as[String]) { _ =>
             parameters("toAddress".as[String]) { _ =>
-              parameters("value".as[U256]) { _ =>
+              parameters("value".as[Int]) { _ =>
                 val unsignedTx = transactionGen().sample.get.unsigned
                 complete(
                   BuildTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                                         Hex.toHexString(unsignedTx.hash.bytes),
+                                         unsignedTx.hash,
                                          unsignedTx.fromGroup.value,
                                          unsignedTx.toGroup.value)
                 )
@@ -287,7 +293,7 @@ object WalletAppSpec extends {
           }
         } ~
         path("infos" / "self-clique") {
-          complete(SelfClique(ArraySeq(peer, peer), 2))
+          complete(SelfClique(cliqueId, AVector(peer, peer), 2))
         } ~
         path("addresses" / Segment / "balance") { _ =>
           get {

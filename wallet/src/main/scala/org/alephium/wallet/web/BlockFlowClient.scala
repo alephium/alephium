@@ -16,206 +16,103 @@
 
 package org.alephium.wallet.web
 
-import java.net.InetAddress
-
-import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
-import scala.reflect.ClassTag
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
-import io.circe.{Codec, Decoder, Encoder, Json, JsonObject}
-import io.circe.generic.semiauto.{deriveCodec, deriveDecoder, deriveEncoder}
-import io.circe.syntax._
+import sttp.client._
+import sttp.client.akkahttp.AkkaHttpBackend
+import sttp.model.{Uri => SttpUri}
+import sttp.tapir.client.sttp._
 
-import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.api.Endpoints
+import org.alephium.api.model._
+import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{Hex, U256}
-import org.alephium.wallet.circe.ProtocolCodecs
+import org.alephium.util.{Duration, Hex, U256}
 
 trait BlockFlowClient {
-  def getBalance(address: Address): Future[Either[String, U256]]
-  def prepareTransaction(
-      fromKey: String,
-      toAddress: Address,
-      value: U256): Future[Either[String, BlockFlowClient.BuildTransactionResult]]
-  def sendTransaction(tx: String,
+  def fetchBalance(address: Address): Future[Either[String, U256]]
+  def prepareTransaction(fromKey: String,
+                         toAddress: Address,
+                         value: U256): Future[Either[String, BuildTransactionResult]]
+  def postTransaction(tx: String,
                       signature: Signature,
-                      fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]]
+                      fromGroup: Int): Future[Either[String, TxResult]]
 }
 
 object BlockFlowClient {
-  def apply(httpClient: HttpClient, defaultUri: Uri, groupNum: Int, networkType: NetworkType)(
-      implicit executionContext: ExecutionContext): BlockFlowClient =
-    new Impl(httpClient, defaultUri, groupNum, networkType)
+  def apply(defaultUri: Uri,
+            groupNum: Int,
+            networkType: NetworkType,
+            blockflowFetchMaxAge: Duration)(implicit actorSystem: ActorSystem,
+                                            executionContext: ExecutionContext): BlockFlowClient =
+    new Impl(defaultUri, groupNum, networkType, blockflowFetchMaxAge)
 
-  private class Impl(httpClient: HttpClient,
-                     defaultUri: Uri,
+  private class Impl(defaultUri: Uri,
                      groupNum: Int,
-                     val networkType: NetworkType)(implicit executionContext: ExecutionContext)
+                     val networkType: NetworkType,
+                     val blockflowFetchMaxAge: Duration)(implicit actorSystem: ActorSystem,
+                                                         executionContext: ExecutionContext)
       extends BlockFlowClient
-      with Codecs {
+      with Endpoints {
 
-    implicit private val groupConfig: GroupConfig = new GroupConfig { val groups = groupNum }
+    implicit val groupConfig: GroupConfig = new GroupConfig { val groups = groupNum }
 
-    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-    private def request[P <: RestRequest: Encoder, R: Codec: ClassTag](
-        restRequest: P,
-        uri: Uri = defaultUri): Future[Either[String, R]] = {
-      httpClient
-        .request[R](
-          HttpRequest(
-            restRequest.method,
-            uri = Uri(uri.toString ++ restRequest.endpoint),
-            entity = {
-              if (restRequest.isEntity) {
-                HttpEntity(ContentTypes.`application/json`, restRequest.asJson.toString)
-              } else {
-                HttpEntity.Empty
-              }
-            }
-          )
-        )
-    }
+    private val backend = AkkaHttpBackend.usingActorSystem(actorSystem)
 
-    private def requestFromGroup[P <: RestRequest: Encoder, R: Codec: ClassTag](
-        fromGroup: GroupIndex,
-        restRequest: P
-    ): Future[Either[String, R]] =
-      uriFromGroup(fromGroup).flatMap {
-        _.fold(
-          error => Future.successful(Left(error)),
-          uri   => request[P, R](restRequest, uri)
-        )
-      }
-
-    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, Uri]] =
-      getSelfClique().map { selfCliqueEither =>
+    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, SttpUri]] =
+      fetchSelfClique().map { selfCliqueEither =>
         for {
           selfClique <- selfCliqueEither
-          peer = selfClique.peer(fromGroup)
-          restPort <- peer.restPort.toRight(
-            s"No rpc port for group ${fromGroup.value} (peers: ${selfClique.peers})")
         } yield {
-          Uri(s"http://${peer.address.getHostAddress}:$restPort")
+          val peer = selfClique.peer(fromGroup)
+          uri"http://${peer.address.getHostAddress}:${peer.restPort}"
         }
       }
 
-    def getBalance(address: Address): Future[Either[String, U256]] =
-      requestFromGroup[GetBalance, Balance](
-        address.groupIndex,
-        GetBalance(address)
-      ).map(_.map(_.balance))
+    private def requestFromGroup[P, A, R](fromGroup: GroupIndex,
+                                          endpoint: BaseEndpoint[P, A],
+                                          params: P)(f: A => R): Future[Either[String, R]] =
+      uriFromGroup(fromGroup).flatMap {
+        _.fold(
+          error => Future.successful(Left(error)),
+          uri =>
+            backend
+              .send(endpoint.toSttpRequestUnsafe(uri).apply(params))
+              .map(_.body.map(f).left.map(_.message))
+        )
+      }
+
+    def fetchBalance(address: Address): Future[Either[String, U256]] =
+      requestFromGroup(address.groupIndex, getBalance, address)(_.balance)
 
     def prepareTransaction(fromKey: String,
                            toAddress: Address,
                            value: U256): Future[Either[String, BuildTransactionResult]] = {
-      Hex.from(fromKey).flatMap(PublicKey.from).map(LockupScript.p2pkh) match {
+      Hex.from(fromKey).flatMap(PublicKey.from) match {
         case None => Future.successful(Left(s"Cannot decode key $fromKey"))
-        case Some(lockupScript) =>
-          requestFromGroup[BuildTransaction, BuildTransactionResult](
-            lockupScript.groupIndex,
-            BuildTransaction(fromKey, toAddress, value)
-          )
+        case Some(publicKey) =>
+          val lockupScript = LockupScript.p2pkh(publicKey)
+          requestFromGroup(lockupScript.groupIndex,
+                           buildTransaction,
+                           (publicKey, toAddress, None, value))(identity)
       }
     }
 
-    def sendTransaction(tx: String,
+    def postTransaction(tx: String,
                         signature: Signature,
-                        fromGroup: Int): Future[Either[String, BlockFlowClient.TxResult]] = {
-      requestFromGroup[SendTransaction, TxResult](
-        GroupIndex.unsafe(fromGroup),
-        SendTransaction(tx, signature.toHexString)
-      )
+                        fromGroup: Int): Future[Either[String, TxResult]] = {
+      requestFromGroup(GroupIndex.unsafe(fromGroup),
+                       sendTransaction,
+                       SendTransaction(tx, signature))(identity)
     }
 
-    private def getSelfClique(): Future[Either[String, SelfClique]] =
-      request[GetSelfClique.type, SelfClique](
-        GetSelfClique
-      )
-  }
-
-  final case class Result[A: Codec](result: A)
-
-  sealed trait RestRequest {
-    def method: HttpMethod
-    def endpoint: String
-    lazy val isEntity: Boolean = false
-  }
-
-  sealed trait GetRequest extends RestRequest {
-    lazy val method: HttpMethod = HttpMethods.GET
-    def endpoint: String
-  }
-
-  sealed trait PostRequest extends RestRequest {
-    lazy val method: HttpMethod = HttpMethods.POST
-    def endpoint: String
-  }
-
-  final case object GetSelfClique extends GetRequest {
-    lazy val endpoint: String = "/infos/self-clique"
-    implicit lazy val encoder: Encoder[GetSelfClique.type] = new Encoder[GetSelfClique.type] {
-      final def apply(selfClique: GetSelfClique.type): Json = JsonObject.empty.asJson
-    }
-  }
-
-  final case class GetBalance(address: Address) extends GetRequest {
-    lazy val endpoint: String = s"/addresses/${address.toBase58}/balance"
-  }
-
-  final case class Balance(balance: U256, utxoNum: Int)
-
-  final case class BuildTransaction(
-      fromKey: String,
-      toAddress: Address,
-      value: U256
-  ) extends GetRequest {
-    lazy val endpoint: String =
-      s"/transactions/build?fromKey=$fromKey&toAddress=${toAddress.toBase58}&value=${value.toString}"
-  }
-
-  final case class BuildTransactionResult(unsignedTx: String,
-                                          txId: String,
-                                          fromGroup: Int,
-                                          toGroup: Int)
-
-  final case class SendTransaction(unsignedTx: String, signature: String) extends PostRequest {
-    lazy val endpoint: String           = "/transactions/send"
-    override lazy val isEntity: Boolean = true
-  }
-
-  final case class TxResult(txId: Hash, fromGroup: Int, toGroup: Int)
-
-  final case class PeerAddress(address: InetAddress, restPort: Option[Int], wsPort: Option[Int])
-
-  final case class SelfClique(peers: ArraySeq[PeerAddress], groupNumPerBroker: Int) {
-    def peer(groupIndex: GroupIndex): PeerAddress =
-      peers((groupIndex.value / groupNumPerBroker) % peers.length)
-  }
-
-  trait Codecs extends ProtocolCodecs {
-
-    def networkType: NetworkType
-
-    implicit def resultCodec[A: Codec]: Codec[Result[A]] = deriveCodec[Result[A]]
-
-    implicit lazy val balanceCodec: Codec[Balance] = deriveCodec[Balance]
-    implicit lazy val buildTransactionCodec: Codec[BuildTransaction] =
-      deriveCodec[BuildTransaction]
-    implicit lazy val buildTransactionResultCodec: Codec[BuildTransactionResult] =
-      deriveCodec[BuildTransactionResult]
-    implicit lazy val getBalanceCodec: Codec[GetBalance]     = deriveCodec[GetBalance]
-    implicit lazy val peerAddressCodec: Codec[PeerAddress]   = deriveCodec[PeerAddress]
-    implicit lazy val selfCliqueEncoder: Encoder[SelfClique] = deriveEncoder[SelfClique]
-    implicit lazy val selfCliqueDecoder: Decoder[SelfClique] =
-      deriveDecoder[SelfClique]
-        .ensure(_.groupNumPerBroker > 0, "Non-positve groupNumPerBroker")
-        .ensure(_.peers.nonEmpty, "Zero number of peers")
-    implicit lazy val selfCliqueCodec: Codec[SelfClique] =
-      Codec.from(selfCliqueDecoder, selfCliqueEncoder)
-    implicit lazy val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
-    implicit lazy val txResultCodec: Codec[TxResult]               = deriveCodec[TxResult]
+    private def fetchSelfClique(): Future[Either[String, SelfClique]] =
+      backend
+        .send(getSelfClique.toSttpRequestUnsafe(uri"${defaultUri.toString}").apply(()))
+        .map(_.body.left.map(_.message))
   }
 }
