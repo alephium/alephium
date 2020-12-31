@@ -48,8 +48,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
       chain
     }
 
-    def addBlocks(chain: BlockChain, blocks: AVector[Block]): Unit = {
-      blocks.foreachWithIndex((block, index) => chain.add(block, index + 1).isRight is true)
+    def addBlocks(chain: BlockChain, blocks: AVector[Block], preBlocks: Int = 0): Unit = {
+      blocks.foreachWithIndex((block, index) =>
+        chain.add(block, preBlocks + index + 1).isRight is true)
     }
   }
 
@@ -58,11 +59,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.contains(genesis) isE true
     chain.getHeight(genesis.hash) isE ALF.GenesisHeight
     chain.getWeight(genesis.hash) isE ALF.GenesisWeight
-    chain.getChainWeight(genesis.hash) isE ALF.GenesisWeight
     chain.containsUnsafe(genesis.hash) is true
     chain.getHeightUnsafe(genesis.hash) is ALF.GenesisHeight
     chain.getWeightUnsafe(genesis.hash) is ALF.GenesisWeight
-    chain.getChainWeightUnsafe(genesis.hash) is ALF.GenesisWeight
     chain.getTimestamp(genesis.hash) isE ALF.GenesisTimestamp
   }
 
@@ -339,7 +338,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
 
-    addBlocks(chain, longChain.drop(2))
+    addBlocks(chain, longChain.drop(2), 2)
     chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
     chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
@@ -369,9 +368,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     val chain      = buildBlockChain()
     addBlocks(chain, shortChain)
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
-    chain.maxChainWeight isE chain.getChainWeightUnsafe(shortChain.last.hash)
+    chain.maxWeight isE chain.getWeightUnsafe(shortChain.last.hash)
     addBlocks(chain, longChain)
-    chain.maxChainWeight isE chain.getChainWeightUnsafe(longChain.last.hash)
+    chain.maxWeight isE chain.getWeightUnsafe(longChain.last.hash)
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
     chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain.last.hash)
   }

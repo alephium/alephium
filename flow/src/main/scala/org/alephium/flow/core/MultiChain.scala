@@ -106,12 +106,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getWeightUnsafe(hash: BlockHash): BigInteger =
     getHashChain(hash).getWeightUnsafe(hash)
 
-  def getChainWeight(hash: BlockHash): IOResult[BigInteger] =
-    getHashChain(hash).getChainWeight(hash)
-
-  def getChainWeightUnsafe(hash: BlockHash): BigInteger =
-    getHashChain(hash).getChainWeightUnsafe(hash)
-
   def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]] =
     getHashChain(hash).getBlockHashSlice(hash)
 

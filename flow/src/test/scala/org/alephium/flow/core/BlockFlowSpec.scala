@@ -128,7 +128,6 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks2.foreach { block =>
         addAndCheck(blockFlow, block, 4)
-        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
@@ -140,7 +139,6 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks3.foreach { block =>
         addAndCheck(blockFlow, block, 8)
-        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
@@ -252,7 +250,6 @@ class BlockFlowSpec extends AlephiumSpec {
     } yield transferOnlyForIntraGroup(blockFlow1, ChainIndex.unsafe(i, j))
     newBlocks2.foreach { block =>
       addAndCheck(blockFlow1, block, 4)
-      blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
     }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))

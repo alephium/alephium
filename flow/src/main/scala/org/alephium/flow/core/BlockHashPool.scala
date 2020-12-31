@@ -38,10 +38,6 @@ trait BlockHashPool {
 
   def getWeightUnsafe(hash: BlockHash): BigInteger
 
-  def getChainWeight(hash: BlockHash): IOResult[BigInteger]
-
-  def getChainWeightUnsafe(hash: BlockHash): BigInteger
-
   def getHeight(hash: BlockHash): IOResult[Int]
 
   def getHeightUnsafe(hash: BlockHash): Int
