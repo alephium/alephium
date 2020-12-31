@@ -51,10 +51,42 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
       }
     }
 
-    iter(initialTips, sortedDeps.filter(_ != bestDep)) match {
+    val result = iter(initialTips, sortedDeps.filter(_ != bestDep)) match {
       case Some(flowTips) => flowTips.sameAs(blockDeps)
       case None           => false
     }
+    if (!result) dumpInvalidFlow(blockDeps, targetGroup)
+    result
+  }
+
+  def dumpInvalidFlow(blockDeps: BlockDeps, targetGroup: GroupIndex): Unit = {
+    var s =
+      s"=========== Invalid Flow for group ${targetGroup.value}: ${blockDeps.deps.map(_.shortHex).mkString("-")}\n"
+
+    val bestDep     = blockDeps.deps.max(blockHashOrdering)
+    val initialTips = getFlowTipsUnsafe(bestDep, targetGroup)
+    val sortedDeps  = BlockFlowValidation.sortDeps(blockDeps, bestDep, targetGroup)
+
+    s += s"bestDep: ${bestDep.shortHex}\n"
+    s += s"sortedDeps: ${sortedDeps.map(_.shortHex).mkString("-")}\n"
+
+    @tailrec
+    def iter(currentTips: FlowTips, tips: AVector[BlockHash]): Unit = {
+      s += (s"currentTips: ${currentTips.toBlockDeps.deps.map(_.shortHex).mkString("-")}\n")
+      if (tips.nonEmpty) {
+        s += (s"next tip: ${tips.head.shortHex}\n")
+
+        tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts = false) match {
+          case Some(merged) => iter(merged, tips.tail)
+          case None         => s += "Cannot merge\n"
+        }
+      }
+    }
+
+    iter(initialTips, sortedDeps.filter(_ != bestDep))
+    s += (s"===========\n")
+
+    println(s)
   }
 
   def checkFlowDepsUnsafe(header: BlockHeader): Boolean = {

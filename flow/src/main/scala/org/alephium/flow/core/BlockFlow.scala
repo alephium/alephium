@@ -242,7 +242,6 @@ object BlockFlow extends StrictLogging {
                         toTry: AVector[BlockHash],
                         bestTip: BlockHash): (FlowTips, BigInteger) = {
       toTry
-        .sorted(blockHashOrdering.reverse)
         .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
             // only consider tips < bestTip
@@ -266,13 +265,19 @@ object BlockFlow extends StrictLogging {
       val weight0    = calWeightUnsafe(flowTips0)
       val groupOrder = BlockFlow.randomGroupOrders(bestTip)
 
+      var s = s"=========== calBestDeps\n"
+      s += (s"bestTip: ${bestTip.shortHex}, group: ${group.value}\n")
+      s += s"bestDeps: ${flowTips0.toBlockDeps.deps.map(_.shortHex).mkString("-")}\n"
+
       val (flowTips1, weight1) =
         (if (bestIndex.from == group) groupOrder.filter(_ != bestIndex.to.value) else groupOrder)
           .fold(flowTips0 -> weight0) {
             case ((tipsCur, weightCur), _r) =>
               val r     = GroupIndex.unsafe(_r)
               val chain = getHashChain(group, r)
-              tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips, bestTip)
+              val x     = tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips, bestTip)
+              s += s"extended1 ${r.value}: ${x._1.toBlockDeps.deps.map(_.shortHex).mkString("-")}\n"
+              x
           }
       val (flowTips2, _) = groupOrder
         .filter(g => g != group.value && g != bestIndex.from.value)
@@ -283,8 +288,12 @@ object BlockFlow extends StrictLogging {
               val r = GroupIndex.unsafe(_r)
               acc ++ getHashChain(l, r).getAllTips
             }
-            tryExtendUnsafe(tipsCur, weightCur, group, toTry, bestTip)
+            val x = tryExtendUnsafe(tipsCur, weightCur, group, toTry, bestTip)
+            s += s"extended2 ${l.value}: ${x._1.toBlockDeps.deps.map(_.shortHex).mkString("-")}\n"
+            x
         }
+
+      println(s)
       flowTips2.toBlockDeps
     }
 
