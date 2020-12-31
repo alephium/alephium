@@ -32,4 +32,8 @@ final case class FlowTips(targetGroup: GroupIndex,
 
 object FlowTips {
   final case class Light(inTips: AVector[BlockHash], outTip: BlockHash)
+
+  def from(blockDeps: BlockDeps, targetGroup: GroupIndex): FlowTips = {
+    FlowTips(targetGroup, blockDeps.inDeps, blockDeps.outDeps)
+  }
 }

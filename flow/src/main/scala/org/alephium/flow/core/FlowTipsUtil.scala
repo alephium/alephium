@@ -137,6 +137,23 @@ trait FlowTipsUtil {
     FlowTips(targetGroup, inTips, targetTips)
   }
 
+  private[core] def getFlowTipsDiffUnsafe(newTips: FlowTips,
+                                          oldTips: FlowTips): AVector[BlockHash] = {
+    val outDiffs = getTipsDiffUnsafe(newTips.outTips, oldTips.outTips)
+    val groupDiffs = newTips.inTips.indices.foldLeft(AVector.empty[BlockHash]) {
+      case (acc, g) =>
+        acc ++ getGroupTipsDiffUnsafe(newTips.inTips(g), oldTips.inTips(g))
+    }
+    groupDiffs ++ outDiffs
+  }
+
+  private[core] def getGroupTipsDiffUnsafe(newTip: BlockHash,
+                                           oldTip: BlockHash): AVector[BlockHash] = {
+    val newOutTips = getOutTips(getBlockHeaderUnsafe(newTip), true)
+    val oldOutTips = getOutTips(getBlockHeaderUnsafe(oldTip), true)
+    getTipsDiffUnsafe(newOutTips, oldOutTips)
+  }
+
   private[core] def getLightTipsUnsafe(tip: BlockHash, targetGroup: GroupIndex): FlowTips.Light = {
     val header = getBlockHeaderUnsafe(tip)
     getLightTipsUnsafe(header, targetGroup)
