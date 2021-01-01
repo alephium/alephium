@@ -128,7 +128,6 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks2.foreach { block =>
         addAndCheck(blockFlow, block, 4)
-        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
@@ -140,7 +139,6 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks3.foreach { block =>
         addAndCheck(blockFlow, block, 8)
-        blockFlow.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 3
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
@@ -177,6 +175,34 @@ class BlockFlowSpec extends AlephiumSpec {
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
     }
+  }
+
+  it should "compute block weight" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val blocks0 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+    val blocks1 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks1.foreach(addAndCheck(blockFlow, _, brokerConfig.depsNum + 1))
+
+    val blocks2 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks2.foreach(addAndCheck(blockFlow, _, brokerConfig.chainNum + brokerConfig.depsNum + 1))
+
+    val blocks3 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks3.foreach(addAndCheck(blockFlow, _, brokerConfig.chainNum * 2 + brokerConfig.depsNum + 1))
   }
 
   it should "update mempool correctly" in new FlowFixture {
@@ -224,7 +250,6 @@ class BlockFlowSpec extends AlephiumSpec {
     } yield transferOnlyForIntraGroup(blockFlow1, ChainIndex.unsafe(i, j))
     newBlocks2.foreach { block =>
       addAndCheck(blockFlow1, block, 4)
-      blockFlow1.getChainWeight(block.hash) isE consensusConfig.maxMiningTarget * 2
     }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
@@ -347,23 +372,29 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val fromGroup = Random.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
     val toGroup   = Random.source.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
-    val block     = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
-    block.nonCoinbase.nonEmpty is true
 
+    val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+    block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow0, block, 1)
     checkBalance(blockFlow0, fromGroup, genesisBalance)
-
     addAndCheck(blockFlow1, block, 1)
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     checkBalance(blockFlow1, pubScript, 0)
 
     val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)
+    addAndCheck(blockFlow1, fromGroupBlock.header, 2)
     checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
 
     val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
-    addAndCheck(blockFlow1, toGroupBlock, 2) // TODO: fix weight calculation
+    addAndCheck(blockFlow1, toGroupBlock, 3)
+    addAndCheck(blockFlow0, toGroupBlock.header, 3)
     checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
+
+    fromGroup isnot toGroup
+    val newBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+    addAndCheck(blockFlow0, newBlock, 4)
+    addAndCheck(blockFlow1, newBlock, 4)
   }
 
   behavior of "Utilities"

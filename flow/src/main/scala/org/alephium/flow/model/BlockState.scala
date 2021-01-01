@@ -20,9 +20,9 @@ import java.math.BigInteger
 
 import org.alephium.serde.Serde
 
-final case class BlockState(height: Int, weight: BigInteger, chainWeight: BigInteger)
+final case class BlockState(height: Int, weight: BigInteger)
 
 object BlockState {
   implicit val serde: Serde[BlockState] =
-    Serde.forProduct3(BlockState(_, _, _), t => (t.height, t.weight, t.chainWeight))
+    Serde.forProduct2(BlockState(_, _), t => (t.height, t.weight))
 }

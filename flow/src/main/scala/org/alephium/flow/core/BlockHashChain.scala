@@ -45,11 +45,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
                         parentHash: BlockHash,
                         height: Int,
                         weight: BigInteger,
-                        chainWeight: BigInteger,
                         timestamp: TimeStamp,
                         isCanonical: Boolean): IOResult[Unit] = {
     for {
-      _ <- blockStateStorage.put(hash, BlockState(height, weight, chainWeight))
+      _ <- blockStateStorage.put(hash, BlockState(height, weight))
       _ <- updateHeightIndex(hash, height, isCanonical)
       _ <- updateState(hash, timestamp, parentHash)
     } yield ()
@@ -57,7 +56,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   protected def addGenesis(hash: BlockHash): IOResult[Unit] = {
     assume(hash == genesisHash)
-    val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight, ALF.GenesisWeight)
+    val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight)
     for {
       _ <- blockStateStorage.put(genesisHash, genesisState)
       _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight, true)
@@ -91,11 +90,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       getWeight(hash).map(weight.max)
   }
 
-  def maxChainWeight: IOResult[BigInteger] = EitherF.foldTry(tips.keys, BigInteger.ZERO) {
-    (chainWeight, hash) =>
-      getChainWeight(hash).map(chainWeight.max)
-  }
-
   def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
     getHeight(hash).map(math.max(height, _))
   }
@@ -121,10 +115,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     blockStateStorage.get(hash).map(_.weight)
   def getWeightUnsafe(hash: BlockHash): BigInteger =
     blockStateStorage.getUnsafe(hash).weight
-  def getChainWeight(hash: BlockHash): IOResult[BigInteger] =
-    blockStateStorage.get(hash).map(_.chainWeight)
-  def getChainWeightUnsafe(hash: BlockHash): BigInteger =
-    blockStateStorage.getUnsafe(hash).chainWeight
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 

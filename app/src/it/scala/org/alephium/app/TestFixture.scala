@@ -21,6 +21,7 @@ import java.nio.channels.DatagramChannel
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
 import scala.util.control.NonFatal
 
@@ -61,7 +62,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig =
-    PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -84,22 +85,29 @@ trait TestFixtureLike
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
 
+  val usedPort = mutable.Set.empty[Int]
   def generatePort: Int = {
-    val tcpPort              = 40000 + Random.source.nextInt(5000) * 4
-    val tcp: DatagramSocket  = DatagramChannel.open().socket()
-    val rest: DatagramSocket = DatagramChannel.open().socket()
-    val ws: DatagramSocket   = DatagramChannel.open().socket()
-    try {
-      tcp.bind(new InetSocketAddress("localhost", tcpPort))
-      rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
-      ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
-      tcpPort
-    } catch {
-      case NonFatal(_) => generatePort
-    } finally {
-      tcp.close()
-      rest.close()
-      ws.close()
+    val tcpPort = 40000 + Random.source.nextInt(5000) * 4
+
+    if (usedPort.contains(tcpPort)) {
+      generatePort
+    } else {
+      val tcp: DatagramSocket  = DatagramChannel.open().socket()
+      val rest: DatagramSocket = DatagramChannel.open().socket()
+      val ws: DatagramSocket   = DatagramChannel.open().socket()
+      try {
+        tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+        ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
+        usedPort.add(tcpPort)
+        tcpPort
+      } catch {
+        case NonFatal(_) => generatePort
+      } finally {
+        tcp.close()
+        rest.close()
+        ws.close()
+      }
     }
   }
 
@@ -244,7 +252,7 @@ trait TestFixtureLike
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.mining.batch-delay", "500 milli"), // increase this if still flaky
+        ("alephium.mining.batch-delay", "100 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )
