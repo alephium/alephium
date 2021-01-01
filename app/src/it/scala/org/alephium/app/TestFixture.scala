@@ -21,6 +21,7 @@ import java.nio.channels.DatagramChannel
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
 import scala.util.control.NonFatal
 
@@ -84,22 +85,29 @@ trait TestFixtureLike
   val initialBalance = Balance(genesisBalance, 1)
   val transferAmount = ALF.alf(1)
 
+  val usedPort = mutable.Set.empty[Int]
   def generatePort: Int = {
-    val tcpPort              = 40000 + Random.source.nextInt(5000) * 4
-    val tcp: DatagramSocket  = DatagramChannel.open().socket()
-    val rest: DatagramSocket = DatagramChannel.open().socket()
-    val ws: DatagramSocket   = DatagramChannel.open().socket()
-    try {
-      tcp.bind(new InetSocketAddress("localhost", tcpPort))
-      rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
-      ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
-      tcpPort
-    } catch {
-      case NonFatal(_) => generatePort
-    } finally {
-      tcp.close()
-      rest.close()
-      ws.close()
+    val tcpPort = 40000 + Random.source.nextInt(5000) * 4
+
+    if (usedPort.contains(tcpPort)) {
+      generatePort
+    } else {
+      val tcp: DatagramSocket  = DatagramChannel.open().socket()
+      val rest: DatagramSocket = DatagramChannel.open().socket()
+      val ws: DatagramSocket   = DatagramChannel.open().socket()
+      try {
+        tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+        ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
+        usedPort.add(tcpPort)
+        tcpPort
+      } catch {
+        case NonFatal(_) => generatePort
+      } finally {
+        tcp.close()
+        rest.close()
+        ws.close()
+      }
     }
   }
 
