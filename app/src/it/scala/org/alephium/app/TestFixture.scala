@@ -62,7 +62,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   override implicit val patienceConfig =
-    PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -252,7 +252,7 @@ trait TestFixtureLike
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.mining.batch-delay", "500 milli"), // increase this if still flaky
+        ("alephium.mining.batch-delay", "100 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )

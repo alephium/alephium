@@ -228,7 +228,7 @@ object BlockFlow extends StrictLogging {
                         toTry: AVector[BlockHash],
                         bestTip: BlockHash): (FlowTips, BigInteger) = {
       toTry
-        .sorted(blockHashOrdering.reverse)
+        .sorted(blockHashOrdering.reverse) // useful for draw situation
         .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) {
           case ((maxTips, maxWeight), tip) =>
             // only consider tips < bestTip
