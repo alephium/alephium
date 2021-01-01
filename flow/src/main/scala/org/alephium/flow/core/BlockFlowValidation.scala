@@ -16,13 +16,9 @@
 
 package org.alephium.flow.core
 
-import scala.annotation.tailrec
-
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, GroupIndex}
-import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
   def getBlockUnsafe(hash: BlockHash): Block
@@ -34,26 +30,20 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     IOUtils.tryExecute(checkFlowDepsUnsafe(header))
 
   def checkFlowDepsUnsafe(blockDeps: BlockDeps, targetGroup: GroupIndex): Boolean = {
-    val bestDep     = blockDeps.deps.max(blockHashOrdering)
-    val initialTips = getFlowTipsUnsafe(bestDep, targetGroup)
+    blockDeps.deps.forall { dep =>
+      val flowTips = getFlowTipsUnsafe(dep, targetGroup)
 
-    val sortedDeps = BlockFlowValidation.sortDeps(blockDeps, bestDep, targetGroup)
-
-    @tailrec
-    def iter(currentTips: FlowTips, tips: AVector[BlockHash]): Option[FlowTips] = {
-      if (tips.isEmpty) {
-        Some(currentTips)
-      } else {
-        tryMergeUnsafe(currentTips, tips.head, targetGroup, checkTxConflicts = false) match {
-          case Some(merged) => iter(merged, tips.tail)
-          case None         => None
-        }
+      val ok1 = flowTips.inTips.forallWithIndex {
+        case (depInTip, k) =>
+          val blockInTip = blockDeps.inDeps(k)
+          isExtendingUnsafe(blockInTip, depInTip)
       }
-    }
-
-    iter(initialTips, sortedDeps.filter(_ != bestDep)) match {
-      case Some(flowTips) => flowTips.sameAs(blockDeps)
-      case None           => false
+      val ok2 = flowTips.outTips.forallWithIndex {
+        case (depOutTip, k) =>
+          val blockOutTip = blockDeps.outDeps(k)
+          isExtendingUnsafe(blockOutTip, depOutTip)
+      }
+      ok1 && ok2
     }
   }
 
@@ -69,31 +59,5 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     val diff       = getTipsDiffUnsafe(newOutTips, oldOutTips)
     !isConflicted(block.hash +: diff,
                   hash => if (hash == block.hash) block else getBlockUnsafe(hash))
-  }
-}
-
-object BlockFlowValidation {
-  def sortDeps(blockDeps: BlockDeps, bestDep: BlockHash, targetGroup: GroupIndex)(
-      implicit groupConfig: GroupConfig): AVector[BlockHash] = {
-    val groupOrders = BlockFlow.randomGroupOrders(bestDep)
-    val outDeps     = blockDeps.outDeps
-    val inDeps      = blockDeps.inDeps
-
-    val sortedDeps = Array.ofDim[BlockHash](groupConfig.depsNum)
-    (0 until groupConfig.groups).foreach { k =>
-      sortedDeps(k) = outDeps(groupOrders(k))
-    }
-    var count = 0
-    groupOrders.foreach { order =>
-      if (order < targetGroup.value) {
-        sortedDeps(groupConfig.groups + count) = inDeps(order)
-        count += 1
-      } else if (order > targetGroup.value) {
-        sortedDeps(groupConfig.groups + count) = inDeps(order - 1)
-        count += 1
-      }
-    }
-
-    AVector.unsafe(sortedDeps)
   }
 }
