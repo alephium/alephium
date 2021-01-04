@@ -31,10 +31,10 @@ object Env {
 
   def resolve(env: String): Env = {
     env match {
-      case "prod"  => Prod
       case "debug" => Debug
       case "test"  => Test
       case "it"    => Integration
+      case _       => Prod
     }
   }
 }
