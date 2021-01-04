@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import java.nio.file.Path
+import java.nio.file.{Files, Path, Paths}
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
@@ -28,17 +28,22 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Files => AFiles}
 
-object Boot extends App {
-  if (!sys.env.get("ALEPHIUM_HOME").isDefined) {
-    import org.alephium.util.Files
-    // We set the environment varible to the default for logback
-    val path = Files.homeDir.resolve(".alephium")
-    System.setProperty("ALEPHIUM_HOME", path.toFile.toString)
+object Boot extends App with StrictLogging {
+  try {
+    val rootPath = sys.env.get("ALEPHIUM_HOME") match {
+      case Some(rawPath) => Paths.get(rawPath)
+      case None          => AFiles.homeDir.resolve(".alephium")
+    }
+    if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
+
+    (new BootUp).init()
+  } catch {
+    case error: Throwable =>
+      logger.error(s"Cannot initialize system: $error")
+      sys.exit(1)
   }
-
-  (new BootUp).init()
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))

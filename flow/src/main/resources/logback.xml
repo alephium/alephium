@@ -2,7 +2,7 @@
 <configuration>
     <property name="defaultPattern" value="%-63(%yellow(%date{ISO8601}) %green([%.13thread])) %highlight(%-5level) %-50(%cyan(%logger{20})) - %msg%n"/>
     <appender name="ERRFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME}/logs/alephium-errors.log</file>
+        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-errors.log</file>
         <append>true</append>
         <encoder>
             <pattern>${defaultPattern}</pattern>
@@ -18,25 +18,8 @@
         </rollingPolicy>
     </appender>
 
-    <appender name="INFOFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME}/logs/alephium-info.log</file>
-        <append>true</append>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
-        </filter>
-        <encoder>
-            <pattern>${defaultPattern}</pattern>
-        </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${ALEPHIUM_HOME}/logs/alephium.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>100MB</maxFileSize>
-            <maxHistory>60</maxHistory>
-            <totalSizeCap>2GB</totalSizeCap>
-        </rollingPolicy>
-    </appender>
-
     <appender name="DEBUGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME}/logs/alephium-debug.log</file>
+        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-errors.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>DEBUG</level>
@@ -65,7 +48,6 @@
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ERRFILE"/>
-        <appender-ref ref="INFOFILE"/>
         <appender-ref ref="DEBUGFILE"/>
     </root>
 </configuration>
