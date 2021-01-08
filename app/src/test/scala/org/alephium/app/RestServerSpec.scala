@@ -16,19 +16,22 @@
 
 package org.alephium.app
 
+import akka.actor.ActorRef
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.testkit.TestProbe
+import akka.testkit.{TestActor, TestProbe}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
+import io.circe.syntax._
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.ScalaFutures
 
+import org.alephium.api.ApiModel
 import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -165,6 +168,60 @@ class RestServerSpec
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Stop)
+    }
+  }
+
+  it should "call GET /miners/addresses" in new RestServerFixture {
+    val address      = Address.fromBase58(dummyKeyAddress, networkType).get
+    val lockupScript = address.lockupScript
+
+    minerProbe.setAutoPilot(new TestActor.AutoPilot {
+      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
+        msg match {
+          case Miner.GetAddresses =>
+            sender ! AVector(lockupScript)
+            TestActor.NoAutoPilot
+        }
+    })
+
+    Get(s"/miners/addresses") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[MinerAddresses] is MinerAddresses(AVector(address))
+    }
+  }
+
+  it should "call PUT /miners/addresses" in new RestServerFixture {
+    val newAddresses = AVector.tabulate(config.broker.groups)(i =>
+      addressStringGen(GroupIndex.unsafe(i)).sample.get._1)
+    val body   = s"""{"addresses":${newAddresses.asJson}}"""
+    val entity = HttpEntity(ContentTypes.`application/json`, body)
+
+    Put(s"/miners/addresses", entity) ~> server.route ~> check {
+      val lockupScripts = newAddresses.map(Address.extractLockupScript(_).get)
+      minerProbe.expectMsg(Miner.UpdateAddresses(lockupScripts))
+      status is StatusCodes.OK
+    }
+
+    val notEnoughAddressesBody = s"""{"addresses":["${dummyKeyAddress}"]}"""
+    val notEnoughAddressesEntity =
+      HttpEntity(ContentTypes.`application/json`, notEnoughAddressesBody)
+    Put(s"/miners/addresses", notEnoughAddressesEntity) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error(
+        -32000,
+        "Server error",
+        Some(s"Wrong number of addresses, expected ${config.broker.groups}, got 1"))
+    }
+
+    val wrongGroup       = AVector.tabulate(config.broker.groups)(_ => dummyKeyAddress)
+    val wrongGroupBody   = s"""{"addresses":${wrongGroup.asJson}}"""
+    val wrongGroupEntity = HttpEntity(ContentTypes.`application/json`, wrongGroupBody)
+    Put(s"/miners/addresses", wrongGroupEntity) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error(
+        -32000,
+        "Server error",
+        Some(s"Address ${dummyKeyAddress} doesn't belong to group 1"))
     }
   }
 

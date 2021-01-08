@@ -189,6 +189,18 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[Boolean])
       .summary("Execute an action on miners")
 
+  val minerListAddresses: BaseEndpoint[Unit, MinerAddresses] =
+    minersEndpoint.get
+      .in("addresses")
+      .out(jsonBody[MinerAddresses])
+      .summary("List miner's addresses")
+
+  val minerUpdateAddresses: BaseEndpoint[MinerAddresses, Unit] =
+    minersEndpoint.put
+      .in("addresses")
+      .in(jsonBody[MinerAddresses])
+      .summary("Update miner's addresses")
+
   val compile: BaseEndpoint[Compile, CompileResult] =
     contractsEndpoint.post
       .in("compile")

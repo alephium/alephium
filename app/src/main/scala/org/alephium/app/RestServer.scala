@@ -41,6 +41,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManage
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, Service}
 import org.alephium.wallet.web.WalletServer
 
@@ -144,6 +145,27 @@ class RestServer(
     case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
   }
 
+  private val minerListAddressesRoute = minerListAddresses.toRoute { _ =>
+    miner
+      .ask(Miner.GetAddresses)
+      .mapTo[AVector[LockupScript]]
+      .map { addresses =>
+        Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
+      }
+  }
+
+  private val minerUpdateAddressesRoute = minerUpdateAddresses.toRoute { minerAddresses =>
+    Future.successful {
+      MinerAddresses
+        .validate(minerAddresses.addresses)
+        .map { addresses =>
+          miner ! Miner.UpdateAddresses(addresses.addresses.map(_.lockupScript))
+        }
+        .left
+        .map(ApiModel.Error.server)
+    }
+  }
+
   private val sendContractRoute = sendContract.toRoute { query =>
     serverUtils.sendContract(txHandler, query)
   }
@@ -190,7 +212,9 @@ class RestServer(
     sendContract,
     compile,
     buildContract,
-    minerAction
+    minerAction,
+    minerListAddresses,
+    minerUpdateAddresses
   )
 
   private val docs: OpenAPI =
@@ -213,6 +237,8 @@ class RestServer(
       sendTransactionRoute ~
       getTransactionStatusRoute ~
       minerActionRoute ~
+      minerListAddressesRoute ~
+      minerUpdateAddressesRoute ~
       sendContractRoute ~
       compileRoute ~
       exportBlocksRoute ~

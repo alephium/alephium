@@ -44,10 +44,7 @@ object Miner {
       implicit brokerConfig: BrokerConfig,
       emissionConfig: EmissionConfig,
       miningConfig: MiningSetting): Props = {
-    require(addresses.length == brokerConfig.groups)
-    addresses.foreachWithIndex { (lockupScript, i) =>
-      require(lockupScript.groupIndex.value == i)
-    }
+    require(validateAddresses(addresses))
     Props(new Miner(addresses, blockFlow, allHandlers))
   }
 
@@ -55,9 +52,11 @@ object Miner {
   case object Start                                                 extends Command
   case object Stop                                                  extends Command
   case object UpdateTemplate                                        extends Command
+  case object GetAddresses                                          extends Command
   final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
   final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
       extends Command
+  final case class UpdateAddresses(addresses: AVector[LockupScript]) extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(
       implicit groupConfig: GroupConfig,
@@ -94,9 +93,17 @@ object Miner {
       resultTs
     }
   }
+
+  def validateAddresses(addresses: AVector[LockupScript])(
+      implicit groupConfig: GroupConfig): Boolean = {
+    (addresses.length == groupConfig.groups) &&
+    addresses.forallWithIndex { (lockupScript, i) =>
+      lockupScript.groupIndex.value == i
+    }
+  }
 }
 
-class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
+class Miner(var addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
     implicit val brokerConfig: BrokerConfig,
     val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting)
@@ -104,7 +111,7 @@ class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers:
     with MinerState {
   val handlers = allHandlers
 
-  def receive: Receive = awaitStart
+  def receive: Receive = handleAddresses orElse awaitStart
 
   def awaitStart: Receive = {
     case Miner.Start =>
@@ -112,7 +119,7 @@ class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers:
       handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
       updateTasks()
       startNewTasks()
-      context become (handleMining orElse awaitStop)
+      context become (handleMining orElse handleAddresses orElse awaitStop)
     case event =>
       log.debug(s"ignore miner event: $event")
   }
@@ -122,7 +129,7 @@ class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers:
       log.info("Stop mining")
       handlers.flowHandler ! FlowHandler.UnRegister
       postMinerStop()
-      context become awaitStart
+      context become (handleAddresses orElse awaitStart)
     case cmd: Miner.Command =>
       log.debug(s"ignore miner commands: $cmd")
   }
@@ -154,6 +161,18 @@ class Miner(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers:
       updateTasks()
       setIdle(fromShift, to)
       startNewTasks()
+
+  }
+
+  def handleAddresses: Receive = {
+    case Miner.UpdateAddresses(newAddresses) => {
+      if (Miner.validateAddresses(newAddresses)) {
+        addresses = newAddresses
+      } else {
+        log.debug(s"Invalid new miner addresses: $newAddresses")
+      }
+    }
+    case Miner.GetAddresses => sender() ! addresses
   }
 
   private def coinbase(chainIndex: ChainIndex,

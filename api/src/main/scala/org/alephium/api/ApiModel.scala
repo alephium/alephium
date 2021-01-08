@@ -172,6 +172,8 @@ trait ApiModelCodec {
   implicit val minerActionCodec: Codec[MinerAction] =
     Codec.from(minerActionDecoder, minerActionEncoder)
 
+  implicit val minerAddressesCodec: Codec[MinerAddresses] = deriveCodec[MinerAddresses]
+
   implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
     Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
       (info.id, info.externalAddresses, info.groupNumPerBroker))

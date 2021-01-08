@@ -142,6 +142,9 @@ trait EndpointsExamples {
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
 
+  implicit val minerAddressesExamples: List[Example[MinerAddresses]] =
+    simpleExample(MinerAddresses(AVector(address)))
+
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 

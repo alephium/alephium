@@ -17,14 +17,18 @@
 package org.alephium.flow.client
 
 import akka.testkit.TestProbe
+import akka.util.Timeout
+import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
-import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, Duration, TimeStamp}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, LockupScriptGenerators}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 
-class MinerSpec extends AlephiumFlowActorSpec("Miner") {
+class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
+  implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
   it should "use proper timestamp" in {
     val currentTs = TimeStamp.now()
     val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
@@ -66,5 +70,34 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") {
     val miner            = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
+  }
+
+  it should "handle its addresses" in new LockupScriptGenerators {
+    val groupConfig      = config.broker
+    val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
+    val (allHandlers, _) = TestUtils.createBlockHandlersProbe
+    val miner            = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
+
+    miner
+      .ask(Miner.GetAddresses)
+      .mapTo[AVector[LockupScript]]
+      .futureValue is config.minerAddresses
+
+    val lockupScripts =
+      AVector.tabulate(groupConfig.groups)(i => addressGen(GroupIndex.unsafe(i)).sample.get._1)
+
+    miner ! Miner.UpdateAddresses(lockupScripts)
+
+    miner
+      .ask(Miner.GetAddresses)
+      .mapTo[AVector[LockupScript]]
+      .futureValue is lockupScripts
+
+    miner ! Miner.UpdateAddresses(AVector.empty)
+
+    miner
+      .ask(Miner.GetAddresses)
+      .mapTo[AVector[LockupScript]]
+      .futureValue is lockupScripts
   }
 }
