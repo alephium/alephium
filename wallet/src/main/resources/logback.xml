@@ -19,7 +19,7 @@
     </appender>
 
     <appender name="DEBUGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-errors.log</file>
+        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-debug.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>DEBUG</level>
