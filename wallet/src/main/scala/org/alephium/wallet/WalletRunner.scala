@@ -24,7 +24,6 @@ import akka.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import pureconfig.ConfigSource
-import pureconfig.generic.auto._
 
 import org.alephium.util.{Duration, Service}
 import org.alephium.wallet.config.WalletConfig
