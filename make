@@ -64,6 +64,7 @@ class AlephiumMake(object):
             itest        Run the integration test suite
             benchmark    Run the benchmark suite
             package      Produce the project deliverable
+            publish      Publish locally the projects libraries
             release      Release a new version of the project
 
             run          Run a local testnet
