@@ -100,6 +100,10 @@ trait ApiModelCodec {
   implicit val cliqueIdDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createCliqueId)
   implicit val cliqueIdCodec: Codec[CliqueId]     = Codec.from(cliqueIdDecoder, cliqueIdEncoder)
 
+  implicit val networkTypeEncoder: Encoder[NetworkType] = Encoder.encodeString.contramap(_.name)
+  implicit val networkTypeDecoder: Decoder[NetworkType] = Decoder.decodeString.emap(NetworkType.fromName(_).toRight("Invalid network type."))
+  implicit val networkTypeCodec: Codec[NetworkType]     = Codec.from(networkTypeDecoder, networkTypeEncoder)
+
   implicit val fetchResponseCodec: Codec[FetchResponse] = deriveCodec[FetchResponse]
 
   implicit val outputRefCodec: Codec[OutputRef] = deriveCodec[OutputRef]
@@ -115,6 +119,8 @@ trait ApiModelCodec {
   implicit val blockEntryCodec: Codec[BlockEntry] = deriveCodec[BlockEntry]
 
   implicit val peerAddressCodec: Codec[PeerAddress] = deriveCodec[PeerAddress]
+
+  implicit val networkCodec: Codec[Network] = deriveCodec[Network]
 
   implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]
 

@@ -69,6 +69,11 @@ class RestServer(
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
+
+  private val getNetworkRoute = getNetwork.toRoute { _ =>
+    Future.successful(Right(Network(networkType)))
+  }
+
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
       cliqueInfo =>
@@ -196,6 +201,7 @@ class RestServer(
   }
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
+    getNetwork,
     getSelfClique,
     getSelfCliqueSynced,
     getInterCliquePeerInfo,
@@ -232,7 +238,8 @@ class RestServer(
     new SwaggerAkka(docs.servers(servers).toYaml, yamlName = "openapi.yaml").routes
 
   private val blockFlowRoute: Route =
-    getSelfCliqueRoute ~
+    getNetworkRoute ~
+      getSelfCliqueRoute ~
       getSelfCliqueSyncedRoute ~
       getInterCliquePeerInfoRoute ~
       getBlockflowRoute ~
