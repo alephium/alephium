@@ -27,7 +27,7 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
 import sttp.tapir.docs.openapi.RichOpenAPIEndpoints
-import sttp.tapir.openapi.OpenAPI
+import sttp.tapir.openapi.{OpenAPI, Server, ServerVariable}
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
@@ -220,7 +220,16 @@ class RestServer(
   private val docs: OpenAPI =
     (walletDocs ++ blockflowDocs).toOpenAPI("Alephium API", "1.0")
 
-  private val swaggerUIRoute = new SwaggerAkka(docs.toYaml, yamlName = "openapi.yaml").routes
+  private val servers = List(
+    Server("http://{host}:{port}")
+      .variables(
+        "host" -> ServerVariable(None, "localhost", None),
+        "port" -> ServerVariable(None, port.toString, None)
+      )
+  )
+
+  private val swaggerUIRoute =
+    new SwaggerAkka(docs.servers(servers).toYaml, yamlName = "openapi.yaml").routes
 
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~

@@ -16,12 +16,16 @@
 
 package org.alephium.app
 
+import scala.io.Source
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActor, TestProbe}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
+import io.circe.{Json, JsonObject}
 import io.circe.syntax._
+import io.circe.yaml
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.ScalaFutures
 
@@ -31,9 +35,11 @@ import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
 import org.alephium.serde.serialize
 import org.alephium.util._
+import org.alephium.wallet.WalletApp
+import org.alephium.wallet.config.WalletConfig
 
 class RestServerSpec
     extends AlephiumSpec
@@ -229,9 +235,35 @@ class RestServerSpec
     Get(s"/docs") ~> server.route ~> check {
       status is StatusCodes.PermanentRedirect
     }
+
     Get(s"/docs/openapi.yaml") ~> server.route ~> check {
       status is StatusCodes.OK
+
+      val timeout = Duration.ofMinutesUnsafe(1).asScala
+
+      val openapiFile =
+        Source.fromFile("../api/src/main/resources/openapi.yaml").getLines().mkString("\n")
+      val openapiFileAsJson = yaml.parser.parse(openapiFile).rightValue
+      val expectedOpenapi   = removeExamples(openapiFileAsJson)
+
+      val responseContent = response.entity.toStrict(timeout).futureValue.getData.utf8String
+      val responseJson    = yaml.parser.parse(responseContent).rightValue
+      val openapi         = removeExamples(responseJson)
+
+      openapi is expectedOpenapi
     }
+  }
+
+  def removeExamples(json: Json): Json = {
+    removeField("examples", removeField("example", json))
+  }
+
+  def removeField(name: String, json: Json): Json = {
+    json.mapObject(obj => removeFieldObj(name, obj))
+  }
+
+  def removeFieldObj(name: String, jsonObject: JsonObject): JsonObject = {
+    jsonObject.remove(name).mapValues(value => removeField(name, value))
   }
 
   trait RestServerFixture extends ServerFixture {
@@ -245,7 +277,15 @@ class RestServerSpec
                                   blockFlowProbe.ref,
                                   dummyTx,
                                   storages)
-    lazy val blocksExporter     = new BlocksExporter(node.blockFlow, rootPath)
-    lazy val server: RestServer = RestServer(node, miner, blocksExporter, None)
+    lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
+    val walletConfig: WalletConfig = WalletConfig(
+      0,
+      (new java.io.File("")).toPath,
+      NetworkType.Devnet,
+      WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0)))
+
+    lazy val walletApp = new WalletApp(walletConfig)
+    lazy val server: RestServer =
+      RestServer(node, miner, blocksExporter, Some(walletApp.walletServer))
   }
 }
