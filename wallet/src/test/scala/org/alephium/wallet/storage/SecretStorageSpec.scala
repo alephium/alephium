@@ -23,9 +23,16 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
+
+case class Genesis(address: String, mnemonic: String)
+object Genesis {
+  import io.circe._
+  import io.circe.generic.semiauto._
+  implicit val decoder: Decoder[Genesis] = deriveDecoder[Genesis]
+}
 
 class SecretStorageSpec() extends AlephiumSpec with Generators {
 
@@ -105,5 +112,24 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       .toOption
       .get is SecretStorage.SecretFileError
   }
+
+  it should "should import wallet in a compatible manner" in {
+    import scala.io.Source
+    import io.circe.parser._
+
+    val genesisRaw = Source.fromURL(this.getClass.getResource("/wallet-genesis.json")).mkString
+    val xs         = decode[List[Genesis]](genesisRaw).rightValue
+
+    val networkType = NetworkType.Testnet
+
+    xs.foreach { genesis =>
+      val mnemonic   = Mnemonic.fromWords(AVector.unsafe(genesis.mnemonic.split(" "))).get
+      val seed       = mnemonic.toSeed("")
+      val path       = Constants.path(networkType)
+      val privateKey = BIP32.btcMasterKey(seed).derive(path).get
+      Address.p2pkh(networkType, privateKey.publicKey).toBase58 is genesis.address
+    }
+  }
+
   secretDir.toFile.listFiles.foreach(_.deleteOnExit())
 }
