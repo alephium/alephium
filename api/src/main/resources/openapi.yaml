@@ -434,6 +434,30 @@ paths:
               example:
                 detail: You shall not pass
                 status: 401
+  /infos/network:
+    get:
+      tags:
+      - Infos
+      summary: Get info about the network
+      operationId: getInfosNetwork
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Network'
+              example:
+                networkType: mainnet
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
   /infos/self-clique:
     get:
       tags:
@@ -1280,6 +1304,24 @@ components:
           type: string
         data:
           type: string
+    Network:
+      required:
+      - networkType
+      type: object
+      properties:
+        networkType:
+          $ref: '#/components/schemas/NetworkType'
+    NetworkType:
+      oneOf:
+      - $ref: '#/components/schemas/Devnet'
+      - $ref: '#/components/schemas/Mainnet'
+      - $ref: '#/components/schemas/Testnet'
+    Devnet:
+      type: object
+    Mainnet:
+      type: object
+    Testnet:
+      type: object
     SelfClique:
       required:
       - cliqueId

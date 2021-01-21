@@ -66,6 +66,9 @@ trait EndpointsExamples {
 
   def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
+  implicit val networkExamples: List[Example[Network]] =
+    simpleExample(Network(NetworkType.Mainnet))
+
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(SelfClique(cliqueId, peers, groupNumPerBroker = 1))
 
