@@ -87,7 +87,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
     infosEndpoint.get
       .in("network")
       .out(jsonBody[Network])
-      .summary("Get info about your own clique")
+      .summary("Get info about the network")
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     infosEndpoint.get
