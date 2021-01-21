@@ -101,8 +101,10 @@ trait ApiModelCodec {
   implicit val cliqueIdCodec: Codec[CliqueId]     = Codec.from(cliqueIdDecoder, cliqueIdEncoder)
 
   implicit val networkTypeEncoder: Encoder[NetworkType] = Encoder.encodeString.contramap(_.name)
-  implicit val networkTypeDecoder: Decoder[NetworkType] = Decoder.decodeString.emap(NetworkType.fromName(_).toRight("Invalid network type."))
-  implicit val networkTypeCodec: Codec[NetworkType]     = Codec.from(networkTypeDecoder, networkTypeEncoder)
+  implicit val networkTypeDecoder: Decoder[NetworkType] =
+    Decoder.decodeString.emap(NetworkType.fromName(_).toRight("Invalid network type."))
+  implicit val networkTypeCodec: Codec[NetworkType] =
+    Codec.from(networkTypeDecoder, networkTypeEncoder)
 
   implicit val fetchResponseCodec: Codec[FetchResponse] = deriveCodec[FetchResponse]
 

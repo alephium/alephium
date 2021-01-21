@@ -19,4 +19,3 @@ package org.alephium.api.model
 import org.alephium.protocol.model.{NetworkType}
 
 final case class Network(networkType: NetworkType)
-
