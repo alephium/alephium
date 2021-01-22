@@ -53,10 +53,6 @@ class WalletAppSpec
     with ScalaFutures {
   implicit val defaultTimeout = RouteTestTimeout(5.seconds)
 
-  implicit val groupConfig: GroupConfig = new GroupConfig {
-    override def groups: Int = groupNum
-  }
-
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
   val blockflowBinding = blockFlowMock.server.futureValue
@@ -66,7 +62,7 @@ class WalletAppSpec
 
   val routes: Route = walletApp.routes
 
-  walletApp.start()
+  walletApp.start().futureValue is ()
 
   val password                   = Hash.generate.toHexString
   var mnemonic: Mnemonic         = _

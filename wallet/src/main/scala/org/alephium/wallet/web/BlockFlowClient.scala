@@ -44,22 +44,19 @@ trait BlockFlowClient {
 }
 
 object BlockFlowClient {
-  def apply(defaultUri: Uri,
-            groupNum: Int,
-            networkType: NetworkType,
-            blockflowFetchMaxAge: Duration)(implicit actorSystem: ActorSystem,
-                                            executionContext: ExecutionContext): BlockFlowClient =
-    new Impl(defaultUri, groupNum, networkType, blockflowFetchMaxAge)
+  def apply(defaultUri: Uri, networkType: NetworkType, blockflowFetchMaxAge: Duration)(
+      implicit groupConfig: GroupConfig,
+      actorSystem: ActorSystem,
+      executionContext: ExecutionContext): BlockFlowClient =
+    new Impl(defaultUri, networkType, blockflowFetchMaxAge)
 
   private class Impl(defaultUri: Uri,
-                     groupNum: Int,
                      val networkType: NetworkType,
-                     val blockflowFetchMaxAge: Duration)(implicit actorSystem: ActorSystem,
+                     val blockflowFetchMaxAge: Duration)(implicit val groupConfig: GroupConfig,
+                                                         actorSystem: ActorSystem,
                                                          executionContext: ExecutionContext)
       extends BlockFlowClient
       with Endpoints {
-
-    implicit val groupConfig: GroupConfig = new GroupConfig { val groups = groupNum }
 
     private val backend = AkkaHttpBackend.usingActorSystem(actorSystem)
 

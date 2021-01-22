@@ -39,10 +39,11 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   it should "create/lock/unlock the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) {
       case (seed, password, wrongPassword) =>
-        val name = Hash.generate.shortHex
-        val file = new File(s"$secretDir/$name")
+        val name  = Hash.generate.shortHex
+        val file  = new File(s"$secretDir/$name")
+        val miner = false
 
-        val secretStorage = SecretStorage.create(seed, password, file, path).toOption.get
+        val secretStorage = SecretStorage.create(seed, password, miner, file, path).toOption.get
         val privateKey    = BIP32.btcMasterKey(seed).derive(path).get
 
         secretStorage.getCurrentPrivateKey() isE privateKey
@@ -80,7 +81,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     )
 
     val rawFile =
-      """{"encrypted":"8df619edbc5737594f0de56700634888ac42aa0a3d688a0721b15cd633ce5a5c2f3c1e696cf1d88a09a44899b010f717ff195ec0cd7f0b8a2a29937c162dfdb4a527bb8774aef5aaf3f0eea4d7bd17b1476d880a9e461be225412a18","salt":"a252a0caecc6673e72ee94caf5a646029b99736ff1e3f3c0f632a03556b0aa77d118b971c58903c37a74ab3504a77cee71ab66bb1c434e3c2e0d8e52e503fe80","iv":"bb341ab6dbcd3b5a5b6cee15308083ff2d12407924a399ec422494ba6b0a139d4720ab088104fdfe88d086334cd3b49e01a07a29e5bc5fc182541d9ce084d12f","version":1}"""
+      """{"encrypted":"736d41462857238addf48f279b6ea5775a7663bfe84a48db562dddd5de148bd6abfa47c7ec0604642d6ef8e3b26d532086f8c205bb5831ea2438370aee035ebe254edaef3304f5046e8d017a8ddc0e7fc8dd5d9db802a2c8bcabe71068","salt":"6a876935df614d6da10cd892a7236c2c3222e06d63d94b7ff35b046d83569c5daae62fd5cb8ab2b912a36ed4c4de5edbeb63096e00fd4c4b04d816e6d4342ff2","iv":"3e5f9b33f594235b40da29cf44a3addee221ac49abed5f1f288b820320c636c8c6ed6c6e02e7f3e201097eace60fcaa91f098401b755b047cec62cd4c660cc97","version":1}"""
 
     val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 

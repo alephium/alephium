@@ -21,6 +21,7 @@ import java.nio.file.Files
 
 import akka.testkit.SocketUtil
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
 import org.alephium.wallet.config.WalletConfig
@@ -39,6 +40,10 @@ trait WalletConfigFixture {
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
+
+  implicit val groupConfig = new GroupConfig {
+    override def groups: Int = config.blockflow.groups
+  }
 
   val config = WalletConfig(
     walletPort,

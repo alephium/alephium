@@ -39,6 +39,7 @@ trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.Error, Unit]
   def isLocked(): Boolean
+  def isMiner(): Either[SecretStorage.Error, Boolean]
   def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
     : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
@@ -60,16 +61,21 @@ object SecretStorage {
   case object SecretFileAlreadyExists extends Error
   case object UnknownKey              extends Error
 
-  final case class StoredState(seed: ByteString, numberOfAddresses: Int, activeAddressIndex: Int)
+  final case class StoredState(seed: ByteString,
+                               isMiner: Boolean,
+                               numberOfAddresses: Int,
+                               activeAddressIndex: Int)
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
-      Serde.forProduct3(apply,
-                        state => (state.seed, state.numberOfAddresses, state.activeAddressIndex))
+      Serde.forProduct4(
+        apply,
+        state => (state.seed, state.isMiner, state.numberOfAddresses, state.activeAddressIndex))
   }
 
   private final case class State(seed: ByteString,
                                  password: String,
+                                 isMiner: Boolean,
                                  activeKey: ExtendedPrivateKey,
                                  privateKeys: AVector[ExtendedPrivateKey])
 
@@ -97,15 +103,17 @@ object SecretStorage {
 
   def create(seed: ByteString,
              password: String,
+             isMiner: Boolean,
              file: File,
              path: AVector[Int]): Either[Error, SecretStorage] = {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
     } else {
       for {
-        _ <- storeStateToFile(file,
-                              StoredState(seed, numberOfAddresses = 1, activeAddressIndex = 0),
-                              password)
+        _ <- storeStateToFile(
+          file,
+          StoredState(seed, isMiner, numberOfAddresses = 1, activeAddressIndex = 0),
+          password)
         state <- stateFromFile(file, password, path)
       } yield {
         new Impl(file, Some(state), path)
@@ -143,6 +151,14 @@ object SecretStorage {
 
     override def isLocked(): Boolean = maybeState.isEmpty
 
+    override def isMiner(): Either[Error, Boolean] = {
+      for {
+        state <- getState
+      } yield {
+        state.isMiner
+      }
+    }
+
     override def getCurrentPrivateKey(): Either[Error, ExtendedPrivateKey] = {
       for {
         state <- getState
@@ -165,10 +181,10 @@ object SecretStorage {
         newPrivateKey <- deriveNextPrivateKey(state.seed, latestKey)
         keys = state.privateKeys :+ newPrivateKey
         _ <- storeStateToFile(file,
-                              StoredState(state.seed, keys.length, keys.length - 1),
+                              StoredState(state.seed, state.isMiner, keys.length, keys.length - 1),
                               state.password)
       } yield {
-        maybeState = Some(State(state.seed, state.password, newPrivateKey, keys))
+        maybeState = Some(state.copy(activeKey = newPrivateKey, privateKeys = keys))
         newPrivateKey
       }
     }
@@ -178,9 +194,10 @@ object SecretStorage {
         state <- getState
         index = state.privateKeys.indexWhere(_.privateKey == key.privateKey)
         _ <- Either.cond(index >= 0, (), UnknownKey)
-        _ <- storeStateToFile(file,
-                              StoredState(state.seed, state.privateKeys.length, index),
-                              state.password)
+        _ <- storeStateToFile(
+          file,
+          StoredState(state.seed, state.isMiner, state.privateKeys.length, index),
+          state.password)
       } yield {
         maybeState = Some(state.copy(activeKey = key))
         ()
@@ -215,7 +232,7 @@ object SecretStorage {
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses, path)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
-        State(state.seed, password, active, privateKeys)
+        State(state.seed, password, state.isMiner, active, privateKeys)
       }
     }.toEither.left.map(_ => SecretFileError).flatten
   }

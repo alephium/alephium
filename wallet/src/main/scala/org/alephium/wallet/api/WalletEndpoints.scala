@@ -50,6 +50,20 @@ trait WalletEndpoints
     )
     .tag("Wallets")
 
+  private val minerWallets = endpoint
+    .in("wallets")
+    .errorOut(
+      oneOf[WalletApiError](
+        statusMapping(StatusCode.BadRequest,
+                      jsonBody[WalletApiError.BadRequest].description("Bad request")),
+        statusMapping(StatusCode.Unauthorized,
+                      jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+      )
+    )
+    .tag("Miners Features")
+    .description(
+      "This endpoint can only be called if the wallet was created with the `miner = true` flag")
+
   val createWallet: Endpoint[WalletCreation, WalletApiError, WalletCreation.Result, Nothing] =
     wallets.post
       .in(jsonBody[WalletCreation])
@@ -111,6 +125,7 @@ trait WalletEndpoints
       .in("deriveNextAddress")
       .out(jsonBody[Address])
       .summary("Derive your next address")
+      .description("Cannot be called from a miner wallet")
 
   val changeActiveAddress: Endpoint[(String, ChangeActiveAddress), WalletApiError, Unit, Nothing] =
     wallets.post
@@ -118,4 +133,22 @@ trait WalletEndpoints
       .in("changeActiveAddress")
       .in(jsonBody[ChangeActiveAddress])
       .summary("Choose the active address")
+
+  val getMinerAddresses: Endpoint[String, WalletApiError, AVector[MinerAddressesInfo], Nothing] =
+    minerWallets.get
+      .in(path[String]("wallet_name"))
+      .in("miner-addresses")
+      .out(jsonBody[AVector[MinerAddressesInfo]])
+      .summary("List all miner addresses per group")
+
+  val deriveNextMinerAddresses: Endpoint[String, WalletApiError, AVector[AddressInfo], Nothing] =
+    minerWallets.post
+      .in(path[String]("wallet_name"))
+      .in("deriveNextMinerAddresses")
+      .out(jsonBody[AVector[AddressInfo]])
+      .summary("Derive your next miner addresse for each group")
+      .description(s"""
+        |Your wallet need to have been created with the miner flag set to true
+      """.stripMargin)
+
 }

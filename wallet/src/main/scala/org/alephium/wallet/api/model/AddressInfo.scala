@@ -16,13 +16,6 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.protocol.model.Address
 
-final case class WalletRestore(password: String,
-                               mnemonic: Mnemonic,
-                               isMiner: Option[Boolean],
-                               walletName: Option[String],
-                               mnemonicPassphrase: Option[String])
-object WalletRestore {
-  final case class Result(walletName: String)
-}
+final case class AddressInfo(address: Address, group: Int)
