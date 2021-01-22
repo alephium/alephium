@@ -17,7 +17,6 @@
 package org.alephium.wallet
 
 import java.net.InetAddress
-import java.nio.file.Files
 
 import scala.concurrent.duration._
 
@@ -27,7 +26,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import akka.testkit.SocketUtil
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
@@ -44,42 +42,24 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
-import org.alephium.wallet.config.WalletConfig
+import org.alephium.wallet.config.WalletConfigFixture
 
 class WalletAppSpec
     extends AlephiumSpec
     with ModelCodecs
+    with WalletConfigFixture
     with ScalatestRouteTest
     with FailFastCirceSupport
     with ScalaFutures {
   implicit val defaultTimeout = RouteTestTimeout(5.seconds)
 
-  val localhost: InetAddress = InetAddress.getLocalHost
-  val blockFlowPort          = SocketUtil.temporaryLocalPort(SocketUtil.Both)
-  val walletPort             = SocketUtil.temporaryLocalPort(SocketUtil.Both)
-
-  val groupNum = 4
-
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = groupNum
   }
 
-  val networkType = NetworkType.Mainnet
-
-  val blockflowFetchMaxAge = Duration.unsafe(1000)
-
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
   val blockflowBinding = blockFlowMock.server.futureValue
-
-  val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
-  tempSecretDir.toFile.deleteOnExit
-
-  val config = WalletConfig(
-    walletPort,
-    tempSecretDir,
-    networkType,
-    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge))
 
   val walletApp: WalletApp =
     new WalletApp(config)
