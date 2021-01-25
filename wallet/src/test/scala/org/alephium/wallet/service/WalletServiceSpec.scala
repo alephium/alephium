@@ -22,7 +22,7 @@ import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.util.{AlephiumSpec, Random}
+import org.alephium.util.{AlephiumSpec, Duration, Random}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -66,15 +66,33 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
 
   it should "fail to start if secret dir path is invalid" in new Fixure {
     val path = s"/${Random.source.nextInt}"
-    override val walletService = WalletService(
+    override lazy val walletService = WalletService(
       blockFlowClient,
       Paths.get(path),
-      config.networkType
+      config.networkType,
+      Duration.ofMinutesUnsafe(10)
     )
 
     whenReady(walletService.start().failed) { exception =>
       exception is a[java.nio.file.AccessDeniedException]
     }
+  }
+
+  it should "lock the wallet if inactive" in new Fixure {
+    override val lockingTimeout = Duration.ofSecondsUnsafe(1)
+
+    val (walletName, _) =
+      walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
+
+    walletService.getAddresses(walletName).isRight is true
+
+    Thread.sleep(1001)
+
+    walletService.getAddresses(walletName).leftValue is WalletService.WalletLocked
+
+    walletService.unlockWallet(walletName, password).isRight is true
+
+    walletService.getAddresses(walletName).isRight is true
   }
 
   trait Fixure extends WalletConfigFixture {
@@ -84,13 +102,13 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     implicit val system: ActorSystem =
       ActorSystem(s"wallet-service-spec-${Random.source.nextInt}")
     implicit val executionContext = system.dispatcher
-    val blockFlowClient =
+    lazy val blockFlowClient =
       BlockFlowClient.apply(config.blockflow.uri,
                             config.networkType,
                             config.blockflow.blockflowFetchMaxAge)
 
-    val walletService: WalletService =
-      WalletService.apply(blockFlowClient, tempSecretDir, config.networkType)
+    lazy val walletService: WalletService =
+      WalletService.apply(blockFlowClient, tempSecretDir, config.networkType, config.lockingTimeout)
   }
 }
 

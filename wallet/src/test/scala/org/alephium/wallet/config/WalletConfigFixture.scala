@@ -36,6 +36,8 @@ trait WalletConfigFixture {
 
   val networkType = NetworkType.Mainnet
 
+  val lockingTimeout = Duration.ofMinutesUnsafe(10)
+
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
@@ -45,9 +47,10 @@ trait WalletConfigFixture {
     override def groups: Int = config.blockflow.groups
   }
 
-  val config = WalletConfig(
+  lazy val config = WalletConfig(
     walletPort,
     tempSecretDir,
     networkType,
+    lockingTimeout,
     WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge))
 }

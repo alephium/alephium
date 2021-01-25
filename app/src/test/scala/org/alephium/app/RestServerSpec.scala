@@ -282,6 +282,7 @@ class RestServerSpec
       0,
       (new java.io.File("")).toPath,
       NetworkType.Devnet,
+      Duration.ofMinutesUnsafe(0),
       WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0)))
 
     lazy val walletApp = new WalletApp(walletConfig)

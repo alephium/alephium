@@ -33,7 +33,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
-import org.alephium.util.{discard, AVector, Service, U256}
+import org.alephium.util.{discard, AVector, Duration, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -121,20 +121,50 @@ object WalletService {
 
   final case class BlockFlowClientError(message: String) extends WalletError
 
-  def apply(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
-      implicit groupConfig: GroupConfig,
-      executionContext: ExecutionContext): WalletService = {
+  def apply(blockFlowClient: BlockFlowClient,
+            secretDir: Path,
+            networkType: NetworkType,
+            lockingTimeout: Duration)(implicit groupConfig: GroupConfig,
+                                      executionContext: ExecutionContext): WalletService = {
 
-    new Impl(blockFlowClient, secretDir, networkType)
+    new Impl(blockFlowClient, secretDir, networkType, lockingTimeout)
   }
 
-  private val secretStorages: mutable.Map[String, SecretStorage] = mutable.Map.empty
+  private final case class StorageState(secretStorage: SecretStorage, lastAccess: TimeStamp)
+
+  private final case class Storages(storages: mutable.Map[String, StorageState],
+                                    lockingTimeout: Duration) {
+    def addOne(filename: String, storage: SecretStorage): Unit = {
+      discard(storages.synchronized {
+        storages.addOne(filename -> StorageState(storage, TimeStamp.now()))
+      })
+    }
+
+    def get(wallet: String): Option[SecretStorage] = {
+      storages.synchronized {
+        storages.get(wallet).map { storageTs =>
+          val lockNeeded = TimeStamp.now().deltaUnsafe(storageTs.lastAccess) > lockingTimeout &&
+            !storageTs.secretStorage.isLocked()
+          if (lockNeeded) {
+            storageTs.secretStorage.lock()
+          } else {
+            storages.update(wallet, storageTs.copy(lastAccess = TimeStamp.now()))
+          }
+          storageTs.secretStorage
+        }
+      }
+    }
+  }
 
   // scalastyle:off number.of.methods
-  private class Impl(blockFlowClient: BlockFlowClient, secretDir: Path, networkType: NetworkType)(
-      implicit groupConfig: GroupConfig,
-      val executionContext: ExecutionContext)
+  private class Impl(blockFlowClient: BlockFlowClient,
+                     secretDir: Path,
+                     networkType: NetworkType,
+                     lockingTimeout: Duration)(implicit groupConfig: GroupConfig,
+                                               val executionContext: ExecutionContext)
       extends WalletService {
+
+    private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
     private val path: AVector[Int] = Constants.path(networkType)
 
@@ -164,7 +194,7 @@ object WalletService {
         _ <- if (isMiner) computeNextMinerAddresses(storage) else Right(())
       } yield {
         val fileName = file.getName
-        secretStorages.addOne(fileName -> storage)
+        secretStorages.addOne(fileName, storage)
         (fileName, mnemonic)
       }
     }
@@ -316,7 +346,7 @@ object WalletService {
           val file = new File(s"$secretDir/$wallet")
           SecretStorage.load(file, path) match {
             case Right(secretStorage) =>
-              secretStorages.addOne(wallet -> secretStorage)
+              secretStorages.addOne(wallet, secretStorage)
               f(secretStorage)
             case Left(error) =>
               errorWrapper(WalletError.from(error))

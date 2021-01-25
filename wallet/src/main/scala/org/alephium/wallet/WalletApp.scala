@@ -50,7 +50,7 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private val secretDir = Paths.get(config.secretDir.toString, config.networkType.name)
   val walletService: WalletService =
-    WalletService.apply(blockFlowClient, secretDir, config.networkType)
+    WalletService.apply(blockFlowClient, secretDir, config.networkType, config.lockingTimeout)
 
   val walletServer: WalletServer =
     new WalletServer(walletService, config.networkType, config.blockflow.blockflowFetchMaxAge)

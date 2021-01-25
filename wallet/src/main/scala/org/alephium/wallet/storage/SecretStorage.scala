@@ -137,7 +137,9 @@ object SecretStorage {
     private var maybeState: Option[State] = initialState
 
     override def lock(): Unit = {
-      maybeState = None
+      if (!isLocked()) {
+        maybeState = None
+      }
     }
 
     override def unlock(password: String): Either[Error, Unit] = {

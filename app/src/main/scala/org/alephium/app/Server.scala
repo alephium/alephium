@@ -46,6 +46,7 @@ trait Server extends Service {
       config.wallet.port,
       config.wallet.secretDir,
       config.network.networkType,
+      config.wallet.lockingTimeout,
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
         config.network.restPort,

@@ -31,6 +31,7 @@ import org.alephium.util.Duration
 final case class WalletConfig(port: Int,
                               secretDir: Path,
                               networkType: NetworkType,
+                              lockingTimeout: Duration,
                               blockflow: WalletConfig.BlockFlow)
 
 object WalletConfig {
@@ -38,17 +39,17 @@ object WalletConfig {
     val uri: Uri = Uri(s"http://$host:$port")
   }
 
-  object BlockFlow {
-    implicit val durationConfig: ConfigReader[Duration] =
-      ConfigReader[FiniteDuration].emap { dt =>
-        val millis = dt.toMillis
-        if (millis >= 0) {
-          Right(Duration.ofMillisUnsafe(millis))
-        } else {
-          Left(CannotConvert(dt.toString, "alephium Duration", "negative duration"))
-        }
+  implicit val durationConfig: ConfigReader[Duration] =
+    ConfigReader[FiniteDuration].emap { dt =>
+      val millis = dt.toMillis
+      if (millis >= 0) {
+        Right(Duration.ofMillisUnsafe(millis))
+      } else {
+        Left(CannotConvert(dt.toString, "alephium Duration", "negative duration"))
       }
+    }
 
+  object BlockFlow {
     implicit val blockFlowReader: ConfigReader[BlockFlow] = deriveReader[BlockFlow]
   }
   implicit val walletConfigReader: ConfigReader[WalletConfig] = deriveReader[WalletConfig]
