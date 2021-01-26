@@ -74,8 +74,17 @@ object WalletService {
     def message: String
   }
 
-  final case class InvalidMnemonic(words: String) extends WalletError {
-    val message: String = s"Invalid mnemonic: $words"
+  object WalletError {
+    def from(error: SecretStorage.Error): WalletError = error match {
+      case SecretStorage.Locked                  => WalletLocked
+      case SecretStorage.CannotDeriveKey         => UnexpectedError
+      case SecretStorage.CannotParseFile         => InvalidWalletFile
+      case SecretStorage.SecretFileError         => InvalidWalletFile
+      case SecretStorage.SecretFileAlreadyExists => InvalidWalletFile
+      case SecretStorage.CannotDecryptSecret     => InvalidPassword
+      case SecretStorage.InvalidState            => UnexpectedError
+      case SecretStorage.UnknownKey              => UnexpectedError
+    }
   }
 
   final case class InvalidWalletName(name: String) extends WalletError {
@@ -90,10 +99,6 @@ object WalletService {
     val message: String = s"Unknown address: ${address.toBase58}"
   }
 
-  case object NoWalletLoaded extends WalletError {
-    val message: String = s"No wallet loaded"
-  }
-
   case object WalletLocked extends WalletError {
     val message: String = s"Wallet is locked"
   }
@@ -102,12 +107,12 @@ object WalletService {
     val message: String = s"Invalid password"
   }
 
-  case object CannotDeriveNewAddress extends WalletError {
-    val message: String = s"Cannot derive new address"
-  }
-
   case object MinerWalletRequired extends WalletError {
     val message: String = s"Miner wallet is needed"
+  }
+
+  case object InvalidWalletFile extends WalletError {
+    val message: String = s"Invalid wallet file"
   }
 
   case object UnexpectedError extends WalletError {
@@ -192,8 +197,9 @@ object WalletService {
     }
 
     override def unlockWallet(wallet: String, password: String): Either[WalletError, Unit] =
-      withWallet(wallet)(secretStorage =>
-        secretStorage.unlock(password).left.map(_ => InvalidPassword))
+      withWalletM(wallet) { secretStorage =>
+        secretStorage.unlock(password).left.map(WalletError.from)
+      }(Left.apply)
 
     override def getBalances(
         wallet: String): Future[Either[WalletError, AVector[(Address, U256)]]] =
@@ -221,7 +227,7 @@ object WalletService {
                 case (group, address, _) => (group, address)
               })
             )
-          case Left(_) => Left(UnexpectedError)
+          case Left(error) => Left(WalletError.from(error))
         }
       }
     }
@@ -229,7 +235,7 @@ object WalletService {
     override def transfer(wallet: String,
                           address: Address,
                           amount: U256): Future[Either[WalletError, (Hash, Int, Int)]] = {
-      withPrivateKeyFut(wallet) { privateKey =>
+      withPrivateKeyFut(wallet, isMinerOpt = None) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
@@ -251,33 +257,25 @@ object WalletService {
               res <- computeNextMinerAddresses(secretStorage)
               _   <- secretStorage.changeActiveKey(activeKey).left.map(_ => UnexpectedError)
             } yield res
-          case Left(_) => Left(UnexpectedError)
+          case Left(error) => Left(WalletError.from(error))
         }
       }
     }
 
     override def deriveNextAddress(wallet: String): Either[WalletError, Address] = {
-      withWallet(wallet) { secretStorage =>
-        (for {
-          isMiner    <- secretStorage.isMiner()
-          privateKey <- if (isMiner) Left(MinerWalletRequired) else secretStorage.deriveNextKey()
-        } yield {
-          Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
-        }).left
-          .map {
-            case SecretStorage.Locked          => WalletLocked: WalletError
-            case SecretStorage.CannotDeriveKey => CannotDeriveNewAddress: WalletError
-            case SecretStorage.SecretFileError => CannotDeriveNewAddress: WalletError
-            case MinerWalletRequired           => MinerWalletRequired: WalletError
-            case _                             => CannotDeriveNewAddress: WalletError
-          }
+      withUserWallet(wallet) { secretStorage =>
+        secretStorage
+          .deriveNextKey()
+          .map(privateKey => Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey))
+          .left
+          .map(WalletError.from)
       }
     }
 
     override def changeActiveAddress(wallet: String,
                                      address: Address): Either[WalletError, Unit] = {
-      withWallet(wallet) { secretStorage =>
-        withPrivateKeys(wallet) {
+      withAnyWallet(wallet) { secretStorage =>
+        withPrivateKeys(secretStorage) {
           case (_, privateKeys) =>
             (for {
               privateKey <- privateKeys.find(privateKey =>
@@ -291,7 +289,7 @@ object WalletService {
     override def listWallets(): Either[WalletError, AVector[(String, Boolean)]] = {
       listWalletsInSecretDir().flatMap { wallets =>
         wallets.mapE { wallet =>
-          withWallet(wallet)(secret => Right(secret.isLocked())).map { locked =>
+          withAnyWallet(wallet)(secret => Right(secret.isLocked())).map { locked =>
             (wallet, locked)
           }
         }
@@ -311,7 +309,7 @@ object WalletService {
         .map(_.map(amount => (address, amount)).left.map(message => BlockFlowClientError(message)))
     }
 
-    private def withWalletM[A, M[A]](wallet: String)(f: SecretStorage => M[A])(
+    private def withWalletM[A, M[_]](wallet: String)(f: SecretStorage => M[A])(
         errorWrapper: WalletError                                     => M[A]): M[A] = {
       secretStorages.get(wallet) match {
         case None =>
@@ -320,54 +318,66 @@ object WalletService {
             case Right(secretStorage) =>
               secretStorages.addOne(wallet -> secretStorage)
               f(secretStorage)
-            case Left(_) =>
-              errorWrapper(NoWalletLoaded)
+            case Left(error) =>
+              errorWrapper(WalletError.from(error))
           }
-
         case Some(secretStorage) => f(secretStorage)
       }
     }
 
-    private def withWallet[A](wallet: String)(
-        f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWalletM(wallet)(f)(Left.apply)
-    }
-
-    private def withWalletFut[A](wallet: String)(
-        f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] = {
-      withWalletM(wallet)(f)(error => Future.successful(Left(error)))
-    }
-
-    private def withMinerStorage[A](secretStorage: SecretStorage)(
-        f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      (for {
-        isMiner <- secretStorage.isMiner()
-      } yield isMiner) match {
-        case Right(isMiner) =>
-          if (isMiner) {
-            f(secretStorage)
-          } else {
-            Left(MinerWalletRequired)
+    private def checkIsMiner(storage: SecretStorage,
+                             isMinerOpt: Option[Boolean]): Either[WalletError, Unit] = {
+      storage
+        .isMiner()
+        .left
+        .map(WalletError.from)
+        .flatMap { state =>
+          isMinerOpt match {
+            case None => Right(())
+            case Some(isMiner) =>
+              if (state == isMiner) Right(()) else Left(MinerWalletRequired)
           }
-        case Left(_) => Left(UnexpectedError)
-      }
+        }
+    }
+
+    private def withWallet[A](wallet: String, isMinerOpt: Option[Boolean])(
+        f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
+      withWalletM(wallet)(storage => checkIsMiner(storage, isMinerOpt).flatMap(_ => f(storage)))(
+        Left.apply)
+    }
+
+    private def withAnyWallet[A](wallet: String)(
+        f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
+      withWallet(wallet, isMinerOpt = None)(f)
+    }
+
+    private def withUserWallet[A](wallet: String)(
+        f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
+      withWallet(wallet, isMinerOpt = Some(false))(f)
     }
 
     private def withMinerWallet[A](wallet: String)(
         f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWallet(wallet) { secretStorage =>
-        withMinerStorage(secretStorage)(f)
-      }
+      withWallet(wallet, isMinerOpt = Some(true))(f)
     }
 
-    private def withPrivateKeyFut[A](wallet: String)(
+    private def withWalletFut[A](wallet: String, isMinerOpt: Option[Boolean])(
+        f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] = {
+      withWalletM(wallet)(storage =>
+        checkIsMiner(storage, isMinerOpt) match {
+          case Left(error) => Future.successful(Left(error))
+          case Right(_)    => f(storage)
+      })(error => Future.successful(Left(error)))
+    }
+
+    private def withPrivateKeyFut[A](wallet: String, isMinerOpt: Option[Boolean])(
         f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withWalletFut(wallet)(_.getCurrentPrivateKey() match {
-        case Left(_)           => Future.successful((Left(WalletLocked)))
+      withWalletFut(wallet, isMinerOpt)(_.getCurrentPrivateKey() match {
+        case Left(error)       => Future.successful(Left(WalletError.from(error)))
         case Right(privateKey) => f(privateKey)
       })
 
-    private def withPrivateKeysM[A, M[A]](storage: SecretStorage)(
+    private def withPrivateKeysM[A, M[_]](storage: SecretStorage)(
         f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => M[A])(
         errorWrapper: WalletError                              => M[A]): M[A] =
       (for {
@@ -376,8 +386,7 @@ object WalletService {
       } yield {
         (privateKeys, isMiner)
       }) match {
-        case Left(SecretStorage.Locked) => errorWrapper(WalletLocked)
-        case Left(_)                    => errorWrapper(UnexpectedError)
+        case Left(error) => errorWrapper(WalletError.from(error))
         case Right((privateKeys, isMiner)) =>
           if (isMiner) {
             f((privateKeys._1, buildMinerPrivateKeys(privateKeys._2)))
@@ -391,15 +400,7 @@ object WalletService {
       : Either[WalletError, A] =
       withPrivateKeysM(storage)(f)(Left.apply)
 
-    private def withPrivateKeys[A](wallet: String)(
-        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Either[WalletError, A])
-      : Either[WalletError, A] = {
-      withWallet(wallet) { storage =>
-        withPrivateKeys(storage)(f)
-      }
-    }
-
-    private def withAddressesM[A, M[A]](wallet: String)(f: ((Address, AVector[Address])) => M[A])(
+    private def withAddressesM[A, M[_]](wallet: String)(f: ((Address, AVector[Address])) => M[A])(
         errorWrapper: WalletError                                                        => M[A]): M[A] =
       withWalletM(wallet) { storage =>
         withPrivateKeysM(storage) {
@@ -448,8 +449,8 @@ object WalletService {
       val smallestIndex                                                 = addressByGroup.values.map(_.length).minOption.getOrElse(1)
       var res: Seq[Seq[(GroupIndex, (Address, ExtendedPrivateKey))]]    = Seq.empty
       var addForGroup: Seq[(GroupIndex, (Address, ExtendedPrivateKey))] = Seq.empty
-      (0 to (smallestIndex - 1)).foreach { index =>
-        (0 to (groupConfig.groups - 1)).foreach { group =>
+      (0 until smallestIndex).foreach { index =>
+        (0 until groupConfig.groups).foreach { group =>
           val groupIndex = GroupIndex.unsafe(group)
           addressByGroup.get(groupIndex).flatMap(_.lift(index)).foreach { address =>
             addForGroup = addForGroup :+ ((groupIndex, address))
@@ -497,7 +498,7 @@ object WalletService {
       if (addressByGroup.keys.size < groupConfig.groups || addresses.exists(_.isEmpty)) {
         storage
           .deriveNextKey() match {
-          case Left(_) => Left(UnexpectedError)
+          case Left(error) => Left(WalletError.from(error))
           case Right(nextKey) =>
             computeNextMinerAddressesWithIndex(
               updateAddressByGroup(addressByGroup, nextKey),
@@ -506,7 +507,7 @@ object WalletService {
             )
         }
       } else {
-        Right(AVector.from(addresses.flatMap(identity)))
+        Right(AVector.from(addresses.flatten))
       }
     }
 

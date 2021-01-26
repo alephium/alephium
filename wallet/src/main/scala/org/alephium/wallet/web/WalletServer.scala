@@ -196,13 +196,11 @@ object WalletServer {
     val unauthorized = Unauthorized(walletError.message)
 
     walletError match {
-      case _: InvalidMnemonic           => badRequest
       case _: InvalidWalletName         => badRequest
       case _: CannotCreateEncryptedFile => badRequest
       case _: BlockFlowClientError      => badRequest
       case _: UnknownAddress            => badRequest
-      case NoWalletLoaded               => badRequest
-      case CannotDeriveNewAddress       => badRequest
+      case InvalidWalletFile            => badRequest
       case UnexpectedError              => badRequest
 
       case WalletLocked        => unauthorized

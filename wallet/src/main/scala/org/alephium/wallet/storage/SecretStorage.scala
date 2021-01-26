@@ -56,7 +56,6 @@ object SecretStorage {
   case object CannotParseFile         extends Error
   case object CannotDecryptSecret     extends Error
   case object InvalidState            extends Error
-  case object SecretDirError          extends Error
   case object SecretFileError         extends Error
   case object SecretFileAlreadyExists extends Error
   case object UnknownKey              extends Error
