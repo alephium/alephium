@@ -39,7 +39,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.protocol.config.{GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, Service}
@@ -70,14 +71,10 @@ class RestServer(
 
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
 
-  private val getNetworkRoute = getNetwork.toRoute { _ =>
-    Future.successful(Right(Network(networkType)))
-  }
-
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
       cliqueInfo =>
-        Right(RestServer.selfCliqueFrom(cliqueInfo))
+        Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus))
     }
   }
 
@@ -201,7 +198,6 @@ class RestServer(
   }
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
-    getNetwork,
     getSelfClique,
     getSelfCliqueSynced,
     getInterCliquePeerInfo,
@@ -238,8 +234,7 @@ class RestServer(
     new SwaggerAkka(docs.servers(servers).toYaml, yamlName = "openapi.yaml").routes
 
   private val blockFlowRoute: Route =
-    getNetworkRoute ~
-      getSelfCliqueRoute ~
+    getSelfCliqueRoute ~
       getSelfCliqueSyncedRoute ~
       getInterCliquePeerInfoRoute ~
       getBlockflowRoute ~
@@ -301,12 +296,17 @@ object RestServer {
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
 
-  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo): SelfClique = {
+  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting)(
+      implicit groupConfig: GroupConfig,
+      networkType: NetworkType): SelfClique = {
     SelfClique(
       cliqueInfo.id,
+      networkType,
+      consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
-      cliqueInfo.groupNumPerBroker
+      cliqueInfo.groupNumPerBroker,
+      groupConfig.groups
     )
   }
 
