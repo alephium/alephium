@@ -16,7 +16,7 @@
 
 package org.alephium.wallet.web
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -27,6 +27,7 @@ import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.{Duration, U256}
 import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
@@ -37,7 +38,8 @@ import org.alephium.wallet.service.WalletService._
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 class WalletServer(walletService: WalletService,
                    val networkType: NetworkType,
-                   val blockflowFetchMaxAge: Duration)(implicit executionContext: ExecutionContext)
+                   val blockflowFetchMaxAge: Duration)(implicit groupConfig: GroupConfig,
+                                                       executionContext: ExecutionContext)
     extends WalletEndpoints
     with AkkaDecodeFailureHandler {
   import WalletServer.toApiError
@@ -51,7 +53,9 @@ class WalletServer(walletService: WalletService,
     getBalances,
     transfer,
     getAddresses,
+    getMinerAddresses,
     deriveNextAddress,
+    deriveNextMinerAddresses,
     changeActiveAddress
   )
 
@@ -61,30 +65,43 @@ class WalletServer(walletService: WalletService,
   // scalastyle:off method.length
   def route: Route =
     createWallet.toRoute { walletCreation =>
-      walletService
-        .createWallet(walletCreation.password,
-                      walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
-                      walletCreation.walletName,
-                      walletCreation.mnemonicPassphrase)
-        .map(_.map {
-          case (walletName, mnemonic) =>
-            model.WalletCreation.Result(walletName, mnemonic)
-        }.left.map(toApiError))
+      Future.successful(
+        walletService
+          .createWallet(
+            walletCreation.password,
+            walletCreation.mnemonicSize.getOrElse(Mnemonic.Size.list.last),
+            walletCreation.isMiner.getOrElse(false),
+            walletCreation.walletName,
+            walletCreation.mnemonicPassphrase
+          )
+          .map {
+            case (walletName, mnemonic) =>
+              model.WalletCreation.Result(walletName, mnemonic)
+          }
+          .left
+          .map(toApiError)
+      )
     } ~
       restoreWallet.toRoute { walletRestore =>
-        walletService
-          .restoreWallet(walletRestore.password,
-                         walletRestore.mnemonic,
-                         walletRestore.walletName,
-                         walletRestore.mnemonicPassphrase)
-          .map(_.map(model.WalletRestore.Result).left.map(toApiError))
+        Future.successful(
+          walletService
+            .restoreWallet(walletRestore.password,
+                           walletRestore.mnemonic,
+                           walletRestore.isMiner.getOrElse(false),
+                           walletRestore.walletName,
+                           walletRestore.mnemonicPassphrase)
+            .map(model.WalletRestore.Result)
+            .left
+            .map(toApiError)
+        )
       } ~
       lockWallet.toRoute { wallet =>
-        walletService.lockWallet(wallet).map(_.left.map(toApiError))
+        Future.successful(walletService.lockWallet(wallet).left.map(toApiError))
       } ~
       unlockWallet.toRoute {
         case (wallet, walletUnlock) =>
-          walletService.unlockWallet(wallet, walletUnlock.password).map(_.left.map(toApiError))
+          Future.successful(
+            walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError))
       } ~
       getBalances.toRoute { wallet =>
         walletService
@@ -100,12 +117,32 @@ class WalletServer(walletService: WalletService,
           }.left.map(toApiError))
       } ~
       getAddresses.toRoute { wallet =>
-        walletService
-          .getAddresses(wallet)
-          .map(_.map {
-            case (active, addresses) =>
-              model.Addresses(active, addresses)
-          }.left.map(toApiError))
+        Future.successful(
+          walletService
+            .getAddresses(wallet)
+            .map {
+              case (active, addresses) =>
+                model.Addresses(active, addresses)
+            }
+            .left
+            .map(toApiError))
+      } ~
+      getMinerAddresses.toRoute { wallet =>
+        Future.successful(
+          walletService
+            .getMinerAddresses(wallet)
+            .map { addresses =>
+              addresses.map { p =>
+                model.MinerAddressesInfo(
+                  p.map {
+                    case (group, ad) =>
+                      model.AddressInfo(ad, group.value)
+                  }
+                )
+              }
+            }
+            .left
+            .map(toApiError))
       } ~
       transfer.toRoute {
         case (wallet, tr) =>
@@ -116,21 +153,37 @@ class WalletServer(walletService: WalletService,
             }.left.map(toApiError))
       } ~
       deriveNextAddress.toRoute { wallet =>
-        walletService
-          .deriveNextAddress(wallet)
-          .map(_.left.map(toApiError))
+        Future.successful(
+          walletService
+            .deriveNextAddress(wallet)
+            .left
+            .map(toApiError))
+      } ~
+      deriveNextMinerAddresses.toRoute { wallet =>
+        Future.successful(
+          walletService
+            .deriveNextMinerAddresses(wallet)
+            .map(_.map(address => model.AddressInfo(address, address.groupIndex.value)))
+            .left
+            .map(toApiError))
       } ~
       changeActiveAddress.toRoute {
         case (wallet, change) =>
-          walletService
-            .changeActiveAddress(wallet, change.address)
-            .map(_.left.map(toApiError))
+          Future.successful(
+            walletService
+              .changeActiveAddress(wallet, change.address)
+              .left
+              .map(toApiError)
+          )
       } ~
       listWallets.toRoute { _ =>
-        walletService
-          .listWallets()
-          .map(_.map(_.map { case (name, locked) => model.WalletStatus(name, locked) }).left
-            .map(toApiError))
+        Future.successful(
+          walletService
+            .listWallets()
+            .map(_.map { case (name, locked) => model.WalletStatus(name, locked) })
+            .left
+            .map(toApiError)
+        )
       } ~
       docsRoute
 }
@@ -143,17 +196,16 @@ object WalletServer {
     val unauthorized = Unauthorized(walletError.message)
 
     walletError match {
-      case _: InvalidMnemonic           => badRequest
       case _: InvalidWalletName         => badRequest
       case _: CannotCreateEncryptedFile => badRequest
       case _: BlockFlowClientError      => badRequest
       case _: UnknownAddress            => badRequest
-      case NoWalletLoaded               => badRequest
-      case CannotDeriveNewAddress       => badRequest
+      case InvalidWalletFile            => badRequest
       case UnexpectedError              => badRequest
 
-      case WalletLocked    => unauthorized
-      case InvalidPassword => unauthorized
+      case WalletLocked        => unauthorized
+      case InvalidPassword     => unauthorized
+      case MinerWalletRequired => unauthorized
     }
   }
 }

@@ -14,15 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api.model
+package org.alephium.wallet.config
 
-import org.alephium.crypto.wallet.Mnemonic
+import com.typesafe.config.{Config, ConfigFactory}
+import pureconfig.ConfigSource
 
-final case class WalletRestore(password: String,
-                               mnemonic: Mnemonic,
-                               isMiner: Option[Boolean],
-                               walletName: Option[String],
-                               mnemonicPassphrase: Option[String])
-object WalletRestore {
-  final case class Result(walletName: String)
+import org.alephium.util.AlephiumSpec
+
+class WalletConfigSpec() extends AlephiumSpec {
+  it should "load wallet config" in {
+
+    val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
+
+    ConfigSource
+      .fromConfig(typesafeConfig)
+      .load[WalletConfig]
+      .toOption
+      .isDefined is true
+  }
 }

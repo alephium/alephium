@@ -27,6 +27,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.StrictLogging
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.Service
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
@@ -37,9 +38,12 @@ class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
     extends Service
     with StrictLogging {
 
+  private implicit val groupConfig = new GroupConfig {
+    override def groups: Int = config.blockflow.groups
+  }
+
   val blockFlowClient: BlockFlowClient =
     BlockFlowClient.apply(config.blockflow.uri,
-                          config.blockflow.groups,
                           config.networkType,
                           config.blockflow.blockflowFetchMaxAge)
 

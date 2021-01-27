@@ -115,6 +115,7 @@ paths:
                 value:
                   password: my-secret-password
                   walletName: wallet-super-name
+                  isMiner: true
                   mnemonicPassphrase: optional-mnemonic-passphrase
                   mnemonicSize: 12
         required: true
@@ -355,11 +356,57 @@ paths:
               example:
                 detail: You shall not pass
                 status: 401
+  /wallets/{wallet_name}/miner-addresses:
+    get:
+      tags:
+      - Miners Features
+      summary: List all miner addresses per group
+      description: This endpoint can only be called if the wallet was created with
+        the `miner = true` flag
+      operationId: getWalletsWallet_nameMiner-addresses
+      parameters:
+      - name: wallet_name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MinerAddressesInfo'
+              example:
+              - addresses:
+                - address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+                  group: 2
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+              example:
+                detail: Something bad in the request
+                status: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /wallets/{wallet_name}/deriveNextAddress:
     post:
       tags:
       - Wallets
       summary: Derive your next address
+      description: Cannot be called from a miner wallet
       operationId: postWalletsWallet_nameDerivenextaddress
       parameters:
       - name: wallet_name
@@ -375,6 +422,50 @@ paths:
               schema:
                 type: string
               example: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+              example:
+                detail: Something bad in the request
+                status: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
+  /wallets/{wallet_name}/deriveNextMinerAddresses:
+    post:
+      tags:
+      - Miners Features
+      summary: Derive your next miner addresse for each group
+      description: "\nYour wallet need to have been created with the miner flag set\
+        \ to true\n      "
+      operationId: postWalletsWallet_nameDerivenextmineraddresses
+      parameters:
+      - name: wallet_name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AddressInfo'
+              example:
+              - address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+                group: 2
         '400':
           description: Bad request
           content:
@@ -1155,6 +1246,8 @@ components:
           type: string
         walletName:
           type: string
+        isMiner:
+          type: boolean
         mnemonicPassphrase:
           type: string
         mnemonicSize:
@@ -1199,6 +1292,8 @@ components:
           type: string
         mnemonic:
           type: string
+        isMiner:
+          type: boolean
         walletName:
           type: string
         mnemonicPassphrase:
@@ -1285,6 +1380,23 @@ components:
           type: array
           items:
             type: string
+    MinerAddressesInfo:
+      type: object
+      properties:
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressInfo'
+    AddressInfo:
+      required:
+      - address
+      - group
+      type: object
+      properties:
+        address:
+          type: string
+        group:
+          type: integer
     ChangeActiveAddress:
       required:
       - address

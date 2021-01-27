@@ -29,6 +29,10 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val addressesCodec: Codec[Addresses] = deriveCodec[Addresses]
 
+  implicit val addresseInfoCodec: Codec[AddressInfo] = deriveCodec[AddressInfo]
+
+  implicit val minerAddressesInfoCodec: Codec[MinerAddressesInfo] = deriveCodec[MinerAddressesInfo]
+
   implicit val addressBalanceCodec: Codec[Balances.AddressBalance] =
     deriveCodec[Balances.AddressBalance]
 
