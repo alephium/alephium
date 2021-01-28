@@ -72,14 +72,12 @@ class RestServer(
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
 
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
-    node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo].map {
-      cliqueInfo =>
-        Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus))
+    for {
+      synced     <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
+    } yield {
+      Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus, synced))
     }
-  }
-
-  private val getSelfCliqueSyncedRoute = getSelfCliqueSynced.toRoute { _ =>
-    node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean].map(Right(_))
   }
 
   private val getInterCliquePeerInfoRoute = getInterCliquePeerInfo.toRoute { _ =>
@@ -199,7 +197,6 @@ class RestServer(
   private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
   private val blockflowDocs = List(
     getSelfClique,
-    getSelfCliqueSynced,
     getInterCliquePeerInfo,
     getBlockflow,
     getBlock,
@@ -235,7 +232,6 @@ class RestServer(
 
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~
-      getSelfCliqueSyncedRoute ~
       getInterCliquePeerInfoRoute ~
       getBlockflowRoute ~
       getBlockRoute ~
@@ -296,7 +292,7 @@ object RestServer {
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
 
-  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting)(
+  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting, synced: Boolean)(
       implicit groupConfig: GroupConfig,
       networkType: NetworkType): SelfClique = {
     SelfClique(
@@ -305,6 +301,7 @@ object RestServer {
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
+      synced,
       cliqueInfo.groupNumPerBroker,
       groupConfig.groups
     )

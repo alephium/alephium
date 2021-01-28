@@ -345,9 +345,6 @@ trait TestFixtureLike
   val getSelfClique =
     httpGet(s"/infos/self-clique") // jsonRpc("self_clique_synced", "{}") = jsonRpc("self_clique", "{}")
 
-  val getSelfCliqueSynced =
-    httpGet(s"/infos/self-clique-synced") // jsonRpc("self_clique_synced", "{}")
-
   val getInterCliquePeerInfo =
     httpGet(s"/infos/inter-clique-peer-info") //jsonRpc("get_inter_clique_peer_info", "{}")
 

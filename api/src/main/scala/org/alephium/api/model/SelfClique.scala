@@ -23,6 +23,7 @@ final case class SelfClique(cliqueId: CliqueId,
                             networkType: NetworkType,
                             numZerosAtLeastInHash: Int,
                             peers: AVector[PeerAddress],
+                            synced: Boolean,
                             groupNumPerBroker: Int,
                             groups: Int) {
   def peer(groupIndex: GroupIndex): PeerAddress =

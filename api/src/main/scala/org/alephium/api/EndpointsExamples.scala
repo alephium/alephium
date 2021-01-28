@@ -72,6 +72,7 @@ trait EndpointsExamples {
                  networkType,
                  numZerosAtLeastInHash = 18,
                  peers,
+                 synced            = true,
                  groupNumPerBroker = 1,
                  groups            = 2))
 
