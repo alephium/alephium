@@ -95,13 +95,10 @@ object Node {
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
     val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system,
-                      CliqueManager.props(blockFlow,
-                                          allHandlers,
-                                          discoveryServer,
-                                          brokerManager,
-                                          blockFlowSynchronizer),
-                      "CliqueManager")
+      ActorRefT.build(
+        system,
+        CliqueManager.props(blockFlow, allHandlers, discoveryServer, blockFlowSynchronizer),
+        "CliqueManager")
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")

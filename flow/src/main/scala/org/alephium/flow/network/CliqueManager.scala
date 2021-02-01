@@ -23,7 +23,6 @@ import akka.util.ByteString
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.broker.BrokerManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
@@ -34,16 +33,10 @@ object CliqueManager {
   def props(blockflow: BlockFlow,
             allHandlers: AllHandlers,
             discoveryServer: ActorRefT[DiscoveryServer.Command],
-            brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting): Props =
-    Props(
-      new CliqueManager(blockflow,
-                        allHandlers,
-                        discoveryServer,
-                        brokerManager,
-                        blockFlowSynchronizer))
+    Props(new CliqueManager(blockflow, allHandlers, discoveryServer, blockFlowSynchronizer))
 
   trait Command
   final case class Start(cliqueInfo: CliqueInfo) extends Command
@@ -67,7 +60,6 @@ object CliqueManager {
 class CliqueManager(blockflow: BlockFlow,
                     allHandlers: AllHandlers,
                     discoveryServer: ActorRefT[DiscoveryServer.Command],
-                    brokerManager: ActorRefT[BrokerManager.Command],
                     blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
@@ -89,7 +81,6 @@ class CliqueManager(blockflow: BlockFlow,
                                                  blockflow,
                                                  allHandlers,
                                                  ActorRefT(self),
-                                                 brokerManager,
                                                  blockFlowSynchronizer),
                         "IntraCliqueManager")
       pool.foreach {
