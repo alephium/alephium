@@ -22,7 +22,7 @@ import akka.io.Tcp
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.broker.{BrokerHandler, BrokerManager}
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.intraclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
@@ -35,7 +35,6 @@ object IntraCliqueManager {
             blockflow: BlockFlow,
             allHandlers: AllHandlers,
             cliqueManager: ActorRefT[CliqueManager.Command],
-            brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting): Props =
@@ -44,7 +43,6 @@ object IntraCliqueManager {
                              blockflow,
                              allHandlers,
                              cliqueManager,
-                             brokerManager,
                              blockFlowSynchronizer))
 
   sealed trait Command    extends CliqueManager.Command
@@ -55,7 +53,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                          blockflow: BlockFlow,
                          allHandlers: AllHandlers,
                          cliqueManager: ActorRefT[CliqueManager.Command],
-                         brokerManager: ActorRefT[BrokerManager.Command],
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
@@ -71,7 +68,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                                                 blockflow,
                                                 allHandlers,
                                                 ActorRefT[CliqueManager.Command](self),
-                                                brokerManager,
                                                 blockFlowSynchronizer)
         context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
       }
