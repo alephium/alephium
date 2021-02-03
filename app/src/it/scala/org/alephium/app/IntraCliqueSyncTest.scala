@@ -32,7 +32,8 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server0.start().futureValue is ()
 
-    request[SelfClique](getSelfClique).synced is false
+    Thread.sleep(2000) // wait until the server is fully operating
+    requestFailed(getSelfClique)
 
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     server1.start().futureValue is ()

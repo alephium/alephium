@@ -158,6 +158,11 @@ trait TestFixtureLike
     }
   }
 
+  def requestFailed(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
+    val response = Http().singleRequest(request(port)).futureValue
+    response.status is StatusCodes.InternalServerError
+  }
+
   def transfer(fromPubKey: String,
                toAddress: String,
                amount: U256,
