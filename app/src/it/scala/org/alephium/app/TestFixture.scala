@@ -158,6 +158,11 @@ trait TestFixtureLike
     }
   }
 
+  def requestFailed(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
+    val response = Http().singleRequest(request(port)).futureValue
+    response.status is StatusCodes.InternalServerError
+  }
+
   def transfer(fromPubKey: String,
                toAddress: String,
                amount: U256,
@@ -344,9 +349,6 @@ trait TestFixtureLike
 
   val getSelfClique =
     httpGet(s"/infos/self-clique") // jsonRpc("self_clique_synced", "{}") = jsonRpc("self_clique", "{}")
-
-  val getSelfCliqueSynced =
-    httpGet(s"/infos/self-clique-synced") // jsonRpc("self_clique_synced", "{}")
 
   val getInterCliquePeerInfo =
     httpGet(s"/infos/inter-clique-peer-info") //jsonRpc("get_inter_clique_peer_info", "{}")

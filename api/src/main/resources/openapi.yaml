@@ -525,30 +525,6 @@ paths:
               example:
                 detail: You shall not pass
                 status: 401
-  /infos/network:
-    get:
-      tags:
-      - Infos
-      summary: Get info about the network
-      operationId: getInfosNetwork
-      responses:
-        '200':
-          description: ''
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Network'
-              example:
-                networkType: mainnet
-        default:
-          description: ''
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                code: -32700
-                message: Parse error
   /infos/self-clique:
     get:
       tags:
@@ -563,35 +539,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/SelfClique'
               example:
-                cliqueId: 9553fe25ab1fe3bb1f250bbf094bf5851063e1269065df5a9a3f19988064205f3e
+                cliqueId: 6127e95167c9ed8f42bbef1ae5a0ac7023ed4f915307bf22c31477e64fd1aafeee
+                networkType: mainnet
+                numZerosAtLeastInHash: 18
                 peers:
                 - address: 1.2.3.4
                   restPort: 12377
                   wsPort: 12366
+                synced: true
                 groupNumPerBroker: 1
-        default:
-          description: ''
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                code: -32700
-                message: Parse error
-  /infos/self-clique-synced:
-    get:
-      tags:
-      - Infos
-      summary: Is your clique synced?
-      operationId: getInfosSelf-clique-synced
-      responses:
-        '200':
-          description: ''
-          content:
-            application/json:
-              schema:
-                type: boolean
-              example: true
+                groups: 2
         default:
           description: ''
           content:
@@ -1416,13 +1373,32 @@ components:
           type: string
         data:
           type: string
-    Network:
+    SelfClique:
       required:
+      - cliqueId
       - networkType
+      - numZerosAtLeastInHash
+      - synced
+      - groupNumPerBroker
+      - groups
       type: object
       properties:
+        cliqueId:
+          type: string
         networkType:
           $ref: '#/components/schemas/NetworkType'
+        numZerosAtLeastInHash:
+          type: integer
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeerAddress'
+        synced:
+          type: boolean
+        groupNumPerBroker:
+          type: integer
+        groups:
+          type: integer
     NetworkType:
       oneOf:
       - $ref: '#/components/schemas/Devnet'
@@ -1434,20 +1410,6 @@ components:
       type: object
     Testnet:
       type: object
-    SelfClique:
-      required:
-      - cliqueId
-      - groupNumPerBroker
-      type: object
-      properties:
-        cliqueId:
-          type: string
-        peers:
-          type: array
-          items:
-            $ref: '#/components/schemas/PeerAddress'
-        groupNumPerBroker:
-          type: integer
     PeerAddress:
       required:
       - address

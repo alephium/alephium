@@ -122,8 +122,6 @@ trait ApiModelCodec {
 
   implicit val peerAddressCodec: Codec[PeerAddress] = deriveCodec[PeerAddress]
 
-  implicit val networkCodec: Codec[Network] = deriveCodec[Network]
-
   implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]
 
   implicit val neighborCliquesCodec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]

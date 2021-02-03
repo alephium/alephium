@@ -269,7 +269,7 @@ object WalletAppSpec extends {
           }
         } ~
         path("infos" / "self-clique") {
-          complete(SelfClique(cliqueId, AVector(peer, peer), 2))
+          complete(SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, 1, 2))
         } ~
         path("addresses" / Segment / "balance") { _ =>
           get {

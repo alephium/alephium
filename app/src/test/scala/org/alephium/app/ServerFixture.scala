@@ -60,7 +60,7 @@ trait ServerFixture
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse   = FetchResponse(AVector(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
-  lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo)
+  lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
   lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
   lazy val dummyBalance         = Balance(U256.Zero, 0)
