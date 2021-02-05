@@ -24,7 +24,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
+import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.serde.{SerdeResult, Staging}
@@ -58,7 +58,7 @@ object Broker {
       context.parent ! Received(message)
     }
 
-    override def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
+    override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
       publishEvent(FlowMonitor.Shutdown)
     }
