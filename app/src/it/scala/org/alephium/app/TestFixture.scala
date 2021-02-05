@@ -296,7 +296,8 @@ trait TestFixtureLike
                brokerNum: Int                       = 2,
                masterPort: Int                      = defaultMasterPort,
                walletPort: Int                      = defaultWalletPort,
-               bootstrap: Option[InetSocketAddress] = None): Server = {
+               bootstrap: Option[InetSocketAddress] = None,
+               networkType: Option[NetworkType]     = None): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
@@ -305,7 +306,11 @@ trait TestFixtureLike
         ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
 
-      implicit val config    = platformEnv.config
+      val defaultNetwork = platformEnv.config.network
+      val network =
+        defaultNetwork.copy(networkType = networkType.getOrElse(defaultNetwork.networkType))
+
+      implicit val config    = platformEnv.config.copy(network = network)
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
       val storages           = platformEnv.storages
       override lazy val blocksExporter: BlocksExporter =

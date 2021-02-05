@@ -25,13 +25,13 @@ import akka.io.{IO, Tcp}
 import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
-            brokerManager: ActorRefT[broker.BrokerManager.Command]): Props =
-    Props(new TcpController(bindAddress, brokerManager))
+            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]): Props =
+    Props(new TcpController(bindAddress, misbehaviorManager))
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef)        extends Command
@@ -46,7 +46,8 @@ object TcpController {
   case object Bound extends Event
 }
 
-class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[BrokerManager.Command])
+class TcpController(bindAddress: InetSocketAddress,
+                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
     extends BaseActor {
   import context.system
 
@@ -55,6 +56,10 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
   val pendingConnections: mutable.Set[InetSocketAddress] = mutable.Set.empty
   val confirmedConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.Map.empty
+
+  override def preStart(): Unit = {
+    require(context.system.eventStream.subscribe(self, classOf[MisbehaviorManager.PeerBanned]))
+  }
 
   override def receive: Receive = awaitStart
 
@@ -86,13 +91,13 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
       if (isOutgoing(c.remoteAddress)) {
         confirmConnection(actor, c, sender())
       } else {
-        brokerManager ! BrokerManager.ConfirmConnection(c, ActorRefT(sender()))
+        misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, ActorRefT(sender()))
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
       pendingConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
-      brokerManager ! BrokerManager.Remove(c.remoteAddress)
+      misbehaviorManager ! MisbehaviorManager.Remove(c.remoteAddress)
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
@@ -108,6 +113,16 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
     case Terminated(connection) =>
       val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
       toRemove.foreach(confirmedConnections -= _)
+    case MisbehaviorManager.PeerBanned(remote) =>
+      confirmedConnections.get(remote) match {
+        case Some(connection) =>
+          connection ! Close
+          confirmedConnections -= remote
+          log.debug(s"Closing connection $remote")
+        case None =>
+          log.warning(s"$remote is banned, but doesn't belong to our confirmed connection")
+      }
+
   }
 
   def isOutgoing(remoteAddress: InetSocketAddress): Boolean = {

@@ -243,11 +243,11 @@ trait ConnectionHandler[T] extends BaseActor {
       case Right(None) => ()
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
-        handleInvalidMessage(BrokerManager.InvalidMessage(remoteAddress))
+        handleInvalidMessage(MisbehaviorManager.InvalidMessage(remoteAddress))
     }
   }
 
-  def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
+  def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
     publishEvent(message)
   }
 }
