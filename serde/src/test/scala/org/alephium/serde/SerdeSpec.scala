@@ -16,6 +16,7 @@
 
 package org.alephium.serde
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import scala.collection.mutable
@@ -145,10 +146,10 @@ class SerdeSpec extends AlephiumSpec {
     }
   }
 
-  "Serde for BigInt" should "serde correctly" in {
+  "Serde for BigInteger" should "serde correctly" in {
     forAll { n: Long =>
-      val bn  = BigInt(n)
-      val bnn = deserialize[BigInt](serialize(bn)).toOption.get
+      val bn  = BigInteger.valueOf(n)
+      val bnn = deserialize[BigInteger](serialize(bn)).toOption.get
       bnn is bn
     }
   }

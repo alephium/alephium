@@ -100,9 +100,6 @@ package object serde {
   implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[mutable.ArraySeq[T]] =
     dynamicSizeSerde(serde, mutable.ArraySeq.newBuilder)
 
-  implicit val bigIntSerde: Serde[BigInt] =
-    avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
-
   implicit val bigIntegerSerde: Serde[BigInteger] =
     avectorSerde[Byte].xmap(vc => new BigInteger(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
 

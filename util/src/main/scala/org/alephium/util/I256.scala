@@ -128,8 +128,21 @@ object I256 {
     new I256(new BigInteger(bytes.toArray))
   }
 
+  def unsafe(bytes: Array[Byte]): I256 = {
+    assume(bytes.length == 32)
+    new I256(new BigInteger(bytes))
+  }
+
+  def from(bytes: ByteString): Option[I256] = {
+    Option.when(bytes.length <= 32)(new I256(new BigInteger(bytes.toArray)))
+  }
+
   def from(value: BigInteger): Option[I256] = {
     if (validate(value)) Some(new I256(value)) else None
+  }
+
+  def from(value: Int): I256 = {
+    new I256(BigInteger.valueOf(value.toLong))
   }
 
   def from(value: Long): I256 = {
