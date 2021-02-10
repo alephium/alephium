@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.EitherValues._
 
-import org.alephium.serde.Serde.{ByteSerde, IntSerde, LongSerde}
+import org.alephium.serde.Serde.ByteSerde
 import org.alephium.util._
 
 class SerdeSpec extends AlephiumSpec {
@@ -62,59 +62,17 @@ class SerdeSpec extends AlephiumSpec {
 
   checkException(ByteSerde)
 
-  "Serde for Int" should "serialize int into 4 bytes" in {
-    intSerde.asInstanceOf[FixedSizeSerde[Int]].serdeSize is 4
-  }
-
-  it should "serde correctly" in {
+  "Serde for Int" should "serde correctly" in {
     forAll { n: Int =>
       val nn = deserialize[Int](serialize(n))
       nn isE n
     }
-
-    forAll { (a: Byte, b: Byte, c: Byte, d: Byte) =>
-      val input  = ByteString(a, b, c, d)
-      val output = serialize(deserialize[Int](input).toOption.get)
-      output is input
-    }
   }
 
-  checkException(IntSerde)
-
-  "Serde for Long" should "serialize long into 8 bytes" in {
-    longSerde.asInstanceOf[FixedSizeSerde[Long]].serdeSize is 8
-  }
-
-  it should "serde correctly" in {
+  "Serde for Long" should "serde correctly" in {
     forAll { n: Long =>
       val nn = deserialize[Long](serialize(n))
       nn isE n
-    }
-  }
-
-  checkException(LongSerde)
-
-  "Serde for I32" should "serde correct" in {
-    forAll { n: I32 =>
-      deserialize[I32](serialize(n)) isE n
-    }
-  }
-
-  "Serde for U32" should "serde correct" in {
-    forAll { n: U32 =>
-      deserialize[U32](serialize(n)) isE n
-    }
-  }
-
-  "Serde for I64" should "serde correct" in {
-    forAll { n: I64 =>
-      deserialize[I64](serialize(n)) isE n
-    }
-  }
-
-  "Serde for U64" should "serde correct" in {
-    forAll { n: U64 =>
-      deserialize[U64](serialize(n)) isE n
     }
   }
 
