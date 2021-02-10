@@ -239,7 +239,7 @@ object WalletAppSpec extends {
       with ApiModelCodec {
 
     private val cliqueId = CliqueId.generate
-    private val peer     = PeerAddress(address, port, port)
+    private val peer     = PeerAddress(address, port, port, None)
 
     val blockflowFetchMaxAge = Duration.unsafe(1000)
 

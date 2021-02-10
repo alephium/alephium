@@ -16,9 +16,11 @@
 
 package org.alephium.api.model
 
-import java.net.InetAddress
+import org.alephium.util.TimeStamp
 
-final case class PeerAddress(address: InetAddress,
-                             restPort: Int,
-                             wsPort: Int,
-                             status: Option[PeerStatus])
+sealed trait PeerStatus
+
+object PeerStatus {
+  final case class Score(value: Int)        extends PeerStatus
+  final case class Banned(until: TimeStamp) extends PeerStatus
+}

@@ -19,6 +19,7 @@ package org.alephium.api
 import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
+import io.circe.syntax._
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
@@ -61,6 +62,40 @@ trait ApiModelCodec {
 
   def blockflowFetchMaxAge: Duration
   implicit def networkType: NetworkType
+
+  implicit val peerStatusScoreCodec: Codec[PeerStatus.Score]   = deriveCodec[PeerStatus.Score]
+  implicit val peerStatusBannedCodec: Codec[PeerStatus.Banned] = deriveCodec[PeerStatus.Banned]
+
+  implicit val peerStatusEncoder: Encoder[PeerStatus] = {
+    new Encoder[PeerStatus] {
+      final def apply(status: PeerStatus): Json = status match {
+        case ps @ PeerStatus.Banned(_) =>
+          Json.obj(
+            ("banned", ps.asJson)
+          )
+        case ps @ PeerStatus.Score(_) =>
+          Json.obj(
+            ("score", ps.asJson)
+          )
+      }
+    }
+  }
+
+  implicit val peerStatusDecoder: Decoder[PeerStatus] = new Decoder[PeerStatus] {
+    final def apply(c: HCursor): Decoder.Result[PeerStatus] = {
+      val keys = c.keys.getOrElse(Nil)
+      if (keys.exists(_ == "banned")) {
+        c.downField("banned").as[PeerStatus.Banned]
+      } else if (keys.exists(_ == "score")) {
+        c.downField("score").as[PeerStatus.Score]
+      } else {
+        Left(DecodingFailure("Can not decode, expecting: 'score' or 'banned' key", c.history))
+      }
+    }
+  }
+
+  implicit val peerStatusCodec: Codec[PeerStatus] =
+    Codec.from(peerStatusDecoder, peerStatusEncoder)
 
   implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
   implicit val u256Decoder: Decoder[U256] = Decoder.decodeJavaBigInteger.emap { u256 =>

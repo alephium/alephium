@@ -43,7 +43,7 @@ trait EndpointsExamples {
   private val restPort                   = 12377
   private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress                = inetSocketAddress.getAddress
-  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort)
+  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, Some(PeerStatus.Score(0)))
   private val peers                      = AVector(peerAddress)
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42
