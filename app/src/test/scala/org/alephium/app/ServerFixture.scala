@@ -60,11 +60,14 @@ trait ServerFixture
   lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse   = FetchResponse(AVector(BlockEntry.from(dummyBlockHeader, 1)))
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
-  lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
-  lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
-  lazy val dummyBalance         = Balance(U256.Zero, 0)
-  lazy val dummyGroup           = Group(0)
+  lazy val dummySelfClique = RestServer.selfCliqueFrom(dummyIntraCliqueInfo,
+                                                       genBrokerPeers.sample.get,
+                                                       config.consensus,
+                                                       true)
+  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1, networkType)
+  lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
+  lazy val dummyBalance       = Balance(U256.Zero, 0)
+  lazy val dummyGroup         = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
   lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get

@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import java.net.InetAddress
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
@@ -39,6 +41,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
+import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.broker.BrokerManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.config.{GroupConfig}
 import org.alephium.protocol.model._
@@ -73,10 +77,11 @@ class RestServer(
 
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     for {
-      synced     <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
-      cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
+      synced      <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      cliqueInfo  <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
+      brokerPeers <- node.brokerManager.ask(BrokerManager.GetPeers).mapTo[Peers]
     } yield {
-      Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus, synced))
+      Right(RestServer.selfCliqueFrom(cliqueInfo, brokerPeers, node.config.consensus, synced))
     }
   }
 
@@ -292,15 +297,32 @@ object RestServer {
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
 
-  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting, synced: Boolean)(
-      implicit groupConfig: GroupConfig,
-      networkType: NetworkType): SelfClique = {
+  def selfCliqueFrom(
+      cliqueInfo: IntraCliqueInfo,
+      brokerPeers: Peers,
+      consensus: ConsensusSetting,
+      synced: Boolean)(implicit groupConfig: GroupConfig, networkType: NetworkType): SelfClique = {
+
+    val peerStatus: Map[InetAddress, PeerStatus] =
+      Map.from(brokerPeers.peers.map {
+        case BrokerManager.Peer(addr, misbehavior) =>
+          val status: PeerStatus = misbehavior match {
+            case BrokerManager.Score(value)  => PeerStatus.Score(value)
+            case BrokerManager.Banned(until) => PeerStatus.Banned(until)
+          }
+          (addr.getAddress, status)
+      }.toIterable)
+
     SelfClique(
       cliqueInfo.id,
       networkType,
       consensus.numZerosAtLeastInHash,
-      cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
+      cliqueInfo.peers.map(
+        peer =>
+          PeerAddress(peer.internalAddress.getAddress,
+                      peer.restPort,
+                      peer.wsPort,
+                      peerStatus.get(peer.internalAddress.getAddress))),
       synced,
       cliqueInfo.groupNumPerBroker,
       groupConfig.groups
