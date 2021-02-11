@@ -41,17 +41,17 @@ object CompactInteger {
       if (n < U32.unsafe(oneByteBound)) {
         ByteString((n.v + SingleByte.prefix).toByte)
       } else if (n < U32.unsafe(twoByteBound)) {
-        ByteString(((n.v >>> 8) + TwoByte.prefix).toByte, n.v.toByte)
+        ByteString(((n.v >> 8) + TwoByte.prefix).toByte, n.v.toByte)
       } else if (n < U32.unsafe(fourByteBound)) {
-        ByteString(((n.v >>> 24) + FourByte.prefix).toByte,
-                   (n.v >>> 16).toByte,
-                   (n.v >>> 8).toByte,
+        ByteString(((n.v >> 24) + FourByte.prefix).toByte,
+                   (n.v >> 16).toByte,
+                   (n.v >> 8).toByte,
                    n.v.toByte)
       } else {
         ByteString(MultiByte.prefix.toByte,
-                   (n.v >>> 24).toByte,
-                   (n.v >>> 16).toByte,
-                   (n.v >>> 8).toByte,
+                   (n.v >> 24).toByte,
+                   (n.v >> 16).toByte,
+                   (n.v >> 8).toByte,
                    n.v.toByte)
       }
     }
@@ -162,17 +162,17 @@ object CompactInteger {
       if (n < oneByteBound) {
         ByteString((n + SingleByte.prefix).toByte)
       } else if (n < twoByteBound) {
-        ByteString(((n >>> 8) + TwoByte.prefix).toByte, n.toByte)
+        ByteString(((n >> 8) + TwoByte.prefix).toByte, n.toByte)
       } else if (n < fourByteBound) {
-        ByteString(((n >>> 24) + FourByte.prefix).toByte,
-                   (n >>> 16).toByte,
-                   (n >>> 8).toByte,
+        ByteString(((n >> 24) + FourByte.prefix).toByte,
+                   (n >> 16).toByte,
+                   (n >> 8).toByte,
                    n.toByte)
       } else {
         ByteString(MultiByte.prefix.toByte,
-                   (n >>> 24).toByte,
-                   (n >>> 16).toByte,
-                   (n >>> 8).toByte,
+                   (n >> 24).toByte,
+                   (n >> 16).toByte,
+                   (n >> 8).toByte,
                    n.toByte)
       }
     }
@@ -181,17 +181,17 @@ object CompactInteger {
       if (n >= -oneByteBound) {
         ByteString((n ^ SingleByte.negPrefix).toByte)
       } else if (n >= -twoByteBound) {
-        ByteString(((n >>> 8) ^ TwoByte.negPrefix).toByte, n.toByte)
+        ByteString(((n >> 8) ^ TwoByte.negPrefix).toByte, n.toByte)
       } else if (n >= -fourByteBound) {
-        ByteString(((n >>> 24) ^ FourByte.negPrefix).toByte,
-                   (n >>> 16).toByte,
-                   (n >>> 8).toByte,
+        ByteString(((n >> 24) ^ FourByte.negPrefix).toByte,
+                   (n >> 16).toByte,
+                   (n >> 8).toByte,
                    n.toByte)
       } else {
         ByteString(MultiByte.prefix.toByte,
-                   (n >>> 24).toByte,
-                   (n >>> 16).toByte,
-                   (n >>> 8).toByte,
+                   (n >> 24).toByte,
+                   (n >> 16).toByte,
+                   (n >> 8).toByte,
                    n.toByte)
       }
     }
