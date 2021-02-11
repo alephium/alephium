@@ -58,11 +58,11 @@ class CompactIntegerSpec extends AlephiumSpec {
     import CompactInteger.Signed._
 
     def test(n: Int): Assertion = {
-      decodeInt(encodeInt(n)) isE Staging(n, ByteString.empty)
-      decodeLong(encodeLong(n.toLong)) isE Staging(n.toLong, ByteString.empty)
+      decodeInt(encode(n)) isE Staging(n, ByteString.empty)
+      decodeLong(encode(n.toLong)) isE Staging(n.toLong, ByteString.empty)
 
       val i256 = I256.from(n)
-      decodeI256(encodeI256(i256)) isE Staging(i256, ByteString.empty)
+      decodeI256(encode(i256)) isE Staging(i256, ByteString.empty)
     }
 
     (0 until 32).foreach { k =>
@@ -74,12 +74,12 @@ class CompactIntegerSpec extends AlephiumSpec {
       test(-(1 << k) + 1)
     }
 
-    decodeInt(encodeInt(Int.MaxValue)) isE Staging(Int.MaxValue, ByteString.empty)
-    decodeInt(encodeInt(Int.MinValue)) isE Staging(Int.MinValue, ByteString.empty)
-    decodeLong(encodeLong(Long.MaxValue)) isE Staging(Long.MaxValue, ByteString.empty)
-    decodeLong(encodeLong(Long.MinValue)) isE Staging(Long.MinValue, ByteString.empty)
-    decodeI256(encodeI256(I256.MaxValue)) isE Staging(I256.MaxValue, ByteString.empty)
-    decodeI256(encodeI256(I256.MinValue)) isE Staging(I256.MinValue, ByteString.empty)
+    decodeInt(encode(Int.MaxValue)) isE Staging(Int.MaxValue, ByteString.empty)
+    decodeInt(encode(Int.MinValue)) isE Staging(Int.MinValue, ByteString.empty)
+    decodeLong(encode(Long.MaxValue)) isE Staging(Long.MaxValue, ByteString.empty)
+    decodeLong(encode(Long.MinValue)) isE Staging(Long.MinValue, ByteString.empty)
+    decodeI256(encode(I256.MaxValue)) isE Staging(I256.MaxValue, ByteString.empty)
+    decodeI256(encode(I256.MinValue)) isE Staging(I256.MinValue, ByteString.empty)
 
     forAll { n: Int =>
       test(n)
@@ -87,7 +87,7 @@ class CompactIntegerSpec extends AlephiumSpec {
 
     forAll { _: Int =>
       val i256 = Random.nextI256()
-      decodeI256(encodeI256(i256)) isE Staging(i256, ByteString.empty)
+      decodeI256(encode(i256)) isE Staging(i256, ByteString.empty)
     }
   }
 }

@@ -150,7 +150,7 @@ object CompactInteger {
     private val twoByteBound: Int  = oneByteBound << 8
     private val fourByteBound: Int = oneByteBound << (8 * 3)
 
-    def encodeInt(n: Int): ByteString = {
+    def encode(n: Int): ByteString = {
       if (n >= 0) {
         encodePositiveInt(n)
       } else {
@@ -196,9 +196,9 @@ object CompactInteger {
       }
     }
 
-    def encodeLong(n: Long): ByteString = {
+    def encode(n: Long): ByteString = {
       if (n >= -0x20000000 && n < 0x20000000) {
-        encodeInt(n.toInt)
+        encode(n.toInt)
       } else {
         ByteString((4 | MultiByte.prefix).toByte,
                    (n >> 56).toByte,
@@ -212,9 +212,9 @@ object CompactInteger {
       }
     }
 
-    def encodeI256(n: I256): ByteString = {
+    def encode(n: I256): ByteString = {
       if (n >= I256.from(-0x20000000) && n < I256.from(0x20000000)) {
-        encodeInt(n.v.intValue())
+        encode(n.v.intValue())
       } else {
         val data   = n.v.toByteArray
         val header = ((data.length - 4) + MultiByte.prefix).toByte

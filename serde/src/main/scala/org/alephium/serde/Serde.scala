@@ -138,7 +138,7 @@ object Serde extends ProductSerde {
 
   private[serde] object IntSerde extends Serde[Int] {
     override def serialize(input: Int): ByteString =
-      CompactInteger.Signed.encodeInt(input)
+      CompactInteger.Signed.encode(input)
 
     override def _deserialize(input: ByteString): SerdeResult[Staging[Int]] =
       CompactInteger.Signed.decodeInt(input)
@@ -146,7 +146,7 @@ object Serde extends ProductSerde {
 
   private[serde] object LongSerde extends Serde[Long] {
     override def serialize(input: Long): ByteString =
-      CompactInteger.Signed.encodeLong(input)
+      CompactInteger.Signed.encode(input)
 
     override def _deserialize(input: ByteString): SerdeResult[Staging[Long]] =
       CompactInteger.Signed.decodeLong(input)
@@ -154,7 +154,7 @@ object Serde extends ProductSerde {
 
   private[serde] object I256Serde extends Serde[I256] {
     override def serialize(input: I256): ByteString =
-      CompactInteger.Signed.encodeI256(input)
+      CompactInteger.Signed.encode(input)
 
     override def _deserialize(input: ByteString): SerdeResult[Staging[I256]] =
       CompactInteger.Signed.decodeI256(input)
