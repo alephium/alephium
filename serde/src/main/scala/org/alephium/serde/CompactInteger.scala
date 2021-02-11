@@ -23,6 +23,7 @@ import org.alephium.util.{Bytes, I256, U256, U32}
 //scalastyle:off magic.number
 
 // The design is heavily influenced by Polkadot's SCALE Codec
+@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 object CompactInteger {
   /*
    * unsigned integers are encoded with the first two most significant bits denoting the mode:
@@ -144,10 +145,10 @@ object CompactInteger {
    * - 0b11: multi-byte mode: [-2**535, 2**535)
    */
   object Signed {
-    private val signFlag      = 0x20 // 0b00100000
-    private val oneByteBound  = 0x20 // 0b00100000
-    private val twoByteBound  = oneByteBound << 8
-    private val fourByteBound = oneByteBound << (8 * 3)
+    private val signFlag: Int      = 0x20 // 0b00100000
+    private val oneByteBound: Int  = 0x20 // 0b00100000
+    private val twoByteBound: Int  = oneByteBound << 8
+    private val fourByteBound: Int = oneByteBound << (8 * 3)
 
     def encodeInt(n: Int): ByteString = {
       if (n >= 0) {
@@ -359,11 +360,11 @@ object CompactInteger {
       if (bs.isEmpty) {
         Left(SerdeError.notEnoughBytes(1, 0))
       } else {
-        (bs.head & maskRest) match {
+        (bs(0) & maskRest) match {
           case SingleByte.prefix => Right((SingleByte, bs.take(1), bs.drop(1)))
           case TwoByte.prefix    => checkSize(bs, 2, TwoByte)
           case FourByte.prefix   => checkSize(bs, 4, FourByte)
-          case _                 => checkSize(bs, (bs.head & Mode.maskMode) + 4 + 1, MultiByte)
+          case _                 => checkSize(bs, (bs(0) & Mode.maskMode) + 4 + 1, MultiByte)
         }
       }
     }

@@ -31,7 +31,7 @@ class MessageSpec extends AlephiumSpec {
   val networkType: NetworkType = NetworkType.Testnet
 
   val magicLength    = 4
-  val lengthField    = 4
+  val lengthField    = 2
   val checksumLength = 4
   val magic          = networkType.magicBytes
   val pong           = Pong(1)
@@ -44,8 +44,8 @@ class MessageSpec extends AlephiumSpec {
 
   it should "serde message" in {
 
-    payload.length is 8
-    header.length is 4
+    payload.length is 2
+    header.length is 1
 
     val additionalLength = magicLength + lengthField + checksumLength
 
