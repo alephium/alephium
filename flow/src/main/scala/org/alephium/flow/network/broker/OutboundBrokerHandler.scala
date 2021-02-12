@@ -23,13 +23,13 @@ import org.alephium.flow.network.TcpController
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.message.{Hello, Payload}
 import org.alephium.protocol.model.CliqueInfo
-import org.alephium.util.{ActorRefT, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, Duration, EventStream, TimeStamp}
 
 object OutboundBrokerHandler {
   case object Retry
 }
 
-trait OutboundBrokerHandler extends BrokerHandler {
+trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
   def selfCliqueInfo: CliqueInfo
 
   implicit def networkSetting: NetworkSetting

@@ -28,7 +28,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{AVector, BaseActor, EventStream}
 
 object TxHandler {
   def props(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
@@ -45,7 +45,8 @@ object TxHandler {
 
 class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
                                       networkSetting: NetworkSetting)
-    extends BaseActor {
+    extends BaseActor
+    with EventStream.Publisher {
   private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
   override def receive: Receive = {

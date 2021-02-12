@@ -27,7 +27,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
 
 object CliqueManager {
   def props(blockflow: BlockFlow,
@@ -47,11 +47,13 @@ object CliqueManager {
       origin: DataOrigin,
       isRecent: Boolean
   ) extends Command
+      with EventStream.Event
   final case class BroadCastTx(tx: TransactionTemplate,
                                txMsg: ByteString,
                                chainIndex: ChainIndex,
                                origin: DataOrigin)
       extends Command
+      with EventStream.Event
   final case class HandShaked(brokerInfo: BrokerInfo) extends Command
   final case class Synced(brokerInfo: BrokerInfo)     extends Command
   final case object IsSelfCliqueReady                 extends Command
@@ -63,7 +65,8 @@ class CliqueManager(blockflow: BlockFlow,
                     blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
-    extends BaseActor {
+    extends BaseActor
+    with EventStream.Subscriber {
   import CliqueManager._
 
   type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
@@ -103,8 +106,8 @@ class CliqueManager(blockflow: BlockFlow,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
-      require(context.system.eventStream.subscribe(self, classOf[BroadCastTx]))
-      require(context.system.eventStream.subscribe(self, classOf[BroadCastBlock]))
+      subscribe(self, classOf[BroadCastTx])
+      subscribe(self, classOf[BroadCastBlock])
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)

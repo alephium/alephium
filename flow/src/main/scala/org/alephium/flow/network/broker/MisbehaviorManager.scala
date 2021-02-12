@@ -22,7 +22,7 @@ import akka.actor.Props
 import akka.io.Tcp
 
 import org.alephium.flow.network.TcpController
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration, TimeStamp}
+import org.alephium.util._
 
 object MisbehaviorManager {
   def props(banDuration: Duration): Props =
@@ -33,14 +33,14 @@ object MisbehaviorManager {
       extends Command
   final case class Remove(remote: InetSocketAddress) extends Command
 
-  sealed trait Misbehavior extends Command {
+  sealed trait Misbehavior extends Command with EventStream.Event {
     def remoteAddress: InetSocketAddress
     def penalty: Int
   }
 
   case object GetPeers extends Command
 
-  final case class PeerBanned(remote: InetSocketAddress)
+  final case class PeerBanned(remote: InetSocketAddress) extends EventStream.Event
 
   final case class Peer(peer: InetSocketAddress, status: MisbehaviorStatus)
   final case class Peers(peers: AVector[Peer])
@@ -75,14 +75,14 @@ object MisbehaviorManager {
   final case class Banned(until: TimeStamp) extends MisbehaviorStatus
 }
 
-class MisbehaviorManager(banDuration: Duration) extends BaseActor {
+class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStream {
   import MisbehaviorManager._
 
   private val misbehaviorThreshold: Int              = 100
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage()
 
   override def preStart(): Unit = {
-    require(context.system.eventStream.subscribe(self, classOf[MisbehaviorManager.Misbehavior]))
+    subscribe(self, classOf[MisbehaviorManager.Misbehavior])
   }
 
   private def handleMisbehavior(misbehavior: Misbehavior): Unit = {

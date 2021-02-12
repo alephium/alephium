@@ -28,7 +28,7 @@ import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.serde.{SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, BaseActor, Duration, EventStream, TimeStamp}
 
 object Broker {
   def props(bootstrapper: ActorRefT[Bootstrapper.Command])(
@@ -68,7 +68,8 @@ object Broker {
 class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfig: BrokerConfig,
                                                             networkSetting: NetworkSetting)
     extends BaseActor
-    with SerdeUtils {
+    with SerdeUtils
+    with EventStream.Publisher {
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
   def remoteAddress: InetSocketAddress = networkSetting.coordinatorAddress

@@ -27,6 +27,7 @@ import akka.io.Tcp.Close
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
@@ -38,6 +39,7 @@ object TcpController {
   final case class Start(bootstrapper: ActorRef) extends Command
   final case class ConnectTo(remote: InetSocketAddress, forwardTo: ActorRefT[Tcp.Command])
       extends Command
+      with EventStream.Event
   final case class ConnectionConfirmed(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class ConnectionDenied(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -53,8 +55,11 @@ class TcpController(bindAddress: InetSocketAddress,
                     misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
     extends BaseActor {
   import context.system
+class TcpController(bindAddress: InetSocketAddress, MisbehaviorManager: ActorRefT[BrokerManager.Command])
+    extends BaseActor
+    with EventStream {
 
-  val tcpManager: ActorRef = IO(Tcp)
+  val tcpManager: ActorRef = IO(Tcp)(context.system)
 
   val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.Map.empty
@@ -62,8 +67,8 @@ class TcpController(bindAddress: InetSocketAddress,
     mutable.Map.empty
 
   override def preStart(): Unit = {
-    require(context.system.eventStream.subscribe(self, classOf[MisbehaviorManager.PeerBanned]))
-    require(context.system.eventStream.subscribe(self, classOf[TcpController.ConnectTo]))
+    subscribe(self, classOf[MisbehaviorManager.PeerBanned])
+    subscribe(self, classOf[TcpController.ConnectTo])
   }
 
   override def receive: Receive = awaitStart
