@@ -28,7 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream, TimeStamp}
 
 object DiscoveryServer {
   def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
@@ -64,7 +64,7 @@ object DiscoveryServer {
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
-  final case class NewPeer(info: BrokerInfo)                 extends Event
+  final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
 }
 
 /*
@@ -87,8 +87,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     val networkConfig: NetworkConfig)
     extends BaseActor
     with Timers
-    with DiscoveryServerState {
-  import context.system
+    with DiscoveryServerState
+    with EventStream.Publisher {
 
   import DiscoveryServer._
 
@@ -100,7 +100,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
-      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(bindAddress.getPort))
+      IO(Udp)(context.system) ! Udp.Bind(self, new InetSocketAddress(bindAddress.getPort))
       context become (binding orElse handleCommand)
   }
 

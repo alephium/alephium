@@ -29,7 +29,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, Forest}
+import org.alephium.util.{ActorRefT, AVector, EventStream, Forest}
 
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
@@ -66,7 +66,8 @@ class BlockChainHandler(blockFlow: BlockFlow,
     extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
       blockFlow,
       chainIndex,
-      BlockValidation.build) {
+      BlockValidation.build)
+    with EventStream.Publisher {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)

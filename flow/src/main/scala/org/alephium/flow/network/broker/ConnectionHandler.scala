@@ -29,7 +29,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, Payload}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object ConnectionHandler {
   def clique(remoteAddress: InetSocketAddress,
@@ -70,7 +70,7 @@ object ConnectionHandler {
   }
 }
 
-trait ConnectionHandler[T] extends BaseActor {
+trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   import ConnectionHandler._
 
   def remoteAddress: InetSocketAddress

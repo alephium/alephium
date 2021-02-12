@@ -27,7 +27,7 @@ import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object BrokerConnector {
   def props(remoteAddress: InetSocketAddress,
@@ -70,7 +70,8 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
                       cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig,
                                                    networkSetting: NetworkSetting)
     extends BaseActor
-    with SerdeUtils {
+    with SerdeUtils
+    with EventStream.Publisher {
   import BrokerConnector._
 
   val connectionHandler: ActorRefT[ConnectionHandler.Command] =

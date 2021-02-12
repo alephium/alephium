@@ -48,7 +48,7 @@ object BrokerHandler {
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
 
-trait BrokerHandler extends BaseActor {
+trait BrokerHandler extends BaseActor with EventStream.Publisher {
   import BrokerHandler._
 
   implicit def brokerConfig: BrokerConfig
