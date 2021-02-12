@@ -16,9 +16,10 @@
 
 package org.alephium.flow.network.broker
 
-import akka.io.{IO, Tcp}
+import akka.io.Tcp
 
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.TcpController
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.message.{Hello, Payload}
 import org.alephium.protocol.model.CliqueInfo
@@ -37,7 +38,7 @@ trait OutboundBrokerHandler extends BrokerHandler {
 
   override def preStart(): Unit = {
     super.preStart()
-    IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
+    publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
   }
 
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
@@ -49,7 +50,7 @@ trait OutboundBrokerHandler extends BrokerHandler {
 
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
-      IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress, pullMode = true)
+      publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
 
     case _: Tcp.Connected =>
       connection = ActorRefT[Tcp.Command](sender())
