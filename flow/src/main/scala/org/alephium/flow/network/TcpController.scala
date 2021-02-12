@@ -35,8 +35,9 @@ object TcpController {
     Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
 
   sealed trait Command
-  final case class Start(bootstrapper: ActorRef)        extends Command
-  final case class ConnectTo(remote: InetSocketAddress) extends Command
+  final case class Start(bootstrapper: ActorRef) extends Command
+  final case class ConnectTo(remote: InetSocketAddress, forwardTo: ActorRefT[Tcp.Command])
+      extends Command
   final case class ConnectionConfirmed(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class ConnectionDenied(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -55,12 +56,14 @@ class TcpController(bindAddress: InetSocketAddress,
 
   val tcpManager: ActorRef = IO(Tcp)
 
-  val pendingConnections: mutable.Set[InetSocketAddress] = mutable.Set.empty
+  val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
+    mutable.Map.empty
   val confirmedConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.Map.empty
 
   override def preStart(): Unit = {
     require(context.system.eventStream.subscribe(self, classOf[MisbehaviorManager.PeerBanned]))
+    require(context.system.eventStream.subscribe(self, classOf[TcpController.ConnectTo]))
   }
 
   override def receive: Receive = awaitStart
@@ -90,23 +93,25 @@ class TcpController(bindAddress: InetSocketAddress,
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def workFor(tcpListener: ActorRef, actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
-      if (isOutgoing(c.remoteAddress)) {
-        confirmConnection(actor, c, sender())
-      } else {
-        misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, ActorRefT(sender()))
+      pendingOutboundConnections.get(c.remoteAddress) match {
+        case Some(outbound) =>
+          confirmConnection(outbound.ref, c, sender())
+        case None =>
+          log.debug(s"Ask connection confirmation for $c")
+          misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, ActorRefT(sender()))
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
-      pendingConnections -= c.remoteAddress
+      pendingOutboundConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
       discoveryServer ! DiscoveryServer.Remove(c.remoteAddress)
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
-      pendingConnections -= connected.remoteAddress
+      pendingOutboundConnections -= connected.remoteAddress
       connection ! Close
-    case TcpController.ConnectTo(remote) =>
-      pendingConnections.addOne(remote)
+    case TcpController.ConnectTo(remote, forwardTo) =>
+      pendingOutboundConnections.update(remote, forwardTo)
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
@@ -127,14 +132,10 @@ class TcpController(bindAddress: InetSocketAddress,
 
   }
 
-  def isOutgoing(remoteAddress: InetSocketAddress): Boolean = {
-    pendingConnections.contains(remoteAddress)
-  }
-
   def confirmConnection(target: ActorRef,
                         connected: Tcp.Connected,
                         connection: ActorRefT[Tcp.Command]): Unit = {
-    pendingConnections -= connected.remoteAddress
+    pendingOutboundConnections -= connected.remoteAddress
     confirmedConnections += connected.remoteAddress -> connection
     context watch connection.ref
     target.tell(connected, connection.ref)
