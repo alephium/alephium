@@ -85,7 +85,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   override def receive: Receive = awaitBrokers(Map.empty)
 
   // TODO: replace Map with Array for performance
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")

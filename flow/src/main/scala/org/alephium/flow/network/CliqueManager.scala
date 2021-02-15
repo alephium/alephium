@@ -74,7 +74,6 @@ class CliqueManager(blockflow: BlockFlow,
 
   override def receive: Receive = awaitStart() orElse isSelfCliqueSynced
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitStart(): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
