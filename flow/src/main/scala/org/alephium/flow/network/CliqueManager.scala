@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Stash}
 import akka.io.Tcp
 import akka.util.ByteString
 
@@ -27,7 +27,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object CliqueManager {
   def props(blockflow: BlockFlow,
@@ -66,17 +66,16 @@ class CliqueManager(blockflow: BlockFlow,
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor
+    with Stash
     with EventStream.Subscriber {
   import CliqueManager._
 
-  type ConnectionPool = AVector[(ActorRef, Tcp.Connected)]
-
   var selfCliqueReady: Boolean = false
 
-  override def receive: Receive = awaitStart(AVector.empty) orElse isSelfCliqueSynced
+  override def receive: Receive = awaitStart() orElse isSelfCliqueSynced
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def awaitStart(pool: ConnectionPool): Receive = {
+  def awaitStart(): Receive = {
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
@@ -86,14 +85,10 @@ class CliqueManager(blockflow: BlockFlow,
                                                  ActorRefT(self),
                                                  blockFlowSynchronizer),
                         "IntraCliqueManager")
-      pool.foreach {
-        case (connection, message) =>
-          intraCliqueManager.tell(message, connection)
-      }
+      unstashAll()
       context become (awaitIntraCliqueReady(intraCliqueManager, cliqueInfo) orElse isSelfCliqueSynced)
-    case c: Tcp.Connected =>
-      val pair = (sender(), c)
-      context become (awaitStart(pool :+ pair) orElse isSelfCliqueSynced)
+    case _: Tcp.Connected =>
+      stash()
   }
 
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
