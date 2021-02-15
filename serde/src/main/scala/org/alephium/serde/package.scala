@@ -47,12 +47,8 @@ package object serde {
   implicit val byteSerde: Serde[Byte]    = ByteSerde
   implicit val intSerde: Serde[Int]      = IntSerde
   implicit val longSerde: Serde[Long]    = LongSerde
-  implicit val i32Serde: Serde[I32]      = intSerde.xmap(I32.unsafe, _.v)
-  implicit val u32Serde: Serde[U32]      = intSerde.xmap(U32.unsafe, _.v)
-  implicit val i64Serde: Serde[I64]      = longSerde.xmap(I64.from, _.v)
-  implicit val u64Serde: Serde[U64]      = longSerde.xmap(U64.unsafe, _.v)
-  implicit val i256Serde: Serde[I256]    = Serde.bytesSerde(32).xmap(I256.unsafe, _.toBytes)
-  implicit val u256Serde: Serde[U256]    = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
+  implicit val i256Serde: Serde[I256]    = I256Serde
+  implicit val u256Serde: Serde[U256]    = U256Serde
 
   implicit val bytestringSerde: Serde[ByteString] = ByteStringSerde
 
@@ -80,8 +76,6 @@ package object serde {
   implicit val byteAVectorSerde: Serde[AVector[Byte]]    = avectorSerde[Byte]
   implicit val intAVectorSerde: Serde[AVector[Int]]      = avectorSerde[Int]
   implicit val longAVectorSerde: Serde[AVector[Long]]    = avectorSerde[Long]
-  implicit val i64AVectorSerde: Serde[AVector[I64]]      = avectorSerde[I64]
-  implicit val u64AVectorSerde: Serde[AVector[U64]]      = avectorSerde[U64]
   implicit val i256AVectorSerde: Serde[AVector[I256]]    = avectorSerde[I256]
   implicit val u256AVectorSerde: Serde[AVector[U256]]    = avectorSerde[U256]
 
@@ -92,16 +86,11 @@ package object serde {
   implicit val byteArraySeqSerde: Serde[mutable.ArraySeq[Byte]]    = arraySeqSerde[Byte]
   implicit val intArraySeqSerde: Serde[mutable.ArraySeq[Int]]      = arraySeqSerde[Int]
   implicit val longArraySeqSerde: Serde[mutable.ArraySeq[Long]]    = arraySeqSerde[Long]
-  implicit val i64ArraySeqSerde: Serde[mutable.ArraySeq[I64]]      = arraySeqSerde[I64]
-  implicit val u64ArraySeqSerde: Serde[mutable.ArraySeq[U64]]      = arraySeqSerde[U64]
   implicit val i256ArraySeqSerde: Serde[mutable.ArraySeq[I256]]    = arraySeqSerde[I256]
   implicit val u256ArraySeqSerde: Serde[mutable.ArraySeq[U256]]    = arraySeqSerde[U256]
 
   implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[mutable.ArraySeq[T]] =
     dynamicSizeSerde(serde, mutable.ArraySeq.newBuilder)
-
-  implicit val bigIntSerde: Serde[BigInt] =
-    avectorSerde[Byte].xmap(vc => BigInt(vc.toArray), bi => AVector.unsafe(bi.toByteArray))
 
   implicit val bigIntegerSerde: Serde[BigInteger] =
     avectorSerde[Byte].xmap(vc => new BigInteger(vc.toArray), bi => AVector.unsafe(bi.toByteArray))

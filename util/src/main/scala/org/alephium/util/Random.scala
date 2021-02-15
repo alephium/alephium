@@ -39,6 +39,12 @@ object Random {
     U256.unsafe(buffer)
   }
 
+  def nextI256(): I256 = {
+    val buffer = new Array[Byte](32)
+    source.nextBytes(buffer)
+    I256.unsafe(buffer)
+  }
+
   def nextU256NonUniform(bound: U256): U256 = {
     nextU256().modUnsafe(bound)
   }

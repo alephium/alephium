@@ -73,11 +73,12 @@ trait TestFixtureLike
     (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address    = "T1D9PBcRXK5uzrNYokNMB7oh6JpW86sZajJ5gD845cshED"
-  val publicKey  = "03ee6c463816f1b7f3d23ccff248fa73d114ac5eabd616b1fd0d35e6f5ec1eb092"
-  val privateKey = "a13841774e62ef76b4d9aac1531b68a46e93baf09ba9c692d57a0edc64b973d4"
+  // the address needs to be in group 0 or 1 for node with broker-id 0
+  val address    = "T1Bz5Lri6ensLeYQaPujQKBnRSuxjwCRDsToHyavDxP6Jh"
+  val publicKey  = "0238c96456729ada4f0b0fce8d3fb7ba4bd5ae18e716853c43fb113341bfa83a1d"
+  val privateKey = "b6f46c5c285ce53caf1c292a4f8aac7ce1670996a3dc37c2ae96217a2141d8f9"
   val mnemonic =
-    "inform ocean drama click lazy ridge unit cause decrease notable cat trumpet describe mushroom truly gospel chaos bless female web festival birth bread embark"
+    "woman trophy alarm surface decade reward robust such such inside swallow kit denial mistake marble curtain vehicle kiss auto couch call knee drama pool"
   val (transferAddress, _, _) = generateAccount
 
   val password = "password"

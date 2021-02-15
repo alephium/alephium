@@ -27,7 +27,7 @@ import org.alephium.util.{Bytes, Hex, Number}
  * value = mantissa * 256 ^ (exponent - 3)
  * value should not be negative always
  */
-final case class Target(val bits: ByteString) extends Ordered[Target] {
+final case class Target(bits: ByteString) extends Ordered[Target] {
   lazy val value: BigInteger = Target.fromCompactBitsUnsafe(bits)
 
   override def compare(that: Target): Int = this.value.compareTo(that.value)

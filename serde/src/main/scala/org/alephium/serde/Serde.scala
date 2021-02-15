@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 
 import akka.util.ByteString
 
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.util.{AVector, I256, U256}
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -136,22 +136,36 @@ object Serde extends ProductSerde {
       deserialize0(input, _.apply(0))
   }
 
-  private[serde] object IntSerde extends FixedSizeSerde[Int] {
-    override val serdeSize: Int = java.lang.Integer.BYTES
+  private[serde] object IntSerde extends Serde[Int] {
+    override def serialize(input: Int): ByteString =
+      CompactInteger.Signed.encode(input)
 
-    override def serialize(input: Int): ByteString = Bytes.from(input)
-
-    override def deserialize(input: ByteString): SerdeResult[Int] =
-      deserialize0(input, Bytes.toIntUnsafe)
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Int]] =
+      CompactInteger.Signed.decodeInt(input)
   }
 
-  private[serde] object LongSerde extends FixedSizeSerde[Long] {
-    override val serdeSize: Int = java.lang.Long.BYTES
+  private[serde] object LongSerde extends Serde[Long] {
+    override def serialize(input: Long): ByteString =
+      CompactInteger.Signed.encode(input)
 
-    override def serialize(input: Long): ByteString = Bytes.toBytes(input)
+    override def _deserialize(input: ByteString): SerdeResult[Staging[Long]] =
+      CompactInteger.Signed.decodeLong(input)
+  }
 
-    override def deserialize(input: ByteString): SerdeResult[Long] =
-      deserialize0(input, Bytes.toLongUnsafe)
+  private[serde] object I256Serde extends Serde[I256] {
+    override def serialize(input: I256): ByteString =
+      CompactInteger.Signed.encode(input)
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[I256]] =
+      CompactInteger.Signed.decodeI256(input)
+  }
+
+  private[serde] object U256Serde extends Serde[U256] {
+    override def serialize(input: U256): ByteString =
+      CompactInteger.Unsigned.encode(input)
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[U256]] =
+      CompactInteger.Unsigned.decodeU256(input)
   }
 
   private[serde] object ByteStringSerde extends Serde[ByteString] {

@@ -138,6 +138,10 @@ object U256 {
     unsafe(bytes.toArray)
   }
 
+  def from(bytes: ByteString): Option[U256] = {
+    from(new BigInteger(1, bytes.toArray))
+  }
+
   def from(value: BigInteger): Option[U256] = {
     if (validate(value)) Some(new U256(value)) else None
   }
