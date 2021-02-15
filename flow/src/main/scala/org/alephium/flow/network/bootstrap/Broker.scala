@@ -103,7 +103,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitCliqueInfo(connectionHandler: ActorRefT[ConnectionHandler.Command]): Receive = {
     case Broker.Received(clique: Message.Clique) =>
       log.debug(s"Received clique info from master")
@@ -112,7 +111,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       context become awaitReady(connectionHandler, clique.info)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitReady(connection: ActorRefT[ConnectionHandler.Command],
                  cliqueInfo: IntraCliqueInfo): Receive = {
     case Broker.Received(Message.Ready) =>
