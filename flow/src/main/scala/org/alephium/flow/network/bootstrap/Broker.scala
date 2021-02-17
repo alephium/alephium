@@ -41,12 +41,14 @@ object Broker {
   final case class Received(message: Message) extends Command
 
   def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig): Props =
+      implicit groupConfig: GroupConfig,
+      networkSetting: NetworkSetting): Props =
     Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class MyConnectionHandler(
-      val remoteAddress: InetSocketAddress,
-      val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+  class MyConnectionHandler(val remoteAddress: InetSocketAddress,
+                            val connection: ActorRefT[Tcp.Command])(
+      implicit groupConfig: GroupConfig,
+      val networkSetting: NetworkSetting)
       extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)

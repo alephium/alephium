@@ -39,6 +39,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.broker.groups is 13
     config.network.networkType is NetworkType.Devnet
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
+    config.network.connectionBufferCapacityInByte is 100000000L
   }
 
   it should "load bootstrap config" in {
