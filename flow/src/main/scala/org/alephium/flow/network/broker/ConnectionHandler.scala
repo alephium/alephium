@@ -19,9 +19,8 @@ package org.alephium.flow.network.broker
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
-import akka.actor.Props
+import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 
@@ -40,7 +39,7 @@ object ConnectionHandler {
       networkSetting: NetworkSetting): Props =
     Props(new CliqueConnectionHandler(remoteAddress, connection, brokerHandler))
 
-  final case class Ack(id: Long) extends Tcp.Event
+  final case class Ack(id: Int) extends Tcp.Event
 
   sealed trait Command
   case object CloseConnection                extends Command
@@ -59,7 +58,7 @@ object ConnectionHandler {
                                 val connection: ActorRefT[Tcp.Command],
                                 val brokerHandler: ActorRefT[BrokerHandler.Command])(
       implicit val groupConfig: GroupConfig,
-      networkSetting: NetworkSetting)
+      val networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Payload]]] = {
       tryDeserializePayload(data, networkSetting.networkType)
@@ -76,6 +75,8 @@ trait ConnectionHandler[T] extends BaseActor {
 
   def remoteAddress: InetSocketAddress
 
+  def networkSetting: NetworkSetting
+
   def connection: ActorRefT[Tcp.Command]
 
   override def preStart(): Unit = {
@@ -86,9 +87,9 @@ trait ConnectionHandler[T] extends BaseActor {
 
   def receive: Receive = communicating
 
-  def communicating: Receive = reading orElse writing orElse close
+  def communicating: Receive = reading orElse writing orElse closed
 
-  def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse close
+  def bufferedCommunicating(ack: Int): Receive = reading orElse bufferedWriting(ack) orElse closed
 
   def reading: Receive = {
     case Tcp.Received(data) =>
@@ -98,43 +99,52 @@ trait ConnectionHandler[T] extends BaseActor {
   }
 
   def writing: Receive = {
-    case Send(data) => write(data)
-    case Ack(ack)   => acknowledge(ack) // TODO: add test and remove acknowledge
-    case Tcp.CommandFailed(Tcp.Write(data, Ack(ack))) =>
-      log.debug(s"Writing failed $ack")
-      connection ! Tcp.ResumeWriting
-      bufferOutMessage(ack, data)
-      context become bufferedCommunicating
-  }
-
-  def bufferedWriting: Receive = {
-    case Tcp.WritingResumed => writeFirst()
-    case Send(data)         => bufferOutMessage(data)
+    case Send(data) =>
+      connection ! Tcp.Write(data, Ack(currentOffset))
+      buffer(data)
     case Ack(ack) =>
       acknowledge(ack)
-      if (outMessageBuffer.nonEmpty) {
-        writeFirst()
-      } else {
-        context become communicating
-      }
-    case Tcp.CommandFailed(Tcp.Write(data, Ack(ack))) =>
+    case Tcp.CommandFailed(Tcp.Write(_, Ack(ack))) =>
+      log.debug(s"Writing failed $ack")
       connection ! Tcp.ResumeWriting
-      bufferOutMessage(ack, data)
+      context become bufferedCommunicating(ack)
+    case Tcp.PeerClosed | CloseConnection =>
+      if (storage.isEmpty) connection ! Tcp.Close else context.become(closing orElse closed)
   }
 
-  def close: Receive = {
-    case _: Tcp.ConnectionClosed =>
-      log.debug(s"Peer connection closed")
+  def bufferedWriting(nack: Int): Receive = {
+    var toAck   = 10
+    var toClose = false
+
+    {
+      case Send(data)             => buffer(data)
+      case Tcp.WritingResumed     => writeFirst()
+      case Ack(ack) if ack < nack => acknowledge(ack)
+      case Ack(ack) =>
+        acknowledge(ack)
+        if (storage.nonEmpty) {
+          if (toAck > 0) {
+            // stay in ACK-based mode for a while
+            writeFirst()
+            toAck -= 1
+          } else {
+            // then return to NACK-based again
+            writeAll()
+            context.become(communicating)
+          }
+        } else if (toClose) {
+          connection ! Tcp.Close
+        } else {
+          context.become(communicating)
+        }
+      case Tcp.PeerClosed | CloseConnection => toClose = true
+    }
+  }
+
+  def closed: Receive = {
+    case _: Tcp.ConnectionClosed | Terminated(_) =>
+      log.debug(s"Peer connection closed: [$remoteAddress]")
       context stop self
-    case CloseConnection =>
-      if (outMessageBuffer.nonEmpty) {
-        log.debug("Clear the buffer before closing the connection")
-        writeAll()
-        context become closing
-      } else {
-        log.debug("Close the connection")
-        connection ! Tcp.Close
-      }
   }
 
   def closing: Receive = {
@@ -146,21 +156,75 @@ trait ConnectionHandler[T] extends BaseActor {
           context.unbecome()
         case Ack(ack) => acknowledge(ack)
       }, discardOld = false)
+
     case Ack(ack) =>
       acknowledge(ack)
-      if (outMessageBuffer.isEmpty) {
+      if (storage.isEmpty) {
         connection ! Tcp.Close
       }
-    case _: Tcp.ConnectionClosed =>
-      log.debug(s"Peer connection closed")
-      context stop self
-    case other: ByteString =>
-      log.debug(s"Got $other in closing phase")
   }
 
-  final var outMessageCount  = 0L
-  final val outMessageBuffer = mutable.TreeMap.empty[Long, ByteString]
-  final var inMessageBuffer  = ByteString.empty
+  override def postStop(): Unit = {
+    log.debug(s"transferred $transferred bytes from/to [$remoteAddress]")
+  }
+
+  private[broker] final var storageOffset = 0
+  private[broker] final var storage       = Vector.empty[ByteString]
+  private[broker] final var stored        = 0L
+  private[broker] final var transferred   = 0L
+
+  final val maxStored                 = networkSetting.connectionBufferCapacityInByte
+  final val highWatermark             = maxStored * 5 / 10
+  final val lowWatermark              = maxStored * 3 / 10
+  private[broker] final var suspended = false
+
+  private def currentOffset = storageOffset + storage.size
+
+  private def buffer(data: ByteString): Unit = {
+    storage :+= data
+    stored += data.size
+
+    if (stored > maxStored) {
+      log.warning(s"drop connection to [$remoteAddress] (buffer overrun)")
+      context.stop(self)
+
+    } else if (stored > highWatermark) {
+      log.debug(s"suspending reading at $currentOffset")
+      connection ! Tcp.SuspendReading
+      suspended = true
+    }
+  }
+
+  private def acknowledge(ack: Int): Unit = {
+    require(ack == storageOffset, s"received ack $ack at $storageOffset")
+    require(storage.nonEmpty, s"storage was empty at ack $ack")
+
+    val size = storage(0).size
+    stored -= size
+    transferred += size
+
+    storageOffset += 1
+    storage = storage.drop(1)
+
+    if (suspended && stored < lowWatermark) {
+      log.debug("resuming reading")
+      connection ! Tcp.ResumeReading
+      suspended = false
+    }
+  }
+
+  private def writeFirst(): Unit = {
+    assume(storage.nonEmpty)
+    connection ! Tcp.Write(storage(0), Ack(storageOffset))
+  }
+
+  private def writeAll(): Unit = {
+    for ((data, i) <- storage.zipWithIndex) {
+      connection ! Tcp.Write(data, Ack(storageOffset + i))
+    }
+  }
+
+  private final var inMessageBuffer = ByteString.empty
 
   def bufferInMessage(data: ByteString): Unit = {
     inMessageBuffer ++= data
@@ -180,39 +244,6 @@ trait ConnectionHandler[T] extends BaseActor {
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
         handleInvalidMessage(BrokerManager.InvalidMessage(remoteAddress))
-    }
-  }
-
-  def bufferOutMessage(id: Long, data: ByteString): Unit = {
-    outMessageBuffer += id -> data
-  }
-
-  def bufferOutMessage(data: ByteString): Unit = {
-    outMessageCount += 1
-    outMessageBuffer += outMessageCount -> data
-  }
-
-  def acknowledge(id: Long): Unit = {
-    outMessageBuffer -= id
-  }
-
-  def write(data: ByteString): Unit = {
-    outMessageCount += 1
-    connection ! Tcp.Write(data, Ack(outMessageCount))
-  }
-
-  def writeFirst(): Unit = {
-    assume(outMessageBuffer.nonEmpty)
-    outMessageBuffer.headOption.foreach {
-      case (id, message) =>
-        outMessageBuffer -= id
-        connection ! Tcp.Write(message, Ack(id))
-    }
-  }
-
-  def writeAll(): Unit = {
-    for ((id, data) <- outMessageBuffer) {
-      connection ! Tcp.Write(data, Ack(id))
     }
   }
 

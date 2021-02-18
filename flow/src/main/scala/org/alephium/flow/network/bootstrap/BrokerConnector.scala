@@ -24,6 +24,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
@@ -31,7 +32,8 @@ import org.alephium.util.{ActorRefT, BaseActor}
 object BrokerConnector {
   def props(remoteAddress: InetSocketAddress,
             connection: ActorRefT[Tcp.Command],
-            cliqueCoordinator: ActorRef)(implicit groupConfig: GroupConfig): Props =
+            cliqueCoordinator: ActorRef)(implicit groupConfig: GroupConfig,
+                                         networkSetting: NetworkSetting): Props =
     Props(new BrokerConnector(remoteAddress, connection, cliqueCoordinator))
 
   sealed trait Command
@@ -39,12 +41,14 @@ object BrokerConnector {
   final case class Send(intraCliqueInfo: IntraCliqueInfo) extends Command
 
   def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig): Props =
+      implicit groupConfig: GroupConfig,
+      networkSetting: NetworkSetting): Props =
     Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class MyConnectionHandler(
-      val remoteAddress: InetSocketAddress,
-      val connection: ActorRefT[Tcp.Command])(implicit groupConfig: GroupConfig)
+  class MyConnectionHandler(val remoteAddress: InetSocketAddress,
+                            val connection: ActorRefT[Tcp.Command])(
+      implicit groupConfig: GroupConfig,
+      val networkSetting: NetworkSetting)
       extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)
@@ -63,7 +67,8 @@ object BrokerConnector {
 
 class BrokerConnector(remoteAddress: InetSocketAddress,
                       connection: ActorRefT[Tcp.Command],
-                      cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig)
+                      cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig,
+                                                   networkSetting: NetworkSetting)
     extends BaseActor
     with SerdeUtils {
   import BrokerConnector._

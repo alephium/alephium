@@ -76,6 +76,7 @@ final case class NetworkSetting(
     networkType: NetworkType,
     pingFrequency: Duration,
     retryTimeout: Duration,
+    connectionBufferCapacityInByte: Long,
     upnp: UpnpSettings,
     bindAddress: InetSocketAddress,
     internalAddress: InetSocketAddress,

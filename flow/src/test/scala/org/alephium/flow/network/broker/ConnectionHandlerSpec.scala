@@ -52,22 +52,23 @@ class ConnectionHandlerSpec
 
   it should "write data to connection" in new Fixture {
     connectionHandler ! ConnectionHandler.Send(messageBytes)
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(0)))
 
     connectionHandler ! ConnectionHandler.Send(messageBytes)
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(2)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
   }
 
   it should "buffer data when writing is failing" in new Fixture {
     connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(1)))
     connection.expectMsg(Tcp.ResumeWriting)
+    connectionHandler.underlyingActor.storage.size is 0
 
     connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectNoMessage()
-    connectionHandler.underlyingActor.outMessageBuffer.contains(1)
+    connectionHandler.underlyingActor.storage.size is 1
 
     connectionHandler ! Tcp.WritingResumed
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(0)))
   }
 
   it should "close connection" in new Fixture {
