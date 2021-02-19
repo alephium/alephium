@@ -105,6 +105,21 @@ trait DiscoveryServerState {
     pendings.get(peerId)
   }
 
+  def banPeerFromAddress(address: InetSocketAddress): Boolean = {
+    val bannedPeer = table.values
+      .filter(status => status.info.address == address)
+      .map(_.info.peerId)
+
+    bannedPeer.foreach(banPeer)
+
+    bannedPeer.nonEmpty
+  }
+
+  def banPeer(peerId: PeerId): Unit = {
+    table -= peerId
+    pendings -= peerId
+  }
+
   def cleanup(): Unit = {
     val now = TimeStamp.now()
     val expired = table.values
@@ -138,7 +153,7 @@ trait DiscoveryServerState {
       .foreach(status => tryPing(status.info))
     val emptySlotNum = discoveryConfig.scanMaxPerGroup - sortedNeighbors.length
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
-    bootstrap.take(bootstrapNum).foreach(tryPing)
+    bootstrap.take(bootstrapNum).foreach(ping)
   }
 
   def shouldScanFast(): Boolean = {
@@ -160,14 +175,18 @@ trait DiscoveryServerState {
 
   def tryPing(peerInfo: BrokerInfo): Unit = {
     if (isUnknown(peerInfo.peerId) && isPendingAvailable) {
-      log.info(s"Sending Ping to $peerInfo")
-      val remoteAddress = peerInfo.address
-      send(remoteAddress, Ping(selfPeerInfoOpt))
-      pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))
+      ping(peerInfo)
     }
   }
 
-  def tryPing(remote: InetSocketAddress): Unit = {
+  def ping(peerInfo: BrokerInfo): Unit = {
+    log.info(s"Sending Ping to $peerInfo")
+    val remoteAddress = peerInfo.address
+    send(remoteAddress, Ping(selfPeerInfoOpt))
+    pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))
+  }
+
+  def ping(remote: InetSocketAddress): Unit = {
     log.debug(s"Sending Ping to $remote")
     send(remote, Ping(selfPeerInfoOpt))
   }

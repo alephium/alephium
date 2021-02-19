@@ -78,7 +78,9 @@ object Node {
       ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
 
     val discoveryProps: Props =
-      DiscoveryServer.props(networkSetting.bindAddress, config.discovery.bootstrap)
+      DiscoveryServer.props(networkSetting.bindAddress,
+                            misbehaviorManager,
+                            config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
