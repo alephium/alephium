@@ -142,4 +142,20 @@ class DiscoveryServerStateSpec
       peers0.map(p => peerInfo.cliqueId.hammingDist(p.cliqueId)).toIterable.toList
     bucket0 is bucket0.sorted
   }
+
+  it should "clean up a banned peer" in new Fixture {
+    addToTable(peerInfo)
+    state.isInTable(peerInfo.peerId) is true
+
+    state.banPeer(peerInfo.peerId)
+    state.isInTable(peerInfo.peerId) is false
+  }
+
+  it should "clean up a banned peer from it's address" in new Fixture {
+    addToTable(peerInfo)
+    state.isInTable(peerInfo.peerId) is true
+
+    state.banPeerFromAddress(peerInfo.address)
+    state.isInTable(peerInfo.peerId) is false
+  }
 }

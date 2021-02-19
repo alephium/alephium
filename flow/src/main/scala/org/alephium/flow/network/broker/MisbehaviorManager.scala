@@ -21,7 +21,8 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.io.Tcp
 
-import org.alephium.flow.network.TcpController
+import org.alephium.flow.network.{DiscoveryServer, TcpController}
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 object MisbehaviorManager {
@@ -31,7 +32,7 @@ object MisbehaviorManager {
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
-  final case class Remove(remote: InetSocketAddress) extends Command
+  final case class ConfirmPeer(peerInfo: BrokerInfo) extends Command
 
   sealed trait Misbehavior extends Command with EventStream.Event {
     def remoteAddress: InetSocketAddress
@@ -125,13 +126,16 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
         sender() ! TcpController.ConnectionConfirmed(connected, connection)
       }
 
-    case Remove(remote) =>
-      misbehaviorStorage.remove(remote)
+    case ConfirmPeer(peerInfo) =>
+      if (misbehaviorStorage.isBanned(peerInfo.address)) {
+        sender() ! DiscoveryServer.PeerDenied(peerInfo)
+      } else {
+        sender() ! DiscoveryServer.PeerConfirmed(peerInfo)
+      }
 
     case misbehavior: Misbehavior =>
       log.debug(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
-
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())
   }

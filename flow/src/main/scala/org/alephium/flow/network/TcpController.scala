@@ -26,7 +26,6 @@ import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.util.{ActorRefT, BaseActor}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
@@ -53,9 +52,6 @@ object TcpController {
 class TcpController(bindAddress: InetSocketAddress,
                     discoveryServer: ActorRefT[DiscoveryServer.Command],
                     misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
-    extends BaseActor {
-  import context.system
-class TcpController(bindAddress: InetSocketAddress, MisbehaviorManager: ActorRefT[BrokerManager.Command])
     extends BaseActor
     with EventStream {
 
