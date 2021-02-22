@@ -58,6 +58,7 @@ object DiscoveryServer {
   sealed trait Command
   case object GetNeighborCliques                          extends Command
   final case class Disable(cliqueId: CliqueId)            extends Command
+  final case class Remove(peer: InetSocketAddress)        extends Command
   case object Scan                                        extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
 
@@ -149,6 +150,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case Disable(peerId) =>
       table -= peerId
       ()
+    case Remove(peer) =>
+      remove(peer)
   }
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =

@@ -28,12 +28,14 @@ import org.alephium.util.AlephiumActorSpec
 
 class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
   trait Fixture {
+    val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()
     val bootstrapper       = TestProbe()
 
     val bindAddress = SocketUtil.temporaryServerAddress()
     val controller =
-      TestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
+      TestActorRef[TcpController](
+        TcpController.props(bindAddress, discoveryServer.ref, misbehaviorManager.ref))
     val controllerActor = controller.underlyingActor
 
     controller ! TcpController.Start(bootstrapper.ref)
@@ -87,5 +89,10 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
       fixture2.controller ! TcpController.ConnectTo(fixture1.bindAddress)
       fixture2.controllerActor.confirmedConnections.contains(fixture1.bindAddress) is true
     }
+  }
+
+  it should "notice the discovery server in case of command failed " in new Fixture {
+    controller ! Tcp.CommandFailed(Tcp.Connect(bindAddress))
+    discoveryServer.expectMsg(DiscoveryServer.Remove(bindAddress))
   }
 }
