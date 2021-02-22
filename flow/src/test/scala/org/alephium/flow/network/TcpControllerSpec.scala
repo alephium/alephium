@@ -23,17 +23,19 @@ import akka.io.{IO, Tcp}
 import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 import org.scalatest.concurrent.Eventually.eventually
 
-import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.util.AlephiumActorSpec
 
 class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
   trait Fixture {
-    val brokerManager = TestProbe()
-    val bootstrapper  = TestProbe()
+    val discoveryServer    = TestProbe()
+    val misbehaviorManager = TestProbe()
+    val bootstrapper       = TestProbe()
 
     val bindAddress = SocketUtil.temporaryServerAddress()
     val controller =
-      TestActorRef[TcpController](TcpController.props(bindAddress, brokerManager.ref))
+      TestActorRef[TcpController](
+        TcpController.props(bindAddress, discoveryServer.ref, misbehaviorManager.ref))
     val controllerActor = controller.underlyingActor
 
     controller ! TcpController.Start(bootstrapper.ref)
@@ -41,7 +43,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)
-      val confirm = brokerManager.expectMsgType[BrokerManager.ConfirmConnection]
+      val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
       controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
 
       bootstrapper.expectMsgType[Tcp.Connected]
@@ -63,7 +65,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
 
   it should "not accept denied connections" in new Fixture {
     IO(Tcp) ! Tcp.Connect(bindAddress)
-    val confirm = brokerManager.expectMsgType[BrokerManager.ConfirmConnection]
+    val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
     controller ! TcpController.ConnectionDenied(confirm.connected, confirm.connection)
 
     val address = confirm.connected.remoteAddress
@@ -87,5 +89,10 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
       fixture2.controller ! TcpController.ConnectTo(fixture1.bindAddress)
       fixture2.controllerActor.confirmedConnections.contains(fixture1.bindAddress) is true
     }
+  }
+
+  it should "notice the discovery server in case of command failed " in new Fixture {
+    controller ! Tcp.CommandFailed(Tcp.Connect(bindAddress))
+    discoveryServer.expectMsg(DiscoveryServer.Remove(bindAddress))
   }
 }

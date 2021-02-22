@@ -18,7 +18,7 @@ package org.alephium.protocol
 
 import java.math.BigInteger
 
-import org.alephium.util.{Number, TimeStamp, U256}
+import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALF {
   //scalastyle:off magic.number
@@ -35,6 +35,9 @@ object ALF {
   val MaxTxInputNum: Int     = 1024
   val MaxTxOutputNum: Int    = 1024
   val MaxOutputDataSize: Int = 256
+
+  val BanDuration: Duration = Duration.ofDaysUnsafe(1)
+
   //scalastyle:on magic.number
 
   def alf(amount: U256): Option[U256] = amount.mul(CoinInOneALF)
