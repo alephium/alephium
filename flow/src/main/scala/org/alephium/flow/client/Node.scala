@@ -39,8 +39,8 @@ trait Node extends Service {
   def system: ActorSystem
   def blockFlow: BlockFlow
   def misbehaviorManager: ActorRefT[MisbehaviorManager.Command]
-  def tcpController: ActorRefT[TcpController.Command]
   def discoveryServer: ActorRefT[DiscoveryServer.Command]
+  def tcpController: ActorRefT[TcpController.Command]
   def bootstrapper: ActorRefT[Bootstrapper.Command]
   def cliqueManager: ActorRefT[CliqueManager.Command]
   def eventBus: ActorRefT[EventBus.Message]
@@ -77,19 +77,19 @@ object Node {
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
       ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
 
-    val tcpController: ActorRefT[TcpController.Command] =
-      ActorRefT
-        .build[TcpController.Command](
-          system,
-          TcpController.props(config.network.bindAddress, misbehaviorManager))
-
-    val eventBus: ActorRefT[EventBus.Message] =
-      ActorRefT.build[EventBus.Message](system, EventBus.props())
-
     val discoveryProps: Props =
       DiscoveryServer.props(networkSetting.bindAddress, config.discovery.bootstrap)
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
+
+    val tcpController: ActorRefT[TcpController.Command] =
+      ActorRefT
+        .build[TcpController.Command](
+          system,
+          TcpController.props(config.network.bindAddress, discoveryServer, misbehaviorManager))
+
+    val eventBus: ActorRefT[EventBus.Message] =
+      ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
 

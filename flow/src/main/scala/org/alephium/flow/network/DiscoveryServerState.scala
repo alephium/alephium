@@ -185,6 +185,12 @@ trait DiscoveryServerState {
     }
   }
 
+  def remove(peer: InetSocketAddress): Unit = {
+    val cliquesToRemove =
+      table.values.filter(_.info.externalAddresses.exists(_ == peer)).map(_.info.id)
+    table --= cliquesToRemove
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def tryInsert(cliqueInfo: InterCliqueInfo): Unit = {
     val myself   = selfCliqueId

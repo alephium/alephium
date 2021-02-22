@@ -30,8 +30,9 @@ import org.alephium.util.{ActorRefT, BaseActor}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
+            discoveryServer: ActorRefT[DiscoveryServer.Command],
             misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]): Props =
-    Props(new TcpController(bindAddress, misbehaviorManager))
+    Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef)        extends Command
@@ -47,6 +48,7 @@ object TcpController {
 }
 
 class TcpController(bindAddress: InetSocketAddress,
+                    discoveryServer: ActorRefT[DiscoveryServer.Command],
                     misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
     extends BaseActor {
   import context.system
@@ -97,7 +99,7 @@ class TcpController(bindAddress: InetSocketAddress,
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
       pendingConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
-      misbehaviorManager ! MisbehaviorManager.Remove(c.remoteAddress)
+      discoveryServer ! DiscoveryServer.Remove(c.remoteAddress)
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
