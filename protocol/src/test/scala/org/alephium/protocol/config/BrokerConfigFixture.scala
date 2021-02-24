@@ -14,9 +14,25 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.config
 
-import org.alephium.protocol.model.InterCliqueInfo
-import org.alephium.util.AVector
+trait BrokerConfigFixture { self =>
+  def groups: Int
+  def brokerId: Int
+  def brokerNum: Int
 
-final case class NeighborCliques(cliques: AVector[InterCliqueInfo])
+  implicit lazy val brokerConfig: BrokerConfig = new BrokerConfig {
+    override def brokerId: Int = self.brokerId
+
+    override def brokerNum: Int = self.brokerNum
+
+    def groups: Int = self.groups
+  }
+}
+
+object BrokerConfigFixture {
+  trait Default extends BrokerConfigFixture {
+    val brokerId: Int  = 0
+    def brokerNum: Int = groups
+  }
+}

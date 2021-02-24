@@ -22,7 +22,7 @@ import scala.language.implicitConversions
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasBox
 import org.alephium.util.{AVector, NumericHelpers}
@@ -90,12 +90,30 @@ trait Generators extends NumericHelpers {
                         AVector.from(peers),
                         groupNumPerBroker)
 
+  def cliqueInfoGen(groupNumPerBroker: Int)(implicit config: GroupConfig): Gen[CliqueInfo] =
+    for {
+      peers <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cid   <- cliqueIdGen
+    } yield
+      CliqueInfo.unsafe(cid,
+                        AVector.from(peers.map(Option.apply)),
+                        AVector.from(peers),
+                        groupNumPerBroker)
+
   def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =
     for {
       groupNumPerBroker <- groupNumPerBrokerGen
       peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
       cid               <- cliqueIdGen
     } yield InterCliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
+
+  def peerInfoGen(implicit config: BrokerConfig): Gen[BrokerInfo] =
+    for {
+      cid               <- cliqueIdGen
+      groupNumPerBroker <- groupNumPerBrokerGen
+      brokerId          <- Gen.choose(0, (config.groups / groupNumPerBroker) - 1)
+      address           <- socketAddressGen
+    } yield BrokerInfo.unsafe(cid, brokerId, groupNumPerBroker, address)
 
   lazy val socketAddressGen: Gen[InetSocketAddress] =
     for {

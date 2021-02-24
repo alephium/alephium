@@ -24,29 +24,29 @@ import akka.actor.{Props, Timers}
 import akka.io.{IO, Udp}
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, InterCliqueInfo}
+import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
 
 object DiscoveryServer {
   def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
-      implicit groupConfig: GroupConfig,
+      implicit brokerConfig: BrokerConfig,
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig): Props =
     Props(new DiscoveryServer(bindAddress, bootstrap))
 
   def props(bindAddress: InetSocketAddress, peers: InetSocketAddress*)(
-      implicit groupConfig: GroupConfig,
+      implicit brokerConfig: BrokerConfig,
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig): Props = {
     props(bindAddress, ArraySeq.from(peers))
   }
 
-  final case class PeerStatus(info: InterCliqueInfo, updateAt: TimeStamp)
+  final case class PeerStatus(info: BrokerInfo, updateAt: TimeStamp)
   object PeerStatus {
-    def fromInfo(info: InterCliqueInfo): PeerStatus = {
+    def fromInfo(info: BrokerInfo): PeerStatus = {
       PeerStatus(info, TimeStamp.now())
     }
   }
@@ -57,14 +57,14 @@ object DiscoveryServer {
 
   sealed trait Command
   case object GetNeighborCliques                          extends Command
-  final case class Disable(cliqueId: CliqueId)            extends Command
+  final case class Disable(peerId: PeerId)                extends Command
   final case class Remove(peer: InetSocketAddress)        extends Command
   case object Scan                                        extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
 
   sealed trait Event
-  final case class NeighborCliques(peers: AVector[InterCliqueInfo]) extends Event
-  final case class NewClique(info: InterCliqueInfo)                 extends Event
+  final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
+  final case class NewPeer(info: BrokerInfo)                 extends Event
 }
 
 /*
@@ -82,7 +82,7 @@ object DiscoveryServer {
  */
 class DiscoveryServer(val bindAddress: InetSocketAddress,
                       val bootstrap: ArraySeq[InetSocketAddress])(
-    implicit val groupConfig: GroupConfig,
+    implicit val brokerConfig: BrokerConfig,
     val discoveryConfig: DiscoveryConfig,
     val networkConfig: NetworkConfig)
     extends BaseActor
@@ -122,11 +122,9 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserialize(selfCliqueInfo.id, data, networkConfig.networkType) match {
+      DiscoveryMessage.deserialize(selfCliqueId, data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
-          log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
-          val sourceId = message.header.cliqueId
-          updateStatus(sourceId)
+          log.debug(s"Received ${message.payload} from $remote")
           handlePayload(remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
@@ -146,7 +144,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       }
       ()
     case GetNeighborCliques =>
-      sender() ! NeighborCliques(getActivePeers)
+      sender() ! NeighborPeers(getActivePeers)
     case Disable(peerId) =>
       table -= peerId
       ()
@@ -156,11 +154,11 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
-      case Ping(cliqueInfoOpt) =>
-        selfInterCliqueInfoOpt.foreach(info => send(remote, Pong(info)))
-        cliqueInfoOpt.foreach(tryPing) // ping back when cliqueInfo is not empty
-      case Pong(cliqueInfo) =>
-        handlePong(cliqueInfo)
+      case Ping(peerInfoOpt) =>
+        selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
+        peerInfoOpt.foreach(tryPing) // ping back when cliqueInfo is not empty
+      case Pong(peerInfo) =>
+        handlePong(peerInfo)
       case FindNode(targetId) =>
         val neighbors = getNeighbors(targetId)
         send(remote, Neighbors(neighbors))
@@ -168,7 +166,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
         peers.foreach(tryPing)
     }
 
-  override def publishNewClique(cliqueInfo: InterCliqueInfo): Unit = {
-    publishEvent(NewClique(cliqueInfo))
+  override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
+    publishEvent(NewPeer(peerInfo))
   }
 }

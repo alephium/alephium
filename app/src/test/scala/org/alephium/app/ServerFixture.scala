@@ -62,7 +62,7 @@ trait ServerFixture
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
+  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
   lazy val dummyBalance         = Balance(U256.Zero, 0)
   lazy val dummyGroup           = Group(0)
 
@@ -97,10 +97,10 @@ object ServerFixture {
     CirceUtils.print(t.asJson)
   }
 
-  class DiscoveryServerDummy(neighborCliques: NeighborCliques) extends BaseActor {
+  class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = {
       case DiscoveryServer.GetNeighborCliques =>
-        sender() ! DiscoveryServer.NeighborCliques(neighborCliques.cliques)
+        sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
     }
   }
 
@@ -111,7 +111,7 @@ object ServerFixture {
   }
 
   class NodeDummy(intraCliqueInfo: IntraCliqueInfo,
-                  neighborCliques: NeighborCliques,
+                  neighborPeers: NeighborPeers,
                   block: Block,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
@@ -127,7 +127,7 @@ object ServerFixture {
       ActorRefT
         .build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.source.nextInt}")
 
-    val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborCliques)))
+    val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
     val selfCliqueSynced = true
