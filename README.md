@@ -26,7 +26,8 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 
 ## Development Status
 
-This project is currently under heavy development with more code consolidation, optimizations, and tests. However, it can be used to run a TestNet already.
+This project is currently under heavy development with more code consolidation, optimizations, and tests.
+You can already try our testnet following this guide [wiki/Testnet-Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide).
 
 ## Installation
 
@@ -40,7 +41,7 @@ You must have the following dependencies installed on your system in order to ru
 
 You can obtain our latest single JAR distribution from the GitHub releases and start the application using the following command:
 
-   java -jar alephium-<VERSION>.jar
+    java -jar alephium-<VERSION>.jar
 
 ## Build from source
 
@@ -54,14 +55,16 @@ In order to build the project from source the following dependencies must be ins
 ### Single JAR
 
 In order to build a single runnable JAR use the following command:
-  ./make assembly
+  
+    ./make assembly
 
 The resulting assembly file will appear in `/app/target/scala-2.13/` directory.
 
 ### Univeral Zip distribution
 
 In order to build a zip distribution including launch scripts use the following command:
-  ./make package
+
+    ./make package
 
 The resulting package file will appear in the `app/target/scala-2.13/universal` directory.
 
@@ -74,5 +77,4 @@ You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, wh
 There are two kinds of tests:
 
 1) Unit and property tests, which can be run with the `./make test` command.
-2) Integration tests, `./make itest`.
-
+2) Integration tests, which can be run with the `./make itest` command.
