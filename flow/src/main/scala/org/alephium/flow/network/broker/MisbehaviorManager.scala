@@ -114,6 +114,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
   }
 
   private def banAndPublish(peer: InetSocketAddress) = {
+    log.info(s"Banning peer: $peer")
     misbehaviorStorage.ban(peer, TimeStamp.now().plusMillisUnsafe(banDuration.millis))
     publishEvent(PeerBanned(peer))
   }

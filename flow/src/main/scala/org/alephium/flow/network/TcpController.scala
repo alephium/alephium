@@ -123,15 +123,11 @@ class TcpController(bindAddress: InetSocketAddress,
         confirmedConnections.filter(_._2.ref == connection).keys
       toRemove.foreach(confirmedConnections -= _)
     case MisbehaviorManager.PeerBanned(remote) =>
-      confirmedConnections.get(remote) match {
-        case Some(connection) =>
-          connection ! Close
-          confirmedConnections -= remote
-          log.debug(s"Closing connection $remote")
-        case None =>
-          log.warning(s"$remote is banned, but doesn't belong to our confirmed connection")
+      confirmedConnections.get(remote).foreach { connection =>
+        connection ! Close
+        confirmedConnections -= remote
+        log.debug(s"Closing connection with $remote")
       }
-
   }
 
   def confirmConnection(target: ActorRef,
