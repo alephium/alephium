@@ -96,7 +96,7 @@ class TcpController(bindAddress: InetSocketAddress,
     case c: Tcp.Connected =>
       pendingOutboundConnections.get(c.remoteAddress) match {
         case Some(outbound) =>
-          confirmConnection(outbound.ref, c, sender())
+          confirmConnection(outbound.ref, c, ActorRefT(sender()))
         case None =>
           log.debug(s"Ask connection confirmation for $c")
           misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, ActorRefT(sender()))

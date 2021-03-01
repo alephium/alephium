@@ -84,12 +84,13 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
 
     case _: Tcp.Connected =>
       log.debug(s"Connected to master: $remoteAddress")
-      val connection        = sender()
-      val connectionHandler = context.actorOf(Broker.connectionProps(remoteAddress, connection))
+      val connection = sender()
+      val connectionHandler = ActorRefT[ConnectionHandler.Command](
+        context.actorOf(Broker.connectionProps(remoteAddress, ActorRefT(connection))))
       context watch connectionHandler.ref
 
       val message = Message.serialize(Message.Peer(PeerInfo.self))
-      connectionHandler ! ConnectionHandler.Send(message)
+      connectionHandler.ref ! ConnectionHandler.Send(message)
       context become awaitCliqueInfo(connectionHandler)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
