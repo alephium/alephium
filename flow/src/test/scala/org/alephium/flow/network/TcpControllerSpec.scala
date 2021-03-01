@@ -24,9 +24,10 @@ import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
-class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
+class TcpControllerSpec extends AlephiumActorSpec("TcpController") with AlephiumConfigFixture {
   trait Fixture {
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()

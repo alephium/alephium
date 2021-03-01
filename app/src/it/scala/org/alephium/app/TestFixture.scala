@@ -25,11 +25,13 @@ import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
 import scala.util.control.NonFatal
 
+import akka.actor.ActorRef
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.io.Tcp
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.TestProbe
 import io.circe.{Codec, Decoder}
@@ -245,7 +247,8 @@ trait TestFixtureLike
                walletPort: Int,
                brokerId: Int,
                brokerNum: Int,
-               bootstrap: Option[InetSocketAddress]) = {
+               bootstrap: Option[InetSocketAddress]
+  ) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
         ("alephium.network.bind-address", s"localhost:$publicPort"),
@@ -297,7 +300,9 @@ trait TestFixtureLike
                masterPort: Int                      = defaultMasterPort,
                walletPort: Int                      = defaultWalletPort,
                bootstrap: Option[InetSocketAddress] = None,
-               networkType: Option[NetworkType]     = None): Server = {
+               networkType: Option[NetworkType]     = None,
+               connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+               ): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
@@ -308,11 +313,13 @@ trait TestFixtureLike
 
       val defaultNetwork = platformEnv.config.network
       val network =
-        defaultNetwork.copy(networkType = networkType.getOrElse(defaultNetwork.networkType))
+        defaultNetwork.copy(networkType = networkType.getOrElse(defaultNetwork.networkType),
+                            connectionBuild = connectionBuild)
 
       implicit val config    = platformEnv.config.copy(network = network)
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
       val storages           = platformEnv.storages
+
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
 

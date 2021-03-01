@@ -99,7 +99,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         InboundBrokerHandler.props(
           selfCliqueInfo,
           remoteAddress,
-          ActorRefT[Tcp.Command](sender()),
+          networkSetting.connectionBuild(sender()),
           blockflow,
           allHandlers,
           ActorRefT[CliqueManager.Command](self),

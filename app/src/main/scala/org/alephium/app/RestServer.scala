@@ -41,8 +41,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
-import org.alephium.flow.network.broker.BrokerManager
-import org.alephium.flow.network.broker.BrokerManager.Peers
+import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.config.{GroupConfig}
 import org.alephium.protocol.model._
@@ -79,7 +79,7 @@ class RestServer(
     for {
       synced      <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
       cliqueInfo  <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
-      brokerPeers <- node.brokerManager.ask(BrokerManager.GetPeers).mapTo[Peers]
+      brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
     } yield {
       Right(RestServer.selfCliqueFrom(cliqueInfo, brokerPeers, node.config.consensus, synced))
     }
@@ -305,10 +305,10 @@ object RestServer {
 
     val peerStatus: Map[InetAddress, PeerStatus] =
       Map.from(brokerPeers.peers.map {
-        case BrokerManager.Peer(addr, misbehavior) =>
+        case MisbehaviorManager.Peer(addr, misbehavior) =>
           val status: PeerStatus = misbehavior match {
-            case BrokerManager.Score(value)  => PeerStatus.Score(value)
-            case BrokerManager.Banned(until) => PeerStatus.Banned(until)
+            case MisbehaviorManager.Penalty(value) => PeerStatus.Score(value)
+            case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
           }
           (addr.getAddress, status)
       }.toIterable)
