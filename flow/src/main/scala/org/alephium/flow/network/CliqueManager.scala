@@ -100,8 +100,8 @@ class CliqueManager(blockflow: BlockFlow,
                                            blockFlowSynchronizer)
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
-      subscribe(self, classOf[BroadCastTx])
-      subscribe(self, classOf[BroadCastBlock])
+      subscribeEvent(self, classOf[BroadCastTx])
+      subscribeEvent(self, classOf[BroadCastBlock])
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)

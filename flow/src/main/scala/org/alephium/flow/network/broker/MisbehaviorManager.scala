@@ -83,7 +83,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage()
 
   override def preStart(): Unit = {
-    subscribe(self, classOf[MisbehaviorManager.Misbehavior])
+    subscribeEvent(self, classOf[MisbehaviorManager.Misbehavior])
   }
 
   private def handleMisbehavior(misbehavior: Misbehavior): Unit = {
