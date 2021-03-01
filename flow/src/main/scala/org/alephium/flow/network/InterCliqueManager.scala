@@ -80,7 +80,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   override def preStart(): Unit = {
     super.preStart()
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
-    subscribe(self, classOf[DiscoveryServer.NewPeer])
+    subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique

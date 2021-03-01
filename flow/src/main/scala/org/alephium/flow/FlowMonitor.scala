@@ -31,7 +31,7 @@ object FlowMonitor {
 
 class FlowMonitor(shutdown: => Unit) extends BaseActor with EventStream.Subscriber {
   override def preStart(): Unit = {
-    subscribe(self, classOf[FlowMonitor.Command])
+    subscribeEvent(self, classOf[FlowMonitor.Command])
   }
 
   override def receive: Receive = {

@@ -63,8 +63,8 @@ class TcpController(bindAddress: InetSocketAddress,
     mutable.Map.empty
 
   override def preStart(): Unit = {
-    subscribe(self, classOf[MisbehaviorManager.PeerBanned])
-    subscribe(self, classOf[TcpController.ConnectTo])
+    subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
+    subscribeEvent(self, classOf[TcpController.ConnectTo])
   }
 
   override def receive: Receive = awaitStart

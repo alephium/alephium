@@ -31,7 +31,7 @@ object EventStream {
   }
 
   trait Subscriber {
-    def subscribe(actor: ActorRef, channel: Class[_ <: Event])(
+    def subscribeEvent(actor: ActorRef, channel: Class[_ <: Event])(
         implicit context: ActorContext): Unit = {
       require(context.system.eventStream.subscribe(actor, channel))
     }
