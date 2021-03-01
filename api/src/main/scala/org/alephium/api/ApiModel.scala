@@ -124,7 +124,7 @@ trait ApiModelCodec {
 
   implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]
 
-  implicit val neighborCliquesCodec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
+  implicit val neighborPeersCodec: Codec[NeighborPeers] = deriveCodec[NeighborPeers]
 
   implicit val getBalanceCodec: Codec[GetBalance] = deriveCodec[GetBalance]
 
@@ -185,6 +185,12 @@ trait ApiModelCodec {
       (info.id, info.externalAddresses, info.groupNumPerBroker))
   implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
     Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
+
+  implicit val peerInfoEncoder: Encoder[BrokerInfo] =
+    Encoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(info =>
+      (info.cliqueId, info.brokerId, info.groupNumPerBroker, info.address))
+  implicit val peerInfoDecoder: Decoder[BrokerInfo] =
+    Decoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(BrokerInfo.unsafe)
 
   implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
     deriveCodec[InterCliquePeerInfo]

@@ -79,13 +79,13 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   override def preStart(): Unit = {
     super.preStart()
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
-    require(context.system.eventStream.subscribe(self, classOf[DiscoveryServer.NewClique]))
+    require(context.system.eventStream.subscribe(self, classOf[DiscoveryServer.NewPeer]))
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
 
   def handleNewClique: Receive = {
-    case DiscoveryServer.NewClique(cliqueInfo) => connect(cliqueInfo)
+    case DiscoveryServer.NewPeer(peerInfo) => connect(peerInfo)
   }
 
   def handleConnection: Receive = {
@@ -142,13 +142,11 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
       sender() ! syncStatuses
   }
 
-  def connect(clique: InterCliqueInfo): Unit = {
-    clique.brokers.foreach { brokerInfo =>
-      if (brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo)) connect(brokerInfo)
-    }
+  def connect(broker: BrokerInfo): Unit = {
+    if (brokerConfig.intersect(broker) && !containsBroker(broker)) connectUnsafe(broker)
   }
 
-  private def connect(brokerInfo: BrokerInfo): Unit = {
+  private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     log.debug(s"Try to connect to $brokerInfo")
     val name = BaseActor.envalidActorName(s"OutboundBrokerHandler-$brokerInfo")
     val props =

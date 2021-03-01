@@ -96,7 +96,7 @@ class WebSocketServerSpec
 
     lazy val blockFlowProbe = TestProbe()
     lazy val node = new NodeDummy(dummyIntraCliqueInfo,
-                                  dummyNeighborCliques,
+                                  dummyNeighborPeers,
                                   dummyBlock,
                                   blockFlowProbe.ref,
                                   dummyTx,

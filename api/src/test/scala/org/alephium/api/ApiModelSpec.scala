@@ -26,7 +26,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
-import org.alephium.protocol.model.{Address, CliqueId, CliqueInfo, NetworkType}
+import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -39,6 +39,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
+  val dummyPeerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, dummyAddress)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
 
@@ -110,13 +111,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode NeighborCliques" in {
-    val neighborCliques = NeighborCliques(AVector(dummyCliqueInfo.interCliqueInfo.get))
-    val cliqueIdString  = dummyCliqueInfo.id.toHexString
+    val neighborCliques = NeighborPeers(AVector(dummyPeerInfo))
+    val cliqueIdString  = dummyPeerInfo.cliqueId.toHexString
     def jsonRaw(cliqueId: String) =
-      s"""{"cliques":[{"id":"$cliqueId","externalAddresses":[{"addr":"127.0.0.1","port":9000}],"groupNumPerBroker":1}]}"""
+      s"""{"peers":[{"cliqueId":"$cliqueId","brokerId":1,"groupNumPerBroker":3,"address":{"addr":"127.0.0.1","port":9000}}]}"""
     checkData(neighborCliques, jsonRaw(cliqueIdString))
 
-    parseFail[NeighborCliques](jsonRaw("OOPS")) is "invalid clique id"
+    parseFail[NeighborPeers](jsonRaw("OOPS")) is "invalid clique id"
   }
 
   it should "encode/decode GetBalance" in {

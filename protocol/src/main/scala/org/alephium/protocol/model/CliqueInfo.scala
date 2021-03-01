@@ -46,14 +46,23 @@ final case class CliqueInfo private (
 
   def coordinatorAddress: InetSocketAddress = internalAddresses.head
 
-  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): InterBrokerInfo =
+  def selfInterBrokerInfo(implicit brokerConfig: BrokerGroupInfo): InterBrokerInfo =
     InterBrokerInfo.unsafe(id, brokerConfig.brokerId, groupNumPerBroker)
 
+  def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): Option[BrokerInfo] = {
+    val brokerId = brokerConfig.brokerId
+    externalAddresses(brokerId) map { address =>
+      BrokerInfo.unsafe(id, brokerId, groupNumPerBroker, address)
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def interCliqueInfo: Option[InterCliqueInfo] =
-    Option.when(externalAddresses.forall(_.nonEmpty))(
-      InterCliqueInfo.unsafe(id, externalAddresses.map(_.get), groupNumPerBroker)
-    )
+  def interBrokers: Option[AVector[BrokerInfo]] = {
+    Option.when(externalAddresses.forall(_.nonEmpty))(externalAddresses.mapWithIndex {
+      case (addressOpt, brokerId) =>
+        BrokerInfo.unsafe(id, brokerId, groupNumPerBroker, addressOpt.get)
+    })
+  }
 }
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {

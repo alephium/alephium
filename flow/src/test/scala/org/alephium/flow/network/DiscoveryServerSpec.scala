@@ -18,6 +18,8 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import scala.util.Random
+
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 
@@ -35,9 +37,9 @@ object DiscoveryServerSpec {
                    _peersPerGroup: Int,
                    _scanFrequency: Duration  = Duration.unsafe(200),
                    _expireDuration: Duration = Duration.ofHoursUnsafe(1))
-    : (InetSocketAddress, DiscoveryConfig with CliqueConfig) = {
+    : (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
-    val discoveryConfig = new DiscoveryConfig with CliqueConfig {
+    val discoveryConfig = new DiscoveryConfig with BrokerConfig {
       val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
       val peersPerGroup: Int          = _peersPerGroup
@@ -50,6 +52,7 @@ object DiscoveryServerSpec {
 
       val groups: Int    = groupSize
       val brokerNum: Int = groupSize
+      val brokerId: Int  = Random.nextInt(brokerNum)
     }
     publicAddress -> discoveryConfig
   }
@@ -61,31 +64,36 @@ class DiscoveryServerSpec
   import DiscoveryServerSpec._
 
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
-    val newInfo = CliqueInfo.unsafe(CliqueId.generate,
-                                    AVector(Option(master)),
-                                    AVector(master),
-                                    groupConfig.groups)
+    val newInfo = CliqueInfo.unsafe(
+      CliqueId.generate,
+      AVector.tabulate(groupConfig.groups)(i =>
+        Option(new InetSocketAddress(master.getAddress, master.getPort + i))),
+      AVector.tabulate(groupConfig.groups)(i =>
+        new InetSocketAddress(master.getAddress, master.getPort + i)),
+      1
+    )
     CliqueInfo.validate(newInfo)(groupConfig).isRight is true
     newInfo.coordinatorAddress is master
     newInfo
   }
 
-  it should "discovery each other for two cliques" in new GroupConfigFixture {
+  it should "discovery each other for two cliques" in new BrokerConfigFixture.Default {
     val groups              = Gen.choose(2, 10).sample.get
     val port0               = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo0         = generateCliqueInfo(createAddr(port0), groupConfig)
-    val (address0, config0) = createConfig(groups, port0, 1)
+    val cliqueInfo0         = generateCliqueInfo(createAddr(port0), brokerConfig)
+    val (address0, config0) = createConfig(groups, port0, groups)
     val port1               = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo1         = generateCliqueInfo(createAddr(port1), groupConfig)
-    val (address1, config1) = createConfig(groups, port1, 1)
+    val cliqueInfo1         = generateCliqueInfo(createAddr(port1), brokerConfig)
+    val (address1, config1) = createConfig(groups, port1, groups)
     val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     val server0 =
-      system.actorOf(DiscoveryServer.props(address0)(groupConfig, config0, networkConfig),
+      system.actorOf(DiscoveryServer.props(address0)(brokerConfig, config0, networkConfig),
                      "server0")
     val server1 =
-      system.actorOf(DiscoveryServer.props(address1, address0)(groupConfig, config1, networkConfig),
-                     "server1")
+      system.actorOf(
+        DiscoveryServer.props(address1, address0)(brokerConfig, config1, networkConfig),
+        "server1")
 
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
@@ -98,14 +106,14 @@ class DiscoveryServerSpec
     server1.tell(DiscoveryServer.GetNeighborCliques, probo1.ref)
 
     probo0.expectMsgPF() {
-      case DiscoveryServer.NeighborCliques(peers) =>
+      case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is 1
-        peers.head is cliqueInfo1.interCliqueInfo.get
+        peers.head is cliqueInfo1.interBrokers.get.head
     }
     probo1.expectMsgPF() {
-      case DiscoveryServer.NeighborCliques(peers) =>
+      case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is 1
-        peers.head is cliqueInfo0.interCliqueInfo.get
+        peers.head is cliqueInfo0.interBrokers.get.head
     }
   }
 }
