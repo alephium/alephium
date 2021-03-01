@@ -62,7 +62,7 @@ class CliqueCoordinatorBootstrapper(
 ) extends BootstrapperHandler {
   log.debug("Start as CliqueCoordinator")
 
-  val cliqueCoordinator: ActorRef = context.actorOf(CliqueCoordinator.props(self))
+  val cliqueCoordinator: ActorRef = context.actorOf(CliqueCoordinator.props(ActorRefT(self)))
 
   override def receive: Receive = {
     case c: Tcp.Connected =>
@@ -80,7 +80,7 @@ class BrokerBootstrapper(
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BootstrapperHandler {
   log.debug("Start as Broker")
-  val broker: ActorRef = context.actorOf(Broker.props(self))
+  val broker: ActorRef = context.actorOf(Broker.props(ActorRefT(self)))
 
   override def receive: Receive = awaitInfoWithForward
 }

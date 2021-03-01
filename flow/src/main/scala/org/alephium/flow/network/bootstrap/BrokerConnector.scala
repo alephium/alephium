@@ -75,7 +75,7 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
   import BrokerConnector._
 
   val connectionHandler: ActorRefT[ConnectionHandler.Command] =
-    context.actorOf(connectionProps(remoteAddress, connection))
+    ActorRefT(context.actorOf(connectionProps(remoteAddress, connection)))
   context watch connectionHandler.ref
 
   override def receive: Receive = {

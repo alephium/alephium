@@ -55,9 +55,10 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
     case _: Tcp.Connected =>
       connection = ActorRefT[Tcp.Command](sender())
       brokerConnectionHandler = {
-        val ref = context.actorOf(ConnectionHandler.clique(remoteAddress, connection, self))
+        val ref =
+          context.actorOf(ConnectionHandler.clique(remoteAddress, connection, ActorRefT(self)))
         context watch ref
-        ref
+        ActorRefT(ref)
       }
       context become handShaking
 

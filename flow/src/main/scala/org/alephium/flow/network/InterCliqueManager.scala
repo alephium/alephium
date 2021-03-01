@@ -108,7 +108,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       if (brokerConfig.intersect(brokerInfo)) {
-        addBroker(brokerInfo, sender())
+        addBroker(brokerInfo, ActorRefT(sender()))
       } else {
         context stop sender()
       }
@@ -155,7 +155,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   brokerInfo,
                                   blockflow,
                                   allHandlers,
-                                  self,
+                                  ActorRefT(self),
                                   blockFlowSynchronizer)
     context.actorOf(props, name)
     ()
