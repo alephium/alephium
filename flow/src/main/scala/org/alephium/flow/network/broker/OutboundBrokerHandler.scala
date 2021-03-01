@@ -16,7 +16,9 @@
 
 package org.alephium.flow.network.broker
 
+import akka.actor.Props
 import akka.io.Tcp
+import java.net.InetSocketAddress
 
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.TcpController
@@ -48,6 +50,11 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
 
   override def receive: Receive = connecting
 
+  protected def connectionHandler(
+      remoteAddress: InetSocketAddress,
+      connection: ActorRefT[Tcp.Command])(implicit networkSetting: NetworkSetting): Props =
+    ConnectionHandler.clique(remoteAddress, connection, ActorRefT(self))
+
   def connecting: Receive = {
     case OutboundBrokerHandler.Retry =>
       publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
@@ -55,8 +62,7 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
     case _: Tcp.Connected =>
       connection = ActorRefT[Tcp.Command](sender())
       brokerConnectionHandler = {
-        val ref =
-          context.actorOf(ConnectionHandler.clique(remoteAddress, connection, ActorRefT(self)))
+        val ref = context.actorOf(connectionHandler(remoteAddress, connection))
         context watch ref
         ActorRefT(ref)
       }

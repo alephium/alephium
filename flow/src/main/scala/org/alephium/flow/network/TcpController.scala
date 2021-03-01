@@ -26,12 +26,14 @@ import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
             discoveryServer: ActorRefT[DiscoveryServer.Command],
-            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]): Props =
+            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command])(
+      implicit networkSetting: NetworkSetting): Props =
     Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
 
   sealed trait Command
@@ -51,7 +53,8 @@ object TcpController {
 
 class TcpController(bindAddress: InetSocketAddress,
                     discoveryServer: ActorRefT[DiscoveryServer.Command],
-                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
+                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])(
+    implicit networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream {
 
@@ -119,7 +122,8 @@ class TcpController(bindAddress: InetSocketAddress,
     case Tcp.Closed =>
       ()
     case Terminated(connection) =>
-      val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
+      val toRemove =
+        confirmedConnections.filter(_._2 == networkSetting.connectionBuild(connection)).keys
       toRemove.foreach(confirmedConnections -= _)
     case MisbehaviorManager.PeerBanned(remote) =>
       confirmedConnections.get(remote) match {

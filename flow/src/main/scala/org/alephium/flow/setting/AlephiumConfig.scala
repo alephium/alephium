@@ -16,17 +16,17 @@
 
 package org.alephium.flow.setting
 
+import akka.actor.ActorRef
+import akka.io.Tcp
+import com.typesafe.config.Config
 import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.nio.file.Path
-
-import scala.collection.immutable.ArraySeq
-
-import com.typesafe.config.Config
 import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
 import pureconfig.error._
 import pureconfig.generic.auto._
+import scala.collection.immutable.ArraySeq
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
@@ -34,7 +34,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Duration, U256}
+import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
   override lazy val groupNumPerBroker: Int = groups / brokerNum
@@ -84,7 +84,8 @@ final case class NetworkSetting(
     externalAddress: Option[InetSocketAddress],
     numOfSyncBlocksLimit: Int,
     wsPort: Int,
-    restPort: Int
+    restPort: Int,
+    connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
   val isCoordinator: Boolean = internalAddress == coordinatorAddress
 
@@ -157,11 +158,45 @@ object AlephiumConfig {
     }
   }
 
+  private final case class TempNetworkSetting(
+      networkType: NetworkType,
+      pingFrequency: Duration,
+      retryTimeout: Duration,
+      connectionBufferCapacityInByte: Long,
+      upnp: UpnpSettings,
+      bindAddress: InetSocketAddress,
+      internalAddress: InetSocketAddress,
+      coordinatorAddress: InetSocketAddress,
+      externalAddress: Option[InetSocketAddress],
+      numOfSyncBlocksLimit: Int,
+      wsPort: Int,
+      restPort: Int
+  ) {
+    def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
+      NetworkSetting(
+        networkType,
+        pingFrequency,
+        retryTimeout,
+        connectionBufferCapacityInByte,
+        upnp,
+        bindAddress,
+        internalAddress,
+        coordinatorAddress,
+        externalAddress,
+        numOfSyncBlocksLimit,
+        wsPort,
+        restPort,
+        connectionBuild
+      )
+
+    }
+  }
+
   private final case class TempAlephiumConfig(
       broker: BrokerSetting,
       consensus: TempConsensusSetting,
       mining: MiningSetting,
-      network: NetworkSetting,
+      network: TempNetworkSetting,
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
       wallet: WalletSetting,
@@ -170,11 +205,12 @@ object AlephiumConfig {
     lazy val toAlephiumConfig: Either[FailureReason, AlephiumConfig] = {
       parseMiners(minerAddresses, network.networkType, broker).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
+        val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         AlephiumConfig(
           broker,
           consensusExtracted,
           mining,
-          network,
+          networkExtracted,
           discovery,
           mempool,
           wallet,

@@ -96,7 +96,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
         val props =
           InboundBrokerHandler.props(cliqueInfo,
                                      remote,
-                                     ActorRefT[Tcp.Command](sender()),
+                                     networkSetting.connectionBuild(sender()),
                                      blockflow,
                                      allHandlers,
                                      ActorRefT[CliqueManager.Command](self),

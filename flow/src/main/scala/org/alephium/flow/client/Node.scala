@@ -64,13 +64,17 @@ object Node {
   def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
       _config: AlephiumConfig
-  ): Node = new Node with StrictLogging {
-    implicit val system          = actorSystem
-    val config                   = _config
-    implicit val brokerConfig    = config.broker
-    implicit val consensusConfig = config.consensus
-    implicit val networkSetting  = config.network
-    implicit val discoveryConfig = config.discovery
+  ): Node = new Default(storages)
+
+  class Default(storages: Storages)(implicit actorSystem: ActorSystem, _config: AlephiumConfig)
+      extends Node
+      with StrictLogging {
+    implicit val system                  = actorSystem
+    val config                           = _config
+    private implicit val brokerConfig    = config.broker
+    private implicit val consensusConfig = config.consensus
+    private implicit val networkSetting  = config.network
+    private implicit val discoveryConfig = config.discovery
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -97,7 +101,7 @@ object Node {
 
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
-    val cliqueManager: ActorRefT[CliqueManager.Command] =
+    lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(
         system,
         CliqueManager.props(blockFlow, allHandlers, discoveryServer, blockFlowSynchronizer),
