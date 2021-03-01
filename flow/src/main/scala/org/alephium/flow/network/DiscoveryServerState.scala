@@ -121,7 +121,7 @@ trait DiscoveryServerState {
   }
 
   private def appendPeer(peerInfo: BrokerInfo): Unit = {
-    log.debug(s"Adding a new clique: $peerInfo")
+    log.debug(s"Adding a new peer: $peerInfo")
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
     fetchNeighbors(peerInfo)
     publishNewPeer(peerInfo)
@@ -190,8 +190,8 @@ trait DiscoveryServerState {
   }
 
   def remove(peer: InetSocketAddress): Unit = {
-    val cliquesToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
-    table --= cliquesToRemove
+    val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
+    table --= peersToRemove
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
