@@ -18,7 +18,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor._
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
@@ -63,6 +63,8 @@ object InterCliqueManager {
       isSynced && info.contains(chainIndex.from)
     }
   }
+
+  final case class PeerDisconected(peer: InetSocketAddress) extends EventStream.Event
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
@@ -73,7 +75,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor
-    with EventStream.Subscriber
+    with EventStream
     with InterCliqueManagerState {
   import InterCliqueManager._
 
@@ -103,7 +105,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           ActorRefT[CliqueManager.Command](self),
           blockFlowSynchronizer
         )
-      context.actorOf(props, name)
+      val in = context.actorOf(props, name)
+      context.watchWith(in, PeerDisconected(remoteAddress))
       ()
     case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
@@ -141,6 +144,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
       }
       sender() ! syncStatuses
+    case PeerDisconected(peer) =>
+      publishEvent(PeerDisconected(peer))
   }
 
   def connect(broker: BrokerInfo): Unit = {
@@ -157,7 +162,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   allHandlers,
                                   ActorRefT(self),
                                   blockFlowSynchronizer)
-    context.actorOf(props, name)
+    val out = context.actorOf(props, name)
+    context.watchWith(out, PeerDisconected(brokerInfo.address))
     ()
   }
 }
