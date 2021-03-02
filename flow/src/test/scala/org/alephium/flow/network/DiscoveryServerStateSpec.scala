@@ -158,4 +158,12 @@ class DiscoveryServerStateSpec
     state.banPeerFromAddress(peerInfo.address)
     state.isInTable(peerInfo.peerId) is false
   }
+
+  it should "remove peer" in new Fixture {
+    addToTable(peerInfo)
+    state.isInTable(peerInfo.peerId) is true
+
+    state.remove(peerInfo.address)
+    state.isInTable(peerInfo.peerId) is false
+  }
 }

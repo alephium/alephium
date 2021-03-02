@@ -59,13 +59,14 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetNeighborCliques                          extends Command
-  final case class Disable(peerId: PeerId)                extends Command
-  final case class Remove(peer: InetSocketAddress)        extends Command
-  case object Scan                                        extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
-  final case class PeerConfirmed(peerInfo: BrokerInfo)    extends Command
-  final case class PeerDenied(peerInfo: BrokerInfo)       extends Command
+  case object GetNeighborCliques                             extends Command
+  final case class Disable(peerId: PeerId)                   extends Command
+  final case class Remove(peer: InetSocketAddress)           extends Command
+  case object Scan                                           extends Command
+  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)    extends Command
+  final case class PeerConfirmed(peerInfo: BrokerInfo)       extends Command
+  final case class PeerDenied(peerInfo: BrokerInfo)          extends Command
+  final case class PeerDisconnected(peer: InetSocketAddress) extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -147,8 +148,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case Scan =>
       log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
-      scan()
-      scheduleScan()
+      scanAndSchedule()
       ()
     case GetNeighborCliques =>
       sender() ! NeighborPeers(getActivePeers)
@@ -162,14 +162,17 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
+    case PeerDisconnected(peer) =>
+      scanScheduled.cancel()
+      remove(peer)
+      scanAndSchedule()
   }
 
   def handleBanning: Receive = {
     case MisbehaviorManager.PeerBanned(peer) =>
       if (banPeerFromAddress(peer)) {
         scanScheduled.cancel()
-        scan()
-        scheduleScan()
+        scanAndSchedule()
       }
   }
 
@@ -202,6 +205,11 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
     publishEvent(NewPeer(peerInfo))
+  }
+
+  private def scanAndSchedule() = {
+    scan()
+    scheduleScan()
   }
 
   private def scheduleScan() = {
