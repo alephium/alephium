@@ -18,7 +18,7 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
-import akka.actor._
+import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 
@@ -64,7 +64,7 @@ object InterCliqueManager {
     }
   }
 
-  final case class PeerDisconected(peer: InetSocketAddress) extends EventStream.Event
+  final case class PeerDisconnected(peer: InetSocketAddress) extends EventStream.Event
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
@@ -75,7 +75,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor
-    with EventStream
+    with EventStream.Subscriber
     with InterCliqueManagerState {
   import InterCliqueManager._
 
@@ -106,7 +106,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           blockFlowSynchronizer
         )
       val in = context.actorOf(props, name)
-      context.watchWith(in, PeerDisconected(remoteAddress))
+      context.watchWith(in, PeerDisconnected(remoteAddress))
       ()
     case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
@@ -144,8 +144,9 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
       }
       sender() ! syncStatuses
-    case PeerDisconected(peer) =>
-      publishEvent(PeerDisconected(peer))
+    case PeerDisconnected(peer) =>
+      removeBroker(peer)
+      discoveryServer ! DiscoveryServer.PeerDisconnected(peer)
   }
 
   def connect(broker: BrokerInfo): Unit = {
@@ -163,7 +164,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   ActorRefT(self),
                                   blockFlowSynchronizer)
     val out = context.actorOf(props, name)
-    context.watchWith(out, PeerDisconected(brokerInfo.address))
+    context.watchWith(out, PeerDisconnected(brokerInfo.address))
     ()
   }
 }
@@ -207,5 +208,9 @@ trait InterCliqueManagerState {
       case Some(state) => brokers(peerId) = state.setSynced()
       case None        => log.warning(s"Unexpected message Synced from $peerId")
     }
+  }
+
+  def removeBroker(peer: InetSocketAddress): Unit = {
+    brokers.filterInPlace { case (_, state) => state.info.address != peer }
   }
 }

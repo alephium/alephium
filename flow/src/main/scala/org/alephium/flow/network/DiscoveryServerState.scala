@@ -211,6 +211,7 @@ trait DiscoveryServerState {
   def remove(peer: InetSocketAddress): Unit = {
     val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
     table --= peersToRemove
+    pendings --= peersToRemove
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))

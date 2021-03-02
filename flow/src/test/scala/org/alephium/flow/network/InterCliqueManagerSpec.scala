@@ -44,7 +44,9 @@ class InterCliqueManagerSpec
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
   }
 
-  it should "publish `PeerDisconected` on inbound peer disconnection" in new Fixture {
+  it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
+
+    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
     interCliqueManager ! Tcp.Connected(peer, socketAddressGen.sample.get)
 
@@ -54,13 +56,20 @@ class InterCliqueManagerSpec
 
       inbound.isDefined is true
 
+      interCliqueManager ! CliqueManager.HandShaked(peerInfo)
+      getPeers() is Seq(peer)
+
       system.stop(inbound.get)
     }
 
-    disconnectionProbe.expectMsg(InterCliqueManager.PeerDisconected(peer))
+    discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peer))
+
+    getPeers() is Seq.empty
   }
 
-  it should "publish `PeerDisconected` on outbound peer disconnection" in new Fixture {
+  it should "publish `PeerDisconnected` on outbound peer disconnection" in new Fixture {
+
+    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
     interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
 
@@ -70,10 +79,15 @@ class InterCliqueManagerSpec
 
       outbound.isDefined is true
 
+      interCliqueManager ! CliqueManager.HandShaked(peerInfo)
+      getPeers() is Seq(peer)
+
       system.stop(outbound.get)
     }
 
-    disconnectionProbe.expectMsg(InterCliqueManager.PeerDisconected(peerInfo.address))
+    discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peerInfo.address))
+
+    getPeers() is Seq.empty
   }
 
   trait Fixture extends AlephiumConfigFixture with StoragesFixture.Default {
@@ -94,10 +108,6 @@ class InterCliqueManagerSpec
                                ActorRefT(blockFlowSynchronizer.ref)),
       parentName)
 
-    val disconnectionProbe = TestProbe()
-    system.eventStream
-      .subscribe(disconnectionProbe.ref, classOf[InterCliqueManager.PeerDisconected])
-
     lazy val peer = socketAddressGen.sample.get
 
     lazy val peerInfo = BrokerInfo.unsafe(cliqueIdGen.sample.get,
@@ -112,6 +122,13 @@ class InterCliqueManagerSpec
         .resolveOne()
         .map(Some(_))
         .recover(_ => None)
+
+    def getPeers() =
+      interCliqueManager
+        .ask(InterCliqueManager.GetSyncStatuses)
+        .mapTo[Seq[InterCliqueManager.SyncStatus]]
+        .futureValue
+        .map(_.address)
   }
 }
 
