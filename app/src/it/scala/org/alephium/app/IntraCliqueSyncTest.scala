@@ -22,7 +22,7 @@ import akka.io.Tcp
 import org.alephium.api.model.{PeerStatus, SelfClique}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.flow.network.broker.ConnectionHandler
-import org.alephium.protocol.message.{Payload, Pong}
+import org.alephium.protocol.message.{SendBlocks, Message, Payload, Pong}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util._
 
@@ -91,7 +91,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if send invalid ping" in new TestFixture("2-nodes") {
+  it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
     val injection: PartialFunction[Payload, Payload] = {
       case Pong(_) => Pong(0)
     }
@@ -111,6 +111,26 @@ class IntraCliqueSyncTest extends AlephiumSpec {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
+
+    server0.stop().futureValue is ()
+    server1.stop().futureValue is ()
+  }
+
+  it should "ban node if spamming" in new TestFixture("2-nodes") {
+    val injection: PartialFunction[Payload, Payload] = {
+      case _ => SendBlocks(AVector.empty)
+    }
+
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
+    server0.start().futureValue is ()
+
+    val server1MasterPort = generatePort
+    val server1 = bootNode(publicPort = server1MasterPort, brokerId = 1, connectionBuild = new InjectedActorRefT(injection, _))
+
+    server1.start().futureValue is ()
+
+    val selfClique0 = request[SelfClique](getSelfClique, restPort(defaultMasterPort))
+    selfClique0.peers.find(_.restPort == restPort(defaultMasterPort)).flatMap(_.status) is Some(PeerStatus.Score(60))
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
