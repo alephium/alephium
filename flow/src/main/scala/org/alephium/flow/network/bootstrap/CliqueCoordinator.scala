@@ -51,7 +51,7 @@ class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(
   def awaitBrokers: Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
-      val connection = sender()
+      val connection = ActorRefT[Tcp.Command](sender())
       val name       = BaseActor.envalidActorName(s"Broker-$remote")
       context.actorOf(BrokerConnector.props(remote, connection, self), name)
       ()

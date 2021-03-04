@@ -20,28 +20,31 @@ import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{Props, Timers}
+import akka.actor.{Cancellable, Props, Stash, Timers}
 import akka.io.{IO, Udp}
 
 import org.alephium.flow.FlowMonitor
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream, TimeStamp}
 
 object DiscoveryServer {
-  def props(bindAddress: InetSocketAddress, bootstrap: ArraySeq[InetSocketAddress])(
-      implicit brokerConfig: BrokerConfig,
-      discoveryConfig: DiscoveryConfig,
-      networkConfig: NetworkConfig): Props =
-    Props(new DiscoveryServer(bindAddress, bootstrap))
+  def props(bindAddress: InetSocketAddress,
+            misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+            bootstrap: ArraySeq[InetSocketAddress])(implicit brokerConfig: BrokerConfig,
+                                                    discoveryConfig: DiscoveryConfig,
+                                                    networkConfig: NetworkConfig): Props =
+    Props(new DiscoveryServer(bindAddress, misbehaviorManager, bootstrap))
 
-  def props(bindAddress: InetSocketAddress, peers: InetSocketAddress*)(
-      implicit brokerConfig: BrokerConfig,
-      discoveryConfig: DiscoveryConfig,
-      networkConfig: NetworkConfig): Props = {
-    props(bindAddress, ArraySeq.from(peers))
+  def props(bindAddress: InetSocketAddress,
+            misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+            peers: InetSocketAddress*)(implicit brokerConfig: BrokerConfig,
+                                       discoveryConfig: DiscoveryConfig,
+                                       networkConfig: NetworkConfig): Props = {
+    props(bindAddress, misbehaviorManager, ArraySeq.from(peers))
   }
 
   final case class PeerStatus(info: BrokerInfo, updateAt: TimeStamp)
@@ -61,10 +64,12 @@ object DiscoveryServer {
   final case class Remove(peer: InetSocketAddress)        extends Command
   case object Scan                                        extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
+  final case class PeerConfirmed(peerInfo: BrokerInfo)    extends Command
+  final case class PeerDenied(peerInfo: BrokerInfo)       extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
-  final case class NewPeer(info: BrokerInfo)                 extends Event
+  final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
 }
 
 /*
@@ -81,14 +86,16 @@ object DiscoveryServer {
  *  TODO: each group has several buckets instead of just one bucket
  */
 class DiscoveryServer(val bindAddress: InetSocketAddress,
+                      val misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
                       val bootstrap: ArraySeq[InetSocketAddress])(
     implicit val brokerConfig: BrokerConfig,
     val discoveryConfig: DiscoveryConfig,
     val networkConfig: NetworkConfig)
     extends BaseActor
+    with Stash
     with Timers
-    with DiscoveryServerState {
-  import context.system
+    with DiscoveryServerState
+    with EventStream {
 
   import DiscoveryServer._
 
@@ -96,11 +103,13 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   var selfCliqueInfo: CliqueInfo = _
 
+  var scanScheduled: Cancellable = _
+
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
 
-      IO(Udp) ! Udp.Bind(self, new InetSocketAddress(bindAddress.getPort))
+      IO(Udp)(context.system) ! Udp.Bind(self, bindAddress)
       context become (binding orElse handleCommand)
   }
 
@@ -109,16 +118,18 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       log.debug(s"UDP server bound to $address")
       setSocket(ActorRefT[Udp.Command](sender()))
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
-      bootstrap.foreach(tryPing)
-      scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
+      bootstrap.foreach(ping)
+      scheduleScan()
+      unstashAll()
       context.become(ready)
 
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
       publishEvent(FlowMonitor.Shutdown)
+    case _ => stash()
   }
 
-  def ready: Receive = handleData orElse handleCommand
+  def ready: Receive = handleData orElse handleCommand orElse handleBanning
 
   def handleData: Receive = {
     case Udp.Received(data, remote) =>
@@ -137,11 +148,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
       scan()
-      if (shouldScanFast()) {
-        scheduleOnce(self, Scan, discoveryConfig.scanFastFrequency)
-      } else {
-        scheduleOnce(self, Scan, discoveryConfig.scanFrequency)
-      }
+      scheduleScan()
       ()
     case GetNeighborCliques =>
       sender() ! NeighborPeers(getActivePeers)
@@ -150,23 +157,70 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       ()
     case Remove(peer) =>
       remove(peer)
+    case PeerDenied(peerInfo) =>
+      log.debug(s"peer ${peerInfo.peerId} - ${peerInfo.address} is banned, ignoring it")
+      banPeer(peerInfo.peerId)
+    case PeerConfirmed(peerInfo) =>
+      tryPing(peerInfo)
+  }
+
+  def handleBanning: Receive = {
+    case MisbehaviorManager.PeerBanned(peer) =>
+      if (banPeerFromAddress(peer)) {
+        scanScheduled.cancel()
+        scan()
+        scheduleScan()
+      }
   }
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
       case Ping(peerInfoOpt) =>
-        selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
-        peerInfoOpt.foreach(tryPing) // ping back when cliqueInfo is not empty
+        peerInfoOpt match {
+          case None =>
+            selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
+          case Some(peerInfo) =>
+            validatePeerInfo(remote, peerInfo) { validPeerInfo =>
+              selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
+              misbehaviorManager ! MisbehaviorManager.ConfirmPeer(validPeerInfo)
+            }
+        }
       case Pong(peerInfo) =>
-        handlePong(peerInfo)
+        validatePeerInfo(remote, peerInfo) { validPeerInfo =>
+          handlePong(validPeerInfo)
+        }
       case FindNode(targetId) =>
         val neighbors = getNeighbors(targetId)
         send(remote, Neighbors(neighbors))
       case Neighbors(peers) =>
-        peers.foreach(tryPing)
+        peers.foreach { peerInfo =>
+          if (!table.contains(peerInfo.peerId)) {
+            misbehaviorManager ! MisbehaviorManager.ConfirmPeer(peerInfo)
+          }
+        }
     }
 
   override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
     publishEvent(NewPeer(peerInfo))
+  }
+
+  private def scheduleScan() = {
+    val frequnecy = if (shouldScanFast()) {
+      discoveryConfig.scanFastFrequency
+    } else {
+      discoveryConfig.scanFrequency
+    }
+
+    scanScheduled = scheduleCancellableOnce(self, Scan, frequnecy)
+  }
+
+  private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
+      f: BrokerInfo => Unit): Unit = {
+    if (remote == peerInfo.address) {
+      f(peerInfo)
+    } else {
+      log.warning(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
+      misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
+    }
   }
 }

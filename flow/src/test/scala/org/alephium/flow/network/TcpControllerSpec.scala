@@ -24,7 +24,7 @@ import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
 class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
   trait Fixture {
@@ -86,7 +86,8 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") {
     val fixture1 = new Fixture {}
     val fixture2 = new Fixture {}
     eventually {
-      fixture2.controller ! TcpController.ConnectTo(fixture1.bindAddress)
+      fixture2.controller ! TcpController.ConnectTo(fixture1.bindAddress,
+                                                    ActorRefT(TestProbe().ref))
       fixture2.controllerActor.confirmedConnections.contains(fixture1.bindAddress) is true
     }
   }

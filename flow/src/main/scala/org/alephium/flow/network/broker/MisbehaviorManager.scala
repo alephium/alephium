@@ -21,8 +21,9 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.io.Tcp
 
-import org.alephium.flow.network.TcpController
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration, TimeStamp}
+import org.alephium.flow.network.{DiscoveryServer, TcpController}
+import org.alephium.protocol.model.BrokerInfo
+import org.alephium.util._
 
 object MisbehaviorManager {
   def props(banDuration: Duration): Props =
@@ -31,16 +32,16 @@ object MisbehaviorManager {
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
-  final case class Remove(remote: InetSocketAddress) extends Command
+  final case class ConfirmPeer(peerInfo: BrokerInfo) extends Command
 
-  sealed trait Misbehavior extends Command {
+  sealed trait Misbehavior extends Command with EventStream.Event {
     def remoteAddress: InetSocketAddress
     def penalty: Int
   }
 
   case object GetPeers extends Command
 
-  final case class PeerBanned(remote: InetSocketAddress)
+  final case class PeerBanned(remote: InetSocketAddress) extends EventStream.Event
 
   final case class Peer(peer: InetSocketAddress, status: MisbehaviorStatus)
   final case class Peers(peers: AVector[Peer])
@@ -75,14 +76,14 @@ object MisbehaviorManager {
   final case class Banned(until: TimeStamp) extends MisbehaviorStatus
 }
 
-class MisbehaviorManager(banDuration: Duration) extends BaseActor {
+class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStream {
   import MisbehaviorManager._
 
   private val misbehaviorThreshold: Int              = 100
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage()
 
   override def preStart(): Unit = {
-    require(context.system.eventStream.subscribe(self, classOf[MisbehaviorManager.Misbehavior]))
+    subscribeEvent(self, classOf[MisbehaviorManager.Misbehavior])
   }
 
   private def handleMisbehavior(misbehavior: Misbehavior): Unit = {
@@ -125,13 +126,16 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor {
         sender() ! TcpController.ConnectionConfirmed(connected, connection)
       }
 
-    case Remove(remote) =>
-      misbehaviorStorage.remove(remote)
+    case ConfirmPeer(peerInfo) =>
+      if (misbehaviorStorage.isBanned(peerInfo.address)) {
+        sender() ! DiscoveryServer.PeerDenied(peerInfo)
+      } else {
+        sender() ! DiscoveryServer.PeerConfirmed(peerInfo)
+      }
 
     case misbehavior: Misbehavior =>
       log.debug(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
-
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())
   }

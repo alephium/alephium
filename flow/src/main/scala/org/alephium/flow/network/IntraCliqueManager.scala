@@ -28,7 +28,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object IntraCliqueManager {
   def props(cliqueInfo: CliqueInfo,
@@ -56,7 +56,8 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
-    extends BaseActor {
+    extends BaseActor
+    with EventStream.Publisher {
 
   override def preStart(): Unit = {
     cliqueInfo.intraBrokers.foreach { remoteBroker =>
@@ -84,7 +85,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   override def receive: Receive = awaitBrokers(Map.empty)
 
   // TODO: replace Map with Array for performance
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")

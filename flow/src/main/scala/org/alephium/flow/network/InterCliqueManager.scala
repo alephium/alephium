@@ -30,7 +30,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object InterCliqueManager {
   // scalastyle:off parameter.number
@@ -73,13 +73,14 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
     extends BaseActor
+    with EventStream.Subscriber
     with InterCliqueManagerState {
   import InterCliqueManager._
 
   override def preStart(): Unit = {
     super.preStart()
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
-    require(context.system.eventStream.subscribe(self, classOf[DiscoveryServer.NewPeer]))
+    subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
@@ -107,7 +108,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       if (brokerConfig.intersect(brokerInfo)) {
-        addBroker(brokerInfo, sender())
+        addBroker(brokerInfo, ActorRefT(sender()))
       } else {
         context stop sender()
       }
@@ -154,7 +155,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   brokerInfo,
                                   blockflow,
                                   allHandlers,
-                                  self,
+                                  ActorRefT(self),
                                   blockFlowSynchronizer)
     context.actorOf(props, name)
     ()

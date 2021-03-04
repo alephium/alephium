@@ -16,22 +16,13 @@
 
 package org.alephium.util
 
-import scala.language.implicitConversions
-
 import akka.actor._
 import org.slf4j.{Logger, LoggerFactory}
 
 trait BaseActor extends Actor with ActorLogging {
-  @SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
-  implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
-
   // Note: make sure that your child actors could ignore the exception and resume
   override val supervisorStrategy: SupervisorStrategy = {
     new DefaultStrategy().create()
-  }
-
-  def publishEvent(event: Any): Unit = {
-    context.system.eventStream.publish(event)
   }
 
   override def unhandled(message: Any): Unit = {

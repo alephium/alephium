@@ -28,7 +28,7 @@ import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.serde.{SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, BaseActor, Duration, EventStream, TimeStamp}
 
 object Broker {
   def props(bootstrapper: ActorRefT[Bootstrapper.Command])(
@@ -68,7 +68,8 @@ object Broker {
 class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfig: BrokerConfig,
                                                             networkSetting: NetworkSetting)
     extends BaseActor
-    with SerdeUtils {
+    with SerdeUtils
+    with EventStream.Publisher {
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
 
   def remoteAddress: InetSocketAddress = networkSetting.coordinatorAddress
@@ -83,12 +84,13 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
 
     case _: Tcp.Connected =>
       log.debug(s"Connected to master: $remoteAddress")
-      val connection        = sender()
-      val connectionHandler = context.actorOf(Broker.connectionProps(remoteAddress, connection))
+      val connection = sender()
+      val connectionHandler = ActorRefT[ConnectionHandler.Command](
+        context.actorOf(Broker.connectionProps(remoteAddress, ActorRefT(connection))))
       context watch connectionHandler.ref
 
       val message = Message.serialize(Message.Peer(PeerInfo.self))
-      connectionHandler ! ConnectionHandler.Send(message)
+      connectionHandler.ref ! ConnectionHandler.Send(message)
       context become awaitCliqueInfo(connectionHandler)
 
     case Tcp.CommandFailed(c: Tcp.Connect) =>
@@ -102,7 +104,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitCliqueInfo(connectionHandler: ActorRefT[ConnectionHandler.Command]): Receive = {
     case Broker.Received(clique: Message.Clique) =>
       log.debug(s"Received clique info from master")
@@ -111,7 +112,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       context become awaitReady(connectionHandler, clique.info)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitReady(connection: ActorRefT[ConnectionHandler.Command],
                  cliqueInfo: IntraCliqueInfo): Receive = {
     case Broker.Received(Message.Ready) =>

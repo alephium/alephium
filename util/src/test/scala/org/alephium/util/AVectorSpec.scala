@@ -465,6 +465,10 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     }
   }
 
+  it should "collect" in new FixtureF {
+    AVector(-1, 2, 3).collect { case i if i > 0 => i * i } is AVector(4, 9)
+  }
+
   it should "forall" in new Fixture {
     AVector.empty[Int].forall(_ > 0) is true
     AVector.empty[Int].forall(_ < 0) is true
