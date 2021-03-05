@@ -28,6 +28,13 @@ class ActorRefT[T](val ref: ActorRef) {
   def forward(message: T)(implicit context: ActorContext): Unit = ref.forward(message)
   def ask(message: T)(implicit timeout: Timeout): Future[Any]   = akka.pattern.ask(ref, message)
   def tell(message: T, sender: ActorRef): Unit                  = ref.tell(message, sender)
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: ActorRefT[_] => ref.equals(that.ref)
+    case _                  => false
+  }
+
+  override def hashCode(): Int = ref.hashCode
 }
 
 object ActorRefT {
