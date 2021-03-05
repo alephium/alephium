@@ -247,8 +247,7 @@ trait TestFixtureLike
                walletPort: Int,
                brokerId: Int,
                brokerNum: Int,
-               bootstrap: Option[InetSocketAddress]
-  ) = {
+               bootstrap: Option[InetSocketAddress]) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
         ("alephium.network.bind-address", s"localhost:$publicPort"),
@@ -278,17 +277,26 @@ trait TestFixtureLike
     }
   }
 
-  def bootClique(nbOfNodes: Int, bootstrap: Option[InetSocketAddress] = None): Seq[Server] = {
+  def bootClique(
+      nbOfNodes: Int,
+      bootstrap: Option[InetSocketAddress] = None,
+      publicPort: Option[Int]              = None,
+      networkType: Option[NetworkType]     = None,
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Seq[Server] = {
     val masterPort = generatePort
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
-      val publicPort = if (brokerId equals 0) masterPort else generatePort
-      bootNode(publicPort = publicPort,
-               masterPort = masterPort,
-               brokerId   = brokerId,
-               walletPort = generatePort,
-               bootstrap  = bootstrap,
-               brokerNum  = nbOfNodes)
+      val publicPortNode = publicPort.getOrElse(if (brokerId equals 0) masterPort else generatePort)
+      bootNode(
+        publicPort      = publicPortNode,
+        masterPort      = masterPort,
+        brokerId        = brokerId,
+        walletPort      = generatePort,
+        bootstrap       = bootstrap,
+        brokerNum       = nbOfNodes,
+        networkType     = networkType,
+        connectionBuild = connectionBuild
+      )
     }
 
     servers
@@ -301,8 +309,7 @@ trait TestFixtureLike
                walletPort: Int                      = defaultWalletPort,
                bootstrap: Option[InetSocketAddress] = None,
                networkType: Option[NetworkType]     = None,
-               connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
-               ): Server = {
+               connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
@@ -313,7 +320,7 @@ trait TestFixtureLike
 
       val defaultNetwork = platformEnv.config.network
       val network =
-        defaultNetwork.copy(networkType = networkType.getOrElse(defaultNetwork.networkType),
+        defaultNetwork.copy(networkType     = networkType.getOrElse(defaultNetwork.networkType),
                             connectionBuild = connectionBuild)
 
       implicit val config    = platformEnv.config.copy(network = network)

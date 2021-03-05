@@ -16,52 +16,8 @@
 
 package org.alephium.app
 
-import akka.actor.{Actor, ActorRef}
-import akka.io.Tcp
-import akka.util.ByteString
-
-import org.alephium.api.CirceUtils._
-import org.alephium.api.model.{PeerMisbehavior, PeerStatus, SelfClique}
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.message.{Message, Payload, Pong}
-import org.alephium.protocol.model.NetworkType
+import org.alephium.api.model.SelfClique
 import org.alephium.util._
-
-class Injected[T](injection: ByteString => Option[ByteString], ref: ActorRef) extends ActorRefT[T](ref) {
-  override def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit =  {
-    message match {
-      case Tcp.Write(data, ack) =>
-        injection.apply(data) match {
-          case Some(injectedData) =>
-            ref.!(Tcp.Write(injectedData, ack))(sender)
-          case None =>
-            ref.!(message)(sender)
-        }
-      case _ =>
-        ref.!(message)(sender)
-    }
-  }
-}
-
-object Injected {
-  def  apply[T](injection: ByteString => Option[ByteString], ref: ActorRef): Injected[T] =
-    new Injected(injection, ref)
-
-  def payload[T](injection: PartialFunction[Payload, Payload], ref: ActorRef)(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
-    val injectionData: ByteString => Option[ByteString] = data => {
-      val payload = Message.deserialize(data, networkConfig.networkType).toOption.get.payload
-      if (injection.isDefinedAt(payload)) {
-        val injected = injection.apply(payload)
-        val injectedData = Message.serialize(injected, networkConfig.networkType)
-        Some(injectedData)
-      } else {
-        None
-      }
-    }
-
-    new Injected(injectionData, ref)
-  }
-}
 
 class IntraCliqueSyncTest extends AlephiumSpec {
   it should "boot and sync single node clique" in new TestFixture("1-node") {
@@ -83,85 +39,6 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server1.start().futureValue is ()
 
     eventually(request[SelfClique](getSelfClique).synced is true)
-
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
-  }
-
-  it should "ban node if not same network type" in new TestFixture("2-nodes") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    server0.start().futureValue is ()
-
-    val server1MasterPort = generatePort
-    val server1 =
-      bootNode(publicPort = server1MasterPort, brokerId = 1, networkType = Some(NetworkType.Mainnet))
-    server1.start().futureValue is ()
-
-    val selfClique1 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(server1MasterPort))
-
-    selfClique1.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _ => false
-    } is true
-
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
-  }
-
-  it should "support injection" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = {
-      case payload => payload
-    }
-    val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1, connectionBuild = Injected.payload(injection, _))
-    server.start().futureValue is (())
-    eventually(request[SelfClique](getSelfClique).synced is true)
-
-    server.stop().futureValue is ()
-  }
-
-  it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = {
-      case Pong(_) => Pong(0)
-    }
-
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    server0.start().futureValue is ()
-
-    val server1MasterPort = generatePort
-    val server1 = bootNode(publicPort = server1MasterPort, brokerId = 1, connectionBuild = Injected.payload(injection, _))
-
-    server1.start().futureValue is ()
-
-    Thread.sleep(2000)
-
-    val selfClique0 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(defaultMasterPort))
-    selfClique0.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _ => false
-    } is true
-
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
-  }
-
-  it should "ban node if spamming" in new TestFixture("2-nodes") {
-    val injectionData: ByteString => Option[ByteString] = {
-      _ => Some(ByteString.fromArray(Array.fill[Byte](42)(0)))
-    }
-
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    server0.start().futureValue is ()
-
-    val server1MasterPort = generatePort
-    val server1 = bootNode(publicPort = server1MasterPort, brokerId = 1, connectionBuild = Injected(injectionData, _))
-
-    server1.start().futureValue is ()
-
-    val selfClique0 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(defaultMasterPort))
-    selfClique0.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _ => false
-    } is true
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
