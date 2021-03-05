@@ -539,7 +539,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SelfClique'
               example:
-                cliqueId: 6127e95167c9ed8f42bbef1ae5a0ac7023ed4f915307bf22c31477e64fd1aafeee
+                cliqueId: b51d57737a6880aeaf94fd4587e50c139682b2e05fb18215c7b2689178d295645d
                 networkType: mainnet
                 numZerosAtLeastInHash: 18
                 peers:
@@ -580,6 +580,37 @@ paths:
                   addr: 1.2.3.4
                   port: 12344
                 isSynced: true
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
+  /infos/misbehaviors:
+    get:
+      tags:
+      - Infos
+      summary: Get the misbehaviors of peers
+      operationId: getInfosMisbehaviors
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PeerMisbehavior'
+              example:
+              - peer:
+                  addr: 1.2.3.4
+                  port: 12344
+                status:
+                  penalty:
+                    value: 42
         default:
           description: ''
           content:
@@ -1439,6 +1470,34 @@ components:
           type: string
         isSynced:
           type: boolean
+    PeerMisbehavior:
+      required:
+      - peer
+      - status
+      type: object
+      properties:
+        peer:
+          type: string
+        status:
+          $ref: '#/components/schemas/PeerStatus'
+    PeerStatus:
+      oneOf:
+      - $ref: '#/components/schemas/Banned'
+      - $ref: '#/components/schemas/Penalty'
+    Banned:
+      required:
+      - until
+      type: object
+      properties:
+        until:
+          type: integer
+    Penalty:
+      required:
+      - value
+      type: object
+      properties:
+        value:
+          type: integer
     FetchResponse:
       type: object
       properties:

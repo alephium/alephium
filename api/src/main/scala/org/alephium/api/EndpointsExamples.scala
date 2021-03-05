@@ -80,6 +80,9 @@ trait EndpointsExamples {
     simpleExample(
       AVector(InterCliquePeerInfo(cliqueId, brokerId = 1, inetSocketAddress, isSynced = true)))
 
+  implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
+    simpleExample(AVector(PeerMisbehavior(inetSocketAddress, PeerStatus.Penalty(42))))
+
   implicit val txsExamples: List[Example[AVector[Tx]]] =
     simpleExample(
       AVector(

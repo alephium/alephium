@@ -119,7 +119,8 @@ class TcpController(bindAddress: InetSocketAddress,
     case Tcp.Closed =>
       ()
     case Terminated(connection) =>
-      val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
+      val toRemove =
+        confirmedConnections.filter(_._2.ref == connection).keys
       toRemove.foreach(confirmedConnections -= _)
     case MisbehaviorManager.PeerBanned(remote) =>
       confirmedConnections.get(remote) match {

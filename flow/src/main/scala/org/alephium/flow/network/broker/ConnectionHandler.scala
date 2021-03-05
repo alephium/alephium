@@ -180,7 +180,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   private def currentOffset = storageOffset + storage.size
 
-  private def buffer(data: ByteString): Unit = {
+  protected def buffer(data: ByteString): Unit = {
     storage :+= data
     stored += data.size
 

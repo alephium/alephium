@@ -39,6 +39,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
+import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.config.{GroupConfig}
 import org.alephium.protocol.model._
@@ -104,6 +106,23 @@ class RestServer(
 
   private val getGroupRoute = getGroup.toRoute { address =>
     Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
+  }
+
+  private val getMisbehaviorsRoute = getMisbehaviors.toRoute { _ =>
+    for {
+      brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
+    } yield {
+      Right(
+        brokerPeers.peers.map {
+          case MisbehaviorManager.Peer(addr, misbehavior) =>
+            val status: PeerStatus = misbehavior match {
+              case MisbehaviorManager.Penalty(value) => PeerStatus.Penalty(value)
+              case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
+            }
+            PeerMisbehavior(addr, status)
+        }
+      )
+    }
   }
 
   private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
@@ -198,6 +217,7 @@ class RestServer(
   private val blockflowDocs = List(
     getSelfClique,
     getInterCliquePeerInfo,
+    getMisbehaviors,
     getBlockflow,
     getBlock,
     getBalance,
@@ -233,6 +253,7 @@ class RestServer(
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~
       getInterCliquePeerInfoRoute ~
+      getMisbehaviorsRoute ~
       getBlockflowRoute ~
       getBlockRoute ~
       getBalanceRoute ~
@@ -295,6 +316,7 @@ object RestServer {
   def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting, synced: Boolean)(
       implicit groupConfig: GroupConfig,
       networkType: NetworkType): SelfClique = {
+
     SelfClique(
       cliqueInfo.id,
       networkType,

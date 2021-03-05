@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import org.alephium.api.model.SelfClique
-import org.alephium.protocol.model.NetworkType
 import org.alephium.util._
 
 class IntraCliqueSyncTest extends AlephiumSpec {
@@ -40,20 +39,6 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server1.start().futureValue is ()
 
     eventually(request[SelfClique](getSelfClique).synced is true)
-
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
-  }
-
-  it should "ban node if not same network type" in new TestFixture("2-nodes") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    server0.start().futureValue is ()
-
-    val server1 =
-      bootNode(publicPort = generatePort, brokerId = 1, networkType = Some(NetworkType.Mainnet))
-    server1.start().futureValue is ()
-
-    //TODO add some assertion here
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()

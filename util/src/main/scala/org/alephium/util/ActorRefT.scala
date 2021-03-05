@@ -23,21 +23,30 @@ import akka.util.Timeout
 
 @SuppressWarnings(
   Array("org.wartremover.warts.ImplicitParameter", "org.wartremover.warts.DefaultArguments"))
-final case class ActorRefT[T](ref: ActorRef) extends AnyVal {
+class ActorRefT[T](val ref: ActorRef) {
   def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit = ref.!(message)(sender)
   def forward(message: T)(implicit context: ActorContext): Unit = ref.forward(message)
   def ask(message: T)(implicit timeout: Timeout): Future[Any]   = akka.pattern.ask(ref, message)
   def tell(message: T, sender: ActorRef): Unit                  = ref.tell(message, sender)
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: ActorRefT[_] => ref.equals(that.ref)
+    case _                  => false
+  }
+
+  override def hashCode(): Int = ref.hashCode
 }
 
 object ActorRefT {
+  def apply[T](ref: ActorRef): ActorRefT[T] = new ActorRefT[T](ref)
+
   def build[T](system: ActorSystem, props: Props): ActorRefT[T] = {
     val ref = system.actorOf(props)
-    ActorRefT[T](ref)
+    new ActorRefT[T](ref)
   }
 
   def build[T](system: ActorSystem, props: Props, name: String): ActorRefT[T] = {
     val ref = system.actorOf(props, name)
-    ActorRefT[T](ref)
+    new ActorRefT[T](ref)
   }
 }
