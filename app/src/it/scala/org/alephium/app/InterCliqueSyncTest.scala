@@ -85,12 +85,22 @@ class InterCliqueSyncTest extends AlephiumSpec {
     test(2, 1)
   }
 
+  it should "support injection" in new Fixture("clique-2-node-clique-1-node-injection") {
+    val injection: PartialFunction[Payload, Payload] = {
+      case payload => payload
+    }
+
+    test(2, 1, connectionBuild = Injected.payload(injection, _))
+  }
+
   class Fixture(name: String) extends TestFixture(name) {
 
-    def test(nbOfNodesClique1: Int, nbOfNodesClique2: Int) = {
+    def test(nbOfNodesClique1: Int,
+             nbOfNodesClique2: Int,
+             connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply) = {
       val fromTs = TimeStamp.now()
 
-      val clique1           = bootClique(nbOfNodes = nbOfNodesClique1)
+      val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
       val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
       Future.sequence(clique1.map(_.start())).futureValue
@@ -110,8 +120,9 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
       val clique2 =
-        bootClique(nbOfNodes = nbOfNodesClique2,
-                   bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
+        bootClique(nbOfNodes       = nbOfNodesClique2,
+                   bootstrap       = Some(new InetSocketAddress("localhost", masterPortClique1)),
+                   connectionBuild = connectionBuild)
       val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
       Future.sequence(clique2.map(_.start())).futureValue
@@ -138,20 +149,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
       clique1.foreach(_.stop().futureValue is ())
       clique2.foreach(_.stop().futureValue is ())
     }
-  }
-
-  it should "support injection" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = {
-      case payload => payload
-    }
-    val server = bootNode(publicPort = defaultMasterPort,
-                          brokerId        = 0,
-                          brokerNum       = 1,
-                          connectionBuild = Injected.payload(injection, _))
-    server.start().futureValue is (())
-    eventually(request[SelfClique](getSelfClique).synced is true)
-
-    server.stop().futureValue is ()
   }
 
   ignore should "ban node if not same network type" in new TestFixture("2-nodes") {
