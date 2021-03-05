@@ -58,6 +58,11 @@ object AlephiumActorSpec {
       |    }
       |
       |    guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
+      |
+      |    default-dispatcher {
+      |      executor = "fork-join-executor"
+      |      throughput = 1
+      |    }
       |  }
       |}
     """.stripMargin

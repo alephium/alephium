@@ -133,7 +133,7 @@ class DiscoveryServerStateSpec
     override def peersPerGroup: Int = 4
 
     state.getActivePeers.length is 0
-    val toAdds = Gen.listOfN(peersPerGroup - 1, peerInfoGen).sample.get
+    val toAdds = Gen.listOfN(peersPerGroup, peerInfoGen).sample.get
     toAdds.foreach(addToTable)
 
     val peers0 = state.getNeighbors(peerInfo.cliqueId)

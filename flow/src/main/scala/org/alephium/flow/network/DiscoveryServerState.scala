@@ -40,6 +40,7 @@ trait DiscoveryServerState {
   def selfCliqueInfo: CliqueInfo
   def selfCliqueId: CliqueId = selfCliqueInfo.id
 
+  lazy val selfPeerId: PeerId                                    = selfCliqueInfo.selfInterBrokerInfo.peerId
   lazy val selfPeerInfoOpt: Option[BrokerInfo]                   = selfCliqueInfo.selfBrokerInfo
   lazy val selfCliqueBrokerInfosOpt: Option[AVector[BrokerInfo]] = selfCliqueInfo.interBrokers
 
@@ -49,7 +50,9 @@ trait DiscoveryServerState {
 
   protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
   private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
-  private val pendingMax = 2 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  private val pendingMax = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+
+  private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
   def setSocket(s: ActorRefT[Udp.Command]): Unit = {
     socket = s
@@ -61,16 +64,15 @@ trait DiscoveryServerState {
 
   def getPeersNum: Int = table.size
 
+  def getPeersWeight: Int = {
+    table.values.foldLeft(0)(_ + _.info.groupNumPerBroker)
+  }
+
   def getNeighbors(target: CliqueId): AVector[BrokerInfo] = {
-    val candidates = if (target == selfCliqueId) {
-      AVector.from(table.values.map(_.info))
-    } else {
-      val neighbors = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
-      selfCliqueBrokerInfosOpt.fold(neighbors)(neighbors ++ _)
-    }
+    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
     candidates
       .sortBy(info => target.hammingDist(info.cliqueId))
-      .takeUpto(discoveryConfig.neighborsPerGroup)
+      .takeUpto(neighborMax)
   }
 
   def isInTable(peerId: PeerId): Boolean = {
@@ -142,16 +144,17 @@ trait DiscoveryServerState {
     publishNewPeer(peerInfo)
   }
 
+  protected def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+    table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+  }
+
   def publishNewPeer(peerInfo: BrokerInfo): Unit
 
   // TODO: improve scan algorithm
   def scan(): Unit = {
-    val sortedNeighbors =
-      AVector.from(table.values).sortBy(status => selfCliqueId.hammingDist(status.info.cliqueId))
-    sortedNeighbors
-      .takeUpto(discoveryConfig.scanMaxPerGroup)
-      .foreach(status => tryPing(status.info))
-    val emptySlotNum = discoveryConfig.scanMaxPerGroup - sortedNeighbors.length
+    table.values
+      .foreach(status => if (status.info.peerId != selfPeerId) { tryPing(status.info) })
+    val emptySlotNum = neighborMax - getPeersWeight
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
     bootstrap.take(bootstrapNum).foreach(ping)
   }
@@ -196,7 +199,7 @@ trait DiscoveryServerState {
     pendings.get(peerId) match {
       case Some(AwaitPong(_, _)) =>
         pendings.remove(peerId)
-        if (table.size < discoveryConfig.neighborsPerGroup) {
+        if (getPeersWeight < neighborMax) {
           appendPeer(peerInfo)
         } else {
           tryInsert(peerInfo)

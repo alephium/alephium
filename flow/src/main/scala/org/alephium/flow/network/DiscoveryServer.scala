@@ -109,6 +109,9 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
+      cliqueInfo.interBrokers.foreach { brokers =>
+        brokers.foreach(addSelfCliquePeer)
+      }
 
       IO(Udp)(context.system) ! Udp.Bind(self, bindAddress)
       context become (binding orElse handleCommand)

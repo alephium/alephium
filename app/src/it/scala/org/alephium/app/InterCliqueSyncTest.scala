@@ -74,7 +74,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     test(2, 2)
   }
 
-  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
+  ignore should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
     "clique-1-node-clique-2-node") {
     test(1, 2)
   }

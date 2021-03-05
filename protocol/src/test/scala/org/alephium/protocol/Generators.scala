@@ -130,3 +130,5 @@ trait DefaultGenerators extends Generators {
     override def groups: Int = 3
   }
 }
+
+object Generators extends Generators
