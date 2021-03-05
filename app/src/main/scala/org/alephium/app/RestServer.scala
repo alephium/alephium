@@ -16,8 +16,6 @@
 
 package org.alephium.app
 
-import java.net.InetAddress
-
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
@@ -77,11 +75,10 @@ class RestServer(
 
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     for {
-      synced      <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
-      cliqueInfo  <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
-      brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
+      synced     <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
     } yield {
-      Right(RestServer.selfCliqueFrom(cliqueInfo, brokerPeers, node.config.consensus, synced))
+      Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus, synced))
     }
   }
 
@@ -109,6 +106,23 @@ class RestServer(
 
   private val getGroupRoute = getGroup.toRoute { address =>
     Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
+  }
+
+  private val getMisbehaviorsRoute = getMisbehaviors.toRoute { _ =>
+    for {
+      brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
+    } yield {
+      Right(
+        brokerPeers.peers.map {
+          case MisbehaviorManager.Peer(addr, misbehavior) =>
+            val status: PeerStatus = misbehavior match {
+              case MisbehaviorManager.Penalty(value) => PeerStatus.Score(value)
+              case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
+            }
+            PeerMisbehavior(addr, status)
+        }
+      )
+    }
   }
 
   private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
@@ -203,6 +217,7 @@ class RestServer(
   private val blockflowDocs = List(
     getSelfClique,
     getInterCliquePeerInfo,
+    getMisbehaviors,
     getBlockflow,
     getBlock,
     getBalance,
@@ -242,6 +257,7 @@ class RestServer(
       getBlockRoute ~
       getBalanceRoute ~
       getGroupRoute ~
+      getMisbehaviorsRoute ~
       getHashesAtHeightRoute ~
       getChainInfoRoute ~
       listUnconfirmedTransactionsRoute ~
@@ -297,32 +313,16 @@ object RestServer {
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
 
-  def selfCliqueFrom(
-      cliqueInfo: IntraCliqueInfo,
-      brokerPeers: Peers,
-      consensus: ConsensusSetting,
-      synced: Boolean)(implicit groupConfig: GroupConfig, networkType: NetworkType): SelfClique = {
-
-    val peerStatus: Map[InetAddress, PeerStatus] =
-      Map.from(brokerPeers.peers.map {
-        case MisbehaviorManager.Peer(addr, misbehavior) =>
-          val status: PeerStatus = misbehavior match {
-            case MisbehaviorManager.Penalty(value) => PeerStatus.Score(value)
-            case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
-          }
-          (addr.getAddress, status)
-      }.toIterable)
+  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting, synced: Boolean)(
+      implicit groupConfig: GroupConfig,
+      networkType: NetworkType): SelfClique = {
 
     SelfClique(
       cliqueInfo.id,
       networkType,
       consensus.numZerosAtLeastInHash,
-      cliqueInfo.peers.map(
-        peer =>
-          PeerAddress(peer.internalAddress.getAddress,
-                      peer.restPort,
-                      peer.wsPort,
-                      peerStatus.get(peer.internalAddress.getAddress))),
+      cliqueInfo.peers.map(peer =>
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
       synced,
       cliqueInfo.groupNumPerBroker,
       groupConfig.groups

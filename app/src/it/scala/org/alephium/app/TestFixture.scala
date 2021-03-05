@@ -366,6 +366,9 @@ trait TestFixtureLike
   val getInterCliquePeerInfo =
     httpGet(s"/infos/inter-clique-peer-info") //jsonRpc("get_inter_clique_peer_info", "{}")
 
+  val getMisbehaviors =
+    httpGet(s"/infos/misbehaviors")
+
   def getGroup(address: String) =
     httpGet(s"/addresses/$address/group")
 

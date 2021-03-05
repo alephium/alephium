@@ -16,6 +16,6 @@
 
 package org.alephium.api.model
 
-import java.net.InetAddress
+import java.net.InetSocketAddress
 
-final case class PeerAddress(address: InetAddress, restPort: Int, wsPort: Int)
+final case class PeerMisbehavior(peer: InetSocketAddress, status: PeerStatus)

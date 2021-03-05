@@ -97,6 +97,8 @@ trait ApiModelCodec {
   implicit val peerStatusCodec: Codec[PeerStatus] =
     Codec.from(peerStatusDecoder, peerStatusEncoder)
 
+  implicit val peerMisbehaviorCodec: Codec[PeerMisbehavior] = deriveCodec[PeerMisbehavior]
+
   implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
   implicit val u256Decoder: Decoder[U256] = Decoder.decodeJavaBigInteger.emap { u256 =>
     U256.from(u256).toRight(s"Invalid U256: $u256")
