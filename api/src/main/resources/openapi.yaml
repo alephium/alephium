@@ -546,9 +546,6 @@ paths:
                 - address: 1.2.3.4
                   restPort: 12377
                   wsPort: 12366
-                  status:
-                    score:
-                      value: 0
                 synced: true
                 groupNumPerBroker: 1
                 groups: 2
@@ -583,6 +580,37 @@ paths:
                   addr: 1.2.3.4
                   port: 12344
                 isSynced: true
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
+  /infos/misbehaviors:
+    get:
+      tags:
+      - Infos
+      summary: Get the misbehaviors of peers
+      operationId: getInfosMisbehaviors
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PeerMisbehavior'
+              example:
+              - peer:
+                  addr: 1.2.3.4
+                  port: 12344
+                status:
+                  score:
+                    value: 42
         default:
           description: ''
           content:
@@ -1426,6 +1454,30 @@ components:
           type: integer
         wsPort:
           type: integer
+    InterCliquePeerInfo:
+      required:
+      - cliqueId
+      - brokerId
+      - address
+      - isSynced
+      type: object
+      properties:
+        cliqueId:
+          type: string
+        brokerId:
+          type: integer
+        address:
+          type: string
+        isSynced:
+          type: boolean
+    PeerMisbehavior:
+      required:
+      - peer
+      - status
+      type: object
+      properties:
+        peer:
+          type: string
         status:
           $ref: '#/components/schemas/PeerStatus'
     PeerStatus:
@@ -1446,22 +1498,6 @@ components:
       properties:
         value:
           type: integer
-    InterCliquePeerInfo:
-      required:
-      - cliqueId
-      - brokerId
-      - address
-      - isSynced
-      type: object
-      properties:
-        cliqueId:
-          type: string
-        brokerId:
-          type: integer
-        address:
-          type: string
-        isSynced:
-          type: boolean
     FetchResponse:
       type: object
       properties:

@@ -20,7 +20,8 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.api.model.{PeerStatus, SelfClique}
+import org.alephium.api.CirceUtils._
+import org.alephium.api.model.{PeerMisbehavior, PeerStatus, SelfClique}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload, Pong}
 import org.alephium.protocol.model.NetworkType
@@ -96,9 +97,9 @@ class IntraCliqueSyncTest extends AlephiumSpec {
       bootNode(publicPort = server1MasterPort, brokerId = 1, networkType = Some(NetworkType.Mainnet))
     server1.start().futureValue is ()
 
-    val selfClique1 = request[SelfClique](getSelfClique, restPort(server1MasterPort))
+    val selfClique1 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(server1MasterPort))
 
-    selfClique1.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
+    selfClique1.map(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
@@ -133,8 +134,8 @@ class IntraCliqueSyncTest extends AlephiumSpec {
 
     Thread.sleep(2000)
 
-    val selfClique0 = request[SelfClique](getSelfClique, restPort(defaultMasterPort))
-    selfClique0.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
+    val selfClique0 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(defaultMasterPort))
+    selfClique0.map(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
@@ -156,8 +157,8 @@ class IntraCliqueSyncTest extends AlephiumSpec {
 
     server1.start().futureValue is ()
 
-    val selfClique0 = request[SelfClique](getSelfClique, restPort(defaultMasterPort))
-    selfClique0.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
+    val selfClique0 = request[AVector[PeerMisbehavior]](getMisbehaviors, restPort(defaultMasterPort))
+    selfClique0.map(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true

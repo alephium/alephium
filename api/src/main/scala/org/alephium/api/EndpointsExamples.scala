@@ -43,7 +43,7 @@ trait EndpointsExamples {
   private val restPort                   = 12377
   private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress                = inetSocketAddress.getAddress
-  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, Some(PeerStatus.Score(0)))
+  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort)
   private val peers                      = AVector(peerAddress)
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42
@@ -79,6 +79,9 @@ trait EndpointsExamples {
   implicit val interCliquePeerInfosExamples: List[Example[AVector[InterCliquePeerInfo]]] =
     simpleExample(
       AVector(InterCliquePeerInfo(cliqueId, brokerId = 1, inetSocketAddress, isSynced = true)))
+
+  implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
+    simpleExample(AVector(PeerMisbehavior(inetSocketAddress, PeerStatus.Score(42))))
 
   implicit val txsExamples: List[Example[AVector[Tx]]] =
     simpleExample(
