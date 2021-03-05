@@ -16,6 +16,8 @@
 
 package org.alephium.flow.setting
 
+import scala.collection.immutable.ArraySeq
+
 import akka.actor.ActorRef
 import akka.io.Tcp
 import com.typesafe.config.Config
@@ -26,7 +28,6 @@ import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
 import pureconfig.error._
 import pureconfig.generic.auto._
-import scala.collection.immutable.ArraySeq
 
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema

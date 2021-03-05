@@ -22,30 +22,9 @@ import akka.util.ByteString
 
 import org.alephium.api.model.{PeerStatus, SelfClique}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.protocol.message.{Message, Payload, Pong}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util._
-
-class InjectedPayload[T](injection: PartialFunction[Payload, Payload], ref: ActorRef)(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig) extends ActorRefT[T](ref) {
-  override def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit =  {
-    message match {
-      case Tcp.Write(data, ack) =>
-        val staging = ConnectionHandler.tryDeserializePayload(data, networkConfig.networkType)
-                      .toOption.flatMap(identity).getOrElse { sys.error("Invalid data")}
-
-        if (injection.isDefinedAt(staging.value)) {
-          val injected = injection.apply(staging.value)
-          val injectedData = Message.serialize(injected, networkConfig.networkType)
-          ref.!(Tcp.Write(injectedData, ack))(sender)
-        } else {
-          ref.!(message)(sender)
-        }
-      case _ =>
-        ref.!(message)(sender)
-    }
-  }
-}
 
 class Injected[T](injection: ByteString => Option[ByteString], ref: ActorRef) extends ActorRefT[T](ref) {
   override def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit =  {
@@ -69,11 +48,9 @@ object Injected {
 
   def payload[T](injection: PartialFunction[Payload, Payload], ref: ActorRef)(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
     val injectionData: ByteString => Option[ByteString] = data => {
-      val staging = ConnectionHandler.tryDeserializePayload(data, networkConfig.networkType)
-                    .toOption.flatMap(identity).getOrElse { sys.error("Invalid data")}
-
-      if (injection.isDefinedAt(staging.value)) {
-        val injected = injection.apply(staging.value)
+      val payload = Message.deserialize(data, networkConfig.networkType).toOption.get.payload
+      if (injection.isDefinedAt(payload)) {
+        val injected = injection.apply(payload)
         val injectedData = Message.serialize(injected, networkConfig.networkType)
         Some(injectedData)
       } else {
@@ -121,13 +98,24 @@ class IntraCliqueSyncTest extends AlephiumSpec {
 
     val selfClique1 = request[SelfClique](getSelfClique, restPort(server1MasterPort))
 
-    selfClique1.peers.find(_.restPort == restPort(defaultMasterPort)).flatMap(_.status).exists {
+    selfClique1.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
+  }
+
+  it should "support injection" in new TestFixture("2-nodes") {
+    val injection: PartialFunction[Payload, Payload] = {
+      case payload => payload
+    }
+    val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1, connectionBuild = Injected.payload(injection, _))
+    server.start().futureValue is (())
+    eventually(request[SelfClique](getSelfClique).synced is true)
+
+    server.stop().futureValue is ()
   }
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
@@ -146,7 +134,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     Thread.sleep(2000)
 
     val selfClique0 = request[SelfClique](getSelfClique, restPort(defaultMasterPort))
-    selfClique0.peers.find(_.restPort == restPort(defaultMasterPort)).flatMap(_.status).exists {
+    selfClique0.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
@@ -169,7 +157,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server1.start().futureValue is ()
 
     val selfClique0 = request[SelfClique](getSelfClique, restPort(defaultMasterPort))
-    selfClique0.peers.find(_.restPort == restPort(defaultMasterPort)).flatMap(_.status).exists {
+    selfClique0.peers.find(_.restPort equals restPort(defaultMasterPort)).flatMap(_.status).exists {
       case PeerStatus.Banned(_) => true
       case _ => false
     } is true
