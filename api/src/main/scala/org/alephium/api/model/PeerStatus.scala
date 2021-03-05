@@ -21,6 +21,6 @@ import org.alephium.util.TimeStamp
 sealed trait PeerStatus
 
 object PeerStatus {
-  final case class Score(value: Int)        extends PeerStatus
+  final case class Penalty(value: Int)      extends PeerStatus
   final case class Banned(until: TimeStamp) extends PeerStatus
 }

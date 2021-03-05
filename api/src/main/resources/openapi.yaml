@@ -609,7 +609,7 @@ paths:
                   addr: 1.2.3.4
                   port: 12344
                 status:
-                  score:
+                  penalty:
                     value: 42
         default:
           description: ''
@@ -1483,7 +1483,7 @@ components:
     PeerStatus:
       oneOf:
       - $ref: '#/components/schemas/Banned'
-      - $ref: '#/components/schemas/Score'
+      - $ref: '#/components/schemas/Penalty'
     Banned:
       required:
       - until
@@ -1491,7 +1491,7 @@ components:
       properties:
         until:
           type: integer
-    Score:
+    Penalty:
       required:
       - value
       type: object

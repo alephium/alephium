@@ -116,7 +116,7 @@ class RestServer(
         brokerPeers.peers.map {
           case MisbehaviorManager.Peer(addr, misbehavior) =>
             val status: PeerStatus = misbehavior match {
-              case MisbehaviorManager.Penalty(value) => PeerStatus.Score(value)
+              case MisbehaviorManager.Penalty(value) => PeerStatus.Penalty(value)
               case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
             }
             PeerMisbehavior(addr, status)
@@ -253,11 +253,11 @@ class RestServer(
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~
       getInterCliquePeerInfoRoute ~
+      getMisbehaviorsRoute ~
       getBlockflowRoute ~
       getBlockRoute ~
       getBalanceRoute ~
       getGroupRoute ~
-      getMisbehaviorsRoute ~
       getHashesAtHeightRoute ~
       getChainInfoRoute ~
       listUnconfirmedTransactionsRoute ~
