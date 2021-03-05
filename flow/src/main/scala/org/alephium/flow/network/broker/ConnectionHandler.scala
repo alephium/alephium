@@ -100,7 +100,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   def writing: Receive = {
     case Send(data) =>
-      connection ! buildTcpWrite(data)
+      connection ! Tcp.Write(data, Ack(currentOffset))
       buffer(data)
     case Ack(ack) =>
       acknowledge(ack)
@@ -167,9 +167,6 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   override def postStop(): Unit = {
     log.debug(s"transferred $transferred bytes from/to [$remoteAddress]")
   }
-
-  protected def buildTcpWrite(data: ByteString): Tcp.Write =
-    Tcp.Write(data, Ack(currentOffset))
 
   private[broker] final var storageOffset = 0
   private[broker] final var storage       = Vector.empty[ByteString]
