@@ -159,9 +159,8 @@ object ServerFixture {
   class BlockFlowDummy(block: Block,
                        blockFlowProbe: ActorRef,
                        dummyTx: Transaction,
-                       storages: Storages)(implicit val config: AlephiumConfig)
-      extends BlockFlow {
-    override def genesisBlocks: AVector[AVector[Block]] = config.genesisBlocks
+                       val storages: Storages)(implicit val config: AlephiumConfig)
+      extends EmptyBlockFlow {
 
     override def getHeightedBlockHeaders(fromTs: TimeStamp,
                                          toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
@@ -189,29 +188,8 @@ object ServerFixture {
                              chainIndex: ChainIndex): IOResult[Option[BlockFlowState.TxStatus]] =
       Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
 
-    implicit def brokerConfig    = config.broker
-    implicit def consensusConfig = config.consensus
-    implicit def mempoolSetting  = config.mempool
-    def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState =
-      BlockChainWithState.fromGenesisUnsafe(storages)
-    def blockchainBuilder: Block => BlockChain =
-      BlockChain.fromGenesisUnsafe(storages)
-    def blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
-      BlockHeaderChain.fromGenesisUnsafe(storages)
-
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
-
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps = ???
-    def getAllTips: AVector[BlockHash]                  = ???
-    def getBestTipUnsafe: BlockHash                     = ???
-    def add(header: org.alephium.protocol.model.BlockHeader,
-            parentHash: BlockHash,
-            weight: Int): IOResult[Unit]         = ???
-    def updateBestDepsUnsafe(): Unit             = ???
-    def updateBestDeps(): IOResult[Unit]         = ???
-    def add(block: Block): IOResult[Unit]        = ???
-    def add(header: BlockHeader): IOResult[Unit] = ???
   }
 }

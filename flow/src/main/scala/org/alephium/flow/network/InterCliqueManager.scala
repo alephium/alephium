@@ -63,6 +63,8 @@ object InterCliqueManager {
       isSynced && info.contains(chainIndex.from)
     }
   }
+
+  final case class PeerDisconnected(peer: InetSocketAddress) extends EventStream.Event
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,
@@ -103,7 +105,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           ActorRefT[CliqueManager.Command](self),
           blockFlowSynchronizer
         )
-      context.actorOf(props, name)
+      val in = context.actorOf(props, name)
+      context.watchWith(in, PeerDisconnected(remoteAddress))
       ()
     case CliqueManager.HandShaked(brokerInfo) =>
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
@@ -141,6 +144,9 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
       }
       sender() ! syncStatuses
+    case PeerDisconnected(peer) =>
+      removeBroker(peer)
+      discoveryServer ! DiscoveryServer.PeerDisconnected(peer)
   }
 
   def connect(broker: BrokerInfo): Unit = {
@@ -157,7 +163,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   allHandlers,
                                   ActorRefT(self),
                                   blockFlowSynchronizer)
-    context.actorOf(props, name)
+    val out = context.actorOf(props, name)
+    context.watchWith(out, PeerDisconnected(brokerInfo.address))
     ()
   }
 }
@@ -201,5 +208,9 @@ trait InterCliqueManagerState {
       case Some(state) => brokers(peerId) = state.setSynced()
       case None        => log.warning(s"Unexpected message Synced from $peerId")
     }
+  }
+
+  def removeBroker(peer: InetSocketAddress): Unit = {
+    brokers.filterInPlace { case (_, state) => state.info.address != peer }
   }
 }
