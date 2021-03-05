@@ -19,7 +19,6 @@ package org.alephium.app
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
-
 import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -98,8 +97,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     def test(nbOfNodesClique1: Int,
              nbOfNodesClique2: Int,
              connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply) = {
-      val fromTs = TimeStamp.now()
-
+      val fromTs            = TimeStamp.now()
       val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
       val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
@@ -118,7 +116,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
       }
 
       val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
-
       val clique2 =
         bootClique(nbOfNodes       = nbOfNodesClique2,
                    bootstrap       = Some(new InetSocketAddress("localhost", masterPortClique1)),
@@ -140,7 +137,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
       }
 
       val toTs = TimeStamp.now()
-
       eventually {
         request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique1)).blocks.toSet is
           request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique2)).blocks.toSet
@@ -178,7 +174,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
     val injection: PartialFunction[Payload, Payload] = {
-      case Pong(_) => Pong(0)
+      case Pong(x) => Pong(x + 1)
     }
 
     val server0 = bootClique(1).head

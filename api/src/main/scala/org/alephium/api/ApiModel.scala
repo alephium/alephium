@@ -63,8 +63,8 @@ trait ApiModelCodec {
   def blockflowFetchMaxAge: Duration
   implicit def networkType: NetworkType
 
-  implicit val peerStatusScoreCodec: Codec[PeerStatus.Score]   = deriveCodec[PeerStatus.Score]
-  implicit val peerStatusBannedCodec: Codec[PeerStatus.Banned] = deriveCodec[PeerStatus.Banned]
+  implicit val peerStatusBannedCodec: Codec[PeerStatus.Banned]   = deriveCodec[PeerStatus.Banned]
+  implicit val peerStatusPenaltyCodec: Codec[PeerStatus.Penalty] = deriveCodec[PeerStatus.Penalty]
 
   implicit val peerStatusEncoder: Encoder[PeerStatus] = {
     new Encoder[PeerStatus] {
@@ -73,9 +73,9 @@ trait ApiModelCodec {
           Json.obj(
             ("banned", ps.asJson)
           )
-        case ps @ PeerStatus.Score(_) =>
+        case ps @ PeerStatus.Penalty(_) =>
           Json.obj(
-            ("score", ps.asJson)
+            ("penalty", ps.asJson)
           )
       }
     }
@@ -86,10 +86,10 @@ trait ApiModelCodec {
       val keys = c.keys.getOrElse(Nil)
       if (keys.exists(_ == "banned")) {
         c.downField("banned").as[PeerStatus.Banned]
-      } else if (keys.exists(_ == "score")) {
-        c.downField("score").as[PeerStatus.Score]
+      } else if (keys.exists(_ == "penalty")) {
+        c.downField("penalty").as[PeerStatus.Penalty]
       } else {
-        Left(DecodingFailure("Can not decode, expecting: 'score' or 'banned' key", c.history))
+        Left(DecodingFailure("Can not decode, expecting: 'penalty' or 'banned' key", c.history))
       }
     }
   }
