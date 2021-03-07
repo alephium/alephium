@@ -159,14 +159,15 @@ class InterCliqueSyncTest extends AlephiumSpec {
                                          server0.config.network.coordinatorAddress.getPort))).head
     server1.start().futureValue is ()
 
-    Thread.sleep(10000)
-    val misbehaviors1 =
-      request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                        restPort(server1.config.network.bindAddress.getPort))
-    misbehaviors1.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _                    => false
-    } is true
+    eventually {
+      val misbehaviors1 =
+        request[AVector[PeerMisbehavior]](getMisbehaviors,
+                                          restPort(server1.config.network.bindAddress.getPort))
+      misbehaviors1.map(_.status).exists {
+        case PeerStatus.Banned(_) => true
+        case _                    => false
+      } is true
+    }
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
@@ -188,14 +189,16 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     server1.start().futureValue is ()
 
-    val misbehaviors0 =
-      request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                        restPort(server0.config.network.bindAddress.getPort))
+    eventually {
+      val misbehaviors0 =
+        request[AVector[PeerMisbehavior]](getMisbehaviors,
+                                          restPort(server0.config.network.bindAddress.getPort))
 
-    misbehaviors0.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _                    => false
-    } is true
+      misbehaviors0.map(_.status).exists {
+        case PeerStatus.Banned(_) => true
+        case _                    => false
+      } is true
+    }
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
@@ -217,13 +220,15 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     server1.start().futureValue is ()
 
-    val misbehaviors0 =
-      request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                        restPort(server0.config.network.bindAddress.getPort))
-    misbehaviors0.map(_.status).exists {
-      case PeerStatus.Banned(_) => true
-      case _                    => false
-    } is true
+    eventually {
+      val misbehaviors0 =
+        request[AVector[PeerMisbehavior]](getMisbehaviors,
+                                          restPort(server0.config.network.bindAddress.getPort))
+      misbehaviors0.map(_.status).exists {
+        case PeerStatus.Banned(_) => true
+        case _                    => false
+      } is true
+    }
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
