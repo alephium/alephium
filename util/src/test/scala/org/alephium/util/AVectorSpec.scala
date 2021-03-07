@@ -42,12 +42,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     lazy val vectorGen: Gen[AVector[A]] =
       Gen.oneOf(vectorGen0, vectorGen1, vectorGen2, vectorGen3)
 
-    def checkState[B: ClassTag](vector: AVector[B],
-                                start: Int,
-                                end: Int,
-                                length: Int,
-                                capacity: Int,
-                                appendable: Boolean): Assertion = {
+    def checkState[B](vector: AVector[B],
+                      start: Int,
+                      end: Int,
+                      length: Int,
+                      capacity: Int,
+                      appendable: Boolean): Assertion = {
       vector.start is start
       vector.end is end
       vector.length is length
@@ -55,7 +55,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vector.appendable is appendable
     }
 
-    def checkState[B: ClassTag](vector: AVector[B], length: Int): Assertion = {
+    def checkState[B](vector: AVector[B], length: Int): Assertion = {
       checkState(vector, 0, length, length, length, true)
     }
 

@@ -18,10 +18,8 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import org.alephium.serde.Serde
-
-final class StagingSMT[K: Serde, V: Serde](val underlying: CachedSMT[K, V],
-                                           val caches: mutable.Map[K, Modified[V]])
+final class StagingSMT[K, V](val underlying: CachedSMT[K, V],
+                             val caches: mutable.Map[K, Modified[V]])
     extends CachedTrie[K, V, Modified[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = underlying.getOpt(key)
 

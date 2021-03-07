@@ -88,7 +88,7 @@ object SecretStorage {
   private implicit val codec: Codec[SecretFile] = deriveCodec[SecretFile]
 
   def load(file: File, path: AVector[Int]): Either[Error, SecretStorage] = {
-    Using(Source.fromFile(file)) { source =>
+    Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
         _ <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
@@ -220,7 +220,7 @@ object SecretStorage {
   private def stateFromFile(file: File,
                             password: String,
                             path: AVector[Int]): Either[Error, State] = {
-    Using(Source.fromFile(file)) { source =>
+    Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
         secretFile <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)

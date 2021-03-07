@@ -314,7 +314,7 @@ object Serde extends ProductSerde {
       }
     }
 
-  private[serde] class AVectorSerializer[T: ClassTag](serializer: Serializer[T])
+  private[serde] class AVectorSerializer[T](serializer: Serializer[T])
       extends Serializer[AVector[T]] {
     override def serialize(input: AVector[T]): ByteString = {
       input.map(serializer.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)

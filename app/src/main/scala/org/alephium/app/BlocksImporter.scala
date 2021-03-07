@@ -41,7 +41,7 @@ object BlocksImporter extends StrictLogging {
   // scalastyle:on magic.number
 
   def importBlocks(file: File, node: Node)(implicit config: GroupConfig): IOResult[Int] = {
-    Using(Source.fromFile(file)) { source =>
+    Using(Source.fromFile(file)("UTF-8")) { source =>
       val (genesis, rest) = source.getLines().splitAt(config.chainNum)
 
       for {

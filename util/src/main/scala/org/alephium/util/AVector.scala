@@ -425,7 +425,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     reduceBy(identity)(op)
   }
 
-  def reduceBy[@sp B: ClassTag](f: A => B)(op: (B, B) => B): B = {
+  def reduceBy[@sp B](f: A => B)(op: (B, B) => B): B = {
     assume(nonEmpty)
 
     var acc = f(elems(start))
@@ -435,7 +435,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     acc
   }
 
-  def reduceByE[L, B: ClassTag](f: A => Either[L, B])(op: (B, B) => B): Either[L, B] = {
+  def reduceByE[L, B](f: A => Either[L, B])(op: (B, B) => B): Either[L, B] = {
     assume(nonEmpty)
 
     var acc = f(elems(start)) match {

@@ -17,7 +17,6 @@
 package org.alephium.serde
 
 import scala.collection.mutable
-import scala.reflect.runtime.universe.TypeTag
 
 import akka.util.ByteString
 
@@ -67,7 +66,7 @@ trait RandomBytes {
 }
 
 object RandomBytes {
-  abstract class Companion[T: TypeTag](val unsafe: ByteString => T, val toBytes: T => ByteString) {
+  abstract class Companion[T](val unsafe: ByteString => T, val toBytes: T => ByteString) {
     lazy val zero: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0)))
 
     lazy val allOne: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0xFF.toByte)))

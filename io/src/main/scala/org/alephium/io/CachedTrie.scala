@@ -18,11 +18,9 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import org.alephium.serde.Serde
 import org.alephium.util.discard
 
-abstract class CachedTrie[K: Serde, V: Serde, C >: Modified[V] <: Cache[V]]
-    extends MutableTrie[K, V] {
+abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTrie[K, V] {
   def underlying: ReadableTrie[K, V]
 
   def caches: mutable.Map[K, C]

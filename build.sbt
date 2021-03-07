@@ -206,7 +206,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.13.3",
+  scalaVersion := "2.13.5",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
@@ -249,7 +249,7 @@ val commonSettings = publishSettings ++ Seq(
   wartremoverErrors in (Test, test) := Warts.allBut(wartsTestExcludes: _*),
   wartremoverErrors in (IntegrationTest, test) := Warts.allBut(wartsTestExcludes: _*),
   fork := true,
-  Test / scalacOptions += "-Xcheckinit",
+  Test / scalacOptions ++= Seq("-Xcheckinit", "-Wconf:cat=other-non-cooperative-equals:s"),
   Test / javaOptions += "-Xss2m",
   Test / envVars += "ALEPHIUM_ENV"            -> "test",
   IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",

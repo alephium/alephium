@@ -18,7 +18,6 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.reflect.ClassTag
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.TxIndex
@@ -132,21 +131,20 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  protected def aggregateHash[T: ClassTag](f: BlockHashPool => T)(op: (T, T) => T): T = {
+  protected def aggregateHash[T](f: BlockHashPool => T)(op: (T, T) => T): T = {
     blockHeaderChains.reduceBy { chains =>
       chains.reduceBy(f)(op)
     }(op)
   }
 
-  protected def aggregateHashE[T: ClassTag](f: BlockHashPool => IOResult[T])(
-      op: (T, T)                                             => T): IOResult[T] = {
+  protected def aggregateHashE[T](f: BlockHashPool => IOResult[T])(op: (T, T) => T): IOResult[T] = {
     blockHeaderChains.reduceByE { chains =>
       chains.reduceByE(f)(op)
     }(op)
   }
 
-  protected def aggregateHeaderE[T: ClassTag](f: BlockHeaderPool => IOResult[T])(
-      op: (T, T)                                                 => T): IOResult[T] = {
+  protected def aggregateHeaderE[T](f: BlockHeaderPool => IOResult[T])(
+      op: (T, T)                                       => T): IOResult[T] = {
     blockHeaderChains.reduceByE { chains =>
       chains.reduceByE(f)(op)
     }(op)

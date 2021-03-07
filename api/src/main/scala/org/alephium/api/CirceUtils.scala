@@ -43,7 +43,7 @@ object CirceUtils {
     Codec.from(decoder, encoder)
   }
 
-  implicit def arrayEncoder[A: ClassTag](implicit encoder: Encoder[A]): Encoder[Array[A]] =
+  implicit def arrayEncoder[A](implicit encoder: Encoder[A]): Encoder[Array[A]] =
     (as: Array[A]) => Json.fromValues(as.map(encoder.apply))
 
   implicit def arrayDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[Array[A]] =
@@ -54,7 +54,7 @@ object CirceUtils {
     Codec.from(arrayDecoder[A], arrayEncoder[A])
   }
 
-  implicit def avectorEncoder[A: ClassTag](implicit encoder: Encoder[A]): Encoder[AVector[A]] =
+  implicit def avectorEncoder[A](implicit encoder: Encoder[A]): Encoder[AVector[A]] =
     (as: AVector[A]) => Json.fromValues(as.toIterable.map(encoder.apply))
 
   implicit def avectorDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[AVector[A]] =

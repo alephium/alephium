@@ -153,6 +153,7 @@ object Node {
         terminate(orderedActors, sender())
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.ListUnapply"))
     def terminate(actors: Seq[ActorRefT[_]], answerTo: ActorRef): Unit = {
       actors match {
         case Nil =>
