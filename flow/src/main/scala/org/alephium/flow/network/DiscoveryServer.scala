@@ -115,6 +115,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
       IO(Udp)(context.system) ! Udp.Bind(self, bindAddress)
       context become (binding orElse handleCommand)
+
+    case _ => stash()
   }
 
   def binding: Receive = {
@@ -126,10 +128,10 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       scheduleScan()
       unstashAll()
       context.become(ready)
-
     case Udp.CommandFailed(bind: Udp.Bind) =>
       log.error(s"Could not bind the UDP socket ($bind)")
       publishEvent(FlowMonitor.Shutdown)
+
     case _ => stash()
   }
 

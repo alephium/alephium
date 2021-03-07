@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Props, Stash, Terminated}
 import akka.io.{IO, Tcp}
 import akka.io.Tcp.Close
 
@@ -53,6 +53,7 @@ class TcpController(bindAddress: InetSocketAddress,
                     discoveryServer: ActorRefT[DiscoveryServer.Command],
                     misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
     extends BaseActor
+    with Stash
     with EventStream {
 
   val tcpManager: ActorRef = IO(Tcp)(context.system)
@@ -76,6 +77,8 @@ class TcpController(bindAddress: InetSocketAddress,
                             pullMode = true,
                             options  = Seq(Tcp.SO.ReuseAddress(true)))
       context.become(binding(bootstrapper))
+
+    case _ => stash()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -83,12 +86,14 @@ class TcpController(bindAddress: InetSocketAddress,
     case Tcp.Bound(localAddress) =>
       log.debug(s"Server bound to $localAddress")
       sender() ! Tcp.ResumeAccepting(batchSize = 1)
+      unstashAll()
       context.become(workFor(sender(), bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
       publishEvent(FlowMonitor.Shutdown)
     case TcpController.WorkFor(another) =>
       context become binding(another)
+    case _ => stash()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

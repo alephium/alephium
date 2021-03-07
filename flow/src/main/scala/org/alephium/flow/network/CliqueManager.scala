@@ -86,8 +86,8 @@ class CliqueManager(blockflow: BlockFlow,
                         "IntraCliqueManager")
       unstashAll()
       context become (awaitIntraCliqueReady(intraCliqueManager, cliqueInfo) orElse isSelfCliqueSynced)
-    case _: Tcp.Connected =>
-      stash()
+
+    case _ => stash()
   }
 
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
@@ -102,9 +102,13 @@ class CliqueManager(blockflow: BlockFlow,
       selfCliqueReady = true
       subscribeEvent(self, classOf[BroadCastTx])
       subscribeEvent(self, classOf[BroadCastBlock])
+
+      unstashAll()
       context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)
+
+    case _ => stash()
   }
 
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
