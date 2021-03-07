@@ -16,18 +16,19 @@
 
 package org.alephium.app
 
+import java.net.InetSocketAddress
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
-import java.net.InetSocketAddress
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload, Pong}
-import org.alephium.protocol.model.NetworkType
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => Option[ByteString], ref: ActorRef)
@@ -74,7 +75,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     test(2, 2)
   }
 
-  ignore should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
+  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
     "clique-1-node-clique-2-node") {
     test(1, 2)
   }
@@ -102,7 +103,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
       Future.sequence(clique1.map(_.start())).futureValue
-
       startWS(wsPort(masterPortClique1))
 
       clique1.foreach { server =>
@@ -116,6 +116,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       }
 
       val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
+
       val clique2 =
         bootClique(nbOfNodes       = nbOfNodesClique2,
                    bootstrap       = Some(new InetSocketAddress("localhost", masterPortClique1)),
@@ -153,7 +154,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
     val server1 =
       bootClique(1,
-                 networkType = Some(NetworkType.Mainnet),
                  bootstrap = Some(
                    new InetSocketAddress("localhost",
                                          server0.config.network.coordinatorAddress.getPort))).head
@@ -206,7 +206,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
   it should "ban node if spamming" in new TestFixture("2-nodes") {
     val injectionData: ByteString => Option[ByteString] = { _ =>
-      Some(ByteString.fromArray(Array.fill[Byte](42)(0)))
+      Some(ByteString.fromArray(Array.fill[Byte](51)(-1)))
     }
 
     val server0 = bootClique(1).head

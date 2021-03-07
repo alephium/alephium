@@ -280,21 +280,18 @@ trait TestFixtureLike
   def bootClique(
       nbOfNodes: Int,
       bootstrap: Option[InetSocketAddress] = None,
-      publicPort: Option[Int]              = None,
-      networkType: Option[NetworkType]     = None,
       connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Seq[Server] = {
     val masterPort = generatePort
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
-      val publicPortNode = publicPort.getOrElse(if (brokerId equals 0) masterPort else generatePort)
+      val publicPort = if (brokerId equals 0) masterPort else generatePort
       bootNode(
-        publicPort      = publicPortNode,
+        publicPort      = publicPort,
         masterPort      = masterPort,
         brokerId        = brokerId,
         walletPort      = generatePort,
         bootstrap       = bootstrap,
         brokerNum       = nbOfNodes,
-        networkType     = networkType,
         connectionBuild = connectionBuild
       )
     }
@@ -308,7 +305,6 @@ trait TestFixtureLike
                masterPort: Int                      = defaultMasterPort,
                walletPort: Int                      = defaultWalletPort,
                bootstrap: Option[InetSocketAddress] = None,
-               networkType: Option[NetworkType]     = None,
                connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
@@ -319,9 +315,7 @@ trait TestFixtureLike
       implicit val executionContext = system.dispatcher
 
       val defaultNetwork = platformEnv.config.network
-      val network =
-        defaultNetwork.copy(networkType     = networkType.getOrElse(defaultNetwork.networkType),
-                            connectionBuild = connectionBuild)
+      val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
 
       implicit val config    = platformEnv.config.copy(network = network)
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
