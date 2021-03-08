@@ -16,8 +16,8 @@
 
 package org.alephium.app
 
-import java.net.{DatagramSocket, InetSocketAddress}
-import java.nio.channels.DatagramChannel
+import java.net.{DatagramSocket, InetSocketAddress, ServerSocket}
+import java.nio.channels.{DatagramChannel, ServerSocketChannel}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -95,11 +95,13 @@ trait TestFixtureLike
     if (usedPort.contains(tcpPort)) {
       generatePort
     } else {
-      val tcp: DatagramSocket  = DatagramChannel.open().socket()
-      val rest: DatagramSocket = DatagramChannel.open().socket()
-      val ws: DatagramSocket   = DatagramChannel.open().socket()
+      val tcp: ServerSocket   = ServerSocketChannel.open().socket()
+      val udp: DatagramSocket = DatagramChannel.open().socket()
+      val rest: ServerSocket  = ServerSocketChannel.open().socket()
+      val ws: ServerSocket    = ServerSocketChannel.open().socket()
       try {
         tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        udp.bind(new InetSocketAddress("localhost", tcpPort))
         rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
         ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
         usedPort.add(tcpPort)
@@ -108,6 +110,7 @@ trait TestFixtureLike
         case NonFatal(_) => generatePort
       } finally {
         tcp.close()
+        udp.close()
         rest.close()
         ws.close()
       }
