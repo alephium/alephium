@@ -44,23 +44,24 @@ trait FlowUtils
     MemPool.empty(group)
   }
 
-  def getPool(mainGroup: Int): MemPool = {
-    mempools(mainGroup - brokerConfig.groupFrom)
+  def getPool(mainGroup: GroupIndex): MemPool = {
+    mempools(mainGroup.value - brokerConfig.groupFrom)
   }
 
   def getPool(chainIndex: ChainIndex): MemPool = {
     mempools(chainIndex.from.value - brokerConfig.groupFrom)
   }
 
-  def calMemPoolChangesUnsafe(mainGroup: Int,
+  def calMemPoolChangesUnsafe(mainGroup: GroupIndex,
                               oldDeps: BlockDeps,
                               newDeps: BlockDeps): MemPoolChanges = {
     val oldOutDeps = oldDeps.outDeps
     val newOutDeps = newDeps.outDeps
-    val diffs = AVector.tabulate(brokerConfig.groups) { i =>
-      val oldDep = oldOutDeps(i)
-      val newDep = newOutDeps(i)
-      val index  = ChainIndex.unsafe(mainGroup, i)
+    val diffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
+      val toGroupIndex = GroupIndex.unsafe(toGroup)
+      val oldDep       = oldOutDeps(toGroup)
+      val newDep       = newOutDeps(toGroup)
+      val index        = ChainIndex(mainGroup, toGroupIndex)
       getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
     }
     val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
@@ -68,12 +69,13 @@ trait FlowUtils
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
-  def updateMemPoolUnsafe(mainGroup: Int, newDeps: BlockDeps): Unit = {
-    val oldDeps = getBestDeps(GroupIndex.unsafe(mainGroup))
+  def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = {
+    val oldDeps = getBestDeps(mainGroup)
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
       case Normal(toRemove) =>
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
-          val index = ChainIndex.unsafe(mainGroup, toGroup)
+          val toGroupIndex = GroupIndex.unsafe(toGroup)
+          val index        = ChainIndex(mainGroup, toGroupIndex)
           sum + getPool(index).remove(index, txs.map(_.toTemplate))
         }
         if (removed > 0) {
