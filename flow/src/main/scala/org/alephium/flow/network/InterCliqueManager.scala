@@ -206,7 +206,7 @@ trait InterCliqueManagerState {
     val peerId = brokerInfo.peerId
     brokers.get(peerId) match {
       case Some(state) => brokers(peerId) = state.setSynced()
-      case None        => log.warning(s"Unexpected message Synced from $peerId")
+      case None        => log.warning(s"Unexpected message Synced from $brokerInfo")
     }
   }
 

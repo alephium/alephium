@@ -26,12 +26,14 @@ import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
             discoveryServer: ActorRefT[DiscoveryServer.Command],
-            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]): Props =
+            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command])(
+      implicit networkSetting: NetworkSetting): Props =
     Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
 
   sealed trait Command
@@ -51,7 +53,8 @@ object TcpController {
 
 class TcpController(bindAddress: InetSocketAddress,
                     discoveryServer: ActorRefT[DiscoveryServer.Command],
-                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])
+                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])(
+    implicit networkSetting: NetworkSetting)
     extends BaseActor
     with Stash
     with EventStream {
@@ -99,12 +102,13 @@ class TcpController(bindAddress: InetSocketAddress,
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def workFor(tcpListener: ActorRef, actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
+      val connection = networkSetting.connectionBuild(sender())
       pendingOutboundConnections.get(c.remoteAddress) match {
         case Some(outbound) =>
-          confirmConnection(outbound.ref, c, ActorRefT(sender()))
+          confirmConnection(outbound.ref, c, connection)
         case None =>
           log.debug(s"Ask connection confirmation for $c")
-          misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, ActorRefT(sender()))
+          misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, connection)
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
