@@ -23,11 +23,11 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.network.broker.{BrokerManager, ConnectionHandler}
+import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object BrokerConnector {
   def props(remoteAddress: InetSocketAddress,
@@ -58,7 +58,7 @@ object BrokerConnector {
       context.parent ! Received(message)
     }
 
-    override def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
+    override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
       publishEvent(FlowMonitor.Shutdown)
     }
@@ -70,11 +70,12 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
                       cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig,
                                                    networkSetting: NetworkSetting)
     extends BaseActor
-    with SerdeUtils {
+    with SerdeUtils
+    with EventStream.Publisher {
   import BrokerConnector._
 
   val connectionHandler: ActorRefT[ConnectionHandler.Command] =
-    context.actorOf(connectionProps(remoteAddress, connection))
+    ActorRefT(context.actorOf(connectionProps(remoteAddress, connection)))
   context watch connectionHandler.ref
 
   override def receive: Receive = {

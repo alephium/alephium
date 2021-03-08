@@ -120,7 +120,6 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
 
   override def receive: Receive = handleWith(None)
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive =
     handleRelay(minerOpt) orElse handleSync
 

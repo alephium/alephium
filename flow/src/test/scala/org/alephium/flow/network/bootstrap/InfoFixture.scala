@@ -18,6 +18,7 @@ package org.alephium.flow.network.bootstrap
 
 import org.scalacheck.Gen
 
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.model.ModelGenerators
 
 trait InfoFixture extends ModelGenerators {
@@ -31,6 +32,18 @@ trait InfoFixture extends ModelGenerators {
         PeerInfo.unsafe(id, info.groupNumPerBroker, Some(address), address, restPort, wsPort)
       }
       IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker)
+    }
+  }
+
+  def genBrokerPeers: Gen[MisbehaviorManager.Peers] = {
+    for {
+      info  <- cliqueInfoGen
+      score <- Gen.choose(0, 42)
+    } yield {
+      val peers = info.internalAddresses.map { address =>
+        MisbehaviorManager.Peer(address, MisbehaviorManager.Penalty(score))
+      }
+      MisbehaviorManager.Peers(peers)
     }
   }
 

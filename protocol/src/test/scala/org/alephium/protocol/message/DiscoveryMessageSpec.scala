@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{PrivateKey, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, NetworkType}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
@@ -43,7 +43,11 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def brokerInfo: BrokerInfo
     def isCoordinator: Boolean
 
-    implicit val groupConfig: GroupConfig = new GroupConfig {
+    implicit val brokerConfig: BrokerConfig = new BrokerConfig {
+      override def brokerId: Int = 1
+
+      override def brokerNum: Int = self.groups
+
       override def groups: Int = self.groups
     }
 
@@ -78,7 +82,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
         BrokerInfo.unsafe(CliqueId.generate, 0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
-    forAll(messageGen(peerFixture.discoveryConfig, peerFixture.groupConfig)) { msg =>
+    forAll(messageGen(peerFixture.discoveryConfig, peerFixture.brokerConfig)) { msg =>
       val bytes = DiscoveryMessage.serialize(msg, networkType)(peerFixture.discoveryConfig)
       val value =
         DiscoveryMessage

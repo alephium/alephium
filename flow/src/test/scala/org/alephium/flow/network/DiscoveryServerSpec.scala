@@ -16,32 +16,39 @@
 
 package org.alephium.flow.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
-import akka.testkit.{SocketUtil, TestProbe}
+import scala.util.Random
+
+import akka.io.Udp
+import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
+import akka.util.Timeout
 import org.scalacheck.Gen
+import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Seconds, Span}
 
-import org.alephium.protocol.SignatureSchema
+import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.protocol.{ALF, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config._
-import org.alephium.protocol.model.{CliqueId, CliqueInfo, NetworkType, NoIndexModelGenerators}
-import org.alephium.util.{AlephiumActorSpec, AVector, Duration}
+import org.alephium.protocol.message.DiscoveryMessage
+import org.alephium.protocol.model._
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 object DiscoveryServerSpec {
-  def createAddr(port: Int): InetSocketAddress =
-    new InetSocketAddress(InetAddress.getLocalHost, port)
 
   def createConfig(groupSize: Int,
                    port: Int,
                    _peersPerGroup: Int,
                    _scanFrequency: Duration  = Duration.unsafe(200),
                    _expireDuration: Duration = Duration.ofHoursUnsafe(1))
-    : (InetSocketAddress, DiscoveryConfig with CliqueConfig) = {
+    : (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
-    val discoveryConfig = new DiscoveryConfig with CliqueConfig {
+    val discoveryConfig = new DiscoveryConfig with BrokerConfig {
       val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
       val peersPerGroup: Int          = _peersPerGroup
-      val scanMaxPerGroup: Int        = 1
+      val scanMaxPerGroup: Int        = _peersPerGroup
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
       val neighborsPerGroup: Int      = _peersPerGroup
@@ -50,6 +57,7 @@ object DiscoveryServerSpec {
 
       val groups: Int    = groupSize
       val brokerNum: Int = groupSize
+      val brokerId: Int  = Random.nextInt(brokerNum)
     }
     publicAddress -> discoveryConfig
   }
@@ -57,55 +65,217 @@ object DiscoveryServerSpec {
 
 class DiscoveryServerSpec
     extends AlephiumActorSpec("DiscoveryServerSpec")
-    with NoIndexModelGenerators {
+    with NoIndexModelGenerators
+    with ScalaFutures
+    with Eventually {
   import DiscoveryServerSpec._
 
+  override implicit val patienceConfig =
+    PatienceConfig(timeout = Span(20, Seconds), interval = Span(2, Seconds))
+
+  trait SimulationFixture { fixture =>
+    def groups: Int
+
+    def generateClique(): (CliqueInfo, AVector[(BrokerInfo, BrokerConfig with DiscoveryConfig)]) = {
+      val brokerNum = {
+        val candidates = (1 to groups).filter(groups % _ equals 0)
+        candidates(Random.nextInt(candidates.size))
+      }
+      val groupNumPerBroker = groups / brokerNum
+      val addresses         = AVector.from(SocketUtil.temporaryServerAddresses(brokerNum, udp = true))
+      val clique =
+        CliqueInfo.unsafe(CliqueId.generate, addresses.map(Some(_)), addresses, groupNumPerBroker)
+
+      val brokers                                     = clique.interBrokers.get
+      val (discoveryPrivateKey0, discoveryPublicKey0) = SignatureSchema.generatePriPub()
+      val infos = brokers.map { brokerInfo =>
+        val config: BrokerConfig with DiscoveryConfig = new BrokerConfig with DiscoveryConfig {
+          val brokerId: Int  = brokerInfo.brokerId
+          val brokerNum: Int = clique.brokerNum
+          val groups: Int    = fixture.groups
+
+          val discoveryPrivateKey: PrivateKey = discoveryPrivateKey0
+          val discoveryPublicKey: PublicKey   = discoveryPublicKey0
+          val peersPerGroup: Int              = 3
+          val scanMaxPerGroup: Int            = 3
+          val scanFrequency: Duration         = Duration.ofMillisUnsafe(500)
+          val scanFastFrequency: Duration     = Duration.ofMillisUnsafe(500)
+          val neighborsPerGroup: Int          = 3
+        }
+        (brokerInfo, config)
+      }
+
+      (clique, infos)
+    }
+  }
+
+  it should "simulate large network" in new SimulationFixture { self =>
+    val groups = 4
+
+    val networkConfig = new NetworkConfig { val networkType = NetworkType.Testnet }
+
+    val cliqueNum = 16
+    val cliques   = AVector.fill(cliqueNum)(generateClique())
+    val servers = cliques.flatMapWithIndex {
+      case ((clique, infos), index) =>
+        infos.map {
+          case (brokerInfo, config) =>
+            val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
+              ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+            val server = {
+              if (index equals 0) {
+                TestActorRef[DiscoveryServer](
+                  DiscoveryServer
+                    .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig))
+              } else {
+                val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
+                TestActorRef[DiscoveryServer](
+                  DiscoveryServer
+                    .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(config,
+                                                                                     config,
+                                                                                     networkConfig))
+              }
+            }
+            server ! DiscoveryServer.SendCliqueInfo(clique)
+
+            server
+        }
+    }
+
+    eventually {
+      servers.foreach { server =>
+        val probe = TestProbe()
+        server.tell(DiscoveryServer.GetNeighborCliques, probe.ref)
+
+        probe.expectMsgPF() {
+          case DiscoveryServer.NeighborPeers(peers) =>
+            (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
+        }
+      }
+    }
+  }
+
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
-    val newInfo = CliqueInfo.unsafe(CliqueId.generate,
-                                    AVector(Option(master)),
-                                    AVector(master),
-                                    groupConfig.groups)
+    val newInfo = CliqueInfo.unsafe(
+      CliqueId.generate,
+      AVector.tabulate(groupConfig.groups)(i =>
+        Option(new InetSocketAddress(master.getAddress, master.getPort + i))),
+      AVector.tabulate(groupConfig.groups)(i =>
+        new InetSocketAddress(master.getAddress, master.getPort + i)),
+      1
+    )
     CliqueInfo.validate(newInfo)(groupConfig).isRight is true
     newInfo.coordinatorAddress is master
     newInfo
   }
 
-  it should "discovery each other for two cliques" in new GroupConfigFixture {
-    val groups              = Gen.choose(2, 10).sample.get
-    val port0               = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo0         = generateCliqueInfo(createAddr(port0), groupConfig)
-    val (address0, config0) = createConfig(groups, port0, 1)
-    val port1               = SocketUtil.temporaryLocalPort(udp = true)
-    val cliqueInfo1         = generateCliqueInfo(createAddr(port1), groupConfig)
-    val (address1, config1) = createConfig(groups, port1, 1)
-    val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
-
-    val server0 =
-      system.actorOf(DiscoveryServer.props(address0)(groupConfig, config0, networkConfig),
-                     "server0")
-    val server1 =
-      system.actorOf(DiscoveryServer.props(address1, address0)(groupConfig, config1, networkConfig),
-                     "server1")
+  it should "discovery each other for two cliques" in new Fixture {
 
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
 
-    Thread.sleep(1000)
+    eventually {
+      val probe0 = TestProbe()
+      server0.tell(DiscoveryServer.GetNeighborCliques, probe0.ref)
+      val probe1 = TestProbe()
+      server1.tell(DiscoveryServer.GetNeighborCliques, probe1.ref)
 
-    val probo0 = TestProbe()
-    server0.tell(DiscoveryServer.GetNeighborCliques, probo0.ref)
-    val probo1 = TestProbe()
-    server1.tell(DiscoveryServer.GetNeighborCliques, probo1.ref)
+      probe0.expectMsgPF() {
+        case DiscoveryServer.NeighborPeers(peers) =>
+          peers.length is 4 // 3 self clique peers + server1
+          peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
+          peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
+            cliqueInfo1.interBrokers.get.head)
+      }
+      probe1.expectMsgPF() {
+        case DiscoveryServer.NeighborPeers(peers) =>
+          peers.length is 4 // 3 self clique peers + server0
+          peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+          peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+            cliqueInfo0.interBrokers.get.head)
+      }
+    }
+  }
 
-    probo0.expectMsgPF() {
-      case DiscoveryServer.NeighborCliques(peers) =>
-        peers.length is 1
-        peers.head is cliqueInfo1.interCliqueInfo.get
+  it should "refuse to discover a banned clique" in new Fixture {
+
+    misbehaviorManager0.ref ! MisbehaviorManager.InvalidMessage(address1)
+
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
+
+    eventually {
+      val probe0 = TestProbe()
+      server0.tell(DiscoveryServer.GetNeighborCliques, probe0.ref)
+      val probe1 = TestProbe()
+      server1.tell(DiscoveryServer.GetNeighborCliques, probe1.ref)
+
+      probe0.expectMsgPF() {
+        case DiscoveryServer.NeighborPeers(peers) =>
+          peers.length is 3 // 3 self clique peers
+      }
+      probe1.expectMsgPF() {
+        case DiscoveryServer.NeighborPeers(peers) =>
+          peers.length is 4 // 3 self clique peers + server0
+          peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+          peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+            cliqueInfo0.interBrokers.get.head)
+      }
     }
-    probo1.expectMsgPF() {
-      case DiscoveryServer.NeighborCliques(peers) =>
-        peers.length is 1
-        peers.head is cliqueInfo0.interCliqueInfo.get
+  }
+
+  it should "refuse to ping a peer with unmatched peer info" in new Fixture {
+    implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
+
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+
+    misbehaviorManager0
+      .ask(MisbehaviorManager.GetPeers)
+      .mapTo[MisbehaviorManager.Peers]
+      .futureValue is MisbehaviorManager.Peers(AVector.empty)
+
+    val message = DiscoveryMessage.from(
+      cliqueInfo1.id,
+      DiscoveryMessage.Ping(
+        Some(BrokerInfo.from(socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo))))(
+      config1)
+    server0 ! Udp.Received(DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
+                           address1)
+
+    eventually {
+      misbehaviorManager0
+        .ask(MisbehaviorManager.GetPeers)
+        .mapTo[MisbehaviorManager.Peers]
+        .futureValue
+        .peers
+        .head
+        .peer is address1
     }
+  }
+
+  trait Fixture extends BrokerConfigFixture.Default {
+    val groups              = Gen.choose(2, 10).sample.get
+    val port0               = SocketUtil.temporaryLocalPort(udp = true)
+    val (address0, config0) = createConfig(groups, port0, 2)
+    val cliqueInfo0         = generateCliqueInfo(address0, groupConfig)
+    val port1               = SocketUtil.temporaryLocalPort(udp = true)
+    val (address1, config1) = createConfig(groups, port1, 2)
+    val cliqueInfo1         = generateCliqueInfo(address1, groupConfig)
+    val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
+    val misbehaviorManager0: ActorRefT[MisbehaviorManager.Command] =
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+    val misbehaviorManager1: ActorRefT[MisbehaviorManager.Command] =
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+
+    val server0 =
+      system.actorOf(
+        DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig))
+    val server1 =
+      system.actorOf(
+        DiscoveryServer
+          .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig))
+
+    val misbehaviorProbe = TestProbe()
+    system.eventStream.subscribe(misbehaviorProbe.ref, classOf[MisbehaviorManager.InvalidMessage])
   }
 }

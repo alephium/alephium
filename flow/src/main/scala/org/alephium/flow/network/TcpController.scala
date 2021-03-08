@@ -20,22 +20,27 @@ import java.net.InetSocketAddress
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Props, Stash, Terminated}
 import akka.io.{IO, Tcp}
 import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
-import org.alephium.flow.network.broker.BrokerManager
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
-            brokerManager: ActorRefT[broker.BrokerManager.Command]): Props =
-    Props(new TcpController(bindAddress, brokerManager))
+            discoveryServer: ActorRefT[DiscoveryServer.Command],
+            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command])(
+      implicit networkSetting: NetworkSetting): Props =
+    Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
 
   sealed trait Command
-  final case class Start(bootstrapper: ActorRef)        extends Command
-  final case class ConnectTo(remote: InetSocketAddress) extends Command
+  final case class Start(bootstrapper: ActorRef) extends Command
+  final case class ConnectTo(remote: InetSocketAddress, forwardTo: ActorRefT[Tcp.Command])
+      extends Command
+      with EventStream.Event
   final case class ConnectionConfirmed(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class ConnectionDenied(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -46,15 +51,25 @@ object TcpController {
   case object Bound extends Event
 }
 
-class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[BrokerManager.Command])
-    extends BaseActor {
-  import context.system
+class TcpController(bindAddress: InetSocketAddress,
+                    discoveryServer: ActorRefT[DiscoveryServer.Command],
+                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])(
+    implicit networkSetting: NetworkSetting)
+    extends BaseActor
+    with Stash
+    with EventStream {
 
-  val tcpManager: ActorRef = IO(Tcp)
+  val tcpManager: ActorRef = IO(Tcp)(context.system)
 
-  val pendingConnections: mutable.Set[InetSocketAddress] = mutable.Set.empty
+  val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
+    mutable.Map.empty
   val confirmedConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.Map.empty
+
+  override def preStart(): Unit = {
+    subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
+    subscribeEvent(self, classOf[TcpController.ConnectTo])
+  }
 
   override def receive: Receive = awaitStart
 
@@ -65,6 +80,8 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
                             pullMode = true,
                             options  = Seq(Tcp.SO.ReuseAddress(true)))
       context.become(binding(bootstrapper))
+
+    case _ => stash()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -72,52 +89,60 @@ class TcpController(bindAddress: InetSocketAddress, brokerManager: ActorRefT[Bro
     case Tcp.Bound(localAddress) =>
       log.debug(s"Server bound to $localAddress")
       sender() ! Tcp.ResumeAccepting(batchSize = 1)
+      unstashAll()
       context.become(workFor(sender(), bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
       publishEvent(FlowMonitor.Shutdown)
     case TcpController.WorkFor(another) =>
       context become binding(another)
+    case _ => stash()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def workFor(tcpListener: ActorRef, actor: ActorRef): Receive = {
     case c: Tcp.Connected =>
-      if (isOutgoing(c.remoteAddress)) {
-        confirmConnection(actor, c, sender())
-      } else {
-        brokerManager ! BrokerManager.ConfirmConnection(c, ActorRefT(sender()))
+      val connection = networkSetting.connectionBuild(sender())
+      pendingOutboundConnections.get(c.remoteAddress) match {
+        case Some(outbound) =>
+          confirmConnection(outbound.ref, c, connection)
+        case None =>
+          log.debug(s"Ask connection confirmation for $c")
+          misbehaviorManager ! MisbehaviorManager.ConfirmConnection(c, connection)
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
-      pendingConnections -= c.remoteAddress
+      pendingOutboundConnections -= c.remoteAddress
       log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
-      brokerManager ! BrokerManager.Remove(c.remoteAddress)
+      discoveryServer ! DiscoveryServer.Remove(c.remoteAddress)
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
-      pendingConnections -= connected.remoteAddress
+      pendingOutboundConnections -= connected.remoteAddress
       connection ! Close
-    case TcpController.ConnectTo(remote) =>
-      pendingConnections.addOne(remote)
+    case TcpController.ConnectTo(remote, forwardTo) =>
+      pendingOutboundConnections.update(remote, forwardTo)
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
     case Tcp.Closed =>
       ()
     case Terminated(connection) =>
-      val toRemove = confirmedConnections.filter(_._2 == ActorRefT[Tcp.Command](connection)).keys
+      val toRemove =
+        confirmedConnections.filter(_._2.ref == connection).keys
       toRemove.foreach(confirmedConnections -= _)
-  }
-
-  def isOutgoing(remoteAddress: InetSocketAddress): Boolean = {
-    pendingConnections.contains(remoteAddress)
+    case MisbehaviorManager.PeerBanned(remote) =>
+      confirmedConnections.get(remote).foreach { connection =>
+        connection ! Close
+        confirmedConnections -= remote
+        log.debug(s"Closing connection with $remote")
+      }
   }
 
   def confirmConnection(target: ActorRef,
                         connected: Tcp.Connected,
                         connection: ActorRefT[Tcp.Command]): Unit = {
-    pendingConnections -= connected.remoteAddress
+    pendingOutboundConnections -= connected.remoteAddress
     confirmedConnections += connected.remoteAddress -> connection
     context watch connection.ref
     target.tell(connected, connection.ref)

@@ -19,6 +19,7 @@ package org.alephium.util
 import scala.{specialized => sp}
 import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
+import scala.runtime.Statics
 
 import org.alephium.macros.HPC
 
@@ -406,11 +407,25 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(res)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def collect[B: ClassTag](pf: PartialFunction[A, B]): AVector[B] = {
+    val marker = Statics.pfMarker
+    fold(AVector.empty[B]) {
+      case (acc, elem) =>
+        val v = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
+        if (marker ne v.asInstanceOf[AnyRef]) {
+          acc :+ v
+        } else {
+          acc
+        }
+    }
+  }
+
   def reduce(op: (A, A) => A): A = {
     reduceBy(identity)(op)
   }
 
-  def reduceBy[@sp B: ClassTag](f: A => B)(op: (B, B) => B): B = {
+  def reduceBy[@sp B](f: A => B)(op: (B, B) => B): B = {
     assume(nonEmpty)
 
     var acc = f(elems(start))
@@ -420,7 +435,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     acc
   }
 
-  def reduceByE[L, B: ClassTag](f: A => Either[L, B])(op: (B, B) => B): Either[L, B] = {
+  def reduceByE[L, B](f: A => Either[L, B])(op: (B, B) => B): Either[L, B] = {
     assume(nonEmpty)
 
     var acc = f(elems(start)) match {

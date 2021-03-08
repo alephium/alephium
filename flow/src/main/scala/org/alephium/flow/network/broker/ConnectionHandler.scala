@@ -29,7 +29,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, Payload}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object ConnectionHandler {
   def clique(remoteAddress: InetSocketAddress,
@@ -70,7 +70,7 @@ object ConnectionHandler {
   }
 }
 
-trait ConnectionHandler[T] extends BaseActor {
+trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   import ConnectionHandler._
 
   def remoteAddress: InetSocketAddress
@@ -180,7 +180,7 @@ trait ConnectionHandler[T] extends BaseActor {
 
   private def currentOffset = storageOffset + storage.size
 
-  private def buffer(data: ByteString): Unit = {
+  protected def buffer(data: ByteString): Unit = {
     storage :+= data
     stored += data.size
 
@@ -243,11 +243,11 @@ trait ConnectionHandler[T] extends BaseActor {
       case Right(None) => ()
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
-        handleInvalidMessage(BrokerManager.InvalidMessage(remoteAddress))
+        handleInvalidMessage(MisbehaviorManager.InvalidMessage(remoteAddress))
     }
   }
 
-  def handleInvalidMessage(message: BrokerManager.InvalidMessage): Unit = {
+  def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
     publishEvent(message)
   }
 }

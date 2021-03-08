@@ -42,12 +42,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     lazy val vectorGen: Gen[AVector[A]] =
       Gen.oneOf(vectorGen0, vectorGen1, vectorGen2, vectorGen3)
 
-    def checkState[B: ClassTag](vector: AVector[B],
-                                start: Int,
-                                end: Int,
-                                length: Int,
-                                capacity: Int,
-                                appendable: Boolean): Assertion = {
+    def checkState[B](vector: AVector[B],
+                      start: Int,
+                      end: Int,
+                      length: Int,
+                      capacity: Int,
+                      appendable: Boolean): Assertion = {
       vector.start is start
       vector.end is end
       vector.length is length
@@ -55,7 +55,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vector.appendable is appendable
     }
 
-    def checkState[B: ClassTag](vector: AVector[B], length: Int): Assertion = {
+    def checkState[B](vector: AVector[B], length: Int): Assertion = {
       checkState(vector, 0, length, length, length, true)
     }
 
@@ -463,6 +463,10 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       val expected = vc.sum + vc.indices.sum
       vc.foldWithIndexE(0)((acc, e, idx) => Right(acc + e + idx)) isE expected
     }
+  }
+
+  it should "collect" in new FixtureF {
+    AVector(-1, 2, 3).collect { case i if i > 0 => i * i } is AVector(4, 9)
   }
 
   it should "forall" in new Fixture {

@@ -64,8 +64,7 @@ package object serde {
   def fixedSizeSerde[T: ClassTag](size: Int)(implicit serde: Serde[T]): Serde[AVector[T]] =
     Serde.fixedSizeSerde[T](size, serde)
 
-  implicit def avectorSerializer[T: ClassTag](
-      implicit serializer: Serializer[T]): Serializer[AVector[T]] =
+  implicit def avectorSerializer[T](implicit serializer: Serializer[T]): Serializer[AVector[T]] =
     new AVectorSerializer[T](serializer)
 
   implicit def avectorDeserializer[T: ClassTag](

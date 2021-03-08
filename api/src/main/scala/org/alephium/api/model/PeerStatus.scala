@@ -14,29 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.api.model
 
-import akka.actor.Props
+import org.alephium.util.TimeStamp
 
-import org.alephium.util.{BaseActor, Duration, EventStream}
+sealed trait PeerStatus
 
-object FlowMonitor {
-  sealed trait Command extends EventStream.Event
-  case object Shutdown extends Command
-
-  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
-
-  def props(shutdown: => Unit): Props = Props(new FlowMonitor(shutdown))
-}
-
-class FlowMonitor(shutdown: => Unit) extends BaseActor with EventStream.Subscriber {
-  override def preStart(): Unit = {
-    subscribeEvent(self, classOf[FlowMonitor.Command])
-  }
-
-  override def receive: Receive = {
-    case FlowMonitor.Shutdown =>
-      log.info(s"Shutdown the system")
-      shutdown
-  }
+object PeerStatus {
+  final case class Penalty(value: Int)      extends PeerStatus
+  final case class Banned(until: TimeStamp) extends PeerStatus
 }

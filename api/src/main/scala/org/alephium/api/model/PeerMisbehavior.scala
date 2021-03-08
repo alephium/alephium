@@ -16,7 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.InterCliqueInfo
-import org.alephium.util.AVector
+import java.net.InetSocketAddress
 
-final case class NeighborCliques(cliques: AVector[InterCliqueInfo])
+final case class PeerMisbehavior(peer: InetSocketAddress, status: PeerStatus)

@@ -14,29 +14,25 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.protocol.config
 
-import akka.actor.Props
+trait BrokerConfigFixture { self =>
+  def groups: Int
+  def brokerId: Int
+  def brokerNum: Int
 
-import org.alephium.util.{BaseActor, Duration, EventStream}
+  implicit lazy val brokerConfig: BrokerConfig = new BrokerConfig {
+    override def brokerId: Int = self.brokerId
 
-object FlowMonitor {
-  sealed trait Command extends EventStream.Event
-  case object Shutdown extends Command
+    override def brokerNum: Int = self.brokerNum
 
-  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
-
-  def props(shutdown: => Unit): Props = Props(new FlowMonitor(shutdown))
+    def groups: Int = self.groups
+  }
 }
 
-class FlowMonitor(shutdown: => Unit) extends BaseActor with EventStream.Subscriber {
-  override def preStart(): Unit = {
-    subscribeEvent(self, classOf[FlowMonitor.Command])
-  }
-
-  override def receive: Receive = {
-    case FlowMonitor.Shutdown =>
-      log.info(s"Shutdown the system")
-      shutdown
+object BrokerConfigFixture {
+  trait Default extends BrokerConfigFixture {
+    val brokerId: Int  = 0
+    def brokerNum: Int = groups
   }
 }

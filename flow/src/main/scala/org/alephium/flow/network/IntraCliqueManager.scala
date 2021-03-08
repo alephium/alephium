@@ -22,20 +22,19 @@ import akka.io.Tcp
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.broker.{BrokerHandler, BrokerManager}
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.intraclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object IntraCliqueManager {
   def props(cliqueInfo: CliqueInfo,
             blockflow: BlockFlow,
             allHandlers: AllHandlers,
             cliqueManager: ActorRefT[CliqueManager.Command],
-            brokerManager: ActorRefT[BrokerManager.Command],
             blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
       implicit brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting): Props =
@@ -44,7 +43,6 @@ object IntraCliqueManager {
                              blockflow,
                              allHandlers,
                              cliqueManager,
-                             brokerManager,
                              blockFlowSynchronizer))
 
   sealed trait Command    extends CliqueManager.Command
@@ -55,11 +53,11 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                          blockflow: BlockFlow,
                          allHandlers: AllHandlers,
                          cliqueManager: ActorRefT[CliqueManager.Command],
-                         brokerManager: ActorRefT[BrokerManager.Command],
                          blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
     implicit brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting)
-    extends BaseActor {
+    extends BaseActor
+    with EventStream.Publisher {
 
   override def preStart(): Unit = {
     cliqueInfo.intraBrokers.foreach { remoteBroker =>
@@ -71,7 +69,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                                                 blockflow,
                                                 allHandlers,
                                                 ActorRefT[CliqueManager.Command](self),
-                                                brokerManager,
                                                 blockFlowSynchronizer)
         context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
       }
@@ -88,7 +85,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   override def receive: Receive = awaitBrokers(Map.empty)
 
   // TODO: replace Map with Array for performance
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
       log.debug(s"Connected to $remote")
@@ -100,7 +96,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
         val props =
           InboundBrokerHandler.props(cliqueInfo,
                                      remote,
-                                     ActorRefT[Tcp.Command](sender()),
+                                     networkSetting.connectionBuild(sender()),
                                      blockflow,
                                      allHandlers,
                                      ActorRefT[CliqueManager.Command](self),

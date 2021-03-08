@@ -18,8 +18,6 @@ package org.alephium.crypto
 
 import java.nio.charset.Charset
 
-import scala.reflect.runtime.universe.TypeTag
-
 import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 
@@ -52,7 +50,7 @@ object HashSchema {
   }
 }
 
-abstract class HashSchema[T: TypeTag](unsafe: ByteString => T, toBytes: T => ByteString)
+abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
     extends RandomBytes.Companion[T](unsafe, toBytes) {
   def provider: Digest
 

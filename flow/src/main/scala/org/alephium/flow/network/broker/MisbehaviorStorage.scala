@@ -14,29 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.flow.network.broker
 
-import akka.actor.Props
+import java.net.InetSocketAddress
 
-import org.alephium.util.{BaseActor, Duration, EventStream}
+import org.alephium.flow.network.broker.MisbehaviorManager.{MisbehaviorStatus, Peer, Penalty}
+import org.alephium.util.{AVector, TimeStamp}
 
-object FlowMonitor {
-  sealed trait Command extends EventStream.Event
-  case object Shutdown extends Command
+trait MisbehaviorStorage {
 
-  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
+  def get(peer: InetSocketAddress): Option[MisbehaviorStatus]
 
-  def props(shutdown: => Unit): Props = Props(new FlowMonitor(shutdown))
-}
+  def update(peer: InetSocketAddress, penalty: Penalty): Unit
 
-class FlowMonitor(shutdown: => Unit) extends BaseActor with EventStream.Subscriber {
-  override def preStart(): Unit = {
-    subscribeEvent(self, classOf[FlowMonitor.Command])
-  }
+  def ban(peer: InetSocketAddress, until: TimeStamp): Unit
 
-  override def receive: Receive = {
-    case FlowMonitor.Shutdown =>
-      log.info(s"Shutdown the system")
-      shutdown
-  }
+  def isBanned(address: InetSocketAddress): Boolean
+
+  def remove(peer: InetSocketAddress): Unit
+
+  def list(): AVector[Peer]
 }

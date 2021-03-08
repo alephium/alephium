@@ -19,6 +19,7 @@ package org.alephium.api
 import akka.util.ByteString
 import io.circe._
 import io.circe.generic.semiauto._
+import io.circe.syntax._
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
@@ -61,6 +62,42 @@ trait ApiModelCodec {
 
   def blockflowFetchMaxAge: Duration
   implicit def networkType: NetworkType
+
+  implicit val peerStatusBannedCodec: Codec[PeerStatus.Banned]   = deriveCodec[PeerStatus.Banned]
+  implicit val peerStatusPenaltyCodec: Codec[PeerStatus.Penalty] = deriveCodec[PeerStatus.Penalty]
+
+  implicit val peerStatusEncoder: Encoder[PeerStatus] = {
+    new Encoder[PeerStatus] {
+      final def apply(status: PeerStatus): Json = status match {
+        case ps @ PeerStatus.Banned(_) =>
+          Json.obj(
+            ("banned", ps.asJson)
+          )
+        case ps @ PeerStatus.Penalty(_) =>
+          Json.obj(
+            ("penalty", ps.asJson)
+          )
+      }
+    }
+  }
+
+  implicit val peerStatusDecoder: Decoder[PeerStatus] = new Decoder[PeerStatus] {
+    final def apply(c: HCursor): Decoder.Result[PeerStatus] = {
+      val keys = c.keys.getOrElse(Nil)
+      if (keys.exists(_ == "banned")) {
+        c.downField("banned").as[PeerStatus.Banned]
+      } else if (keys.exists(_ == "penalty")) {
+        c.downField("penalty").as[PeerStatus.Penalty]
+      } else {
+        Left(DecodingFailure("Can not decode, expecting: 'penalty' or 'banned' key", c.history))
+      }
+    }
+  }
+
+  implicit val peerStatusCodec: Codec[PeerStatus] =
+    Codec.from(peerStatusDecoder, peerStatusEncoder)
+
+  implicit val peerMisbehaviorCodec: Codec[PeerMisbehavior] = deriveCodec[PeerMisbehavior]
 
   implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
   implicit val u256Decoder: Decoder[U256] = Decoder.decodeJavaBigInteger.emap { u256 =>
@@ -124,7 +161,7 @@ trait ApiModelCodec {
 
   implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]
 
-  implicit val neighborCliquesCodec: Codec[NeighborCliques] = deriveCodec[NeighborCliques]
+  implicit val neighborPeersCodec: Codec[NeighborPeers] = deriveCodec[NeighborPeers]
 
   implicit val getBalanceCodec: Codec[GetBalance] = deriveCodec[GetBalance]
 
@@ -185,6 +222,12 @@ trait ApiModelCodec {
       (info.id, info.externalAddresses, info.groupNumPerBroker))
   implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
     Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
+
+  implicit val peerInfoEncoder: Encoder[BrokerInfo] =
+    Encoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(info =>
+      (info.cliqueId, info.brokerId, info.groupNumPerBroker, info.address))
+  implicit val peerInfoDecoder: Decoder[BrokerInfo] =
+    Decoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(BrokerInfo.unsafe)
 
   implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
     deriveCodec[InterCliquePeerInfo]

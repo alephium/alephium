@@ -48,7 +48,7 @@ object BrokerHandler {
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
 
-trait BrokerHandler extends BaseActor {
+trait BrokerHandler extends BaseActor with EventStream.Publisher {
   import BrokerHandler._
 
   implicit def brokerConfig: BrokerConfig
@@ -85,9 +85,9 @@ trait BrokerHandler extends BaseActor {
         context become (exchanging orElse pingPong)
       case HandShakeTimeout =>
         log.debug(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
-        publishEvent(BrokerManager.RequestTimeout(remoteAddress))
+        publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
       case Received(_) =>
-        publishEvent(BrokerManager.Spamming(remoteAddress))
+        publishEvent(MisbehaviorManager.Spamming(remoteAddress))
     }
     receive
   }
@@ -120,7 +120,7 @@ trait BrokerHandler extends BaseActor {
           }
         case None =>
           log.warning(s"The blocks received do not form a proper flow DAG")
-          publishEvent(BrokerManager.InvalidDag(remoteAddress))
+          publishEvent(MisbehaviorManager.InvalidDag(remoteAddress))
       }
     case Received(GetBlocks(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
@@ -150,14 +150,14 @@ trait BrokerHandler extends BaseActor {
       log.debug(s"Failed in adding new block")
     case BlockChainHandler.InvalidBlock(hash) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      publishEvent(BrokerManager.InvalidMessage(remoteAddress))
+      publishEvent(MisbehaviorManager.InvalidMessage(remoteAddress))
     case HeaderChainHandler.HeaderAdded(_) =>
       ()
     case HeaderChainHandler.HeaderAddingFailed =>
       log.debug(s"Failed in adding new header")
     case HeaderChainHandler.InvalidHeader(hash) =>
       log.debug(s"Invalid header received ${hash.shortHex}")
-      publishEvent(BrokerManager.InvalidMessage(remoteAddress))
+      publishEvent(MisbehaviorManager.InvalidMessage(remoteAddress))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
     case TxHandler.AddFailed(hash) =>
@@ -180,7 +180,7 @@ trait BrokerHandler extends BaseActor {
   def sendPing(): Unit = {
     if (pingNonce != 0) {
       log.debug("No Pong message received in time")
-      publishEvent(BrokerManager.RequestTimeout(remoteAddress))
+      publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
       context stop self // stop it manually
     } else {
       pingNonce = Random.nextNonZeroInt()
@@ -190,7 +190,7 @@ trait BrokerHandler extends BaseActor {
 
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
-      publishEvent(BrokerManager.InvalidPingPong(remoteAddress))
+      publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
@@ -205,7 +205,7 @@ trait BrokerHandler extends BaseActor {
     } else {
       log.debug(
         s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce")
-      publishEvent(BrokerManager.InvalidPingPong(remoteAddress))
+      publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
     }
   }
 

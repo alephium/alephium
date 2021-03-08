@@ -18,11 +18,10 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import org.alephium.serde.Serde
 import org.alephium.util.EitherF
 
-final class CachedSMT[K: Serde, V: Serde](val underlying: SparseMerkleTrie[K, V],
-                                          val caches: mutable.Map[K, Cache[V]])
+final class CachedSMT[K, V](val underlying: SparseMerkleTrie[K, V],
+                            val caches: mutable.Map[K, Cache[V]])
     extends CachedTrie[K, V, Cache[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = {
     underlying.getOpt(key).map { valueOpt =>
@@ -44,7 +43,7 @@ final class CachedSMT[K: Serde, V: Serde](val underlying: SparseMerkleTrie[K, V]
 }
 
 object CachedSMT {
-  def from[K: Serde, V: Serde](trie: SparseMerkleTrie[K, V]): CachedSMT[K, V] = {
+  def from[K, V](trie: SparseMerkleTrie[K, V]): CachedSMT[K, V] = {
     new CachedSMT(trie, mutable.Map.empty)
   }
 }

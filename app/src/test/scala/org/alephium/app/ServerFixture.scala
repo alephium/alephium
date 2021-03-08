@@ -33,7 +33,7 @@ import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
-import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash, PrivateKey, SignatureSchema}
@@ -62,7 +62,7 @@ trait ServerFixture
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyNeighborCliques = NeighborCliques(AVector.empty)
+  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
   lazy val dummyBalance         = Balance(U256.Zero, 0)
   lazy val dummyGroup           = Group(0)
 
@@ -97,10 +97,10 @@ object ServerFixture {
     CirceUtils.print(t.asJson)
   }
 
-  class DiscoveryServerDummy(neighborCliques: NeighborCliques) extends BaseActor {
+  class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = {
       case DiscoveryServer.GetNeighborCliques =>
-        sender() ! DiscoveryServer.NeighborCliques(neighborCliques.cliques)
+        sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
     }
   }
 
@@ -111,7 +111,7 @@ object ServerFixture {
   }
 
   class NodeDummy(intraCliqueInfo: IntraCliqueInfo,
-                  neighborCliques: NeighborCliques,
+                  neighborPeers: NeighborPeers,
                   block: Block,
                   blockFlowProbe: ActorRef,
                   dummyTx: Transaction,
@@ -120,14 +120,14 @@ object ServerFixture {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
-    val brokerManager: ActorRefT[BrokerManager.Command] = ActorRefT(TestProbe().ref)
-    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(TestProbe().ref)
+    val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] = ActorRefT(TestProbe().ref)
+    val tcpController: ActorRefT[TcpController.Command]           = ActorRefT(TestProbe().ref)
 
     val eventBus =
       ActorRefT
         .build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.source.nextInt}")
 
-    val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborCliques)))
+    val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
     val selfCliqueSynced = true
@@ -159,9 +159,8 @@ object ServerFixture {
   class BlockFlowDummy(block: Block,
                        blockFlowProbe: ActorRef,
                        dummyTx: Transaction,
-                       storages: Storages)(implicit val config: AlephiumConfig)
-      extends BlockFlow {
-    override def genesisBlocks: AVector[AVector[Block]] = config.genesisBlocks
+                       val storages: Storages)(implicit val config: AlephiumConfig)
+      extends EmptyBlockFlow {
 
     override def getHeightedBlockHeaders(fromTs: TimeStamp,
                                          toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
@@ -189,29 +188,8 @@ object ServerFixture {
                              chainIndex: ChainIndex): IOResult[Option[BlockFlowState.TxStatus]] =
       Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
 
-    implicit def brokerConfig    = config.broker
-    implicit def consensusConfig = config.consensus
-    implicit def mempoolSetting  = config.mempool
-    def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState =
-      BlockChainWithState.fromGenesisUnsafe(storages)
-    def blockchainBuilder: Block => BlockChain =
-      BlockChain.fromGenesisUnsafe(storages)
-    def blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
-      BlockHeaderChain.fromGenesisUnsafe(storages)
-
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
-
-    def calBestDepsUnsafe(group: GroupIndex): BlockDeps = ???
-    def getAllTips: AVector[BlockHash]                  = ???
-    def getBestTipUnsafe: BlockHash                     = ???
-    def add(header: org.alephium.protocol.model.BlockHeader,
-            parentHash: BlockHash,
-            weight: Int): IOResult[Unit]         = ???
-    def updateBestDepsUnsafe(): Unit             = ???
-    def updateBestDeps(): IOResult[Unit]         = ???
-    def add(block: Block): IOResult[Unit]        = ???
-    def add(header: BlockHeader): IOResult[Unit] = ???
   }
 }

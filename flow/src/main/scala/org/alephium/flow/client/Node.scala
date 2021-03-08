@@ -28,18 +28,19 @@ import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
-import org.alephium.flow.network.broker.BrokerManager
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.protocol.ALF
 import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
 
 trait Node extends Service {
   implicit def config: AlephiumConfig
   def system: ActorSystem
   def blockFlow: BlockFlow
-  def brokerManager: ActorRefT[BrokerManager.Command]
-  def tcpController: ActorRefT[TcpController.Command]
+  def misbehaviorManager: ActorRefT[MisbehaviorManager.Command]
   def discoveryServer: ActorRefT[DiscoveryServer.Command]
+  def tcpController: ActorRefT[TcpController.Command]
   def bootstrapper: ActorRefT[Bootstrapper.Command]
   def cliqueManager: ActorRefT[CliqueManager.Command]
   def eventBus: ActorRefT[EventBus.Message]
@@ -63,45 +64,48 @@ object Node {
   def build(storages: Storages)(
       implicit actorSystem: ActorSystem,
       _config: AlephiumConfig
-  ): Node = new Node with StrictLogging {
-    implicit val system          = actorSystem
-    val config                   = _config
-    implicit val brokerConfig    = config.broker
-    implicit val consensusConfig = config.consensus
-    implicit val networkSetting  = config.network
-    implicit val discoveryConfig = config.discovery
+  ): Node = new Default(storages)
+
+  class Default(storages: Storages)(implicit actorSystem: ActorSystem, _config: AlephiumConfig)
+      extends Node
+      with StrictLogging {
+    implicit val system                  = actorSystem
+    val config                           = _config
+    private implicit val brokerConfig    = config.broker
+    private implicit val consensusConfig = config.consensus
+    private implicit val networkSetting  = config.network
+    private implicit val discoveryConfig = config.discovery
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
-    val brokerManager: ActorRefT[BrokerManager.Command] =
-      ActorRefT.build(system, BrokerManager.props())
+    val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+
+    val discoveryProps: Props =
+      DiscoveryServer.props(networkSetting.bindAddress,
+                            misbehaviorManager,
+                            config.discovery.bootstrap)
+    val discoveryServer: ActorRefT[DiscoveryServer.Command] =
+      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
     val tcpController: ActorRefT[TcpController.Command] =
       ActorRefT
         .build[TcpController.Command](
           system,
-          TcpController.props(config.network.bindAddress, brokerManager))
+          TcpController.props(config.network.bindAddress, discoveryServer, misbehaviorManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
-
-    val discoveryProps: Props =
-      DiscoveryServer.props(networkSetting.bindAddress, config.discovery.bootstrap)
-    val discoveryServer: ActorRefT[DiscoveryServer.Command] =
-      ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
     val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
 
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
-    val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system,
-                      CliqueManager.props(blockFlow,
-                                          allHandlers,
-                                          discoveryServer,
-                                          brokerManager,
-                                          blockFlowSynchronizer),
-                      "CliqueManager")
+    lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
+      ActorRefT.build(
+        system,
+        CliqueManager.props(blockFlow, allHandlers, discoveryServer, blockFlowSynchronizer),
+        "CliqueManager")
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
@@ -135,7 +139,7 @@ object Node {
 
   class Monitor(node: Node) extends BaseActor {
     private val orderedActors = Seq(
-      node.brokerManager,
+      node.misbehaviorManager,
       node.tcpController,
       node.discoveryServer,
       node.bootstrapper,
@@ -149,6 +153,7 @@ object Node {
         terminate(orderedActors, sender())
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.ListUnapply"))
     def terminate(actors: Seq[ActorRefT[_]], answerTo: ActorRef): Unit = {
       actors match {
         case Nil =>

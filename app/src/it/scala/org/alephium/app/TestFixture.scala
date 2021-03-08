@@ -16,8 +16,8 @@
 
 package org.alephium.app
 
-import java.net.{DatagramSocket, InetSocketAddress}
-import java.nio.channels.DatagramChannel
+import java.net.{DatagramSocket, InetSocketAddress, ServerSocket}
+import java.nio.channels.{DatagramChannel, ServerSocketChannel}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -25,11 +25,13 @@ import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
 import scala.util.control.NonFatal
 
+import akka.actor.ActorRef
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.io.Tcp
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.TestProbe
 import io.circe.{Codec, Decoder}
@@ -93,11 +95,13 @@ trait TestFixtureLike
     if (usedPort.contains(tcpPort)) {
       generatePort
     } else {
-      val tcp: DatagramSocket  = DatagramChannel.open().socket()
-      val rest: DatagramSocket = DatagramChannel.open().socket()
-      val ws: DatagramSocket   = DatagramChannel.open().socket()
+      val tcp: ServerSocket   = ServerSocketChannel.open().socket()
+      val udp: DatagramSocket = DatagramChannel.open().socket()
+      val rest: ServerSocket  = ServerSocketChannel.open().socket()
+      val ws: ServerSocket    = ServerSocketChannel.open().socket()
       try {
         tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        udp.bind(new InetSocketAddress("localhost", tcpPort))
         rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
         ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
         usedPort.add(tcpPort)
@@ -106,6 +110,7 @@ trait TestFixtureLike
         case NonFatal(_) => generatePort
       } finally {
         tcp.close()
+        udp.close()
         rest.close()
         ws.close()
       }
@@ -275,17 +280,23 @@ trait TestFixtureLike
     }
   }
 
-  def bootClique(nbOfNodes: Int, bootstrap: Option[InetSocketAddress] = None): Seq[Server] = {
+  def bootClique(
+      nbOfNodes: Int,
+      bootstrap: Option[InetSocketAddress] = None,
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Seq[Server] = {
     val masterPort = generatePort
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
       val publicPort = if (brokerId equals 0) masterPort else generatePort
-      bootNode(publicPort = publicPort,
-               masterPort = masterPort,
-               brokerId   = brokerId,
-               walletPort = generatePort,
-               bootstrap  = bootstrap,
-               brokerNum  = nbOfNodes)
+      bootNode(
+        publicPort      = publicPort,
+        masterPort      = masterPort,
+        brokerId        = brokerId,
+        walletPort      = generatePort,
+        bootstrap       = bootstrap,
+        brokerNum       = nbOfNodes,
+        connectionBuild = connectionBuild
+      )
     }
 
     servers
@@ -296,7 +307,8 @@ trait TestFixtureLike
                brokerNum: Int                       = 2,
                masterPort: Int                      = defaultMasterPort,
                walletPort: Int                      = defaultWalletPort,
-               bootstrap: Option[InetSocketAddress] = None): Server = {
+               bootstrap: Option[InetSocketAddress] = None,
+               connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
@@ -305,9 +317,13 @@ trait TestFixtureLike
         ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
 
-      implicit val config    = platformEnv.config
+      val defaultNetwork = platformEnv.config.network
+      val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
+
+      implicit val config    = platformEnv.config.copy(network = network)
       implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
       val storages           = platformEnv.storages
+
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
 
@@ -353,6 +369,9 @@ trait TestFixtureLike
 
   val getInterCliquePeerInfo =
     httpGet(s"/infos/inter-clique-peer-info") //jsonRpc("get_inter_clique_peer_info", "{}")
+
+  val getMisbehaviors =
+    httpGet(s"/infos/misbehaviors")
 
   def getGroup(address: String) =
     httpGet(s"/addresses/$address/group")

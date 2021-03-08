@@ -40,7 +40,7 @@ trait DiscoveryConfig {
   def neighborsPerGroup: Int
 
   /** Duration we wait before considering a peer dead. **/
-  lazy val peersTimeout: Duration = scanFrequency.timesUnsafe(3)
+  lazy val peersTimeout: Duration = scanFrequency.timesUnsafe(5)
 
   val expireDuration: Duration = Duration.ofHoursUnsafe(1)
 }
