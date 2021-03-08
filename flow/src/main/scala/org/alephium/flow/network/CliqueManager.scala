@@ -72,7 +72,7 @@ class CliqueManager(blockflow: BlockFlow,
 
   var selfCliqueReady: Boolean = false
 
-  override def receive: Receive = awaitStart() orElse isSelfCliqueSynced
+  override def receive: Receive = isSelfCliqueSynced orElse awaitStart()
 
   def awaitStart(): Receive = {
     case Start(cliqueInfo) =>
@@ -85,7 +85,8 @@ class CliqueManager(blockflow: BlockFlow,
                                                  blockFlowSynchronizer),
                         "IntraCliqueManager")
       unstashAll()
-      context become (awaitIntraCliqueReady(intraCliqueManager, cliqueInfo) orElse isSelfCliqueSynced)
+      context.become(
+        isSelfCliqueSynced orElse awaitIntraCliqueReady(intraCliqueManager, cliqueInfo))
 
     case _ => stash()
   }
