@@ -16,10 +16,12 @@
 
 package org.alephium.api
 
+import java.net.{InetAddress, InetSocketAddress}
+
+import scala.reflect.ClassTag
+
 import akka.util.ByteString
 import io.circe._
-import java.net.{InetAddress, InetSocketAddress}
-import scala.reflect.ClassTag
 
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
