@@ -59,7 +59,7 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetNeighborCliques                             extends Command
+  case object GetNeighborPeers                               extends Command
   final case class Disable(peerId: PeerId)                   extends Command
   final case class Remove(peer: InetSocketAddress)           extends Command
   case object Scan                                           extends Command
@@ -155,7 +155,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       cleanup()
       scanAndSchedule()
       ()
-    case GetNeighborCliques =>
+    case GetNeighborPeers =>
       sender() ! NeighborPeers(getActivePeers)
     case Disable(peerId) =>
       table -= peerId

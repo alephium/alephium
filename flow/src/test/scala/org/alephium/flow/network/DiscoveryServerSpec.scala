@@ -145,7 +145,7 @@ class DiscoveryServerSpec
     eventually {
       servers.foreach { server =>
         val probe = TestProbe()
-        server.tell(DiscoveryServer.GetNeighborCliques, probe.ref)
+        server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
 
         probe.expectMsgPF() {
           case DiscoveryServer.NeighborPeers(peers) =>
@@ -176,9 +176,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborCliques, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborCliques, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
       probe0.expectMsgPF() {
         case DiscoveryServer.NeighborPeers(peers) =>
@@ -206,9 +206,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborCliques, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborCliques, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
       probe0.expectMsgPF() {
         case DiscoveryServer.NeighborPeers(peers) =>

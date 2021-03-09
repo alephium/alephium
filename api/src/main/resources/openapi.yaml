@@ -574,12 +574,43 @@ paths:
                 items:
                   $ref: '#/components/schemas/InterCliquePeerInfo'
               example:
-              - cliqueId: 9553fe25ab1fe3bb1f250bbf094bf5851063e1269065df5a9a3f19988064205f3e
+              - cliqueId: 89329865fd774d03aa17faf8bca8de0a0e3f38d3a925374e12e66a1c64917181ee
                 brokerId: 1
                 address:
                   addr: 1.2.3.4
                   port: 12344
                 isSynced: true
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
+  /infos/discovered-neighbors:
+    get:
+      tags:
+      - Infos
+      summary: Get discovered neighbors
+      operationId: getInfosDiscovered-neighbors
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrokerInfo'
+              example:
+              - cliqueId: 89329865fd774d03aa17faf8bca8de0a0e3f38d3a925374e12e66a1c64917181ee
+                brokerId: 1
+                groupNumPerBroker: 1
+                address:
+                  addr: 1.2.3.4
+                  port: 12344
         default:
           description: ''
           content:
@@ -1470,6 +1501,22 @@ components:
           type: string
         isSynced:
           type: boolean
+    BrokerInfo:
+      required:
+      - cliqueId
+      - brokerId
+      - groupNumPerBroker
+      - address
+      type: object
+      properties:
+        cliqueId:
+          type: string
+        brokerId:
+          type: integer
+        groupNumPerBroker:
+          type: integer
+        address:
+          type: string
     PeerMisbehavior:
       required:
       - peer
