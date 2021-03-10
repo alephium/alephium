@@ -209,7 +209,7 @@ class Miner(var addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandl
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
           log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
-          val handlerMessage = BlockChainHandler.addOneBlock(block, Local)
+          val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
           allHandlers.getBlockHandler(index) ! handlerMessage
           self ! Miner.MiningResult(Some(block), index, miningCount)
         case None =>

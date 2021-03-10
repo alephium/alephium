@@ -16,8 +16,6 @@
 
 package org.alephium.flow.handler
 
-import scala.collection.mutable
-
 import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
@@ -26,7 +24,7 @@ import org.alephium.flow.validation._
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.{ActorRefT, Forest}
+import org.alephium.util.ActorRefT
 
 object HeaderChainHandler {
   def props(blockFlow: BlockFlow,
@@ -35,17 +33,10 @@ object HeaderChainHandler {
                                                          consensusConfig: ConsensusConfig): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
-  def addOneHeader(header: BlockHeader, origin: DataOrigin): AddHeaders = {
-    val forest = Forest.build[BlockHash, BlockHeader](header, _.hash)
-    AddHeaders(forest, origin)
-  }
-
   sealed trait Command
-  final case class AddHeaders(header: Forest[BlockHash, BlockHeader], origin: DataOrigin)
-      extends Command
-  final case class AddPendingHeader(header: BlockHeader,
-                                    broker: ActorRefT[ChainHandler.Event],
-                                    origin: DataOrigin)
+  final case class Validate(header: BlockHeader,
+                            broker: ActorRefT[ChainHandler.Event],
+                            origin: DataOrigin)
       extends Command
 
   sealed trait Event                              extends ChainHandler.Event
@@ -66,10 +57,7 @@ class HeaderChainHandler(blockFlow: BlockFlow,
   import HeaderChainHandler._
 
   override def receive: Receive = {
-    case AddHeaders(headers, origin) =>
-      handleDatas(headers, ActorRefT[ChainHandler.Event](sender()), origin)
-    case AddPendingHeader(header, broker, origin)        => handlePending(header, broker, origin)
-    case FlowHandler.HeaderAdded(header, broker, origin) => handleDataAdded(header, broker, origin)
+    case Validate(header, broker, origin) => handleData(header, broker, origin)
   }
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
@@ -79,16 +67,6 @@ class HeaderChainHandler(blockFlow: BlockFlow,
                                 origin: DataOrigin): Unit = {
     flowHandler ! FlowHandler.AddHeader(header, broker, origin)
   }
-
-  override def pendingToFlowHandler(header: BlockHeader,
-                                    missings: mutable.HashSet[BlockHash],
-                                    broker: ActorRefT[ChainHandler.Event],
-                                    origin: DataOrigin,
-                                    self: ActorRefT[Command]): Unit = {
-    flowHandler ! FlowHandler.PendingHeader(header, missings, origin, broker, self)
-  }
-
-  override def dataAddedEvent(data: BlockHeader): Event = HeaderAdded(data.hash)
 
   override def dataAddingFailed(): Event = HeaderAddingFailed
 

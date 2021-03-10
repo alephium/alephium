@@ -16,14 +16,11 @@
 
 package org.alephium.flow.handler
 
-import scala.collection.mutable
-
-import akka.actor.Props
+import akka.actor.{Props, Stash}
 
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
-import org.alephium.io.IOUtils
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendHeaders}
@@ -37,6 +34,7 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
+  final case class SetHandler(handler: ActorRefT[DependencyHandler.Command]) extends Command
   final case class AddHeader(header: BlockHeader,
                              broker: ActorRefT[ChainHandler.Event],
                              origin: DataOrigin)
@@ -51,29 +49,6 @@ object FlowHandler {
   final case class PrepareBlockFlow(chainIndex: ChainIndex)                  extends Command
   final case class Register(miner: ActorRefT[Miner.Command])                 extends Command
   case object UnRegister                                                     extends Command
-
-  sealed trait PendingData {
-    def hash: BlockHash
-    def missingDeps: mutable.HashSet[BlockHash]
-  }
-  final case class PendingBlock(block: Block,
-                                missingDeps: mutable.HashSet[BlockHash],
-                                origin: DataOrigin,
-                                broker: ActorRefT[ChainHandler.Event],
-                                chainHandler: ActorRefT[BlockChainHandler.Command])
-      extends PendingData
-      with Command {
-    override def hash: BlockHash = block.hash
-  }
-  final case class PendingHeader(header: BlockHeader,
-                                 missingDeps: mutable.HashSet[BlockHash],
-                                 origin: DataOrigin,
-                                 broker: ActorRefT[ChainHandler.Event],
-                                 chainHandler: ActorRefT[HeaderChainHandler.Command])
-      extends PendingData
-      with Command {
-    override def hash: BlockHash = header.hash
-  }
 
   sealed trait Event
   final case class BlockFlowTemplate(index: ChainIndex,
@@ -96,14 +71,6 @@ object FlowHandler {
       }
     }
   }
-  final case class BlockAdded(block: Block,
-                              broker: ActorRefT[ChainHandler.Event],
-                              origin: DataOrigin)
-      extends Event
-  final case class HeaderAdded(header: BlockHeader,
-                               broker: ActorRefT[ChainHandler.Event],
-                               origin: DataOrigin)
-      extends Event
   final case class BlockNotify(header: BlockHeader, height: Int) extends EventBus.Event
 }
 
@@ -113,12 +80,18 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     implicit brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig)
     extends IOBaseActor
-    with FlowHandlerState {
+    with Stash {
   import FlowHandler._
 
-  override def statusSizeLimit: Int = brokerConfig.brokerNum * 100 // TODO: config this
+  private var dependencyHandler: ActorRefT[DependencyHandler.Command] = _
 
-  override def receive: Receive = handleWith(None)
+  override def receive: Receive = {
+    case SetHandler(handler) =>
+      dependencyHandler = handler
+      unstashAll()
+      context become handleWith(None)
+    case _ => stash()
+  }
 
   def handleWith(minerOpt: Option[ActorRefT[Miner.Command]]): Receive =
     handleRelay(minerOpt) orElse handleSync
@@ -138,14 +111,11 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
         case Right(blocks) =>
           sender() ! BlocksLocated(blocks)
       }
-    case PrepareBlockFlow(chainIndex) => prepareBlockFlow(chainIndex)
-    case AddHeader(header, broker, origin: DataOrigin) =>
-      handleHeader(minerOpt, header, broker, origin)
-    case AddBlock(block, broker, origin) =>
-      handleBlock(minerOpt, block, broker, origin)
-    case pending: PendingData => handlePending(pending)
-    case Register(miner)      => context become handleWith(Some(miner))
-    case UnRegister           => context become handleWith(None)
+    case PrepareBlockFlow(chainIndex)    => prepareBlockFlow(chainIndex)
+    case AddHeader(header, broker, _)    => handleHeader(minerOpt, header, broker)
+    case AddBlock(block, broker, origin) => handleBlock(minerOpt, block, broker, origin)
+    case Register(miner)                 => context become handleWith(Some(miner))
+    case UnRegister                      => context become handleWith(None)
   }
 
   def handleSync: Receive = {
@@ -176,8 +146,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
 
   def handleHeader(minerOpt: Option[ActorRefT[Miner.Command]],
                    header: BlockHeader,
-                   broker: ActorRefT[ChainHandler.Event],
-                   origin: DataOrigin): Unit = {
+                   broker: ActorRefT[ChainHandler.Event]): Unit = {
     blockFlow.contains(header) match {
       case Right(true) =>
         log.debug(s"Blockheader ${header.shortHex} exists already")
@@ -185,8 +154,8 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
         blockFlow.add(header) match {
           case Left(error) => handleIOError(error)
           case Right(_) =>
-            sender() ! FlowHandler.HeaderAdded(header, broker, origin)
-            updateUponNewData(header.hash)
+            dependencyHandler ! DependencyHandler.FlowDataAdded(header)
+            broker ! HeaderChainHandler.HeaderAdded(header.hash)
             minerOpt.foreach(_ ! Miner.UpdateTemplate)
             logInfo(header)
         }
@@ -203,8 +172,8 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
         blockFlow.add(block) match {
           case Left(error) => handleIOError(error)
           case Right(_) =>
-            sender() ! FlowHandler.BlockAdded(block, broker, origin)
-            updateUponNewData(block.hash)
+            dependencyHandler ! DependencyHandler.FlowDataAdded(block)
+            broker ! BlockChainHandler.BlockAdded(block.hash)
             origin match {
               case DataOrigin.Local => ()
               case _: DataOrigin.FromClique =>
@@ -221,32 +190,6 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     escapeIOError(blockFlow.getHeight(block)) { height =>
       eventBus ! BlockNotify(block.header, height)
     }
-  }
-
-  def handlePending(pending: PendingData): Unit = {
-    val missings = pending.missingDeps
-    escapeIOError(IOUtils.tryExecute(missings.filterInPlace(!blockFlow.containsUnsafe(_)))) { _ =>
-      if (missings.isEmpty) {
-        feedback(pending)
-      } else {
-        addStatus(pending)
-      }
-    }
-  }
-
-  def updateUponNewData(hash: BlockHash): Unit = {
-    val readies = updateStatus(hash)
-    if (readies.nonEmpty) {
-      log.debug(s"There are #${readies.size} pending blocks/header ready for further processing")
-    }
-    readies.foreach(feedback)
-  }
-
-  def feedback(pending: PendingData): Unit = pending match {
-    case PendingBlock(block, _, origin, broker, chainHandler) =>
-      chainHandler ! BlockChainHandler.AddPendingBlock(block, broker, origin)
-    case PendingHeader(header, _, origin, broker, chainHandler) =>
-      chainHandler ! HeaderChainHandler.AddPendingHeader(header, broker, origin)
   }
 
   def logInfo(header: BlockHeader): Unit = {
@@ -271,52 +214,5 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
     log.info(s"$index; total: $total; ${chain
       .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
-  }
-}
-
-trait FlowHandlerState {
-  import FlowHandler._
-
-  def statusSizeLimit: Int
-
-  var counter: Int  = 0
-  val pendingStatus = mutable.SortedMap.empty[Int, PendingData]
-  val pendingHashes = mutable.Set.empty[BlockHash]
-
-  def increaseAndCounter(): Int = {
-    counter += 1
-    counter
-  }
-
-  def addStatus(pending: PendingData): Unit = {
-    if (!pendingHashes.contains(pending.hash)) {
-      pendingStatus.put(increaseAndCounter(), pending)
-      pendingHashes.add(pending.hash)
-      checkSizeLimit()
-    }
-  }
-
-  def updateStatus(hash: BlockHash): IndexedSeq[PendingData] = {
-    val toRemove = pendingStatus.collect[Int] {
-      case (ts, status) if status.missingDeps.remove(hash) && status.missingDeps.isEmpty =>
-        ts
-    }
-    val data = toRemove.map(pendingStatus(_))
-    toRemove.foreach(removeStatus)
-    data.toIndexedSeq
-  }
-
-  def removeStatus(id: Int): Unit = {
-    pendingStatus.remove(id).foreach { data =>
-      pendingHashes.remove(data.hash)
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def checkSizeLimit(): Unit = {
-    if (pendingStatus.size > statusSizeLimit) {
-      val toRemove = pendingStatus.head._1
-      removeStatus(toRemove)
-    }
   }
 }
