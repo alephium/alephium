@@ -21,13 +21,13 @@ import scala.collection.mutable
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.TransactionTemplate
-import org.alephium.util.{AVector, RWLock}
+import org.alephium.util.{AVector, RWLock, U256}
 
 /*
  * Transaction pool implementation
  */
 class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
-                      weights: mutable.HashMap[Hash, Double],
+                      weights: mutable.HashMap[Hash, U256],
                       _capacity: Int)
     extends RWLock {
   def isFull: Boolean = pool.size == _capacity
@@ -48,15 +48,15 @@ class TxPool private (pool: mutable.SortedMap[WeightedId, TransactionTemplate],
     AVector.from(pool.values)
   }
 
-  def add(transactions: AVector[(TransactionTemplate, Double)]): Int = writeOnly {
+  def add(transactions: AVector[TransactionTemplate]): Int = writeOnly {
     val sizeBefore = size
     transactions.foreachE {
-      case (tx, weight) =>
+      case (tx) =>
         if (isFull) {
           Left(())
         } else {
-          weights += tx.id                  -> weight
-          pool += WeightedId(weight, tx.id) -> tx
+          weights += tx.id                                -> tx.unsigned.gasPrice
+          pool += WeightedId(tx.unsigned.gasPrice, tx.id) -> tx
           Right(())
         }
     }
@@ -86,7 +86,7 @@ object TxPool {
   def empty(capacity: Int): TxPool =
     new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
-  final case class WeightedId(weight: Double, id: Hash) {
+  final case class WeightedId(weight: U256, id: Hash) {
     override def equals(obj: Any): Boolean = obj match {
       case that: WeightedId => this.id == that.id
       case _                => false
@@ -96,9 +96,8 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    import scala.math.Ordering.Implicits.seqOrdering
-    implicit val keccak256Ord: Ordering[Hash]      = Ordering.by[Hash, Seq[Byte]](_.bytes.toSeq)
-    implicit val pairOrd: Ordering[(Double, Hash)] = Ordering.Tuple2[Double, Hash]
-    Ordering.by(p => (-p.weight, p.id))
+    import org.alephium.util.Bytes.byteStringOrdering
+    implicit val hashOrd: Ordering[Hash] = Ordering.by(_.bytes)
+    Ordering.by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight, weightedId.id)).reverse
   }
 }

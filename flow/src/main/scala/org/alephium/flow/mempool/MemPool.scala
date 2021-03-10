@@ -52,7 +52,7 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
     getPool(index).getAll
   }
 
-  def add(index: ChainIndex, transactions: AVector[(TransactionTemplate, Double)]): Int = readOnly {
+  def add(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = readOnly {
     getPool(index).add(transactions)
   }
 
@@ -62,12 +62,12 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
 
   // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(toRemove: AVector[AVector[Transaction]],
-            toAdd: AVector[AVector[(Transaction, Double)]]): (Int, Int) = writeOnly {
+            toAdd: AVector[AVector[Transaction]]): (Int, Int) = writeOnly {
     assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
     // First, add transactions from short chains, then remove transactions from canonical chains
-    val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + pools(toGroup).add(txs.map { case (tx, weight) => tx.toTemplate -> weight }))
+    val added =
+      toAdd.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).add(txs.map(_.toTemplate)))
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
       sum + pools(toGroup).remove(txs.map(_.toTemplate)))
     (removed, added)

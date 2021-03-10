@@ -65,7 +65,7 @@ trait FlowUtils
       getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
     }
     val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
-    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase.map((_, 1.0))))
+    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase))
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
