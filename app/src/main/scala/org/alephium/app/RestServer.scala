@@ -37,12 +37,12 @@ import org.alephium.api.model._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.protocol.config.{GroupConfig}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, Service}
@@ -89,6 +89,13 @@ class RestServer(
       .map { syncedStatuses =>
         Right(AVector.from(syncedStatuses.map(RestServer.interCliquePeerInfoFrom)))
       }
+  }
+
+  private val getDiscoveredNeighborsRoute = getDiscoveredNeighbors.toRoute { _ =>
+    node.discoveryServer
+      .ask(DiscoveryServer.GetNeighborPeers)
+      .mapTo[DiscoveryServer.NeighborPeers]
+      .map(response => Right(response.peers))
   }
 
   private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
@@ -217,6 +224,7 @@ class RestServer(
   private val blockflowDocs = List(
     getSelfClique,
     getInterCliquePeerInfo,
+    getDiscoveredNeighbors,
     getMisbehaviors,
     getBlockflow,
     getBlock,
@@ -253,6 +261,7 @@ class RestServer(
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~
       getInterCliquePeerInfoRoute ~
+      getDiscoveredNeighborsRoute ~
       getMisbehaviorsRoute ~
       getBlockflowRoute ~
       getBlockRoute ~

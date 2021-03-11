@@ -29,6 +29,7 @@ import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload, Pong}
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => Option[ByteString], ref: ActorRef)
@@ -95,6 +96,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
   class Fixture(name: String) extends TestFixture(name) {
 
+    // scalastyle:off method.length
     def test(nbOfNodesClique1: Int,
              nbOfNodesClique2: Int,
              connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply) = {
@@ -127,13 +129,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
       clique2.foreach { server =>
         eventually {
-          val response =
+          val interCliquePeers =
             request[Seq[InterCliquePeerInfo]](
               getInterCliquePeerInfo,
               restPort(server.config.network.bindAddress.getPort)).head
+          interCliquePeers.cliqueId is selfClique1.cliqueId
+          interCliquePeers.isSynced is true
 
-          response.cliqueId is selfClique1.cliqueId
-          response.isSynced is true
+          val discoveredNeighbors =
+            request[Seq[BrokerInfo]](getDiscoveredNeighbors,
+                                     restPort(server.config.network.bindAddress.getPort))
+          discoveredNeighbors.length is (nbOfNodesClique1 + nbOfNodesClique2)
         }
       }
 
@@ -146,6 +152,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       clique1.foreach(_.stop().futureValue is ())
       clique2.foreach(_.stop().futureValue is ())
     }
+    // scalastyle:on method.length
   }
 
   ignore should "ban node if not same network type" in new TestFixture("2-nodes") {

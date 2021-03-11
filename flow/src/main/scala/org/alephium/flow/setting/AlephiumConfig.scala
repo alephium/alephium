@@ -16,14 +16,15 @@
 
 package org.alephium.flow.setting
 
+import java.math.BigInteger
+import java.net.InetSocketAddress
+import java.nio.file.Path
+
 import scala.collection.immutable.ArraySeq
 
 import akka.actor.ActorRef
 import akka.io.Tcp
 import com.typesafe.config.Config
-import java.math.BigInteger
-import java.net.InetSocketAddress
-import java.nio.file.Path
 import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
 import pureconfig.error._

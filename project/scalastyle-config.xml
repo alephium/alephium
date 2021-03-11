@@ -102,7 +102,7 @@
             <parameter name="groups">java,scala,3rdParty,alephium</parameter>
             <parameter name="group.java">javax?\..*</parameter>
             <parameter name="group.scala">scala\..*</parameter>
-            <parameter name="group.3rdParty">(?!org\.alephium\.).*</parameter>
+            <parameter name="group.3rdParty">(?!org\.alephium\.)(?!javax?\.)(?!scala\.).*</parameter>
             <parameter name="group.alephium">org\.alephium\..*</parameter>
         </parameters>
     </check>

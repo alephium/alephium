@@ -101,6 +101,12 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[AVector[InterCliquePeerInfo]])
       .summary("Get infos about the inter cliques")
 
+  val getDiscoveredNeighbors: BaseEndpoint[Unit, AVector[BrokerInfo]] =
+    infosEndpoint.get
+      .in("discovered-neighbors")
+      .out(jsonBody[AVector[BrokerInfo]])
+      .summary("Get discovered neighbors")
+
   val getMisbehaviors: BaseEndpoint[Unit, AVector[PeerMisbehavior]] =
     infosEndpoint.get
       .in("misbehaviors")

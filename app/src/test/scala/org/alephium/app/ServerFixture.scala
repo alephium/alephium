@@ -99,7 +99,7 @@ object ServerFixture {
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = {
-      case DiscoveryServer.GetNeighborCliques =>
+      case DiscoveryServer.GetNeighborPeers =>
         sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
     }
   }
