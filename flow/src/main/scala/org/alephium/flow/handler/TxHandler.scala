@@ -79,7 +79,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
                     tx: TransactionTemplate,
                     mempool: MemPool,
                     origin: DataOrigin): Unit = {
-    val count = mempool.add(chainIndex, AVector((tx, 1.0)))
+    val count = mempool.add(chainIndex, AVector(tx))
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
     val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)

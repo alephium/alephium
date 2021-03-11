@@ -54,7 +54,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate -> 1.0))
+      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 1)
       serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)
@@ -112,7 +112,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate -> 1.0))
+      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 1)
       serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)

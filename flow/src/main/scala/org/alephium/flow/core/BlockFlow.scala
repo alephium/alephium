@@ -276,8 +276,9 @@ object BlockFlow extends StrictLogging {
 
     def updateBestDepsUnsafe(): Unit =
       brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
-        val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
-        updateMemPoolUnsafe(mainGroup, deps)
+        val mainGroupIndex = GroupIndex.unsafe(mainGroup)
+        val deps           = calBestDepsUnsafe(mainGroupIndex)
+        updateMemPoolUnsafe(mainGroupIndex, deps)
         updateBestDeps(mainGroup, deps)
       }
 

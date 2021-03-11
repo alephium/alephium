@@ -17,8 +17,8 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.NoIndexModelGeneratorsLike
-import org.alephium.util.LockFixture
+import org.alephium.protocol.model._
+import org.alephium.util.{AVector, LockFixture, U256}
 
 class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
   it should "initialize an empty tx pool" in {
@@ -31,8 +31,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
     val pool = TxPool.empty(3)
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
-      val weightedTxs = txTemplates.map((_, 1.0))
-      val numberAdded = pool.add(weightedTxs)
+      val numberAdded = pool.add(txTemplates)
       pool.size is numberAdded
       if (block.transactions.length > pool.capacity) {
         pool.isFull is true
@@ -52,9 +51,8 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
     val pool        = TxPool.empty(3)
     val block       = blockGen.sample.get
     val txTemplates = block.transactions.map(_.toTemplate)
-    val weightedTxs = txTemplates.map((_, 1.0))
     val txNum       = block.transactions.length
-    val rwl         = pool._getLock
+    lazy val rwl    = pool._getLock
 
     val sizeAfterAdd = if (txNum >= 3) 3 else txNum
   }
@@ -64,11 +62,26 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
   }
 
   it should "use write lock for adding" in new Fixture {
-    checkWriteLock(rwl)(0, pool.add(weightedTxs), sizeAfterAdd)
+    checkWriteLock(rwl)(0, pool.add(txTemplates), sizeAfterAdd)
   }
 
   it should "use write lock for removing" in new Fixture {
-    pool.add(weightedTxs)
+    pool.add(txTemplates)
     checkWriteLock(rwl)(0, pool.remove(txTemplates), sizeAfterAdd)
+  }
+
+  it should "order txs" in new Fixture {
+    def txGen(gasPrice: U256): TransactionTemplate = {
+      val tx: Transaction = transactionGen().sample.get
+      tx.toTemplate.copy(unsigned = tx.unsigned.copy(gasPrice = gasPrice))
+    }
+
+    val tx1 = txGen(U256.unsafe(1))
+    val tx2 = txGen(U256.unsafe(3))
+    val tx3 = txGen(U256.unsafe(2))
+
+    pool.add(AVector(tx1, tx2, tx3))
+
+    pool.getAll is AVector(tx2, tx3, tx1)
   }
 }
