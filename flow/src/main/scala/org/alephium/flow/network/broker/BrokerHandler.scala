@@ -32,7 +32,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, FlowData}
+import org.alephium.protocol.model.{BrokerInfo, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -216,26 +216,25 @@ trait FlowDataHandler extends BaseActor with EventStream.Publisher {
   implicit def brokerConfig: BrokerConfig
   def allHandlers: AllHandlers
   def remoteAddress: InetSocketAddress
+  def blockflow: BlockFlow
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def handleFlowData[T <: FlowData](datas: AVector[T],
                                     dataOrigin: DataOrigin,
                                     isBlock: Boolean): Unit = {
-    Validation.validateFlowForest(datas) match {
-      case Some(forests) =>
-        val ok = forests.forall { forest =>
-          val chainIndex = ChainIndex.from(forest.roots.head.key)
-          chainIndex.relateTo(brokerConfig) == isBlock
-        }
-        if (ok) {
-          val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-          allHandlers.dependencyHandler ! message
-        } else {
-          publishEvent(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
-        }
-      case None =>
-        log.warning(s"The blocks received do not form a proper flow DAG")
-        publishEvent(MisbehaviorManager.InvalidFlowForest(remoteAddress))
+    if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
+      log.warning(s"The data received does not contain minimal work")
+      publishEvent(MisbehaviorManager.InvalidPoW(remoteAddress))
+    } else {
+      val ok = datas.forall { data =>
+        data.chainIndex.relateTo(brokerConfig) == isBlock
+      }
+      if (ok) {
+        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+        allHandlers.dependencyHandler ! message
+      } else {
+        publishEvent(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+      }
     }
   }
 }

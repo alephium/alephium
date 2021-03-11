@@ -27,7 +27,6 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.DependencyHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.validation.Validation
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Block
@@ -95,12 +94,7 @@ object BlocksImporter extends StrictLogging {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def validateAndSendBlocks(blocks: AVector[Block], node: Node): Either[String, Unit] = {
-    Validation.validateFlowForest(blocks) match {
-      case Some(_) =>
-        val message = DependencyHandler.AddFlowData(blocks, DataOrigin.Local)
-        Right(node.allHandlers.dependencyHandler ! message)
-      case None =>
-        Left("Invalid DAG")
-    }
+    val message = DependencyHandler.AddFlowData(blocks, DataOrigin.Local)
+    Right(node.allHandlers.dependencyHandler ! message)
   }
 }

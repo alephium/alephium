@@ -17,6 +17,28 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
+import org.alephium.util.{AVector, Duration}
 
-class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {}
+class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
+  override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+  it should "pre-validate blocks" in {
+    val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
+    Validation.preValidate(AVector(block)) is true
+
+    val newTarget = Target.unsafe(block.target.value.divide(4))
+    val newConsensusConfig = new ConsensusConfig {
+      override def blockTargetTime: Duration = ???
+      override def maxMiningTarget: Target   = newTarget
+      override def emission: Emission        = ???
+    }
+    Validation.preValidate(AVector(block))(newConsensusConfig) is false
+
+    val invalidBlock = invalidNonceBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    invalidBlock.target is consensusConfig.maxMiningTarget
+    Validation.preValidate(AVector(invalidBlock)) is false
+  }
+}

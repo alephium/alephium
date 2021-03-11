@@ -19,6 +19,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core._
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
@@ -40,5 +41,12 @@ object Validation {
     val splits = datas.splitBy(_.chainIndex)
     val builds = splits.map(ds => Forest.tryBuild[BlockHash, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
+  }
+
+  def preValidate[T <: FlowData](datas: AVector[T])(
+      implicit consensusConfig: ConsensusConfig): Boolean = {
+    datas.forall { data =>
+      (data.target <= consensusConfig.maxMiningTarget) && PoW.checkWork(data)
+    }
   }
 }
