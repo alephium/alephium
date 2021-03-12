@@ -185,4 +185,16 @@ class DependencyHandlerSpec extends AlephiumActorSpec("DependencyHandlerSpec") {
     state.readies.isEmpty is true
     state.processing.isEmpty is true
   }
+
+  it should "not pend in-processing blocks" in new Fixture {
+    val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
+    state.addPendingData(block, broker, origin)
+    state.extractReadies()
+    state.readies.isEmpty is true
+    state.processing.isEmpty is false
+
+    (0 until 10).foreach(_ => state.addPendingData(block, broker, origin))
+    state.readies.isEmpty is true
+    state.processing.isEmpty is false
+  }
 }
