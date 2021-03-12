@@ -94,13 +94,8 @@ trait BlockFlow
   }
 
   // data should be valid, and parent should be in blockflow already
-  def isRecent(data: FlowData): IOResult[Boolean] = {
-    if (data.timestamp > TimeStamp.now().minusUnsafe(consensusConfig.recentBlockTimestampDiff)) {
-      Right(true)
-    } else {
-      val hashChain = getHashChain(data.hash)
-      hashChain.isRecent(data.parentHash)
-    }
+  def isRecent(data: FlowData): Boolean = {
+    data.timestamp > TimeStamp.now().minusUnsafe(consensusConfig.recentBlockTimestampDiff)
   }
 }
 
