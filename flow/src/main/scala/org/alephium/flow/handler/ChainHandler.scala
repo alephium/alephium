@@ -62,12 +62,10 @@ abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](blockFlo
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"${data.shortHex} is validated")
     logInfo(data)
-    escapeIOError(blockFlow.isRecent(data)) { isRecent =>
-      if (isRecent) {
-        broadcast(data, origin)
-      }
-      addToFlowHandler(data, broker, origin)
+    if (blockFlow.isRecent(data)) {
+      broadcast(data, origin)
     }
+    addToFlowHandler(data, broker, origin)
   }
 
   def logInfo(data: T): Unit = {
