@@ -43,6 +43,7 @@ trait DiscoveryServerState {
   lazy val selfPeerId: PeerId                                    = selfCliqueInfo.selfInterBrokerInfo.peerId
   lazy val selfPeerInfoOpt: Option[BrokerInfo]                   = selfCliqueInfo.selfBrokerInfo
   lazy val selfCliqueBrokerInfosOpt: Option[AVector[BrokerInfo]] = selfCliqueInfo.interBrokers
+  lazy val tableInitialSize                                      = selfCliqueBrokerInfosOpt.map(_.length).getOrElse(0)
 
   import DiscoveryServer._
 
@@ -59,7 +60,9 @@ trait DiscoveryServerState {
   }
 
   def getActivePeers: AVector[BrokerInfo] = {
-    AVector.from(table.values.map(_.info))
+    AVector
+      .from(table.values.map(_.info))
+      .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
   }
 
   def getPeersNum: Int = table.size
@@ -124,10 +127,10 @@ trait DiscoveryServerState {
 
   def cleanup(): Unit = {
     val now = TimeStamp.now()
-    val expired = table.values
+    val expired = table.values.view
       .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.expireDuration))
+      .filter(_.info.cliqueId != selfCliqueId)
       .map(_.info.peerId)
-      .toSet
     table --= expired
 
     val deadPendings = pendings.collect {
@@ -137,14 +140,14 @@ trait DiscoveryServerState {
     pendings --= deadPendings
   }
 
-  private def appendPeer(peerInfo: BrokerInfo): Unit = {
+  def appendPeer(peerInfo: BrokerInfo): Unit = {
     log.info(s"Adding a new peer: $peerInfo")
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
     fetchNeighbors(peerInfo)
     publishNewPeer(peerInfo)
   }
 
-  protected def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
   }
 
@@ -159,8 +162,9 @@ trait DiscoveryServerState {
     bootstrap.take(bootstrapNum).foreach(ping)
   }
 
+  private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
   def shouldScanFast(): Boolean = {
-    table.isEmpty
+    (TimeStamp.now() < fastScanThreshold) || (getPeersWeight < brokerConfig.groups * 2)
   }
 
   def fetchNeighbors(info: BrokerInfo): Unit = {
@@ -172,6 +176,7 @@ trait DiscoveryServerState {
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
+    log.debug(s"Send $payload to $remote")
     val message = DiscoveryMessage.from(selfCliqueId, payload)
     socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
   }
@@ -183,7 +188,6 @@ trait DiscoveryServerState {
   }
 
   def ping(peerInfo: BrokerInfo): Unit = {
-    log.info(s"Sending Ping to $peerInfo")
     val remoteAddress = peerInfo.address
     send(remoteAddress, Ping(selfPeerInfoOpt))
     pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))

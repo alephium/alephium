@@ -50,7 +50,7 @@ class DiscoveryServerStateSpec
     implicit lazy val config: DiscoveryConfig with BrokerConfig =
       createConfig(groupSize, udpPort, peersPerGroup, scanFrequency, expireDuration)._2
 
-    val state = new DiscoveryServerState {
+    lazy val state = new DiscoveryServerState {
       implicit def brokerConfig: BrokerConfig       = self.config
       implicit def discoveryConfig: DiscoveryConfig = self.config
       implicit def networkConfig: NetworkConfig     = self.networkConfig
@@ -64,8 +64,8 @@ class DiscoveryServerStateSpec
 
       setSocket(ActorRefT[Udp.Command](socketProbe.ref))
     }
-    val peerClique: CliqueInfo = cliqueInfoGen(config.groupNumPerBroker).sample.get
-    val peerInfo               = peerClique.interBrokers.get.sample()
+    lazy val peerClique: CliqueInfo = cliqueInfoGen(config.groupNumPerBroker).sample.get
+    lazy val peerInfo               = peerClique.interBrokers.get.sample()
 
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
@@ -165,5 +165,29 @@ class DiscoveryServerStateSpec
 
     state.remove(peerInfo.address)
     state.isInTable(peerInfo.peerId) is false
+  }
+
+  it should "not remove peers from self clique" in new Fixture {
+    override def expireDuration: Duration = Duration.ofMillisUnsafe(0)
+    config.expireDuration is Duration.unsafe(0)
+    state.selfCliqueInfo.interBrokers.foreach { brokers =>
+      brokers.foreach(state.addSelfCliquePeer)
+    }
+    state.selfCliqueInfo.interBrokers.foreach { brokers =>
+      brokers.foreach(broker => state.isInTable(broker.peerId) is true)
+    }
+    state.cleanup()
+    state.selfCliqueInfo.interBrokers.foreach { brokers =>
+      brokers.foreach(broker => state.isInTable(broker.peerId) is true)
+    }
+  }
+
+  it should "calculate correct initial table size" in new Fixture {
+    state.selfCliqueInfo.interBrokers.foreach { brokers =>
+      brokers.foreach(state.addSelfCliquePeer)
+    }
+    state.tableInitialSize is state.getActivePeers.length
+    state.shouldScanFast() is true
+    (state.getPeersWeight < state.brokerConfig.groups * 2) is true
   }
 }

@@ -53,6 +53,7 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
       publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
 
     case _: Tcp.Connected =>
+      log.info(s"Connected to $remoteAddress")
       connection = networkSetting.connectionBuild(sender())
       brokerConnectionHandler = {
         val ref =

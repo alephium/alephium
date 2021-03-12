@@ -151,8 +151,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   def handleCommand: Receive = {
     case Scan =>
-      log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
+      log.debug(s"Scanning peers: $getPeersNum in total")
       scanAndSchedule()
       ()
     case GetNeighborPeers =>

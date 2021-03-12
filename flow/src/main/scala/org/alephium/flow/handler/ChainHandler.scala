@@ -60,17 +60,11 @@ abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](blockFlo
   }
 
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    log.debug(s"${data.shortHex} is validated")
-    logInfo(data)
+    log.info(s"${data.shortHex} is validated")
     if (blockFlow.isRecent(data)) {
       broadcast(data, origin)
     }
     addToFlowHandler(data, broker, origin)
-  }
-
-  def logInfo(data: T): Unit = {
-    val elapsed = (TimeStamp.now() -- data.timestamp).getOrElse(Duration.zero)
-    log.info(s"Potentially new block/header: ${data.shortHex}; elapsed: $elapsed")
   }
 
   def broadcast(data: T, origin: DataOrigin): Unit

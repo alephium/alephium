@@ -93,7 +93,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
   def handleConnection: Receive = {
     case Tcp.Connected(remoteAddress, _) =>
-      log.debug(s"Connected to ${remoteAddress}")
+      log.info(s"Connected to $remoteAddress")
       val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${remoteAddress}")
       val props =
         InboundBrokerHandler.props(
@@ -130,6 +130,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
           brokerState.actor ! BrokerHandler.Send(message.blockMsg)
         }
       }
+
     case message: CliqueManager.BroadCastTx =>
       log.debug(s"Broadcasting tx ${message.tx.id.shortHex} for ${message.chainIndex}")
       iterBrokers { (peerId, brokerState) =>
@@ -144,7 +145,9 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
         SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
       }
       sender() ! syncStatuses
+
     case PeerDisconnected(peer) =>
+      log.info(s"Peer disconnected: $peer")
       removeBroker(peer)
       discoveryServer ! DiscoveryServer.PeerDisconnected(peer)
   }

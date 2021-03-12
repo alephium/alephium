@@ -106,17 +106,20 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
 
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
-      log.debug(s"Download blocks ${Utils.showDigest(hashes)} from $remoteAddress")
+      log.debug(
+        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress")
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
-      log.debug(s"Received blocks ${Utils.showDataDigest(blocks)} from $remoteAddress")
+      log.debug(
+        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress")
       handleFlowData(blocks, dataOrigin, isBlock = true)
     case Received(GetBlocks(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(SendBlocks(blocks))
       }
     case Received(SendHeaders(headers)) =>
-      log.debug(s"Received headers ${Utils.showDataDigest(headers)} from $remoteAddress")
+      log.debug(
+        s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress")
       handleFlowData(headers, dataOrigin, isBlock = false)
     case Received(GetHeaders(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
