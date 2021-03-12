@@ -89,24 +89,27 @@ trait DependencyHandlerState extends IOBaseActor {
   def addPendingData(data: FlowData,
                      broker: ActorRefT[ChainHandler.Event],
                      origin: DataOrigin): Unit = {
-    // update when data is not cached, otherwise we replace the old cache with 0.5 probability
-    val shouldUpdate = (!pending.contains(data.hash)) || (Random.nextInt() % 2 == 0)
-    if (shouldUpdate) {
-      pending(data.hash) = (data, broker, origin)
+    escapeIOError(blockFlow.contains(data.hash)) { existing =>
+      // update when data is not cached, otherwise we replace the old cache with 0.5 probability
+      val shouldUpdate = (!existing) &&
+        ((!pending.contains(data.hash)) || (Random.nextInt() % 2 == 0))
+      if (shouldUpdate) {
+        pending(data.hash) = (data, broker, origin)
 
-      escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
-        if (missingDeps.nonEmpty) {
-          missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
-        }
-
-        missingDeps.foreach { dep =>
-          missingIndex.get(dep) match {
-            case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
-            case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+        escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
+          if (missingDeps.nonEmpty) {
+            missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
           }
-        }
 
-        if (missingDeps.isEmpty) readies.addOne(data.hash)
+          missingDeps.foreach { dep =>
+            missingIndex.get(dep) match {
+              case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
+              case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+            }
+          }
+
+          if (missingDeps.isEmpty) readies.addOne(data.hash)
+        }
       }
     }
   }
