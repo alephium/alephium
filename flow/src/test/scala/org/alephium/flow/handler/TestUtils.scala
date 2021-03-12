@@ -29,6 +29,7 @@ import org.alephium.util.{ActorRefT, Files => AFiles}
 object TestUtils {
   case class AllHandlerProbs(flowHandler: TestProbe,
                              txHandler: TestProbe,
+                             dependencyHandler: TestProbe,
                              blockHandlers: Map[ChainIndex, TestProbe],
                              headerHandlers: Map[ChainIndex, TestProbe])
 
@@ -56,12 +57,16 @@ object TestUtils {
       val probe = TestProbe()
       chainIndex -> (ActorRefT[HeaderChainHandler.Command](probe.ref) -> probe)
     }).toMap
+    val dependencyProbe   = TestProbe()
+    val dependencyHandler = ActorRefT[DependencyHandler.Command](dependencyProbe.ref)
     val allHandlers = AllHandlers(flowHandler,
                                   txHandler,
+                                  dependencyHandler,
                                   blockHandlers.view.mapValues(_._1).toMap,
                                   headerHandlers.view.mapValues(_._1).toMap)
     val allProbes = AllHandlerProbs(flowProbe,
                                     txProbe,
+                                    dependencyProbe,
                                     blockHandlers.view.mapValues(_._2).toMap,
                                     headerHandlers.view.mapValues(_._2).toMap)
     allHandlers -> allProbes

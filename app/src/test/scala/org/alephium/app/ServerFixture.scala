@@ -142,10 +142,13 @@ object ServerFixture {
       system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
     val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
 
-    val allHandlers: AllHandlers = AllHandlers(flowHandler = ActorRefT(TestProbe().ref),
-                                               txHandler      = txHandler,
-                                               blockHandlers  = Map.empty,
-                                               headerHandlers = Map.empty)(config.broker)
+    val allHandlers: AllHandlers = AllHandlers(
+      flowHandler       = ActorRefT(TestProbe().ref),
+      txHandler         = txHandler,
+      dependencyHandler = ActorRefT(TestProbe().ref),
+      blockHandlers     = Map.empty,
+      headerHandlers    = Map.empty
+    )(config.broker)
 
     val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)

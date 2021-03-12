@@ -23,7 +23,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler, TxHandler}
+import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
@@ -32,7 +32,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.{BrokerInfo, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -48,7 +48,7 @@ object BrokerHandler {
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
 
-trait BrokerHandler extends BaseActor with EventStream.Publisher {
+trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHandler {
   import BrokerHandler._
 
   implicit def brokerConfig: BrokerConfig
@@ -104,34 +104,20 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher {
 
   def exchanging: Receive
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(s"Download blocks ${Utils.showDigest(hashes)} from $remoteAddress")
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
       log.debug(s"Received blocks ${Utils.showDataDigest(blocks)} from $remoteAddress")
-      Validation.validateFlowDAG(blocks) match {
-        case Some(forests) =>
-          forests.foreach { forest =>
-            val chainIndex = ChainIndex.from(forest.roots.head.key)
-            val message    = BlockChainHandler.AddBlocks(forest, dataOrigin)
-            allHandlers.getBlockHandler(chainIndex) ! message
-          }
-        case None =>
-          log.warning(s"The blocks received do not form a proper flow DAG")
-          publishEvent(MisbehaviorManager.InvalidDag(remoteAddress))
-      }
+      handleFlowData(blocks, dataOrigin, isBlock = true)
     case Received(GetBlocks(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(SendBlocks(blocks))
       }
     case Received(SendHeaders(headers)) =>
       log.debug(s"Received headers ${Utils.showDataDigest(headers)} from $remoteAddress")
-      headers.foreach { header =>
-        val message = HeaderChainHandler.addOneHeader(header, dataOrigin)
-        allHandlers.getHeaderHandler(header.chainIndex) ! message
-      }
+      handleFlowData(headers, dataOrigin, isBlock = false)
     case Received(GetHeaders(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
         send(SendHeaders(headers))
@@ -223,5 +209,32 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher {
     case Terminated(_) =>
       context stop self
     case _ => super.unhandled(message)
+  }
+}
+
+trait FlowDataHandler extends BaseActor with EventStream.Publisher {
+  implicit def brokerConfig: BrokerConfig
+  def allHandlers: AllHandlers
+  def remoteAddress: InetSocketAddress
+  def blockflow: BlockFlow
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def handleFlowData[T <: FlowData](datas: AVector[T],
+                                    dataOrigin: DataOrigin,
+                                    isBlock: Boolean): Unit = {
+    if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
+      log.warning(s"The data received does not contain minimal work")
+      publishEvent(MisbehaviorManager.InvalidPoW(remoteAddress))
+    } else {
+      val ok = datas.forall { data =>
+        data.chainIndex.relateTo(brokerConfig) == isBlock
+      }
+      if (ok) {
+        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+        allHandlers.dependencyHandler ! message
+      } else {
+        publishEvent(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+      }
+    }
   }
 }

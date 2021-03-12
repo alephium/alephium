@@ -46,30 +46,25 @@ object MisbehaviorManager {
   final case class Peer(peer: InetSocketAddress, status: MisbehaviorStatus)
   final case class Peers(peers: AVector[Peer])
 
-  sealed trait Critical  extends Misbehavior
-  sealed trait Error     extends Misbehavior
-  sealed trait Warning   extends Misbehavior
-  sealed trait Uncertain extends Misbehavior
-
-  final case class InvalidMessage(remoteAddress: InetSocketAddress) extends Critical {
+  sealed trait Critical extends Misbehavior {
     val penalty: Int = 100
   }
-
-  final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Critical {
-    val penalty: Int = 100
-  }
-
-  final case class InvalidDag(remoteAddress: InetSocketAddress) extends Critical {
-    val penalty: Int = 100
-  }
-
-  final case class Spamming(remoteAddress: InetSocketAddress) extends Warning {
+  sealed trait Error extends Misbehavior
+  sealed trait Warning extends Misbehavior {
     val penalty: Int = 20
   }
-
-  final case class RequestTimeout(remoteAddress: InetSocketAddress) extends Uncertain {
+  sealed trait Uncertain extends Misbehavior {
     val penalty: Int = 10
   }
+
+  final case class InvalidMessage(remoteAddress: InetSocketAddress)  extends Critical
+  final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Critical
+  final case class InvalidPoW(remoteAddress: InetSocketAddress)      extends Critical
+
+  final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
+  final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
+
+  final case class RequestTimeout(remoteAddress: InetSocketAddress) extends Uncertain
 
   sealed trait MisbehaviorStatus
   final case class Penalty(value: Int)      extends MisbehaviorStatus

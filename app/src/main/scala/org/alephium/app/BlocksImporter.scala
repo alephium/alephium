@@ -25,12 +25,11 @@ import scala.util.{Failure, Success, Using}
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.client.Node
-import org.alephium.flow.handler.BlockChainHandler
+import org.alephium.flow.handler.DependencyHandler
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.validation.Validation
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.Block
 import org.alephium.serde.deserialize
 import org.alephium.util._
 
@@ -67,8 +66,7 @@ object BlocksImporter extends StrictLogging {
     )
   }
 
-  private def handleRawBlocksIterator(it: Iterator[String], node: Node)(
-      implicit groupConfig: GroupConfig): IOResult[Int] = {
+  private def handleRawBlocksIterator(it: Iterator[String], node: Node): IOResult[Int] = {
     @tailrec
     def rec(sum: Int, groupedIt: Iterator[Seq[String]]): Either[String, Int] = {
       if (groupedIt.hasNext) {
@@ -84,8 +82,7 @@ object BlocksImporter extends StrictLogging {
     rec(0, it.grouped(batchNumber)).left.map(error => IOError.Other(new Throwable(error)))
   }
 
-  private def handleRawBlocks(rawBlocks: AVector[String], node: Node)(
-      implicit groupConfig: GroupConfig): Either[String, Int] = {
+  private def handleRawBlocks(rawBlocks: AVector[String], node: Node): Either[String, Int] = {
     for {
       blocks <- rawBlocks
         .mapE(line => deserialize[Block](Hex.unsafe(line.stripLineEnd)))
@@ -96,19 +93,8 @@ object BlocksImporter extends StrictLogging {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def validateAndSendBlocks(blocks: AVector[Block], node: Node)(
-      implicit groupConfig: GroupConfig): Either[String, Unit] = {
-    Validation.validateFlowDAG(blocks) match {
-      case Some(forests) =>
-        Right(
-          forests.foreach { forest =>
-            val chainIndex = ChainIndex.from(forest.roots.head.key)
-            val message    = BlockChainHandler.AddBlocks(forest, DataOrigin.Local)
-            node.allHandlers.getBlockHandler(chainIndex) ! message
-          }
-        )
-      case None =>
-        Left("Invalid DAG")
-    }
+  private def validateAndSendBlocks(blocks: AVector[Block], node: Node): Either[String, Unit] = {
+    val message = DependencyHandler.AddFlowData(blocks, DataOrigin.Local)
+    Right(node.allHandlers.dependencyHandler ! message)
   }
 }

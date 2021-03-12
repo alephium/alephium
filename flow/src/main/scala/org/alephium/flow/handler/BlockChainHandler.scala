@@ -16,8 +16,6 @@
 
 package org.alephium.flow.handler
 
-import scala.collection.mutable
-
 import akka.actor.Props
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
@@ -29,7 +27,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, EventStream, Forest}
+import org.alephium.util.{ActorRefT, AVector, EventStream}
 
 object BlockChainHandler {
   def props(blockFlow: BlockFlow,
@@ -39,16 +37,8 @@ object BlockChainHandler {
                                                          networkSetting: NetworkSetting): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
 
-  def addOneBlock(block: Block, origin: DataOrigin): AddBlocks = {
-    val forest = Forest.build[BlockHash, Block](block, _.hash)
-    AddBlocks(forest, origin)
-  }
-
   sealed trait Command
-  final case class AddBlocks(blocks: Forest[BlockHash, Block], origin: DataOrigin) extends Command
-  final case class AddPendingBlock(block: Block,
-                                   broker: ActorRefT[ChainHandler.Event],
-                                   origin: DataOrigin)
+  final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
 
   sealed trait Event                             extends ChainHandler.Event
@@ -73,10 +63,7 @@ class BlockChainHandler(blockFlow: BlockFlow,
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
   override def receive: Receive = {
-    case AddBlocks(blocks, origin) =>
-      handleDatas(blocks, ActorRefT[ChainHandler.Event](sender()), origin)
-    case AddPendingBlock(block, broker, origin)        => handlePending(block, broker, origin)
-    case FlowHandler.BlockAdded(block, broker, origin) => handleDataAdded(block, broker, origin)
+    case Validate(block, broker, origin) => handleData(block, broker, origin)
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
@@ -98,16 +85,6 @@ class BlockChainHandler(blockFlow: BlockFlow,
                                 origin: DataOrigin): Unit = {
     flowHandler ! FlowHandler.AddBlock(block, broker, origin)
   }
-
-  override def pendingToFlowHandler(block: Block,
-                                    missings: mutable.HashSet[BlockHash],
-                                    broker: ActorRefT[ChainHandler.Event],
-                                    origin: DataOrigin,
-                                    self: ActorRefT[BlockChainHandler.Command]): Unit = {
-    flowHandler ! FlowHandler.PendingBlock(block, missings, origin, broker, self)
-  }
-
-  override def dataAddedEvent(data: Block): Event = BlockAdded(data.hash)
 
   override def dataAddingFailed(): Event = BlockAddingFailed
 

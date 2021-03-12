@@ -235,6 +235,15 @@ trait FlowFixture
     mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
   }
 
+  def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
+    @tailrec
+    def iter(current: Block): Block = {
+      val tmp = Block(current.header.copy(nonce = Random.nextU256()), current.transactions)
+      if (!PoW.checkWork(tmp) && (tmp.chainIndex equals chainIndex)) tmp else iter(tmp)
+    }
+    iter(mineFromMemPool(blockFlow, chainIndex))
+  }
+
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps

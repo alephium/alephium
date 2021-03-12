@@ -44,11 +44,12 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val flowHandler          = TestProbe("flowHandler")
     val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val allHandlers: AllHandlers =
-      AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref))
+      AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref), "")
 
     val miner = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.Start
+    flowHandler.expectMsgType[FlowHandler.SetHandler]
     flowHandler.expectMsgType[FlowHandler.Register]
     flowHandler.expectMsgType[FlowHandler.AddBlock]
     flowHandler.expectMsgType[FlowHandler.AddBlock]

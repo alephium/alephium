@@ -27,6 +27,7 @@ import org.alephium.util.{ActorRefT, EventBus}
 final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
     txHandler: ActorRefT[TxHandler.Command],
+    dependencyHandler: ActorRefT[DependencyHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])(
     implicit brokerConfig: BrokerConfig) {
@@ -50,26 +51,46 @@ object AllHandlers {
       implicit brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting): AllHandlers = {
-    val flowProps   = FlowHandler.props(blockFlow, eventBus)
-    val flowHandler = ActorRefT.build[FlowHandler.Command](system, flowProps, "FlowHandler")
-    buildWithFlowHandler(system, blockFlow, flowHandler)
+    build(system, blockFlow, eventBus, "")
   }
+
+  def build(system: ActorSystem,
+            blockFlow: BlockFlow,
+            eventBus: ActorRefT[EventBus.Message],
+            namePostfix: String)(implicit brokerConfig: BrokerConfig,
+                                 consensusConfig: ConsensusConfig,
+                                 networkSetting: NetworkSetting): AllHandlers = {
+    val flowProps = FlowHandler.props(blockFlow, eventBus)
+    val flowHandler =
+      ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
+    buildWithFlowHandler(system, blockFlow, flowHandler, namePostfix)
+  }
+
   def buildWithFlowHandler(system: ActorSystem,
                            blockFlow: BlockFlow,
-                           flowHandler: ActorRefT[FlowHandler.Command])(
-      implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting): AllHandlers = {
+                           flowHandler: ActorRefT[FlowHandler.Command],
+                           namePostfix: String)(implicit brokerConfig: BrokerConfig,
+                                                consensusConfig: ConsensusConfig,
+                                                networkSetting: NetworkSetting): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
-    val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, "TxHandler")
-    val blockHandlers  = buildBlockHandlers(system, blockFlow, flowHandler)
-    val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler)
-    AllHandlers(flowHandler, txHandler, blockHandlers, headerHandlers)
+    val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
+    val blockHandlers  = buildBlockHandlers(system, blockFlow, flowHandler, namePostfix)
+    val headerHandlers = buildHeaderHandlers(system, blockFlow, flowHandler, namePostfix)
+
+    val dependencyHandlerProps = DependencyHandler.props(blockFlow, blockHandlers, headerHandlers)
+    val dependencyHandler = ActorRefT
+      .build[DependencyHandler.Command](system,
+                                        dependencyHandlerProps,
+                                        s"DependencyHandler$namePostfix")
+    flowHandler ! FlowHandler.SetHandler(dependencyHandler)
+
+    AllHandlers(flowHandler, txHandler, dependencyHandler, blockHandlers, headerHandlers)
   }
 
   private def buildBlockHandlers(system: ActorSystem,
                                  blockFlow: BlockFlow,
-                                 flowHandler: ActorRefT[FlowHandler.Command])(
+                                 flowHandler: ActorRefT[FlowHandler.Command],
+                                 namePostfix: String)(
       implicit brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
@@ -82,7 +103,7 @@ object AllHandlers {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
         BlockChainHandler.props(blockFlow, chainIndex, flowHandler),
-        s"BlockChainHandler-$from-$to")
+        s"BlockChainHandler-$from-$to$namePostfix")
       chainIndex -> handler
     }
     handlers.toMap
@@ -90,7 +111,8 @@ object AllHandlers {
 
   private def buildHeaderHandlers(system: ActorSystem,
                                   blockFlow: BlockFlow,
-                                  flowHandler: ActorRefT[FlowHandler.Command])(
+                                  flowHandler: ActorRefT[FlowHandler.Command],
+                                  namePostfix: String)(
       implicit brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
@@ -102,7 +124,7 @@ object AllHandlers {
       val headerHander = ActorRefT.build[HeaderChainHandler.Command](
         system,
         HeaderChainHandler.props(blockFlow, chainIndex, flowHandler),
-        s"HeaderChainHandler-$from-$to")
+        s"HeaderChainHandler-$from-$to$namePostfix")
       chainIndex -> headerHander
     }
     headerHandlers.toMap
