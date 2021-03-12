@@ -174,4 +174,15 @@ class DependencyHandlerSpec extends AlephiumActorSpec("DependencyHandlerSpec") {
     state.readies is mutable.HashSet(block0.hash)
     state.processing.isEmpty is true
   }
+
+  it should "not pend existing blocks" in new Fixture {
+    val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block)
+    state.addPendingData(block, broker, origin)
+    state.pending.isEmpty is true
+    state.missing.isEmpty is true
+    state.missingIndex.isEmpty is true
+    state.readies.isEmpty is true
+    state.processing.isEmpty is true
+  }
 }
