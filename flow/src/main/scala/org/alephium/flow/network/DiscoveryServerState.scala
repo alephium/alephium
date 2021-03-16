@@ -27,7 +27,7 @@ import akka.io.Udp
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, GroupIndex, PeerId}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -43,10 +43,11 @@ trait DiscoveryServerState {
   lazy val selfPeerId: PeerId                                    = selfCliqueInfo.selfInterBrokerInfo.peerId
   lazy val selfPeerInfoOpt: Option[BrokerInfo]                   = selfCliqueInfo.selfBrokerInfo
   lazy val selfCliqueBrokerInfosOpt: Option[AVector[BrokerInfo]] = selfCliqueInfo.interBrokers
+  lazy val tableInitialSize                                      = selfCliqueBrokerInfosOpt.map(_.length).getOrElse(0)
 
   import DiscoveryServer._
 
-  private var socket: ActorRefT[Udp.Command] = _
+  private var socketOpt: Option[ActorRefT[Udp.Command]] = None
 
   protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
   private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
@@ -55,11 +56,17 @@ trait DiscoveryServerState {
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
   def setSocket(s: ActorRefT[Udp.Command]): Unit = {
-    socket = s
+    socketOpt = Some(s)
+  }
+
+  def unsetSocket(): Unit = {
+    socketOpt = None
   }
 
   def getActivePeers: AVector[BrokerInfo] = {
-    AVector.from(table.values.map(_.info))
+    AVector
+      .from(table.values.map(_.info))
+      .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
   }
 
   def getPeersNum: Int = table.size
@@ -124,10 +131,10 @@ trait DiscoveryServerState {
 
   def cleanup(): Unit = {
     val now = TimeStamp.now()
-    val expired = table.values
+    val expired = table.values.view
       .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.expireDuration))
+      .filter(_.info.cliqueId != selfCliqueId)
       .map(_.info.peerId)
-      .toSet
     table --= expired
 
     val deadPendings = pendings.collect {
@@ -137,30 +144,40 @@ trait DiscoveryServerState {
     pendings --= deadPendings
   }
 
-  private def appendPeer(peerInfo: BrokerInfo): Unit = {
+  def appendPeer(peerInfo: BrokerInfo): Unit = {
     log.info(s"Adding a new peer: $peerInfo")
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
     fetchNeighbors(peerInfo)
     publishNewPeer(peerInfo)
   }
 
-  protected def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
   }
 
   def publishNewPeer(peerInfo: BrokerInfo): Unit
 
-  // TODO: improve scan algorithm
   def scan(): Unit = {
-    table.values
-      .foreach(status => if (status.info.peerId != selfPeerId) { tryPing(status.info) })
+    val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
+    peerCandidates.foreach(status => ping(status.info))
+
     val emptySlotNum = neighborMax - getPeersWeight
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
-    bootstrap.take(bootstrapNum).foreach(ping)
+    bootstrap
+      .filter(address => !peerCandidates.exists(_.info.address == address))
+      .take(bootstrapNum)
+      .foreach(ping)
   }
 
+  private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
   def shouldScanFast(): Boolean = {
-    table.isEmpty
+    (TimeStamp.now() < fastScanThreshold) || (!atLeastOnePeerPerGroup())
+  }
+
+  def atLeastOnePeerPerGroup(): Boolean = {
+    (brokerConfig.groupFrom until brokerConfig.groupUntil).forall { group =>
+      table.values.count(_.info.contains(GroupIndex.unsafe(group))) >= 2 // peers from self clique is counted
+    }
   }
 
   def fetchNeighbors(info: BrokerInfo): Unit = {
@@ -172,8 +189,15 @@ trait DiscoveryServerState {
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
-    val message = DiscoveryMessage.from(selfCliqueId, payload)
-    socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
+    socketOpt match {
+      case Some(socket) =>
+        log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
+        val message = DiscoveryMessage.from(selfCliqueId, payload)
+        socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
+      case None =>
+        log.debug(
+          s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote")
+    }
   }
 
   def tryPing(peerInfo: BrokerInfo): Unit = {
@@ -183,14 +207,12 @@ trait DiscoveryServerState {
   }
 
   def ping(peerInfo: BrokerInfo): Unit = {
-    log.info(s"Sending Ping to $peerInfo")
     val remoteAddress = peerInfo.address
     send(remoteAddress, Ping(selfPeerInfoOpt))
     pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))
   }
 
   def ping(remote: InetSocketAddress): Unit = {
-    log.debug(s"Sending Ping to $remote")
     send(remote, Ping(selfPeerInfoOpt))
   }
 
@@ -199,10 +221,12 @@ trait DiscoveryServerState {
     pendings.get(peerId) match {
       case Some(AwaitPong(_, _)) =>
         pendings.remove(peerId)
-        if (getPeersWeight < neighborMax) {
-          appendPeer(peerInfo)
-        } else {
-          tryInsert(peerInfo)
+        if (!isInTable(peerInfo.peerId)) {
+          if (getPeersWeight < neighborMax) {
+            appendPeer(peerInfo)
+          } else {
+            tryInsert(peerInfo)
+          }
         }
         updateStatus(peerId)
         fetchNeighbors(peerInfo)

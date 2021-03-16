@@ -87,7 +87,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   // TODO: replace Map with Array for performance
   def awaitBrokers(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
     case Tcp.Connected(remote, _) =>
-      log.debug(s"Connected to $remote")
+      log.info(s"Connected to $remote")
       val index = cliqueInfo.internalAddresses.indexWhere(_ == remote)
       if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition

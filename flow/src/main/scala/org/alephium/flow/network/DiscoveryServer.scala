@@ -20,16 +20,16 @@ import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{Cancellable, Props, Stash, Timers}
+import akka.actor.{Cancellable, Props, Stash, Terminated, Timers}
 import akka.io.{IO, Udp}
+import akka.io.Udp.SO
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream, TimeStamp}
+import org.alephium.util._
 
 object DiscoveryServer {
   def props(bindAddress: InetSocketAddress,
@@ -67,6 +67,7 @@ object DiscoveryServer {
   final case class PeerConfirmed(peerInfo: BrokerInfo)       extends Command
   final case class PeerDenied(peerInfo: BrokerInfo)          extends Command
   final case class PeerDisconnected(peer: InetSocketAddress) extends Command
+  case object RestartUdp                                     extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -104,7 +105,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   var selfCliqueInfo: CliqueInfo = _
 
-  var scanScheduled: Cancellable = _
+  var scanScheduled: Option[Cancellable] = None
 
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
@@ -112,49 +113,60 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       cliqueInfo.interBrokers.foreach { brokers =>
         brokers.foreach(addSelfCliquePeer)
       }
-
-      IO(Udp)(context.system) ! Udp.Bind(self, bindAddress)
-      context become (binding orElse handleCommand)
+      unstashAll()
+      log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
+      startBinding()
 
     case _ => stash()
+  }
+
+  def startBinding(): Unit = {
+    IO(Udp)(context.system) ! Udp.Bind(self, bindAddress, options = Seq(SO.ReuseAddress(true)))
+    context become (handleCommand orElse binding) // binding will stash messages
   }
 
   def binding: Receive = {
     case Udp.Bound(address) =>
-      log.debug(s"UDP server bound to $address")
+      logUdpBound(s"UDP server bound to $address")
       setSocket(ActorRefT[Udp.Command](sender()))
-      log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
+      context.watch(sender()) // upd listener might crash when there are network issues
       bootstrap.foreach(ping)
       scheduleScan()
       unstashAll()
       context.become(ready)
-    case Udp.CommandFailed(bind: Udp.Bind) =>
-      log.error(s"Could not bind the UDP socket ($bind)")
-      publishEvent(FlowMonitor.Shutdown)
+    case Udp.CommandFailed(_) =>
+      logUdpFailure(s"Could not bind the UDP socket. Restarting udp ...")
+      scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
+    case RestartUdp => startBinding()
 
     case _ => stash()
   }
 
-  def ready: Receive = handleData orElse handleCommand orElse handleBanning
+  def ready: Receive = handleUdp orElse handleCommand orElse handleBanning
 
-  def handleData: Receive = {
+  def handleUdp: Receive = {
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(selfCliqueId, data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
-          log.debug(s"Received ${message.payload} from $remote")
+          log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           handlePayload(remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
           log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
       }
+    case Terminated(_) =>
+      logUdpFailure(s"Udp listener stopped, there might be network issue. Restarting udp ...")
+      unsetSocket()
+      cancelScan()
+      scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
+    case RestartUdp => startBinding()
   }
 
   def handleCommand: Receive = {
     case Scan =>
-      log.debug(s"Scanning peers: $getPeersNum in total")
       cleanup()
+      log.debug(s"Scanning peers: $getPeersNum in total")
       scanAndSchedule()
-      ()
     case GetNeighborPeers =>
       sender() ! NeighborPeers(getActivePeers)
     case Disable(peerId) =>
@@ -168,7 +180,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
     case PeerDisconnected(peer) =>
-      scanScheduled.cancel()
       remove(peer)
       scanAndSchedule()
   }
@@ -176,7 +187,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
   def handleBanning: Receive = {
     case MisbehaviorManager.PeerBanned(peer) =>
       if (banPeerFromAddress(peer)) {
-        scanScheduled.cancel()
         scanAndSchedule()
       }
   }
@@ -224,7 +234,13 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       discoveryConfig.scanFrequency
     }
 
-    scanScheduled = scheduleCancellableOnce(self, Scan, frequnecy)
+    scanScheduled.foreach(_.cancel())
+    scanScheduled = Some(scheduleCancellableOnce(self, Scan, frequnecy))
+  }
+
+  def cancelScan(): Unit = {
+    scanScheduled.foreach(_.cancel())
+    scanScheduled = None
   }
 
   private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
@@ -232,8 +248,36 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     if (remote == peerInfo.address) {
       f(peerInfo)
     } else {
-      log.warning(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
+      log.debug(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
       misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
+    }
+  }
+
+  private var isBound: Boolean         = true
+  private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)
+  private var unsilentPoint: TimeStamp = TimeStamp.now()
+  private var lastFailureTs: TimeStamp = TimeStamp.zero
+  def logUdpFailure(message: String): Unit = {
+    isBound = false
+    val currentTs = TimeStamp.now()
+    if (currentTs > lastFailureTs + Duration.ofMinutesUnsafe(2)) {
+      silentDuration = Duration.ofSecondsUnsafe(1)
+    }
+    if (currentTs > unsilentPoint) {
+      log.warning(message)
+      silentDuration = silentDuration.timesUnsafe(2)
+      unsilentPoint  = unsilentPoint + silentDuration
+    } else {
+      log.debug(message)
+    }
+    lastFailureTs = currentTs
+  }
+  def logUdpBound(message: String): Unit = {
+    if (isBound) { // bound for the first time
+      log.info(message)
+    } else { // bound after udp failures
+      isBound = true
+      log.debug(message)
     }
   }
 }

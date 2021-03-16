@@ -34,6 +34,7 @@ trait DownloadTracker extends BaseActor {
   def download(hashes: AVector[AVector[BlockHash]]): Unit = {
     val toDownload = hashes.flatMap(_.filter(needToDownload))
     toDownload.foreach(downloading.addOne)
+    log.debug(s"Downloading ${toDownload.length} blocks")
     sender() ! BrokerHandler.DownloadBlocks(toDownload)
   }
 
