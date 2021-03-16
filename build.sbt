@@ -253,7 +253,6 @@ val commonSettings = publishSettings ++ Seq(
   Test / javaOptions += "-Xss2m",
   Test / envVars += "ALEPHIUM_ENV"            -> "test",
   IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",
-  run / javaOptions += "-Xmx4g",
   libraryDependencies ++= Seq(
     `akka-test`,
     scalacheck,
