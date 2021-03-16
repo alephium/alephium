@@ -159,7 +159,7 @@ trait DiscoveryServerState {
 
   def scan(): Unit = {
     val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
-    peerCandidates.foreach(status => tryPing(status.info))
+    peerCandidates.foreach(status => ping(status.info))
 
     val emptySlotNum = neighborMax - getPeersWeight
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
@@ -185,7 +185,7 @@ trait DiscoveryServerState {
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
     socketOpt match {
       case Some(socket) =>
-        log.debug(s"Send $payload to $remote")
+        log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
         val message = DiscoveryMessage.from(selfCliqueId, payload)
         socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
       case None =>
@@ -207,7 +207,6 @@ trait DiscoveryServerState {
   }
 
   def ping(remote: InetSocketAddress): Unit = {
-    log.debug(s"Sending Ping to $remote")
     send(remote, Ping(selfPeerInfoOpt))
   }
 
@@ -216,10 +215,12 @@ trait DiscoveryServerState {
     pendings.get(peerId) match {
       case Some(AwaitPong(_, _)) =>
         pendings.remove(peerId)
-        if (getPeersWeight < neighborMax) {
-          appendPeer(peerInfo)
-        } else {
-          tryInsert(peerInfo)
+        if (!isInTable(peerInfo.peerId)) {
+          if (getPeersWeight < neighborMax) {
+            appendPeer(peerInfo)
+          } else {
+            tryInsert(peerInfo)
+          }
         }
         updateStatus(peerId)
         fetchNeighbors(peerInfo)

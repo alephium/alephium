@@ -114,6 +114,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
         brokers.foreach(addSelfCliquePeer)
       }
       unstashAll()
+      log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
 
     case _ => stash()
@@ -126,16 +127,15 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   def binding: Receive = {
     case Udp.Bound(address) =>
-      log.debug(s"UDP server bound to $address")
+      logUdpBound(s"UDP server bound to $address")
       setSocket(ActorRefT[Udp.Command](sender()))
       context.watch(sender()) // upd listener might crash when there are network issues
-      log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(ping)
       scheduleScan()
       unstashAll()
       context.become(ready)
     case Udp.CommandFailed(_) =>
-      log.warning(s"Could not bind the UDP socket. Restarting it in 1 second")
+      logUdpFailure(s"Could not bind the UDP socket. Restarting udp ...")
       scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
     case RestartUdp => startBinding()
 
@@ -148,14 +148,14 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(selfCliqueId, data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
-          log.debug(s"Received ${message.payload} from $remote")
+          log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           handlePayload(remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
           log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
       }
     case Terminated(_) =>
-      log.warning(s"Udp listener stopped, there might be network issue. Restarting it in 1 second")
+      logUdpFailure(s"Udp listener stopped, there might be network issue. Restarting udp ...")
       unsetSocket()
       scanScheduled.cancel()
       scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
@@ -245,8 +245,36 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     if (remote == peerInfo.address) {
       f(peerInfo)
     } else {
-      log.warning(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
+      log.debug(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
       misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
+    }
+  }
+
+  private var isBound: Boolean         = true
+  private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)
+  private var unsilentPoint: TimeStamp = TimeStamp.now()
+  private var lastFailureTs: TimeStamp = TimeStamp.zero
+  def logUdpFailure(message: String): Unit = {
+    isBound = false
+    val currentTs = TimeStamp.now()
+    if (currentTs > lastFailureTs + Duration.ofMinutesUnsafe(2)) {
+      silentDuration = Duration.ofSecondsUnsafe(1)
+    }
+    if (currentTs > unsilentPoint) {
+      log.warning(message)
+      silentDuration = silentDuration.timesUnsafe(2)
+      unsilentPoint  = unsilentPoint + silentDuration
+    } else {
+      log.debug(message)
+    }
+    lastFailureTs = currentTs
+  }
+  def logUdpBound(message: String): Unit = {
+    if (isBound) { // bound for the first time
+      log.info(message)
+    } else { // bound after udp failures
+      isBound = true
+      log.debug(message)
     }
   }
 }
