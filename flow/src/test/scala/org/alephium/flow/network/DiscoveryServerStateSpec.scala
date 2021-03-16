@@ -182,25 +182,36 @@ class DiscoveryServerStateSpec
     }
   }
 
-  it should "calculate correct initial table size" in new Fixture {
+  it should "detect when to scan fast" in new Fixture {
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
       brokers.foreach(state.addSelfCliquePeer)
     }
     state.tableInitialSize is state.getActivePeers.length
     state.shouldScanFast() is true
-    (state.getPeersWeight < state.brokerConfig.groups * 2) is true
+    state.atLeastOnePeerPerGroup() is false
+
+    val clique0 = cliqueInfoGen.retryUntil(_.brokerNum > 1).sample.get
+    state.appendPeer(
+      clique0.interBrokers.get.filter(broker => !state.brokerConfig.intersect(broker)).head)
+    state.shouldScanFast() is true
+    state.atLeastOnePeerPerGroup() is false
+
+    clique0.interBrokers.get.foreach(state.appendPeer)
+    state.shouldScanFast() is true
+    state.atLeastOnePeerPerGroup() is true
   }
 
   it should "ping discovered bootstrap nodes once" in new Fixture {
     state.scan()
-    socketProbe.expectMsgType[Udp.Send]
+    expectPayload[Ping]
     socketProbe.expectNoMessage()
     state.appendPeer {
       val info = brokerInfoGen.sample.get
       BrokerInfo.unsafe(info.cliqueId, info.brokerId, info.groupNumPerBroker, state.bootstrap.head)
     }
+    expectPayload[FindNode]
     state.scan()
-    socketProbe.expectMsgType[Udp.Send]
+    expectPayload[Ping]
     socketProbe.expectNoMessage()
   }
 }

@@ -27,7 +27,7 @@ import akka.io.Udp
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, GroupIndex, PeerId}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -171,7 +171,13 @@ trait DiscoveryServerState {
 
   private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
   def shouldScanFast(): Boolean = {
-    (TimeStamp.now() < fastScanThreshold) || (getPeersWeight < brokerConfig.groups * 2)
+    (TimeStamp.now() < fastScanThreshold) || (!atLeastOnePeerPerGroup())
+  }
+
+  def atLeastOnePeerPerGroup(): Boolean = {
+    (brokerConfig.groupFrom until brokerConfig.groupUntil).forall { group =>
+      table.values.count(_.info.contains(GroupIndex.unsafe(group))) >= 2 // peers from self clique is counted
+    }
   }
 
   def fetchNeighbors(info: BrokerInfo): Unit = {
