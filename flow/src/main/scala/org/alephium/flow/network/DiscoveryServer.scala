@@ -105,7 +105,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
 
   var selfCliqueInfo: CliqueInfo = _
 
-  var scanScheduled: Cancellable = _
+  var scanScheduled: Option[Cancellable] = None
 
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
@@ -157,7 +157,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case Terminated(_) =>
       logUdpFailure(s"Udp listener stopped, there might be network issue. Restarting udp ...")
       unsetSocket()
-      scanScheduled.cancel()
+      cancelScan()
       scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
     case RestartUdp => startBinding()
   }
@@ -167,7 +167,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       cleanup()
       log.debug(s"Scanning peers: $getPeersNum in total")
       scanAndSchedule()
-      ()
     case GetNeighborPeers =>
       sender() ! NeighborPeers(getActivePeers)
     case Disable(peerId) =>
@@ -181,7 +180,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
     case PeerDisconnected(peer) =>
-      scanScheduled.cancel()
       remove(peer)
       scanAndSchedule()
   }
@@ -189,7 +187,6 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
   def handleBanning: Receive = {
     case MisbehaviorManager.PeerBanned(peer) =>
       if (banPeerFromAddress(peer)) {
-        scanScheduled.cancel()
         scanAndSchedule()
       }
   }
@@ -237,7 +234,13 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       discoveryConfig.scanFrequency
     }
 
-    scanScheduled = scheduleCancellableOnce(self, Scan, frequnecy)
+    scanScheduled.foreach(_.cancel())
+    scanScheduled = Some(scheduleCancellableOnce(self, Scan, frequnecy))
+  }
+
+  def cancelScan(): Unit = {
+    scanScheduled.foreach(_.cancel())
+    scanScheduled = None
   }
 
   private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(

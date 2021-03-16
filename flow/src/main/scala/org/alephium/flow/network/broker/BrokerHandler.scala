@@ -182,7 +182,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp
-      log.info(s"Ping received with ${delay}ms delay; Replying with Pong")
+      log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
       send(Pong(nonce))
     }
   }
