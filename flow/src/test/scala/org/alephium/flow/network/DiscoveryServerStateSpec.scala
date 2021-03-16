@@ -56,7 +56,7 @@ class DiscoveryServerStateSpec
       implicit def networkConfig: NetworkConfig     = self.networkConfig
       def log: LoggingAdapter                       = system.log
 
-      def bootstrap: ArraySeq[InetSocketAddress] = ArraySeq.empty
+      lazy val bootstrap: ArraySeq[InetSocketAddress] = ArraySeq(socketAddressGen.sample.get)
 
       override def publishNewPeer(peer: BrokerInfo): Unit = ()
 
@@ -189,5 +189,18 @@ class DiscoveryServerStateSpec
     state.tableInitialSize is state.getActivePeers.length
     state.shouldScanFast() is true
     (state.getPeersWeight < state.brokerConfig.groups * 2) is true
+  }
+
+  it should "ping discovered bootstrap nodes once" in new Fixture {
+    state.scan()
+    socketProbe.expectMsgType[Udp.Send]
+    socketProbe.expectNoMessage()
+    state.appendPeer {
+      val info = brokerInfoGen.sample.get
+      BrokerInfo.unsafe(info.cliqueId, info.brokerId, info.groupNumPerBroker, state.bootstrap.head)
+    }
+    state.scan()
+    socketProbe.expectMsgType[Udp.Send]
+    socketProbe.expectNoMessage()
   }
 }

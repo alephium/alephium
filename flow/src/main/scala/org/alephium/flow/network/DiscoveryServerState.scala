@@ -157,13 +157,16 @@ trait DiscoveryServerState {
 
   def publishNewPeer(peerInfo: BrokerInfo): Unit
 
-  // TODO: improve scan algorithm
   def scan(): Unit = {
-    table.values
-      .foreach(status => if (status.info.peerId != selfPeerId) { tryPing(status.info) })
+    val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
+    peerCandidates.foreach(status => tryPing(status.info))
+
     val emptySlotNum = neighborMax - getPeersWeight
     val bootstrapNum = if (emptySlotNum > 0) emptySlotNum else 0
-    bootstrap.take(bootstrapNum).foreach(ping)
+    bootstrap
+      .filter(address => !peerCandidates.exists(_.info.address == address))
+      .take(bootstrapNum)
+      .foreach(ping)
   }
 
   private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
