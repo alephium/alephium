@@ -20,16 +20,16 @@ import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{Cancellable, Props, Stash, Timers}
+import akka.actor.{Cancellable, Props, Stash, Terminated, Timers}
 import akka.io.{IO, Udp}
+import akka.io.Udp.SO
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream, TimeStamp}
+import org.alephium.util._
 
 object DiscoveryServer {
   def props(bindAddress: InetSocketAddress,
@@ -67,6 +67,7 @@ object DiscoveryServer {
   final case class PeerConfirmed(peerInfo: BrokerInfo)       extends Command
   final case class PeerDenied(peerInfo: BrokerInfo)          extends Command
   final case class PeerDisconnected(peer: InetSocketAddress) extends Command
+  case object RestartUdp                                     extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -112,32 +113,38 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       cliqueInfo.interBrokers.foreach { brokers =>
         brokers.foreach(addSelfCliquePeer)
       }
-
-      IO(Udp)(context.system) ! Udp.Bind(self, bindAddress)
-      context become (binding orElse handleCommand)
+      unstashAll()
+      startBinding()
 
     case _ => stash()
+  }
+
+  def startBinding(): Unit = {
+    IO(Udp)(context.system) ! Udp.Bind(self, bindAddress, options = Seq(SO.ReuseAddress(true)))
+    context become (handleCommand orElse binding) // binding will stash messages
   }
 
   def binding: Receive = {
     case Udp.Bound(address) =>
       log.debug(s"UDP server bound to $address")
       setSocket(ActorRefT[Udp.Command](sender()))
+      context.watch(sender()) // upd listener might crash when there are network issues
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       bootstrap.foreach(ping)
       scheduleScan()
       unstashAll()
       context.become(ready)
-    case Udp.CommandFailed(bind: Udp.Bind) =>
-      log.error(s"Could not bind the UDP socket ($bind)")
-      publishEvent(FlowMonitor.Shutdown)
+    case Udp.CommandFailed(_) =>
+      log.warning(s"Could not bind the UDP socket. Restarting it in 1 second")
+      scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
+    case RestartUdp => startBinding()
 
     case _ => stash()
   }
 
-  def ready: Receive = handleData orElse handleCommand orElse handleBanning
+  def ready: Receive = handleUdp orElse handleCommand orElse handleBanning
 
-  def handleData: Receive = {
+  def handleUdp: Receive = {
     case Udp.Received(data, remote) =>
       DiscoveryMessage.deserialize(selfCliqueId, data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
@@ -147,6 +154,12 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
           // TODO: handler error properly
           log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
       }
+    case Terminated(_) =>
+      log.warning(s"Udp listener stopped, there might be network issue. Restarting it in 1 second")
+      unsetSocket()
+      scanScheduled.cancel()
+      scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
+    case RestartUdp => startBinding()
   }
 
   def handleCommand: Receive = {

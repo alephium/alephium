@@ -47,7 +47,7 @@ trait DiscoveryServerState {
 
   import DiscoveryServer._
 
-  private var socket: ActorRefT[Udp.Command] = _
+  private var socketOpt: Option[ActorRefT[Udp.Command]] = None
 
   protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
   private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
@@ -56,7 +56,11 @@ trait DiscoveryServerState {
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
   def setSocket(s: ActorRefT[Udp.Command]): Unit = {
-    socket = s
+    socketOpt = Some(s)
+  }
+
+  def unsetSocket(): Unit = {
+    socketOpt = None
   }
 
   def getActivePeers: AVector[BrokerInfo] = {
@@ -176,9 +180,15 @@ trait DiscoveryServerState {
   }
 
   def send(remote: InetSocketAddress, payload: Payload): Unit = {
-    log.debug(s"Send $payload to $remote")
-    val message = DiscoveryMessage.from(selfCliqueId, payload)
-    socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
+    socketOpt match {
+      case Some(socket) =>
+        log.debug(s"Send $payload to $remote")
+        val message = DiscoveryMessage.from(selfCliqueId, payload)
+        socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
+      case None =>
+        log.debug(
+          s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote")
+    }
   }
 
   def tryPing(peerInfo: BrokerInfo): Unit = {
