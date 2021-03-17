@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
@@ -114,9 +114,9 @@ trait DiscoveryServerState {
     pendings.get(peerId)
   }
 
-  def banPeerFromAddress(address: InetSocketAddress): Boolean = {
+  def banPeerFromAddress(address: InetAddress): Boolean = {
     val bannedPeer = table.values
-      .filter(status => status.info.address == address)
+      .filter(status => status.info.address.getAddress == address)
       .map(_.info.peerId)
 
     bannedPeer.foreach(banPeer)

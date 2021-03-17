@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetAddress
 
 import scala.collection.mutable
 
@@ -27,24 +27,23 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
 
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
-  def get(peer: InetSocketAddress): Option[MisbehaviorStatus] = {
-    val peerAddress = peer.getAddress
-    peers.get(peerAddress).map { status =>
-      withUpdatedStatus(peerAddress, status) { (_, status) =>
+  def get(peer: InetAddress): Option[MisbehaviorStatus] = {
+    peers.get(peer).map { status =>
+      withUpdatedStatus(peer, status) { (_, status) =>
         status
       }
     }
   }
 
-  def update(peer: InetSocketAddress, penalty: Penalty): Unit = {
-    peers.addOne(peer.getAddress -> penalty)
+  def update(peer: InetAddress, penalty: Penalty): Unit = {
+    peers.addOne(peer -> penalty)
   }
 
-  def ban(peer: InetSocketAddress, until: TimeStamp): Unit = {
-    peers.update(peer.getAddress, Banned(until))
+  def ban(peer: InetAddress, until: TimeStamp): Unit = {
+    peers.update(peer, Banned(until))
   }
 
-  def isBanned(peer: InetSocketAddress): Boolean = {
+  def isBanned(peer: InetAddress): Boolean = {
     get(peer) match {
       case Some(status) =>
         status match {
@@ -56,8 +55,8 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
     }
   }
 
-  def remove(peer: InetSocketAddress): Unit = {
-    discard(peers.remove(peer.getAddress))
+  def remove(peer: InetAddress): Unit = {
+    discard(peers.remove(peer))
   }
 
   def list(): AVector[Peer] = {

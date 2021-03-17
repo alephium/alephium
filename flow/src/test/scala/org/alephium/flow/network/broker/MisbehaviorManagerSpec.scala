@@ -58,7 +58,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! Spamming(peer)
 
-    bannedProbe.expectMsg(PeerBanned(peer))
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
     misbehaviorManager ! ConfirmConnection(connected, connection.ref)
     expectMsg(TcpController.ConnectionDenied(connected, connection.ref))
@@ -81,7 +81,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
 
     misbehaviorManager ! InvalidMessage(peer)
 
-    bannedProbe.expectMsg(PeerBanned(peer))
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
     Thread.sleep(1)
 
