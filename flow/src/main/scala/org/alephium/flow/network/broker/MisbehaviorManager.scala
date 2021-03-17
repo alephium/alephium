@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.Props
 import akka.io.Tcp
@@ -43,7 +43,7 @@ object MisbehaviorManager {
 
   final case class PeerBanned(remote: InetSocketAddress) extends EventStream.Event
 
-  final case class Peer(peer: InetSocketAddress, status: MisbehaviorStatus)
+  final case class Peer(peer: InetAddress, status: MisbehaviorStatus)
   final case class Peers(peers: AVector[Peer])
 
   sealed trait Critical extends Misbehavior {

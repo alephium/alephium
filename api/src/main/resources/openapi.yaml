@@ -636,9 +636,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/PeerMisbehavior'
               example:
-              - peer:
-                  addr: 1.2.3.4
-                  port: 12344
+              - peer: 1.2.3.4
                 status:
                   penalty:
                     value: 42

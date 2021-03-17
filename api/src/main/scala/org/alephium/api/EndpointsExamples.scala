@@ -84,7 +84,7 @@ trait EndpointsExamples {
     simpleExample(AVector(BrokerInfo.unsafe(cliqueId, 1, 1, inetSocketAddress)))
 
   implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
-    simpleExample(AVector(PeerMisbehavior(inetSocketAddress, PeerStatus.Penalty(42))))
+    simpleExample(AVector(PeerMisbehavior(inetAddress, PeerStatus.Penalty(42))))
 
   implicit val txsExamples: List[Example[AVector[Tx]]] =
     simpleExample(

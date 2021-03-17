@@ -34,7 +34,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   it should "penalize peer" in new Fixture {
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer, Penalty(20)))))
+    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(20)))))
   }
 
   it should "confirm known peer" in new Fixture {
@@ -51,7 +51,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   it should "ban and refuse peer that misbehaved " in new Fixture {
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer, Penalty(20)))))
+    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(20)))))
 
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! Spamming(peer)
@@ -68,7 +68,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
       case Peers(peers) =>
         peers.map {
           case Peer(peerToTest, Banned(until)) =>
-            peerToTest is peer
+            peerToTest is peer.getAddress
             TimeStamp.now().isBefore(until) is true
           case peer => throw new AssertionError(s"Wrong peer: $peer")
 
@@ -86,7 +86,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     Thread.sleep(1)
 
     misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer, Penalty(0)))))
+    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(0)))))
   }
 
   trait Fixture extends Generators {

@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.mutable
 
@@ -25,22 +25,23 @@ import org.alephium.util.{discard, AVector, TimeStamp}
 
 class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
 
-  private val peers: mutable.Map[InetSocketAddress, MisbehaviorStatus] = mutable.Map.empty
+  private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
   def get(peer: InetSocketAddress): Option[MisbehaviorStatus] = {
-    peers.get(peer).map { status =>
-      withUpdatedStatus(peer, status) { (_, status) =>
+    val peerAddress = peer.getAddress
+    peers.get(peerAddress).map { status =>
+      withUpdatedStatus(peerAddress, status) { (_, status) =>
         status
       }
     }
   }
 
   def update(peer: InetSocketAddress, penalty: Penalty): Unit = {
-    peers.addOne(peer -> penalty)
+    peers.addOne(peer.getAddress -> penalty)
   }
 
   def ban(peer: InetSocketAddress, until: TimeStamp): Unit = {
-    peers.update(peer, Banned(until))
+    peers.update(peer.getAddress, Banned(until))
   }
 
   def isBanned(peer: InetSocketAddress): Boolean = {
@@ -56,7 +57,7 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
   }
 
   def remove(peer: InetSocketAddress): Unit = {
-    discard(peers.remove(peer))
+    discard(peers.remove(peer.getAddress))
   }
 
   def list(): AVector[Peer] = {
@@ -68,8 +69,8 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
     })
   }
 
-  private def withUpdatedStatus[A](peer: InetSocketAddress, status: MisbehaviorStatus)(
-      f: (InetSocketAddress, MisbehaviorStatus) => A): A = {
+  private def withUpdatedStatus[A](peer: InetAddress, status: MisbehaviorStatus)(
+      f: (InetAddress, MisbehaviorStatus) => A): A = {
     status match {
       case Banned(until) if until < TimeStamp.now() =>
         val newStatus = Penalty(0)

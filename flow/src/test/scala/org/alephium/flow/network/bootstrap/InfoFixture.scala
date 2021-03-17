@@ -41,7 +41,7 @@ trait InfoFixture extends ModelGenerators {
       score <- Gen.choose(0, 42)
     } yield {
       val peers = info.internalAddresses.map { address =>
-        MisbehaviorManager.Peer(address, MisbehaviorManager.Penalty(score))
+        MisbehaviorManager.Peer(address.getAddress, MisbehaviorManager.Penalty(score))
       }
       MisbehaviorManager.Peers(peers)
     }

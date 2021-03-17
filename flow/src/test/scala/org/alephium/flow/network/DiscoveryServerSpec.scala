@@ -249,7 +249,7 @@ class DiscoveryServerSpec
         .futureValue
         .peers
         .head
-        .peer is address1
+        .peer is address1.getAddress
     }
   }
 
