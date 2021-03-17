@@ -29,41 +29,35 @@ import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload, Pong}
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{BrokerInfo, NetworkType}
 import org.alephium.util._
 
-class Injected[T](injection: ByteString => Option[ByteString], ref: ActorRef)
-    extends ActorRefT[T](ref) {
+class Injected[T](injection: ByteString => ByteString, ref: ActorRef) extends ActorRefT[T](ref) {
   override def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit = {
     message match {
-      case Tcp.Write(data, ack) =>
-        injection.apply(data) match {
-          case Some(injectedData) =>
-            ref.!(Tcp.Write(injectedData, ack))(sender)
-          case None =>
-            ref.!(message)(sender)
-        }
-      case _ =>
-        ref.!(message)(sender)
+      case Tcp.Write(data, ack) => ref.!(Tcp.Write(injection(data), ack))(sender)
+      case _                    => ref.!(message)(sender)
     }
   }
 }
 
 object Injected {
-  def apply[T](injection: ByteString => Option[ByteString], ref: ActorRef): Injected[T] =
+  def apply[T](injection: ByteString => ByteString, ref: ActorRef): Injected[T] =
     new Injected(injection, ref)
+
+  def noModification[T](ref: ActorRef): Injected[T] = apply[T](identity, ref)
 
   def payload[T](injection: PartialFunction[Payload, Payload], ref: ActorRef)(
       implicit groupConfig: GroupConfig,
       networkConfig: NetworkConfig): Injected[T] = {
-    val injectionData: ByteString => Option[ByteString] = data => {
+    val injectionData: ByteString => ByteString = data => {
       val payload = Message.deserialize(data, networkConfig.networkType).toOption.get.payload
       if (injection.isDefinedAt(payload)) {
         val injected     = injection.apply(payload)
         val injectedData = Message.serialize(injected, networkConfig.networkType)
-        Some(injectedData)
+        injectedData
       } else {
-        None
+        data
       }
     }
 
@@ -87,11 +81,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "support injection" in new Fixture("clique-2-node-clique-1-node-injection") {
-    val injection: PartialFunction[Payload, Payload] = {
-      case payload => payload
-    }
-
-    test(2, 1, connectionBuild = Injected.payload(injection, _))
+    test(2, 1, connectionBuild = Injected.noModification)
   }
 
   class Fixture(name: String) extends TestFixture(name) {
@@ -155,21 +145,28 @@ class InterCliqueSyncTest extends AlephiumSpec {
     // scalastyle:on method.length
   }
 
-  ignore should "ban node if not same network type" in new TestFixture("2-nodes") {
+  it should "ban node if not same network type" in new TestFixture("2-nodes") {
     val server0 = bootClique(1).head
     server0.start().futureValue is ()
 
+    val currentNetworkType = config.network.networkType
+    currentNetworkType isnot NetworkType.Mainnet
+    val modifier: ByteString => ByteString = { data =>
+      val message = Message.deserialize(data, currentNetworkType).toOption.get
+      Message.serialize(message.payload, NetworkType.Mainnet)
+    }
     val server1 =
-      bootClique(1,
-                 bootstrap = Some(
-                   new InetSocketAddress("localhost",
-                                         server0.config.network.coordinatorAddress.getPort))).head
+      bootClique(
+        1,
+        bootstrap = Some(
+          new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
+        connectionBuild = Injected.apply(modifier, _)).head
     server1.start().futureValue is ()
 
     eventually {
       val misbehaviors1 =
         request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                          restPort(server1.config.network.bindAddress.getPort))
+                                          restPort(server0.config.network.bindAddress.getPort))
       misbehaviors1.map(_.status).exists {
         case PeerStatus.Banned(_) => true
         case _                    => false
@@ -212,8 +209,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "ban node if spamming" in new TestFixture("2-nodes") {
-    val injectionData: ByteString => Option[ByteString] = { _ =>
-      Some(ByteString.fromArray(Array.fill[Byte](51)(-1)))
+    val injectionData: ByteString => ByteString = { _ =>
+      ByteString.fromArray(Array.fill[Byte](51)(-1))
     }
 
     val server0 = bootClique(1).head
