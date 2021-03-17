@@ -18,7 +18,7 @@ package org.alephium.flow.network.sync
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Cancellable, Props, Terminated}
+import akka.actor.{Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
@@ -36,6 +36,7 @@ object BlockFlowSynchronizer {
   case object Sync                                                      extends Command
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
   final case class BlockFinalized(hash: BlockHash)                      extends Command
+  case object CleanDownloading                                          extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
@@ -44,11 +45,11 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     with BrokerStatusTracker {
   import BlockFlowSynchronizer._
 
-  var syncTick: Option[Cancellable] = None
-
   override def preStart(): Unit = {
     super.preStart()
-    syncTick = Some(scheduleCancellable(self, Sync, Duration.ofSecondsUnsafe(2)))
+    scheduleCancellable(self, Sync, Duration.ofSecondsUnsafe(2))
+    scheduleCancellable(self, CleanDownloading, Duration.ofSecondsUnsafe(30))
+    ()
   }
 
   override def receive: Receive = {
@@ -68,6 +69,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
+    case CleanDownloading        => cleanupDownloading(Duration.ofMinutesUnsafe(2))
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
