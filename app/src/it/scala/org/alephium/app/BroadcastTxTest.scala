@@ -28,6 +28,8 @@ class BroadcastTxTest extends AlephiumSpec {
     val server2 = bootNode(publicPort = port2, brokerId = 1)
     Seq(server1.start(), server2.start()).foreach(_.futureValue is (()))
 
+    eventually(request[SelfClique](getSelfClique).synced is true)
+
     val selfClique1 = request[SelfClique](getSelfClique)
     val group1      = request[Group](getGroup(address))
     val index1      = group1.group / selfClique1.groupNumPerBroker
@@ -54,12 +56,16 @@ class BroadcastTxTest extends AlephiumSpec {
 
     clique1.map(_.start()).foreach(_.futureValue is (()))
 
+    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
+
     val clique2 =
       bootClique(nbOfNodes = 1,
                  bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
     val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
     clique2.map(_.start()).foreach(_.futureValue is (()))
+
+    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 
     val tx =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
