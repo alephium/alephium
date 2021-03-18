@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Props, Stash}
 import akka.io.Tcp
 
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
@@ -70,7 +70,9 @@ class CliqueCoordinatorBootstrapper(
       cliqueCoordinator.forward(c)
     case Bootstrapper.ForwardConnection =>
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
+      unstashAll()
       context become awaitInfoWithForward
+    case _ => stash()
   }
 }
 
@@ -95,7 +97,7 @@ class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Co
   override def receive: Receive = awaitInfoWithForward
 }
 
-trait BootstrapperHandler extends BaseActor {
+trait BootstrapperHandler extends BaseActor with Stash {
   val tcpController: ActorRefT[TcpController.Command]
   val cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -103,14 +105,17 @@ trait BootstrapperHandler extends BaseActor {
     tcpController ! TcpController.Start(self)
   }
 
-  def awaitInfoWithForward: Receive = awaitInfo orElse forwardConnection
+  def awaitInfoWithForward: Receive = forwardConnection orElse awaitInfo
 
   private def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
       cliqueManager ! CliqueManager.Start(intraCliqueInfo.cliqueInfo)
 
+      unstashAll()
       context become (ready(intraCliqueInfo) orElse forwardConnection)
+
+    case _ => stash()
   }
 
   def ready(cliqueInfo: IntraCliqueInfo): Receive = {
