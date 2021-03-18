@@ -97,6 +97,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
       Future.sequence(clique1.map(_.start())).futureValue
       startWS(wsPort(masterPortClique1))
 
+      eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
+
       clique1.foreach { server =>
         request[Boolean](startMining, restPort(server.config.network.bindAddress.getPort)) is true
       }
@@ -116,6 +118,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
       Future.sequence(clique2.map(_.start())).futureValue
+
+      eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 
       clique2.foreach { server =>
         eventually {
