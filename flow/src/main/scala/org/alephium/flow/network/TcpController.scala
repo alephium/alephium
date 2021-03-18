@@ -125,7 +125,7 @@ class TcpController(bindAddress: InetSocketAddress,
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
-    case Tcp.Closed =>
+    case _: Tcp.ConnectionClosed =>
       ()
     case Terminated(connection) =>
       removeConnection(connection)
@@ -151,7 +151,7 @@ class TcpController(bindAddress: InetSocketAddress,
       case (socketAddress, connection) =>
         val shouldKeep = socketAddress.getAddress != bannedAddress
         if (!shouldKeep) {
-          connection ! Close
+          connection ! Tcp.Abort
           log.debug(s"Closing connection with $bannedAddress")
         }
         shouldKeep

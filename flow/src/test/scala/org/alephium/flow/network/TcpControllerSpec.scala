@@ -44,6 +44,8 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)
+      expectMsgType[Tcp.Connected]
+
       val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
       controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
 
@@ -87,15 +89,18 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
   }
 
   it should "remove banned connections" in new Fixture {
-    val (address, connection) = connectToController()
+    val (address, _) = connectToController()
     controllerActor.confirmedConnections.contains(address) is true
 
     controller ! MisbehaviorManager.PeerBanned(InetAddress.getByName("8.8.8.8"))
-    controllerActor.confirmedConnections.contains(address) is true
+    eventually {
+      controllerActor.confirmedConnections.contains(address) is true
+    }
 
     controller ! MisbehaviorManager.PeerBanned(address.getAddress)
-    controllerActor.confirmedConnections.contains(address) is false
-    expectTerminated(connection)
+    eventually {
+      controllerActor.confirmedConnections.contains(address) is false
+    }
   }
 
   it should "handle outgoing connections" in {
