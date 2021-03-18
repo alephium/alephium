@@ -104,7 +104,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
         context.actorOf(props, name)
         ()
       }
-    case CliqueManager.HandShaked(brokerInfo) =>
+    case CliqueManager.HandShaked(brokerInfo, _) =>
       log.debug(s"Start syncing with intra-clique node: ${brokerInfo.address}")
       if (brokerInfo.cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")

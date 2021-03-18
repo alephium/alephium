@@ -34,7 +34,7 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
     super.handleHandshakeInfo(remoteBrokerInfo)
-    cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo)
+    cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
   }
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents

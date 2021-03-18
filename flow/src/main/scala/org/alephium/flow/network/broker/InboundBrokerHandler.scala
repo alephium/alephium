@@ -25,6 +25,8 @@ import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.{ActorRefT, Duration}
 
 trait InboundBrokerHandler extends BrokerHandler {
+  val connectionType: ConnectionType = InboundConnection
+
   def selfCliqueInfo: CliqueInfo
 
   implicit def networkSetting: NetworkSetting

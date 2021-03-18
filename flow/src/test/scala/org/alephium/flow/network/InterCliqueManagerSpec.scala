@@ -20,18 +20,17 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorRef
 import akka.io.Tcp
-import akka.testkit.{TestProbe}
+import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.flow.core.{BlockFlow, EmptyBlockFlow}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
-import org.alephium.flow.io.{Storages, StoragesFixture}
-import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
+import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.model.BrokerInfo
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, BaseActor, Duration, Random}
+import org.alephium.util._
 
 class InterCliqueManagerSpec
     extends AlephiumActorSpec("InterCliqueManagerSpec")
@@ -56,7 +55,7 @@ class InterCliqueManagerSpec
 
       inbound.isDefined is true
 
-      interCliqueManager ! CliqueManager.HandShaked(peerInfo)
+      interCliqueManager ! CliqueManager.HandShaked(peerInfo, InboundConnection)
       getPeers() is Seq(peer)
 
       system.stop(inbound.get)
@@ -79,7 +78,7 @@ class InterCliqueManagerSpec
 
       outbound.isDefined is true
 
-      interCliqueManager ! CliqueManager.HandShaked(peerInfo)
+      interCliqueManager ! CliqueManager.HandShaked(peerInfo, InboundConnection)
       getPeers() is Seq(peer)
 
       system.stop(outbound.get)
@@ -90,23 +89,63 @@ class InterCliqueManagerSpec
     getPeers() is Seq.empty
   }
 
-  trait Fixture extends AlephiumConfigFixture with StoragesFixture.Default {
+  it should "check for unknown incoming connections" in new Fixture {
+    interCliqueManagerActor.checkForInConnection(0) is false
+    interCliqueManagerActor.checkForInConnection(1) is true
+  }
+
+  it should "not include brokers that are not related to our groups" in new Fixture {
+    val badBroker = irrelevantBrokerInfo()
+    interCliqueManagerActor.checkForOutConnection(badBroker, maxOutboundConnectionsPerGroup) is false
+    interCliqueManagerActor.checkForInConnection(badBroker, maxInboundConnectionsPerGroup) is false
+  }
+
+  it should "not re-add existing brokers" in new Fixture {
+    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is true
+    interCliqueManagerActor.addBroker(broker, OutboundConnection, TestProbe().ref)
+    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is false
+  }
+
+  it should "not accept incoming connection when the number of inbound connections is large" in new Fixture {
+    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.checkForInConnection(broker, maxInboundConnectionsPerGroup) is true
+    interCliqueManagerActor.checkForInConnection(broker, 0) is false
+
+    val newBroker = newBrokerInfo(broker)
+    interCliqueManagerActor.addBroker(broker, InboundConnection, TestProbe().ref)
+    interCliqueManagerActor.checkForInConnection(newBroker, 1) is false
+    interCliqueManagerActor.checkForInConnection(newBroker, 2) is true
+  }
+
+  it should "not accept outbound connection when the number of outbound connections is large" in new Fixture {
+    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is true
+    interCliqueManagerActor.checkForOutConnection(broker, 0) is false
+
+    val newBroker = newBrokerInfo(broker)
+    interCliqueManagerActor.addBroker(broker, OutboundConnection, TestProbe().ref)
+    interCliqueManagerActor.checkForOutConnection(newBroker, 1) is false
+    interCliqueManagerActor.checkForOutConnection(newBroker, 2) is true
+  }
+
+  trait Fixture extends FlowFixture with Generators {
 
     val cliqueInfo = cliqueInfoGen.sample.get
 
     val discoveryServer       = TestProbe()
     val blockFlowSynchronizer = TestProbe()
     val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
-    val blockflow: BlockFlow  = new InterCliqueManagerSpec.EmptyBlockFlowImpl(storages)
 
     val parentName = s"InterCliqueManager-${Random.source.nextInt}"
-    val interCliqueManager = system.actorOf(
+    val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(cliqueInfo,
-                               blockflow,
+                               blockFlow,
                                allHandlers,
                                ActorRefT(discoveryServer.ref),
                                ActorRefT(blockFlowSynchronizer.ref)),
       parentName)
+    val interCliqueManagerActor = interCliqueManager.underlyingActor
 
     lazy val peer = socketAddressGen.sample.get
 
@@ -129,10 +168,20 @@ class InterCliqueManagerSpec
         .mapTo[Seq[InterCliqueManager.SyncStatus]]
         .futureValue
         .map(_.address)
-  }
-}
 
-object InterCliqueManagerSpec {
-  class EmptyBlockFlowImpl(val storages: Storages)(implicit val config: AlephiumConfig)
-      extends EmptyBlockFlow
+    def irrelevantBrokerInfo(): BrokerInfo = {
+      brokerInfoGen.retryUntil(!_.intersect(brokerConfig)).sample.get
+    }
+
+    def relevantBrokerInfo(): BrokerInfo = {
+      brokerInfoGen.retryUntil(_.intersect(brokerConfig)).sample.get
+    }
+
+    def newBrokerInfo(info: BrokerInfo): BrokerInfo = {
+      BrokerInfo.unsafe(cliqueIdGen.sample.get,
+                        info.brokerId,
+                        info.groupNumPerBroker,
+                        socketAddressGen.sample.get)
+    }
+  }
 }
