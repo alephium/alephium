@@ -19,6 +19,7 @@ package org.alephium.app
 import java.net.InetSocketAddress
 
 import org.alephium.api.model._
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 class BroadcastTxTest extends AlephiumSpec {
@@ -55,8 +56,7 @@ class BroadcastTxTest extends AlephiumSpec {
     val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
     clique1.map(_.start()).foreach(_.futureValue is (()))
-
-    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
+    val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
     val clique2 =
       bootClique(nbOfNodes = 1,
@@ -64,8 +64,21 @@ class BroadcastTxTest extends AlephiumSpec {
     val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
     clique2.map(_.start()).foreach(_.futureValue is (()))
+    clique2.foreach { server =>
+      eventually {
+        val interCliquePeers =
+          request[Seq[InterCliquePeerInfo]](
+            getInterCliquePeerInfo,
+            restPort(server.config.network.bindAddress.getPort)).head
+        interCliquePeers.cliqueId is selfClique1.cliqueId
+        interCliquePeers.isSynced is true
 
-    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
+        val discoveredNeighbors =
+          request[Seq[BrokerInfo]](getDiscoveredNeighbors,
+                                   restPort(server.config.network.bindAddress.getPort))
+        discoveredNeighbors.length is 2
+      }
+    }
 
     val tx =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
