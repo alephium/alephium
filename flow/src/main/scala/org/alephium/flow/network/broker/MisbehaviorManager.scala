@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.Props
 import akka.io.Tcp
@@ -41,9 +41,9 @@ object MisbehaviorManager {
 
   case object GetPeers extends Command
 
-  final case class PeerBanned(remote: InetSocketAddress) extends EventStream.Event
+  final case class PeerBanned(remote: InetAddress) extends EventStream.Event
 
-  final case class Peer(peer: InetSocketAddress, status: MisbehaviorStatus)
+  final case class Peer(peer: InetAddress, status: MisbehaviorStatus)
   final case class Peers(peers: AVector[Peer])
 
   sealed trait Critical extends Misbehavior {
@@ -82,7 +82,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
   }
 
   private def handleMisbehavior(misbehavior: Misbehavior): Unit = {
-    val peer = misbehavior.remoteAddress
+    val peer = misbehavior.remoteAddress.getAddress
     misbehaviorStorage.get(peer) match {
       case None => handlePenalty(peer, misbehavior.penalty)
       case Some(status) =>
@@ -98,7 +98,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
     }
   }
 
-  private def handlePenalty(peer: InetSocketAddress, penalty: Int) = {
+  private def handlePenalty(peer: InetAddress, penalty: Int) = {
     if (penalty >= misbehaviorThreshold) {
       log.debug(s"Ban $peer")
       banAndPublish(peer)
@@ -108,7 +108,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
     }
   }
 
-  private def banAndPublish(peer: InetSocketAddress) = {
+  private def banAndPublish(peer: InetAddress) = {
     log.info(s"Banning peer: $peer")
     misbehaviorStorage.ban(peer, TimeStamp.now().plusMillisUnsafe(banDuration.millis))
     publishEvent(PeerBanned(peer))
@@ -116,14 +116,14 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
 
   override def receive: Receive = {
     case ConfirmConnection(connected, connection) =>
-      if (misbehaviorStorage.isBanned(connected.remoteAddress)) {
+      if (misbehaviorStorage.isBanned(connected.remoteAddress.getAddress)) {
         sender() ! TcpController.ConnectionDenied(connected, connection)
       } else {
         sender() ! TcpController.ConnectionConfirmed(connected, connection)
       }
 
     case ConfirmPeer(peerInfo) =>
-      if (misbehaviorStorage.isBanned(peerInfo.address)) {
+      if (misbehaviorStorage.isBanned(peerInfo.address.getAddress)) {
         sender() ! DiscoveryServer.PeerDenied(peerInfo)
       } else {
         sender() ! DiscoveryServer.PeerConfirmed(peerInfo)
@@ -132,6 +132,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
     case misbehavior: Misbehavior =>
       log.debug(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
+
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())
   }

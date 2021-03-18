@@ -155,7 +155,7 @@ class DiscoveryServerStateSpec
     addToTable(peerInfo)
     state.isInTable(peerInfo.peerId) is true
 
-    state.banPeerFromAddress(peerInfo.address)
+    state.banPeerFromAddress(peerInfo.address.getAddress)
     state.isInTable(peerInfo.peerId) is false
   }
 

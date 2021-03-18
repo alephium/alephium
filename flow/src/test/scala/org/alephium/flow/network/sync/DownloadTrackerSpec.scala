@@ -24,7 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
   trait Fixture { F =>
@@ -64,16 +64,38 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
 
     downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
     expectMsg(BrokerHandler.DownloadBlocks(randomHashes))
-    downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
+    downloadTrack.underlyingActor.downloading.keys.toSet is randomHashes.toSet
 
     downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
     expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[BlockHash]))
-    downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
+    downloadTrack.underlyingActor.downloading.keys.toSet is randomHashes.toSet
 
     hashes.foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
-    downloadTrack.underlyingActor.downloading.toSet is randomHashes.toSet
+    downloadTrack.underlyingActor.downloading.keys.toSet is randomHashes.toSet
 
     (hashes ++ randomHashes).foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
     downloadTrack.underlyingActor.downloading.isEmpty is true
+  }
+
+  it should "cleanup expired downloading accordingly" in new Fixture {
+    val currentTs = TimeStamp.now()
+    val downloadingTs = AVector.tabulate(randomHashes.length)(k =>
+      currentTs.minusUnsafe(Duration.ofMinutesUnsafe(k.toLong)))
+
+    val downloadTrackObj = downloadTrack.underlyingActor
+
+    downloadingTs.indices.foreach { k =>
+      downloadTrackObj.downloading.addOne(randomHashes(k) -> downloadingTs(k))
+    }
+    downloadTrackObj.downloading.size is randomHashes.length
+
+    downloadTrackObj.cleanupDownloading(Duration.ofMinutesUnsafe(randomHashes.length.toLong))
+    downloadTrackObj.downloading.size is randomHashes.length
+
+    downloadTrackObj.cleanupDownloading(Duration.ofMinutesUnsafe(randomHashes.length.toLong - 1))
+    downloadTrackObj.downloading.size is randomHashes.length - 1
+
+    downloadTrackObj.cleanupDownloading(Duration.zero)
+    downloadTrackObj.downloading.size is 0
   }
 }

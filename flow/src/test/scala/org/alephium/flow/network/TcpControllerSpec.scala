@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.ActorRef
 import akka.io.{IO, Tcp}
@@ -44,6 +44,8 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)
+      expectMsgType[Tcp.Connected]
+
       val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
       controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
 
@@ -77,7 +79,25 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     val (address, connection) = connectToController()
     controllerActor.confirmedConnections.contains(address) is true
 
+    controllerActor.removeConnection(TestProbe().ref)
+    controllerActor.confirmedConnections.contains(address) is true
+
     system.stop(connection)
+    eventually {
+      controllerActor.confirmedConnections.contains(address) is false
+    }
+  }
+
+  it should "remove banned connections" in new Fixture {
+    val (address, _) = connectToController()
+    controllerActor.confirmedConnections.contains(address) is true
+
+    controller ! MisbehaviorManager.PeerBanned(InetAddress.getByName("8.8.8.8"))
+    eventually {
+      controllerActor.confirmedConnections.contains(address) is true
+    }
+
+    controller ! MisbehaviorManager.PeerBanned(address.getAddress)
     eventually {
       controllerActor.confirmedConnections.contains(address) is false
     }

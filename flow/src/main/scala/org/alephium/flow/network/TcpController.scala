@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.mutable
 
@@ -63,8 +63,8 @@ class TcpController(bindAddress: InetSocketAddress,
 
   val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.Map.empty
-  val confirmedConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
-    mutable.Map.empty
+  val confirmedConnections: mutable.HashMap[InetSocketAddress, ActorRefT[Tcp.Command]] =
+    mutable.HashMap.empty
 
   override def preStart(): Unit = {
     subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
@@ -125,18 +125,12 @@ class TcpController(bindAddress: InetSocketAddress,
       tcpManager ! Tcp.Connect(remote, pullMode = true)
     case TcpController.WorkFor(another) =>
       context become workFor(tcpListener, another)
-    case Tcp.Closed =>
+    case _: Tcp.ConnectionClosed =>
       ()
     case Terminated(connection) =>
-      val toRemove =
-        confirmedConnections.filter(_._2.ref == connection).keys
-      toRemove.foreach(confirmedConnections -= _)
-    case MisbehaviorManager.PeerBanned(remote) =>
-      confirmedConnections.get(remote).foreach { connection =>
-        connection ! Close
-        confirmedConnections -= remote
-        log.debug(s"Closing connection with $remote")
-      }
+      removeConnection(connection)
+    case MisbehaviorManager.PeerBanned(bannedAddress) =>
+      handleBannedPeer(bannedAddress)
   }
 
   def confirmConnection(target: ActorRef,
@@ -146,5 +140,21 @@ class TcpController(bindAddress: InetSocketAddress,
     confirmedConnections += connected.remoteAddress -> connection
     context watch connection.ref
     target.tell(connected, connection.ref)
+  }
+
+  def removeConnection(connection: ActorRef): Unit = {
+    confirmedConnections.filterInPlace((_, y) => y.ref != connection)
+  }
+
+  def handleBannedPeer(bannedAddress: InetAddress): Unit = {
+    confirmedConnections.filterInPlace {
+      case (socketAddress, connection) =>
+        val shouldKeep = socketAddress.getAddress != bannedAddress
+        if (!shouldKeep) {
+          connection ! Tcp.Abort
+          log.debug(s"Closing connection with $bannedAddress")
+        }
+        shouldKeep
+    }
   }
 }

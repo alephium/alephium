@@ -16,22 +16,22 @@
 
 package org.alephium.flow.network.broker
 
-import java.net.InetSocketAddress
+import java.net.InetAddress
 
 import org.alephium.flow.network.broker.MisbehaviorManager.{MisbehaviorStatus, Peer, Penalty}
 import org.alephium.util.{AVector, TimeStamp}
 
 trait MisbehaviorStorage {
 
-  def get(peer: InetSocketAddress): Option[MisbehaviorStatus]
+  def get(peer: InetAddress): Option[MisbehaviorStatus]
 
-  def update(peer: InetSocketAddress, penalty: Penalty): Unit
+  def update(peer: InetAddress, penalty: Penalty): Unit
 
-  def ban(peer: InetSocketAddress, until: TimeStamp): Unit
+  def ban(peer: InetAddress, until: TimeStamp): Unit
 
-  def isBanned(address: InetSocketAddress): Boolean
+  def isBanned(address: InetAddress): Boolean
 
-  def remove(peer: InetSocketAddress): Unit
+  def remove(peer: InetAddress): Unit
 
   def list(): AVector[Peer]
 }
