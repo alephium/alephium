@@ -143,6 +143,17 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "chain  tail and headOption/lastOption" in new Fixture {
+    val vector = AVector(1, 2, 3)
+    vector.headOption is Some(1)
+    vector.lastOption is Some(3)
+
+    vector.tail is AVector(2, 3)
+
+    vector.tail.headOption is Some(2)
+    vector.tail.lastOption is Some(3)
+  }
+
   it should "get element by index" in {
     forAll { xs: Array[A] =>
       whenever(xs.length >= 4) {
