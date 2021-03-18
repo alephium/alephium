@@ -14,19 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.flow.network.broker
 
-import org.alephium.util.Duration
-
-// scalastyle:off magic.number
-package object network {
-  val maxOutboundConnectionsPerGroup: Int = 10
-  val maxInboundConnectionsPerGroup: Int  = 40
-
-  val fastScanPeriod: Duration = Duration.ofMinutesUnsafe(1)
-
-  val syncFrequency: Duration        = Duration.ofSecondsUnsafe(2)
-  val syncCleanupFrequency: Duration = Duration.ofSecondsUnsafe(30)
-  val syncExpiryPeriod: Duration     = Duration.ofMinutesUnsafe(2)
-}
-// scalastyle:on magic.number
+sealed trait ConnectionType
+case object InboundConnection  extends ConnectionType
+case object OutboundConnection extends ConnectionType

@@ -30,6 +30,8 @@ object OutboundBrokerHandler {
 }
 
 trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
+  val connectionType: ConnectionType = OutboundConnection
+
   def selfCliqueInfo: CliqueInfo
 
   implicit def networkSetting: NetworkSetting

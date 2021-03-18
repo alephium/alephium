@@ -23,6 +23,7 @@ import akka.util.ByteString
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.ConnectionType
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
@@ -54,9 +55,10 @@ object CliqueManager {
                                origin: DataOrigin)
       extends Command
       with EventStream.Event
-  final case class HandShaked(brokerInfo: BrokerInfo) extends Command
-  final case class Synced(brokerInfo: BrokerInfo)     extends Command
-  final case object IsSelfCliqueReady                 extends Command
+  final case class HandShaked(brokerInfo: BrokerInfo, connectionType: ConnectionType)
+      extends Command
+  final case class Synced(brokerInfo: BrokerInfo) extends Command
+  final case object IsSelfCliqueReady             extends Command
 }
 
 class CliqueManager(blockflow: BlockFlow,

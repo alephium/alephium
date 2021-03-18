@@ -65,6 +65,8 @@ class TestBrokerHandler(val brokerConnectionHandler: ActorRefT[ConnectionHandler
                         val blockflow: BlockFlow)(implicit val brokerConfig: BrokerConfig,
                                                   val networkSetting: NetworkSetting)
     extends BrokerHandler {
+  val connectionType: ConnectionType = OutboundConnection
+
   override val remoteAddress: InetSocketAddress = SocketUtil.temporaryServerAddress()
 
   override def handShakeDuration: Duration = Duration.ofSecondsUnsafe(2)

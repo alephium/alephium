@@ -51,6 +51,8 @@ object BrokerHandler {
 trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHandler {
   import BrokerHandler._
 
+  def connectionType: ConnectionType
+
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
