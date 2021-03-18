@@ -34,7 +34,7 @@ final case class Target(bits: ByteString) extends Ordered[Target] {
 
   def toHexString: String = Hex.toHexString(bits)
 
-  override def toString: String = s"Target(toHexString)"
+  override def toString: String = s"Target($toHexString)"
 }
 
 object Target {
