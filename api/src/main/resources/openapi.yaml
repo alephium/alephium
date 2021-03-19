@@ -1184,6 +1184,11 @@ paths:
         required: true
         schema:
           type: string
+        examples:
+          Start mining:
+            value: start-mining
+          Stop mining:
+            value: stop-mining
       responses:
         '200':
           description: ''
