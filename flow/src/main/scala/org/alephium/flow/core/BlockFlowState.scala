@@ -338,17 +338,22 @@ trait BlockFlowState extends FlowTipsUtil {
                         fromUnlockScript: UnlockScript,
                         toLockupScript: LockupScript,
                         lockTimeOpt: Option[TimeStamp],
-                        value: U256): IOResult[Option[UnsignedTransaction]] = {
+                        value: U256): IOResult[Either[String, UnsignedTransaction]] = {
     getUtxos(fromLockupScript).map { utxos =>
-      val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
-      UnsignedTransaction
-        .transferAlf(utxos.map(_._1),
-                     balance,
-                     fromLockupScript,
-                     fromUnlockScript,
-                     toLockupScript,
-                     lockTimeOpt,
-                     value)
+      for {
+        totalAmount <- (value add defaultGasFee).toRight(
+          s"Amount overflow ($value + $defaultGasFee")
+        selectedUtxos <- UtxoUtils.select(utxos, totalAmount)
+        unsignedTx <- UnsignedTransaction
+          .transferAlf(selectedUtxos,
+                       fromLockupScript,
+                       fromUnlockScript,
+                       toLockupScript,
+                       lockTimeOpt,
+                       value)
+      } yield {
+        unsignedTx
+      }
     }
   }
 

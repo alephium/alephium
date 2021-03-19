@@ -178,13 +178,13 @@ object ServerFixture {
                                    fromUnlockScript: UnlockScript,
                                    toLockupScript: LockupScript,
                                    lockTimeOpt: Option[TimeStamp],
-                                   value: U256): IOResult[Option[UnsignedTransaction]] =
+                                   value: U256): IOResult[Either[String, UnsignedTransaction]] =
       lockTimeOpt match {
-        case None => Right(Some(dummyTx.unsigned))
+        case None => Right(Right(dummyTx.unsigned))
         case Some(lockTime) =>
           val outputs    = dummyTx.unsigned.fixedOutputs
           val newOutputs = outputs.map(_.copy(lockTime = lockTime))
-          Right(Some(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
+          Right(Right(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
       }
 
     override def getTxStatus(txId: Hash,

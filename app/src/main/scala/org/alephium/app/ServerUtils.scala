@@ -194,9 +194,9 @@ class ServerUtils(networkType: NetworkType) {
                                 toLockupScript,
                                 lockTimeOpt,
                                 value) match {
-      case Right(Some(unsignedTransaction)) => Right(unsignedTransaction)
-      case Right(None)                      => Left(apiError("Not enough balance"))
-      case Left(error)                      => failed(error)
+      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Left(error))                => Left(apiError(error))
+      case Left(error)                       => failed(error)
     }
   }
 

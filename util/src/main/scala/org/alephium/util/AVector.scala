@@ -52,7 +52,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def headOption: Option[A] = {
-    get(start)
+    Option.when(nonEmpty)(elems(start))
   }
 
   def last: A = {
@@ -61,7 +61,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def lastOption: Option[A] = {
-    get(end - 1)
+    Option.when(nonEmpty)(elems(end - 1))
   }
 
   def init: AVector[A] = {
