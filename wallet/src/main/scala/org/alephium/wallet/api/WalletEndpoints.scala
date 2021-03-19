@@ -60,7 +60,7 @@ trait WalletEndpoints
                       jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
       )
     )
-    .tag("Miners Features")
+    .tag("Miners")
     .description(
       "This endpoint can only be called if the wallet was created with the `miner = true` flag")
 

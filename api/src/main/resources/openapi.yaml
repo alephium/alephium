@@ -359,7 +359,7 @@ paths:
   /wallets/{wallet_name}/miner-addresses:
     get:
       tags:
-      - Miners Features
+      - Miners
       summary: List all miner addresses per group
       description: This endpoint can only be called if the wallet was created with
         the `miner = true` flag
@@ -443,7 +443,7 @@ paths:
   /wallets/{wallet_name}/deriveNextMinerAddresses:
     post:
       tags:
-      - Miners Features
+      - Miners
       summary: Derive your next miner addresse for each group
       description: "\nYour wallet need to have been created with the miner flag set\
         \ to true\n      "
