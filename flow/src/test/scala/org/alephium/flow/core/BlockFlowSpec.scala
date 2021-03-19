@@ -425,7 +425,7 @@ class BlockFlowSpec extends AlephiumSpec {
                              lockTimeOpt,
                              ALF.alf(1))
           .rightValue
-          .get
+          .rightValue
       unsigned.fixedOutputs.length is 2
       unsigned.fixedOutputs(0).lockTime is lockTimeOpt.getOrElse(TimeStamp.zero)
       unsigned.fixedOutputs(1).lockTime is TimeStamp.zero
@@ -445,12 +445,12 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
     blockFlow
       .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
-      .rightValue is None
+      .rightValue is Left("Not enough balance")
     Thread.sleep(2000)
     blockFlow
       .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue
-      .nonEmpty is true
+      .isRight is true
   }
 
   behavior of "confirmations"

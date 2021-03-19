@@ -35,37 +35,37 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
   it should "return the matching utxo when exists" in new Fixture {
     val utxos = buildUtxos(2, 1, 3)
 
-    UtxoUtils.select(utxos, U256.unsafe(1)) is Some(AVector(utxos(1)))
+    UtxoUtils.select(utxos, U256.unsafe(1)) is Right(AVector(utxos(1)))
   }
 
   it should "return everything in case of wallet dump" in new Fixture {
     val utxos = buildUtxos(1, 2, 3)
 
-    UtxoUtils.select(utxos, U256.unsafe(6)) is Some(AVector(utxos(0), utxos(1), utxos(2)))
+    UtxoUtils.select(utxos, U256.unsafe(6)) is Right(AVector(utxos(0), utxos(1), utxos(2)))
   }
 
   it should "return all the smallers value if their sum match the target" in new Fixture {
     val utxos = buildUtxos(1, 2, 3, 7, 8, 9)
 
-    UtxoUtils.select(utxos, U256.unsafe(6)) is Some(AVector(utxos(0), utxos(1), utxos(2)))
+    UtxoUtils.select(utxos, U256.unsafe(6)) is Right(AVector(utxos(0), utxos(1), utxos(2)))
   }
 
   it should "return the smallest greater if the sum of the smallest is less than the target" in new Fixture {
     val utxos = buildUtxos(1, 2, 3, 8, 9)
 
-    UtxoUtils.select(utxos, U256.unsafe(7)) is Some(AVector(utxos(3)))
+    UtxoUtils.select(utxos, U256.unsafe(7)) is Right(AVector(utxos(3)))
   }
 
-  it should "return None if not enough amount" in new Fixture {
+  it should "return error if not enough amount" in new Fixture {
     val utxos = buildUtxos(1, 2, 3)
 
-    UtxoUtils.select(utxos, U256.unsafe(7)) is None
+    UtxoUtils.select(utxos, U256.unsafe(7)) is Left("Not enough balance")
   }
 
   it should "return the minimum set of smallers value if their sum is bigger than the match" in new Fixture {
     val utxos = buildUtxos(1, 2, 3, 7, 8, 9)
 
-    UtxoUtils.select(utxos, U256.unsafe(5)) is Some(AVector(utxos(1), utxos(2)))
+    UtxoUtils.select(utxos, U256.unsafe(5)) is Right(AVector(utxos(1), utxos(2)))
   }
 
   trait Fixture extends AlephiumConfigFixture {

@@ -51,22 +51,22 @@ object UtxoUtils {
     }
   }
 
-  def select(utxos: AVector[Asset], target: U256): Option[AVector[Asset]] = {
+  def select(utxos: AVector[Asset], target: U256): Either[String, AVector[Asset]] = {
     val state = buildState(utxos, target)
 
     val smallersSum = sumAssets(state.smallers)
 
     state match {
       case State(_, _, Some(matching)) =>
-        Some(AVector(matching))
+        Right(AVector(matching))
       case State(smallers, _, _) if smallersSum == target =>
-        Some(smallers)
+        Right(smallers)
       case State(_, Some(smallestGreater), _) if smallersSum < target =>
-        Some(AVector(smallestGreater))
+        Right(AVector(smallestGreater))
       case State(smallers, _, _) if smallersSum > target =>
-        Some(reduceSmallerValue(smallers, smallersSum, target))
-      case State(_, Some(smallestGreater), _) => Some(AVector(smallestGreater))
-      case _                                  => None
+        Right(reduceSmallerValue(smallers, smallersSum, target))
+      case State(_, Some(smallestGreater), _) => Right(AVector(smallestGreater))
+      case _                                  => Left("Not enough balance")
     }
   }
 

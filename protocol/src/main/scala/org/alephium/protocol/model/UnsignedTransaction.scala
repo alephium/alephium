@@ -92,9 +92,9 @@ object UnsignedTransaction {
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
                   lockTimeOpt: Option[TimeStamp],
-                  amount: U256): Option[UnsignedTransaction] = {
+                  amount: U256): Either[String, UnsignedTransaction] = {
     val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
-    for {
+    (for {
       remainder0 <- inputSum.sub(amount)
       remainder  <- remainder0.sub(defaultGasFee)
     } yield {
@@ -108,6 +108,6 @@ object UnsignedTransaction {
           AVector[AssetOutput](toOutput)
         }
       UnsignedTransaction(inputs.map { case (ref, _) => TxInput(ref, fromUnlockScript) }, outputs)
-    }
+    }).toRight(s"Not enough balance")
   }
 }
