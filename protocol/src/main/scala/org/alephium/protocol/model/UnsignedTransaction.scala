@@ -87,13 +87,13 @@ object UnsignedTransaction {
     UnsignedTransaction(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
-  def transferAlf(inputs: AVector[AssetOutputRef],
-                  inputSum: U256,
+  def transferAlf(inputs: AVector[(AssetOutputRef, AssetOutput)],
                   fromLockupScript: LockupScript,
                   fromUnlockScript: UnlockScript,
                   toLockupScript: LockupScript,
                   lockTimeOpt: Option[TimeStamp],
                   amount: U256): Option[UnsignedTransaction] = {
+    val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
     for {
       remainder0 <- inputSum.sub(amount)
       remainder  <- remainder0.sub(defaultGasFee)
@@ -107,7 +107,7 @@ object UnsignedTransaction {
         } else {
           AVector[AssetOutput](toOutput)
         }
-      UnsignedTransaction(inputs.map(TxInput(_, fromUnlockScript)), outputs)
+      UnsignedTransaction(inputs.map { case (ref, _) => TxInput(ref, fromUnlockScript) }, outputs)
     }
   }
 }
