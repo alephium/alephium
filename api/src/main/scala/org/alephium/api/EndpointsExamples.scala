@@ -66,6 +66,10 @@ trait EndpointsExamples {
 
   def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
+  val minerActionExamples: List[Example[MinerAction]] = List(
+    Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
+    Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None))
+
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(
       SelfClique(cliqueId,

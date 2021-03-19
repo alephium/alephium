@@ -197,7 +197,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
-      .in(query[MinerAction]("action"))
+      .in(query[MinerAction]("action").examples(minerActionExamples))
       .out(jsonBody[Boolean])
       .summary("Execute an action on miners")
 
