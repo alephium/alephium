@@ -27,7 +27,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, AVector, Random, TimeStamp}
 
 class BlockFlowSpec extends AlephiumSpec {
@@ -412,18 +412,12 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "prepare tx with lock time" in new FlowFixture {
     def test(lockTimeOpt: Option[TimeStamp]) = {
       val (_, publicKey, _) = genesisKeys(0)
-      val fromLockupScript  = LockupScript.p2pkh(publicKey)
-      val unlockScript      = UnlockScript.p2pkh(publicKey)
       val (_, toPublicKey)  = GroupIndex.unsafe(1).generateKey
       val toLockupScript    = LockupScript.p2pkh(toPublicKey)
 
       val unsigned =
         blockFlow
-          .prepareUnsignedTx(fromLockupScript,
-                             unlockScript,
-                             toLockupScript,
-                             lockTimeOpt,
-                             ALF.alf(1))
+          .prepareUnsignedTx(publicKey, toLockupScript, lockTimeOpt, ALF.alf(1))
           .rightValue
           .rightValue
       unsigned.fixedOutputs.length is 2
@@ -441,14 +435,13 @@ class BlockFlowSpec extends AlephiumSpec {
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     val toPrivateKey   = keyManager(toLockupScript)
-    val toUnlockScript = UnlockScript.p2pkh(toPrivateKey.publicKey)
     addAndCheck(blockFlow, block)
     blockFlow
-      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue is Left("Not enough balance")
     Thread.sleep(2000)
     blockFlow
-      .prepareUnsignedTx(toLockupScript, toUnlockScript, toLockupScript, None, ALF.nanoAlf(1))
+      .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue
       .isRight is true
   }

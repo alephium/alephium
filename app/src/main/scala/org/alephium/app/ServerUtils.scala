@@ -187,13 +187,7 @@ class ServerUtils(networkType: NetworkType) {
                                  toLockupScript: LockupScript,
                                  lockTimeOpt: Option[TimeStamp],
                                  value: U256): Try[UnsignedTransaction] = {
-    val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
-    blockFlow.prepareUnsignedTx(fromLockupScript,
-                                fromUnlockScript,
-                                toLockupScript,
-                                lockTimeOpt,
-                                value) match {
+    blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(apiError(error))
       case Left(error)                       => failed(error)

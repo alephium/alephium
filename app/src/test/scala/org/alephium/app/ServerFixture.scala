@@ -23,8 +23,7 @@ import akka.testkit.TestProbe
 import io.circe.Encoder
 import io.circe.syntax._
 
-import org.alephium.api.ApiModelCodec
-import org.alephium.api.CirceUtils
+import org.alephium.api.{ApiModelCodec, CirceUtils}
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
@@ -36,9 +35,9 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash, PrivateKey, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -174,11 +173,10 @@ object ServerFixture {
     override def getBalance(lockupScript: LockupScript): IOResult[(U256, Int)] =
       Right((U256.Zero, 0))
 
-    override def prepareUnsignedTx(fromLockupScript: LockupScript,
-                                   fromUnlockScript: UnlockScript,
+    override def prepareUnsignedTx(fromKey: PublicKey,
                                    toLockupScript: LockupScript,
                                    lockTimeOpt: Option[TimeStamp],
-                                   value: U256): IOResult[Either[String, UnsignedTransaction]] =
+                                   amount: U256): IOResult[Either[String, UnsignedTransaction]] =
       lockTimeOpt match {
         case None => Right(Right(dummyTx.unsigned))
         case Some(lockTime) =>

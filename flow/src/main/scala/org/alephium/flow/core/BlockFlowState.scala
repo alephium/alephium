@@ -23,7 +23,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -334,23 +334,34 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  def prepareUnsignedTx(fromLockupScript: LockupScript,
-                        fromUnlockScript: UnlockScript,
+  def prepareUnsignedTx(fromKey: PublicKey,
                         toLockupScript: LockupScript,
                         lockTimeOpt: Option[TimeStamp],
-                        value: U256): IOResult[Either[String, UnsignedTransaction]] = {
+                        amount: U256): IOResult[Either[String, UnsignedTransaction]] = {
+    val fromLockupScript = LockupScript.p2pkh(fromKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     getUtxos(fromLockupScript).map { utxos =>
       for {
-        totalAmount <- (value add defaultGasFee).toRight(
-          s"Amount overflow ($value + $defaultGasFee")
-        selectedUtxos <- UtxoUtils.select(utxos, totalAmount)
+        selected <- UtxoUtils.select(utxos,
+                                     amount,
+                                     defaultGasFee,
+                                     defaultGasFeePerInput,
+                                     defaultGasFeePerOutput,
+                                     2) // sometime only 1 output, but 2 is always safe
+        gas <- GasBox
+          .from(selected.gasFee, defaultGasPrice)
+          .toRight(s"Invalid gas: ${selected.gasFee} / $defaultGasPrice")
         unsignedTx <- UnsignedTransaction
-          .transferAlf(selectedUtxos,
-                       fromLockupScript,
-                       fromUnlockScript,
-                       toLockupScript,
-                       lockTimeOpt,
-                       value)
+          .transferAlf(
+            selected.assets,
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            amount,
+            gas,
+            defaultGasPrice
+          )
       } yield {
         unsignedTx
       }

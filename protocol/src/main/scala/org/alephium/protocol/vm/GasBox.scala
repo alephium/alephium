@@ -42,6 +42,15 @@ object GasBox {
     new GasBox(initialGas)
   }
 
+  def from(gas: Int): Option[GasBox] = Option.when(gas >= 0)(new GasBox(gas))
+
+  def from(gasFee: U256, gasPrice: U256): Option[GasBox] = {
+    for {
+      rawGas <- gasFee.div(gasPrice)
+      result <- from(rawGas.toBigInt.intValue())
+    } yield result
+  }
+
   def unsafeTest(gas: Int): GasBox = new GasBox(gas)
 
   def validate(box: GasBox): Boolean = box.value >= minimalGas.value
