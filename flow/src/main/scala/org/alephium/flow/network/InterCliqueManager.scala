@@ -96,7 +96,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
     case Tcp.Connected(remoteAddress, _) =>
       if (checkForInConnection(maxInboundConnectionsPerGroup)) {
         log.info(s"Connected to $remoteAddress")
-        val name = BaseActor.envalidActorName(s"InboundBrokerHandler-${remoteAddress}")
         val props =
           InboundBrokerHandler.props(
             selfCliqueInfo,
@@ -107,7 +106,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
             ActorRefT[CliqueManager.Command](self),
             blockFlowSynchronizer
           )
-        val in = context.actorOf(props, name)
+        val in = context.actorOf(props)
         context.watchWith(in, PeerDisconnected(remoteAddress))
         ()
       } else {
@@ -164,7 +163,6 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     log.debug(s"Try to connect to $brokerInfo")
-    val name = BaseActor.envalidActorName(s"OutboundBrokerHandler-$brokerInfo")
     val props =
       OutboundBrokerHandler.props(selfCliqueInfo,
                                   brokerInfo,
@@ -172,7 +170,7 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
                                   allHandlers,
                                   ActorRefT(self),
                                   blockFlowSynchronizer)
-    val out = context.actorOf(props, name)
+    val out = context.actorOf(props)
     context.watchWith(out, PeerDisconnected(brokerInfo.address))
     ()
   }
@@ -191,7 +189,7 @@ trait InterCliqueManagerState {
   implicit def brokerConfig: BrokerConfig
 
   // The key is (CliqueId, BrokerId)
-  private val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
+  val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
 
   def addBroker(brokerInfo: BrokerInfo,
                 connectionType: ConnectionType,

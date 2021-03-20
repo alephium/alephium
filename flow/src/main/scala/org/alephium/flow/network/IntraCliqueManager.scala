@@ -62,7 +62,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
   override def preStart(): Unit = {
     cliqueInfo.intraBrokers.foreach { remoteBroker =>
       if (remoteBroker.brokerId > brokerConfig.brokerId) {
-        val address = remoteBroker.address
         log.debug(s"Connect to broker $remoteBroker")
         val props = OutboundBrokerHandler.props(cliqueInfo,
                                                 remoteBroker,
@@ -70,7 +69,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                                                 allHandlers,
                                                 ActorRefT[CliqueManager.Command](self),
                                                 blockFlowSynchronizer)
-        context.actorOf(props, BaseActor.envalidActorName(s"OutboundBrokerHandler-$address"))
+        context.actorOf(props)
       }
     }
 
@@ -92,7 +91,6 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       if (index < brokerConfig.brokerId) {
         // Note: index == -1 is also the right condition
         log.debug(s"The connection from $remote is incoming connection")
-        val name = BaseActor.envalidActorName(s"InboundBrokerHandler-$remote")
         val props =
           InboundBrokerHandler.props(cliqueInfo,
                                      remote,
@@ -101,7 +99,7 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
                                      allHandlers,
                                      ActorRefT[CliqueManager.Command](self),
                                      blockFlowSynchronizer)
-        context.actorOf(props, name)
+        context.actorOf(props)
         ()
       }
     case CliqueManager.HandShaked(brokerInfo, _) =>
