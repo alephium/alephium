@@ -17,11 +17,14 @@
 package org.alephium.protocol
 
 import org.alephium.protocol.vm.GasBox
+import org.alephium.util.{Duration, U256}
 import org.alephium.util.Bytes.byteStringOrdering
-import org.alephium.util.U256
 
 package object model {
   val cliqueIdLength: Int = PublicKey.length
+
+  // TODO: use proper lockup period before mainnet launch
+  val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(1)
 
   //scalastyle:off magic.number
   // TODO: improve gas mechanism

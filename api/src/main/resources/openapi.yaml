@@ -754,6 +754,7 @@ paths:
                 $ref: '#/components/schemas/Balance'
               example:
                 balance: 1000000000000000000
+                lockedBalance: 500000000000000000
                 utxoNum: 3
         default:
           description: ''
@@ -1632,10 +1633,14 @@ components:
     Balance:
       required:
       - balance
+      - lockedBalance
       - utxoNum
       type: object
       properties:
         balance:
+          type: integer
+          format: uint256
+        lockedBalance:
           type: integer
           format: uint256
         utxoNum:

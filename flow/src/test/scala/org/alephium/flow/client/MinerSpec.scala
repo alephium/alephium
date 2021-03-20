@@ -46,7 +46,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val allHandlers: AllHandlers =
       AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref), "")
 
-    val miner = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
+    val miner = system.actorOf(
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.Start
     flowHandler.expectMsgType[FlowHandler.SetHandler]
@@ -68,7 +69,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
   it should "ignore handled mining result when it's stopped" in {
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val (allHandlers, _) = TestUtils.createBlockHandlersProbe
-    val miner            = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
+    val miner = system.actorOf(
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
 
     miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
   }
@@ -77,7 +79,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val groupConfig      = config.broker
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val (allHandlers, _) = TestUtils.createBlockHandlersProbe
-    val miner            = system.actorOf(Miner.props(config.minerAddresses, blockFlow, allHandlers))
+    val miner = system.actorOf(
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
 
     miner
       .ask(Miner.GetAddresses)

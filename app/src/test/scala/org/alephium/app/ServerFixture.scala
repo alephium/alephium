@@ -62,7 +62,7 @@ trait ServerFixture
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
   lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
-  lazy val dummyBalance         = Balance(U256.Zero, 0)
+  lazy val dummyBalance         = Balance(U256.Zero, U256.Zero, 0)
   lazy val dummyGroup           = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
@@ -170,8 +170,8 @@ object ServerFixture {
       Right(AVector((block.header, 1)))
     }
 
-    override def getBalance(lockupScript: LockupScript): IOResult[(U256, Int)] =
-      Right((U256.Zero, 0))
+    override def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] =
+      Right((U256.Zero, U256.Zero, 0))
 
     override def prepareUnsignedTx(fromKey: PublicKey,
                                    toLockupScript: LockupScript,

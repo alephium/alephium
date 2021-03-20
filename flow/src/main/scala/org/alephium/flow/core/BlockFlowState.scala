@@ -295,23 +295,35 @@ trait BlockFlowState extends FlowTipsUtil {
     case _: ContractOutput => false
   }
 
-  def getUtxos(lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+  def getPersistedUtxos(
+      lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val groupIndex = lockupScript.groupIndex
-    val currentTs  = TimeStamp.now()
     assume(brokerConfig.contains(groupIndex))
 
     for {
       bestWorldState <- getBestPersistedWorldState(groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
-        .map(_.filter(p => ableToUse(p._2, lockupScript, currentTs)))
+        .map(_.filter(p => p._2.lockupScript == lockupScript))
     } yield persistedUtxos
   }
 
-  def getBalance(lockupScript: LockupScript): IOResult[(U256, Int)] = {
-    getUtxos(lockupScript).map { utxos =>
+  def getUsableUtxos(
+      lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+    val currentTs = TimeStamp.now()
+    getPersistedUtxos(lockupScript).map(_.filter(p => p._2.lockTime <= currentTs))
+  }
+
+  // return the total balance, the locked balance, and the number of all utxos
+  def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] = {
+    val currentTs = TimeStamp.now()
+    getPersistedUtxos(lockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
-      (balance, utxos.length)
+      val lockedBalance = utxos.fold(U256.Zero) {
+        case (acc, (_, output)) =>
+          if (output.lockTime > currentTs) acc addUnsafe output.amount else acc
+      }
+      (balance, lockedBalance, utxos.length)
     }
   }
 
@@ -340,7 +352,7 @@ trait BlockFlowState extends FlowTipsUtil {
                         amount: U256): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
-    getUtxos(fromLockupScript).map { utxos =>
+    getUsableUtxos(fromLockupScript).map { utxos =>
       for {
         selected <- UtxoUtils.select(utxos,
                                      amount,

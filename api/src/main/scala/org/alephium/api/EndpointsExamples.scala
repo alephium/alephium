@@ -106,7 +106,7 @@ trait EndpointsExamples {
     simpleExample(blockEntry)
 
   implicit val balanceExamples: List[Example[Balance]] =
-    simpleExample(Balance(balance, utxoNum = 3))
+    simpleExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3))
 
   implicit val groupExamples: List[Example[Group]] =
     simpleExample(Group(group = 2))

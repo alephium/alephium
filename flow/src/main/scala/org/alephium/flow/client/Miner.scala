@@ -36,16 +36,19 @@ import org.alephium.util._
 
 object Miner {
   def props(node: Node)(implicit config: AlephiumConfig): Props =
-    props(config.minerAddresses, node.blockFlow, node.allHandlers)(config.broker,
-                                                                   config.consensus,
-                                                                   config.mining)
+    props(config.network.networkType, config.minerAddresses, node.blockFlow, node.allHandlers)(
+      config.broker,
+      config.consensus,
+      config.mining)
 
-  def props(addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
-      implicit brokerConfig: BrokerConfig,
-      emissionConfig: EmissionConfig,
-      miningConfig: MiningSetting): Props = {
+  def props(networkType: NetworkType,
+            addresses: AVector[LockupScript],
+            blockFlow: BlockFlow,
+            allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
+                                      emissionConfig: EmissionConfig,
+                                      miningConfig: MiningSetting): Props = {
     require(validateAddresses(addresses))
-    Props(new Miner(addresses, blockFlow, allHandlers))
+    Props(new Miner(networkType, addresses, blockFlow, allHandlers))
   }
 
   sealed trait Command
@@ -103,10 +106,12 @@ object Miner {
   }
 }
 
-class Miner(var addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandlers: AllHandlers)(
-    implicit val brokerConfig: BrokerConfig,
-    val emissionConfig: EmissionConfig,
-    val miningConfig: MiningSetting)
+class Miner(networkType: NetworkType,
+            var addresses: AVector[LockupScript],
+            blockFlow: BlockFlow,
+            allHandlers: AllHandlers)(implicit val brokerConfig: BrokerConfig,
+                                      val emissionConfig: EmissionConfig,
+                                      val miningConfig: MiningSetting)
     extends BaseActor
     with MinerState {
   val handlers = allHandlers
@@ -146,8 +151,11 @@ class Miner(var addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandl
           val miningCount = getMiningCount(fromShift, to)
           val txCount     = block.transactions.length
           log.debug(s"MiningCounts: $countsToString")
+          val minerAddress =
+            Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
           log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, miningCount: $miningCount, target: ${block.header.target}")
+            s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
+              s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress")
         case None =>
           setIdle(fromShift, to)
           startNewTasks()
@@ -161,13 +169,13 @@ class Miner(var addresses: AVector[LockupScript], blockFlow: BlockFlow, allHandl
       updateTasks()
       setIdle(fromShift, to)
       startNewTasks()
-
   }
 
   def handleAddresses: Receive = {
     case Miner.UpdateAddresses(newAddresses) => {
       if (Miner.validateAddresses(newAddresses)) {
         addresses = newAddresses
+        updateTasks()
       } else {
         log.debug(s"Invalid new miner addresses: $newAddresses")
       }

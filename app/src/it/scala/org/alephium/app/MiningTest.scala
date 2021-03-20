@@ -42,14 +42,14 @@ class MiningTest extends AlephiumSpec {
     confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - transferAmount - defaultGasFee, 1)
+        Balance(initialBalance.balance - transferAmount - defaultGasFee, 0, 1)
     }
 
     val tx2 = transferFromWallet(transferAddress, transferAmount, restPort)
     confirmTx(tx2, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 1)
+        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 0, 1)
     }
 
     selfClique.peers.foreach { peer =>

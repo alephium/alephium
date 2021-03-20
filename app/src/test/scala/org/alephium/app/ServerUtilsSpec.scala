@@ -56,8 +56,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       block0.chainIndex is chainIndex
@@ -65,16 +65,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 1)
+        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
 
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 2, 2, 2)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 1)
+        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
     }
   }
 
@@ -114,32 +114,32 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       block0.chainIndex is chainIndex
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 1)
+        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
 
       val block2 = emptyBlock(blockFlow, ChainIndex(chainIndex.to, chainIndex.to))
       addAndCheck(blockFlow, block2)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 1)
+        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
     }
   }
 }

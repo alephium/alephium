@@ -18,10 +18,10 @@ package org.alephium.api.model
 
 import org.alephium.util.U256
 
-final case class Balance(balance: U256, utxoNum: Int)
+final case class Balance(balance: U256, lockedBalance: U256, utxoNum: Int)
 
 object Balance {
-  def apply(balance_utxoNum: (U256, Int)): Balance = {
-    Balance(balance_utxoNum._1, balance_utxoNum._2)
+  def apply(balance_locked_utxoNum: (U256, U256, Int)): Balance = {
+    Balance(balance_locked_utxoNum._1, balance_locked_utxoNum._2, balance_locked_utxoNum._3)
   }
 }

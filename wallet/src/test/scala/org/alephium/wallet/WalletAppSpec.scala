@@ -273,7 +273,7 @@ object WalletAppSpec extends {
         } ~
         path("addresses" / Segment / "balance") { _ =>
           get {
-            complete(Balance(42, 1))
+            complete(Balance(42, 21, 1))
           }
         }
 

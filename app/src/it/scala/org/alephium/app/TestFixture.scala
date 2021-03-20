@@ -85,7 +85,7 @@ trait TestFixtureLike
 
   val password = "password"
 
-  val initialBalance = Balance(genesisBalance, 1)
+  val initialBalance = Balance(genesisBalance, 0, 1)
   val transferAmount = ALF.alf(1)
 
   val usedPort = mutable.Set.empty[Int]
