@@ -207,7 +207,7 @@ object Transaction {
     val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
-    val lockTime     = blockTs.plusHoursUnsafe(1)
+    val lockTime     = blockTs + coinbaseLockupPeriod
 
     val txOutput =
       AssetOutput(reward.addUnsafe(gasFee),

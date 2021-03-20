@@ -124,7 +124,7 @@ trait FlowFixture
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
     val unlockScript               = UnlockScript.p2pkh(publicKey)
-    val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
     val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
     val toLockupScripts = AVector.fill(numReceivers) {
       val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
@@ -167,7 +167,7 @@ trait FlowFixture
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
-    val balances     = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val balances     = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
     val total        = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
 
     val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
@@ -188,7 +188,7 @@ trait FlowFixture
     val unlockScript               = UnlockScript.p2pkh(publicKey)
 
     val balances = {
-      val balances = blockFlow.getUtxos(fromLockupScript).toOption.get
+      val balances = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
       balances ++ balances
     }
     balances.length is 2 // this function is used in this particular case
@@ -218,7 +218,7 @@ trait FlowFixture
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
     val unlockScript               = UnlockScript.p2pkh(publicKey)
-    val balances                   = blockFlow.getUtxos(fromLockupScript).toOption.get
+    val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
     val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
 
     val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
@@ -333,14 +333,14 @@ trait FlowFixture
     val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
-      .getUtxos(pubScript)
+      .getUsableUtxos(pubScript)
       .toOption
       .get
       .sumBy(_._2.amount.v: BigInt) is expected.toBigInt
   }
 
   def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U256): Assertion = {
-    blockFlow.getUtxos(pubScript).toOption.get.sumBy(_._2.amount.v: BigInt) is expected.v
+    blockFlow.getUsableUtxos(pubScript).toOption.get.sumBy(_._2.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -366,7 +366,7 @@ trait FlowFixture
   def getBalance(blockFlow: BlockFlow, address: PublicKey): U256 = {
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
-    val query = blockFlow.getUtxos(lockupScript)
+    val query = blockFlow.getUsableUtxos(lockupScript)
     U256.unsafe(query.toOption.get.sumBy(_._2.amount.v: BigInt).underlying())
   }
 
@@ -377,7 +377,7 @@ trait FlowFixture
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUtxos(pubScript).toOption.get.map(_._2)
+    val txOutputs = blockFlow.getUsableUtxos(pubScript).toOption.get.map(_._2)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 

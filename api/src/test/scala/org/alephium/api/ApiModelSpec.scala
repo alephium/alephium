@@ -175,8 +175,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Balance" in {
-    val response = Balance(100, 1)
-    val jsonRaw  = """{"balance":100,"utxoNum":1}"""
+    val response = Balance(100, 50, 1)
+    val jsonRaw  = """{"balance":100,"lockedBalance":50,"utxoNum":1}"""
     checkData(response, jsonRaw)
   }
 

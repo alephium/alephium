@@ -32,8 +32,6 @@ sealed trait LockupScript extends HashSerde[LockupScript] {
   def assetHintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
-
-  def toBase58: String = Base58.encode(serialize(this))
 }
 
 object LockupScript {
