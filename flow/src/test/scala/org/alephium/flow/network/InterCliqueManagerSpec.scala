@@ -47,18 +47,15 @@ class InterCliqueManagerSpec
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
-    interCliqueManager ! Tcp.Connected(peer, socketAddressGen.sample.get)
+    val connection = TestProbe()
+    connection.send(interCliqueManager, Tcp.Connected(peer, socketAddressGen.sample.get))
 
     eventually {
-      val name    = BaseActor.envalidActorName(s"InboundBrokerHandler-$peer")
-      val inbound = getActor(name)(system.dispatcher).futureValue
-
-      inbound.isDefined is true
-
-      interCliqueManager ! CliqueManager.HandShaked(peerInfo, InboundConnection)
+      connection.send(interCliqueManager, CliqueManager.HandShaked(peerInfo, InboundConnection))
       getPeers() is Seq(peer)
 
-      system.stop(inbound.get)
+      interCliqueManagerActor.brokers(peerInfo.peerId).actor.ref is connection.ref
+      system.stop(connection.ref)
     }
 
     discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peer))
@@ -73,15 +70,11 @@ class InterCliqueManagerSpec
     interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
 
     eventually {
-      val name     = BaseActor.envalidActorName(s"OutboundBrokerHandler-$peerInfo")
-      val outbound = getActor(name)(system.dispatcher).futureValue
-
-      outbound.isDefined is true
-
-      interCliqueManager ! CliqueManager.HandShaked(peerInfo, InboundConnection)
+      val connection = getActor("*")(system.dispatcher).futureValue.get
+      interCliqueManager.tell(CliqueManager.HandShaked(peerInfo, OutboundConnection), connection)
       getPeers() is Seq(peer)
 
-      system.stop(outbound.get)
+      system.stop(connection)
     }
 
     discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peerInfo.address))
