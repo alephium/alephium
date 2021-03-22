@@ -192,8 +192,9 @@ object WalletServer {
   import WalletApiError._
   def toApiError(walletError: WalletError): WalletApiError = {
 
-    val badRequest   = BadRequest(walletError.message)
-    val unauthorized = Unauthorized(walletError.message)
+    def badRequest                 = BadRequest(walletError.message)
+    def unauthorized               = Unauthorized(walletError.message)
+    def notFound(filename: String) = NotFound(filename)
 
     walletError match {
       case _: InvalidWalletName         => badRequest
@@ -202,6 +203,7 @@ object WalletServer {
       case _: UnknownAddress            => badRequest
       case InvalidWalletFile            => badRequest
       case UnexpectedError              => badRequest
+      case WalletNotFound(file)         => notFound(file.getName())
 
       case WalletLocked        => unauthorized
       case InvalidPassword     => unauthorized

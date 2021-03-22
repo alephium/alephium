@@ -76,14 +76,15 @@ object WalletService {
 
   object WalletError {
     def from(error: SecretStorage.Error): WalletError = error match {
-      case SecretStorage.Locked                  => WalletLocked
-      case SecretStorage.CannotDeriveKey         => UnexpectedError
-      case SecretStorage.CannotParseFile         => InvalidWalletFile
-      case SecretStorage.SecretFileError         => InvalidWalletFile
-      case SecretStorage.SecretFileAlreadyExists => InvalidWalletFile
-      case SecretStorage.CannotDecryptSecret     => InvalidPassword
-      case SecretStorage.InvalidState            => UnexpectedError
-      case SecretStorage.UnknownKey              => UnexpectedError
+      case SecretStorage.Locked                   => WalletLocked
+      case SecretStorage.CannotDeriveKey          => UnexpectedError
+      case SecretStorage.CannotParseFile          => InvalidWalletFile
+      case SecretStorage.SecretFileError          => InvalidWalletFile
+      case SecretStorage.SecretFileAlreadyExists  => InvalidWalletFile
+      case SecretStorage.CannotDecryptSecret      => InvalidPassword
+      case SecretStorage.InvalidState             => UnexpectedError
+      case SecretStorage.UnknownKey               => UnexpectedError
+      case SecretStorage.SecretFileNotFound(file) => WalletNotFound(file)
     }
   }
 
@@ -117,6 +118,10 @@ object WalletService {
 
   case object UnexpectedError extends WalletError {
     val message: String = s"Unexpected error"
+  }
+
+  final case class WalletNotFound(file: File) extends WalletError {
+    val message: String = s"Wallet ${file.getName()} not found"
   }
 
   final case class BlockFlowClientError(message: String) extends WalletError

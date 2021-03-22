@@ -16,13 +16,16 @@
 
 package org.alephium.wallet.service
 
+import java.io.File
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.util.{AlephiumSpec, Duration, Random}
+import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AlephiumSpec, Duration, Random, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -95,6 +98,27 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     walletService.getAddresses(walletName).isRight is true
   }
 
+  it should "return Not Found if wallet doesn't exist" in new Fixure {
+    import WalletService.WalletNotFound
+
+    val walletName = "wallet"
+    val notFound   = WalletNotFound(new File(tempSecretDir.toString, walletName))
+    val address =
+      Address(NetworkType.Devnet,
+              LockupScript.fromBase58("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get)
+
+    walletService.unlockWallet(walletName, "").leftValue is notFound
+    walletService.getBalances(walletName).futureValue.leftValue is notFound
+    walletService.getAddresses(walletName).leftValue is notFound
+    walletService.getMinerAddresses(walletName).leftValue is notFound
+    walletService.transfer(walletName, address, U256.Zero).futureValue.leftValue is notFound
+    walletService.deriveNextAddress(walletName).leftValue is notFound
+    walletService.deriveNextMinerAddresses(walletName).leftValue is notFound
+    walletService.changeActiveAddress(walletName, address).leftValue is notFound
+
+    //We curently  do an optimist lock
+    walletService.lockWallet(walletName) isE ()
+  }
   trait Fixure extends WalletConfigFixture {
 
     val password     = "password"
