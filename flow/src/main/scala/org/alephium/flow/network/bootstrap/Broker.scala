@@ -96,7 +96,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
     case Tcp.CommandFailed(c: Tcp.Connect) =>
       val current = TimeStamp.now()
       if (current isBefore until) {
-        scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(2))
+        scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(1))
         ()
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the system")
