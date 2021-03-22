@@ -35,8 +35,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
 
     val bindAddress = SocketUtil.temporaryServerAddress()
     val controller =
-      TestActorRef[TcpController](
-        TcpController.props(bindAddress, discoveryServer.ref, misbehaviorManager.ref))
+      TestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
     val controllerActor = controller.underlyingActor
 
     controller ! TcpController.Start(bootstrapper.ref)
@@ -113,8 +112,10 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     }
   }
 
-  it should "notice the discovery server in case of command failed " in new Fixture {
-    controller ! Tcp.CommandFailed(Tcp.Connect(bindAddress))
-    discoveryServer.expectMsg(DiscoveryServer.Remove(bindAddress))
+  it should "forward connection failure" in new Fixture {
+    val freeAddress = SocketUtil.temporaryServerAddress()
+    val probe       = TestProbe()
+    controller ! TcpController.ConnectTo(freeAddress, probe.ref)
+    probe.expectMsgType[Tcp.CommandFailed]
   }
 }
