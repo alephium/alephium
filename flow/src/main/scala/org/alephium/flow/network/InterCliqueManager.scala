@@ -65,7 +65,7 @@ object InterCliqueManager {
     }
   }
 
-  final case class PeerDisconnected(peer: InetSocketAddress) extends EventStream.Event
+  final case class PeerDisconnected(peer: InetSocketAddress)
 }
 
 class InterCliqueManager(selfCliqueInfo: CliqueInfo,

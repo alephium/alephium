@@ -92,7 +92,7 @@ object Node {
       ActorRefT
         .build[TcpController.Command](
           system,
-          TcpController.props(config.network.bindAddress, discoveryServer, misbehaviorManager))
+          TcpController.props(config.network.bindAddress, misbehaviorManager))
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())

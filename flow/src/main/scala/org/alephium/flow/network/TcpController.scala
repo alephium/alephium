@@ -22,7 +22,6 @@ import scala.collection.mutable
 
 import akka.actor.{ActorRef, Props, Stash, Terminated}
 import akka.io.{IO, Tcp}
-import akka.io.Tcp.Close
 
 import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -31,14 +30,13 @@ import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
   def props(bindAddress: InetSocketAddress,
-            discoveryServer: ActorRefT[DiscoveryServer.Command],
             misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command])(
       implicit networkSetting: NetworkSetting): Props =
-    Props(new TcpController(bindAddress, discoveryServer, misbehaviorManager))
+    Props(new TcpController(bindAddress, misbehaviorManager))
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef) extends Command
-  final case class ConnectTo(remote: InetSocketAddress, forwardTo: ActorRefT[Tcp.Command])
+  final case class ConnectTo(remote: InetSocketAddress, forwardTo: ActorRefT[Tcp.Event])
       extends Command
       with EventStream.Event
   final case class ConnectionConfirmed(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -52,7 +50,6 @@ object TcpController {
 }
 
 class TcpController(bindAddress: InetSocketAddress,
-                    discoveryServer: ActorRefT[DiscoveryServer.Command],
                     misbehaviorManager: ActorRefT[MisbehaviorManager.Command])(
     implicit networkSetting: NetworkSetting)
     extends BaseActor
@@ -61,7 +58,7 @@ class TcpController(bindAddress: InetSocketAddress,
 
   val tcpManager: ActorRef = IO(Tcp)(context.system)
 
-  val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Command]] =
+  val pendingOutboundConnections: mutable.Map[InetSocketAddress, ActorRefT[Tcp.Event]] =
     mutable.Map.empty
   val confirmedConnections: mutable.HashMap[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.HashMap.empty
@@ -112,14 +109,17 @@ class TcpController(bindAddress: InetSocketAddress,
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
-      pendingOutboundConnections -= c.remoteAddress
-      log.info(s"Failed to connect to ${c.remoteAddress} - $failure")
-      discoveryServer ! DiscoveryServer.Remove(c.remoteAddress)
+      pendingOutboundConnections.get(c.remoteAddress).foreach { forwardTo =>
+        log.debug(s"Failed to connect to ${c.remoteAddress} - $failure")
+        pendingOutboundConnections -= c.remoteAddress
+        forwardTo.forward(failure)
+      }
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
+      log.debug(s"Connection with ${connected.remoteAddress} is denied")
       pendingOutboundConnections -= connected.remoteAddress
-      connection ! Close
+      connection ! Tcp.Abort
     case TcpController.ConnectTo(remote, forwardTo) =>
       pendingOutboundConnections.update(remote, forwardTo)
       tcpManager ! Tcp.Connect(remote, pullMode = true)
