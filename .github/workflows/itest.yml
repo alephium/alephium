@@ -19,3 +19,4 @@ jobs:
           java-version: ${{ matrix.java }}
       - run: sudo apt-get install rng-tools haveged
       - run: ./make itest
+      - run: while sbt 'app/it:test'; do :; done
