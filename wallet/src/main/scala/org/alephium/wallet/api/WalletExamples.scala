@@ -102,6 +102,9 @@ trait WalletExamples {
   implicit val badRequestExamples: List[Example[WalletApiError.BadRequest]] =
     simpleExample(WalletApiError.BadRequest("Something bad in the request"))
 
+  implicit val notFoundExamples: List[Example[WalletApiError.NotFound]] =
+    simpleExample(WalletApiError.NotFound("wallet-name"))
+
   implicit val unauthorizedExamples: List[Example[WalletApiError.Unauthorized]] =
     simpleExample(WalletApiError.Unauthorized("You shall not pass"))
 }

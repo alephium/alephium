@@ -44,6 +44,8 @@ trait WalletEndpoints
       oneOf[WalletApiError](
         statusMapping(StatusCode.BadRequest,
                       jsonBody[WalletApiError.BadRequest].description("Bad request")),
+        statusMapping(StatusCode.NotFound,
+                      jsonBody[WalletApiError.NotFound].description("Not Found")),
         statusMapping(StatusCode.Unauthorized,
                       jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
       )
@@ -56,6 +58,8 @@ trait WalletEndpoints
       oneOf[WalletApiError](
         statusMapping(StatusCode.BadRequest,
                       jsonBody[WalletApiError.BadRequest].description("Bad request")),
+        statusMapping(StatusCode.NotFound,
+                      jsonBody[WalletApiError.NotFound].description("Not Found")),
         statusMapping(StatusCode.Unauthorized,
                       jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
       )

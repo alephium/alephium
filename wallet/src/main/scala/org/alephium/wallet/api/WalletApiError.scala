@@ -72,9 +72,30 @@ object WalletApiError {
                       FieldName("detail") -> Schema.schemaForString)))
   }
 
+  final case class NotFound(entity: String) extends WalletApiError {
+    final val status: StatusCode = StatusCode.NotFound
+    final val detail: String     = s"$entity not found"
+  }
+
+  object NotFound {
+    implicit val encoder: Encoder[NotFound] = new Encoder[NotFound] {
+      val baseEncoder = deriveEncoder[NotFound]
+      final def apply(notFound: NotFound): Json =
+        encodeApiError[NotFound](notFound).deepMerge(baseEncoder(notFound))
+    }
+
+    implicit val decoder: Decoder[NotFound] = deriveDecoder
+    implicit val schema: Schema[NotFound] =
+      Schema(
+        SProduct(SObjectInfo("NotFound"),
+                 List(FieldName("status") -> Schema.schemaForInt,
+                      FieldName("detail") -> Schema.schemaForString)))
+  }
+
   implicit val decoder: Decoder[WalletApiError] = new Decoder[WalletApiError] {
     def dec(c: HCursor, status: StatusCode): Decoder.Result[WalletApiError] = status match {
       case StatusCode.BadRequest   => BadRequest.decoder(c)
+      case StatusCode.NotFound     => NotFound.decoder(c)
       case StatusCode.Unauthorized => Unauthorized.decoder(c)
       case _                       => Left(DecodingFailure(s"$status not supported", c.history))
     }
@@ -88,6 +109,7 @@ object WalletApiError {
   implicit val encoder: Encoder[WalletApiError] = new Encoder[WalletApiError] {
     final def apply(apiError: WalletApiError): Json = apiError match {
       case badRequest: BadRequest     => BadRequest.encoder(badRequest)
+      case notFound: NotFound         => NotFound.encoder(notFound)
       case unauthorized: Unauthorized => Unauthorized.encoder(unauthorized)
       case _                          => encodeApiError[WalletApiError](apiError)
     }
@@ -100,6 +122,7 @@ object WalletApiError {
   implicit val schema: Schema[WalletApiError] =
     Schema.oneOf[WalletApiError, StatusCode](_.status, _.toString)(
       StatusCode.BadRequest   -> BadRequest.schema,
+      StatusCode.NotFound     -> NotFound.schema,
       StatusCode.Unauthorized -> Unauthorized.schema
     )
 }

@@ -37,6 +37,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -80,6 +90,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -140,6 +160,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -173,6 +203,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -214,6 +254,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -256,6 +306,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -306,6 +366,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -347,6 +417,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -392,6 +472,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -431,6 +521,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -475,6 +575,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -516,6 +626,16 @@ paths:
               example:
                 detail: Something bad in the request
                 status: 400
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
         '401':
           description: Unauthorized
           content:
@@ -1285,6 +1405,16 @@ components:
           type: integer
         detail:
           type: string
+    NotFound:
+      required:
+      - status
+      - detail
+      type: object
+      properties:
+        status:
+          type: integer
+        detail:
+          type: string
     Unauthorized:
       required:
       - status
@@ -1709,7 +1839,7 @@ components:
       oneOf:
       - $ref: '#/components/schemas/Confirmed'
       - $ref: '#/components/schemas/MemPooled'
-      - $ref: '#/components/schemas/NotFound'
+      - $ref: '#/components/schemas/NotFound1'
     Confirmed:
       required:
       - blockHash
@@ -1731,7 +1861,7 @@ components:
           type: integer
     MemPooled:
       type: object
-    NotFound:
+    NotFound1:
       type: object
     SendContract:
       required:
