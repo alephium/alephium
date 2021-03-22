@@ -72,9 +72,9 @@ object WalletApiError {
                       FieldName("detail") -> Schema.schemaForString)))
   }
 
-  final case class NotFound(entity: String) extends WalletApiError {
+  final case class NotFound(resource: String) extends WalletApiError {
     final val status: StatusCode = StatusCode.NotFound
-    final val detail: String     = s"$entity not found"
+    final val detail: String     = s"$resource not found"
   }
 
   object NotFound {

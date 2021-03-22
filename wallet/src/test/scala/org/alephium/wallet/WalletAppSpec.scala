@@ -27,10 +27,12 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import io.circe.Json
 import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.api.ApiModelCodec
+import org.alephium.api.CirceUtils
 import org.alephium.api.CirceUtils.avectorDecoder
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
@@ -68,7 +70,7 @@ class WalletAppSpec
   var mnemonic: Mnemonic         = _
   var addresses: model.Addresses = _
   var address: Address           = _
-  var wallet: String             = _
+  var wallet: String             = "wallet-name"
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
   val transferAmount             = 10
@@ -103,7 +105,8 @@ class WalletAppSpec
   it should "work" in {
 
     unlock() ~> check {
-      status is StatusCodes.BadRequest
+      status is StatusCodes.NotFound
+      CirceUtils.print(responseAs[Json]) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
     }
 
     create(2) ~> check {

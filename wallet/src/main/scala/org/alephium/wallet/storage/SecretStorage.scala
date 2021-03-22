@@ -16,7 +16,7 @@
 
 package org.alephium.wallet.storage
 
-import java.io.{File, PrintWriter}
+import java.io.{File, FileNotFoundException, PrintWriter}
 
 import scala.io.Source
 import scala.util.Using
@@ -60,6 +60,8 @@ object SecretStorage {
   case object SecretFileAlreadyExists extends Error
   case object UnknownKey              extends Error
 
+  final case class SecretFileNotFound(file: File) extends Error
+
   final case class StoredState(seed: ByteString,
                                isMiner: Boolean,
                                numberOfAddresses: Int,
@@ -95,9 +97,10 @@ object SecretStorage {
       } yield {
         new Impl(file, None, path)
       }
-    }.toEither.left
-      .map(_ => SecretFileError)
-      .flatten
+    }.toEither.left.map {
+      case _: FileNotFoundException => SecretFileNotFound(file)
+      case _                        => SecretFileError: Error
+    }.flatten
   }
 
   def create(seed: ByteString,
