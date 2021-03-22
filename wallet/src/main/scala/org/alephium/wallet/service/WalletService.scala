@@ -270,7 +270,7 @@ object WalletService {
     override def transfer(wallet: String,
                           address: Address,
                           amount: U256): Future[Either[WalletError, (Hash, Int, Int)]] = {
-      withPrivateKeyFut(wallet, isMinerOpt = None) { privateKey =>
+      withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
@@ -309,7 +309,7 @@ object WalletService {
 
     override def changeActiveAddress(wallet: String,
                                      address: Address): Either[WalletError, Unit] = {
-      withAnyWallet(wallet) { secretStorage =>
+      withWallet(wallet) { secretStorage =>
         withPrivateKeys(secretStorage) {
           case (_, privateKeys) =>
             (for {
@@ -324,7 +324,9 @@ object WalletService {
     override def listWallets(): Either[WalletError, AVector[(String, Boolean)]] = {
       listWalletsInSecretDir().flatMap { wallets =>
         wallets.mapE { wallet =>
-          withAnyWallet(wallet)(secret => Right(secret.isLocked())).map { locked =>
+          withWallet(wallet) { secret =>
+            Right(secret.isLocked())
+          }.map { locked =>
             (wallet, locked)
           }
         }
@@ -361,53 +363,45 @@ object WalletService {
     }
 
     private def checkIsMiner(storage: SecretStorage,
-                             isMinerOpt: Option[Boolean]): Either[WalletError, Unit] = {
+                             isMiner: Boolean): Either[WalletError, Unit] = {
       storage
         .isMiner()
         .left
         .map(WalletError.from)
         .flatMap { state =>
-          isMinerOpt match {
-            case None => Right(())
-            case Some(isMiner) =>
-              if (state == isMiner) Right(()) else Left(MinerWalletRequired)
-          }
+          if (state == isMiner) Right(()) else Left(MinerWalletRequired)
         }
     }
 
-    private def withWallet[A](wallet: String, isMinerOpt: Option[Boolean])(
+    private def withWallet[A](wallet: String)(
         f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWalletM(wallet)(storage => checkIsMiner(storage, isMinerOpt).flatMap(_ => f(storage)))(
-        Left.apply)
+      withWalletM(wallet)(storage => f(storage))(Left.apply)
     }
 
-    private def withAnyWallet[A](wallet: String)(
+    private def withSpecificWallet[A](wallet: String, isMiner: Boolean)(
         f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWallet(wallet, isMinerOpt = None)(f)
+      withWalletM(wallet)(storage => checkIsMiner(storage, isMiner).flatMap(_ => f(storage)))(
+        Left.apply)
     }
 
     private def withUserWallet[A](wallet: String)(
         f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWallet(wallet, isMinerOpt = Some(false))(f)
+      withSpecificWallet(wallet, isMiner = false)(f)
     }
 
     private def withMinerWallet[A](wallet: String)(
         f: SecretStorage => Either[WalletError, A]): Either[WalletError, A] = {
-      withWallet(wallet, isMinerOpt = Some(true))(f)
+      withSpecificWallet(wallet, isMiner = true)(f)
     }
 
-    private def withWalletFut[A](wallet: String, isMinerOpt: Option[Boolean])(
+    private def withWalletFut[A](wallet: String)(
         f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] = {
-      withWalletM(wallet)(storage =>
-        checkIsMiner(storage, isMinerOpt) match {
-          case Left(error) => Future.successful(Left(error))
-          case Right(_)    => f(storage)
-      })(error => Future.successful(Left(error)))
+      withWalletM(wallet)(storage => f(storage))(error => Future.successful(Left(error)))
     }
 
-    private def withPrivateKeyFut[A](wallet: String, isMinerOpt: Option[Boolean])(
+    private def withPrivateKeyFut[A](wallet: String)(
         f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withWalletFut(wallet, isMinerOpt)(_.getCurrentPrivateKey() match {
+      withWalletFut(wallet)(_.getCurrentPrivateKey() match {
         case Left(error)       => Future.successful(Left(WalletError.from(error)))
         case Right(privateKey) => f(privateKey)
       })

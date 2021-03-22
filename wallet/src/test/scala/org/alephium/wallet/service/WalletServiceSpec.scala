@@ -25,7 +25,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, Duration, Random, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Random, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -119,6 +119,25 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     //We curently  do an optimist lock
     walletService.lockWallet(walletName) isE ()
   }
+
+  it should "list all wallets even when locked" in new Fixure {
+
+    val (walletName1, _) =
+      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+    val (walletName2, _) =
+      walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
+
+    walletService
+      .listWallets()
+      .map(_.toSet) isE AVector((walletName1, false), (walletName2, false)).toSet
+
+    walletService.lockWallet(walletName1)
+
+    walletService
+      .listWallets()
+      .map(_.toSet) isE AVector((walletName1, true), (walletName2, false)).toSet
+  }
+
   trait Fixure extends WalletConfigFixture {
 
     val password     = "password"
