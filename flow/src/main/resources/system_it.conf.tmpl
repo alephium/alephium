@@ -76,9 +76,8 @@ alephium {
     coordinator-address = "127.0.0.1:9973"
     num-of-sync-blocks-limit = 128
 
-    rpc-port = 0
-    ws-port = 0
-    rest-port = 0
+    rest-port = 12973
+    ws-port = 11973
   }
 
   discovery {
@@ -92,7 +91,7 @@ alephium {
   }
 
   api {
-    network-interface = "127.0.0.1"
+    network-interface = "0.0.0.0"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
   }

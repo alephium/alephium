@@ -54,23 +54,38 @@ alephium {
   }
 
   network {
+    # Connected nodes will need to ping each other regularly
     ping-frequency = 300 second
+
+    # Timeout for establish a connection with peers
     retry-timeout = 30 second
+
+    # Buffer size for TCP writting
     connection-buffer-capacity-in-byte = 100000000
 
     upnp {
+      # Enable UPnP if your router/gateway supports it
+      # Not helpful when you run the node in cloud
       enabled = true
     }
 
+    # Network address for TCP/UDP
     bind-address = "0.0.0.0:9973"
-    external-address = null
-    internal-address  = "127.0.0.1:9973"
-    coordinator-address    = "127.0.0.1:9973"
-    num-of-sync-blocks-limit = 128
 
-    rpc-port = 0
-    ws-port = 0
-    rest-port = 0
+    # Optional public address for the other nodes to find you
+    # If the external address is not set and UPnP works, you will get your external address via your IGD
+    # If the external address is set and UPnP is enable, UPnP will be ignored
+    external-address = null
+
+    # This is the address for the other nodes of your clique to connect to you
+    # For example, your clique has 2 nodes in a same LAN, then your 2 nodes can use private addresses to connect to each other
+    internal-address  = "127.0.0.1:9973"
+
+    # Each clique has a master node with brokerId == 0, of which the internal-address is the coordinator-address
+    coordinator-address    = "127.0.0.1:9973"
+
+    rest-port = 12973
+    ws-port = 11973
   }
 
   discovery {
@@ -87,7 +102,7 @@ alephium {
   }
 
   api {
-    network-interface = "127.0.0.1"
+    network-interface = "0.0.0.0"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
   }

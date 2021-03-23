@@ -85,9 +85,8 @@ final case class NetworkSetting(
     internalAddress: InetSocketAddress,
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
-    numOfSyncBlocksLimit: Int,
-    wsPort: Int,
     restPort: Int,
+    wsPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
   val isCoordinator: Boolean = internalAddress == coordinatorAddress
@@ -177,9 +176,8 @@ object AlephiumConfig {
       internalAddress: InetSocketAddress,
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
-      numOfSyncBlocksLimit: Int,
-      wsPort: Int,
-      restPort: Int
+      restPort: Int,
+      wsPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
@@ -192,9 +190,8 @@ object AlephiumConfig {
         internalAddress,
         coordinatorAddress,
         externalAddress,
-        numOfSyncBlocksLimit,
-        wsPort,
         restPort,
+        wsPort,
         connectionBuild
       )
     }
