@@ -75,7 +75,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     config.minerAddresses is minerAddresses.map(str =>
-      Address.fromBase58(str, NetworkType.Devnet).get.lockupScript
+      Address.fromBase58(str, NetworkType.Devnet).get
     )
   }
 

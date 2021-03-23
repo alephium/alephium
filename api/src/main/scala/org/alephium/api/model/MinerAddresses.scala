@@ -16,28 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-final case class MinerAddresses(addresses: AVector[Address])
-
-object MinerAddresses {
-  def validate(
-      addresses: AVector[Address]
-  )(implicit groupConfig: GroupConfig): Either[String, MinerAddresses] = {
-    if (addresses.length != groupConfig.groups) {
-      Left(s"Wrong number of addresses, expected ${groupConfig.groups}, got ${addresses.length}")
-    } else {
-      addresses
-        .foreachWithIndexE { (address, i) =>
-          Either.cond(
-            address.lockupScript.groupIndex.value == i,
-            (),
-            s"Address ${address.toBase58} doesn't belong to group $i"
-          )
-        }
-        .map(_ => new MinerAddresses(addresses))
-    }
-  }
-}
+final case class MinerAddresses(addresses: AVector[Address]) extends AnyVal

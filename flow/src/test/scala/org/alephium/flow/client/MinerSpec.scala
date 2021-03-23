@@ -23,7 +23,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, LockupScriptGenerators}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 
@@ -88,23 +88,25 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     miner
       .ask(Miner.GetAddresses)
       .mapTo[AVector[LockupScript]]
-      .futureValue is config.minerAddresses
+      .futureValue is config.minerAddresses.map(_.lockupScript)
 
-    val lockupScripts =
-      AVector.tabulate(groupConfig.groups)(i => addressGen(GroupIndex.unsafe(i)).sample.get._1)
+    val newMinderAddresses =
+      AVector.tabulate(groupConfig.groups)(i =>
+        Address(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
+      )
 
-    miner ! Miner.UpdateAddresses(lockupScripts)
+    miner ! Miner.UpdateAddresses(newMinderAddresses)
 
     miner
       .ask(Miner.GetAddresses)
       .mapTo[AVector[LockupScript]]
-      .futureValue is lockupScripts
+      .futureValue is newMinderAddresses.map(_.lockupScript)
 
     miner ! Miner.UpdateAddresses(AVector.empty)
 
     miner
       .ask(Miner.GetAddresses)
       .mapTo[AVector[LockupScript]]
-      .futureValue is lockupScripts
+      .futureValue is newMinderAddresses.map(_.lockupScript)
   }
 }

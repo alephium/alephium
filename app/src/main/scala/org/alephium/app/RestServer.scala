@@ -186,9 +186,9 @@ class RestServer(
 
   private val minerUpdateAddressesRoute = minerUpdateAddresses.toRoute { minerAddresses =>
     Future.successful {
-      MinerAddresses
-        .validate(minerAddresses.addresses)
-        .map { addresses => miner ! Miner.UpdateAddresses(addresses.addresses.map(_.lockupScript)) }
+      Miner
+        .validateAddresses(minerAddresses.addresses)
+        .map(_ => miner ! Miner.UpdateAddresses(minerAddresses.addresses))
         .left
         .map(ApiModel.Error.server)
     }

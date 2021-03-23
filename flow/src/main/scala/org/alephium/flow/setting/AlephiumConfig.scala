@@ -34,7 +34,7 @@ import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Block, NetworkType, Target}
+import org.alephium.protocol.model.{Address, Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
@@ -141,7 +141,7 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     genesisBalances: AVector[(LockupScript, U256)],
-    minerAddresses: AVector[LockupScript]
+    minerAddresses: AVector[Address]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -197,7 +197,6 @@ object AlephiumConfig {
         restPort,
         connectionBuild
       )
-
     }
   }
 

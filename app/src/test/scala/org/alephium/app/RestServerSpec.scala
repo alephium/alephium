@@ -212,8 +212,8 @@ class RestServerSpec
     val entity = HttpEntity(ContentTypes.`application/json`, body)
 
     Put(s"/miners/addresses", entity) ~> server.route ~> check {
-      val lockupScripts = newAddresses.map(Address.extractLockupScript(_).get)
-      minerProbe.expectMsg(Miner.UpdateAddresses(lockupScripts))
+      val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
+      minerProbe.expectMsg(Miner.UpdateAddresses(addresses))
       status is StatusCodes.OK
     }
 

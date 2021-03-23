@@ -27,7 +27,6 @@ import pureconfig.error._
 import org.alephium.crypto.Sha256
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Duration, Hex}
 
 object PureConfigUtils {
@@ -102,10 +101,10 @@ object PureConfigUtils {
       minerAddressesOpt: Option[Seq[String]],
       networkType: NetworkType,
       brokerConfig: BrokerConfig
-  ): Either[FailureReason, AVector[LockupScript]] = {
+  ): Either[FailureReason, AVector[Address]] = {
     minerAddressesOpt match {
       case Some(minerAddresses) =>
-        AVector.from(minerAddresses).mapE(parseLockupScript(_, networkType))
+        AVector.from(minerAddresses).mapE(parseAddresses(_, networkType))
       case None => generateMiners(networkType, brokerConfig)
     }
   }
@@ -113,7 +112,7 @@ object PureConfigUtils {
   private def generateMiners(
       networkType: NetworkType,
       brokerConfig: BrokerConfig
-  ): Either[FailureReason, AVector[LockupScript]] = {
+  ): Either[FailureReason, AVector[Address]] = {
     networkType match {
       case NetworkType.Mainnet =>
         Left(
@@ -121,22 +120,22 @@ object PureConfigUtils {
             new Throwable(s"`miner-addresses` field is mandatory for ${networkType.name}")
           )
         )
-      case _ =>
+      case networkType =>
         Right {
           AVector.tabulate(brokerConfig.groups) { i =>
             val index          = GroupIndex.unsafe(i)(brokerConfig)
             val (_, publicKey) = index.generateKey(brokerConfig)
-            LockupScript.p2pkh(publicKey)
+            Address.p2pkh(networkType, publicKey)
           }
         }
     }
   }
 
-  private def parseLockupScript(
+  private def parseAddresses(
       rawAddress: String,
       networkType: NetworkType
-  ): Either[FailureReason, LockupScript] = {
-    Address.fromBase58(rawAddress, networkType).map(_.lockupScript).toRight {
+  ): Either[FailureReason, Address] = {
+    Address.fromBase58(rawAddress, networkType).toRight {
       CannotConvert(rawAddress, "Address", "Invalid base58 or network-type")
     }
   }

@@ -21,6 +21,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 import akka.actor.Props
+import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
@@ -34,7 +35,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
-object Miner {
+object Miner extends LazyLogging {
   def props(node: Node)(implicit config: AlephiumConfig): Props =
     props(config.network.networkType, config.minerAddresses, node.blockFlow, node.allHandlers)(
       config.broker,
@@ -44,7 +45,7 @@ object Miner {
 
   def props(
       networkType: NetworkType,
-      addresses: AVector[LockupScript],
+      addresses: AVector[Address],
       blockFlow: BlockFlow,
       allHandlers: AllHandlers
   )(implicit
@@ -52,8 +53,14 @@ object Miner {
       emissionConfig: EmissionConfig,
       miningConfig: MiningSetting
   ): Props = {
-    require(validateAddresses(addresses))
-    Props(new Miner(networkType, addresses, blockFlow, allHandlers))
+    validateAddresses(addresses) match {
+      case Left(error) =>
+        logger.error(s"Invalid miner addresses: $addresses, due to $error")
+        sys.exit(1)
+      case _ => ()
+    }
+
+    Props(new Miner(networkType, addresses.map(_.lockupScript), blockFlow, allHandlers))
   }
 
   sealed trait Command
@@ -64,7 +71,7 @@ object Miner {
   final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
   final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
       extends Command
-  final case class UpdateAddresses(addresses: AVector[LockupScript]) extends Command
+  final case class UpdateAddresses(addresses: AVector[Address]) extends Command
 
   def mine(index: ChainIndex, template: BlockTemplate)(implicit
       groupConfig: GroupConfig,
@@ -104,10 +111,20 @@ object Miner {
   }
 
   def validateAddresses(
-      addresses: AVector[LockupScript]
-  )(implicit groupConfig: GroupConfig): Boolean = {
-    (addresses.length == groupConfig.groups) &&
-    addresses.forallWithIndex { (lockupScript, i) => lockupScript.groupIndex.value == i }
+      addresses: AVector[Address]
+  )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
+    if (addresses.length != groupConfig.groups) {
+      Left(s"Wrong number of addresses, expected ${groupConfig.groups}, got ${addresses.length}")
+    } else {
+      addresses
+        .foreachWithIndexE { (address, i) =>
+          if (address.lockupScript.groupIndex.value == i) {
+            Right(())
+          } else {
+            Left(s"Address ${address.toBase58} doesn't belong to group $i")
+          }
+        }
+    }
   }
 }
 
@@ -182,11 +199,12 @@ class Miner(
 
   def handleAddresses: Receive = {
     case Miner.UpdateAddresses(newAddresses) => {
-      if (Miner.validateAddresses(newAddresses)) {
-        addresses = newAddresses
-        updateTasks()
-      } else {
-        log.debug(s"Invalid new miner addresses: $newAddresses")
+      Miner.validateAddresses(newAddresses) match {
+        case Right(_) =>
+          addresses = newAddresses.map(_.lockupScript)
+          updateTasks()
+        case Left(error) =>
+          log.debug(s"Invalid new miner addresses: $newAddresses, due to $error")
       }
     }
     case Miner.GetAddresses => sender() ! addresses
